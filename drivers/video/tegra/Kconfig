@@ -1,0 +1,22 @@
+if ARCH_TEGRA
+
+config TEGRA_NVMAP
+	bool "Tegra GPU memory management driver"
+	select ARM_ATTRIB_ALLOCATOR
+	default y
+	help
+	  Say Y here to include the memory management driver for the Tegra
+	  GPU, multimedia and display subsystems
+
+config NVMAP_RECLAIM_UNPINNED_VM
+	bool "Allow /dev/nvmap to reclaim unpinned I/O virtual memory"
+	depends on TEGRA_NVMAP && TEGRA_IOVMM
+	default y
+	help
+	  Say Y here to enable /dev/nvmap to reclaim I/O virtual memory after
+	  it has been unpinned, and re-use it for other objects. This can
+	  allow a larger virtual I/O VM space than would normally be
+	  supported by the hardware, at a slight cost in performance.
+
+endif
+
