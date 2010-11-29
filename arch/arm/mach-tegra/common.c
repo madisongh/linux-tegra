@@ -24,6 +24,7 @@
 #include <linux/reboot.h>
 #include <linux/irqchip.h>
 #include <linux/clk-provider.h>
+#include <linux/memblock.h>
 
 #include <asm/hardware/cache-l2x0.h>
 
@@ -31,9 +32,13 @@
 #include "common.h"
 #include "fuse.h"
 #include "iomap.h"
+#include "pm.h"
 #include "pmc.h"
 #include "apbio.h"
 #include "sleep.h"
+
+unsigned long tegra_lp0_vec_start;
+unsigned long tegra_lp0_vec_size;
 
 /*
  * Storage for debug-macro.S's state.
@@ -73,7 +78,7 @@ void tegra_assert_system_reset(enum reboot_mode mode, const char *cmd)
 	writel_relaxed(reg, reset);
 }
 
-static void __init tegra_init_cache(u32 tag_latency, u32 data_latency)
+void tegra_init_cache(u32 tag_latency, u32 data_latency)
 {
 #ifdef CONFIG_CACHE_L2X0
 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
@@ -112,6 +117,31 @@ void __init tegra30_init_early(void)
 	tegra30_hotplug_init();
 }
 #endif
+
+static int __init tegra_lp0_vec_arg(char *options)
+{
+	char *p = options;
+
+	tegra_lp0_vec_size = memparse(p, &p);
+	if (*p == '@')
+		tegra_lp0_vec_start = memparse(p+1, &p);
+
+	return 0;
+}
+early_param("lp0_vec", tegra_lp0_vec_arg);
+
+void __init tegra_reserve(void)
+{
+	if (tegra_lp0_vec_size)
+		if (memblock_reserve(tegra_lp0_vec_start, tegra_lp0_vec_size))
+			pr_err("Failed to reserve lp0_vec %08lx@%08lx\n",
+				tegra_lp0_vec_size, tegra_lp0_vec_start);
+
+	pr_info("Tegra reserved memory:\n"
+		"LP0:                    %08lx - %08lx\n",
+		tegra_lp0_vec_start,
+		tegra_lp0_vec_start + tegra_lp0_vec_size - 1);
+}
 
 void __init tegra_init_late(void)
 {
