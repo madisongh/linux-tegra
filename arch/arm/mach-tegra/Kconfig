@@ -78,4 +78,9 @@ config TEGRA_THERMAL_THROTTLE
        help
          Also requires enabling a temperature sensor such as NCT1008.
 
+config TEGRA_CLOCK_DEBUG_WRITE
+	bool "Enable debugfs write access to clock tree"
+	depends on DEBUG_FS
+	default n
+
 endif
