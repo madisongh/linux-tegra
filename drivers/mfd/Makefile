@@ -174,6 +174,7 @@ obj-$(CONFIG_MFD_STW481X)	+= stw481x.o
 obj-$(CONFIG_MFD_IPAQ_MICRO)	+= ipaq-micro.o
 obj-$(CONFIG_MFD_MENF21BMC)	+= menf21bmc.o
 obj-$(CONFIG_MFD_HI6421_PMIC)	+= hi6421-pmic-core.o
+obj-$(CONFIG_MFD_TPS6591X)	+= tps6591x.o
 obj-$(CONFIG_MFD_MAX8907C)	+= max8907c.o
 obj-$(CONFIG_MFD_MAX8907C)	+= max8907c-irq.o
 
