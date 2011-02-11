@@ -523,6 +523,12 @@ config VEXPRESS_SYSCFG
 	  bus. System Configuration interface is one of the possible means
 	  of generating transactions on this bus.
 
+config BCM4329_RFKILL
+	bool "Enable BCM4329 RFKILL driver"
+	default n
+	---help---
+	Adds BCM4329 RFKILL driver for Broadcom BCM4329 chipset
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

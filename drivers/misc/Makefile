@@ -57,3 +57,4 @@ obj-$(CONFIG_ECHO)		+= echo/
 obj-$(CONFIG_VEXPRESS_SYSCFG)	+= vexpress-syscfg.o
 obj-$(CONFIG_CXL_BASE)		+= cxl/
 obj-$(CONFIG_SENSORS_NCT1008)	+= nct1008.o
+obj-$(CONFIG_BCM4329_RFKILL)	+= bcm4329_rfkill.o
