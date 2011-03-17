@@ -438,10 +438,10 @@ out:
 	return wait;
 }
 
+static
 struct nvmap_heap_block *do_nvmap_carveout_alloc(struct nvmap_client *client,
-						 size_t len, size_t align,
-						 unsigned long usage,
-						 unsigned int prot)
+					      struct nvmap_handle *handle,
+					      unsigned long type)
 {
 	struct nvmap_carveout_node *co_heap;
 	struct nvmap_device *dev = client->dev;
@@ -451,13 +451,12 @@ struct nvmap_heap_block *do_nvmap_carveout_alloc(struct nvmap_client *client,
 		struct nvmap_heap_block *block;
 		co_heap = &dev->heaps[i];
 
-		if (!(co_heap->heap_bit & usage))
+		if (!(co_heap->heap_bit & type))
 			continue;
 
-		block = nvmap_heap_alloc(co_heap->carveout, len, align, prot);
-		if (block) {
+		block = nvmap_heap_alloc(co_heap->carveout, handle);
+		if (block)
 			return block;
-		}
 	}
 	return NULL;
 }
@@ -469,9 +468,8 @@ static bool nvmap_carveout_freed(int count)
 }
 
 struct nvmap_heap_block *nvmap_carveout_alloc(struct nvmap_client *client,
-					      size_t len, size_t align,
-					      unsigned long usage,
-					      unsigned int prot)
+					      struct nvmap_handle *handle,
+					      unsigned long type)
 {
 	struct nvmap_heap_block *block;
 	struct nvmap_carveout_node *co_heap;
@@ -482,8 +480,7 @@ struct nvmap_heap_block *nvmap_carveout_alloc(struct nvmap_client *client,
 	int count = 0;
 
 	do {
-		block = do_nvmap_carveout_alloc(client, len, align,
-						usage, prot);
+		block = do_nvmap_carveout_alloc(client, handle, type);
 		if (!carveout_killer)
 			return block;
 
@@ -498,11 +495,11 @@ struct nvmap_heap_block *nvmap_carveout_alloc(struct nvmap_client *client,
 				task_comm[0] = 0;
 			pr_info("%s: failed to allocate %u bytes for "
 				"process %s, firing carveout "
-				"killer!\n", __func__, len, task_comm);
+				"killer!\n", __func__, handle->size, task_comm);
 
 		} else {
 			pr_info("%s: still can't allocate %u bytes, "
-				"attempt %d!\n", __func__, len, count);
+				"attempt %d!\n", __func__, handle->size, count);
 		}
 
 		/* shrink carveouts that matter and try again */
@@ -510,7 +507,7 @@ struct nvmap_heap_block *nvmap_carveout_alloc(struct nvmap_client *client,
 			int count;
 			co_heap = &dev->heaps[i];
 
-			if (!(co_heap->heap_bit & usage))
+			if (!(co_heap->heap_bit & type))
 				continue;
 
 			count = wait_count;
@@ -1170,6 +1167,8 @@ static int nvmap_probe(struct platform_device *pdev)
 	for (i = 0; i < plat->nr_carveouts; i++) {
 		struct nvmap_carveout_node *node = &dev->heaps[i];
 		const struct nvmap_platform_carveout *co = &plat->carveouts[i];
+		if (!co->size)
+			continue;
 		node->carveout = nvmap_heap_create(dev->dev_user.this_device,
 				   co->name, co->base, co->size,
 				   co->buddy_size, node);
