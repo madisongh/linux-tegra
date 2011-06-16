@@ -1690,6 +1690,13 @@ config SENSORS_ULTRA45
 	  This driver provides support for the Ultra45 workstation environmental
 	  sensors.
 
+config SENSORS_INA219
+	tristate "Texas Instruments INA219 POWER MONITOR SENSOR DRIVER"
+	depends on I2C
+	default n
+	help
+		Support for the TI INA219 power monitor sensor.
+
 if ACPI
 
 comment "ACPI drivers"
