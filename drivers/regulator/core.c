@@ -1817,6 +1817,7 @@ static int _regulator_do_enable(struct regulator_dev *rdev)
 	}
 
 	trace_regulator_enable(rdev_get_name(rdev));
+	_notifier_call_chain(rdev, REGULATOR_EVENT_PRE_ENABLE, NULL);
 
 	if (rdev->desc->off_on_delay) {
 		/* if needed, keep a distance of off_on_delay from last time
@@ -1863,6 +1864,7 @@ static int _regulator_do_enable(struct regulator_dev *rdev)
 
 	_regulator_enable_delay(delay);
 
+	_notifier_call_chain(rdev, REGULATOR_EVENT_POST_ENABLE, NULL);
 	trace_regulator_enable_complete(rdev_get_name(rdev));
 
 	return 0;
@@ -2486,6 +2488,10 @@ static int _regulator_do_set_voltage(struct regulator_dev *rdev,
 			return old_selector;
 	}
 
+	if (_regulator_is_enabled(rdev))
+		_notifier_call_chain(rdev, REGULATOR_EVENT_OUT_PRECHANGE,
+				     NULL);
+
 	if (rdev->desc->ops->set_voltage) {
 		ret = _regulator_call_set_voltage(rdev, min_uV, max_uV,
 						  &selector);
@@ -2560,6 +2566,10 @@ static int _regulator_do_set_voltage(struct regulator_dev *rdev,
 		_notifier_call_chain(rdev, REGULATOR_EVENT_VOLTAGE_CHANGE,
 				     (void *)data);
 	}
+
+	if (_regulator_is_enabled(rdev))
+		_notifier_call_chain(rdev, REGULATOR_EVENT_OUT_POSTCHANGE,
+				     NULL);
 
 	trace_regulator_set_voltage_complete(rdev_get_name(rdev), best_val);
 
