@@ -24,6 +24,14 @@
 #include <linux/types.h>
 #include <linux/reboot.h>
 
+#define NVMAP_HEAP_CARVEOUT_IRAM_INIT	\
+	{	.name		= "iram",					\
+		.usage_mask	= NVMAP_HEAP_CARVEOUT_IRAM,			\
+		.base		= TEGRA_IRAM_BASE + TEGRA_RESET_HANDLER_SIZE,	\
+		.size		= TEGRA_IRAM_SIZE - TEGRA_RESET_HANDLER_SIZE,	\
+		.buddy_size	= 0, /* no buddy allocation for IRAM */		\
+	}
+
 void tegra_assert_system_reset(enum reboot_mode mode, const char *cmd);
 
 void __init tegra20_init_early(void);
