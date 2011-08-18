@@ -127,10 +127,11 @@ static struct attribute_group stats_attr_group = {
 static int freq_table_get_index(struct cpufreq_stats *stats, unsigned int freq)
 {
 	int index;
-	for (index = 0; index < stats->max_state; index++)
-		if (stats->freq_table[index] == freq)
-			return index;
-	return -1;
+
+	for (index = 0; index < stats->state_num; index++)
+		if (stats->freq_table[index] > freq)
+			break;
+	return index - 1; /* below lowest freq in table: return -1 */
 }
 
 static void __cpufreq_stats_free_table(struct cpufreq_policy *policy)
@@ -164,7 +165,7 @@ static void cpufreq_stats_free_table(unsigned int cpu)
 
 static int __cpufreq_stats_create_table(struct cpufreq_policy *policy)
 {
-	unsigned int i = 0, count = 0, ret = -ENOMEM;
+	unsigned int i = 0, j, k, count = 0, ret = -ENOMEM;
 	struct cpufreq_stats *stats;
 	unsigned int alloc_size;
 	unsigned int cpu = policy->cpu;
@@ -207,9 +208,19 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy)
 	stats->max_state = count;
 
 	/* Find valid-unique entries */
-	cpufreq_for_each_valid_entry(pos, table)
+	cpufreq_for_each_valid_entry(pos, table) {
 		if (freq_table_get_index(stats, pos->frequency) == -1)
 			stats->freq_table[i++] = pos->frequency;
+		/* Insert in sorted stat->freq_table */
+		for (j = 0; j < i && stats->freq_table[j] < pos->frequency; j++)
+			;
+		if (stats->freq_table[j] == pos->frequency)
+			continue;
+		for (k = i; k > j; k--)
+			stats->freq_table[k] = stats->freq_table[k - 1];
+		stats->freq_table[j] = pos->frequency;
+		i++;
+	}
 
 	stats->state_num = i;
 	stats->last_time = get_jiffies_64();
