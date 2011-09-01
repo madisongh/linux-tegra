@@ -41,10 +41,23 @@ config ARCH_TEGRA_3x_SOC
 	  Support for NVIDIA Tegra T30 processor family, based on the
 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
 
+config ARCH_TEGRA_HAS_DUAL_3D
+	bool
+
+config ARCH_TEGRA_HAS_DUAL_CPU_CLUSTERS
+	bool
+
+config ARCH_TEGRA_HAS_PCIE
+	bool
+
+config ARCH_TEGRA_HAS_SATA
+	bool
+
 config TEGRA_PCI
 	bool "PCI Express support"
 	depends on ARCH_TEGRA_2x_SOC
 	select PCI
+	depends on ARCH_TEGRA_HAS_PCIE
 
 config TEGRA_AHB
 	bool "Enable AHB driver for NVIDIA Tegra SoCs"
@@ -128,6 +141,8 @@ config TEGRA_CLOCK_DEBUG_WRITE
 
 config TEGRA_CLUSTER_CONTROL
 	bool
+	depends on ARCH_TEGRA_HAS_DUAL_CPU_CLUSTERS
+	default y if PM_SLEEP
 
 config TEGRA_AUTO_HOTPLUG
 	bool "Enable automatic CPU hot-plugging"
