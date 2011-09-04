@@ -24,6 +24,7 @@
 
 #include <linux/types.h>
 #include <linux/reboot.h>
+#include <linux/power_supply.h>
 
 #define NVMAP_HEAP_CARVEOUT_IRAM_INIT	\
 	{	.name		= "iram",					\
@@ -116,5 +117,6 @@ void tegra_get_pmu_board_info(struct board_info *bi);
 int get_core_edp(void);
 enum panel_type get_panel_type(void);
 int tegra_get_modem_id(void);
+enum power_supply_type get_power_supply_type(void);
 
 #endif
