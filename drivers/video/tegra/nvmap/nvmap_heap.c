@@ -404,6 +404,11 @@ static struct nvmap_heap_block *do_heap_alloc(struct nvmap_heap *heap,
 			fix_base = ALIGN(i->block.base, align);
 			fix_size = i->size - (fix_base - i->block.base);
 
+			/* needed for compaction. relocated chunk
+			 * should never go up */
+			if (base_max && fix_base > base_max)
+				break;
+
 			if (fix_size >= len) {
 				b = i;
 				break;
@@ -479,7 +484,7 @@ static void freelist_debug(struct nvmap_heap *heap, const char *title,
 	dev_debug(&heap->dev, "%s\n", title);
 	i = 0;
 	list_for_each_entry(n, &heap->free_list, free_list) {
-		dev_debug(&heap->dev,"\t%d [%p..%p]%s\n", i, (void *)n->orig_addr,
+		dev_debug(&heap->dev, "\t%d [%p..%p]%s\n", i, (void *)n->orig_addr,
 			  (void *)(n->orig_addr + n->size),
 			  (n == token) ? "<--" : "");
 		i++;
@@ -838,9 +843,6 @@ void nvmap_heap_free(struct nvmap_heap_block *b)
 		h = lb->heap;
 	}
 }
-
-int nvmap_flush_heap_block(struct nvmap_client *client,
-	struct nvmap_heap_block *block, size_t len, unsigned int prot);
 
 /* nvmap_heap_free: frees block b*/
 void nvmap_heap_free(struct nvmap_heap_block *b)
