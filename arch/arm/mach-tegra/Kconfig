@@ -187,4 +187,9 @@ config TEGRA_EDP_EXACT_FREQ
 	  When enabled the cpu will run at the exact frequency
 	  specified in the EDP table when EDP capping is applied; when
 	  disabled the next lower cpufreq frequency will be used.
+
+config TEGRA_THERMAL_SYSFS
+	bool "Enable Thermal driver to use Thermal Sysfs infrastructure"
+	depends on THERMAL
+	default n
 endif
