@@ -60,3 +60,10 @@ config TEGRA_EMC_SCALING_ENABLE
 	bool "Enable scaling the memory frequency"
 
 endif
+
+config TEGRA_USB_MODEM_POWER
+	bool "Enable tegra usb modem power management"
+	default n
+	help
+	  This option enables support for out-of_band remote wakeup, selective
+	  suspend and system suspend/resume.
