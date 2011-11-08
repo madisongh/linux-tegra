@@ -23,6 +23,7 @@
  */
 #define GCOV_DATA_MAGIC		((unsigned int) 0x67636461)
 #define GCOV_TAG_FUNCTION	((unsigned int) 0x01000000)
+#define GCOV_TAG_FUNCTION_LENGTH 3
 #define GCOV_TAG_COUNTER_BASE	((unsigned int) 0x01a10000)
 #define GCOV_TAG_FOR_COUNTER(count)					\
 	(GCOV_TAG_COUNTER_BASE + ((unsigned int) (count) << 17))
