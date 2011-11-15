@@ -160,6 +160,7 @@ static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
 {
 	u32 ctrl;
 
+	A
 	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
 	if ((host->mmc->caps & MMC_CAP_8_BIT_DATA) &&
 	    (bus_width == MMC_BUS_WIDTH_8)) {
@@ -173,6 +174,27 @@ static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
 			ctrl &= ~SDHCI_CTRL_4BITBUS;
 	}
 	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+}
+
+static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
+		unsigned int timing)
+{
+	u16 clk;
+
+	/* Set the UHS signaling mode */
+	sdhci_set_uhs_signaling(host, timing);
+
+	/*
+	 * Tegra SDMMC controllers support only a clock divisor of 2 in DDR
+	 * mode. No other divisors are supported.
+	 */
+	if (timing == MMC_TIMING_UHS_DDR50) {
+		clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+		clk &= ~(0xFF << SDHCI_DIVIDER_SHIFT);
+		clk |= 1 << SDHCI_DIVIDER_SHIFT;
+		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+	}
+	return 0;
 }
 
 static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
@@ -218,6 +240,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
 	.platform_suspend	= tegra_sdhci_suspend,
 	.platform_resume	= tegra_sdhci_resume,
+	.set_uhs_signaling = tegra_sdhci_set_uhs_signaling,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
