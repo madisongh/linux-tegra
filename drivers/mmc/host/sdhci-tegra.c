@@ -55,6 +55,7 @@ struct sdhci_tegra {
 	const struct sdhci_tegra_soc_data *soc_data;
 	int power_gpio;
 	bool	clk_enabled;
+	unsigned int max_clk_limit;
 };
 
 static u16 tegra_sdhci_readw(struct sdhci_host *host, int reg)
@@ -197,6 +198,30 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 	return 0;
 }
 
+static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
+	unsigned int clock)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+	unsigned int clk_rate;
+
+	/*
+	 * In ddr mode, tegra sdmmc controller clock frequency
+	 * should be double the card clock frequency.
+	 */
+	if (sdhci->mmc->card &&	mmc_card_ddr_mode(sdhci->mmc->card))
+		clk_rate = clock * 2;
+	else
+		clk_rate = clock;
+
+	if (tegra_host->max_clk_limit && (clk_rate > tegra_host->max_clk_limit))
+		clk_rate = tegra_host->max_clk_limit;
+
+	clk_set_rate(pltfm_host->clk, clk_rate);
+	sdhci->max_clk = clk_get_rate(pltfm_host->clk);
+}
+
 static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
@@ -205,10 +230,15 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	pr_debug("%s %s %u enabled=%u\n", __func__,
 		mmc_hostname(sdhci->mmc), clock, tegra_host->clk_enabled);
 
-	if (clock && !tegra_host->clk_enabled) {
-		clk_prepare_enable(pltfm_host->clk);
-		sdhci_writeb(sdhci, 1, SDHCI_VENDOR_CLOCK_CNTRL);
-		tegra_host->clk_enabled = true;
+	if (clock) {
+		tegra_sdhci_set_clk_rate(sdhci, clock);
+		if (!tegra_host->clk_enabled) {
+			clk_prepare_enable(pltfm_host->clk);
+			vendor_ctrl = sdhci_readb(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
+			vendor_ctrl |= SDHCI_VENDOR_CLOCK_CNTRL_SDMMC_CLK;
+			sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
+			tegra_host->clk_enabled = true;
+		}
 		sdhci_set_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
 		sdhci_set_clock(sdhci, 0);
@@ -235,12 +265,11 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.write_w    = tegra_sdhci_writew,
 	.set_clock  = tegra_sdhci_set_clock,
 	.set_bus_width = tegra_sdhci_set_bus_width,
+	.set_uhs_signaling = tegra_sdhci_set_uhs_signaling,
 	.reset      = tegra_sdhci_reset,
-	.set_uhs_signaling = sdhci_set_uhs_signaling,
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
 	.platform_suspend	= tegra_sdhci_suspend,
 	.platform_resume	= tegra_sdhci_resume,
-	.set_uhs_signaling = tegra_sdhci_set_uhs_signaling,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -368,6 +397,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		goto err_clk_put;
 	pltfm_host->clk = clk;
 	tegra_host->clk_enabled = true;
+	tegra_host->max_clk_limit = plat->max_clk_limit;
 
 	rc = sdhci_add_host(host);
 	if (rc)
