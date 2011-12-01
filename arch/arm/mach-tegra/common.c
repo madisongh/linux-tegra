@@ -138,7 +138,7 @@ static int debug_uart_port_id;
 static enum audio_codec_type audio_codec_name;
 static int max_cpu_current;
 
-void tegra_init_cache(u32 tag_latency, u32 data_latency)
+void tegra_init_cache(bool init)
 {
 #ifdef CONFIG_CACHE_L2X0
 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
@@ -154,8 +154,8 @@ void tegra_init_cache(u32 tag_latency, u32 data_latency)
 		tag_latency = 0x221;
 		data_latency = 0x221;
 	} else {
-		tag_latency = 0x441;
-		data_latency = 0x551;
+		tag_latency = 0x442;
+		data_latency = 0x552;
 	}
 #else
 	tag_latency = 0x770;
@@ -172,11 +172,13 @@ void tegra_init_cache(u32 tag_latency, u32 data_latency)
 #endif	
 #endif
 
-	cache_type = readl(p + L2X0_CACHE_TYPE);
-	aux_ctrl = (cache_type & 0x700) << (17-8);
-	aux_ctrl |= 0x7C400001;
+	if (init) {
+		cache_type = readl(p + L2X0_CACHE_TYPE);
+		aux_ctrl = (cache_type & 0x700) << (17-8);
+		aux_ctrl |= 0x7C400001;
 
-	l2x0_init(p, aux_ctrl, 0x8200c3fe);
+		l2x0_init(p, aux_ctrl, 0x8200c3fe);
+	}
 #endif
 }
 
@@ -257,7 +259,7 @@ void __init tegra20_init_early(void)
 #endif
 	tegra_apb_io_init();
 	tegra_init_fuse();
-	tegra_init_cache();
+	tegra_init_cache(true);
 	tegra_powergate_init();
 	tegra20_hotplug_init();
 	tegra_init_power();
@@ -275,7 +277,7 @@ void __init tegra30_init_early(void)
 #endif
 	tegra_apb_io_init();
 	tegra_init_fuse();
-	tegra_init_cache();
+	tegra_init_cache(true);
 	tegra_pmc_init();
 	tegra_powergate_init();
 	tegra30_hotplug_init();
