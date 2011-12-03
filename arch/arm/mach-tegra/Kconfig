@@ -198,7 +198,7 @@ config TEGRA_EDP_EXACT_FREQ
 config TEGRA_THERMAL_SYSFS
 	bool "Enable Thermal driver to use Thermal Sysfs infrastructure"
 	depends on THERMAL
-	default n
+	default y
 
 config TEGRA_PLLM_RESTRICTED
 	bool "Restrict PLLM usage as module clock source"
