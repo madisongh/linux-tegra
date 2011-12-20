@@ -45,6 +45,13 @@
 #define NVQUIRK_SHADOW_XFER_MODE_REG	BIT(6)
 
 #define SDHCI_VENDOR_CLOCK_CNTRL       0x100
+#define SDHCI_VENDOR_CLOCK_CNTRL_SDMMC_CLK	0x1
+#define SDHCI_VENDOR_CLOCK_CNTRL_PADPIPE_CLKEN_OVERRIDE	0x8
+#define SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_SHIFT	16
+#define SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_MASK		0xFF
+
+#define SDHCI_VENDOR_MISC_CNTRL		0x120
+#define SDHCI_VENDOR_MISC_CNTRL_SDMMC_SPARE0_ENABLE_SD_3_0	0x20
 
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
@@ -131,17 +138,42 @@ static unsigned int tegra_sdhci_get_ro(struct sdhci_host *host)
 	return mmc_gpio_get_ro(host->mmc);
 }
 
+static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
+	u8 tap_delay)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	u32 vendor_ctrl;
+
+	if ((tap_delay > SDHCI_TEGRA_MAX_TAP_VALUES) && (tap_delay < 0)){
+		dev_err(mmc_dev(sdhci->mmc), "Invalid tap value\n");
+		return -1;
+	}
+
+	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
+	vendor_ctrl &= (SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_MASK <<
+			SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_SHIFT);
+	vendor_ctrl |= (tap_delay<< SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_SHIFT);
+	sdhci_writel(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
+
+	return 0;
+}
+
 static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
 	u32 misc_ctrl;
 
 	sdhci_reset(host, mask);
 
 	if (!(mask & SDHCI_RESET_ALL))
 		return;
+
+	/* Set the tap delay value */
+	tegra_sdhci_set_tap_delay(host, plat->tap_delay);
 
 	misc_ctrl = sdhci_readw(host, SDHCI_TEGRA_VENDOR_MISC_CTRL);
 	/* Erratum: Enable SDHCI spec v3.00 support */
@@ -161,7 +193,6 @@ static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
 {
 	u32 ctrl;
 
-	A
 	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
 	if ((host->mmc->caps & MMC_CAP_8_BIT_DATA) &&
 	    (bus_width == MMC_BUS_WIDTH_8)) {
