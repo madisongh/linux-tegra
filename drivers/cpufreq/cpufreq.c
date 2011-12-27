@@ -29,6 +29,7 @@
 #include <linux/suspend.h>
 #include <linux/syscore_ops.h>
 #include <linux/tick.h>
+#include <linux/pm_qos.h>
 #include <trace/events/power.h>
 
 static LIST_HEAD(cpufreq_policy_list);
@@ -2099,8 +2100,17 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	struct cpufreq_governor *old_gov;
 	int ret;
 
-	pr_debug("setting new policy for CPU %u: %u - %u kHz\n",
-		 new_policy->cpu, new_policy->min, new_policy->max);
+	unsigned int pmin = new_policy->min;
+	unsigned int pmax = new_policy->max;
+	unsigned int qmin = pm_qos_request(PM_QOS_CPU_FREQ_MIN);
+	unsigned int qmax = pm_qos_request(PM_QOS_CPU_FREQ_MAX);
+
+	pr_debug("setting new policy for CPU %u: %u - %u (%u - %u) kHz\n",
+		 new_policy->cpu, pmin, pmax, qmin, qmax);
+
+	/* clamp the new policy to PM QoS limits */
+	new_policy->min = max(pmin, qmin);
+	new_policy->max = min(pmax, qmax);
 
 	memcpy(&new_policy->cpuinfo, &policy->cpuinfo, sizeof(policy->cpuinfo));
 
@@ -2108,13 +2118,15 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	* This check works well when we store new min/max freq attributes,
 	* because new_policy is a copy of policy with one field updated.
 	*/
-	if (new_policy->min > new_policy->max)
-		return -EINVAL;
+	if (new_policy->min > new_policy->max) {
+		ret = -EINVAL;
+		goto error_out;
+	}
 
 	/* verify the cpu speed can be set within this limit */
 	ret = cpufreq_driver->verify(new_policy);
 	if (ret)
-		return ret;
+		goto error_out;
 
 	/* adjust if necessary - all reasons */
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
@@ -2126,7 +2138,7 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	 */
 	ret = cpufreq_driver->verify(new_policy);
 	if (ret)
-		return ret;
+		goto error_out;
 
 	/* notification of the new policy */
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
@@ -2196,11 +2208,18 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 			__cpufreq_governor(policy, CPUFREQ_GOV_START);
 	}
 
+	ret = -EINVAL;
+
+error_out:
+	/* restore the limits that the policy requested */
+	new_policy->min = pmin;
+	new_policy->max = pmax;
 	return ret;
 
  out:
 	pr_debug("governor: change or update limits\n");
 	return __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS);
+
 }
 
 /**
@@ -2522,13 +2541,47 @@ static struct syscore_ops cpufreq_syscore_ops = {
 struct kobject *cpufreq_global_kobject;
 EXPORT_SYMBOL(cpufreq_global_kobject);
 
+static int cpu_freq_notify(struct notifier_block *b,
+			   unsigned long l, void *v);
+
+static struct notifier_block min_freq_notifier = {
+	.notifier_call = cpu_freq_notify,
+};
+static struct notifier_block max_freq_notifier = {
+	.notifier_call = cpu_freq_notify,
+};
+
+static int cpu_freq_notify(struct notifier_block *b,
+			   unsigned long l, void *v)
+{
+	int cpu;
+	pr_debug("PM QoS %s %lu\n",
+		b == &min_freq_notifier ? "min" : "max", l);
+	for_each_online_cpu(cpu) {
+		struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+		if (policy) {
+			cpufreq_update_policy(policy->cpu);
+			cpufreq_cpu_put(policy);
+		}
+	}
+	return NOTIFY_OK;
+}
+
 static int __init cpufreq_core_init(void)
 {
+	int rc;
+
 	if (cpufreq_disabled())
 		return -ENODEV;
 
 	cpufreq_global_kobject = kobject_create_and_add("cpufreq", &cpu_subsys.dev_root->kobj);
 	BUG_ON(!cpufreq_global_kobject);
+	rc = pm_qos_add_notifier(PM_QOS_CPU_FREQ_MIN,
+				 &min_freq_notifier);
+	BUG_ON(rc);
+	rc = pm_qos_add_notifier(PM_QOS_CPU_FREQ_MAX,
+				 &max_freq_notifier);
+	BUG_ON(rc);
 
 	register_syscore_ops(&cpufreq_syscore_ops);
 
