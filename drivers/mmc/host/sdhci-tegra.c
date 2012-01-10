@@ -165,7 +165,7 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
-	u32 misc_ctrl;
+	u32 misc_ctrl, vendor_ctrl;
 
 	sdhci_reset(host, mask);
 
@@ -174,6 +174,10 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 
 	/* Set the tap delay value */
 	tegra_sdhci_set_tap_delay(host, plat->tap_delay);
+
+	vendor_ctrl = sdhci_readl(host, SDHCI_TEGRA_VENDOR_CLOCK_CNTRL);
+	vendor_ctrl |= SDHCI_VENDOR_CLOCK_CNTRL_PADPIPE_CLKEN_OVERRIDE;
+	sdhci_writel(host, SDHCI_TEGRA_VENDOR_CLOCK_CNTRL);
 
 	misc_ctrl = sdhci_readw(host, SDHCI_TEGRA_VENDOR_MISC_CTRL);
 	/* Erratum: Enable SDHCI spec v3.00 support */
