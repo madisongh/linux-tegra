@@ -217,6 +217,9 @@ config TEGRA_WDT_RECOVERY
 	help
 	  Enables watchdog recovery mechanism to protect against
 	  suspend/resume hangs.
+
+config TEGRA_LP2_ARM_TWD
+	bool
 endif
 
 config TEGRA_SLOW_CSITE
