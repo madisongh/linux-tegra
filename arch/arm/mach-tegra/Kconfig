@@ -129,6 +129,13 @@ config TEGRA_AHB
 
 comment "Tegra board type"
 
+config MACH_BONAIRE
+       bool "Bonaire board"
+       depends on ARCH_TEGRA_12x_SOC
+       select TEGRA_FPGA_PLATFORM
+       help
+         Support for NVIDIA Bonaire FPGA development platform
+
 choice
        prompt "Tegra platform type"
        default TEGRA_SILICON_PLATFORM
