@@ -220,6 +220,9 @@ config TEGRA_WDT_RECOVERY
 
 config TEGRA_LP2_ARM_TWD
 	bool
+
+config TEGRA_RAIL_OFF_MULTIPLE_CPUS
+	bool
 endif
 
 config TEGRA_SLOW_CSITE
