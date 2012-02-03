@@ -41,6 +41,9 @@ config ARCH_TEGRA_3x_SOC
 	  Support for NVIDIA Tegra T30 processor family, based on the
 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
 
+config ARCH_TEGRA_HAS_ARM_SCU
+	bool
+
 config ARCH_TEGRA_HAS_DUAL_3D
 	bool
 
