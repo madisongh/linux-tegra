@@ -1460,7 +1460,8 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 	eld = &per_pin->sink_eld;
 
 #ifdef CONFIG_SND_HDA_TEGRA
-	if (is_tegra21x(codec)) {
+	if (is_tegra21x(codec) &&
+		(!eld->monitor_present || !eld->info.lpcm_sad_ready)) {
 		if (!eld->monitor_present) {
 			if (tegra_hdmi_setup_hda_presence() < 0) {
 				codec_warn(codec,
@@ -1468,6 +1469,8 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 				return -ENODEV;
 			}
 		}
+		if (!eld->info.lpcm_sad_ready)
+			return -ENODEV;
 	}
 #endif
 
@@ -1499,7 +1502,7 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 	hinfo->maxbps = per_cvt->maxbps;
 
 	/* Restrict capabilities by ELD if this isn't disabled */
-	if (!static_hdmi_pcm && eld->eld_valid) {
+	if (!static_hdmi_pcm && (eld->eld_valid || eld->info.lpcm_sad_ready)) {
 		snd_hdmi_eld_update_pcm_info(&eld->info, hinfo);
 		if (hinfo->channels_min > hinfo->channels_max ||
 		    !hinfo->rates || !hinfo->formats) {
@@ -1580,14 +1583,22 @@ static bool hdmi_present_sense(struct hdmi_spec_per_pin *per_pin, int repoll)
 		codec->addr, pin_nid, pin_eld->monitor_present, eld->eld_valid);
 
 	if (eld->eld_valid) {
+		memset(&eld->info, 0, sizeof(struct parsed_hdmi_eld));
+		hdmi_update_lpcm_sad_eld(codec, pin_nid, eld);
+
 		if (spec->ops.pin_get_eld(codec, pin_nid, eld->eld_buffer,
 						     &eld->eld_size) < 0)
 			eld->eld_valid = false;
 		else {
-			memset(&eld->info, 0, sizeof(struct parsed_hdmi_eld));
 			if (snd_hdmi_parse_eld(codec, &eld->info, eld->eld_buffer,
 						    eld->eld_size) < 0)
 				eld->eld_valid = false;
+		}
+
+		if (!eld->eld_valid && !pin_eld->info.lpcm_sad_ready) {
+			pin_eld->info = eld->info;
+			memcpy(pin_eld->eld_buffer, eld->eld_buffer,
+			       eld->eld_size);
 		}
 
 		if (eld->eld_valid) {

@@ -1548,8 +1548,11 @@ int snd_hda_codec_new(struct hda_bus *bus,
 	codec->epss = snd_hda_codec_get_supported_ps(codec, fg,
 					AC_PWRST_EPSS);
 #ifdef CONFIG_PM
+/* TODO: Need to check whether this is really needed for 3.18 */
+#ifndef CONFIG_SND_HDA_TEGRA
 	if (!codec->d3_stop_clk || !codec->epss)
 		bus->power_keep_link_on = 1;
+#endif
 #endif
 
 
@@ -2754,7 +2757,7 @@ typedef int (*map_slave_func_t)(struct hda_codec *, void *, struct snd_kcontrol 
 
 /* apply the function to all matching slave ctls in the mixer list */
 static int map_slaves(struct hda_codec *codec, const char * const *slaves,
-		      const char *suffix, map_slave_func_t func, void *data) 
+		      const char *suffix, map_slave_func_t func, void *data)
 {
 	struct hda_nid_item *items;
 	const char * const *s;
@@ -3482,6 +3485,44 @@ static int snd_hda_spdif_out_switch_put(struct snd_kcontrol *kcontrol,
 	return change;
 }
 
+int snd_hda_max_pcm_ch_info(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 0xFFFFFFFF;
+	return 0;
+}
+
+int snd_hda_hdmi_decode_info(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 0xFFFFFFFF;
+	return 0;
+}
+
+static int snd_hda_max_pcm_ch_get(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
+
+	ucontrol->value.integer.value[0] = codec->max_pcm_channels;
+	return 0;
+}
+
+static int snd_hda_hdmi_decode_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
+
+	ucontrol->value.integer.value[0] = codec->recv_dec_cap;
+	return 0;
+}
+
 static struct snd_kcontrol_new dig_mixes[] = {
 	{
 		.access = SNDRV_CTL_ELEM_ACCESS_READ,
@@ -3510,6 +3551,20 @@ static struct snd_kcontrol_new dig_mixes[] = {
 		.info = snd_hda_spdif_out_switch_info,
 		.get = snd_hda_spdif_out_switch_get,
 		.put = snd_hda_spdif_out_switch_put,
+	},
+	{
+		.access = SNDRV_CTL_ELEM_ACCESS_READ,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "HDA Decode Capability",
+		.info = snd_hda_hdmi_decode_info,
+		.get = snd_hda_hdmi_decode_get,
+	},
+	{
+		.access = SNDRV_CTL_ELEM_ACCESS_READ,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "HDA Maximum PCM Channels",
+		.info = snd_hda_max_pcm_ch_info,
+		.get = snd_hda_max_pcm_ch_get,
 	},
 	{ } /* end */
 };
@@ -4117,6 +4172,10 @@ static unsigned int hda_call_codec_suspend(struct hda_codec *codec, bool in_wq)
 	codec->power_jiffies = jiffies;
 	spin_unlock(&codec->power_lock);
 	codec->in_pm = 0;
+/* TODO: Need to check whether this is really needed for 3.18 */
+#ifdef CONFIG_SND_HDA_TEGRA
+	state |= AC_PWRST_CLK_STOP_OK;
+#endif
 	return state;
 }
 
