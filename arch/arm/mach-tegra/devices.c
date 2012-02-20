@@ -510,8 +510,8 @@ struct platform_device tegra_spi_device6 = {
 };
 #endif
 
-struct platform_device tegra_spi_r2_device1 = {
-	.name		= "spi_tegra_r2",
+struct platform_device tegra11_spi_device1 = {
+	.name		= "tegra11-spi",
 	.id		= 0,
 	.resource	= spi_resource1,
 	.num_resources	= ARRAY_SIZE(spi_resource1),
@@ -520,8 +520,8 @@ struct platform_device tegra_spi_r2_device1 = {
 	},
 };
 
-struct platform_device tegra_spi_r2_device2 = {
-	.name		= "spi_tegra_r2",
+struct platform_device tegra11_spi_device2 = {
+	.name		= "tegra11-spi",
 	.id		= 1,
 	.resource	= spi_resource2,
 	.num_resources	= ARRAY_SIZE(spi_resource2),
@@ -530,8 +530,8 @@ struct platform_device tegra_spi_r2_device2 = {
 	},
 };
 
-struct platform_device tegra_spi_r2_device3 = {
-	.name		= "spi_tegra_r2",
+struct platform_device tegra11_spi_device3 = {
+	.name		= "tegra11-spi",
 	.id		= 2,
 	.resource	= spi_resource3,
 	.num_resources	= ARRAY_SIZE(spi_resource3),
@@ -540,8 +540,8 @@ struct platform_device tegra_spi_r2_device3 = {
 	},
 };
 
-struct platform_device tegra_spi_r2_device4 = {
-	.name		= "spi_tegra_r2",
+struct platform_device tegra11_spi_device4 = {
+	.name		= "tegra11-spi",
 	.id		= 3,
 	.resource	= spi_resource4,
 	.num_resources	= ARRAY_SIZE(spi_resource4),
@@ -551,8 +551,8 @@ struct platform_device tegra_spi_r2_device4 = {
 };
 
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-struct platform_device tegra_spi_r2_device5 = {
-	.name           = "spi_tegra_r2",
+struct platform_device tegra11_spi_device5 = {
+	.name           = "tegra11-spi",
 	.id             = 4,
 	.resource       = spi_resource5,
 	.num_resources  = ARRAY_SIZE(spi_resource5),
@@ -561,8 +561,8 @@ struct platform_device tegra_spi_r2_device5 = {
 	},
 };
 
-struct platform_device tegra_spi_r2_device6 = {
-	.name           = "spi_tegra_r2",
+struct platform_device tegra11_spi_device6 = {
+	.name           = "tegra11-spi",
 	.id             = 5,
 	.resource       = spi_resource6,
 	.num_resources  = ARRAY_SIZE(spi_resource6),
@@ -633,8 +633,8 @@ struct platform_device tegra_spi_slave_device6 = {
 };
 #endif
 
-struct platform_device tegra_spi_r2_slave_device1 = {
-	.name           = "spi_slave_tegra_r2",
+struct platform_device tegra11_spi_slave_device1 = {
+	.name           = "tegra11-spi-slave",
 	.id             = 0,
 	.resource       = spi_resource1,
 	.num_resources  = ARRAY_SIZE(spi_resource1),
@@ -643,8 +643,8 @@ struct platform_device tegra_spi_r2_slave_device1 = {
 	},
 };
 
-struct platform_device tegra_spi_slave_r2_device2 = {
-	.name           = "spi_slave_tegra_r2",
+struct platform_device tegra11_spi_slave_device2 = {
+	.name           = "tegra11-spi-slave",
 	.id             = 1,
 	.resource       = spi_resource2,
 	.num_resources  = ARRAY_SIZE(spi_resource2),
@@ -653,8 +653,8 @@ struct platform_device tegra_spi_slave_r2_device2 = {
 	},
 };
 
-struct platform_device tegra_spi_slave_r2_device3 = {
-	.name           = "spi_slave_tegra_r2",
+struct platform_device tegra11_spi_slave_device3 = {
+	.name           = "tegra11-spi-slave",
 	.id             = 2,
 	.resource       = spi_resource3,
 	.num_resources  = ARRAY_SIZE(spi_resource3),
@@ -663,8 +663,8 @@ struct platform_device tegra_spi_slave_r2_device3 = {
 	},
 };
 
-struct platform_device tegra_spi_slave_r2_device4 = {
-	.name           = "spi_slave_tegra_r2",
+struct platform_device tegra11_spi_slave_device4 = {
+	.name           = "tegra11-spi-slave",
 	.id             = 3,
 	.resource       = spi_resource4,
 	.num_resources  = ARRAY_SIZE(spi_resource4),
@@ -672,10 +672,9 @@ struct platform_device tegra_spi_slave_r2_device4 = {
 		.coherent_dma_mask      = 0xffffffff,
 	},
 };
-
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-struct platform_device tegra_spi_slave_r2_device5 = {
-	.name           = "spi_slave_tegra_r2",
+struct platform_device tegra11_spi_slave_device5 = {
+	.name           = "tegra11-spi-slave",
 	.id             = 4,
 	.resource       = spi_resource5,
 	.num_resources  = ARRAY_SIZE(spi_resource5),
@@ -684,8 +683,8 @@ struct platform_device tegra_spi_slave_r2_device5 = {
 	},
 };
 
-struct platform_device tegra_spi_r2_slave_device6 = {
-	.name           = "spi_slave_tegra_r2",
+struct platform_device tegra11_spi_slave_device6 = {
+	.name           = "tegra11-spi-slave",
 	.id             = 5,
 	.resource       = spi_resource6,
 	.num_resources  = ARRAY_SIZE(spi_resource6),
