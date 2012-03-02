@@ -2,6 +2,7 @@
  * consumer.h -- SoC Regulator consumer support.
  *
  * Copyright (C) 2007, 2008 Wolfson Microelectronics PLC.
+ * Copyright (C) 2012 NVIDIA Corporation
  *
  * Author: Liam Girdwood <lrg@slimlogic.co.uk>
  *
@@ -438,6 +439,12 @@ static inline int regulator_can_change_voltage(struct regulator *regulator)
 	return 0;
 }
 
+static inline int regulator_list_voltage(struct regulator *regulator,
+					 unsigned selector)
+{
+	return 0;
+}
+
 static inline int regulator_set_voltage(struct regulator *regulator,
 					int min_uV, int max_uV)
 {
@@ -457,6 +464,11 @@ static inline int regulator_get_voltage(struct regulator *regulator)
 
 static inline int regulator_is_supported_voltage(struct regulator *regulator,
 				   int min_uV, int max_uV)
+{
+	return 0;
+}
+
+static inline int regulator_sync_voltage(struct regulator *regulator)
 {
 	return 0;
 }
