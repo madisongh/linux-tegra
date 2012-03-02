@@ -153,7 +153,12 @@ static int freq_table_get_index(struct cpufreq_stats *stat, unsigned int freq)
 
 static void __cpufreq_stats_free_table(struct cpufreq_policy *policy)
 {
-	struct cpufreq_stats *stat = per_cpu(cpufreq_stats_table, policy->cpu);
+	struct cpufreq_stats *stat;
+
+	spin_lock(&cpufreq_stats_lock);
+	stat = per_cpu(cpufreq_stats_table, policy->cpu);
+	per_cpu(cpufreq_stats_table, policy->cpu) = NULL;
+	spin_unlock(&cpufreq_stats_lock);
 
 	if (!stat)
 		return;
@@ -311,19 +316,23 @@ static int cpufreq_stat_notifier_trans(struct notifier_block *nb,
 	if (val != CPUFREQ_POSTCHANGE)
 		return 0;
 
+	cpufreq_stats_update(freq->cpu);
+
+	spin_lock(&cpufreq_stats_lock);
 	stat = per_cpu(cpufreq_stats_table, freq->cpu);
-	if (!stat)
+	if (!stat) {
+		spin_unlock(&cpufreq_stats_lock);
 		return 0;
+	}
 
 	old_index = stat->last_index;
 	new_index = freq_table_get_index(stat, freq->new);
 
-	cpufreq_stats_update(freq->cpu);
-
-	if (old_index == new_index)
+	if (old_index == new_index) {
+		spin_unlock(&cpufreq_stats_lock);
 		return 0;
+	}
 
-	spin_lock(&cpufreq_stats_lock);
 	stat->last_index = new_index;
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
 	if (old_index >= 0 && new_index >= 0)
