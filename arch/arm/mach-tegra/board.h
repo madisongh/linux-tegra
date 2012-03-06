@@ -36,6 +36,8 @@
 	}
 #endif
 
+struct memory_accessor;
+
 void tegra_assert_system_reset(enum reboot_mode mode, const char *cmd);
 
 void __init tegra20_init_early(void);
