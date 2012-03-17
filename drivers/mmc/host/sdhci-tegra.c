@@ -439,6 +439,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	tegra_host->clk_enabled = true;
 	tegra_host->max_clk_limit = plat->max_clk_limit;
 
+	host->mmc->pm_caps |= plat->pm_caps;
+	host->mmc->pm_flags |= plat->pm_flags;
+
 	rc = sdhci_add_host(host);
 	if (rc)
 		goto err_add_host;
