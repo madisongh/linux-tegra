@@ -2173,11 +2173,14 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 {
 	struct cpufreq_governor *old_gov;
 	int ret;
-
+	unsigned int qmin, qmax;
 	unsigned int pmin = new_policy->min;
 	unsigned int pmax = new_policy->max;
-	unsigned int qmin = min(pm_qos_request(PM_QOS_CPU_FREQ_MIN), policy->max);
-	unsigned int qmax = max(pm_qos_request(PM_QOS_CPU_FREQ_MAX), policy->min);
+
+	qmin = min((unsigned int)pm_qos_request(PM_QOS_CPU_FREQ_MIN),
+		   policy->max);
+	qmax = max((unsigned int)pm_qos_request(PM_QOS_CPU_FREQ_MAX),
+		   policy->min);
 
 	pr_debug("setting new policy for CPU %u: %u - %u (%u - %u) kHz\n",
 		 new_policy->cpu, pmin, pmax, qmin, qmax);
