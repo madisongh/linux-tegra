@@ -27,6 +27,8 @@
 #include <linux/clk/clk-conf.h>
 #include <linux/limits.h>
 
+#include <asm/dma-iommu.h>
+
 #include "base.h"
 #include "power/power.h"
 
