@@ -59,6 +59,9 @@ config ARCH_TEGRA_HAS_PCIE
 config ARCH_TEGRA_HAS_SATA
 	bool
 
+config ARCH_TEGRA_HAS_CL_DVFS
+	bool
+
 config TEGRA_PCI
 	bool "PCIe host controller driver"
 	select PCI
