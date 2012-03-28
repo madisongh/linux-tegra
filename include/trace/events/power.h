@@ -131,6 +131,27 @@ enum {
 		{ PM_EVENT_RESTORE, "restore" }, \
 		{ PM_EVENT_RECOVER, "recover" })
 
+TRACE_EVENT(cpu_hotplug,
+
+	TP_PROTO(unsigned int cpu_id, int state),
+
+	TP_ARGS(cpu_id, state),
+
+	TP_STRUCT__entry(
+		__field(u32, cpu_id)
+		__field(u32, state)
+	),
+
+	TP_fast_assign(
+		__entry->cpu_id = cpu_id;
+		__entry->state = state;
+	),
+
+	TP_printk("cpu_id=%lu, state=%lu",
+		  (unsigned long)__entry->cpu_id,
+		  (unsigned long)__entry->state)
+);
+
 DEFINE_EVENT(cpu, cpu_frequency,
 
 	TP_PROTO(unsigned int frequency, unsigned int cpu_id),
