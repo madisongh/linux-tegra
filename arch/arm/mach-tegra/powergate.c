@@ -29,6 +29,7 @@
 #include <linux/spinlock.h>
 #include <linux/clk/tegra.h>
 #include <linux/tegra-powergate.h>
+#include <trace/events/power.h>
 
 #include "clock.h"
 #include "fuse.h"
@@ -481,6 +482,9 @@ static int tegra_powergate_set(int id, bool new_state)
 		WARN(1, "Could not set powergate %d to %d", id, new_state);
 		return -EBUSY;
 	}
+
+	trace_power_domain_target(powergate_partition_info[id].name, new_state,
+			smp_processor_id());
 
 	return 0;
 }
