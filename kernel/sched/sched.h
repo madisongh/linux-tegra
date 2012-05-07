@@ -541,6 +541,10 @@ struct rq {
 #endif
 	int skip_clock_update;
 
+	/* time-based average load */
+	u64 nr_last_stamp;
+	unsigned int ave_nr_running;
+
 	/* capture load from *all* tasks on this cpu: */
 	struct load_weight load;
 	unsigned long nr_load_updates;
@@ -1223,10 +1227,36 @@ extern void update_idle_cpu_load(struct rq *this_rq);
 
 extern void init_task_runnable_average(struct task_struct *p);
 
+/* 27 ~= 134217728ns = 134.2ms
+ * 26 ~=  67108864ns =  67.1ms
+ * 25 ~=  33554432ns =  33.5ms
+ * 24 ~=  16777216ns =  16.8ms
+ */
+#define NR_AVE_PERIOD_EXP	27
+#define NR_AVE_SCALE(x)		((x) << FSHIFT)
+#define NR_AVE_PERIOD		(1 << NR_AVE_PERIOD_EXP)
+#define NR_AVE_DIV_PERIOD(x)	((x) >> NR_AVE_PERIOD_EXP)
+
+static inline void do_avg_nr_running(struct rq *rq)
+{
+	s64 nr, deltax;
+
+	deltax = rq->clock_task - rq->nr_last_stamp;
+	rq->nr_last_stamp = rq->clock_task;
+	nr = NR_AVE_SCALE(rq->nr_running);
+
+	if (deltax > NR_AVE_PERIOD)
+		rq->ave_nr_running = nr;
+	else
+		rq->ave_nr_running +=
+			NR_AVE_DIV_PERIOD(deltax * (nr - rq->ave_nr_running));
+}
+
 static inline void add_nr_running(struct rq *rq, unsigned count)
 {
 	unsigned prev_nr = rq->nr_running;
 
+	do_avg_nr_running(rq);
 	rq->nr_running = prev_nr + count;
 
 	if (prev_nr < 2 && rq->nr_running >= 2) {
@@ -1253,7 +1283,18 @@ static inline void add_nr_running(struct rq *rq, unsigned count)
 
 static inline void sub_nr_running(struct rq *rq, unsigned count)
 {
+	do_avg_nr_running(rq);
 	rq->nr_running -= count;
+}
+
+unsigned long avg_nr_running(void)
+{
+	unsigned long i, sum = 0;
+
+	for_each_online_cpu(i)
+		sum += cpu_rq(i)->ave_nr_running;
+
+	return sum;
 }
 
 static inline void rq_last_tick_reset(struct rq *rq)
