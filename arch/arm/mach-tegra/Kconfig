@@ -265,4 +265,7 @@ config TEGRA_PREPOWER_WIFI
 	default n
 	help
 	  Pre-power up the on board WiFi chip
+
+config TEGRA_DYNAMIC_CBUS
+	bool
 endif
