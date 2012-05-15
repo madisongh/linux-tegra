@@ -2120,9 +2120,9 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	unsigned int pmax = new_policy->max;
 
 	qmin = min((unsigned int)pm_qos_request(PM_QOS_CPU_FREQ_MIN),
-		   policy->max);
+		   policy->user_policy.max);
 	qmax = max((unsigned int)pm_qos_request(PM_QOS_CPU_FREQ_MAX),
-		   policy->min);
+		   policy->user_policy.min);
 
 	pr_debug("setting new policy for CPU %u: %u - %u (%u - %u) kHz\n",
 		 new_policy->cpu, pmin, pmax, qmin, qmax);
@@ -2133,11 +2133,8 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 
 	memcpy(&new_policy->cpuinfo, &policy->cpuinfo, sizeof(policy->cpuinfo));
 
-	/*
-	* This check works well when we store new min/max freq attributes,
-	* because new_policy is a copy of policy with one field updated.
-	*/
-	if (new_policy->min > new_policy->max) {
+	if (new_policy->min > policy->user_policy.max ||
+	    new_policy->max < policy->user_policy.min) {
 		ret = -EINVAL;
 		goto error_out;
 	}
