@@ -28,16 +28,17 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
+#include <linux/shrinker.h>
+#include <linux/moduleparam.h>
+#include <linux/nvmap.h>
 
 #include <asm/cacheflush.h>
 #include <asm/outercache.h>
 #include <asm/pgtable.h>
 
 #include <mach/iovmm.h>
-#include <linux/nvmap.h>
+#include <trace/events/nvmap.h>
 
-#include <linux/shrinker.h>
-#include <linux/moduleparam.h>
 #include "nvmap.h"
 #include "nvmap_mru.h"
 #include "nvmap_common.h"
@@ -738,6 +739,7 @@ int nvmap_alloc_handle_id(struct nvmap_client *client,
 	if (h->alloc)
 		goto out;
 
+	trace_nvmap_alloc_handle_id(client, id, heap_mask, align, flags);
 	h->userflags = flags;
 	nr_page = ((h->size + PAGE_SIZE - 1) >> PAGE_SHIFT);
 	h->secure = !!(flags & NVMAP_HANDLE_SECURE);
@@ -820,6 +822,7 @@ void nvmap_free_handle_id(struct nvmap_client *client, unsigned long id)
 		return;
 	}
 
+	trace_nvmap_free_handle_id(client, id);
 	BUG_ON(!ref->handle);
 	h = ref->handle;
 
@@ -920,6 +923,7 @@ struct nvmap_handle_ref *nvmap_create_handle(struct nvmap_client *client,
 	ref->handle = h;
 	atomic_set(&ref->pin, 0);
 	add_handle_ref(client, ref);
+	trace_nvmap_create_handle(client, h, size, ref);
 	return ref;
 }
 
@@ -993,5 +997,6 @@ struct nvmap_handle_ref *nvmap_duplicate_handle_id(struct nvmap_client *client,
 	ref->handle = h;
 	atomic_set(&ref->pin, 0);
 	add_handle_ref(client, ref);
+	trace_nvmap_duplicate_handle_id(client, id, ref);
 	return ref;
 }
