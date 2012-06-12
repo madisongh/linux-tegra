@@ -350,9 +350,8 @@ int nvmap_page_pool_init(struct nvmap_page_pool *pool, int flags)
 	if (pool->max_pages <= 0 || pool->max_pages >= info.totalram)
 		goto fail;
 	pool_size[flags] = pool->max_pages;
-	pr_info("nvmap %s page pool size=%d pages",
-		flags == NVMAP_HANDLE_UNCACHEABLE ? "uc" : "wc",
-		pool->max_pages);
+	pr_info("nvmap %s page pool size=%d pages\n",
+		s_memtype_str[flags], pool->max_pages);
 	pool->page_array = vmalloc(sizeof(void *) * pool->max_pages);
 	pool->shrink_array = vmalloc(sizeof(struct page *) * pool->max_pages);
 	if (!pool->page_array || !pool->shrink_array)
@@ -382,7 +381,7 @@ int nvmap_page_pool_init(struct nvmap_page_pool *pool, int flags)
 	}
 	si_meminfo(&info);
 	pr_info("nvmap pool = %s, highmem=%d, pool_size=%d,"
-		"totalram=%lu, freeram=%lu, totalhigh=%lu, freehigh=%lu",
+		"totalram=%lu, freeram=%lu, totalhigh=%lu, freehigh=%lu\n",
 		s_memtype_str[flags], highmem_pages, pool->max_pages,
 		info.totalram, info.freeram, info.totalhigh, info.freehigh);
 do_cpa:
