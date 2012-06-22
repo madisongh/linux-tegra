@@ -59,4 +59,7 @@ comment "Tegra board type"
 config TEGRA_EMC_SCALING_ENABLE
 	bool "Enable scaling the memory frequency"
 
+config TEGRA_CPUQUIET
+	bool
+
 endif
