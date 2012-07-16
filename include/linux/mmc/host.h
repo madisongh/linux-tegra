@@ -449,6 +449,9 @@ static inline int mmc_regulator_set_ocr(struct mmc_host *mmc,
 int mmc_regulator_get_supply(struct mmc_host *mmc);
 
 int mmc_pm_notify(struct notifier_block *notify_block, unsigned long, void *);
+int mmc_speed_class_control(struct mmc_host *host,
+	unsigned int speed_class_ctrl_arg);
+
 
 static inline int mmc_card_is_removable(struct mmc_host *host)
 {
