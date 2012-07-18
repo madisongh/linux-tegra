@@ -3,7 +3,7 @@
  *
  * Handle allocation and freeing routines for nvmap
  *
- * Copyright (c) 2009-2012, NVIDIA Corporation.
+ * Copyright (c) 2009-2012, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -54,7 +54,8 @@
  * the kernel (i.e., not a carveout handle) includes its array of pages. to
  * preserve kmalloc space, if the array of pages exceeds PAGELIST_VMALLOC_MIN,
  * the array is allocated using vmalloc. */
-#define PAGELIST_VMALLOC_MIN	(PAGE_SIZE * 2)
+#define PAGELIST_VMALLOC_MIN	(PAGE_SIZE)
+
 #ifdef CONFIG_NVMAP_PAGE_POOLS
 
 #define NVMAP_TEST_PAGE_POOL_SHRINKER 1
@@ -433,7 +434,7 @@ int nvmap_page_pool_get_free_count(struct nvmap_page_pool *pool)
 
 static inline void *altalloc(size_t len)
 {
-	if (len >= PAGELIST_VMALLOC_MIN)
+	if (len > PAGELIST_VMALLOC_MIN)
 		return vmalloc(len);
 	else
 		return kmalloc(len, GFP_KERNEL);
@@ -444,7 +445,7 @@ static inline void altfree(void *ptr, size_t len)
 	if (!ptr)
 		return;
 
-	if (len >= PAGELIST_VMALLOC_MIN)
+	if (len > PAGELIST_VMALLOC_MIN)
 		vfree(ptr);
 	else
 		kfree(ptr);
