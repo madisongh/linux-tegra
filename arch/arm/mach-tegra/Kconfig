@@ -258,7 +258,7 @@ config TEGRA_WDT_RECOVERY
 	  Enables watchdog recovery mechanism to protect against
 	  suspend/resume hangs.
 
-config TEGRA_LP2_ARM_TWD
+config TEGRA_LP2_CPU_TIMER
 	bool
 
 config TEGRA_RAIL_OFF_MULTIPLE_CPUS
