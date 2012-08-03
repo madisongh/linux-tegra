@@ -41,6 +41,23 @@ config ARCH_TEGRA_3x_SOC
 	  Support for NVIDIA Tegra T30 processor family, based on the
 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
 
+config TEGRA_BASEBAND
+	bool "Enable integrated tegra baseband support"
+	default n
+	help
+	  This option enables support for integrated icera baseband
+	  This driver is used to setup shared memory space, provide
+	  functions to handle IPC mechanism and a sysfs interface for IPC
+	  notification which support polling on sysfs file.
+
+config TEGRA_BASEBAND_SIMU
+	bool "Enable integrated tegra baseband simulation"
+	select TEGRA_BASEBAND
+	help
+	  This option enables tegra baseband simulation when actual hardware
+	  is not present. IPC is simulated when writing to status file which
+	  allow high level tests in local loopback
+
 config TEGRA_PCI
 	bool "PCI Express support"
 	depends on ARCH_TEGRA_2x_SOC
