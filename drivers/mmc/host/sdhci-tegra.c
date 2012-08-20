@@ -37,6 +37,7 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 
+#include <mach/hardware.h>
 #include <linux/platform_data/mmc-sdhci-tegra.h>
 
 #include "sdhci-pltfm.h"
@@ -363,6 +364,10 @@ static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
 
 	clk_set_rate(pltfm_host->clk, clk_rate);
 	sdhci->max_clk = clk_get_rate(pltfm_host->clk);
+
+	/* FPGA supports 26MHz of clock for SDMMC. */
+	if (tegra_platform_is_fpga())
+		sdhci->max_clk = 26000000;
 }
 
 static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
