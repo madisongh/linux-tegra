@@ -135,6 +135,9 @@ extern struct platform_device tegra_uartd_device;
 extern struct platform_device tegra_uarte_device;
 extern struct platform_device tegra_avp_device;
 extern struct nvhost_device nvavp_device;
+#if defined(CONFIG_TEGRA_SKIN_THROTTLE)
+extern struct platform_device tegra_skin_therm_est_device;
+#endif
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 extern struct platform_device tegra_tsensor_device;
 #endif
