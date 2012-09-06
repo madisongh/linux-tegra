@@ -19,6 +19,7 @@
 #include <linux/spinlock.h>
 #include <linux/notifier.h>
 #include <linux/types.h>
+#include <linux/errno.h>
 
 /*
  * All voltages, currents, charges, energies, time and temperatures in uV,
