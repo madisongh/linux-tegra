@@ -23,7 +23,6 @@
 
 #include <linux/platform_device.h>
 #include <linux/nvhost.h>
-#include <linux/platform_data/tegra_usb.h>
 
 extern struct platform_device tegra_emc_device;
 extern struct platform_device tegra_gpio_device;
