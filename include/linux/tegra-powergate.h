@@ -19,10 +19,10 @@
 #ifndef _MACH_TEGRA_POWERGATE_H_
 #define _MACH_TEGRA_POWERGATE_H_
 
-#include <linux/init.h>
-
 #define TEGRA_POWERGATE_CPU	0
+#define TEGRA_POWERGATE_CPU0	TEGRA_POWERGATE_CPU
 #define TEGRA_POWERGATE_3D	1
+#define TEGRA_POWERGATE_3D0	TEGRA_POWERGATE_3D
 #define TEGRA_POWERGATE_VENC	2
 #define TEGRA_POWERGATE_PCIE	3
 #define TEGRA_POWERGATE_VDEC	4
@@ -36,11 +36,24 @@
 #define TEGRA_POWERGATE_CELP	12
 #define TEGRA_POWERGATE_3D1	13
 
-#define TEGRA_POWERGATE_CPU0	TEGRA_POWERGATE_CPU
-#define TEGRA_POWERGATE_3D0	TEGRA_POWERGATE_3D
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+#define TEGRA_NUM_POWERGATE	7
+#define TEGRA_CPU_POWERGATE_ID(cpu)	(TEGRA_POWERGATE_CPU)
+#define TEGRA_IS_CPU_POWERGATE_ID(id)	((id) == TEGRA_POWERGATE_CPU)
+#else
+#define TEGRA_NUM_POWERGATE	14
+#define TEGRA_CPU_POWERGATE_ID(cpu)	((cpu == 0) ? TEGRA_POWERGATE_CPU0 : \
+						(cpu + TEGRA_POWERGATE_CPU1 - 1))
+#define TEGRA_IS_CPU_POWERGATE_ID(id)  (((id) == TEGRA_POWERGATE_CPU0) || \
+					((id) == TEGRA_POWERGATE_CPU1) || \
+					((id) == TEGRA_POWERGATE_CPU2) || \
+					((id) == TEGRA_POWERGATE_CPU3))
+#endif
 
 #ifdef CONFIG_ARCH_TEGRA
-int tegra_powergate_is_powered(int id);
+bool tegra_powergate_is_powered(int id);
+int tegra_powergate_power_on(int id);
+int tegra_powergate_power_off(int id);
 int tegra_powergate_mc_disable(int id);
 int tegra_powergate_mc_enable(int id);
 int tegra_powergate_mc_flush(int id);
@@ -80,9 +93,9 @@ int tegra_unpowergate_partition_with_clk_on(int id);
 int tegra_powergate_partition(int id);
 int tegra_unpowergate_partition(int id);
 #else
-static inline int tegra_powergate_is_powered(int id)
+static inline bool tegra_powergate_is_powered(int id)
 {
-	return -ENOSYS;
+	return 0;
 }
 
 static inline int tegra_powergate_partition(int id)
