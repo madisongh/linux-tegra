@@ -24,6 +24,7 @@
 
 #include <linux/types.h>
 #include <linux/reboot.h>
+#include <linux/errno.h>
 #include <linux/power_supply.h>
 #include <linux/memory.h>
 
