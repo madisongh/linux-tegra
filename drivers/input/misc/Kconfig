@@ -812,4 +812,7 @@ config INPUT_DRV2667_HAPTICS
 	  To compile this driver as a module, choose M here: the
 	  module will be called drv2667-haptics.
 
+source	"drivers/input/misc/compass/Kconfig"
+source	"drivers/input/misc/mpu/Kconfig"
+
 endif
