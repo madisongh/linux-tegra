@@ -428,6 +428,7 @@ static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
 		  SDHCI_QUIRK_NO_HISPD_BIT |
 		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
 		  SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+	.quirks2 = SDHCI_QUIRK2_BROKEN_PRESET_VALUES,
 	.ops  = &tegra_sdhci_ops,
 };
 
@@ -444,6 +445,7 @@ static const struct sdhci_pltfm_data sdhci_tegra30_pdata = {
 		  SDHCI_QUIRK_NO_HISPD_BIT |
 		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
 		  SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+	.quirks2 = SDHCI_QUIRK2_BROKEN_PRESET_VALUES,
 	.ops  = &tegra_sdhci_ops,
 };
 
@@ -461,6 +463,7 @@ static const struct sdhci_pltfm_data sdhci_tegra114_pdata = {
 		  SDHCI_QUIRK_NO_HISPD_BIT |
 		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
 		  SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+	.quirks2 = SDHCI_QUIRK2_BROKEN_PRESET_VALUES,
 	.ops  = &tegra_sdhci_ops,
 };
 
