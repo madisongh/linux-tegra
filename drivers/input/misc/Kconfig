@@ -735,4 +735,10 @@ config INPUT_ALPS_GPIO_SCROLLWHEEL
 	  To compile this driver as a module, choose M here: the
 	  module will be called alps_gpio_scrollwheel.
 
+config INPUT_CAPELLA_CM3218
+	tristate "CM3218 light sensor"
+	depends on I2C
+	help
+	  Say Y here to enable the CM3218 Ambient Light Sensor.
+
 endif
