@@ -59,9 +59,14 @@
 #define SDHCI_VENDOR_CLOCK_CNTRL_SPI_MODE_CLKEN_OVERRIDE	0x4
 #define SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_SHIFT	16
 #define SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_MASK		0xFF
+#define SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_SHIFT	24
+#define SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_MASK	0x1F
 
 #define SDHCI_VENDOR_MISC_CNTRL		0x120
 #define SDHCI_VENDOR_MISC_CNTRL_SDMMC_SPARE0_ENABLE_SD_3_0	0x20
+
+#define SDHCI_TEGRA_MAX_TAP_VALUES	0xFF
+#define SDHCI_TEGRA_MAX_TRIM_VALUES	0x1F
 
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
@@ -154,12 +159,29 @@ static unsigned int tegra_sdhci_get_ro(struct sdhci_host *sdhci)
 	return mmc_gpio_get_ro(host->mmc);
 }
 
-static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
-	u8 tap_delay)
+static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
+	u8 trim_delay)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	u32 vendor_ctrl;
+
+	if ((trim_delay > SDHCI_TEGRA_MAX_TRIM_VALUES) && (trim_delay < 0)) {
+		dev_err(mmc_dev(sdhci->mmc), "Invalid trim value\n");
+		return -1;
+
+	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
+	vendor_ctrl &= (SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_MASK <<
+			SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_SHIFT);
+	vendor_ctrl |= (trim_delay<< SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_SHIFT);
+	sdhci_writel(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
+
+	return 0;
+}
+
+static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
+	u8 tap_delay)
+{
 
 	if ((tap_delay > SDHCI_TEGRA_MAX_TAP_VALUES) && (tap_delay < 0)){
 		dev_err(mmc_dev(sdhci->mmc), "Invalid tap value\n");
@@ -190,6 +212,8 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 
 	/* Set the tap delay value */
 	tegra_sdhci_set_tap_delay(host, plat->tap_delay);
+	/* Set the trim delay value */
+	tegra_sdhci_set_trim_delay(host, plat->trim_delay);
 
 	vendor_ctrl = sdhci_readl(host, SDHCI_TEGRA_VENDOR_CLOCK_CNTRL);
 	vendor_ctrl |= SDHCI_VENDOR_CLOCK_CNTRL_PADPIPE_CLKEN_OVERRIDE;
