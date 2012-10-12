@@ -351,6 +351,14 @@ config TEGRA_LATENCY_ALLOWANCE_SCALING
 	  programmed latency allowance values based on fifo threshold levels
 	  set for for display and vi hardware.
 
+config TEGRA_MC_PTSA
+	bool "Enable MC PTSA programming"
+	depends on TEGRA_LATENCY_ALLOWANCE
+	help
+	  Enables Priority Tier Snap Arbiter programming in
+	  Memory Controller. PTSA is a Memory Controller feature that
+	  allows specifying the bandwidth necessary for ISO clients.
+
 config TEGRA_ISOMGR
 	bool "Isochronous Bandwidth Manager "
 	help
