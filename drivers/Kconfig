@@ -154,6 +154,8 @@ source "drivers/devfreq/Kconfig"
 
 source "drivers/extcon/Kconfig"
 
+source "drivers/mipi_bif/Kconfig"
+
 source "drivers/memory/Kconfig"
 
 source "drivers/iio/Kconfig"
