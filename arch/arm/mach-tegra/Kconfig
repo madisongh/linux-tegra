@@ -400,13 +400,19 @@ config TEGRA_IO_DPD
 	  Deep Power Down (DPD) state. This is a temporary config
 	  option until a proper way is implemented to resolve this issue.
 
-config TEGRA_USE_DFLL
-	bool "Use DFLL as CPU clock source by default"
+config TEGRA_USE_DFLL_RANGE
+	int "Default CPU DFLL operating range"
 	depends on ARCH_TEGRA_HAS_CL_DVFS
-	default n
-        help
-	  Enables dynamic frequency lock loop (DFLL) as CPU clock
-	  source.
+	range 0 2
+	default "1" if TEGRA_SILICON_PLATFORM
+	default "0"
+	help
+	  Defines default range for dynamic frequency lock loop (DFLL)
+	  to be used as CPU clock source:
+	  "0" - DFLL is not used,
+	  "1" - DFLL is used as a source for all CPU rates
+	  "2" - DFLL is used only for high rates above crossover with
+		PLL dvfs curve
 
 config TEGRA_SOCTHERM
 	bool "Enable soctherm"
