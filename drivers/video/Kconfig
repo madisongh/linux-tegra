@@ -54,4 +54,10 @@ if FB || SGI_NEWPORT_CONSOLE
 endif
 
 
+config DS90UH925Q_SER
+	bool "DS90UH925Q FPDLink Serializer"
+	depends on I2C
+	help
+	  This is a driver for FPDLink Serializer DS90UH925Q.
+
 endmenu
