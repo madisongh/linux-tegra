@@ -91,17 +91,6 @@ TRACE_EVENT(pstate_sample,
 #define _PWR_EVENT_AVOID_DOUBLE_DEFINING
 
 #define PWR_EVENT_EXIT -1
-
-enum {
-	POWER_CPU_CLUSTER_START,
-	POWER_CPU_CLUSTER_DONE,
-};
-
-enum {
-	POWER_CPU_POWERGATE_ENTRY,
-	POWER_CPU_POWERGATE_EXIT,
-};
-
 #endif
 
 #define pm_verb_symbolic(event) \
@@ -114,45 +103,6 @@ enum {
 		{ PM_EVENT_THAW, "thaw" }, \
 		{ PM_EVENT_RESTORE, "restore" }, \
 		{ PM_EVENT_RECOVER, "recover" })
-
-TRACE_EVENT(cpu_cluster,
-
-	TP_PROTO(int state),
-
-	TP_ARGS(state),
-
-	TP_STRUCT__entry(
-		__field(u64, state)
-	),
-
-	TP_fast_assign(
-		__entry->state = state;
-	),
-
-	TP_printk("state=%lu",
-		  (unsigned long)__entry->state)
-);
-
-TRACE_EVENT(cpu_powergate,
-
-	TP_PROTO(unsigned int counter, int state),
-
-	TP_ARGS(counter, state),
-
-	TP_STRUCT__entry(
-		__field(u32, counter)
-		__field(u32, state)
-	),
-
-	TP_fast_assign(
-		__entry->counter = counter;
-		__entry->state = state;
-	),
-
-	TP_printk("counter=%lu, state=%lu",
-		  (unsigned long)__entry->counter,
-		  (unsigned long)__entry->state)
-);
 
 DEFINE_EVENT(cpu, cpu_frequency,
 
