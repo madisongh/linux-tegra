@@ -32,6 +32,8 @@
 #include <linux/delay.h>
 
 #include <asm/gpio.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
 
 #include <linux/platform_data/mmc-sdhci-tegra.h>
 
@@ -89,12 +91,51 @@ struct sdhci_tegra_soc_data {
 	u32 nvquirks;
 };
 
+struct sdhci_tegra_sd_stats {
+	unsigned int data_crc_count;
+	unsigned int cmd_crc_count;
+	unsigned int data_to_count;
+	unsigned int cmd_to_count;
+};
+
 struct sdhci_tegra {
 	const struct sdhci_tegra_soc_data *soc_data;
 	int power_gpio;
 	bool	clk_enabled;
 	/* max clk supported by the platform */
 	unsigned int max_clk_limit;
+	/* max ddr clk supported by the platform */
+	unsigned int ddr_clk_limit;
+	struct sdhci_tegra_sd_stats *sd_stat_head;
+};
+
+static int show_register_dump(struct seq_file *s, void *data)
+{
+	struct sdhci_host *host = s->private;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	struct sdhci_tegra_sd_stats *head;
+
+	seq_printf(s, "ErrorStatistics:\n");
+	seq_printf(s, "DataCRC\tCmdCRC\tDataTimeout\tCmdTimeout\n");
+	head = tegra_host->sd_stat_head;
+	if (head != NULL)
+		seq_printf(s, "%d\t%d\t%d\t%d\n", head->data_crc_count,
+			head->cmd_crc_count, head->data_to_count,
+			head->cmd_to_count);
+	return 0;
+}
+
+static int sdhci_register_dump(struct inode *inode, struct file *file)
+{
+	return single_open(file, show_register_dump, inode->i_private);
+}
+
+static const struct file_operations sdhci_host_fops = {
+	.open		= sdhci_register_dump,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
 };
 
 static u16 tegra_sdhci_readw(struct sdhci_host *host, int reg)
@@ -225,6 +266,13 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 
 	if (!(mask & SDHCI_RESET_ALL))
 		return;
+
+	if (tegra_host->sd_stat_head != NULL) {
+		tegra_host->sd_stat_head->data_crc_count = 0;
+		tegra_host->sd_stat_head->cmd_crc_count = 0;
+		tegra_host->sd_stat_head->data_to_count = 0;
+		tegra_host->sd_stat_head->cmd_to_count = 0;
+	}
 
 	/* Set the tap delay value */
 	tegra_sdhci_set_tap_delay(host, plat->tap_delay);
@@ -398,6 +446,32 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci)
 	sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
 }
 
+static int sdhci_tegra_sd_error_stats(struct sdhci_host *host, u32 int_status)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
+	struct sdhci_tegra_sd_stats *head;
+
+	if (tegra_host->sd_stat_head == NULL) {
+		tegra_host->sd_stat_head = devm_kzalloc(&pdev->dev, sizeof(
+						struct sdhci_tegra_sd_stats),
+						GFP_KERNEL);
+		if (tegra_host->sd_stat_head == NULL)
+			return -ENOMEM;
+		}
+	head = tegra_host->sd_stat_head;
+	if (int_status & SDHCI_INT_DATA_CRC)
+		head->data_crc_count = head->data_crc_count + 1;
+	if (int_status & SDHCI_INT_CRC)
+		head->cmd_crc_count = head->cmd_crc_count + 1;
+	if (int_status & SDHCI_INT_TIMEOUT)
+		head->cmd_to_count = head->cmd_to_count + 1;
+	if (int_status & SDHCI_INT_DATA_TIMEOUT)
+		head->data_to_count = head->data_to_count + 1;
+	return 0;
+}
+
 static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
 {
 	tegra_sdhci_set_clock(sdhci, 0);
@@ -406,6 +480,34 @@ static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
 static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 {
 	tegra_sdhci_set_clock(sdhci, 400000);
+}
+
+static void sdhci_tegra_error_stats_debugfs(struct sdhci_host *host)
+{
+	struct dentry *root;
+
+	root = debugfs_create_dir(dev_name(mmc_dev(host->mmc)), NULL);
+	if (IS_ERR(root))
+		/* Don't complain -- debugfs just isn't enabled */
+		return;
+	if (!root)
+		/* Complain -- debugfs is enabled, but it failed to
+		 * create the directory. */
+		goto err_root;
+
+	host->debugfs_root = root;
+
+	if (!debugfs_create_file("error_stats", S_IRUSR, root, host,
+				&sdhci_host_fops))
+		goto err_node;
+	return;
+
+err_node:
+	debugfs_remove_recursive(root);
+	host->debugfs_root = NULL;
+err_root:
+	pr_err("%s: Failed to initialize debugfs functionality\n", __func__);
+	return;
 }
 
 static const struct sdhci_ops tegra_sdhci_ops = {
@@ -421,6 +523,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.platform_suspend	= tegra_sdhci_suspend,
 	.platform_resume	= tegra_sdhci_resume,
 	.switch_signal_voltage_exit = tegra_sdhci_do_calibration,
+	.sd_error_stats		= sdhci_tegra_sd_error_stats,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -505,6 +608,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	struct sdhci_host *host;
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_tegra *tegra_host;
+	struct tegra_sdhci_platform_data *plat;
 	struct clk *clk;
 	int rc;
 
@@ -517,6 +621,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	if (IS_ERR(host))
 		return PTR_ERR(host);
 	pltfm_host = sdhci_priv(host);
+	plat = pdev->dev.platform_data;
 
 	tegra_host = devm_kzalloc(&pdev->dev, sizeof(*tegra_host), GFP_KERNEL);
 	if (!tegra_host) {
@@ -524,6 +629,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		rc = -ENOMEM;
 		goto err_alloc_tegra_host;
 	}
+
+	tegra_host->plat = plat;
+	tegra_host->sd_stat_head = NULL;
 	tegra_host->soc_data = soc_data;
 	pltfm_host->priv = tegra_host;
 
@@ -559,6 +667,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	host->mmc->pm_flags |= plat->pm_flags;
 
 	rc = sdhci_add_host(host);
+	sdhci_tegra_error_stats_debugfs(host);
 	if (rc)
 		goto err_add_host;
 

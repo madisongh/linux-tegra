@@ -300,6 +300,7 @@ struct sdhci_ops {
 	int	(*suspend)(struct sdhci_host *host);
 	int	(*resume)(struct sdhci_host *host);
 	int	(*get_tuning_counter)(struct sdhci_host *sdhci);
+	int	(*sd_error_stats)(struct sdhci_host *host, u32 int_status);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

@@ -20,8 +20,8 @@
 struct sdhci_host {
 	/* Data set by hardware interface driver */
 	const char *hw_name;	/* Hardware bus name */
-
 	unsigned int quirks;	/* Deviations from spec. */
+	struct dentry           *debugfs_root;
 
 /* Controller doesn't honor resets unless we touch the clock register */
 #define SDHCI_QUIRK_CLOCK_BEFORE_RESET			(1<<0)

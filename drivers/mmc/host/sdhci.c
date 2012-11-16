@@ -2497,6 +2497,10 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 			result = IRQ_WAKE_THREAD;
 		}
 
+		if (intmask & (SDHCI_INT_DATA_MASK | SDHCI_INT_CMD_MASK))
+			if (host->ops->sd_error_stats)
+				host->ops->sd_error_stats(host, intmask);
+
 		if (intmask & SDHCI_INT_CMD_MASK)
 			sdhci_cmd_irq(host, intmask & SDHCI_INT_CMD_MASK,
 				      &intmask);
