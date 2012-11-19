@@ -131,6 +131,18 @@ config SWIOTLB
 config IOMMU_HELPER
 	def_bool SWIOTLB
 
+config MULTI_IRQ_HANDLER
+        bool
+        help
+	  Allow each machine to specify it's own IRQ handler at run time.
+
+config NEED_MACH_IO_H
+	bool
+	help
+	  Select this when mach/io.h is required to provide special
+	  definitions for this platform.  The need for mach/io.h should
+	  be avoided when possible. (HACK: copied from arch/arm)
+
 config KERNEL_MODE_NEON
 	def_bool y
 
@@ -162,6 +174,22 @@ config ARCH_XGENE
 	bool "AppliedMicro X-Gene SOC Family"
 	help
 	  This enables support for AppliedMicro X-Gene SOC Family
+
+config ARCH_TEGRA
+	bool "NVIDIA Tegra"
+	select CLKDEV_LOOKUP
+	select CLKSRC_MMIO
+	select GENERIC_CLOCKEVENTS
+	select GENERIC_GPIO
+	select HAVE_CLK
+	select HAVE_SMP
+	select MIGHT_HAVE_CACHE_L2X0
+	select NEED_MACH_IO_H
+	help
+	  This enables support for NVIDIA Tegra based systems (Tegra APX,
+	  Tegra 6xx and Tegra 2 series).
+
+source "arch/arm64/mach-tegra/Kconfig"
 
 endmenu
 
