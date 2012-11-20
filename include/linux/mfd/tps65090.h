@@ -78,6 +78,11 @@ enum {
 #define TPS65090_REG_CG_STATUS1	0x0a
 #define TPS65090_REG_CG_STATUS2	0x0b
 
+struct tps65090_charger_data {
+	int irq_base;
+	void (*update_status)(void);
+};
+
 struct tps65090 {
 	struct device		*dev;
 	struct regmap		*rmap;
@@ -112,6 +117,7 @@ struct tps65090_platform_data {
 	int enable_low_current_chrg;
 
 	struct tps65090_regulator_plat_data *reg_pdata[TPS65090_REGULATOR_MAX];
+	struct tps65090_charger_data *charger_pdata;
 };
 
 /*
