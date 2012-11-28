@@ -42,7 +42,12 @@
 
 #include "mm.h"
 
+/* FIXME */
+#ifndef CONFIG_MACH_EXUMA
 phys_addr_t memstart_addr __read_mostly = 0;
+#else
+phys_addr_t memstart_addr __read_mostly = 0x80000000;
+#endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
 static int __init early_initrd(char *p)
