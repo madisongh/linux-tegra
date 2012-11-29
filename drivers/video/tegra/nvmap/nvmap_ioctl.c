@@ -500,7 +500,7 @@ static void inner_cache_maint(unsigned int op, void *vaddr, size_t size)
 		dmac_map_area(vaddr, size, DMA_TO_DEVICE);
 }
 
-static void outer_cache_maint(unsigned int op, unsigned long paddr, size_t size)
+static void outer_cache_maint(unsigned int op, phys_addr_t paddr, size_t size)
 {
 	if (op == NVMAP_CACHE_OP_WB_INV)
 		outer_flush_range(paddr, paddr + size);
@@ -516,7 +516,7 @@ static void heap_page_cache_maint(struct nvmap_client *client,
 	unsigned long kaddr, pgprot_t prot)
 {
 	struct page *page;
-	unsigned long paddr;
+	phys_addr_t paddr;
 	unsigned long next;
 	unsigned long off;
 	size_t size;
@@ -591,9 +591,10 @@ static bool fast_cache_maint(struct nvmap_client *client, struct nvmap_handle *h
 				heap_page_cache_maint(client, h, start,
 					end, op, false, true, NULL, 0, 0);
 			} else  {
-				start += h->carveout->base;
-				end += h->carveout->base;
-				outer_cache_maint(op, start, end - start);
+				phys_addr_t pstart;
+
+				pstart = start + h->carveout->base;
+				outer_cache_maint(op, pstart, end - start);
 			}
 		}
 	}
@@ -615,7 +616,9 @@ static int cache_maint(struct nvmap_client *client, struct nvmap_handle *h,
 	pgprot_t prot;
 	pte_t **pte = NULL;
 	unsigned long kaddr;
-	unsigned long loop;
+	phys_addr_t pstart = start;
+	phys_addr_t pend = end;
+	phys_addr_t loop;
 	int err = 0;
 
 	h = nvmap_handle_get(h);
@@ -657,15 +660,18 @@ static int cache_maint(struct nvmap_client *client, struct nvmap_handle *h,
 		goto out;
 	}
 
-	start += h->carveout->base;
-	end += h->carveout->base;
+	/* lock carveout from relocation by mapcount */
+	nvmap_usecount_inc(h);
 
-	loop = start;
+	pstart += h->carveout->base;
+	pend += h->carveout->base;
 
-	while (loop < end) {
-		unsigned long next = (loop + PAGE_SIZE) & PAGE_MASK;
+	loop = pstart;
+
+	while (loop < pend) {
+		phys_addr_t next = (loop + PAGE_SIZE) & PAGE_MASK;
 		void *base = (void *)kaddr + (loop & ~PAGE_MASK);
-		next = min(next, end);
+		next = min(next, pend);
 
 		set_pte_at(&init_mm, kaddr, *pte,
 			   pfn_pte(__phys_to_pfn(loop), prot));
@@ -676,7 +682,7 @@ static int cache_maint(struct nvmap_client *client, struct nvmap_handle *h,
 	}
 
 	if (h->flags != NVMAP_HANDLE_INNER_CACHEABLE)
-		outer_cache_maint(op, start, end - start);
+		outer_cache_maint(op, pstart, pend - pstart);
 
 	/* unlock carveout */
 	nvmap_usecount_dec(h);
