@@ -253,6 +253,12 @@ config ACPI_THERMAL_REL
 	tristate
 	depends on ACPI
 
+config PWM_FAN
+	bool "PWM Fan driver"
+	depends on THERMAL
+	help
+	  Enables the fan driver that is controlled by pwm
+
 menu "Texas Instruments thermal drivers"
 source "drivers/thermal/ti-soc-thermal/Kconfig"
 endmenu
