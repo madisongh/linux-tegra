@@ -379,6 +379,12 @@ config INTEL_PCH_THERMAL
 	  Thermal reporting device will provide temperature reading,
 	  programmable trip points and other information.
 
+config PWM_FAN
+	bool "PWM Fan driver"
+	depends on THERMAL
+	help
+	  Enables the fan driver that is controlled by pwm
+
 menu "Texas Instruments thermal drivers"
 depends on ARCH_HAS_BANDGAP || COMPILE_TEST
 source "drivers/thermal/ti-soc-thermal/Kconfig"
