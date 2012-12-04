@@ -66,7 +66,7 @@
 
 #define SDHCI_VENDOR_MISC_CNTRL		0x120
 #define SDHCI_VENDOR_MISC_CNTRL_SDMMC_SPARE0_ENABLE_SD_3_0	0x20
-
+#define SDHCI_VENDOR_MISC_CNTRL_INFINITE_ERASE_TIMEOUT	0x1
 
 #define SDMMC_SDMEMCOMPPADCTRL	0x1E0
 #define SDMMC_SDMEMCOMPPADCTRL_VREF_SEL_MASK	0xF
@@ -190,7 +190,7 @@ static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 	vendor_ctrl &= (SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_MASK <<
 			SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_SHIFT);
 	vendor_ctrl |= (trim_delay<< SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_SHIFT);
-	sdhci_writel(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
+	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
 
 	return 0;
 }
@@ -247,6 +247,8 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_DDR50;
 	if (soc_data->nvquirks & NVQUIRK_DISABLE_SDR104)
 		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_SDR104;
+	/* Enable infinite erase timeout */
+	misc_ctrl |= SDHCI_VENDOR_MISC_CNTRL_INFINITE_ERASE_TIMEOUT;
 	sdhci_writew(host, misc_ctrl, SDHCI_TEGRA_VENDOR_MISC_CTRL);
 }
 
