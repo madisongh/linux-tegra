@@ -764,5 +764,13 @@ config REGULATOR_RICOH583
 	help
 	  This driver supports regulator driver for RICOH583 PMIC.
 
+config REGULATOR_MAX77660
+	tristate "Maxim 77660 voltage regulator"
+	depends on MFD_MAX77660
+	help
+	  This driver controls a Maxim 77660 voltage output regulator
+	  via I2C bus. The provided regulator is suitable for Tegra
+	  chip to control Step-Down DC-DC and LDOs.
+
 endif
 
