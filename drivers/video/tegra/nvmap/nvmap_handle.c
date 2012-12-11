@@ -295,25 +295,39 @@ static struct shrinker nvmap_page_pool_shrinker = {
 	.seeks = 1,
 };
 
+static void shrink_page_pools(int *total_pages, int *available_pages)
+{
+	struct shrink_control sc;
+
+	if (*total_pages == 0) {
+		sc.gfp_mask = GFP_KERNEL;
+		sc.nr_to_scan = 0;
+		*total_pages = nvmap_page_pool_shrink(NULL, &sc);
+	}
+	sc.nr_to_scan = *total_pages;
+	*available_pages = nvmap_page_pool_shrink(NULL, &sc);
+}
+
 #if NVMAP_TEST_PAGE_POOL_SHRINKER
-static int shrink_state;
+static int shrink_pp;
 static int shrink_set(const char *arg, const struct kernel_param *kp)
 {
 	struct shrink_control sc;
 	int cpu = smp_processor_id();
 	unsigned long long t1, t2;
-	int total_pages, free_pages;
+	int total_pages, available_pages;
 
-	sc.gfp_mask = GFP_KERNEL;
-	sc.nr_to_scan = 0;
-	total_pages = nvmap_page_pool_shrink(NULL, &sc);
-	t1 = cpu_clock(cpu);
-	sc.nr_to_scan = 32768 * 4 - 1;
-	free_pages = nvmap_page_pool_shrink(NULL, &sc);
-	t2 = cpu_clock(cpu);
-	pr_info("%s: time=%lldns, total_pages=%d, free_pages=%d",
-		__func__, t2-t1, total_pages, free_pages);
-	shrink_state = 1;
+	param_set_int(arg, kp);
+
+	if (shrink_pp) {
+		total_pages = shrink_pp;
+		t1 = cpu_clock(cpu);
+		shrink_page_pools(&total_pages, &available_pages);
+		t2 = cpu_clock(cpu);
+		pr_debug("shrink page pools: time=%lldns, "
+			"total_pages_released=%d, free_pages_available=%d",
+			t2-t1, total_pages, available_pages);
+	}
 	return 0;
 }
 
@@ -329,6 +343,79 @@ static struct kernel_param_ops shrink_ops = {
 
 module_param_cb(shrink, &shrink_ops, &shrink_state, 0644);
 #endif
+
+static int enable_pp_set(const char *arg, const struct kernel_param *kp)
+{
+	int total_pages, available_pages;
+
+	param_set_bool(arg, kp);
+
+	if (!enable_pp) {
+		total_pages = 0;
+		shrink_page_pools(&total_pages, &available_pages);
+		pr_info("disabled page pools and released pages, "
+			"total_pages_released=%d, free_pages_available=%d",
+			total_pages, available_pages);
+	}
+	return 0;
+}
+
+static int enable_pp_get(char *buff, const struct kernel_param *kp)
+{
+	return param_get_int(buff, kp);
+}
+
+static struct kernel_param_ops enable_pp_ops = {
+	.get = enable_pp_get,
+	.set = enable_pp_set,
+};
+
+module_param_cb(enable_page_pools, &enable_pp_ops, &enable_pp, 0644);
+
+#define POOL_SIZE_SET(m, i) \
+static int pool_size_##m##_set(const char *arg, const struct kernel_param *kp) \
+{ \
+	struct nvmap_share *share = nvmap_get_share_from_dev(nvmap_dev); \
+	param_set_int(arg, kp); \
+	nvmap_page_pool_resize(&share->pools[i], pool_size[i]); \
+	return 0; \
+}
+
+#define POOL_SIZE_GET(m) \
+static int pool_size_##m##_get(char *buff, const struct kernel_param *kp) \
+{ \
+	return param_get_int(buff, kp); \
+}
+
+#define POOL_SIZE_OPS(m) \
+static struct kernel_param_ops pool_size_##m##_ops = { \
+	.get = pool_size_##m##_get, \
+	.set = pool_size_##m##_set, \
+};
+
+#define POOL_SIZE_MOUDLE_PARAM_CB(m, i) \
+module_param_cb(m##_pool_size, &pool_size_##m##_ops, &pool_size[i], 0644)
+
+POOL_SIZE_SET(uc, NVMAP_HANDLE_UNCACHEABLE);
+POOL_SIZE_GET(uc);
+POOL_SIZE_OPS(uc);
+POOL_SIZE_MOUDLE_PARAM_CB(uc, NVMAP_HANDLE_UNCACHEABLE);
+
+POOL_SIZE_SET(wc, NVMAP_HANDLE_WRITE_COMBINE);
+POOL_SIZE_GET(wc);
+POOL_SIZE_OPS(wc);
+POOL_SIZE_MOUDLE_PARAM_CB(wc, NVMAP_HANDLE_WRITE_COMBINE);
+
+POOL_SIZE_SET(iwb, NVMAP_HANDLE_INNER_CACHEABLE);
+POOL_SIZE_GET(iwb);
+POOL_SIZE_OPS(iwb);
+POOL_SIZE_MOUDLE_PARAM_CB(iwb, NVMAP_HANDLE_INNER_CACHEABLE);
+
+POOL_SIZE_SET(wb, NVMAP_HANDLE_CACHEABLE);
+POOL_SIZE_GET(wb);
+POOL_SIZE_OPS(wb);
+POOL_SIZE_MOUDLE_PARAM_CB(wb, NVMAP_HANDLE_CACHEABLE);
+
 int nvmap_page_pool_init(struct nvmap_page_pool *pool, int flags)
 {
 	static int reg = 1;
