@@ -23,6 +23,7 @@ config ARCH_TEGRA_2x_SOC
 	select ARM_ERRATA_742230 if SMP
 	select ARM_ERRATA_751472
 	select ARM_ERRATA_754327 if SMP
+	select ARM_ERRATA_761320 if SMP
 	select ARM_ERRATA_764369 if SMP
 	select ARM_GIC
 	select CPU_V7
@@ -42,6 +43,7 @@ config ARCH_TEGRA_3x_SOC
 	select ARM_ERRATA_743622
 	select ARM_ERRATA_751472
 	select ARM_ERRATA_754322
+	select ARM_ERRATA_761320 if SMP
 	select ARM_ERRATA_764369 if SMP
 	select ARM_GIC
 	select CPU_V7
