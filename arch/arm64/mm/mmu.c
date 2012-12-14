@@ -26,6 +26,7 @@
 #include <linux/memblock.h>
 #include <linux/fs.h>
 #include <linux/io.h>
+#include <linux/vmalloc.h>
 
 #include <asm/cputype.h>
 #include <asm/sections.h>
@@ -36,6 +37,7 @@
 #include <asm/mmu_context.h>
 
 #include <asm/mach/arch.h>
+#include <asm/mach/map.h>
 
 #include "mm.h"
 
@@ -131,7 +133,7 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 }
 EXPORT_SYMBOL(phys_mem_access_prot);
 
-static void __init *early_alloc(unsigned long sz)
+void __init *early_alloc(unsigned long sz)
 {
 	void *ptr = __va(memblock_alloc(sz, sz));
 	memset(ptr, 0, sz);
@@ -287,6 +289,25 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
 	}
 	__create_mapping(&idmap_pg_dir[pgd_index(addr)],
 			 addr, addr, size, map_io);
+}
+
+/* To support old-style static device memory mapping. */
+__init void iotable_init(struct map_desc *io_desc, int nr)
+{
+	struct map_desc *md;
+	struct vm_struct *vm;
+
+	vm = early_alloc(sizeof(*vm) * nr);
+
+	for (md = io_desc; nr; md++, nr--) {
+		__create_mapping(__pfn_to_phys(md->pfn), md->virtual, md->length, 1);
+		vm->addr = (void *)(md->virtual & PAGE_MASK);
+		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
+		vm->phys_addr = __pfn_to_phys(md->pfn);
+		vm->flags = VM_IOREMAP;
+		vm->caller = iotable_init;
+		vm_area_add_early(vm++);
+	}
 }
 
 static void __init map_mem(void)
