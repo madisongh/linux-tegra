@@ -22,9 +22,18 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
+#include <linux/slab.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/slot-gpio.h>
+#include <linux/module.h>
+#include <linux/mmc/sd.h>
+#include <linux/regulator/consumer.h>
+#include <linux/delay.h>
+
+#include <asm/gpio.h>
+
+#include <linux/platform_data/mmc-sdhci-tegra.h>
 
 #include "sdhci-pltfm.h"
 
@@ -63,11 +72,13 @@ struct sdhci_tegra {
 	const struct sdhci_tegra_soc_data *soc_data;
 	int power_gpio;
 	bool	clk_enabled;
+	/* max clk supported by the platform */
 	unsigned int max_clk_limit;
 };
 
 static u16 tegra_sdhci_readw(struct sdhci_host *host, int reg)
 {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
@@ -77,15 +88,17 @@ static u16 tegra_sdhci_readw(struct sdhci_host *host, int reg)
 		/* Erratum: Version register is invalid in HW. */
 		return SDHCI_SPEC_200;
 	}
-
+#endif
 	return readw(host->ioaddr + reg);
 }
 
 static void tegra_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
 {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+#endif
 
 	/* Seems like we're getting spurious timeout and crc errors, so
 	 * disable signalling of them. In case of real errors software
@@ -96,6 +109,7 @@ static void tegra_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
 
 	writel(val, host->ioaddr + reg);
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if (unlikely((soc_data->nvquirks & NVQUIRK_ENABLE_BLOCK_GAP_DET) &&
 			(reg == SDHCI_INT_ENABLE))) {
 		/* Erratum: Must enable block gap interrupt detection */
@@ -106,11 +120,12 @@ static void tegra_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
 			gap_ctrl &= ~0x8;
 		writeb(gap_ctrl, host->ioaddr + SDHCI_BLOCK_GAP_CONTROL);
 	}
+#endif
 }
 
 static void tegra_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
 {
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 
@@ -134,7 +149,7 @@ static void tegra_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
 	writew(val, host->ioaddr + reg);
 }
 
-static unsigned int tegra_sdhci_get_ro(struct sdhci_host *host)
+static unsigned int tegra_sdhci_get_ro(struct sdhci_host *sdhci)
 {
 	return mmc_gpio_get_ro(host->mmc);
 }
@@ -240,7 +255,6 @@ static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
-	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	unsigned int clk_rate;
 
 	/*
@@ -288,12 +302,12 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	}
 }
 
-static void tegra_sdhci_suspend(struct sdhci_host *sdhci)
+static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
 {
 	tegra_sdhci_set_clock(sdhci, 0);
 }
 
-static void tegra_sdhci_resume(struct sdhci_host *sdhci)
+static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 {
 	tegra_sdhci_set_clock(sdhci, 400000);
 }
@@ -314,6 +328,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
 	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
+		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
 		  SDHCI_QUIRK_SINGLE_POWER_WRITE |
 		  SDHCI_QUIRK_NO_HISPD_BIT |
 		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
@@ -436,6 +451,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	if (rc != 0)
 		goto err_clk_put;
 	pltfm_host->clk = clk;
+	pltfm_host->priv = tegra_host;
 	tegra_host->clk_enabled = true;
 	tegra_host->max_clk_limit = plat->max_clk_limit;
 
