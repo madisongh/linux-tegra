@@ -596,8 +596,24 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	struct sdhci_host *host = dev_get_drvdata(dev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	struct tegra_sdhci_platform_data *plat;
+	int val;
+
+	if (!np)
+		return NULL;
 
 	tegra_host->power_gpio = of_get_named_gpio(np, "power-gpios", 0);
+	plat = devm_kzalloc(&pdev->dev, sizeof(*plat), GFP_KERNEL);
+	if (!plat) {
+		dev_err(&pdev->dev, "Can't allocate platform data\n");
+		return NULL;
+	}
+
+	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
+	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
+	of_property_read_u32(np, "ddr-clk-limit", &plat->ddr_clk_limit);
+	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
+
 	return mmc_of_parse(host->mmc);
 }
 
