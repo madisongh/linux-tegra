@@ -631,6 +631,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	}
 
 	tegra_host->plat = plat;
+	pdev->dev.platform_data = plat;
 	tegra_host->sd_stat_head = NULL;
 	tegra_host->soc_data = soc_data;
 	pltfm_host->priv = tegra_host;
