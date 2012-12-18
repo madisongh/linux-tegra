@@ -433,6 +433,13 @@ config REGULATOR_MAX77802
 config REGULATOR_MC13XXX_CORE
 	tristate
 
+config REGULATOR_AS3720
+	tristate "ams AS3720 PMIC regulators"
+	depends on MFD_AS3720
+	help
+	  This driver provides support for the voltage regulators of the
+	  AS3720 PMIC.
+
 config REGULATOR_MC13783
 	tristate "Freescale MC13783 regulator driver"
 	depends on MFD_MC13XXX
