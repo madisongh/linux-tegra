@@ -479,6 +479,7 @@ static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
 
 static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 {
+	/* Setting the min identification clock of freq 400KHz */
 	tegra_sdhci_set_clock(sdhci, 400000);
 }
 
@@ -510,6 +511,17 @@ err_root:
 	return;
 }
 
+static void tegra_sdhci_post_resume(struct sdhci_host *sdhci)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+
+	/* Turn OFF the clocks if removable card is not present */
+	if (!(sdhci->mmc->caps & MMC_CAP_NONREMOVABLE) &&
+		(mmc_gpio_get_cd(sdhci->mmc) != 0) && tegra_host->clk_enabled)
+		tegra_sdhci_set_clock(sdhci, 0);
+}
+
 static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_ro     = tegra_sdhci_get_ro,
 	.read_w     = tegra_sdhci_readw,
@@ -520,8 +532,10 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.set_uhs_signaling = tegra_sdhci_set_uhs_signaling,
 	.reset      = tegra_sdhci_reset,
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
-	.platform_suspend	= tegra_sdhci_suspend,
-	.platform_resume	= tegra_sdhci_resume,
+	.suspend		= tegra_sdhci_suspend,
+	.resume			= tegra_sdhci_resume,
+	.platform_resume	= tegra_sdhci_post_resume,
+	.platform_reset_exit	= tegra_sdhci_reset_exit,
 	.switch_signal_voltage_exit = tegra_sdhci_do_calibration,
 	.sd_error_stats		= sdhci_tegra_sd_error_stats,
 };
