@@ -2,6 +2,8 @@
 # Makefile for the video capture/playback device drivers.
 #
 
+GCOV_PROFILE := y
+
 obj-$(CONFIG_VIDEO_VINO) += indycam.o
 obj-$(CONFIG_VIDEO_VINO) += vino.o
 
