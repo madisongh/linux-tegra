@@ -119,7 +119,7 @@ static int max8831_bl_probe(struct platform_device *pdev)
 	data->notify = pData->notify;
 	data->is_powered = pData->is_powered;
 	data->regulator = regulator_get(data->max8831_dev,
-			"avdd_backlight_3v0");
+			"vin");
 	if (IS_ERR(data->regulator)) {
 		dev_err(&pdev->dev, "%s: Unable to get the backlight regulator\n",
 		       __func__);
