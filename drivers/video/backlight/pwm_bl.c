@@ -19,6 +19,7 @@
 #include <linux/fb.h>
 #include <linux/backlight.h>
 #include <linux/err.h>
+#include <linux/gpio.h>
 #include <linux/pwm.h>
 #include <linux/pwm_backlight.h>
 #include <linux/regulator/consumer.h>
@@ -34,6 +35,7 @@ struct pwm_bl_data {
 	struct regulator	*power_supply;
 	struct gpio_desc	*enable_gpio;
 	unsigned int		scale;
+	unsigned int		pwm_gpio;
 	int			(*notify)(struct device *,
 					  int brightness);
 	void			(*notify_after)(struct device *,
@@ -238,6 +240,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	pb->check_fb = data->check_fb;
 	pb->exit = data->exit;
 	pb->dev = &pdev->dev;
+	pb->pwm_gpio = data->pwm_gpio;
 	pb->enabled = false;
 
 	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
@@ -302,6 +305,13 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	memset(&props, 0, sizeof(struct backlight_properties));
 	props.type = BACKLIGHT_RAW;
 	props.max_brightness = data->max_brightness;
+
+	if (gpio_is_valid(pb->pwm_gpio)) {
+		ret = gpio_request(pb->pwm_gpio, "disp_bl");
+		if (ret)
+			dev_err(&pdev->dev, "backlight gpio request failed\n");
+	}
+
 	bl = backlight_device_register(dev_name(&pdev->dev), &pdev->dev, pb,
 				       &pwm_backlight_ops, &props);
 	if (IS_ERR(bl)) {
@@ -319,6 +329,9 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 
 	bl->props.brightness = data->dft_brightness;
 	backlight_update_status(bl);
+
+	if (gpio_is_valid(pb->pwm_gpio))
+		gpio_free(pb->pwm_gpio);
 
 	platform_set_drvdata(pdev, bl);
 	return 0;
