@@ -602,5 +602,12 @@ config TILE_SROM
 
 source "drivers/char/xillybus/Kconfig"
 
+config TEGRA_EFS
+	bool "Character-device interface for efs file system"
+	depends on  ARCH_TEGRA
+	default n
+	help
+	Enable tegra efs helper driver for Nvidia's board.
+
 endmenu
 
