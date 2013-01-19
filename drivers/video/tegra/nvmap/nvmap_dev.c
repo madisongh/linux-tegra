@@ -317,9 +317,9 @@ int nvmap_flush_heap_block(struct nvmap_client *client,
 {
 	pte_t **pte;
 	void *addr;
-	unsigned long kaddr;
-	unsigned long phys = block->base;
-	unsigned long end = block->base + len;
+	uintptr_t kaddr;
+	phys_addr_t phys = block->base;
+	phys_addr_t end = block->base + len;
 
 	if (prot == NVMAP_HANDLE_UNCACHEABLE || prot == NVMAP_HANDLE_WRITE_COMBINE)
 		goto out;
@@ -337,7 +337,7 @@ int nvmap_flush_heap_block(struct nvmap_client *client,
 	if (IS_ERR(pte))
 		return PTR_ERR(pte);
 
-	kaddr = (unsigned long)addr;
+	kaddr = (uintptr_t)addr;
 
 	while (phys < end) {
 		unsigned long next = (phys + PAGE_SIZE) & PAGE_MASK;
