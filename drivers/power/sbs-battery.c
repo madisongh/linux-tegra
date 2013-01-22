@@ -1,7 +1,7 @@
 /*
  * Gas Gauge driver for SBS Compliant Batteries
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2013, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -168,6 +168,8 @@ struct sbs_info {
 	int				poll_time;
 	struct delayed_work		work;
 	int				ignore_changes;
+	int				shutdown_complete;
+	struct mutex			mutex;
 };
 struct sbs_info *tchip;
 
@@ -180,6 +182,11 @@ static int sbs_read_word_data(struct i2c_client *client, u8 address)
 	s32 ret = 0;
 	int retries = 1;
 
+	mutex_lock(&chip->mutex);
+	if (chip && chip->shutdown_complete) {
+		mutex_unlock(&chip->mutex);
+		return -ENODEV;
+	}
 	retries = max(chip->plat_data.i2c_retry_count + 1, 1);
 
 	while (retries > 0) {
@@ -193,8 +200,10 @@ static int sbs_read_word_data(struct i2c_client *client, u8 address)
 		dev_dbg(&client->dev,
 			"%s: i2c read at address 0x%x failed\n",
 			__func__, address);
+		mutex_unlock(&chip->mutex);
 		return ret;
 	}
+	mutex_unlock(&chip->mutex);
 
 	return le16_to_cpu(ret);
 }
@@ -272,6 +281,12 @@ static int sbs_write_word_data(struct i2c_client *client, u8 address,
 	s32 ret = 0;
 	int retries = 1;
 
+	mutex_lock(&chip->mutex);
+	if (chip && chip->shutdown_complete) {
+		mutex_unlock(&chip->mutex);
+		return -ENODEV;
+	}
+
 	retries = max(chip->plat_data.i2c_retry_count + 1, 1);
 
 	while (retries > 0) {
@@ -286,8 +301,10 @@ static int sbs_write_word_data(struct i2c_client *client, u8 address,
 		dev_dbg(&client->dev,
 			"%s: i2c write to address 0x%x failed\n",
 			__func__, address);
+		mutex_unlock(&chip->mutex);
 		return ret;
 	}
+	mutex_unlock(&chip->mutex);
 
 	return 0;
 }
@@ -860,6 +877,8 @@ static int sbs_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, chip);
 
+	mutex_init(&chip->mutex);
+
 	if (!chip->gpio_detect)
 		goto skip_gpio;
 
@@ -898,6 +917,8 @@ static int sbs_probe(struct i2c_client *client,
 
 	chip->irq = irq;
 
+	chip->shutdown_complete = 0;
+
 skip_gpio:
 	/*
 	 * Before we register, we need to make sure we can actually talk
@@ -934,6 +955,7 @@ exit_psupply:
 	if (chip->gpio_detect)
 		gpio_free(pdata->battery_detect);
 
+	mutex_destroy(&chip->mutex);
 	kfree(chip);
 
 exit_free_name:
@@ -955,11 +977,30 @@ static int sbs_remove(struct i2c_client *client)
 
 	cancel_delayed_work_sync(&chip->work);
 
+	mutex_destroy(&chip->mutex);
+
 	kfree(chip->power_supply.name);
 	kfree(chip);
 	chip = NULL;
 
 	return 0;
+}
+
+static void sbs_shutdown(struct i2c_client *client)
+{
+	struct sbs_info *chip = i2c_get_clientdata(client);
+
+	mutex_lock(&chip->mutex);
+	if (chip->irq)
+		disable_irq(chip->irq);
+
+	if (chip->gpio_detect)
+		gpio_free(chip->plat_data.battery_detect);
+
+	cancel_delayed_work_sync(&chip->work);
+	chip->shutdown_complete = 1;
+
+	mutex_unlock(&chip->mutex);
 }
 
 #if defined CONFIG_PM_SLEEP
@@ -1008,6 +1049,7 @@ static struct i2c_driver sbs_battery_driver = {
 	.probe		= sbs_probe,
 	.remove		= sbs_remove,
 	.id_table	= sbs_id,
+	.shutdown	= sbs_shutdown,
 	.driver = {
 		.name	= "sbs-battery",
 		.of_match_table = of_match_ptr(sbs_dt_ids),
