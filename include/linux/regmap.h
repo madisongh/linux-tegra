@@ -504,10 +504,16 @@ int regmap_fields_update_bits(struct regmap_field *field,  unsigned int id,
  *
  * @reg_offset: Offset of the status/mask register within the bank
  * @mask:       Mask used to flag/control the register.
+ * @type_reg_offset: Offset register for the irq type setting.
+ * @type_rising_mask: Mask bit to configure RISING type irq.
+ * @type_falling_mask: Mask bit to configure FALLING type irq.
  */
 struct regmap_irq {
 	unsigned int reg_offset;
 	unsigned int mask;
+	unsigned int type_reg_offset;
+	unsigned int type_rising_mask;
+	unsigned int type_falling_mask;
 };
 
 /**
@@ -522,17 +528,22 @@ struct regmap_irq {
  * @ack_base:    Base ack address. If zero then the chip is clear on read.
  *               Using zero value is possible with @use_ack bit.
  * @wake_base:   Base address for wake enables.  If zero unsupported.
+ * @type_base:   Base address for irq type.  If zero unsupported.
  * @irq_reg_stride:  Stride to use for chips where registers are not contiguous.
  * @init_ack_masked: Ack all masked interrupts once during initalization.
  * @mask_invert: Inverted mask register: cleared bits are masked out.
  * @use_ack:     Use @ack register even if it is zero.
  * @wake_invert: Inverted wake register: cleared bits are wake enabled.
  * @runtime_pm:  Hold a runtime PM lock on the device when accessing it.
+ * @type_invert: Invert the type flags.
  *
  * @num_regs:    Number of registers in each control bank.
  * @irqs:        Descriptors for individual IRQs.  Interrupt numbers are
  *               assigned based on the index in the array of the interrupt.
  * @num_irqs:    Number of descriptors.
+ * @num_type_reg:    Number of type registers.
+ * @type_reg_stride: Stride to use for chips where type registers are not
+ *			contiguous.
  */
 struct regmap_irq_chip {
 	const char *name;
@@ -541,17 +552,22 @@ struct regmap_irq_chip {
 	unsigned int mask_base;
 	unsigned int ack_base;
 	unsigned int wake_base;
+	unsigned int type_base;
 	unsigned int irq_reg_stride;
 	bool init_ack_masked:1;
 	bool mask_invert:1;
 	bool use_ack:1;
 	bool wake_invert:1;
 	bool runtime_pm:1;
+	bool type_invert:1;
 
 	int num_regs;
 
 	const struct regmap_irq *irqs;
 	int num_irqs;
+
+	int num_type_reg;
+	unsigned int type_reg_stride;
 };
 
 struct regmap_irq_chip_data;
