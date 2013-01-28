@@ -41,6 +41,15 @@ config ARCH_TEGRA_3x_SOC
 	  Support for NVIDIA Tegra T30 processor family, based on the
 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
 
+config TEGRA_BBC_PROXY
+	bool "Enable BBC Proxy driver"
+	default n
+	help
+	  Enables driver which handles miscellaneous services required
+	  by the BB core. Handles initialization of EDP, ISO Bandwidth,
+	  and Latency Allowance settings. Additional setting adjustments
+	  can be done from user space through sysfs.
+
 config TEGRA_BASEBAND
 	bool "Enable integrated tegra baseband support"
 	default n
