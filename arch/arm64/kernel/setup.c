@@ -61,6 +61,8 @@
 #include <asm/psci.h>
 #include <asm/efi.h>
 
+#include <asm/mach/arch.h>
+
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
 
@@ -80,6 +82,8 @@ unsigned int compat_elf_hwcap2 __read_mostly;
 #endif
 
 static const char *cpu_name;
+
+const struct machine_desc *machine_desc __initdata;
 phys_addr_t __fdt_pointer __initdata;
 
 /*
@@ -299,8 +303,12 @@ static void __init setup_processor(void)
 #endif
 }
 
-static void __init setup_machine_fdt(phys_addr_t dt_phys)
+static const struct machine_desc * __init setup_machine_fdt(phys_addr_t dt_phys)
 {
+	const struct machine_desc *mdesc, *mdesc_best = NULL;
+	unsigned int score, mdesc_score = ~1;
+	unsigned long dt_root;
+
 	if (!dt_phys || !early_init_dt_scan(phys_to_virt(dt_phys))) {
 		early_print("\n"
 			"Error: invalid device tree blob at physical address 0x%p (virtual address 0x%p)\n"
@@ -311,6 +319,38 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 		while (true)
 			cpu_relax();
 	}
+
+	dt_root = of_get_flat_dt_root();
+
+	for_each_machine_desc(mdesc) {
+		score = of_flat_dt_match(dt_root, mdesc->dt_compat);
+		if (score > 0 && score < mdesc_score) {
+			mdesc_best = mdesc;
+			mdesc_score = score;
+		}
+	}
+	if (!mdesc_best) {
+		const char *prop;
+		int size;
+
+		pr_info("\nError: unrecognized/unsupported "
+			    "device tree compatible list:\n[ ");
+
+		prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
+		while (size > 0) {
+			pr_info("'%s' ", prop);
+			size -= strlen(prop) + 1;
+			prop += strlen(prop) + 1;
+		}
+		pr_info("]\n\n");
+
+		while (true)
+			/* can't use cpu_relax() here as it may require MMU setup */;
+	}
+
+	dump_stack_set_arch_desc("%s (DT)", of_flat_dt_get_machine_name());
+
+	return mdesc_best;
 }
 
 /*
@@ -364,9 +404,11 @@ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
 
 void __init setup_arch(char **cmdline_p)
 {
-	setup_processor();
+	const struct machine_desc *mdesc;
 
-	setup_machine_fdt(__fdt_pointer);
+	setup_processor();
+	mdesc = setup_machine_fdt(__fdt_pointer);
+	machine_desc = mdesc;
 
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code   = (unsigned long) _etext;
@@ -413,6 +455,9 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
+
+	if (machine_desc->init_early)
+		machine_desc->init_early();
 }
 
 static int __init arm64_device_init(void)
@@ -557,3 +602,12 @@ const struct seq_operations cpuinfo_op = {
 	.stop	= c_stop,
 	.show	= c_show
 };
+
+static int __init customize_machine(void)
+{
+	/* customizes platform devices, or adds new ones */
+	if (machine_desc->init_machine)
+		machine_desc->init_machine();
+	return 0;
+}
+arch_initcall(customize_machine);

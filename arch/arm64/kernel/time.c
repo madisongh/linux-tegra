@@ -41,6 +41,9 @@
 #include <asm/thread_info.h>
 #include <asm/stacktrace.h>
 
+#include <asm/mach/arch.h>
+#include <asm/mach/time.h>
+
 #ifdef CONFIG_SMP
 unsigned long profile_pc(struct pt_regs *regs)
 {
@@ -69,6 +72,9 @@ void __init time_init(void)
 
 	of_clk_init(NULL);
 	clocksource_of_init();
+
+	if (machine_desc->init_time)
+			machine_desc->init_time();
 
 	tick_setup_hrtimer_broadcast();
 

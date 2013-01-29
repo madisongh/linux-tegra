@@ -35,6 +35,8 @@
 #include <asm/memblock.h>
 #include <asm/mmu_context.h>
 
+#include <asm/mach/arch.h>
+
 #include "mm.h"
 
 /*
@@ -348,6 +350,12 @@ void __init paging_init(void)
 	void *zero_page;
 
 	map_mem();
+
+	/*
+	 * Ask the machine support to map in the statically mapped devices.
+	 */
+	if (machine_desc->map_io)
+		machine_desc->map_io();
 
 	/*
 	 * Finally flush the caches and tlb to ensure that we're in a
