@@ -904,7 +904,7 @@ static void allocations_stringify(struct nvmap_client *client,
 			phys_addr_t base = iovmm ? 0 :
 					   (handle->carveout->base);
 			seq_printf(s,
-				"%-18s %-18s %8llx %10u %8x %6u %6u %6u\n",
+				"%-18s %-18s %8llx %10zu %8x %6u %6u %6u\n",
 				"", "",
 				(unsigned long long)base, handle->size,
 				handle->userflags,
@@ -932,7 +932,7 @@ static int nvmap_debug_allocations_show(struct seq_file *s, void *unused)
 		struct nvmap_client *client =
 			get_client_from_carveout_commit(node, commit);
 		client_stringify(client, s);
-		seq_printf(s, " %10u\n", commit->commit);
+		seq_printf(s, " %10zu\n", commit->commit);
 		allocations_stringify(client, s, false);
 		seq_printf(s, "\n");
 		total += commit->commit;
@@ -970,7 +970,7 @@ static int nvmap_debug_clients_show(struct seq_file *s, void *unused)
 		struct nvmap_client *client =
 			get_client_from_carveout_commit(node, commit);
 		client_stringify(client, s);
-		seq_printf(s, " %10u\n", commit->commit);
+		seq_printf(s, " %10zu\n", commit->commit);
 		total += commit->commit;
 	}
 	seq_printf(s, "%-18s %18s %8u %10u\n", "total", "", 0, total);
@@ -1254,7 +1254,7 @@ static int nvmap_probe(struct platform_device *pdev)
 					    &heap_extra_attr_group))
 			dev_warn(&pdev->dev, "couldn't add extra attributes\n");
 
-		dev_info(&pdev->dev, "created carveout %s (%uKiB)\n",
+		dev_info(&pdev->dev, "created carveout %s (%zuKiB)\n",
 			 co->name, co->size / 1024);
 
 		if (!IS_ERR_OR_NULL(nvmap_debug_root)) {

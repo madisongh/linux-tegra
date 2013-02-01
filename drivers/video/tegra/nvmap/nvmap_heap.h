@@ -35,8 +35,8 @@ struct nvmap_heap_block {
 #define NVMAP_HEAP_MIN_BUDDY_SIZE	8192
 
 struct nvmap_heap *nvmap_heap_create(struct device *parent, const char *name,
-				     unsigned long base, size_t len,
-				     unsigned int buddy_size, void *arg);
+				     phys_addr_t base, size_t len,
+				     size_t buddy_size, void *arg);
 
 void nvmap_heap_destroy(struct nvmap_heap *heap);
 
