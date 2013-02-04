@@ -90,6 +90,9 @@ obj-$(CONFIG_GPIO_SYSCON)	+= gpio-syscon.o
 obj-$(CONFIG_GPIO_TB10X)	+= gpio-tb10x.o
 obj-$(CONFIG_GPIO_TC3589X)	+= gpio-tc3589x.o
 CFLAGS_gpio-tegra.o		= -Werror
+ifeq ($(CONFIG_ARM64),y)
+CFLAGS_gpio-tegra.o		+= -Iarch/arm/mach-tegra/include
+endif
 obj-$(CONFIG_ARCH_TEGRA)	+= gpio-tegra.o
 obj-$(CONFIG_GPIO_TIMBERDALE)	+= gpio-timberdale.o
 obj-$(CONFIG_GPIO_TPS6586X)	+= gpio-tps6586x.o
