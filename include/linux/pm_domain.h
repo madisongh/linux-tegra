@@ -76,6 +76,11 @@ struct generic_pm_domain {
 			  struct device *dev);
 	void (*detach_dev)(struct generic_pm_domain *domain,
 			   struct device *dev);
+	struct delayed_work power_off_delayed_work;
+	s64 power_off_delay;
+#ifdef CONFIG_PM_SLEEP
+	struct notifier_block system_suspend_notifier;
+#endif
 };
 
 static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
@@ -120,6 +125,12 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
 	return to_gpd_data(dev->power.subsys_data->domain_data);
 }
 
+static inline void pm_genpd_set_poweroff_delay(struct generic_pm_domain *genpd,
+	s64 delay)
+{
+	genpd->power_off_delay = delay;
+}
+
 extern struct generic_pm_domain *dev_to_genpd(struct device *dev);
 extern int __pm_genpd_add_device(struct generic_pm_domain *genpd,
 				 struct device *dev,
@@ -152,6 +163,8 @@ extern struct dev_power_governor simple_qos_governor;
 extern struct dev_power_governor pm_domain_always_on_gov;
 #else
 
+static inline void pm_genpd_set_poweroff_delay(struct generic_pm_domain *genpd,
+	s64 delay) {}
 static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
 {
 	return ERR_PTR(-ENOSYS);

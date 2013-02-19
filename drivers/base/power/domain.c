@@ -592,6 +592,19 @@ static int pm_genpd_poweroff(struct generic_pm_domain *genpd)
 	return ret;
 }
 
+static int __pm_genpd_poweroff(struct generic_pm_domain *genpd)
+{
+	int ret = 0;
+
+	mutex_lock(&genpd->lock);
+	genpd->in_progress++;
+	ret = pm_genpd_poweroff(genpd);
+	genpd->in_progress--;
+	mutex_unlock(&genpd->lock);
+
+	return ret;
+}
+
 /**
  * genpd_power_off_work_fn - Power off PM domain whose subdomain count is 0.
  * @work: Work structure used for scheduling the execution of this function.
@@ -605,6 +618,21 @@ static void genpd_power_off_work_fn(struct work_struct *work)
 	genpd_acquire_lock(genpd);
 	pm_genpd_poweroff(genpd);
 	genpd_release_lock(genpd);
+}
+
+/**
+ * genpd_delayed_power_off_work_fn - Power off PM domain after the delay.
+ * @work: Work structure used for scheduling the execution of this function.
+ */
+static void genpd_delayed_power_off_work_fn(struct work_struct *work)
+{
+	struct generic_pm_domain *genpd;
+	struct delayed_work *delay_work = to_delayed_work(work);
+
+	genpd = container_of(delay_work, struct generic_pm_domain,
+		power_off_delayed_work);
+
+	__pm_genpd_poweroff(genpd);
 }
 
 /**
@@ -644,7 +672,6 @@ static int pm_genpd_runtime_suspend(struct device *dev)
 		return 0;
 
 	mutex_lock(&genpd->lock);
-
 	/*
 	 * If we have an unknown state of the need_restore flag, it means none
 	 * of the runtime PM callbacks has been invoked yet. Let's update the
@@ -653,11 +680,13 @@ static int pm_genpd_runtime_suspend(struct device *dev)
 	gpd_data = to_gpd_data(dev->power.subsys_data->domain_data);
 	if (gpd_data->need_restore < 0)
 		gpd_data->need_restore = 0;
-
-	genpd->in_progress++;
-	pm_genpd_poweroff(genpd);
-	genpd->in_progress--;
 	mutex_unlock(&genpd->lock);
+
+	if (genpd->power_off_delay)
+		queue_delayed_work(pm_wq, &genpd->power_off_delayed_work,
+			msecs_to_jiffies(genpd->power_off_delay));
+	else
+		__pm_genpd_poweroff(genpd);
 
 	return 0;
 }
@@ -685,6 +714,12 @@ static int pm_genpd_runtime_resume(struct device *dev)
 	/* If power.irq_safe, the PM domain is never powered off. */
 	if (dev->power.irq_safe)
 		return genpd_start_dev_no_timing(genpd, dev);
+
+	if (genpd->power_off_delay) {
+		if (delayed_work_pending(&genpd->power_off_delayed_work))
+			cancel_delayed_work_sync(
+				&genpd->power_off_delayed_work);
+	}
 
 	mutex_lock(&genpd->lock);
 	ret = __pm_genpd_poweron(genpd);
@@ -767,6 +802,7 @@ static inline void
 genpd_queue_power_off_work(struct generic_pm_domain *genpd) {}
 
 static inline void genpd_power_off_work_fn(struct work_struct *work) {}
+static inline void genpd_delayed_power_off_work_fn(struct work_struct *work) {}
 
 #define pm_genpd_runtime_suspend	NULL
 #define pm_genpd_runtime_resume		NULL
@@ -1878,6 +1914,40 @@ static int pm_genpd_default_restore_state(struct device *dev)
 	return cb ? cb(dev) : 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+
+static int pm_genpd_suspend_notifier(struct notifier_block *notifier,
+	unsigned long pm_event, void *unused)
+{
+	struct generic_pm_domain *genpd = container_of(notifier,
+		struct generic_pm_domain, system_suspend_notifier);
+
+	if (!genpd)
+		return NOTIFY_DONE;
+
+	switch (pm_event) {
+	case PM_SUSPEND_PREPARE:
+		if (genpd->power_off_delay) {
+			/* if a domain has scheduled a delayed work */
+			if (delayed_work_pending(
+				&genpd->power_off_delayed_work)) {
+
+				/* cancel it now */
+				cancel_delayed_work_sync(
+					&genpd->power_off_delayed_work);
+
+				/* call its power off */
+				__pm_genpd_poweroff(genpd);
+			}
+		}
+		return NOTIFY_OK;
+	}
+
+	return NOTIFY_DONE;
+}
+
+#endif /* !CONFIG_PM_SLEEP */
+
 /**
  * pm_genpd_init - Initialize a generic I/O PM domain object.
  * @genpd: PM domain object to initialize.
@@ -1896,7 +1966,10 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
 	mutex_init(&genpd->lock);
 	genpd->gov = gov;
 	INIT_WORK(&genpd->power_off_work, genpd_power_off_work_fn);
+	INIT_DELAYED_WORK(&genpd->power_off_delayed_work,
+		genpd_delayed_power_off_work_fn);
 	genpd->in_progress = 0;
+	genpd->power_off_delay = 0;
 	atomic_set(&genpd->sd_count, 0);
 	genpd->status = is_off ? GPD_STATE_POWER_OFF : GPD_STATE_ACTIVE;
 	init_waitqueue_head(&genpd->status_wait_queue);
@@ -1929,6 +2002,11 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
 	genpd->domain.ops.complete = pm_genpd_complete;
 	genpd->dev_ops.save_state = pm_genpd_default_save_state;
 	genpd->dev_ops.restore_state = pm_genpd_default_restore_state;
+#ifdef CONFIG_PM_SLEEP
+	genpd->system_suspend_notifier.notifier_call =
+		pm_genpd_suspend_notifier;
+	register_pm_notifier(&genpd->system_suspend_notifier);
+#endif
 	mutex_lock(&gpd_list_lock);
 	list_add(&genpd->gpd_list_node, &gpd_list);
 	mutex_unlock(&gpd_list_lock);
