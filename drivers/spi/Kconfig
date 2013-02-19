@@ -508,6 +508,14 @@ config SPI_MXS
 	help
 	  SPI driver for Freescale MXS devices.
 
+config SPI_TEGRA114
+	tristate "Nvidia Tegra114 SPI Controller"
+	depends on ARCH_TEGRA && TEGRA20_APB_DMA
+	help
+	  SPI driver for Nvidia Tegra114 SPI Controller interface. This controller
+	  is different than the older SoCs spi controller and register interface
+	  also get changed with this controller.
+
 config SPI_TEGRA20_SFLASH
 	tristate "Nvidia Tegra20 Serial flash Controller"
 	depends on ARCH_TEGRA || COMPILE_TEST
