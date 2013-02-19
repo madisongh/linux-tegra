@@ -2,6 +2,7 @@
  * drivers/base/power/domain.c - Common code related to device power domains.
  *
  * Copyright (C) 2011 Rafael J. Wysocki <rjw@sisk.pl>, Renesas Electronics Corp.
+ * Copyright (c) 2014, NVIDIA CORPORATION. All rights reserved.
  *
  * This file is released under the GPLv2.
  */
@@ -325,6 +326,15 @@ static int genpd_poweroff(struct generic_pm_domain *genpd, bool is_async)
 			not_suspended++;
 	}
 
+	/*
+	 * Due to power_off_delay, there will be only one outstanding
+	 * genpd poweroff request while corresponding device(s) will be
+	 * in suspended state. For last active device, the genpd shall
+	 * be ON while genpd poweroff for other devices is being processed.
+	 */
+	if (genpd->power_off_delay && not_suspended == 1)
+		return -EBUSY;
+
 	if (not_suspended > 1 || (not_suspended == 1 && is_async))
 		return -EBUSY;
 
@@ -362,6 +372,17 @@ static int genpd_poweroff(struct generic_pm_domain *genpd, bool is_async)
 	return 0;
 }
 
+static int __pm_genpd_poweroff(struct generic_pm_domain *genpd)
+{
+	int ret = 0;
+
+	mutex_lock(&genpd->lock);
+	ret = genpd_poweroff(genpd, false);
+	mutex_unlock(&genpd->lock);
+
+	return ret;
+}
+
 /**
  * genpd_power_off_work_fn - Power off PM domain whose subdomain count is 0.
  * @work: Work structure used for scheduling the execution of this function.
@@ -375,6 +396,21 @@ static void genpd_power_off_work_fn(struct work_struct *work)
 	mutex_lock(&genpd->lock);
 	genpd_poweroff(genpd, true);
 	mutex_unlock(&genpd->lock);
+}
+
+/**
+ * genpd_delayed_power_off_work_fn - Power off PM domain after the delay.
+ * @work: Work structure used for scheduling the execution of this function.
+ */
+static void genpd_delayed_power_off_work_fn(struct work_struct *work)
+{
+	struct generic_pm_domain *genpd;
+	struct delayed_work *delay_work = to_delayed_work(work);
+
+	genpd = container_of(delay_work, struct generic_pm_domain,
+		power_off_delayed_work);
+
+	__pm_genpd_poweroff(genpd);
 }
 
 /**
@@ -445,7 +481,11 @@ static int pm_genpd_runtime_suspend(struct device *dev)
 		return 0;
 
 	mutex_lock(&genpd->lock);
-	genpd_poweroff(genpd, false);
+	if (genpd->power_off_delay)
+		queue_delayed_work(pm_wq, &genpd->power_off_delayed_work,
+			msecs_to_jiffies(genpd->power_off_delay));
+	else
+		genpd_poweroff(genpd, false);
 	mutex_unlock(&genpd->lock);
 
 	return 0;
@@ -479,6 +519,12 @@ static int pm_genpd_runtime_resume(struct device *dev)
 	if (dev->power.irq_safe) {
 		timed = false;
 		goto out;
+	}
+
+	if (genpd->power_off_delay) {
+		if (delayed_work_pending(&genpd->power_off_delayed_work))
+			cancel_delayed_work_sync(
+				&genpd->power_off_delayed_work);
 	}
 
 	mutex_lock(&genpd->lock);
@@ -1479,6 +1525,9 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
 	mutex_init(&genpd->lock);
 	genpd->gov = gov;
 	INIT_WORK(&genpd->power_off_work, genpd_power_off_work_fn);
+	INIT_DELAYED_WORK(&genpd->power_off_delayed_work,
+		genpd_delayed_power_off_work_fn);
+	genpd->power_off_delay = 0;
 	atomic_set(&genpd->sd_count, 0);
 	genpd->status = is_off ? GPD_STATE_POWER_OFF : GPD_STATE_ACTIVE;
 	genpd->device_count = 0;
