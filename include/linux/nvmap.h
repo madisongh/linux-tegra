@@ -50,10 +50,7 @@
 #define NVMAP_HANDLE_SECURE          (0x1ul << 2)
 #define NVMAP_HANDLE_ZEROED_PAGES    (0x1ul << 3)
 
-<<<<<<< HEAD
-=======
 struct nvmap_handle;
->>>>>>> 0c5b831... video: tegra: nvmap: move nvmap ioctls to linux/nvmap.h
 
 #if defined(__KERNEL__)
 
@@ -76,22 +73,6 @@ struct nvmap_device;
 #define nvmap_convert_handle_u2k(h) (*((u32 *)h))
 #endif
 
-#define nvmap_id_to_handle(_id) ((struct nvmap_handle *)(_id))
-
-
-#if defined(CONFIG_TEGRA_NVMAP)
-/* handle_ref objects are client-local references to an nvmap_handle;
- * they are distinct objects so that handles can be unpinned and
- * unreferenced the correct number of times when a client abnormally
- * terminates */
-struct nvmap_handle_ref {
-	struct nvmap_handle *handle;
-	struct rb_node	node;
-	atomic_t	dupes;	/* number of times to free on file close */
-	atomic_t	pin;	/* number of times to unpin on free */
-};
-#endif
-
 struct nvmap_client *nvmap_create_client(struct nvmap_device *dev,
 					 const char *name);
 
@@ -99,7 +80,7 @@ struct nvmap_handle_ref *nvmap_alloc(struct nvmap_client *client, size_t size,
 				     size_t align, unsigned int flags,
 				     unsigned int heap_mask);
 
-phys_addr_t _nvmap_get_addr_from_id(u32 user_id);
+phys_addr_t _nvmap_get_addr_from_id(ulong user_id);
 
 void nvmap_free(struct nvmap_client *client, struct nvmap_handle_ref *r);
 
@@ -193,14 +174,19 @@ enum {
 };
 
 struct nvmap_create_handle {
+#ifdef CONFIG_COMPAT
 	union {
 		__u32 id;	/* FromId */
 		__u32 size;	/* CreateHandle */
 		__s32 fd;	/* DmaBufFd or FromFd */
 	};
-#ifdef CONFIG_COMPAT
 	__u32 handle;		/* returns nvmap handle */
 #else
+	union {
+		unsigned long id;	/* FromId */
+		__u32 size;	/* CreateHandle */
+		__s32 fd;	/* DmaBufFd or FromFd */
+	};
 	struct nvmap_handle *handle; /* returns nvmap handle */
 #endif
 };
