@@ -532,8 +532,6 @@ int nvmap_ioctl_rw_handle(struct file *filp, int is_read, void __user* arg)
 	if (!h)
 		return -EPERM;
 
-	nvmap_usecount_inc(h);
-
 	trace_nvmap_ioctl_rw_handle(client, h, is_read, op.offset,
 				    op.addr, op.hmem_stride,
 				    op.user_stride, op.elem_size, op.count);
@@ -860,9 +858,6 @@ static void cache_maint_work_funct(struct cache_maint_op *cache_work)
 		goto out;
 	}
 
-	/* lock carveout from relocation by mapcount */
-	nvmap_usecount_inc(h);
-
 	pstart += h->carveout->base;
 	pend += h->carveout->base;
 
@@ -883,9 +878,6 @@ static void cache_maint_work_funct(struct cache_maint_op *cache_work)
 
 	if (h->flags != NVMAP_HANDLE_INNER_CACHEABLE)
 		outer_cache_maint(op, pstart, pend - pstart);
-
-	/* unlock carveout */
-	nvmap_usecount_dec(h);
 
 out:
 	if (pte)

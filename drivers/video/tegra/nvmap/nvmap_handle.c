@@ -800,8 +800,6 @@ static void alloc_handle(struct nvmap_client *client,
 
 	if (type & carveout_mask) {
 		struct nvmap_heap_block *b;
-		/* Protect handle from relocation */
-		nvmap_usecount_inc(h);
 
 		b = nvmap_carveout_alloc(client, h, type);
 		if (b) {
@@ -812,9 +810,6 @@ static void alloc_handle(struct nvmap_client *client,
 				nvmap_heap_to_arg(nvmap_block_to_heap(b)),
 				h->size);
 		}
-	} else if (type & NVMAP_HEAP_IOVMM) {
-		nvmap_usecount_dec(h);
-
 	} else if (type & iovmm_mask) {
 		size_t reserved = PAGE_ALIGN(h->size);
 		int commit = 0;
