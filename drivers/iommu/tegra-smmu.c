@@ -32,6 +32,7 @@
 #include <linux/io.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#include <linux/dma-mapping.h>
 
 #include <soc/tegra/ahb.h>
 
@@ -1400,6 +1401,10 @@ static int tegra_smmu_device_notifier(struct notifier_block *nb,
 	int err;
 
 	switch (event) {
+	case BUS_NOTIFY_BIND_DRIVER:
+		if (get_dma_ops(dev) != &arm_dma_ops)
+			break;
+		/* FALLTHROUGH */
 	case BUS_NOTIFY_ADD_DEVICE:
 		err = of_get_dma_window(dev->of_node, NULL, 0, NULL, &base,
 					&size);
