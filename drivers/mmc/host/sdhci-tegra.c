@@ -90,6 +90,7 @@
 
 #define SDHCI_TEGRA_MAX_TAP_VALUES	0xFF
 #define SDHCI_TEGRA_MAX_TRIM_VALUES	0x1F
+#define DEFAULT_SDHOST_FREQ	50000000
 
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
@@ -412,6 +413,7 @@ static void tegra_sdhci_clock_set_parent(struct sdhci_host *host,
 		if (!tegra_host->is_parent_pllc) {
 			parent_clk = pll_c;
 			tegra_host->is_parent_pllc = true;
+			clk_set_rate(pltfm_host->clk, DEFAULT_SDHOST_FREQ);
 		} else
 			return;
 	} else if (tegra_host->is_parent_pllc) {
