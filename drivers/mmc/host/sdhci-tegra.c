@@ -36,6 +36,7 @@
 #include <asm/gpio.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#include <linux/reboot.h>
 
 #include <mach/hardware.h>
 #include <linux/platform_data/mmc-sdhci-tegra.h>
@@ -111,6 +112,7 @@ struct sdhci_tegra {
 	/* max ddr clk supported by the platform */
 	unsigned int ddr_clk_limit;
 	struct sdhci_tegra_sd_stats *sd_stat_head;
+	struct notifier_block reboot_notify;
 };
 
 static int show_register_dump(struct seq_file *s, void *data)
@@ -631,6 +633,29 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	return mmc_of_parse(host->mmc);
 }
 
+static void tegra_sdhci_rail_off(struct sdhci_tegra *tegra_host)
+{
+	/*
+	 * Fix me: Tegra sdhci regulators are no longer used. So, either
+	 * move reboot notifier to sdhci driver or remove the notifier.
+	 */
+}
+
+static int tegra_sdhci_reboot_notify(struct notifier_block *nb,
+				unsigned long event, void *data)
+{
+	struct sdhci_tegra *tegra_host =
+		container_of(nb, struct sdhci_tegra, reboot_notify);
+
+	switch (event) {
+	case SYS_RESTART:
+	case SYS_POWER_OFF:
+		tegra_sdhci_rail_off(tegra_host);
+		return NOTIFY_OK;
+	}
+	return NOTIFY_DONE;
+}
+
 static int sdhci_tegra_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
@@ -715,6 +740,11 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	/* Enable async suspend/resume to reduce LP0 latency */
 	device_enable_async_suspend(&pdev->dev);
 
+	if (plat->power_off_rail) {
+		tegra_host->reboot_notify.notifier_call =
+			tegra_sdhci_reboot_notify;
+		register_reboot_notifier(&tegra_host->reboot_notify);
+	}
 	return 0;
 
 err_add_host:
@@ -746,6 +776,9 @@ static int sdhci_tegra_remove(struct platform_device *pdev)
 	if (tegra_host->clk_enabled)
 		clk_disable_unprepare(pltfm_host->clk);
 	clk_put(pltfm_host->clk);
+
+	if (plat->power_off_rail)
+		unregister_reboot_notifier(&tegra_host->reboot_notify);
 
 	sdhci_pltfm_free(pdev);
 
