@@ -577,4 +577,13 @@ config TEGRA_USE_NCT
 	bool "Enable NCT partition access"
 	help
 	  When enabled, we can read non-volatile items from NCT partition.
+
+config TEGRA_VDD_CORE_OVERRIDE
+	bool "Enable core rail override support"
+	depends on TEGRA_SILICON_PLATFORM
+	default n
+	help
+	  When enabled, core rail can be fixed and locked at specified voltage
+	  within override range, and core modules clocks are capped at rates
+	  safe at override level.
 endif
