@@ -123,4 +123,13 @@ config SPEAR_ADC
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called spear_adc.
+
+config PALMAS_GPADC
+	tristate "TI Palmas General Purpose ADC"
+	depends on MFD_PALMAS
+	help
+	 Palmas series pmic chip is used in smartphones and tablets
+	 which supports a 16 channel GPADC. Add iio driver to read
+	 different channel of GPADCs.
+
 endmenu
