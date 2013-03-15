@@ -704,6 +704,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	host->mmc->pm_caps |= plat->pm_caps;
 	host->mmc->pm_flags |= plat->pm_flags;
 
+	/* disable access to boot partitions */
+	host->mmc->caps2 |= MMC_CAP2_BOOTPART_NOACC;
+
 	rc = sdhci_add_host(host);
 	sdhci_tegra_error_stats_debugfs(host);
 	if (rc)
