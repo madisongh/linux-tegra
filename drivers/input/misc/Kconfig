@@ -746,5 +746,6 @@ config INPUT_ALPS_GPIO_SCROLLWHEEL
 
 source	"drivers/input/misc/compass/Kconfig"
 source	"drivers/input/misc/mpu/Kconfig"
+source	"drivers/input/misc/pressure/Kconfig"
 
 endif

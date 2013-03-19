@@ -72,3 +72,4 @@ obj-$(CONFIG_INPUT_YEALINK)		+= yealink.o
 obj-$(CONFIG_INPUT_IDEAPAD_SLIDEBAR)	+= ideapad_slidebar.o
 obj-y					+= compass/
 obj-y					+= mpu/
+obj-y					+= pressure/
