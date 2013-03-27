@@ -1136,7 +1136,7 @@ static phys_addr_t smmu_iommu_iova_to_phys(struct iommu_domain *domain,
 	}
 
 	dev_dbg(as->smmu->dev,
-		"iova:%08llx pfn:%08x asid:%d\n", (unsigned long long)iova,
+		"iova:%08llx pfn:%pa asid:%d\n", (unsigned long long)iova,
 		 pa, as->asid);
 
 	spin_unlock_irqrestore(&as->lock, flags);
