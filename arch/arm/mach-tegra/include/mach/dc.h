@@ -513,6 +513,7 @@ struct tegra_dc_out {
 
 	int	(*hotplug_init)(struct device *);
 	int	(*postsuspend)(void);
+	void	(*hotplug_report)(bool);
 };
 
 /* bits for tegra_dc_out.flags */
