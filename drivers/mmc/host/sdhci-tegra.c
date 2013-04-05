@@ -700,6 +700,10 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	struct tegra_sdhci_platform_data *plat;
 	int val;
+	struct property *prop;
+	const __be32 *p;
+	u32 u;
+	int i = 0;
 
 	if (!np)
 		return NULL;
@@ -709,6 +713,18 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	if (!plat) {
 		dev_err(&pdev->dev, "Can't allocate platform data\n");
 		return NULL;
+	}
+
+	if (of_find_property(np, "edp_support", NULL)) {
+		plat->edp_support = true;
+		of_property_for_each_u32(np, "edp_states", prop, p, u) {
+			if (i == SD_EDP_NUM_STATES)
+				break;
+			plat->edp_states[i] = u;
+			i++;
+		}
+		p = NULL;
+		prop = NULL;
 	}
 
 	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
@@ -841,6 +857,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 	tegra_pd_add_device(&pdev->dev);
 	host->mmc->caps2 |= MMC_CAP2_PACKED_CMD;
+	
 	rc = sdhci_add_host(host);
 	sdhci_tegra_error_stats_debugfs(host);
 	if (rc)
