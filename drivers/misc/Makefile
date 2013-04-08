@@ -75,4 +75,5 @@ obj-$(CONFIG_FAN_THERM_EST)	+= therm_fan_est.o
 obj-$(CONFIG_BLUEDROID_PM)      += bluedroid_pm.o
 obj-$(CONFIG_CPULOAD_MONITOR)	+= cpuload.o
 obj-$(CONFIG_SIM_MAX77660)	+= max77660-sim.o
+obj-$(CONFIG_SIM_PALMAS)	+= palmas-sim.o
 obj-$(CONFIG_ARCH_TEGRA)        +=tegra_timerinfo.o
