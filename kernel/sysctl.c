@@ -96,6 +96,7 @@
 #if defined(CONFIG_SYSCTL)
 
 /* External variables not in a header file. */
+extern int sysctl_lazy_vfree_pages;
 extern int max_threads;
 extern int suid_dumpable;
 #ifdef CONFIG_COREDUMP
@@ -1110,6 +1111,13 @@ static struct ctl_table kern_table[] = {
 };
 
 static struct ctl_table vm_table[] = {
+	{
+		.procname	= "lazy_vfree_pages",
+		.data		= &sysctl_lazy_vfree_pages,
+		.maxlen		= sizeof(sysctl_lazy_vfree_pages),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
 	{
 		.procname	= "overcommit_memory",
 		.data		= &sysctl_overcommit_memory,
