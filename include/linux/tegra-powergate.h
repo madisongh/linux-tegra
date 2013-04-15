@@ -140,4 +140,5 @@ static inline int tegra_unpowergate_partition(int id)
 }
 #endif
 
+bool tegra_powergate_check_clamping(int id);
 #endif /* _MACH_TEGRA_POWERGATE_H_ */
