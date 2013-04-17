@@ -47,21 +47,21 @@
 
 
 /* Tegra SDHOST controller vendor register definitions */
-#define SDHCI_VENDOR_CLOCK_CNTRL       0x100
-#define SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_SHIFT		16
-#define SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_MASK			0xFF
-#define SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_SHIFT		24
-#define SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_MASK		0x1F
-#define SDHCI_VENDOR_CLOCK_CNTRL_PADPIPE_CLKEN_OVERRIDE		0x8
-#define SDHCI_VENDOR_CLOCK_CNTRL_SPI_MODE_CLKEN_OVERRIDE	0x4
-#define SDHCI_VENDOR_CLOCK_CNTRL_INPUT_IO_CLK			0x2
-#define SDHCI_VENDOR_CLOCK_CNTRL_SDMMC_CLK			0x1
+#define SDHCI_VNDR_CLK_CTRL       0x100
+#define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT		16
+#define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK			0xFF
+#define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT		24
+#define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK		0x1F
+#define SDHCI_VNDR_CLK_CTRL_PADPIPE_CLKEN_OVERRIDE		0x8
+#define SDHCI_VNDR_CLK_CTRL_SPI_MODE_CLKEN_OVERRIDE	0x4
+#define SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK			0x2
+#define SDHCI_VNDR_CLK_CTRL_SDMMC_CLK			0x1
 
-#define SDHCI_TEGRA_VENDOR_MISC_CTRL		0x120
-#define SDHCI_MISC_CTRL_ENABLE_SDR104		0x8
-#define SDHCI_MISC_CTRL_ENABLE_SDR50		0x10
-#define SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300	0x20
-#define SDHCI_MISC_CTRL_ENABLE_DDR50		0x200
+#define SDHCI_VNDR_MISC_CTRL		0x120
+#define SDHCI_VNDR_MISC_CTRL_ENABLE_SDR104		0x8
+#define SDHCI_VNDR_MISC_CTRL_ENABLE_SDR50		0x10
+#define SDHCI_VNDR_MISC_CTRL_ENABLE_SDHCI_SPEC_300	0x20
+#define SDHCI_VNDR_MISC_CTRL_ENABLE_DDR50		0x200
 #define SDHCI_VENDOR_MISC_CNTRL_INFINITE_ERASE_TIMEOUT	0x1
 
 #define SDMMC_SDMEMCOMPPADCTRL	0x1E0
@@ -127,6 +127,8 @@
 #define NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD	BIT(18)
 /* Shadow write xfer mode reg and write it alongwith CMD register */
 #define NVQUIRK_SHADOW_XFER_MODE_REG		BIT(19)
+/* Set Pipe stages value o zero */
+#define NVQUIRK_SET_PIPE_STAGES_MASK_0		BIT(20)
 
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
@@ -274,11 +276,11 @@ static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 		dev_err(mmc_dev(sdhci->mmc), "Invalid trim value\n");
 		return -1;
 
-	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
-	vendor_ctrl &= (SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_MASK <<
-			SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_SHIFT);
-	vendor_ctrl |= (trim_delay << SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_SHIFT);
-	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
+	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
+	vendor_ctrl &= (SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK <<
+			SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
+	vendor_ctrl |= (trim_delay << SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
+	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 
 	return 0;
 }
@@ -293,11 +295,11 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 		return -1;
 	}
 
-	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
-	vendor_ctrl &= (SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_MASK <<
-			SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_SHIFT);
-	vendor_ctrl |= (tap_delay << SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_SHIFT);
-	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
+	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
+	vendor_ctrl &= (SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK <<
+			SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
+	vendor_ctrl |= (tap_delay << SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
+	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 
 	return 0;
 }
@@ -322,31 +324,47 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		tegra_host->sd_stat_head->cmd_to_count = 0;
 	}
 
+	vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_CLK_CTRL);
+	vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_PADPIPE_CLKEN_OVERRIDE;
+	vendor_ctrl &= ~SDHCI_VNDR_CLK_CTRL_SPI_MODE_CLKEN_OVERRIDE;
+	/* Enable feedback/internal clock */
+	if (soc_data->nvquirks & NVQUIRK_EN_FEEDBACK_CLK)
+		vendor_ctrl &= ~SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK;
+	else
+		vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_INTERNAL_CLK;
+	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDR50_TUNING)
+		vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_SDR50_TUNING;
+	sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
+
 	/* Set the tap delay value */
-	tegra_sdhci_set_tap_delay(host, plat->tap_delay);
+	if (soc_data->nvquirks & NVQUIRK_SET_TAP_DELAY)
+		tegra_sdhci_set_tap_delay(host, plat->tap_delay);
 	/* Set the trim delay value */
-	tegra_sdhci_set_trim_delay(host, plat->trim_delay);
+	if (soc_data->nvquirks & NVQUIRK_SET_TRIM_DELAY)
+		tegra_sdhci_set_trim_delay(host, plat->trim_delay);
 
-	vendor_ctrl = sdhci_readl(host, SDHCI_TEGRA_VENDOR_CLOCK_CNTRL);
-	vendor_ctrl |= SDHCI_VENDOR_CLOCK_CNTRL_PADPIPE_CLKEN_OVERRIDE;
-	vendor_ctrl &= ~SDHCI_VENDOR_CLOCK_CNTRL_SPI_MODE_CLKEN_OVERRIDE;
-	vendor_ctrl &=  ~SDHCI_VENDOR_CLOCK_CNTRL_INPUT_IO_CLK;
-	sdhci_writel(host, SDHCI_TEGRA_VENDOR_CLOCK_CNTRL);
-
-	misc_ctrl = sdhci_readw(host, SDHCI_TEGRA_VENDOR_MISC_CTRL);
+	misc_ctrl = sdhci_readw(host, SDHCI_VNDR_MISC_CTRL);
 	/* Erratum: Enable SDHCI spec v3.00 support */
-	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDHCI_SPEC_300)
-		misc_ctrl |= SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300;
+	if (soc_data->nvquirks & NVQUIRK_ENABLE_SD_3_0)
+		misc_ctrl |= SDHCI_VNDR_MISC_CTRL_ENABLE_SD_3_0;
 	/* Don't advertise UHS modes which aren't supported yet */
-	if (soc_data->nvquirks & NVQUIRK_DISABLE_SDR50)
-		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_SDR50;
-	if (soc_data->nvquirks & NVQUIRK_DISABLE_DDR50)
-		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_DDR50;
-	if (soc_data->nvquirks & NVQUIRK_DISABLE_SDR104)
-		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_SDR104;
-	/* Enable infinite erase timeout */
-	misc_ctrl |= SDHCI_VENDOR_MISC_CNTRL_INFINITE_ERASE_TIMEOUT;
-	sdhci_writew(host, misc_ctrl, SDHCI_TEGRA_VENDOR_MISC_CTRL);
+	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDR104)
+		misc_ctrl |= SDHCI_VNDR_MISC_CTRL_ENABLE_SDR104_SUPPORT;
+	else
+		misc_ctrl &= ~SDHCI_VNDR_MISC_CTRL_ENABLE_SDR104_SUPPORT;
+	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDR50)
+		misc_ctrl |= SDHCI_VNDR_MISC_CTRL_ENABLE_SDR50_SUPPORT;
+	else
+		misc_ctrl &= ~SDHCI_VNDR_MISC_CTRL_ENABLE_SDR50_SUPPORT;
+	if (soc_data->nvquirks & NVQUIRK_ENABLE_DDR50)
+		misc_ctrl |= SDHCI_VNDR_MISC_CTRL_ENABLE_DDR50_SUPPORT;
+	else
+		misc_ctrl &= ~SDHCI_VNDR_MISC_CTRL_ENABLE_DDR50_SUPPORT;
+	if (soc_data->nvquirks & NVQUIRK_INFINITE_ERASE_TIMEOUT)
+		misc_ctrl |= SDHCI_VNDR_MISC_CTRL_INFINITE_ERASE_TIMEOUT;
+	if (soc_data->nvquirks & NVQUIRK_SET_PIPE_STAGES_MASK_0)
+		misc_ctrl &= ~SDHCI_VNDR_MISC_CTRL_PIPE_STAGES_MASK;
+	sdhci_writew(host, misc_ctrl, SDHCI_VNDR_MISC_CTRL);
 }
 
 static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
@@ -514,17 +532,17 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 		tegra_sdhci_set_clk_rate(sdhci, clock);
 		if (!tegra_host->clk_enabled) {
 			clk_prepare_enable(pltfm_host->clk);
-			vendor_ctrl = sdhci_readb(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
-			vendor_ctrl |= SDHCI_VENDOR_CLOCK_CNTRL_SDMMC_CLK;
-			sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
+			vendor_ctrl = sdhci_readb(sdhci, SDHCI_VNDR_CLK_CTRL);
+			vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_SDMMC_CLK;
+			sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 			tegra_host->clk_enabled = true;
 		}
 		sdhci_set_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
 		sdhci_set_clock(sdhci, 0);
-		vendor_ctrl = sdhci_readb(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
+		vendor_ctrl = sdhci_readb(sdhci, SDHCI_VNDR_CLK_CTRL);
 		vendor_ctrl &= ~0x1;
-		sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
+		sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 		clk_disable_unprepare(pltfm_host->clk);
 		tegra_host->clk_enabled = false;
 	}
