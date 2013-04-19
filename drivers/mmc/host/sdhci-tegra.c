@@ -45,24 +45,8 @@
 
 #include "sdhci-pltfm.h"
 
+
 /* Tegra SDHOST controller vendor register definitions */
-#define SDHCI_TEGRA_VENDOR_MISC_CTRL		0x120
-#define SDHCI_MISC_CTRL_ENABLE_SDR104		0x8
-#define SDHCI_MISC_CTRL_ENABLE_SDR50		0x10
-#define SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300	0x20
-#define SDHCI_MISC_CTRL_ENABLE_DDR50		0x200
-
-#define NVQUIRK_FORCE_SDHCI_SPEC_200	BIT(0)
-#define NVQUIRK_ENABLE_BLOCK_GAP_DET	BIT(1)
-#define NVQUIRK_ENABLE_SDHCI_SPEC_300	BIT(2)
-#define NVQUIRK_DISABLE_SDR50		BIT(3)
-#define NVQUIRK_DISABLE_SDR104		BIT(4)
-#define NVQUIRK_DISABLE_DDR50		BIT(5)
-/* Shadow write xfer mode reg and write it alongwith CMD register */
-#define NVQUIRK_SHADOW_XFER_MODE_REG	BIT(6)
-#define NVQUIRK_DISABLE_AUTO_CALIBRATION	BIT(7)
-#define NVQUIRK_SET_CALIBRATION_OFFSETS	BIT(8)
-
 #define SDHCI_VENDOR_CLOCK_CNTRL       0x100
 #define SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_SHIFT		16
 #define SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_MASK			0xFF
@@ -73,12 +57,16 @@
 #define SDHCI_VENDOR_CLOCK_CNTRL_INPUT_IO_CLK			0x2
 #define SDHCI_VENDOR_CLOCK_CNTRL_SDMMC_CLK			0x1
 
-#define SDHCI_VENDOR_MISC_CNTRL		0x120
-#define SDHCI_VENDOR_MISC_CNTRL_SDMMC_SPARE0_ENABLE_SD_3_0	0x20
+#define SDHCI_TEGRA_VENDOR_MISC_CTRL		0x120
+#define SDHCI_MISC_CTRL_ENABLE_SDR104		0x8
+#define SDHCI_MISC_CTRL_ENABLE_SDR50		0x10
+#define SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300	0x20
+#define SDHCI_MISC_CTRL_ENABLE_DDR50		0x200
 #define SDHCI_VENDOR_MISC_CNTRL_INFINITE_ERASE_TIMEOUT	0x1
 
 #define SDMMC_SDMEMCOMPPADCTRL	0x1E0
 #define SDMMC_SDMEMCOMPPADCTRL_VREF_SEL_MASK	0xF
+#define SDMMC_SDMEMCOMPPADCTRL_PAD_E_INPUT_OR_E_PWRD_MASK	0x80000000
 
 #define SDMMC_AUTO_CAL_CONFIG	0x1E4
 #define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START	0x80000000
@@ -93,6 +81,52 @@
 #define SDHCI_TEGRA_MAX_TAP_VALUES	0xFF
 #define SDHCI_TEGRA_MAX_TRIM_VALUES	0x1F
 #define DEFAULT_SDHOST_FREQ	50000000
+
+/* Shadow write xfer mode reg and write it alongwith CMD register */
+#define NVQUIRK_SHADOW_XFER_MODE_REG	BIT(6)
+#define NVQUIRK_DISABLE_AUTO_CALIBRATION	BIT(7)
+#define NVQUIRK_SET_CALIBRATION_OFFSETS	BIT(8)
+
+/* Erratum: Version register is invalid in HW */
+#define NVQUIRK_FORCE_SDHCI_SPEC_200		BIT(0)
+/* Erratum: Enable block gap interrupt detection */
+#define NVQUIRK_ENABLE_BLOCK_GAP_DET		BIT(1)
+/* Enable SDHOST v3.0 support */
+#define NVQUIRK_ENABLE_SDHCI_SPEC_300		BIT(2)
+/* Enable SDR50 mode */
+#define NVQUIRK_DISABLE_SDR50			BIT(3)
+/* Enable SDR104 mode */
+#define NVQUIRK_DISABLE_SDR104			BIT(4)
+/* Enable DDR50 mode */
+#define NVQUIRK_DISABLE_DDR50			BIT(5)
+/* Do not enable auto calibration if the platform doesn't support */
+#define NVQUIRK_DISABLE_AUTO_CALIBRATION	BIT(6)
+/* Set Calibration Offsets */
+#define NVQUIRK_SET_CALIBRATION_OFFSETS		BIT(7)
+/* Set Drive Strengths */
+#define NVQUIRK_SET_DRIVE_STRENGTH		BIT(8)
+/* Enable PADPIPE CLKEN */
+#define NVQUIRK_ENABLE_PADPIPE_CLKEN		BIT(9)
+/* DISABLE SPI_MODE CLKEN */
+#define NVQUIRK_DISABLE_SPI_MODE_CLKEN		BIT(10)
+/* Set tap delay */
+#define NVQUIRK_SET_TAP_DELAY			BIT(11)
+/* Set trim delay */
+#define NVQUIRK_SET_TRIM_DELAY			BIT(12)
+/* Enable Frequency Tuning for SDR50 mode */
+#define NVQUIRK_ENABLE_SDR50_TUNING		BIT(13)
+/* Enable Infinite Erase Timeout*/
+#define NVQUIRK_INFINITE_ERASE_TIMEOUT		BIT(14)
+/* No Calibration for sdmmc4 */
+#define NVQUIRK_DISABLE_SDMMC4_CALIB		BIT(15)
+/* ENAABLE FEEDBACK IO CLOCK */
+#define NVQUIRK_EN_FEEDBACK_CLK			BIT(16)
+/* Disable AUTO CMD23 */
+#define NVQUIRK_DISABLE_AUTO_CMD23		BIT(17)
+/* update PAD_E_INPUT_OR_E_PWRD bit */
+#define NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD	BIT(18)
+/* Shadow write xfer mode reg and write it alongwith CMD register */
+#define NVQUIRK_SHADOW_XFER_MODE_REG		BIT(19)
 
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
@@ -512,6 +546,8 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci)
 
 	val = sdhci_readl(sdhci, SDMMC_SDMEMCOMPPADCTRL);
 	val &= ~SDMMC_SDMEMCOMPPADCTRL_VREF_SEL_MASK;
+	if (soc_data->nvquirks & NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD)
+		val |= SDMMC_SDMEMCOMPPADCTRL_PAD_E_INPUT_OR_E_PWRD_MASK;
 	val |= 0x7;
 	sdhci_writel(sdhci, val, SDMMC_SDMEMCOMPPADCTRL);
 
@@ -548,6 +584,12 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci)
 	val = sdhci_readl(sdhci, SDMMC_AUTO_CAL_CONFIG);
 	val &= ~SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE;
 	sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
+
+	if (soc_data->nvquirks & NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD) {
+		val = sdhci_readl(sdhci, SDMMC_SDMEMCOMPPADCTRL);
+		val &= ~SDMMC_SDMEMCOMPPADCTRL_PAD_E_INPUT_OR_E_PWRD_MASK;
+		sdhci_writel(sdhci, val, SDMMC_SDMEMCOMPPADCTRL);
+	}
 }
 
 static int sdhci_tegra_sd_error_stats(struct sdhci_host *host, u32 int_status)
@@ -686,7 +728,8 @@ static struct sdhci_tegra_soc_data soc_data_tegra114 = {
 	.nvquirks = NVQUIRK_DISABLE_SDR50 |
 		    NVQUIRK_DISABLE_DDR50 |
 		    NVQUIRK_DISABLE_SDR104 |
-		    NVQUIRK_SHADOW_XFER_MODE_REG,
+		    NVQUIRK_SHADOW_XFER_MODE_REG |
+		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD,
 };
 
 static const struct of_device_id sdhci_tegra_dt_match[] = {
