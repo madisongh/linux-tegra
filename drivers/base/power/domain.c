@@ -2002,7 +2002,7 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
 	genpd->domain.ops.complete = pm_genpd_complete;
 	genpd->dev_ops.save_state = pm_genpd_default_save_state;
 	genpd->dev_ops.restore_state = pm_genpd_default_restore_state;
-#ifdef CONFIG_PM_SLEEP
+#if defined(CONFIG_PM_SLEEP) && defined(CONFIG_PM_RUNTIME)
 	genpd->system_suspend_notifier.notifier_call =
 		pm_genpd_suspend_notifier;
 	register_pm_notifier(&genpd->system_suspend_notifier);
