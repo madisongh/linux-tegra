@@ -1914,8 +1914,7 @@ static int pm_genpd_default_restore_state(struct device *dev)
 	return cb ? cb(dev) : 0;
 }
 
-#ifdef CONFIG_PM_SLEEP
-
+#if defined(CONFIG_PM_SLEEP) && defined(CONFIG_PM_RUNTIME)
 static int pm_genpd_suspend_notifier(struct notifier_block *notifier,
 	unsigned long pm_event, void *unused)
 {
@@ -1945,8 +1944,7 @@ static int pm_genpd_suspend_notifier(struct notifier_block *notifier,
 
 	return NOTIFY_DONE;
 }
-
-#endif /* !CONFIG_PM_SLEEP */
+#endif
 
 /**
  * pm_genpd_init - Initialize a generic I/O PM domain object.
