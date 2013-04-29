@@ -178,6 +178,8 @@
 #define   SDHCI_CTRL_DRV_TYPE_D		0x0030
 #define  SDHCI_CTRL_EXEC_TUNING		0x0040
 #define  SDHCI_CTRL_TUNED_CLK		0x0080
+#define  SDHCI_HOST_VERSION_4_EN	0x1000
+#define  SDHCI_ADDRESSING_64BIT_EN	0x2000
 #define  SDHCI_CTRL_PRESET_VAL_ENABLE	0x8000
 
 #define SDHCI_CAPABILITIES	0x40
@@ -263,6 +265,7 @@
 #define   SDHCI_SPEC_100	0
 #define   SDHCI_SPEC_200	1
 #define   SDHCI_SPEC_300	2
+#define   SDHCI_SPEC_400	3
 #define   SDHCI_SPEC_410	4
 
 /*
@@ -293,6 +296,9 @@ struct sdhci_adma2_32_desc {
 
 /* ADMA2 64-bit DMA descriptor size */
 #define SDHCI_ADMA2_64_DESC_SZ	12
+
+/* ADMA2 64-bit Addressing DMA descriptor size */
+#define SDHCI_ADMA2_64_ADDR_DESC_SZ	16
 
 /* ADMA2 64-bit DMA alignment */
 #define SDHCI_ADMA2_64_ALIGN	8
@@ -429,6 +435,7 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_DDR_FIXED_DIVISOR			(1<<17)
 /* Turn off/on card clock before sending/after tuning command*/
 #define SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK             (1<<18)
+#define SDHCI_QUIRK2_USE_64BIT_ADDR             (1<<19)
 
 
 	int irq;		/* Device IRQ */

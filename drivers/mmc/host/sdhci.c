@@ -188,6 +188,7 @@ static void sdhci_disable_card_detection(struct sdhci_host *host)
 void sdhci_reset(struct sdhci_host *host, u8 mask)
 {
 	unsigned long timeout;
+	u16 ctrl;
 
 	sdhci_writeb(host, mask, SDHCI_SOFTWARE_RESET);
 
@@ -211,6 +212,14 @@ void sdhci_reset(struct sdhci_host *host, u8 mask)
 		}
 		timeout--;
 		mdelay(1);
+	}
+
+	if ((mask & SDHCI_RESET_ALL) && (host->version >= SDHCI_SPEC_400)) {
+		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+		ctrl |= SDHCI_HOST_VERSION_4_EN;
+		if (host->quirks2 & SDHCI_QUIRK2_USE_64BIT_ADDR)
+			ctrl |= SDHCI_ADDRESSING_64BIT_EN;
+		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
 	}
 }
 EXPORT_SYMBOL_GPL(sdhci_reset);
@@ -552,9 +561,12 @@ static int sdhci_adma_table_pre(struct sdhci_host *host,
 
 		BUG_ON(len > 65536);
 
-		/* tran, valid */
-		sdhci_adma_write_desc(host, desc, addr, len, ADMA2_TRAN_VALID);
-		desc += host->desc_sz;
+		if (len > 0) {
+			/* tran, valid */
+			sdhci_adma_write_desc(host, desc, addr, len,
+					ADMA2_TRAN_VALID);
+			desc += host->desc_sz;
+		}
 
 		/*
 		 * If this triggers then we have a calculation bug
@@ -835,12 +847,21 @@ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
 				WARN_ON(1);
 				host->flags &= ~SDHCI_REQ_USE_DMA;
 			} else {
-				sdhci_writel(host, host->adma_addr,
+				sdhci_writel(host,
+					(host->adma_addr & 0xFFFFFFFF),
 					SDHCI_ADMA_ADDRESS);
-				if (host->flags & SDHCI_USE_64_BIT_DMA)
-					sdhci_writel(host,
-						     (u64)host->adma_addr >> 32,
-						     SDHCI_ADMA_ADDRESS_HI);
+				if (host->flags & SDHCI_USE_64_BIT_DMA) {
+					if (host->quirks2 &
+					    SDHCI_QUIRK2_USE_64BIT_ADDR) {
+						sdhci_writel(host,
+						((u64)host->adma_addr >> 32)
+							& 0xFFFFFFFF,
+						SDHCI_ADMA_ADDRESS_HI);
+					} else {
+						sdhci_writel(host, 0,
+						SDHCI_ADMA_ADDRESS_HI);
+					}
+				}
 			}
 		} else {
 			int sg_cnt;
@@ -871,8 +892,9 @@ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
 		ctrl &= ~SDHCI_CTRL_DMA_MASK;
 		if ((host->flags & SDHCI_REQ_USE_DMA) &&
 			(host->flags & SDHCI_USE_ADMA)) {
-			if (host->flags & SDHCI_USE_64_BIT_DMA)
-				ctrl |= SDHCI_CTRL_ADMA64;
+			if ((host->flags & SDHCI_USE_64_BIT_DMA) &&
+				(host->version < SDHCI_SPEC_400))
+					ctrl |= SDHCI_CTRL_ADMA64;
 			else
 				ctrl |= SDHCI_CTRL_ADMA32;
 		} else {
@@ -3223,11 +3245,14 @@ int sdhci_add_host(struct sdhci_host *host)
 		 * all multipled by the descriptor size.
 		 */
 		if (host->flags & SDHCI_USE_64_BIT_DMA) {
+			if (host->quirks2 & SDHCI_QUIRK2_USE_64BIT_ADDR)
+				host->desc_sz = SDHCI_ADMA2_64_ADDR_DESC_SZ;
+			else
+				host->desc_sz = SDHCI_ADMA2_64_DESC_SZ;
 			host->adma_table_sz = (SDHCI_MAX_SEGS * 2 + 1) *
-					      SDHCI_ADMA2_64_DESC_SZ;
+						host->desc_sz;
 			host->align_buffer_sz = SDHCI_MAX_SEGS *
 						SDHCI_ADMA2_64_ALIGN;
-			host->desc_sz = SDHCI_ADMA2_64_DESC_SZ;
 			host->align_sz = SDHCI_ADMA2_64_ALIGN;
 			host->align_mask = SDHCI_ADMA2_64_ALIGN - 1;
 		} else {
@@ -3672,11 +3697,12 @@ int sdhci_add_host(struct sdhci_host *host)
 
 	mmc_add_host(mmc);
 
-	pr_info("%s: SDHCI controller on %s [%s] using %s\n",
+	pr_info("%s: SDHCI controller on %s [%s] using %s with %s bit addr\n",
 		mmc_hostname(mmc), host->hw_name, dev_name(mmc_dev(mmc)),
 		(host->flags & SDHCI_USE_ADMA) ?
 		(host->flags & SDHCI_USE_64_BIT_DMA) ? "ADMA 64-bit" : "ADMA" :
-		(host->flags & SDHCI_USE_SDMA) ? "DMA" : "PIO");
+		(host->flags & SDHCI_USE_SDMA) ? "DMA" : "PIO",
+		(host->quirks2 & SDHCI_QUIRK2_USE_64BIT_ADDR) ? "64" : "32");
 
 	sdhci_enable_card_detection(host);
 
