@@ -214,6 +214,7 @@ struct max17042_platform_data {
 	 * the datasheet although it can be changed by board designers.
 	 */
 	unsigned int r_sns;
+	bool is_battery_present;
 };
 
 #endif /* __MAX17042_BATTERY_H_ */
