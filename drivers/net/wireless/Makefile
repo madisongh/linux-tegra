@@ -68,4 +68,5 @@ obj-$(CONFIG_CW1200)	+= cw1200/
 obj-$(CONFIG_RSI_91X)	+= rsi/
 
 obj-$(CONFIG_SD8797)	+= sd8797/
+obj-$(CONFIG_SD8897)	+= sd8897/
 
