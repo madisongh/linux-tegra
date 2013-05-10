@@ -89,7 +89,6 @@ struct tegra_core_edp_limits {
 struct thermal_cooling_device *edp_cooling_device_create(void *v);
 void tegra_init_cpu_edp_limits(unsigned int regulator_mA);
 void tegra_recalculate_cpu_edp_limits(void);
-void tegra_init_system_edp_limits(unsigned int power_limit_mW);
 void tegra_get_cpu_edp_limits(const struct tegra_edp_limits **limits, int *size);
 unsigned int tegra_get_edp_limit(int *get_edp_thermal_index);
 void tegra_get_system_edp_limits(const unsigned int **limits);
@@ -105,8 +104,6 @@ static inline struct thermal_cooling_device *edp_cooling_device_create(
 static inline void tegra_init_cpu_edp_limits(int regulator_mA)
 {}
 static inline void tegra_recalculate_cpu_edp_limits(void)
-{}
-static inline void tegra_init_system_edp_limits(int power_limit_mW)
 {}
 static inline void tegra_get_cpu_edp_limits(struct tegra_edp_limits **limits,
 					    int *size)
@@ -146,6 +143,16 @@ static inline int tegra_core_edp_debugfs_init(struct dentry *edp_dir)
 static inline int tegra_core_edp_cpu_state_update(bool scpu_state)
 { return 0; }
 static inline struct tegra_cooling_device *tegra_core_edp_get_cdev(void)
+{ return NULL; }
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+struct tegra_edp_vdd_cpu_entry *tegra3x_get_vdd_cpu_map(int *sz);
+struct tegra_system_edp_entry *tegra3x_get_system_edp_map(int *sz);
+#else
+static inline struct tegra_edp_vdd_cpu_entry *tegra3x_get_vdd_cpu_map(int *sz)
+{ return NULL; }
+static inline struct tegra_system_edp_entry *tegra3x_get_system_edp_map(int *sz)
 { return NULL; }
 #endif
 
