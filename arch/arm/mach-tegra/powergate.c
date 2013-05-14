@@ -337,6 +337,12 @@ int tegra_powergate_remove_clamping(int id)
 }
 EXPORT_SYMBOL(tegra_powergate_remove_clamping);
 
+static inline bool tegra_powergate_check_skip_list(int id)
+{
+	return pg_ops->powergate_skip ?
+		pg_ops->powergate_skip(id) : false;
+}
+
 /* EXTERNALY VISIBLE APIS */
 
 bool tegra_powergate_is_powered(int id)
@@ -390,6 +396,10 @@ int tegra_powergate_partition(int id)
 		return -EINVAL;
 	}
 
+	if (tegra_powergate_check_skip_list(id))
+		printk_once("%s: %s is in powergate skip list\n", __func__,
+			tegra_powergate_get_name(id));
+
 	if (pg_ops->powergate_partition)
 		return pg_ops->powergate_partition(id);
 	else
@@ -410,6 +420,10 @@ int tegra_unpowergate_partition(int id)
 		pr_info("%s: invalid powergate id\n", __func__);
 		return -EINVAL;
 	}
+
+	if (tegra_powergate_check_skip_list(id))
+		printk_once("%s: %s is in powergate skip list\n", __func__,
+			tegra_powergate_get_name(id));
 
 	if (pg_ops->unpowergate_partition)
 		return pg_ops->unpowergate_partition(id);
@@ -432,6 +446,10 @@ int tegra_powergate_partition_with_clk_off(int id)
 		return -EINVAL;
 	}
 
+	if (tegra_powergate_check_skip_list(id))
+		printk_once("%s: %s is in powergate skip list\n", __func__,
+			tegra_powergate_get_name(id));
+
 	if (pg_ops->powergate_partition_with_clk_off)
 		return pg_ops->powergate_partition_with_clk_off(id);
 	else
@@ -452,6 +470,10 @@ int tegra_unpowergate_partition_with_clk_on(int id)
 		pr_info("%s: invalid powergate id\n", __func__);
 		return -EINVAL;
 	}
+
+	if (tegra_powergate_check_skip_list(id))
+		printk_once("%s: %s is in powergate skip list\n", __func__,
+			tegra_powergate_get_name(id));
 
 	if (pg_ops->unpowergate_partition_with_clk_on)
 		return pg_ops->unpowergate_partition_with_clk_on(id);
@@ -617,6 +639,7 @@ static int powergate_show(struct seq_file *s, void *data)
 {
 	int i;
 	const char *name;
+	bool is_pg_skip;
 
 	if (!pg_ops) {
 		seq_printf(s, "This SOC doesn't support powergating\n");
@@ -628,9 +651,13 @@ static int powergate_show(struct seq_file *s, void *data)
 
 	for (i = 0; i < pg_ops->num_powerdomains; i++) {
 		name = tegra_powergate_get_name(i);
-		if (name)
+		if (name) {
+			is_pg_skip = tegra_powergate_check_skip_list(i);
 			seq_printf(s, " %9s %7s\n", name,
-				tegra_powergate_is_powered(i) ? "yes" : "no");
+				(is_pg_skip ? "skip" : \
+				(tegra_powergate_is_powered(i) ? \
+				"yes" : "no")));
+		}
 	}
 
 	return 0;
