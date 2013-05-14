@@ -332,7 +332,7 @@ static void __init map_mem(void)
 		}
 #endif
 
-		create_mapping(start, __phys_to_virt(start), end - start);
+		create_mapping(start, __phys_to_virt(start), end - start, 0);
 	}
 
 	/* Limit no longer required. */
