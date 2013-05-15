@@ -234,8 +234,6 @@ static unsigned int tegra_sdhci_get_ro(struct sdhci_host *sdhci)
 static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 	u8 trim_delay)
 {
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	u32 vendor_ctrl;
 
 	if ((trim_delay > SDHCI_TEGRA_MAX_TRIM_VALUES) && (trim_delay < 0)) {
@@ -245,7 +243,7 @@ static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
 	vendor_ctrl &= (SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_MASK <<
 			SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_SHIFT);
-	vendor_ctrl |= (trim_delay<< SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_SHIFT);
+	vendor_ctrl |= (trim_delay << SDHCI_VENDOR_CLOCK_CNTRL_TRIM_VALUE_SHIFT);
 	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
 
 	return 0;
@@ -254,6 +252,7 @@ static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 	u8 tap_delay)
 {
+	u32 vendor_ctrl;
 
 	if ((tap_delay > SDHCI_TEGRA_MAX_TAP_VALUES) && (tap_delay < 0)){
 		dev_err(mmc_dev(sdhci->mmc), "Invalid tap value\n");
@@ -263,8 +262,8 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
 	vendor_ctrl &= (SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_MASK <<
 			SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_SHIFT);
-	vendor_ctrl |= (tap_delay<< SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_SHIFT);
-	sdhci_writel(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
+	vendor_ctrl |= (tap_delay << SDHCI_VENDOR_CLOCK_CNTRL_TAP_VALUE_SHIFT);
+	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
 
 	return 0;
 }
@@ -339,6 +338,7 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		unsigned int timing)
 {
 	u16 clk;
+	u32 vndr_ctrl;
 
 	/* Set the UHS signaling mode */
 	sdhci_set_uhs_signaling(host, timing);
@@ -352,6 +352,10 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		clk &= ~(0xFF << SDHCI_DIVIDER_SHIFT);
 		clk |= 1 << SDHCI_DIVIDER_SHIFT;
 		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+
+		/* Set the ddr mode trim delay if required */
+		if (plat->ddr_trim_delay != -1)
+			sdhci_tegra_set_trim_value(host, plat->ddr_trim_delay);
 	}
 	return 0;
 }
