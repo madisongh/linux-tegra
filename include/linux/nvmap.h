@@ -57,9 +57,10 @@ struct nvmap_handle;
 #if defined(CONFIG_TEGRA_NVMAP)
 struct nvmap_client;
 struct nvmap_device;
-#define nvmap_ref_to_handle(_ref) (*(struct nvmap_handle **)(_ref))
+
 /* Convert User space handle to Kernel. */
 #define nvmap_convert_handle_u2k(h) (h)
+
 #elif defined(CONFIG_ION_TEGRA)
 /* For Ion Mem Manager support through nvmap_* API's. */
 #include "../../../../../drivers/gpu/ion/ion_priv.h"
@@ -68,7 +69,6 @@ struct nvmap_device;
 #define nvmap_device ion_device
 #define nvmap_handle ion_handle
 #define nvmap_handle_ref ion_handle
-#define nvmap_ref_to_handle(_ref) (struct ion_handle *)_ref
 /* Convert User space handle to Kernel. */
 #define nvmap_convert_handle_u2k(h) (*((u32 *)h))
 #endif
@@ -80,7 +80,9 @@ struct nvmap_handle_ref *nvmap_alloc(struct nvmap_client *client, size_t size,
 				     size_t align, unsigned int flags,
 				     unsigned int heap_mask);
 
-phys_addr_t _nvmap_get_addr_from_id(ulong user_id);
+ulong nvmap_ref_to_user_id(struct nvmap_handle_ref *ref);
+
+phys_addr_t nvmap_get_addr_from_user_id(ulong user_id);
 
 void nvmap_free(struct nvmap_client *client, struct nvmap_handle_ref *r);
 
@@ -103,8 +105,6 @@ void nvmap_client_put(struct nvmap_client *c);
 
 phys_addr_t nvmap_pin(struct nvmap_client *c, struct nvmap_handle_ref *r);
 
-phys_addr_t nvmap_handle_address(struct nvmap_client *c, unsigned long id);
-
 phys_addr_t nvmap_handle_address_user_id(struct nvmap_client *c,
 					 unsigned long user_id);
 
@@ -126,10 +126,10 @@ int nvmap_pin_array(struct nvmap_client *client,
 		struct nvmap_handle **unique_arr,
 		struct nvmap_handle_ref **unique_arr_refs);
 
-struct nvmap_handle *nvmap_get_handle_user_id(struct nvmap_client *client,
+ulong nvmap_get_handle_user_id(struct nvmap_client *client,
 					 unsigned long id);
 
-void nvmap_handle_put(struct nvmap_handle *h);
+void nvmap_put_handle_user_id(ulong user_id);
 
 struct nvmap_handle_ref *nvmap_alloc_iovm(struct nvmap_client *client,
 	size_t size, size_t align, unsigned int flags, unsigned int iova_start);
