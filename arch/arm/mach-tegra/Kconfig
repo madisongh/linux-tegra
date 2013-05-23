@@ -419,27 +419,8 @@ config TEGRA_LP1_LOW_COREVOLTAGE
 	help
 		Enable support for LP1 Core voltage to set to lowest
 
-config TEGRA_LATENCY_ALLOWANCE
-	bool "Allow memory clients to configure latency allowance"
-	help
-	  Latency allowance is a per-memory-client setting that tells the
-	  memory controller how long it can ignore a request in favor of
-	  others. In other words, It indicates how long a request from specific
-	  memory client can wait before it is served.
-	  Enabling this option allows memory clients configure the
-	  latency allowance as per their bandwidth requirement.
-
-config TEGRA_LATENCY_ALLOWANCE_SCALING
-	bool "Enable latency allowance scaling"
-	depends on TEGRA_LATENCY_ALLOWANCE
-	help
-	  Enables latency allowance scaling, which enables scaling
-	  programmed latency allowance values based on fifo threshold levels
-	  set for for display and vi hardware.
-
 config TEGRA_DISABLE_BBC_LATENCY_ALLOWANCE
 	bool "Disable BBCRW latency allowance"
-	depends on TEGRA_LATENCY_ALLOWANCE
 	help
 	  Disables BBCRW latency allowance configuration by
 	  clients. The BBCRW latency allowance would remain
@@ -447,7 +428,6 @@ config TEGRA_DISABLE_BBC_LATENCY_ALLOWANCE
 
 config TEGRA_MC_PTSA
 	bool "Enable MC PTSA programming"
-	depends on TEGRA_LATENCY_ALLOWANCE
 	help
 	  Enables Priority Tier Snap Arbiter programming in
 	  Memory Controller. PTSA is a Memory Controller feature that
