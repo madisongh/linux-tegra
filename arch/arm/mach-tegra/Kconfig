@@ -437,6 +437,14 @@ config TEGRA_LATENCY_ALLOWANCE_SCALING
 	  programmed latency allowance values based on fifo threshold levels
 	  set for for display and vi hardware.
 
+config TEGRA_DISABLE_BBC_LATENCY_ALLOWANCE
+	bool "Disable BBCRW latency allowance"
+	depends on TEGRA_LATENCY_ALLOWANCE
+	help
+	  Disables BBCRW latency allowance configuration by
+	  clients. The BBCRW latency allowance would remain
+	  same as boot time configured value.
+
 config TEGRA_MC_PTSA
 	bool "Enable MC PTSA programming"
 	depends on TEGRA_LATENCY_ALLOWANCE
