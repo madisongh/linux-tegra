@@ -41,7 +41,7 @@
 #include <mach/iovmm.h>
 #include <trace/events/nvmap.h>
 
-#include "nvmap.h"
+#include "nvmap_priv.h"
 #include "nvmap_mru.h"
 #include "nvmap_common.h"
 
@@ -1090,7 +1090,7 @@ struct nvmap_handle_ref *nvmap_create_handle(struct nvmap_client *client,
 	ref->handle = h;
 	atomic_set(&ref->pin, 0);
 	add_handle_ref(client, ref);
-	trace_nvmap_create_handle(client, h, size, ref);
+	trace_nvmap_create_handle(client, client->name, h, size, ref);
 	return ref;
 }
 
