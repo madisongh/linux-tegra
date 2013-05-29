@@ -1116,7 +1116,7 @@ struct nvmap_handle_ref *_nvmap_duplicate_handle_id(struct nvmap_client *client,
 		return ref;
 	} else {
 		nvmap_ref_unlock(client);
-		return nvmap_duplicate_handle_id(client, id);
+		return nvmap_duplicate_handle_id(client, id, 0);
 	}
 }
 
@@ -1128,7 +1128,7 @@ struct nvmap_handle_ref *_nvmap_duplicate_handle_user_id(
 }
 
 struct nvmap_handle_ref *nvmap_duplicate_handle_id(struct nvmap_client *client,
-						   unsigned long id)
+					unsigned long id, bool skip_val)
 {
 	struct nvmap_handle_ref *ref = NULL;
 	struct nvmap_handle *h = NULL;
@@ -1136,7 +1136,7 @@ struct nvmap_handle_ref *nvmap_duplicate_handle_id(struct nvmap_client *client,
 	BUG_ON(!client || client->dev != nvmap_dev);
 	/* on success, the reference count for the handle should be
 	 * incremented, so the success paths will not call nvmap_handle_put */
-	h = nvmap_validate_get(client, id);
+	h = nvmap_validate_get(client, id, skip_val);
 
 	if (!h) {
 		nvmap_debug(client, "%s duplicate handle failed\n",
@@ -1205,7 +1205,7 @@ struct nvmap_handle_ref *nvmap_duplicate_handle_user_id(
 						struct nvmap_client *client,
 						unsigned long user_id)
 {
-	return nvmap_duplicate_handle_id(client, unmarshal_user_id(user_id));
+	return nvmap_duplicate_handle_id(client, unmarshal_user_id(user_id), 0);
 }
 
 struct nvmap_handle_ref *nvmap_create_handle_from_fd(
@@ -1226,7 +1226,7 @@ struct nvmap_handle_ref *nvmap_create_handle_from_fd(
 	}
 
 	id = (unsigned long)file->private_data;
-	ref = nvmap_duplicate_handle_id(client, id);
+	ref = nvmap_duplicate_handle_id(client, id, 1);
 	fput(file);
 	return ref;
 }
@@ -1234,7 +1234,7 @@ struct nvmap_handle_ref *nvmap_create_handle_from_fd(
 unsigned long nvmap_duplicate_handle_id_ex(struct nvmap_client *client,
 						unsigned long id)
 {
-	struct nvmap_handle_ref *ref = nvmap_duplicate_handle_id(client, id);
+	struct nvmap_handle_ref *ref = nvmap_duplicate_handle_id(client, id, 0);
 
 	if (IS_ERR(ref))
 		return 0;
@@ -1256,7 +1256,7 @@ int nvmap_get_page_list_info(struct nvmap_client *client,
 	*flags = 0;
 	*nr_page = 0;
 
-	h = nvmap_validate_get(client, id);
+	h = nvmap_validate_get(client, id, 0);
 
 	if (!h) {
 		nvmap_err(client, "%s query invalid handle %p\n",
@@ -1290,7 +1290,7 @@ int nvmap_acquire_page_list(struct nvmap_client *client,
 
 	BUG_ON(!client || client->dev != nvmap_dev);
 
-	h = nvmap_validate_get(client, id);
+	h = nvmap_validate_get(client, id, 0);
 
 	if (!h) {
 		nvmap_err(client, "%s query invalid handle %p\n",
