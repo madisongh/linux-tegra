@@ -255,3 +255,6 @@ config BT_WILINK
 	  into the kernel or say M to compile it as module (btwilink).
 
 endmenu
+
+source "drivers/bluetooth/sd8897/Kconfig"
+source "drivers/bluetooth/sd8797/Kconfig"
