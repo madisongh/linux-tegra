@@ -79,7 +79,5 @@ void tegra20_hotplug_shutdown(void);
 void tegra30_hotplug_shutdown(void);
 #endif
 
-int tegra30_sleep_cpu_secondary_finish(unsigned long);
-
 #endif
 #endif
