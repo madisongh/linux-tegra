@@ -173,7 +173,6 @@ struct sbs_info {
 	int				shutdown_complete;
 	struct mutex			mutex;
 };
-struct sbs_info *tchip;
 
 static char model_name[I2C_SMBUS_BLOCK_MAX + 1];
 static char manufacturer[I2C_SMBUS_BLOCK_MAX + 1];
@@ -705,37 +704,6 @@ static void sbs_external_power_changed(struct power_supply *psy)
 	chip->poll_time = chip->plat_data.poll_retry_count;
 }
 
-void sbs_update(void)
-{
-	int ret;
-
-	if (tchip != NULL) {
-		ret = sbs_read_word_data(tchip->client,
-				sbs_data[REG_STATUS].addr);
-		/* if the read failed, give up on this work */
-		if (ret < 0) {
-			tchip->poll_time = 0;
-			return;
-		}
-
-		if (ret & BATTERY_FULL_CHARGED)
-			ret = POWER_SUPPLY_STATUS_FULL;
-		else if (ret & BATTERY_FULL_DISCHARGED)
-			ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
-		else if (ret & BATTERY_DISCHARGING)
-			ret = POWER_SUPPLY_STATUS_DISCHARGING;
-		else
-			ret = POWER_SUPPLY_STATUS_CHARGING;
-
-		if (tchip->last_state != ret) {
-			tchip->poll_time = 0;
-			power_supply_changed(&tchip->power_supply);
-			return;
-		}
-	}
-}
-EXPORT_SYMBOL_GPL(sbs_update);
-
 static int sbs_update_battery_status(struct battery_gauge_dev *bg_dev,
 	enum battery_charger_status status)
 {
@@ -781,7 +749,7 @@ static void sbs_delayed_work(struct work_struct *work)
 
 	chip = container_of(work, struct sbs_info, work.work);
 
-	power_supply_changed(&tchip->power_supply);
+	power_supply_changed(&chip->power_supply);
 	schedule_delayed_work(&chip->work, HZ*2);
 }
 
@@ -906,8 +874,6 @@ static int sbs_probe(struct i2c_client *client,
 	chip->ignore_changes = 1;
 	chip->last_state = POWER_SUPPLY_STATUS_UNKNOWN;
 	chip->power_supply.external_power_changed = sbs_external_power_changed;
-
-	tchip = chip;
 
 	pdata = sbs_of_populate_pdata(client);
 	if (pdata) {
