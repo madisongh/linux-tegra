@@ -49,13 +49,14 @@
 /* Tegra SDHOST controller vendor register definitions */
 #define SDHCI_VNDR_CLK_CTRL       0x100
 #define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT		16
-#define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK			0xFF
+#define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK		0xFF
 #define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT		24
 #define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK		0x1F
-#define SDHCI_VNDR_CLK_CTRL_PADPIPE_CLKEN_OVERRIDE		0x8
+#define SDHCI_VNDR_CLK_CTRL_PADPIPE_CLKEN_OVERRIDE	0x8
 #define SDHCI_VNDR_CLK_CTRL_SPI_MODE_CLKEN_OVERRIDE	0x4
-#define SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK			0x2
+#define SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK		0x2
 #define SDHCI_VNDR_CLK_CTRL_SDMMC_CLK			0x1
+#define SDHCI_VNDR_CLK_CTRL_SDR50_TUNING		0x20
 
 #define SDHCI_VNDR_MISC_CTRL		0x120
 #define SDHCI_VNDR_MISC_CTRL_ENABLE_SDR104		0x8
@@ -799,6 +800,7 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
 	of_property_read_u32(np, "ddr-clk-limit", &plat->ddr_clk_limit);
 	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
+	of_property_read_u32(np, "uhs_mask", &plat->uhs_mask);
 
 	return mmc_of_parse(host->mmc);
 }
