@@ -1356,13 +1356,19 @@ static struct resource tegra_uarte_resources[] = {
 
 #define TEGRA_UART_NAME "serial-tegra"
 
+#if defined(CONFIG_ARCH_TEGRA_12x_SOC)
+#define UART_DMA_BIT_MASK DMA_BIT_MASK(64)
+#else
+#define UART_DMA_BIT_MASK DMA_BIT_MASK(32)
+#endif
+
 struct platform_device tegra_uarta_device = {
 	.name	= TEGRA_UART_NAME,
 	.id	= 0,
 	.num_resources	= ARRAY_SIZE(tegra_uarta_resources),
 	.resource	= tegra_uarta_resources,
 	.dev	= {
-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+		.coherent_dma_mask	= UART_DMA_BIT_MASK,
 	},
 };
 
@@ -1372,7 +1378,7 @@ struct platform_device tegra_uartb_device = {
 	.num_resources	= ARRAY_SIZE(tegra_uartb_resources),
 	.resource	= tegra_uartb_resources,
 	.dev	= {
-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+		.coherent_dma_mask	= UART_DMA_BIT_MASK,
 	},
 };
 
@@ -1382,7 +1388,7 @@ struct platform_device tegra_uartc_device = {
 	.num_resources	= ARRAY_SIZE(tegra_uartc_resources),
 	.resource	= tegra_uartc_resources,
 	.dev	= {
-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+		.coherent_dma_mask	= UART_DMA_BIT_MASK,
 	},
 };
 
@@ -1392,7 +1398,7 @@ struct platform_device tegra_uartd_device = {
 	.num_resources	= ARRAY_SIZE(tegra_uartd_resources),
 	.resource	= tegra_uartd_resources,
 	.dev	= {
-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+		.coherent_dma_mask	= UART_DMA_BIT_MASK,
 	},
 };
 
