@@ -811,7 +811,7 @@ struct platform_device tegra11_spi_device1 = {
 	.resource	= spi_resource1,
 	.num_resources	= ARRAY_SIZE(spi_resource1),
 	.dev		= {
-		.coherent_dma_mask	= 0xffffffff,
+		.coherent_dma_mask	= DMA_BIT_MASK(64),
 	},
 };
 
@@ -821,7 +821,7 @@ struct platform_device tegra11_spi_device2 = {
 	.resource	= spi_resource2,
 	.num_resources	= ARRAY_SIZE(spi_resource2),
 	.dev		= {
-		.coherent_dma_mask	= 0xffffffff,
+		.coherent_dma_mask	= DMA_BIT_MASK(64),
 	},
 };
 
@@ -831,7 +831,7 @@ struct platform_device tegra11_spi_device3 = {
 	.resource	= spi_resource3,
 	.num_resources	= ARRAY_SIZE(spi_resource3),
 	.dev		= {
-		.coherent_dma_mask	= 0xffffffff,
+		.coherent_dma_mask	= DMA_BIT_MASK(64),
 	},
 };
 
@@ -841,7 +841,7 @@ struct platform_device tegra11_spi_device4 = {
 	.resource	= spi_resource4,
 	.num_resources	= ARRAY_SIZE(spi_resource4),
 	.dev		= {
-		.coherent_dma_mask	= 0xffffffff,
+		.coherent_dma_mask	= DMA_BIT_MASK(64),
 	},
 };
 
@@ -852,7 +852,7 @@ struct platform_device tegra11_spi_device5 = {
 	.resource       = spi_resource5,
 	.num_resources  = ARRAY_SIZE(spi_resource5),
 	.dev  = {
-		.coherent_dma_mask      = 0xffffffff,
+		.coherent_dma_mask	= DMA_BIT_MASK(64),
 	},
 };
 
@@ -862,7 +862,7 @@ struct platform_device tegra11_spi_device6 = {
 	.resource       = spi_resource6,
 	.num_resources  = ARRAY_SIZE(spi_resource6),
 	.dev  = {
-		.coherent_dma_mask      = 0xffffffff,
+		.coherent_dma_mask	= DMA_BIT_MASK(64),
 	},
 };
 #endif
@@ -2123,7 +2123,7 @@ struct swgid_fixup tegra_swgid_fixup_t124[] = {
 	  SWGID(PPCS2), },
 	{ .name = "tegra11-se",	.swgids = SWGID(PPCS) | SWGID(PPCS1) |
 	  SWGID(PPCS2), },
-	{ .name = "tegra11-spi",	.swgids = SWGID(PPCS) | SWGID(PPCS1) |
+	{ .name = "spi-tegra114",	.swgids = SWGID(PPCS) | SWGID(PPCS1) |
 	  SWGID(PPCS2), },
 	{ .name = "tegra14-i2c",	.swgids = SWGID(PPCS) | SWGID(PPCS1) |
 	  SWGID(PPCS2), },
