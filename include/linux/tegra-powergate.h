@@ -84,6 +84,8 @@
 					((id) == TEGRA_POWERGATE_CPU2) || \
 					((id) == TEGRA_POWERGATE_CPU3))
 #define TEGRA_IS_GPU_POWERGATE_ID(id)  ((id) == TEGRA_POWERGATE_GPU)
+#define TEGRA_IS_DISP_POWERGATE_ID(id) (((id) == TEGRA_POWERGATE_DISA) || \
+					((id) == TEGRA_POWERGATE_DISB))
 #endif
 
 #ifdef CONFIG_ARCH_TEGRA
