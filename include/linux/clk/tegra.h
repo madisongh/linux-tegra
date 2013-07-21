@@ -135,6 +135,10 @@ enum tegra_clk_ex_param {
 #ifdef CONFIG_COMMON_CLK
 void tegra_clocks_apply_init_table(void);
 
+static inline int tegra_dvfs_override_core_voltage(struct clk *c, int override_mv)
+{
+	return -EINVAL;
+}
 static inline int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 {
 	return -EINVAL;
@@ -151,7 +155,7 @@ struct notifier_block;
 
 int tegra_dvfs_get_freqs(struct clk *c, unsigned long **freqs, int *num_freqs);
 int tegra_dvfs_set_rate(struct clk *c, unsigned long rate);
-int tegra_dvfs_override_core_voltage(int override_mv);
+int tegra_dvfs_override_core_voltage(struct clk *c, int override_mv);
 unsigned long clk_get_rate_all_locked(struct clk *c);
 int tegra_dvfs_rail_disable_by_name(const char *reg_id);
 int tegra_register_clk_rate_notifier(struct clk *c, struct notifier_block *nb);
