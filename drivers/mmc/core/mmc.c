@@ -1757,9 +1757,14 @@ static int _mmc_resume(struct mmc_host *host)
 	if (!mmc_card_suspended(host->card))
 		goto out;
 
-	mmc_power_up(host, host->card->ocr);
-	err = mmc_init_card(host, host->card->ocr, host->card);
-	mmc_card_clr_suspended(host->card);
+	if (mmc_card_can_sleep(host) &&
+		!(host->caps2 & MMC_CAP2_NO_SLEEP_CMD)) {
+		err = mmc_card_awake(host);
+	} else {
+		mmc_power_up(host, host->card->ocr);
+		err = mmc_init_card(host, host->card->ocr, host->card);
+		mmc_card_clr_suspended(host->card);
+	}
 
 out:
 	mmc_release_host(host);
