@@ -74,7 +74,6 @@
 #else
 void tegra_resume(void);
 int tegra_sleep_cpu_finish(unsigned long);
-void tegra_disable_clean_inv_dcache(void);
 
 #ifdef CONFIG_HOTPLUG_CPU
 void tegra20_hotplug_shutdown(void);
