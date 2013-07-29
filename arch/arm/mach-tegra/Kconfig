@@ -87,7 +87,6 @@ config ARCH_TEGRA_12x_SOC
 	select ARCH_TEGRA_VIC
 	select SOC_BUS
 	select THERMAL
-	select TEGRA_THERMAL_THROTTLE_EXACT_FREQ
 	select PM_GENERIC_DOMAINS if PM
 	select PINCTRL
 	select TEGRA_DC_TEMPORAL_DITHER
@@ -272,6 +271,7 @@ config TEGRA_THERMAL_THROTTLE
 config TEGRA_THERMAL_THROTTLE_EXACT_FREQ
 	bool "Use exact cpu frequency capping when thermal throttling"
 	depends on TEGRA_THERMAL_THROTTLE
+	default y if TEGRA_THERMAL_THROTTLE
 	default n
 	help
 	  When this option is enabled, the cpu will run at the exact
