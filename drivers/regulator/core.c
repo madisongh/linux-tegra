@@ -1193,6 +1193,14 @@ static int set_machine_constraints(struct regulator_dev *rdev,
 		}
 	}
 
+	if ((rdev->constraints->boot_off) && ops->disable) {
+		ret = ops->disable(rdev);
+		if (ret < 0) {
+			rdev_err(rdev, "failed to disable\n");
+			goto out;
+		}
+	}
+
 	if ((rdev->constraints->ramp_delay || rdev->constraints->ramp_disable)
 		&& ops->set_ramp_delay) {
 		ret = ops->set_ramp_delay(rdev, rdev->constraints->ramp_delay);
