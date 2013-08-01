@@ -3,6 +3,17 @@
  *
  * Copyright (C) 2003,2004 Hewlett-Packard Company
  *
+ * Copyright (c) 2013, NVIDIA CORPORATION, All rights reserved.
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -35,6 +46,9 @@ struct backlight_device *get_backlight_device_by_name(char *name)
 {
 	struct list_head *ptr;
 	struct backlight_device *entry = NULL;
+
+	if (!name)
+		return NULL;
 
 	mutex_lock(&backlight_dev_list_mutex);
 	list_for_each(ptr, &backlight_dev_list) {
