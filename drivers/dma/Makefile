@@ -1,3 +1,5 @@
+GCOV_PROFILE := y
+
 subdir-ccflags-$(CONFIG_DMADEVICES_DEBUG)  := -DDEBUG
 subdir-ccflags-$(CONFIG_DMADEVICES_VDEBUG) += -DVERBOSE_DEBUG
 
