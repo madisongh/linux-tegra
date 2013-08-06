@@ -433,6 +433,12 @@ config REGULATOR_MAX77802
 config REGULATOR_MC13XXX_CORE
 	tristate
 
+config REGULATOR_MAX15569
+	tristate "Maxim 15569 voltage regulator"
+	help
+	  This driver controls a Maxim 15569 voltage output regulator
+	  via I2C bus.
+
 config REGULATOR_AS3720
 	tristate "ams AS3720 PMIC regulators"
 	depends on MFD_AS3720
