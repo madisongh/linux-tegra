@@ -28,6 +28,7 @@
 #define BOARD_E1580   0x062C
 #define BOARD_E1780   0x06F4
 #define BOARD_E1781   0x06F5
+#define BOARD_E1792   0x0700
 #define BOARD_PM358   0x0166
 #define BOARD_PM359   0x0167
 #define BOARD_PM363   0x016B
