@@ -32,6 +32,13 @@
 #define PTE_PROT_NONE		(_AT(pteval_t, 1) << 58) /* only when !PTE_VALID */
 
 /*
+ * Some extra PTE bits definition.
+ */
+#define PTE_YOUNG		PTE_AF
+#define PTE_PRESENT		PTE_VALID | PTE_PROT_NONE
+#define PTE_XN			PTE_UXN
+
+/*
  * VMALLOC and SPARSEMEM_VMEMMAP ranges.
  *
  * VMEMAP_SIZE: allows the whole VA space to be covered by a struct page array
