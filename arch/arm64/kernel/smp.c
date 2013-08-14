@@ -70,6 +70,26 @@ enum ipi_msg_type {
 	IPI_IRQ_WORK,
 };
 
+static struct smp_operations smp_ops;
+
+void __init smp_set_ops(struct smp_operations *ops)
+{
+	if (ops)
+		smp_ops = *ops;
+};
+
+static void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+{
+	if (smp_ops.smp_prepare_cpus)
+		smp_ops.smp_prepare_cpus(max_cpus);
+}
+
+static void  platform_secondary_init(unsigned int cpu)
+{
+	if (smp_ops.smp_secondary_init)
+		smp_ops.smp_secondary_init(cpu);
+}
+
 /*
  * Boot a secondary CPU, and assign it the specified idle task.
  * This also gives us the initial stack to use for this CPU.
@@ -125,6 +145,29 @@ static void smp_store_cpu_info(unsigned int cpuid)
 	store_cpu_topology(cpuid);
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+
+static int platform_cpu_kill(unsigned int cpu)
+{
+	if (smp_ops.cpu_kill)
+		return smp_ops.cpu_kill(cpu);
+	return 1;
+}
+
+static void platform_cpu_die(unsigned int cpu)
+{
+	if (smp_ops.cpu_die)
+		smp_ops.cpu_die(cpu);
+}
+
+static int platform_cpu_disable(unsigned int cpu)
+{
+	if (smp_ops.cpu_disable)
+		return smp_ops.cpu_disable(cpu);
+	return 0;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 /*
  * This is the secondary CPU boot entry.  We're using this CPUs
  * idle thread stack, but a set of temporary page tables.
@@ -154,6 +197,11 @@ asmlinkage void secondary_start_kernel(void)
 
 	preempt_disable();
 	trace_hardirqs_off();
+
+	/*
+	 * Give the platform a chance to do its own initialisation.
+	 */
+	platform_secondary_init(cpu);
 
 	if (cpu_ops[cpu]->cpu_postboot)
 		cpu_ops[cpu]->cpu_postboot();
@@ -216,6 +264,10 @@ int __cpu_disable(void)
 	unsigned int cpu = smp_processor_id();
 	int ret;
 
+	ret = platform_cpu_disable(cpu);
+	if (ret)
+		return ret;
+
 	ret = op_cpu_disable(cpu);
 	if (ret)
 		return ret;
@@ -264,6 +316,10 @@ void __cpu_die(unsigned int cpu)
 		pr_crit("CPU%u: cpu didn't die\n", cpu);
 		return;
 	}
+
+	if (!platform_cpu_kill(cpu))
+		printk("CPU%u: unable to kill\n", cpu);
+
 	pr_notice("CPU%u: shutdown\n", cpu);
 
 	/*
@@ -302,7 +358,23 @@ void cpu_die(void)
 	 */
 	cpu_ops[cpu]->cpu_die(cpu);
 
-	BUG();
+	/*
+	 * actual CPU shutdown procedure is at least platform (if not
+	 * CPU) specific.
+	 */
+	platform_cpu_die(cpu);
+
+	/*
+	 * Do not return to the idle loop - jump back to the secondary
+	 * cpu initialisation.  There's some initialisation which needs
+	 * to be repeated to undo the effects of taking the CPU offline.
+	 * ps. x29 is the frame pointer.
+	 */
+	__asm__("mov	sp, %0\n"
+	"	mov	x29, #0\n"
+	"	b	secondary_start_kernel"
+	:
+	: "r" (secondary_data.stack));
 }
 #endif
 
@@ -422,6 +494,9 @@ next:
 	for (i = 0; i < NR_CPUS; i++)
 		if (cpu_logical_map(i) != INVALID_HWID)
 			set_cpu_possible(i, true);
+
+	if (smp_ops.smp_init_cpus)
+		smp_ops.smp_init_cpus();
 }
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
@@ -468,6 +543,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		set_cpu_present(cpu, true);
 		max_cpus--;
 	}
+
+	platform_smp_prepare_cpus(max_cpus);
 }
 
 void (*__smp_cross_call)(const struct cpumask *, unsigned int);
