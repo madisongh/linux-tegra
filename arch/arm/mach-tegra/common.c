@@ -49,7 +49,7 @@
 #include <linux/tegra-fuse.h>
 
 #ifdef CONFIG_ARM64
-#include <linux/irqchip/gic.h>
+#include <linux/irqchip/arm-gic.h>
 #include <asm/system_info.h>
 #else
 #include <asm/system.h>
@@ -183,7 +183,11 @@ u32 notrace tegra_read_cycle(void)
 {
 	u32 cycle_count;
 
+#ifdef CONFIG_ARM64
+	asm volatile("mrs %0, pmccntr_el0" : "=r"(cycle_count));
+#else
 	asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r"(cycle_count));
+#endif
 
 	return cycle_count;
 }
