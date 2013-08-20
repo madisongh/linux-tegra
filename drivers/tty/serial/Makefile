@@ -1,7 +1,7 @@
 #
 # Makefile for the kernel serial device drivers.
 #
-GCOV_PROFILE_tegra_hsuart.o := y
+GCOV_PROFILE := y
 
 ccflags-y += -Werror
 obj-$(CONFIG_SERIAL_CORE) += serial_core.o
