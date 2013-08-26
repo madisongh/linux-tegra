@@ -173,5 +173,8 @@ config POWER_RESET_ZX
 	help
 	  Reboot support for ZTE SoCs.
 
+config SYSTEM_PMIC
+	bool "System PMIC reset ot power off"
+
 endif
 
