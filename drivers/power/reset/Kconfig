@@ -150,5 +150,8 @@ config POWER_RESET_SYSCON
 	help
 	  Reboot support for generic SYSCON mapped register reset.
 
+config SYSTEM_PMIC
+	bool "System PMIC reset ot power off"
+
 endif
 
