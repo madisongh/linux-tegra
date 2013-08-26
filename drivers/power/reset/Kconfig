@@ -84,6 +84,14 @@ config POWER_RESET_LTC2952
 	  This driver supports an external powerdown trigger and board power
 	  down via the LTC2952. Bindings are made in the device tree.
 
+config POWER_OFF_PALMAS
+	bool "Palmas power-off-reset driver"
+	depends on MFD_PALMAS
+	select SYSTEM_PMIC
+	help
+	  This driver supports turning off and resetting board through Palmas
+	  PMIC.
+
 config POWER_RESET_QNAP
 	bool "QNAP power-off driver"
 	depends on OF_GPIO && PLAT_ORION
