@@ -599,15 +599,48 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci)
 	if (!timeout)
 		dev_err(mmc_dev(sdhci->mmc), "Auto calibration failed\n");
 
-	/* Disable Auto calibration */
-	val = sdhci_readl(sdhci, SDMMC_AUTO_CAL_CONFIG);
-	val &= ~SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE;
-	sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
-
 	if (soc_data->nvquirks & NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD) {
 		val = sdhci_readl(sdhci, SDMMC_SDMEMCOMPPADCTRL);
 		val &= ~SDMMC_SDMEMCOMPPADCTRL_PAD_E_INPUT_OR_E_PWRD_MASK;
 		sdhci_writel(sdhci, val, SDMMC_SDMEMCOMPPADCTRL);
+	}
+
+	if (unlikely(soc_data->nvquirks & NVQUIRK_SET_DRIVE_STRENGTH)) {
+		unsigned int pulldown_code;
+		unsigned int pullup_code;
+		int pg;
+		int err;
+
+		/* Disable Auto calibration */
+		val = sdhci_readl(sdhci, SDMMC_AUTO_CAL_CONFIG);
+		val &= ~SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE;
+		sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
+
+		pg = tegra_drive_get_pingroup(mmc_dev(sdhci->mmc));
+		if (pg != -1) {
+			/* Get the pull down codes from auto cal status reg */
+			pulldown_code = (
+				sdhci_readl(sdhci, SDMMC_AUTO_CAL_STATUS) >>
+				SDMMC_AUTO_CAL_STATUS_PULLDOWN_OFFSET);
+			/* Set the pull down in the pinmux reg */
+			err = tegra_drive_pinmux_set_pull_down(pg,
+				pulldown_code);
+			if (err)
+				dev_err(mmc_dev(sdhci->mmc),
+				"Failed to set pulldown codes %d err %d\n",
+				pulldown_code, err);
+
+			/* Calculate the pull up codes */
+			pullup_code = pulldown_code + PULLUP_ADJUSTMENT_OFFSET;
+			if (pullup_code >= TEGRA_MAX_PULL)
+				pullup_code = TEGRA_MAX_PULL - 1;
+			/* Set the pull up code in the pinmux reg */
+			err = tegra_drive_pinmux_set_pull_up(pg, pullup_code);
+			if (err)
+				dev_err(mmc_dev(sdhci->mmc),
+				"Failed to set pullup codes %d err %d\n",
+				pullup_code, err);
+		}
 	}
 }
 
