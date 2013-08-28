@@ -1012,7 +1012,7 @@ void nvmap_free_handle_id(struct nvmap_client *client, unsigned long id)
 
 	nvmap_ref_lock(client);
 
-	ref = _nvmap_validate_id_locked(client, id);
+	ref = __nvmap_validate_id_locked(client, id);
 	if (!ref) {
 		nvmap_ref_unlock(client);
 		return;
@@ -1165,7 +1165,7 @@ struct nvmap_handle_ref *nvmap_duplicate_handle_id(struct nvmap_client *client,
 	}
 
 	nvmap_ref_lock(client);
-	ref = _nvmap_validate_id_locked(client, (unsigned long)h);
+	ref = __nvmap_validate_id_locked(client, (unsigned long)h);
 
 	if (ref) {
 		/* handle already duplicated in client; just increment
@@ -1328,7 +1328,7 @@ int nvmap_acquire_page_list(struct nvmap_client *client,
 		pages[idx] = h->pgalloc.pages[idx];
 
 	nvmap_ref_lock(client);
-	ref = _nvmap_validate_id_locked(client, id);
+	ref = __nvmap_validate_id_locked(client, id);
 	if (ref)
 		nvmap_pin(client, ref, &dummy);
 	nvmap_ref_unlock(client);
@@ -1346,7 +1346,7 @@ int nvmap_release_page_list(struct nvmap_client *client, unsigned long id)
 
 	nvmap_ref_lock(client);
 
-	ref = _nvmap_validate_id_locked(client, id);
+	ref = __nvmap_validate_id_locked(client, id);
 	if (ref)
 		nvmap_unpin(client, ref);
 
