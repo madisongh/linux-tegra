@@ -1648,6 +1648,7 @@ void azx_stop_chip(struct azx *chip)
 	/* disable interrupts */
 	azx_int_disable(chip);
 	azx_int_clear(chip);
+	synchronize_irq(chip->irq);
 
 	/* disable CORB/RIRB */
 	azx_free_cmd_io(chip);
