@@ -37,3 +37,4 @@ obj-$(CONFIG_INT340X_THERMAL)  += int340x_thermal/
 obj-$(CONFIG_ST_THERMAL)	+= st/
 obj-$(CONFIG_PWM_FAN)		+= pwm_fan.o
 obj-$(CONFIG_GENERIC_ADC_THERMAL)	+= generic_adc_thermal.o
+obj-$(CONFIG_PALMAS_THERMAL)	+= palmas_thermal.o
