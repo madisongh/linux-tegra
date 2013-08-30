@@ -29,6 +29,7 @@ struct dma_iommu_mapping {
 	/* FIXME: currently only alignment of 2^n is supported. */
 	size_t			alignment;
 
+	struct list_head	list;
 };
 
 struct dma_iommu_mapping *
