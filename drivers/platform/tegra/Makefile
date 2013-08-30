@@ -4,7 +4,7 @@
 #
 obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
 
-ifneq ($(CONFIG_ARCH_TEGRA_13x_SOC),)
+ifneq ($(CONFIG_ARM64),)
 
 ccflags-y += -I$(srctree)/arch/arm/mach-tegra
 
@@ -81,7 +81,7 @@ obj-y += eeprom-wifi-mac.o
 
 obj-y += board-panel.o
 
-else # --- CONFIG_ARCH_TEGRA_13x_SOC --- #
+else # --- CONFIG_ARM64 --- #
 
 obj-y += dummy.o # generate a built-in.o
 
