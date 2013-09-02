@@ -1342,6 +1342,24 @@ static bool smmu_iommu_capable(enum iommu_cap cap)
 	return false;
 }
 
+#if defined(CONFIG_DMA_API_DEBUG) || defined(CONFIG_FTRACE)
+char *debug_dma_platformdata(struct device *dev)
+{
+	static char buf[21];
+	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+	struct smmu_as *as;
+	int asid = -1;
+
+	if (mapping) {
+		as = mapping->domain->priv;
+		asid = as->asid;
+	}
+
+	sprintf(buf, "%d", asid);
+	return buf;
+}
+#endif
+
 static int smmu_iommu_attach_dev(struct iommu_domain *domain,
 				 struct device *dev)
 {
