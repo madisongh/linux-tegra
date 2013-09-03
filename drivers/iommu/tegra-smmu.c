@@ -1752,7 +1752,7 @@ static int tegra_smmu_probe(struct platform_device *pdev)
 	struct smmu_device *smmu;
 	struct resource *regs, *regs2, *window;
 	struct device *dev = &pdev->dev;
-	int i;
+	int i, num_as;
 	size_t bytes;
 
 	if (smmu_handle)
@@ -1768,7 +1768,11 @@ static int tegra_smmu_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	bytes = sizeof(*smmu) + SMMU_NUM_ASIDS * sizeof(*smmu->as);
+	num_as = SMMU_NUM_ASIDS;
+	if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA12)
+		num_as = SMMU_NUM_ASIDS_TEGRA12;
+
+	bytes = sizeof(*smmu) + num_as * sizeof(*smmu->as);
 	smmu = devm_kzalloc(dev, bytes, GFP_KERNEL);
 	if (!smmu) {
 		dev_err(dev, "failed to allocate smmu_device\n");
@@ -1776,10 +1780,7 @@ static int tegra_smmu_probe(struct platform_device *pdev)
 	}
 
 	smmu->dev = dev;
-	smmu->num_as = SMMU_NUM_ASIDS;
-
-	if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA12)
-		smmu->num_as = SMMU_NUM_ASIDS_TEGRA12;
+	smmu->num_as = num_as;
 
 	smmu->iovmm_base = (unsigned long)window->start;
 	smmu->page_count = resource_size(window) >> SMMU_PAGE_SHIFT;
