@@ -415,8 +415,7 @@ static void heap_release(struct device *heap)
  * address base.
  */
 struct nvmap_heap *nvmap_heap_create(struct device *parent, const char *name,
-				     unsigned long base, size_t len,
-				     size_t buddy_size, void *arg)
+				     phys_addr_t base, size_t len, void *arg)
 {
 	struct nvmap_heap *h = NULL;
 	struct list_block *l = NULL;

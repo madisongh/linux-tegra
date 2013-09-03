@@ -1366,8 +1366,7 @@ static int nvmap_probe(struct platform_device *pdev)
 		if (!co->size)
 			continue;
 		node->carveout = nvmap_heap_create(dev->dev_user.this_device,
-				   co->name, node->base, node->size,
-				   co->buddy_size, node);
+				   co->name, node->base, node->size, node);
 		if (!node->carveout) {
 			e = -ENOMEM;
 			dev_err(&pdev->dev, "couldn't create %s\n", co->name);
