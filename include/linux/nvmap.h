@@ -54,6 +54,7 @@
 #define NVMAP_HANDLE_COMPR_SPECIFIED (0x1ul << 4)
 
 struct nvmap_handle;
+struct nvmap_handle_ref;
 
 #if defined(__KERNEL__)
 
@@ -90,6 +91,8 @@ struct dma_buf *nvmap_alloc_dmabuf(size_t size, size_t align,
 struct dma_buf *nvmap_dmabuf_export(struct nvmap_client *client, ulong user_id);
 
 struct dma_buf *nvmap_dmabuf_export_from_ref(struct nvmap_handle_ref *ref);
+
+ulong nvmap_ref_to_id(struct nvmap_handle_ref *ref);
 
 ulong nvmap_ref_to_user_id(struct nvmap_handle_ref *ref);
 
