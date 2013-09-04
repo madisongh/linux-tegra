@@ -38,6 +38,7 @@
 #include <linux/smsc911x.h>
 #endif
 #include <linux/pm.h>
+#include <linux/tegra-powergate.h>
 
 #include <linux/export.h>
 #include <linux/bootmem.h>

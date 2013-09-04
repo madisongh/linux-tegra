@@ -89,6 +89,9 @@
 #endif
 
 #ifdef CONFIG_ARCH_TEGRA
+int  __init tegra_powergate_init(void);
+
+int tegra_cpu_powergate_id(int cpuid);
 bool tegra_powergate_is_powered(int id);
 int tegra_powergate_power_on(int id);
 int tegra_powergate_power_off(int id);

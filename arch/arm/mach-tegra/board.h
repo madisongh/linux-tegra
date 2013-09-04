@@ -172,7 +172,6 @@ int tegra_clk_debugfs_init(void);
 static inline int tegra_clk_debugfs_init(void) { return 0; }
 #endif
 
-int __init tegra_powergate_init(void);
 #if defined(CONFIG_DEBUG_FS)
 int __init tegra_powergate_debugfs_init(void);
 #else
