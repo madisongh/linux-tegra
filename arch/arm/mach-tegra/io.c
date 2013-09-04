@@ -25,10 +25,10 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/tegra-soc.h>
 
 #include <asm/mach/map.h>
 #include <asm/page.h>
-#include <mach/hardware.h>
 
 #include "board.h"
 #include "iomap.h"
