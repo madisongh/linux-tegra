@@ -32,7 +32,6 @@
 #include <linux/delay.h>
 #include <linux/export.h>
 #include <linux/clk/tegra.h>
-#include <linux/tegra-powergate.h>
 #include <linux/msi.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
@@ -44,6 +43,7 @@
 #include <linux/async.h>
 #include <linux/vmalloc.h>
 #include <linux/pm_runtime.h>
+#include <linux/tegra-powergate.h>
 
 #include <asm/sizes.h>
 #include <asm/mach/pci.h>
