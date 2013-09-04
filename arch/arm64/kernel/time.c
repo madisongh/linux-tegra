@@ -101,7 +101,9 @@ void __init time_init(void)
 {
 	u32 arch_timer_rate;
 
+#if defined(CONFIG_COMMON_CLK)
 	of_clk_init(NULL);
+#endif
 	clocksource_of_init();
 
 	tick_setup_hrtimer_broadcast();
