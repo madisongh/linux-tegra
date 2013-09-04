@@ -40,6 +40,7 @@
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 #include <linux/clk.h>
+#include <linux/clk/tegra.h>
 #include <linux/async.h>
 #include <linux/vmalloc.h>
 #include <linux/pm_runtime.h>
