@@ -36,6 +36,7 @@
 #include <linux/seq_file.h>
 #include <linux/dma-mapping.h>
 #include <linux/bitops.h>
+#include <linux/tegra-soc.h>
 
 #include <soc/tegra/ahb.h>
 
@@ -43,7 +44,6 @@
 #include <asm/cacheflush.h>
 #include <asm/dma-iommu.h>
 
-#include <mach/hardware.h>
 #include <mach/tegra_smmu.h>
 #include <mach/tegra-swgid.h>
 
