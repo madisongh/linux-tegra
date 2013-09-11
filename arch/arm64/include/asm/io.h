@@ -241,6 +241,8 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
 
 #define IOMEM(x)	((void __force __iomem *)(x))
 
+extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
+
 /*
  * More restrictive address range checking than the default implementation
  * (PHYS_OFFSET and PHYS_MASK taken into account).

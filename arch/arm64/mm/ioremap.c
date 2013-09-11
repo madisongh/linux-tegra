@@ -197,3 +197,16 @@ void __init __early_set_fixmap(enum fixed_addresses idx,
 		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
 	}
 }
+
+#ifdef CONFIG_PCI
+int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+{
+	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
+
+	return ioremap_page_range(PCI_IOBASE + offset,
+				  PCI_IOBASE + offset + SZ_64K,
+				  phys_addr,
+				  __pgprot(PROT_DEVICE_nGnRE));
+}
+EXPORT_SYMBOL_GPL(pci_ioremap_io);
+#endif
