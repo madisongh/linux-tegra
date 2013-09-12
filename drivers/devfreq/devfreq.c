@@ -1063,6 +1063,15 @@ static ssize_t trans_stat_show(struct device *dev,
 	else
 		prev_freq = devfreq->profile->freq_table[prev_freq_level];
 
+	/* round the current frequency */
+	prev_freq_level = devfreq_get_freq_level(devfreq,
+						 devfreq->previous_freq);
+
+	if (prev_freq_level < 0)
+		prev_freq = devfreq->previous_freq;
+	else
+		prev_freq = devfreq->profile->freq_table[prev_freq_level];
+
 	len = sprintf(buf, "   From  :   To\n");
 	len += sprintf(buf + len, "         :");
 	for (i = 0; i < max_state; i++)
