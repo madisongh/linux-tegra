@@ -74,7 +74,9 @@ obj-$(CONFIG_ARCH_SOCFPGA)		+= socfpga/
 obj-$(CONFIG_PLAT_SPEAR)		+= spear/
 obj-$(CONFIG_ARCH_STI)			+= st/
 obj-$(CONFIG_ARCH_SUNXI)		+= sunxi/
+ifeq ($(CONFIG_COMMON_CLK), y)
 obj-$(CONFIG_ARCH_TEGRA)		+= tegra/
+endif
 obj-$(CONFIG_ARCH_OMAP2PLUS)		+= ti/
 obj-$(CONFIG_ARCH_U8500)		+= ux500/
 obj-$(CONFIG_COMMON_CLK_VERSATILE)	+= versatile/
