@@ -305,6 +305,15 @@ void zconf_initscan(const char *name)
 	current_file->lineno = 1;
 }
 
+void zconf_trynextfile(const char *name)
+{
+	FILE *file = zconf_fopen(name);
+
+	if (!file)
+		return;
+	fclose(file);
+}
+
 void zconf_nextfile(const char *name)
 {
 	struct file *iter;
