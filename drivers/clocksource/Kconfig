@@ -223,4 +223,10 @@ config CLKSRC_VERSATILE
 	  ARM Versatile, RealView and Versatile Express reference
 	  platforms.
 
+config CLK_SRC_TEGRA_TIMER
+	bool "Clocksource for tegra based SOC's"
+	default y
+	help
+	  Use the always on PRCMU Timer as sched_clock
+
 endmenu
