@@ -44,6 +44,7 @@ Optional properties:
   any consumer request.
 - regulator-pull-down: Enable pull down resistor when the regulator is disabled.
 - regulator-over-current-protection: Enable over current protection.
+- regulator-init-microvolt: Initial microvolt need to be set during registration
 
 Deprecated properties:
 - regulator-compatible: If a regulator chip contains multiple
