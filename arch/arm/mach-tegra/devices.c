@@ -786,27 +786,6 @@ static struct resource spi_resource6[] = {
 };
 #endif
 
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-static struct resource dtv_resource[] = {
-	[0] = {
-		.start  = INT_DTV,
-		.end    = INT_DTV,
-		.flags  = IORESOURCE_IRQ,
-	},
-	[1] = {
-		.start  = TEGRA_DTV_BASE,
-		.end    = TEGRA_DTV_BASE + TEGRA_DTV_SIZE - 1,
-		.flags  = IORESOURCE_MEM,
-	},
-	[2] = {
-		.start	= TEGRA_DMA_REQ_SEL_DTV,
-		.end	= TEGRA_DMA_REQ_SEL_DTV,
-		.flags	= IORESOURCE_DMA
-	},
-};
-#endif
-
-
 struct platform_device tegra_spi_device1 = {
 	.name		= "spi_tegra",
 	.id		= 0,
@@ -1082,7 +1061,19 @@ struct platform_device tegra_nor_device = {
 	},
 };
 
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+static struct resource dtv_resource[] = {
+	[0] = {
+		.start  = TEGRA_DTV_BASE,
+		.end    = TEGRA_DTV_BASE + TEGRA_DTV_SIZE - 1,
+		.flags  = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= TEGRA_DMA_REQ_SEL_DTV,
+		.end	= TEGRA_DMA_REQ_SEL_DTV,
+		.flags	= IORESOURCE_DMA
+	},
+};
+
 struct platform_device tegra_dtv_device = {
 	.name           = "tegra_dtv",
 	.id             = -1,
@@ -1093,7 +1084,6 @@ struct platform_device tegra_dtv_device = {
 		.coherent_dma_mask = 0xffffffff,
 	},
 };
-#endif
 
 static struct resource sdhci_resource1[] = {
 	[0] = {
@@ -2178,6 +2168,7 @@ struct swgid_fixup tegra_swgid_fixup_t124[] = {
 	  SWGID(PPCS2), },
 	{ .name = "serial-tegra",	.swgids = SWGID(PPCS) | SWGID(PPCS1) |
 	  SWGID(PPCS2), },
+	{ .name = "dtv",	.swgids = SWGID(PPCS), },
 	{ .name = "snd-soc-dummy",	.swgids = SWGID(PPCS) | SWGID(PPCS1) |
 	  SWGID(PPCS2), },
 	{ .name = "spdif-dit",	.swgids = SWGID(PPCS) | SWGID(PPCS1) |
