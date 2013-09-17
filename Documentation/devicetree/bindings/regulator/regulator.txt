@@ -19,6 +19,7 @@ Optional properties:
   design requires. This property describes the total system ramp time
   required due to the combination of internal ramping of the regulator itself,
   and board design issues such as trace capacitance and load on the supply.
+- regulator-init-microvolt: Initial microvolt need to be set during registration
 
 Deprecated properties:
 - regulator-compatible: If a regulator chip contains multiple

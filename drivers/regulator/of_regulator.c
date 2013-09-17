@@ -23,6 +23,7 @@ static void of_get_regulation_constraints(struct device_node *np,
 					struct regulator_init_data **init_data)
 {
 	const __be32 *min_uV, *max_uV;
+	const __be32 *init_uV;
 	struct regulation_constraints *constraints = &(*init_data)->constraints;
 	int ret;
 	u32 pval;
@@ -35,6 +36,9 @@ static void of_get_regulation_constraints(struct device_node *np,
 	max_uV = of_get_property(np, "regulator-max-microvolt", NULL);
 	if (max_uV)
 		constraints->max_uV = be32_to_cpu(*max_uV);
+	init_uV = of_get_property(np, "regulator-init-microvolt", NULL);
+	if (init_uV)
+		constraints->init_uV = be32_to_cpu(*init_uV);
 
 	/* Voltage change possible? */
 	if (constraints->min_uV != constraints->max_uV)
