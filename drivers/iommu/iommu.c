@@ -1319,7 +1319,7 @@ static size_t iommu_pgsize(struct iommu_domain *domain,
 }
 
 int iommu_map(struct iommu_domain *domain, unsigned long iova,
-	      phys_addr_t paddr, size_t size, int prot)
+	      phys_addr_t paddr, size_t size, unsigned long prot)
 {
 	unsigned long orig_iova = iova;
 	unsigned int min_pagesz;
@@ -1427,7 +1427,7 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
 EXPORT_SYMBOL_GPL(iommu_unmap);
 
 size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
-			 struct scatterlist *sg, unsigned int nents, int prot)
+			 struct scatterlist *sg, unsigned int nents, unsigned long prot)
 {
 	struct scatterlist *s;
 	size_t mapped = 0;
