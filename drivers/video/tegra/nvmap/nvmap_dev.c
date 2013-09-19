@@ -1332,11 +1332,10 @@ static int nvmap_probe(struct platform_device *pdev)
 		if (!co->size)
 			continue;
 
-		dev_info(&pdev->dev, "heap (%s) base (%pa) size (%d)\n",
-			co->name, &node->base, node->size);
+		node->carveout = nvmap_heap_create(
+				dev->dev_user.this_device, co,
+				node->base, node->size, node);
 
-		node->carveout = nvmap_heap_create(dev->dev_user.this_device,
-				   co->name, node->base, node->size, node);
 		if (!node->carveout) {
 			e = -ENOMEM;
 			dev_err(&pdev->dev, "couldn't create %s\n", co->name);
@@ -1347,8 +1346,6 @@ static int nvmap_probe(struct platform_device *pdev)
 		spin_lock_init(&node->clients_lock);
 		INIT_LIST_HEAD(&node->clients);
 		node->heap_bit = co->usage_mask;
-		dev_info(&pdev->dev, "created carveout %s (%zuKiB)\n",
-			 co->name, co->size / 1024);
 
 		if (!IS_ERR_OR_NULL(nvmap_debug_root)) {
 			struct dentry *heap_root =
@@ -1357,11 +1354,10 @@ static int nvmap_probe(struct platform_device *pdev)
 				debugfs_create_file("clients", S_IRUGO,
 					heap_root, node, &debug_clients_fops);
 				debugfs_create_file("allocations", S_IRUGO,
-				    heap_root, node, &debug_allocations_fops);
-				debugfs_create_x32("base", S_IRUGO,
-				    heap_root, (u32 *)&node->base);
-				debugfs_create_x32("size", S_IRUGO,
-				    heap_root, &node->size);
+					heap_root, node,
+					&debug_allocations_fops);
+				nvmap_heap_debugfs_init(heap_root,
+					node->carveout);
 			}
 		}
 	}
