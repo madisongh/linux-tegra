@@ -131,6 +131,10 @@ config SWIOTLB
 config IOMMU_HELPER
 	def_bool SWIOTLB
 
+config ARM_DMA_USE_IOMMU
+	select NEED_SG_DMA_LENGTH
+	bool
+
 config MULTI_IRQ_HANDLER
         bool
         help
