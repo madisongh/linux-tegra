@@ -341,11 +341,11 @@ static int palmas_usb_probe(struct platform_device *pdev)
 
 	palmas_usb->edev.supported_cable = palmas_extcon_cable;
 	palmas_usb->edev.mutually_exclusive = mutually_exclusive;
-	palmas_usb->edev.name  = (ext_name) ? ext_name : dev_name(&pdev->dev);
+	palmas_usb->edev.name = ext_name;
 	palmas_usb->edev.dev.parent = palmas_usb->dev;
 
 	status = extcon_dev_register(&palmas_usb->edev);
-	if (status < 0) {
+	if (status) {
 		dev_err(&pdev->dev, "failed to register extcon device\n");
 		return status;
 	}
