@@ -206,8 +206,8 @@ static int as3722_adc_extcon_probe(struct platform_device *pdev)
 
 	adc->edev.name = (extcon_pdata->connection_name) ?
 				extcon_pdata->connection_name : pdev->name;
+	adc->edev.dev.parent = &pdev->dev;
 	adc->edev.supported_cable = as3722_adc_excon_cable;
-	adc->edev.dev.parent = NULL;
 	ret = extcon_dev_register(&adc->edev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "extcon dev register failed %d\n", ret);
