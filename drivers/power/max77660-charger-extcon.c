@@ -981,9 +981,8 @@ static int max77660_chg_extcon_probe(struct platform_device *pdev)
 	charger->bcharger_pdata = bcharger_pdata;
 
 	chg_extcon->edev = edev;
-	chg_extcon->edev->name = (chg_pdata->ext_conn_name) ?
-					chg_pdata->ext_conn_name :
-					dev_name(&pdev->dev);
+	chg_extcon->edev->name = chg_pdata->ext_conn_name;
+	chg_extcon->edev->dev.parent = &pdev->dev;
 	chg_extcon->edev->supported_cable = max77660_excon_cable;
 	chg_extcon->edev->dev.parent = NULL;
 
