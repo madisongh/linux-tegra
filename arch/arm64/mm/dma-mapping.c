@@ -110,6 +110,7 @@ static int __free_from_pool(void *start, size_t size)
 	return 1;
 }
 
+#ifdef CONFIG_SWIOTLB
 static void *__dma_alloc_coherent(struct device *dev, size_t size,
 				  dma_addr_t *dma_handle, gfp_t flags,
 				  struct dma_attrs *attrs)
@@ -385,6 +386,8 @@ EXPORT_SYMBOL(coherent_swiotlb_dma_ops);
 
 extern int swiotlb_late_init_with_default_size(size_t default_size);
 
+#endif /* CONFIG_SWIOTLB */
+
 static int __init atomic_pool_init(void)
 {
 	pgprot_t prot = __pgprot(PROT_NORMAL_NC);
@@ -446,6 +449,7 @@ out:
 	return -ENOMEM;
 }
 
+#ifdef CONFIG_SWIOTLB
 static int __init swiotlb_late_init(void)
 {
 	size_t swiotlb_size = min(SZ_64M, MAX_ORDER_NR_PAGES << PAGE_SHIFT);
@@ -454,12 +458,15 @@ static int __init swiotlb_late_init(void)
 
 	return swiotlb_late_init_with_default_size(swiotlb_size);
 }
+#endif /* CONFIG_SWIOTLB */
 
 static int __init arm64_dma_init(void)
 {
 	int ret = 0;
 
+#ifdef CONFIG_SWIOTLB
 	ret |= swiotlb_late_init();
+#endif /* CONFIG_SWIOTLB */
 	ret |= atomic_pool_init();
 
 	return ret;
