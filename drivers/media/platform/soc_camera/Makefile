@@ -9,12 +9,8 @@ obj-$(CONFIG_SOC_CAMERA_PLATFORM)	+= soc_camera_platform.o
 obj-$(CONFIG_VIDEO_ATMEL_ISI)		+= atmel-isi.o
 obj-$(CONFIG_VIDEO_MX2)			+= mx2_camera.o
 obj-$(CONFIG_VIDEO_MX3)			+= mx3_camera.o
-obj-$(CONFIG_VIDEO_TEGRA)		+= tegra_v4l2_camera.o
 obj-$(CONFIG_VIDEO_OMAP1)		+= omap1_camera.o
 obj-$(CONFIG_VIDEO_PXA27x)		+= pxa_camera.o
 obj-$(CONFIG_VIDEO_SH_MOBILE_CEU)	+= sh_mobile_ceu_camera.o
 obj-$(CONFIG_VIDEO_SH_MOBILE_CSI2)	+= sh_mobile_csi2.o
-obj-$(CONFIG_VIDEO_RCAR_VIN)		+= rcar_vin.o
-obj-$(CONFIG_VIDEO_TEGRA)		+= tegra_v4l2_camera.o
-
-ccflags-y += -I$(srctree)/drivers/video/tegra/host
+obj-$(CONFIG_VIDEO_TEGRA)		+= tegra_camera/
