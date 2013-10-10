@@ -111,11 +111,12 @@ static inline void dma_mark_clean(void *addr, size_t size)
 }
 
 #define dma_alloc_coherent(d, s, h, f)	dma_alloc_attrs(d, s, h, f, NULL)
+#define dma_alloc_at_coherent(d, s, h, f) dma_alloc_at_attrs(d, s, h, f, NULL)
 #define dma_free_coherent(d, s, h, f)	dma_free_attrs(d, s, h, f, NULL)
 
-static inline void *dma_alloc_attrs(struct device *dev, size_t size,
-				    dma_addr_t *dma_handle, gfp_t flags,
-				    struct dma_attrs *attrs)
+static inline void *dma_alloc_at_attrs(struct device *dev, size_t size,
+				       dma_addr_t *dma_handle, gfp_t flags,
+				       struct dma_attrs *attrs)
 {
 	struct dma_map_ops *ops = get_dma_ops(dev);
 	void *vaddr;
@@ -126,6 +127,14 @@ static inline void *dma_alloc_attrs(struct device *dev, size_t size,
 	vaddr = ops->alloc(dev, size, dma_handle, flags, attrs);
 	debug_dma_alloc_coherent(dev, size, *dma_handle, vaddr);
 	return vaddr;
+}
+
+static inline void *dma_alloc_attrs(struct device *dev, size_t size,
+				    dma_addr_t *dma_handle, gfp_t flags,
+				    struct dma_attrs *attrs)
+{
+	*dma_handle = DMA_ERROR_CODE;
+	return dma_alloc_at_attrs(dev, size, dma_handle, flags, attrs);
 }
 
 static inline void dma_free_attrs(struct device *dev, size_t size,
