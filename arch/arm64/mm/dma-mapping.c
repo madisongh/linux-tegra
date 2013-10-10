@@ -1271,7 +1271,7 @@ static int pg_iommu_map(struct iommu_domain *domain, unsigned long iova,
 }
 
 static size_t pg_iommu_unmap(struct iommu_domain *domain,
-			     unsigned long iova, size_t len, int prot)
+			     unsigned long iova, size_t len, unsigned long prot)
 {
 	phys_addr_t phys_addr;
 
@@ -1694,7 +1694,7 @@ ____iommu_create_mapping(struct device *dev, dma_addr_t *req,
 	return dma_addr;
 fail:
 	pg_iommu_unmap(mapping->domain, dma_addr,
-			iova-dma_addr, (int)((s64)attrs));
+			iova-dma_addr, (unsigned long)attrs);
 	__free_iova(mapping, dma_addr, size, attrs);
 	return DMA_ERROR_CODE;
 }
@@ -1718,7 +1718,7 @@ static int __iommu_remove_mapping(struct device *dev, dma_addr_t iova,
 	size = PAGE_ALIGN((iova & ~PAGE_MASK) + size);
 	iova &= PAGE_MASK;
 
-	pg_iommu_unmap(mapping->domain, iova, size, (int)((s64)attrs));
+	pg_iommu_unmap(mapping->domain, iova, size, (unsigned long)attrs);
 	__free_iova(mapping, iova, size, attrs);
 	return 0;
 }
@@ -1934,7 +1934,7 @@ skip_cmaint:
 	return 0;
 fail:
 	pg_iommu_unmap(mapping->domain, iova_base, count * PAGE_SIZE,
-		       (int)((s64)attrs));
+		       (unsigned long)attrs);
 	__free_iova(mapping, iova_base, size, attrs);
 	return ret;
 }
@@ -2223,7 +2223,7 @@ static void arm_coherent_iommu_unmap_page(struct device *dev, dma_addr_t handle,
 	if (!iova)
 		return;
 
-	pg_iommu_unmap(mapping->domain, iova, len, (int)((s64)attrs));
+	pg_iommu_unmap(mapping->domain, iova, len, (unsigned long)attrs);
 	if (!dma_get_attr(DMA_ATTR_SKIP_FREE_IOVA, attrs))
 		__free_iova(mapping, iova, len, attrs);
 }
@@ -2253,7 +2253,7 @@ static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
 	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
 		__dma_page_dev_to_cpu(page, offset, size, dir);
 
-	pg_iommu_unmap(mapping->domain, iova, len, (int)((s64)attrs));
+	pg_iommu_unmap(mapping->domain, iova, len, (unsigned long)attrs);
 	if (!dma_get_attr(DMA_ATTR_SKIP_FREE_IOVA, attrs))
 		__free_iova(mapping, iova, len, attrs);
 }
