@@ -202,30 +202,31 @@ extern void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
 			dma_addr_t handle, struct dma_attrs *attrs);
 
 
-static inline dma_addr_t dma_iova_alloc(struct device *dev, size_t size)
+static inline dma_addr_t dma_iova_alloc(struct device *dev, size_t size,
+					struct dma_attrs *attrs)
 {
 	struct dma_map_ops *ops = get_dma_ops(dev);
 	BUG_ON(!ops);
 
-	return ops->iova_alloc(dev, size);
+	return ops->iova_alloc(dev, size, attrs);
 }
 
 static inline void dma_iova_free(struct device *dev, dma_addr_t addr,
-				size_t size)
+				 size_t size, struct dma_attrs *attrs)
 {
 	struct dma_map_ops *ops = get_dma_ops(dev);
 	BUG_ON(!ops);
 
-	ops->iova_free(dev, addr, size);
+	ops->iova_free(dev, addr, size, attrs);
 }
 
 static inline dma_addr_t dma_iova_alloc_at(struct device *dev, dma_addr_t *addr,
-					   size_t size)
+					   size_t size, struct dma_attrs *attrs)
 {
 	struct dma_map_ops *ops = get_dma_ops(dev);
 	BUG_ON(!ops);
 
-	return ops->iova_alloc_at(dev, addr, size);
+	return ops->iova_alloc_at(dev, addr, size, attrs);
 }
 
 static inline size_t dma_iova_get_free_total(struct device *dev)
@@ -251,7 +252,7 @@ dma_map_linear_attrs(struct device *dev, phys_addr_t pa, size_t size,
 	dma_addr_t da, req = pa;
 	void *va = phys_to_virt(pa);
 
-	da = dma_iova_alloc_at(dev, &req, size);
+	da = dma_iova_alloc_at(dev, &req, size, attrs);
 	if (da == DMA_ERROR_CODE) {
 		DEFINE_DMA_ATTRS(_attrs);
 		switch (req) {
