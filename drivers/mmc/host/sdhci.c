@@ -25,14 +25,16 @@
 #include <linux/pm_runtime.h>
 #include <linux/platform_device.h>
 
-#include <linux/leds.h>
 
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/slot-gpio.h>
 
+#include <linux/leds.h>
 #include <linux/edp.h>
+#include <linux/sysedp.h>
+#include <linux/tegra-soc.h>
 
 #include "sdhci.h"
 
@@ -3352,6 +3354,9 @@ int sdhci_add_host(struct sdhci_host *host)
 		goto untasklet;
 	}
 
+	host->sysedpc = sysedp_create_consumer(dev_name(mmc_dev(mmc)),
+					       dev_name(mmc_dev(mmc)));
+
 	if (host->edp_support == true) {
 		battery_manager = edp_get_manager("battery");
 		if (!battery_manager)
@@ -3498,6 +3503,9 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 
 	host->adma_desc = NULL;
 	host->align_buffer = NULL;
+
+	sysedp_free_consumer(host->sysedpc);
+	host->sysedpc = NULL;
 }
 
 EXPORT_SYMBOL_GPL(sdhci_remove_host);
