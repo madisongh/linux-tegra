@@ -12,6 +12,9 @@
 #include <linux/fb.h>
 #include <linux/mutex.h>
 #include <linux/notifier.h>
+#ifdef CONFIG_SYSEDP_FRAMEWORK
+#include <linux/sysedp.h>
+#endif
 
 /* Notes on locking:
  *
@@ -115,8 +118,17 @@ struct backlight_device {
 	bool fb_bl_on[FB_MAX];
 
 	int use_count;
+
+#ifdef CONFIG_SYSEDP_FRAMEWORK
+	struct sysedp_consumer *sysedpc;
+#endif
 };
 
+#ifdef CONFIG_SYSEDP_FRAMEWORK
+
+int backlight_update_status(struct backlight_device *bd);
+
+#else
 static inline int backlight_update_status(struct backlight_device *bd)
 {
 	int ret = -ENOENT;
@@ -128,6 +140,8 @@ static inline int backlight_update_status(struct backlight_device *bd)
 
 	return ret;
 }
+#endif
+
 extern struct backlight_device *get_backlight_device_by_name(char *name);
 
 extern struct backlight_device *backlight_device_register(const char *name,
