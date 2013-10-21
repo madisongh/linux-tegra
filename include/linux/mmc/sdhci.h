@@ -3,6 +3,8 @@
  *
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
  *
+ *  Copyright (c) 2013-2014, NVIDIA CORPORATION. All Rights Reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or (at
@@ -18,11 +20,47 @@
 #include <linux/mmc/host.h>
 #include <linux/sysedp.h>
 
+#ifdef CONFIG_DEBUG_FS
+struct data_stat_entry {
+	u32 max_kbps;
+	u32 min_kbps;
+	ktime_t start_ktime;
+	u32 duration_usecs;
+	u32 total_usecs;
+	u32 current_transferred_bytes;
+	u64 total_bytes;
+	u32 stat_blk_size;
+	u32 stat_blks_per_transfer;
+	struct data_stat_entry *next;
+};
+
+/*
+ * 1. Each block size has a element of type struct data_stat_entry
+ * 2. For a particular block size we maintain a table of
+ *    performance values observed. This table is used to
+ *    find the most frequent performance value
+ */
+struct data_stat {
+	/*
+	 * use insertion sort to keep the list sorted with
+	 * increasing block size
+	 */
+	struct data_stat_entry *head;
+	/* actual number of stat entries */
+	u8	stat_size;
+};
+#endif
+
 struct sdhci_host {
 	/* Data set by hardware interface driver */
 	const char *hw_name;	/* Hardware bus name */
 	unsigned int quirks;	/* Deviations from spec. */
+#ifdef CONFIG_DEBUG_FS
 	struct dentry           *debugfs_root;
+	/* collect data transfer rate statistics */
+	struct data_stat sdhci_data_stat;
+	unsigned int no_data_transfer_count;
+#endif
 
 /* Controller doesn't honor resets unless we touch the clock register */
 #define SDHCI_QUIRK_CLOCK_BEFORE_RESET			(1<<0)
@@ -190,6 +228,10 @@ struct sdhci_host {
 	struct timer_list	tuning_timer;	/* Timer for tuning */
 
 	struct sysedp_consumer *sysedpc;
+
+#ifdef CONFIG_DEBUG_FS
+	bool			enable_sdhci_perf_stats;
+#endif
 
 	unsigned long private[0] ____cacheline_aligned;
 };
