@@ -27,13 +27,10 @@
 #include <linux/irqchip/arm-gic.h>
 #include <linux/irqchip.h>
 #include <linux/syscore_ops.h>
-
-#include <mach/legacy_irq.h>
+#include <linux/irqchip/tegra.h>
 
 #include "board.h"
-#include "gic.h"
 #include "iomap.h"
-#include "pm-irq.h"
 
 #define ICTLR_CPU_IEP_VFIQ	0x08
 #define ICTLR_CPU_IEP_FIR	0x14
