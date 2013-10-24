@@ -81,8 +81,8 @@ config ARCH_TEGRA_12x_SOC
 	select USE_OF
 	select REPORT_PRESENT_CPUS if TEGRA_AUTO_HOTPLUG
 	select TEGRA_LP2_CPU_TIMER if !TEGRA_RAIL_OFF_MULTIPLE_CPUS
-	select ARCH_SUPPORTS_MSI if TEGRA_PCI
-	select PCI_MSI if TEGRA_PCI
+	select ARCH_SUPPORTS_MSI if PCI_TEGRA
+	select PCI_MSI if PCI_TEGRA
 	select NVMAP_CACHE_MAINT_BY_SET_WAYS if TEGRA_NVMAP
 	select NVMAP_CACHE_MAINT_BY_SET_WAYS_ON_ONE_CPU if TEGRA_NVMAP
 	select NVMAP_DEFERRED_CACHE_MAINT if TEGRA_NVMAP
@@ -131,17 +131,9 @@ config ARCH_TEGRA_HAS_SATA
 config ARCH_TEGRA_HAS_CL_DVFS
 	bool
 
-config TEGRA_PCI
-	bool "PCIe host controller driver"
-	select PCI
-	select TEGRA_USB_SHARED_PAD
-	depends on ARCH_TEGRA_HAS_PCIE
-	help
-	  Adds PCIe Host controller driver for tegra based systems
-
 config TEGRA_PCIE_SKIP_POWERGATING
 	bool "Skip PCIE powergating"
-	depends on TEGRA_PCI
+	depends on PCI_TEGRA
 	help
 	 Do not powergate PCIE partition on boot up.
 
