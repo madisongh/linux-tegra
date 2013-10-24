@@ -78,4 +78,5 @@ obj-$(CONFIG_SIM_MAX77660)	+= max77660-sim.o
 obj-$(CONFIG_SIM_PALMAS)	+= palmas-sim.o
 obj-y				+= issp/
 obj-$(CONFIG_TEGRA_PROFILER)    += tegra-profiler/
+obj-$(CONFIG_MTK_GPS)		+= gps/
 obj-$(CONFIG_ARCH_TEGRA)        +=tegra_timerinfo.o

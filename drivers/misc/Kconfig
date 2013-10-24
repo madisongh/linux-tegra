@@ -634,4 +634,5 @@ source "drivers/misc/echo/Kconfig"
 source "drivers/misc/cxl/Kconfig"
 source "drivers/misc/issp/Kconfig"
 source "drivers/misc/tegra-profiler/Kconfig"
+source "drivers/misc/gps/Kconfig"
 endmenu
