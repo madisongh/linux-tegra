@@ -1304,6 +1304,9 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 	timeout = jiffies;
 	if (!cmd->data && cmd->busy_timeout > 9000)
 		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
+	else if ((cmd->opcode == MMC_SWITCH) &&	(((cmd->arg >> 16) &
+		EXT_CSD_SANITIZE_START)	== EXT_CSD_SANITIZE_START))
+		timeout += 100 * HZ;
 	else
 		timeout += 10 * HZ;
 	mod_timer(&host->timer, timeout);
