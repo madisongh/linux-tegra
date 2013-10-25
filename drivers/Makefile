@@ -6,6 +6,7 @@
 #
 
 obj-$(CONFIG_EDP_FRAMEWORK)	+= edp/
+obj-$(CONFIG_SYSEDP_FRAMEWORK)	+= edp/
 
 obj-y				+= irqchip/
 obj-y				+= bus/
