@@ -68,6 +68,9 @@ struct generic_pm_domain {
 	unsigned int flags;		/* Bit field of configs for genpd */
 	struct delayed_work power_off_delayed_work;
 	s64 power_off_delay;
+	unsigned long power_on_jiffies;
+	unsigned long power_off_jiffies;
+	unsigned long accounting_timestamp;
 };
 
 static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
