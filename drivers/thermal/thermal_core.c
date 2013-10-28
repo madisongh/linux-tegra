@@ -1871,7 +1871,7 @@ static struct genl_family thermal_event_genl_family = {
 };
 
 int thermal_generate_netlink_event(struct thermal_zone_device *tz,
-					enum events event)
+				   enum events event, int temp)
 {
 	struct sk_buff *skb;
 	struct nlattr *attr;
@@ -1920,6 +1920,7 @@ int thermal_generate_netlink_event(struct thermal_zone_device *tz,
 
 	thermal_event->orig = tz->id;
 	thermal_event->event = event;
+	thermal_event->temp = temp;
 
 	/* send multicast genetlink message */
 	result = genlmsg_end(skb, msg_header);
