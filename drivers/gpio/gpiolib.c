@@ -278,6 +278,8 @@ int gpiochip_add(struct gpio_chip *chip)
 	of_gpiochip_add(chip);
 	acpi_gpiochip_add(chip);
 
+	of_gpiochip_init(chip);
+
 	status = gpiochip_export(chip);
 	if (status) {
 		acpi_gpiochip_remove(chip);

@@ -294,7 +294,7 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
 static void of_gpiochip_add_pin_range(struct gpio_chip *chip) {}
 #endif
 
-static int of_gpio_init(struct gpio_chip *chip)
+void of_gpiochip_init(struct gpio_chip *chip)
 {
 	struct device_node *np = chip->of_node;
 	struct device_node *np_config;
@@ -306,6 +306,9 @@ static int of_gpio_init(struct gpio_chip *chip)
 	unsigned int plen;
 	int offset;
 	int i;
+
+	if (!chip->of_node)
+		return;
 
 	/* For each defined state ID */
 	for (state = 0; ; state++) {
@@ -352,8 +355,6 @@ static int of_gpio_init(struct gpio_chip *chip)
 		of_node_put(np_config);
 		kfree(propname);
 	}
-
-	return 0;
 }
 
 void of_gpiochip_add(struct gpio_chip *chip)
@@ -370,7 +371,6 @@ void of_gpiochip_add(struct gpio_chip *chip)
 	}
 
 	of_gpiochip_add_pin_range(chip);
-	of_gpio_init(chip);
 	of_node_get(chip->of_node);
 }
 
