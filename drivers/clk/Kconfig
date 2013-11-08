@@ -134,6 +134,13 @@ config COMMON_CLK_PXA
 	---help---
 	  Sypport for the Marvell PXA SoC.
 
+config CLK_AS3722
+	tristate "ams AS3722 clock32K driver"
+	depends on MFD_AS3722
+	help
+	  Supports the clocking subsystem of the ams AS3722 PMIC from ams.
+	  This device supports one 32KHz clock.
+
 source "drivers/clk/qcom/Kconfig"
 
 endmenu
