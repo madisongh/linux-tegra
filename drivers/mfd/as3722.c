@@ -36,6 +36,15 @@
 
 #define AS3722_DEVICE_ID	0x0C
 
+enum {
+	AS3722_PINCTRL_ID,
+	AS3722_REGULATOR_ID,
+	AS3722_RTC_ID,
+	AS3722_ADC,
+	AS3722_POWER_OFF_ID,
+	AS3722_CLK_ID,
+};
+
 static const struct resource as3722_rtc_resource[] = {
 	{
 		.name = "as3722-rtc-alarm",
@@ -57,22 +66,31 @@ static const struct resource as3722_adc_resource[] = {
 static const struct mfd_cell as3722_devs[] = {
 	{
 		.name = "as3722-pinctrl",
+		.id = AS3722_PINCTRL_ID,
 	},
 	{
 		.name = "as3722-regulator",
+		.id = AS3722_REGULATOR_ID,
+	},
+	{
+		.name = "as3722-clk",
+		.id = AS3722_CLK_ID,
 	},
 	{
 		.name = "as3722-rtc",
 		.num_resources = ARRAY_SIZE(as3722_rtc_resource),
 		.resources = as3722_rtc_resource,
+		.id = AS3722_RTC_ID,
 	},
 	{
-		.name = "as3722-adc",
+		.name = "as3722-adc-extcon",
 		.num_resources = ARRAY_SIZE(as3722_adc_resource),
 		.resources = as3722_adc_resource,
+		.id = AS3722_ADC,
 	},
 	{
 		.name = "as3722-power-off",
+		.id = AS3722_POWER_OFF_ID,
 	},
 	{
 		.name = "as3722-wdt",
@@ -350,7 +368,23 @@ static int as3722_i2c_of_probe(struct i2c_client *i2c,
 	as3722->en_intern_i2c_pullup = of_property_read_bool(np,
 					"ams,enable-internal-i2c-pullup");
 	as3722->irq_flags = irqd_get_trigger_type(irq_data);
+	as3722->irq_base = -1;
 	dev_dbg(&i2c->dev, "IRQ flags are 0x%08lx\n", as3722->irq_flags);
+	return 0;
+}
+
+static int as3722_i2c_non_of_probe(struct i2c_client *i2c,
+			struct as3722 *as3722)
+{
+	struct as3722_platform_data *pdata = dev_get_platdata(&i2c->dev);
+
+	if (!pdata)
+		return -EINVAL;
+
+	as3722->irq_flags = pdata->irq_type;
+	as3722->irq_base = pdata->irq_base;
+	as3722->en_intern_i2c_pullup = pdata->use_internal_i2c_pullup;
+	as3722->en_intern_int_pullup = pdata->use_internal_int_pullup;
 	return 0;
 }
 
@@ -369,9 +403,12 @@ static int as3722_i2c_probe(struct i2c_client *i2c,
 	as3722->chip_irq = i2c->irq;
 	i2c_set_clientdata(i2c, as3722);
 
-	ret = as3722_i2c_of_probe(i2c, as3722);
-	if (ret < 0)
-		return ret;
+	ret = as3722_i2c_non_of_probe(i2c, as3722);
+	if (ret < 0) {
+		ret = as3722_i2c_of_probe(i2c, as3722);
+		if (ret < 0)
+			return ret;
+	}
 
 	as3722->regmap = devm_regmap_init_i2c(i2c, &as3722_regmap_config);
 	if (IS_ERR(as3722->regmap)) {
@@ -386,7 +423,7 @@ static int as3722_i2c_probe(struct i2c_client *i2c,
 
 	irq_flags = as3722->irq_flags | IRQF_ONESHOT;
 	ret = regmap_add_irq_chip(as3722->regmap, as3722->chip_irq,
-			irq_flags, -1, &as3722_irq_chip,
+			irq_flags, as3722->irq_base, &as3722_irq_chip,
 			&as3722->irq_data);
 	if (ret < 0) {
 		dev_err(as3722->dev, "Failed to add regmap irq: %d\n", ret);
@@ -445,7 +482,19 @@ static struct i2c_driver as3722_i2c_driver = {
 	.id_table = as3722_i2c_id,
 };
 
-module_i2c_driver(as3722_i2c_driver);
+static int __init as3722_i2c_init(void)
+{
+	return i2c_add_driver(&as3722_i2c_driver);
+}
+
+subsys_initcall(as3722_i2c_init);
+
+static void __exit as3722_i2c_exit(void)
+{
+	i2c_del_driver(&as3722_i2c_driver);
+}
+
+module_exit(as3722_i2c_exit);
 
 MODULE_DESCRIPTION("I2C support for AS3722 PMICs");
 MODULE_AUTHOR("Florian Lobmaier <florian.lobmaier@ams.com>");
