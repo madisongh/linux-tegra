@@ -55,9 +55,6 @@ void __init init_IRQ(void)
 {
 	irqchip_init();
 
-	if (machine_desc->init_irq)
-		machine_desc->init_irq();
-
 	if (!handle_arch_irq)
 		panic("No interrupt controller found.");
 }
