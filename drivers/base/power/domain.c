@@ -446,6 +446,20 @@ static void genpd_delayed_power_off_work_fn(struct work_struct *work)
 	__pm_genpd_poweroff(genpd);
 }
 
+static struct pm_domain_data *genpd_to_pdd(struct generic_pm_domain *genpd,
+						struct device *dev)
+{
+	struct pm_domain_data *pdd = NULL;
+
+	mutex_lock(&genpd->lock);
+	list_for_each_entry(pdd, &genpd->dev_list, list_node)
+		if (pdd->dev == dev) {
+			return pdd;
+		}
+	mutex_unlock(&genpd->lock);
+	return pdd;
+}
+
 /**
  * pm_genpd_runtime_suspend - Suspend a device belonging to I/O PM domain.
  * @dev: Device to suspend.
@@ -463,6 +477,8 @@ static int pm_genpd_runtime_suspend(struct device *dev)
 	ktime_t time_start;
 	s64 elapsed_ns;
 	int ret;
+	struct pm_domain_data *pdd;
+	struct generic_pm_domain_data *gpd_data;
 
 	dev_dbg(dev, "%s()\n", __func__);
 
@@ -484,9 +500,16 @@ static int pm_genpd_runtime_suspend(struct device *dev)
 	if (runtime_pm)
 		time_start = ktime_get();
 
-	ret = genpd_save_dev(genpd, dev);
-	if (ret)
-		return ret;
+	pdd = genpd_to_pdd(genpd, dev);
+	if (pdd) {
+		gpd_data = to_gpd_data(pdd);
+		if (gpd_data->need_save) {
+			ret = genpd_save_dev(genpd, dev);
+			if (ret)
+				return ret;
+		
+		}
+	}
 
 	ret = genpd_stop_dev(genpd, dev);
 	if (ret) {
@@ -1331,6 +1354,11 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
 	genpd->max_off_time_changed = true;
 
 	list_add_tail(&gpd_data->base.list_node, &genpd->dev_list);
+	gpd_data->need_restore = -1;
+	gpd_data->need_save = true;
+	gpd_data->td.constraint_changed = true;
+	gpd_data->td.effective_constraint_ns = -1;
+	mutex_unlock(&gpd_data->lock);
 
  out:
 	mutex_unlock(&genpd->lock);
@@ -1392,6 +1420,46 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
 
 	return ret;
 }
+
+/**
+ * pm_genpd_dev_needsave - Set/unset the device's "need save" flag.
+ * @dev: Device to set/unset the flag for.
+ * @val: The new value of the device's "need save" flag.
+ */
+void pm_genpd_dev_need_save(struct device *dev, bool val)
+{
+	struct pm_subsys_data *psd;
+	unsigned long flags;
+
+	spin_lock_irqsave(&dev->power.lock, flags);
+
+	psd = dev_to_psd(dev);
+	if (psd && psd->domain_data)
+		to_gpd_data(psd->domain_data)->need_save = val;
+
+	spin_unlock_irqrestore(&dev->power.lock, flags);
+}
+EXPORT_SYMBOL_GPL(pm_genpd_dev_need_save);
+
+/**
+ * pm_genpd_dev_need_restore - Set/unset the device's "need restore" flag.
+ * @dev: Device to set/unset the flag for.
+ * @val: The new value of the device's "need restore" flag.
+ */
+void pm_genpd_dev_need_restore(struct device *dev, bool val)
+{
+	struct pm_subsys_data *psd;
+	unsigned long flags;
+
+	spin_lock_irqsave(&dev->power.lock, flags);
+
+	psd = dev_to_psd(dev);
+	if (psd && psd->domain_data)
+		to_gpd_data(psd->domain_data)->need_restore = val ? 1 : 0;
+
+	spin_unlock_irqrestore(&dev->power.lock, flags);
+}
+EXPORT_SYMBOL_GPL(pm_genpd_dev_need_restore);
 
 /**
  * pm_genpd_add_subdomain - Add a subdomain to an I/O PM domain.
