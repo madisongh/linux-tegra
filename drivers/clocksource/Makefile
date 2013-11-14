@@ -49,4 +49,6 @@ obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
 
 obj-$(CONFIG_CLK_SRC_TEGRA_TIMER)       += tegra-nvtimers.o
 obj-$(CONFIG_CLK_SRC_TEGRA_TIMER)       += tegra-wakeup-nvtimers.o
+ifneq ($(CONFIG_ARM64),y)
 obj-$(CONFIG_ARM_ARCH_TIMER)            += tegra-tsc-timer.o
+endif
