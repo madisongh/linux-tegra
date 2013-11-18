@@ -1035,7 +1035,11 @@ static void nvmap_iovmm_get_total_mss(u64 *pss, u64 *non_pss, u64 *total)
 	unsigned long flags;
 	struct nvmap_device *dev = nvmap_dev;
 
-	*pss = *non_pss = *total = 0;
+	*total = 0;
+	if (pss)
+		*pss = 0;
+	if (non_pss)
+		*non_pss = 0;
 	if (!dev)
 		return;
 	spin_lock_irqsave(&dev->handle_lock, flags);
@@ -1046,6 +1050,10 @@ static void nvmap_iovmm_get_total_mss(u64 *pss, u64 *non_pss, u64 *total)
 
 		if (!h || !h->alloc || !h->heap_pgalloc)
 			continue;
+		if (!non_pss) {
+			*total += h->size;
+			continue;
+		}
 
 		for (i = 0; i < h->size >> PAGE_SHIFT; i++) {
 			int mapcount = page_mapcount(h->pgalloc.pages[i]);
@@ -1054,7 +1062,8 @@ static void nvmap_iovmm_get_total_mss(u64 *pss, u64 *non_pss, u64 *total)
 			*total += PAGE_SIZE;
 		}
 	}
-	*pss = *total - *non_pss;
+	if (pss && non_pss)
+		*pss = *total - *non_pss;
 	spin_unlock_irqrestore(&dev->handle_lock, flags);
 }
 
@@ -1068,7 +1077,7 @@ do { \
 
 static int nvmap_debug_iovmm_clients_show(struct seq_file *s, void *unused)
 {
-	u64 dummy, total;
+	u64 total;
 	unsigned long flags;
 	struct nvmap_client *client;
 	struct nvmap_device *dev = s->private;
@@ -1082,7 +1091,7 @@ static int nvmap_debug_iovmm_clients_show(struct seq_file *s, void *unused)
 		seq_printf(s, " %10uK\n", K(iovm_commit));
 	}
 	spin_unlock_irqrestore(&dev->clients_lock, flags);
-	nvmap_iovmm_get_total_mss(&dummy, &dummy, &total);
+	nvmap_iovmm_get_total_mss(NULL, NULL, &total);
 	seq_printf(s, "%-18s %18s %8s %10lluK\n", "total", "", "", K(total));
 	PRINT_MEM_STATS_NOTE(SIZE);
 	return 0;
@@ -1092,7 +1101,7 @@ DEBUGFS_OPEN_FOPS(iovmm_clients);
 
 static int nvmap_debug_iovmm_allocations_show(struct seq_file *s, void *unused)
 {
-	u64 dummy, total;
+	u64 total;
 	unsigned long flags;
 	struct nvmap_client *client;
 	struct nvmap_device *dev = s->private;
@@ -1111,7 +1120,7 @@ static int nvmap_debug_iovmm_allocations_show(struct seq_file *s, void *unused)
 		seq_printf(s, "\n");
 	}
 	spin_unlock_irqrestore(&dev->clients_lock, flags);
-	nvmap_iovmm_get_total_mss(&dummy, &dummy, &total);
+	nvmap_iovmm_get_total_mss(NULL, NULL, &total);
 	seq_printf(s, "%-18s %-18s %8s %10lluK\n", "total", "", "", K(total));
 	PRINT_MEM_STATS_NOTE(SIZE);
 	return 0;
@@ -1178,9 +1187,9 @@ DEBUGFS_OPEN_FOPS(iovmm_procrank);
 
 ulong nvmap_iovmm_get_used_pages(void)
 {
-	u64 dummy, total;
+	u64 total;
 
-	nvmap_iovmm_get_total_mss(&dummy, &dummy, &total);
+	nvmap_iovmm_get_total_mss(NULL, NULL, &total);
 	return total >> PAGE_SHIFT;
 }
 
