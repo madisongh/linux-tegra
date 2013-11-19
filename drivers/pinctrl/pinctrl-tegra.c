@@ -640,8 +640,8 @@ static int tegra_pinconf_group_set(struct pinctrl_dev *pctldev,
 		mask = (1 << width) - 1;
 		if (arg & ~mask) {
 			dev_err(pctldev->dev,
-				"config %lx: %x too big for %d bit register\n",
-				configs[i], arg, width);
+				"group %s config %lx: %x too big for %d bit register\n",
+				g->name, configs[i], arg, width);
 			ret = -EINVAL;
 			goto err;
 		}
