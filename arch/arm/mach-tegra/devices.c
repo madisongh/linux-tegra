@@ -127,40 +127,6 @@ struct platform_device tegra_gpio_device = {
 	.num_resources	= ARRAY_SIZE(gpio_resource),
 };
 
-static struct resource pinmux_resource[] = {
-	[0] = {
-		/* Tri-state registers */
-		.start	= TEGRA_APB_MISC_BASE + 0x14,
-		.end	= TEGRA_APB_MISC_BASE + 0x20 + 3,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		/* Mux registers */
-		.start	= TEGRA_APB_MISC_BASE + 0x80,
-		.end	= TEGRA_APB_MISC_BASE + 0x9c + 3,
-		.flags	= IORESOURCE_MEM,
-	},
-	[2] = {
-		/* Pull-up/down registers */
-		.start	= TEGRA_APB_MISC_BASE + 0xa0,
-		.end	= TEGRA_APB_MISC_BASE + 0xb0 + 3,
-		.flags	= IORESOURCE_MEM,
-	},
-	[3] = {
-		/* Pad control registers */
-		.start	= TEGRA_APB_MISC_BASE + 0x868,
-		.end	= TEGRA_APB_MISC_BASE + 0x90c + 3,
-		.flags	= IORESOURCE_MEM,
-	},
-};
-
-struct platform_device tegra_pinmux_device = {
-	.name		= "tegra20-pinctrl",
-	.id		= -1,
-	.resource	= pinmux_resource,
-	.num_resources	= ARRAY_SIZE(pinmux_resource),
-};
-
 static struct resource tegra124_pinctrl_resource[] = {
 	[0] = {
 		/* Drive registers */
