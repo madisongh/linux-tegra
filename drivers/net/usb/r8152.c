@@ -1958,6 +1958,7 @@ static void rtl_set_eee_plus(struct r8152 *tp)
 	u32 ocp_data;
 	u8 speed;
 
+	set_tx_qlen(tp);
 	speed = rtl8152_get_speed(tp);
 	if (speed & _10bps) {
 		ocp_data = ocp_read_word(tp, MCU_TYPE_PLA, PLA_EEEP_CR);
