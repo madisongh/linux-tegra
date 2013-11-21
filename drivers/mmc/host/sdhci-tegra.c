@@ -147,6 +147,8 @@ struct sdhci_tegra {
 	const struct sdhci_tegra_soc_data *soc_data;
 	int power_gpio;
 	bool	clk_enabled;
+	/* ensure atomic set clock calls */
+	struct mutex		set_clock_mutex;
 	/* max clk supported by the platform */
 	unsigned int max_clk_limit;
 	/* max ddr clk supported by the platform */
@@ -526,9 +528,9 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	u8 vendor_ctrl;
 
+	mutex_lock(&tegra_host->set_clock_mutex);
 	pr_debug("%s %s %u enabled=%u\n", __func__,
 		mmc_hostname(sdhci->mmc), clock, tegra_host->clk_enabled);
-
 	if (clock) {
 		tegra_sdhci_set_clk_rate(sdhci, clock);
 		if (!tegra_host->clk_enabled) {
@@ -547,7 +549,9 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 		clk_disable_unprepare(pltfm_host->clk);
 		tegra_host->clk_enabled = false;
 	}
+	mutex_unlock(&tegra_host->set_clock_mutex);
 }
+
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci)
 {
 	unsigned int val;
@@ -950,6 +954,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	pltfm_host->clk = clk;
 	pltfm_host->priv = tegra_host;
 	tegra_host->clk_enabled = true;
+	mutex_init(&tegra_host->set_clock_mutex);
+
 	tegra_host->max_clk_limit = plat->max_clk_limit;
 
 	host->mmc->pm_caps |= plat->pm_caps;
