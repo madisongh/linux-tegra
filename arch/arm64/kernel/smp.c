@@ -97,6 +97,9 @@ static void  platform_secondary_init(unsigned int cpu)
  */
 static int boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
+	if (smp_ops.smp_boot_secondary)
+		smp_ops.smp_boot_secondary(cpu, idle);
+
 	if (cpu_ops[cpu]->cpu_boot)
 		return cpu_ops[cpu]->cpu_boot(cpu);
 
