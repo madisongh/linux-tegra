@@ -174,15 +174,13 @@ struct nvmap_handle_ref {
 #define NVMAP_NUM_POOLS (NVMAP_HANDLE_CACHEABLE + 1)
 
 struct nvmap_page_pool {
-	spinlock_t lock;
-	int npages;
-	struct page **page_array;
-	struct mutex shrink_lock;
-	struct page **shrink_array;
+	struct mutex lock;
+	int npages;                       /* Number of zeroed pages. */
+	struct page **page_array;         /* For zeroed pages. */
 	int max_pages;
 };
 
-int nvmap_page_pool_init(struct nvmap_page_pool *pool, int flags);
+int nvmap_page_pool_init(struct nvmap_device *dev);
 struct page *nvmap_page_pool_alloc(struct nvmap_page_pool *pool);
 bool nvmap_page_pool_release(struct nvmap_page_pool *pool, struct page *page);
 #endif
@@ -192,13 +190,7 @@ struct nvmap_share {
 	wait_queue_head_t pin_wait;
 	struct mutex pin_lock;
 #ifdef CONFIG_NVMAP_PAGE_POOLS
-	union {
-		struct nvmap_page_pool pools[NVMAP_NUM_POOLS];
-		struct {
-			struct nvmap_page_pool uc_pool;
-			struct nvmap_page_pool wc_pool;
-		};
-	};
+	struct nvmap_page_pool pool;
 #endif
 };
 
@@ -429,10 +421,6 @@ extern void __flush_dcache_all(void *arg);
 
 void inner_flush_cache_all(void);
 void inner_clean_cache_all(void);
-int nvmap_set_pages_array_uc(struct page **pages, int addrinarray);
-int nvmap_set_pages_array_wc(struct page **pages, int addrinarray);
-int nvmap_set_pages_array_iwb(struct page **pages, int addrinarray);
-int nvmap_set_pages_array_wb(struct page **pages, int addrinarray);
 void nvmap_flush_cache(struct page **pages, int numpages);
 
 /* Internal API to support dmabuf */
