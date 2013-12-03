@@ -196,3 +196,4 @@ obj-$(CONFIG_TEGRA_13x_SERROR)		+= tegra13_serr.o
 obj-$(CONFIG_DENVER_CPU)		+= denver-knobs.o
 obj-$(CONFIG_DENVER_DEBUG)		+= denver-hardwood.o
 
+obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o

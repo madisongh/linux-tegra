@@ -4,7 +4,7 @@
  * Serial Debugger Interface for Tegra
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2013, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -28,10 +28,8 @@
 #include <linux/stacktrace.h>
 #include <linux/irqchip/tegra.h>
 #include <linux/tegra_fiq_debugger.h>
-#include <linux/of_address.h>
-#include <linux/of_irq.h>
 
-#include "../../../drivers/staging/android/fiq_debugger/fiq_debugger.h"
+#include <asm/fiq_debugger.h>
 
 #include <linux/uaccess.h>
 
@@ -62,6 +60,21 @@ static inline unsigned int tegra_read_lsr(struct tegra_fiq_debugger *t)
 		t->break_seen = true;
 
 	return lsr;
+}
+
+static int debug_port_init(struct platform_device *pdev)
+{
+	struct tegra_fiq_debugger *t;
+	t = container_of(dev_get_platdata(&pdev->dev), typeof(*t), pdata);
+
+	if (tegra_read(t, UART_LSR) & UART_LSR_DR)
+		(void)tegra_read(t, UART_RX);
+	/* enable rx and lsr interrupt */
+	tegra_write(t, UART_IER_RLSI | UART_IER_RDI, UART_IER);
+	/* interrupt on every character */
+	tegra_write(t, 0, UART_IIR);
+
+	return 0;
 }
 
 static int debug_getc(struct platform_device *pdev)
@@ -103,55 +116,13 @@ static void debug_flush(struct platform_device *pdev)
 		cpu_relax();
 }
 
-#ifdef CONFIG_FIQ_GLUE
 static void fiq_enable(struct platform_device *pdev, unsigned int irq, bool on)
 {
-#ifndef CONFIG_ARCH_TEGRA_18x_SOC
 	if (on)
 		tegra_fiq_enable(irq);
 	else
 		tegra_fiq_disable(irq);
-#endif
 }
-#else /* !CONFIG_FIQ_GLUE */
-
-static int debug_port_init(struct platform_device *pdev)
-{
-	struct tegra_fiq_debugger *t;
-	t = container_of(dev_get_platdata(&pdev->dev), typeof(*t), pdata);
-
-	/* enable and clear FIFO */
-	tegra_write(t, UART_FCR_ENABLE_FIFO, UART_FCR);
-	tegra_write(t, UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR |
-				UART_FCR_CLEAR_XMIT, UART_FCR);
-	tegra_write(t, 0, UART_FCR);
-	tegra_write(t, UART_FCR_ENABLE_FIFO, UART_FCR);
-
-	/* clear LSR */
-	tegra_read(t, UART_LSR);
-
-	/* enable rx interrupt */
-	tegra_write(t, UART_IER_RDI, UART_IER);
-
-	return 0;
-}
-
-static int debug_suspend(struct platform_device *pdev)
-{
-	struct tegra_fiq_debugger *t;
-	t = container_of(dev_get_platdata(&pdev->dev), typeof(*t), pdata);
-
-	tegra_write(t, 0, UART_IER);
-
-	return 0;
-}
-
-static int debug_resume(struct platform_device *pdev)
-{
-	return debug_port_init(pdev);
-}
-#endif /* CONFIG_FIQ_GLUE */
-
 
 static int tegra_fiq_debugger_id;
 
@@ -169,18 +140,11 @@ static void __tegra_serial_debug_init(unsigned int base, int fiq, int irq,
 		return;
 	}
 
+	t->pdata.uart_init = debug_port_init;
 	t->pdata.uart_getc = debug_getc;
 	t->pdata.uart_putc = debug_putc;
 	t->pdata.uart_flush = debug_flush;
-
-#ifdef CONFIG_FIQ_GLUE
 	t->pdata.fiq_enable = fiq_enable;
-#else
-	BUG_ON(fiq >= 0);
-	t->pdata.uart_init = debug_port_init;
-	t->pdata.uart_dev_suspend = debug_suspend;
-	t->pdata.uart_dev_resume = debug_resume;
-#endif
 
 	t->debug_port_base = ioremap(base, PAGE_SIZE);
 	if (!t->debug_port_base) {
@@ -249,70 +213,14 @@ out1:
 	kfree(t);
 }
 
-#ifdef CONFIG_FIQ_GLUE
 void tegra_serial_debug_init(unsigned int base, int fiq,
 			   struct clk *clk, int signal_irq, int wakeup_irq)
 {
 	__tegra_serial_debug_init(base, fiq, -1, clk, signal_irq, wakeup_irq);
 }
-#endif
 
 void tegra_serial_debug_init_irq_mode(unsigned int base, int irq,
 			   struct clk *clk, int signal_irq, int wakeup_irq)
 {
 	__tegra_serial_debug_init(base, -1, irq, clk, signal_irq, wakeup_irq);
 }
-
-static int __init fiq_debugger_init(void)
-{
-	struct device_node *dn, *dn_debugger;
-	struct resource resource;
-	unsigned uartbase = 0;
-	int irq = -1;
-
-	dn_debugger = of_find_compatible_node(NULL, NULL,
-			"nvidia,fiq-debugger");
-	if (!dn_debugger) {
-		pr_err("%s: no fiq_debugger node\n", __func__);
-		return -ENODEV;
-	}
-
-	/* Search for the IO memory of console port */
-	if (of_property_read_bool(dn_debugger, "use-console-port")) {
-		dn = of_find_node_with_property(NULL, "console-port");
-		if (!dn) {
-			pr_err("%s: no console-port found\n", __func__);
-			return -ENODEV;
-		}
-	} else
-		dn = dn_debugger;
-
-	if (of_address_to_resource(dn, 0, &resource)) {
-		pr_err("%s: could not get IO memory\n", __func__);
-		return -ENXIO;
-	}
-	uartbase = resource.start;
-	pr_debug("%s: found console port at %08X\n", __func__, uartbase);
-
-	/* Search for the interrupt which acts as trigger of FIQ debugger */
-	if (of_property_read_bool(dn_debugger, "use-wdt-irq")) {
-		dn = of_find_compatible_node(NULL, NULL, "nvidia,tegra-wdt");
-		if (!dn) {
-			pr_err("%s: no tegra-wdt found\n", __func__);
-			return -ENODEV;
-		}
-	} else
-		dn = dn_debugger;
-
-	irq = irq_of_parse_and_map(dn, 0);
-	if (irq <= 0) {
-		pr_err("%s: cound not find interrupt for FIQ\n", __func__);
-		return -ENODEV;
-	}
-	pr_debug("%s: found FIQ source (IRQ %d)\n", __func__, irq);
-
-	tegra_serial_debug_init(uartbase, irq, NULL, -1, -1);
-
-	return 0;
-}
-subsys_initcall(fiq_debugger_init);
