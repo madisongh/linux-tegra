@@ -9,7 +9,7 @@
 
 /**
  * touch_nmi_watchdog - restart NMI watchdog timeout.
- * 
+ *
  * If the architecture supports the NMI watchdog, touch_nmi_watchdog()
  * may be used to reset the timeout - for code which intentionally
  * disables interrupts for a long time. This call is stateless.
@@ -87,6 +87,7 @@ extern int sysctl_softlockup_all_cpu_backtrace;
 struct ctl_table;
 extern int proc_dowatchdog(struct ctl_table *, int ,
 			   void __user *, size_t *, loff_t *);
+extern int watchdog_get_lockup_state(void);
 #endif
 
 #ifdef CONFIG_HAVE_ACPI_APEI_NMI
