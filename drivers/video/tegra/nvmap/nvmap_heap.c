@@ -220,23 +220,6 @@ void nvmap_heap_free(struct nvmap_heap_block *b)
 	mutex_unlock(&h->lock);
 }
 
-struct nvmap_heap *nvmap_block_to_heap(struct nvmap_heap_block *b)
-{
-	if (b->type == BLOCK_BUDDY) {
-		struct buddy_block *bb;
-		bb = container_of(b, struct buddy_block, block);
-		return parent_of(bb->heap);
-	} else {
-		struct list_block *lb;
-		lb = container_of(b, struct list_block, block);
-		return lb->heap;
-	}
-}
-
-static void heap_release(struct device *heap)
-{
-}
-
 /* nvmap_heap_create: create a heap object of len bytes, starting from
  * address base.
  */
@@ -256,15 +239,6 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent, const char *name,
 	dev_set_name(&h->dev, "heap-%s", name);
 	h->name = name;
 	h->arg = arg;
-	h->dev.parent = parent;
-	h->dev.driver = NULL;
-	h->dev.release = heap_release;
-
-	if (device_register(&h->dev)) {
-		dev_err(parent, "%s: failed to register %s\n", __func__,
-			dev_name(&h->dev));
-		goto fail_register;
-	}
 
 	INIT_LIST_HEAD(&h->free_list);
 	INIT_LIST_HEAD(&h->all_list);
@@ -290,8 +264,6 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent, const char *name,
 	return h;
 
 fail_dma_declare:
-	device_unregister(&h->dev);
-fail_register:
 	kfree(h);
 fail_alloc:
 	return NULL;
@@ -311,8 +283,6 @@ void *nvmap_heap_to_arg(struct nvmap_heap *heap)
 /* nvmap_heap_destroy: frees all resources in heap */
 void nvmap_heap_destroy(struct nvmap_heap *heap)
 {
-	device_unregister(&heap->dev);
-
 	WARN_ON(!list_is_singular(&heap->all_list));
 	while (!list_empty(&heap->all_list)) {
 		struct list_block *l;
