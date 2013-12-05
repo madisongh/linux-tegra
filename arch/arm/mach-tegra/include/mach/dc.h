@@ -334,6 +334,10 @@ struct tegra_dsi_out {
 	bool		ulpm_not_supported;
 };
 
+struct tegra_dp_out {
+	bool tx_pu_disable;
+};
+
 enum {
 	TEGRA_DC_STEREO_MODE_2D,
 	TEGRA_DC_STEREO_MODE_3D
@@ -538,6 +542,7 @@ struct tegra_dc_out {
 
 	struct tegra_dsi_out		*dsi;
 	struct tegra_hdmi_out		*hdmi_out;
+	struct tegra_dp_out		*dp_out;
 	struct tegra_stereo_out		*stereo;
 
 	unsigned			height; /* mm */
