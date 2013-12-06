@@ -45,18 +45,17 @@
 
 #include "sdhci-pltfm.h"
 
-
 /* Tegra SDHOST controller vendor register definitions */
 #define SDHCI_VNDR_CLK_CTRL       0x100
 #define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT		16
 #define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK		0xFF
 #define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT		24
 #define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK		0x1F
+#define SDHCI_VNDR_CLK_CTRL_SDR50_TUNING		0x20
 #define SDHCI_VNDR_CLK_CTRL_PADPIPE_CLKEN_OVERRIDE	0x8
 #define SDHCI_VNDR_CLK_CTRL_SPI_MODE_CLKEN_OVERRIDE	0x4
 #define SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK		0x2
 #define SDHCI_VNDR_CLK_CTRL_SDMMC_CLK			0x1
-#define SDHCI_VNDR_CLK_CTRL_SDR50_TUNING		0x20
 
 #define SDHCI_VNDR_MISC_CTRL		0x120
 #define SDHCI_VNDR_MISC_CTRL_ENABLE_SDR104		0x8
@@ -64,6 +63,7 @@
 #define SDHCI_VNDR_MISC_CTRL_ENABLE_SDHCI_SPEC_300	0x20
 #define SDHCI_VNDR_MISC_CTRL_ENABLE_DDR50		0x200
 #define SDHCI_VENDOR_MISC_CNTRL_INFINITE_ERASE_TIMEOUT	0x1
+#define SDHCI_VNDR_MISC_CTRL_EN_EXT_LOOPBACK_SHIFT	17
 
 #define SDMMC_SDMEMCOMPPADCTRL	0x1E0
 #define SDMMC_SDMEMCOMPPADCTRL_VREF_SEL_MASK	0xF
@@ -130,6 +130,8 @@
 #define NVQUIRK_SHADOW_XFER_MODE_REG		BIT(19)
 /* Set Pipe stages value o zero */
 #define NVQUIRK_SET_PIPE_STAGES_MASK_0		BIT(20)
+/* Disable SDMMC3 external loopback */
+#define NVQUIRK_DISABLE_EXTERNAL_LOOPBACK	BIT(23)
 
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
@@ -346,7 +348,7 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	if (soc_data->nvquirks & NVQUIRK_SET_TRIM_DELAY)
 		tegra_sdhci_set_trim_delay(host, plat->trim_delay);
 
-	misc_ctrl = sdhci_readw(host, SDHCI_VNDR_MISC_CTRL);
+	misc_ctrl = sdhci_readl(host, SDHCI_VNDR_MISC_CTRL);
 	/* Erratum: Enable SDHCI spec v3.00 support */
 	if (soc_data->nvquirks & NVQUIRK_ENABLE_SD_3_0)
 		misc_ctrl |= SDHCI_VNDR_MISC_CTRL_ENABLE_SD_3_0;
@@ -367,7 +369,10 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		misc_ctrl |= SDHCI_VNDR_MISC_CTRL_INFINITE_ERASE_TIMEOUT;
 	if (soc_data->nvquirks & NVQUIRK_SET_PIPE_STAGES_MASK_0)
 		misc_ctrl &= ~SDHCI_VNDR_MISC_CTRL_PIPE_STAGES_MASK;
-	sdhci_writew(host, misc_ctrl, SDHCI_VNDR_MISC_CTRL);
+	/* External loopback is valid for sdmmc3 only */
+	if (soc_data->nvquirks & NVQUIRK_DISABLE_EXTERNAL_LOOPBACK)
+		misc_ctrl &= ~(1 << SDHCI_VNDR_MISC_CTRL_EN_EXT_LOOPBACK_SHIFT);
+	sdhci_writel(host, misc_ctrl, SDHCI_VNDR_MISC_CTRL);
 }
 
 static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
