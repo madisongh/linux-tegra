@@ -28,6 +28,7 @@ obj-$(CONFIG_MIPS_CPS_CPUIDLE)		+= cpuidle-cps.o
 obj-$(CONFIG_ARM64_CPUIDLE)		+= cpuidle-arm64.o
 obj-$(CONFIG_CPU_IDLE_DENVER)		+= cpuidle-denver.o
 obj-$(CONFIG_CPU_IDLE_TEGRA210)		+= cpuidle-tegra210.o
+obj-$(CONFIG_CPU_IDLE_TEGRA210)		+= cpuidle-tegra210-proc.o
 
 ###############################################################################
 # POWERPC drivers
