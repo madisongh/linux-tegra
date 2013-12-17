@@ -541,6 +541,14 @@ static const char *compat_hwcap2_str[] = {
 };
 #endif /* CONFIG_COMPAT */
 
+static void denver_show(struct seq_file *m)
+{
+	u32 aidr;
+
+	asm volatile("mrs %0, AIDR_EL1" : "=r" (aidr) : );
+	seq_printf(m, "MTS version\t: %u\n", aidr);
+}
+
 static int c_show(struct seq_file *m, void *v)
 {
 	int i, j;
@@ -590,6 +598,8 @@ static int c_show(struct seq_file *m, void *v)
 		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
 	}
 
+	if ((read_cpuid_id() >> 24) == 'N')
+		denver_show(m);
 	return 0;
 }
 
