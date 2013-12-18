@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
 
 targets += dtbs
 dtb-$(CONFIG_MACH_EXUMA) := tegra132-exuma.dtb
+dtb-$(CONFIG_MACH_T132REF) := tegra132-norrin.dtb
 targets += $(dtb-y)
 
 DTC_FLAGS := -i $(srctree)/arch/arm/boot/dts
