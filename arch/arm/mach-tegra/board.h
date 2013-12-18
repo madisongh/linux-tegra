@@ -219,6 +219,7 @@ enum touch_vendor {
 	RAYDIUM_TOUCH = 0,
 	SYNAPTIC_TOUCH,
 	MAXIM_TOUCH,
+	VENDOR_NONE,
 };
 
 enum touch_panel {
