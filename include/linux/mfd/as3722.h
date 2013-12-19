@@ -394,6 +394,8 @@ struct as3722 {
 	bool en_intern_int_pullup;
 	bool en_intern_i2c_pullup;
 	struct regmap_irq_chip_data *irq_data;
+	u32 major_rev;
+	u32 minor_rev;
 };
 
 
@@ -500,4 +502,16 @@ static inline int as3722_irq_get_virq(struct as3722 *as3722, int irq)
 {
 	return regmap_irq_get_virq(as3722->irq_data, irq);
 }
+
+static inline bool as3722_device_rev(struct as3722 *as3722, u32 major_rev,
+		u32 minor_rev)
+{
+
+	if ((as3722->major_rev == major_rev) &&
+			(as3722->minor_rev == minor_rev))
+		return true;
+	else
+		return false;
+}
+
 #endif /* __LINUX_MFD_AS3722_H__ */
