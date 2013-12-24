@@ -601,6 +601,9 @@ static int sbs_get_property(struct power_supply *psy,
 			break;
 
 		ret = sbs_get_battery_capacity(client, ret, psp, val);
+		if (psp == POWER_SUPPLY_PROP_CAPACITY)
+			battery_gauge_record_capacity_value(chip->bg_dev,
+								val->intval);
 		break;
 
 	case POWER_SUPPLY_PROP_SERIAL_NUMBER:
@@ -621,6 +624,9 @@ static int sbs_get_property(struct power_supply *psy,
 			break;
 
 		ret = sbs_get_battery_property(client, ret, psp, val);
+		if (psp == POWER_SUPPLY_PROP_VOLTAGE_NOW)
+			battery_gauge_record_voltage_value(chip->bg_dev,
+								val->intval);
 		break;
 
 	case POWER_SUPPLY_PROP_MODEL_NAME:
@@ -978,6 +984,9 @@ skip_gpio:
 
 	INIT_DEFERRABLE_WORK(&chip->work, sbs_delayed_work);
 	schedule_delayed_work(&chip->work, HZ);
+
+	battery_gauge_record_snapshot_values(chip->bg_dev,
+					jiffies_to_msecs(HZ/2));
 
 	chip->enable_detection = true;
 
