@@ -349,6 +349,8 @@
 
 #define AS3722_FUSE7_SD0_LOW_VOLTAGE			BIT(4)
 
+#define AS3722_CTRL_SEQ1_AC_OK_PWR_ON			BIT(0)
+
 /* Interrupt IDs */
 enum as3722_irq {
 	AS3722_IRQ_LID,
@@ -393,6 +395,7 @@ struct as3722 {
 	unsigned long irq_flags;
 	bool en_intern_int_pullup;
 	bool en_intern_i2c_pullup;
+	bool en_ac_ok_pwr_on;
 	struct regmap_irq_chip_data *irq_data;
 	u32 major_rev;
 	u32 minor_rev;
