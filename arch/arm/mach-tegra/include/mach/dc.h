@@ -750,16 +750,6 @@ struct tegra_fb_data {
 
 #define TEGRA_FB_FLIP_ON_PROBE		(1 << 0)
 
-struct of_tegra_dc_data {
-	unsigned long		fb_size;
-	unsigned long		fb_start;
-	unsigned long		carveout_size;
-	unsigned long		carveout_start;
-	struct regulator	**of_regulators;
-	int			*of_gpios;
-	int			dc_controller;
-};
-
 struct tegra_dc_platform_data {
 	unsigned long		flags;
 	unsigned long		emc_clk_rate;
@@ -771,7 +761,6 @@ struct tegra_dc_platform_data {
 	bool			cmu_enable;
 	struct tegra_dc_cmu	*cmu;
 #endif
-	struct of_tegra_dc_data of_data;
 };
 
 struct tegra_dc_bw_data {
