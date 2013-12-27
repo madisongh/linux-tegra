@@ -106,9 +106,6 @@ void __init time_init(void)
 	of_clk_init(NULL);
 	clocksource_of_init();
 
-	if (machine_desc->init_time)
-			machine_desc->init_time();
-
 	tick_setup_hrtimer_broadcast();
 
 	arch_timer_rate = arch_timer_get_rate();
