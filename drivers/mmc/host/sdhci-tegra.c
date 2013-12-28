@@ -1002,7 +1002,6 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 	tegra_pd_add_device(&pdev->dev);
 	host->mmc->caps2 |= MMC_CAP2_PACKED_CMD;
-	
 	rc = sdhci_add_host(host);
 	sdhci_tegra_error_stats_debugfs(host);
 	if (rc)

@@ -23,7 +23,6 @@
 #include <linux/scatterlist.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
-#include <linux/platform_device.h>
 
 
 #include <linux/mmc/mmc.h>
@@ -2895,9 +2894,6 @@ int sdhci_add_host(struct sdhci_host *host)
 	unsigned int ocr_avail;
 	unsigned int override_timeout_clk;
 	int ret;
-	struct edp_manager *battery_manager = NULL;
-	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
-	u32 ctrl;
 
 	WARN_ON(host == NULL);
 	if (host == NULL)
@@ -3371,51 +3367,6 @@ int sdhci_add_host(struct sdhci_host *host)
 
 	host->sysedpc = sysedp_create_consumer(dev_name(mmc_dev(mmc)),
 					       dev_name(mmc_dev(mmc)));
-
-	if (host->edp_support == true) {
-		battery_manager = edp_get_manager("battery");
-		if (!battery_manager)
-			dev_err(&pdev->dev, "unable to get edp manager\n");
-		else {
-			host->sd_edp_client = devm_kzalloc(&pdev->dev,
-					sizeof(struct edp_client), GFP_KERNEL);
-			if (IS_ERR_OR_NULL(host->sd_edp_client)) {
-				dev_err(&pdev->dev,
-					"could not allocate edp client\n");
-				host->sd_edp_client = NULL;
-			}
-
-			strncpy(host->sd_edp_client->name,
-				dev_name(mmc_dev(mmc)), EDP_NAME_LEN-1);
-			host->sd_edp_client->name[EDP_NAME_LEN-1] = '\0';
-			host->sd_edp_client->states = host->edp_states;
-			host->sd_edp_client->num_states = SD_EDP_NUM_STATES;
-			host->sd_edp_client->e0_index = SD_EDP_HIGH;
-			host->sd_edp_client->priority = EDP_MAX_PRIO + 2;
-
-			ret = edp_register_client(battery_manager,
-				host->sd_edp_client);
-			if (ret) {
-				dev_err(&pdev->dev,
-					"unable to register edp client\n");
-			} else {
-				pr_info("%s: edp client registration" \
-					" successful.\n",
-					dev_name(mmc_dev(mmc)));
-				ret = edp_update_client_request(
-						host->sd_edp_client,
-						SD_EDP_LOW, NULL);
-				if (ret) {
-					dev_err(&pdev->dev,
-						"Unable to set E0 EDP state\n");
-					edp_unregister_client(
-							host->sd_edp_client);
-					devm_kfree(&pdev->dev,
-							host->sd_edp_client);
-				}
-			}
-		}
-	}
 
 #ifdef CONFIG_MMC_DEBUG
 	sdhci_dumpregs(host);
