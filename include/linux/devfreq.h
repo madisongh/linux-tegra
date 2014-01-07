@@ -105,7 +105,7 @@ struct devfreq_dev_profile {
 	int (*set_low_wmark)(struct device *dev, unsigned int val);
 	void (*exit)(struct device *dev);
 
-	unsigned int *freq_table;
+	unsigned long *freq_table;
 	unsigned int max_state;
 };
 
