@@ -532,6 +532,7 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	u8 vendor_ctrl;
+	int ret = 0;
 
 	mutex_lock(&tegra_host->set_clock_mutex);
 	pr_debug("%s %s %u enabled=%u\n", __func__,
@@ -539,7 +540,12 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	if (clock) {
 		tegra_sdhci_set_clk_rate(sdhci, clock);
 		if (!tegra_host->clk_enabled) {
-			clk_prepare_enable(pltfm_host->clk);
+			ret = clk_prepare_enable(pltfm_host->clk);
+			if (ret) {
+				dev_err(mmc_dev(sdhci->mmc),
+					"clock enable is failed, ret: %d\n", ret);
+				return;
+			}
 			vendor_ctrl = sdhci_readb(sdhci, SDHCI_VNDR_CLK_CTRL);
 			vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_SDMMC_CLK;
 			sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
