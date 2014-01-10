@@ -417,6 +417,13 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		if (plat->ddr_trim_delay != -1)
 			sdhci_tegra_set_trim_value(host, plat->ddr_trim_delay);
 	}
+
+	/* Set tap delay */
+	if (timing == MMC_TIMING_UHS_DDR50)
+		sdhci_tegra_set_tap_value(host, plat->ddr_tap_delay);
+	else
+		sdhci_tegra_set_tap_value(host, plat->tap_delay);
+
 	return 0;
 }
 
