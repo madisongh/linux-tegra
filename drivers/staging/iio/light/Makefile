@@ -2,7 +2,7 @@
 # Makefile for industrial I/O Light sensors
 #
 
-#ccflags-y := -Werror
+ccflags-y := -Werror
 
 obj-$(CONFIG_SENSORS_CM3218)	+= cm3218.o
 obj-$(CONFIG_SENSORS_ISL29018)	+= isl29018.o
