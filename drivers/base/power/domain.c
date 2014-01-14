@@ -996,6 +996,15 @@ static int pm_genpd_prepare(struct device *dev)
 	if (resume_needed(dev, genpd))
 		pm_runtime_resume(dev);
 
+	/* If a delayed power-off for the domain is pending, turn it off now */
+	if (genpd->power_off_delay) {
+		if (delayed_work_pending(&genpd->power_off_delayed_work)) {
+			cancel_delayed_work_sync(
+				&genpd->power_off_delayed_work);
+			__pm_genpd_poweroff(genpd);
+		}
+	}
+
 	genpd_acquire_lock(genpd);
 
 	if (genpd->prepared_count++ == 0) {
@@ -1983,38 +1992,6 @@ static int pm_genpd_default_restore_state(struct device *dev)
 	return cb ? cb(dev) : 0;
 }
 
-#if defined(CONFIG_PM_SLEEP) && defined(CONFIG_PM_RUNTIME)
-static int pm_genpd_suspend_notifier(struct notifier_block *notifier,
-	unsigned long pm_event, void *unused)
-{
-	struct generic_pm_domain *genpd = container_of(notifier,
-		struct generic_pm_domain, system_suspend_notifier);
-
-	if (!genpd)
-		return NOTIFY_DONE;
-
-	switch (pm_event) {
-	case PM_SUSPEND_PREPARE:
-		if (genpd->power_off_delay) {
-			/* if a domain has scheduled a delayed work */
-			if (delayed_work_pending(
-				&genpd->power_off_delayed_work)) {
-
-				/* cancel it now */
-				cancel_delayed_work_sync(
-					&genpd->power_off_delayed_work);
-
-				/* call its power off */
-				__pm_genpd_poweroff(genpd);
-			}
-		}
-		return NOTIFY_OK;
-	}
-
-	return NOTIFY_DONE;
-}
-#endif
-
 /**
  * pm_genpd_init - Initialize a generic I/O PM domain object.
  * @genpd: PM domain object to initialize.
@@ -2071,11 +2048,6 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
 	genpd->domain.ops.complete = pm_genpd_complete;
 	genpd->dev_ops.save_state = pm_genpd_default_save_state;
 	genpd->dev_ops.restore_state = pm_genpd_default_restore_state;
-#if defined(CONFIG_PM_SLEEP) && defined(CONFIG_PM_RUNTIME)
-	genpd->system_suspend_notifier.notifier_call =
-		pm_genpd_suspend_notifier;
-	register_pm_notifier(&genpd->system_suspend_notifier);
-#endif
 	mutex_lock(&gpd_list_lock);
 	list_add(&genpd->gpd_list_node, &gpd_list);
 	mutex_unlock(&gpd_list_lock);
