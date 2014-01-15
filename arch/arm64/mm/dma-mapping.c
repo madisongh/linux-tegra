@@ -1225,11 +1225,115 @@ int arm_dma_mapping_error(struct device *dev, dma_addr_t dev_addr)
 	return dev_addr == DMA_ERROR_CODE;
 }
 
+#if defined(CONFIG_ARM_DMA_USE_IOMMU)
+
+static LIST_HEAD(iommu_mapping_list);
+static DEFINE_SPINLOCK(iommu_mapping_list_lock);
+
+#if defined(CONFIG_DEBUG_FS)
+static dma_addr_t bit_to_addr(size_t pos, dma_addr_t base)
+{
+	return base + pos * (1 << PAGE_SHIFT);
+}
+
+static void seq_print_dma_areas(struct seq_file *s, void *bitmap,
+				dma_addr_t base, size_t bits)
+{
+	/* one bit = one (page + order) sized block */
+	size_t pos = find_first_bit(bitmap, bits), end;
+
+	for (; pos < bits; pos = find_next_bit(bitmap, bits, end + 1)) {
+		dma_addr_t start_addr, end_addr;
+
+		end = find_next_zero_bit(bitmap, bits, pos);
+		start_addr = bit_to_addr(pos, base);
+		end_addr = bit_to_addr(end, base) - 1;
+		seq_printf(s, "    %pa-%pa pages=%zu\n",
+			   &start_addr, &end_addr, end - pos);
+	}
+}
+
+static void seq_print_mapping(struct seq_file *s,
+			      struct dma_iommu_mapping *mapping)
+{
+	int i;
+	size_t mapping_size = mapping->bits << PAGE_SHIFT;
+
+	seq_printf(s, "  memory map: base=%pa size=%zu domain=%p\n",
+		   &mapping->base, (size_t)(mapping->end - mapping->base),
+		   mapping->domain);
+
+	for (i = 0; i < mapping->nr_bitmaps; i++)
+		seq_print_dma_areas(s, mapping->bitmaps[i],
+			mapping->base + mapping_size * i, mapping->bits);
+}
+
+static void debug_dma_seq_print_mappings(struct seq_file *s)
+{
+	struct dma_iommu_mapping *mapping;
+	int i = 0;
+
+	list_for_each_entry(mapping, &iommu_mapping_list, list) {
+		seq_printf(s, "Map %d (%p):\n", i, mapping);
+		seq_print_mapping(s, mapping);
+		i++;
+	}
+}
+
+static int dump_iommu_mappings(struct seq_file *s, void *data)
+{
+	debug_dma_seq_print_mappings(s);
+	return 0;
+}
+
+static int dump_iommu_mappings_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dump_iommu_mappings, NULL);
+}
+
+static const struct file_operations dump_iommu_mappings_fops = {
+	.open           = dump_iommu_mappings_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+#endif /* CONFIG_DEBUG_FS */
+
+void dma_debugfs_platform_info(struct dentry *dent)
+{
+	debugfs_create_file("dump_mappings", S_IRUGO, dent, NULL,
+			    &dump_iommu_mappings_fops);
+}
+
+#else /* !CONFIG_ARM_DMA_USE_IOMMU */
+static inline void dma_debugfs_platform_info(struct dentry *dent)
+{
+}
+#endif /* !CONFIG_ARM_DMA_USE_IOMMU */
+
+#if defined(CONFIG_DMA_API_DEBUG)
+static inline void dma_debug_platform(void)
+{
+	struct dentry *dent;
+
+	dent = debugfs_create_dir("dma-api", NULL);
+	if (dent)
+		dma_debugfs_platform_info(dent);
+}
+#else /* !CONFIG_DMA_API_DEBUG */
+static void dma_debug_platform(void)
+{
+}
+#endif /* !CONFIG_DMA_API_DEBUG */
+
+
 #define PREALLOC_DMA_DEBUG_ENTRIES	4096
 
 static int __init dma_debug_do_init(void)
 {
 	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+	dma_debug_platform();
 	return 0;
 }
 fs_initcall(dma_debug_do_init);
@@ -1262,6 +1366,24 @@ static int __init iova_gap_pages_init(void)
 	return 0;
 }
 core_initcall(iova_gap_pages_init);
+
+static void iommu_mapping_list_add(struct dma_iommu_mapping *mapping)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&iommu_mapping_list_lock, flags);
+	list_add_tail(&mapping->list, &iommu_mapping_list);
+	spin_unlock_irqrestore(&iommu_mapping_list_lock, flags);
+}
+
+static void iommu_mapping_list_del(struct dma_iommu_mapping *mapping)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&iommu_mapping_list_lock, flags);
+	list_del(&mapping->list);
+	spin_unlock_irqrestore(&iommu_mapping_list_lock, flags);
+}
 
 static int pg_iommu_map(struct iommu_domain *domain, unsigned long iova,
 			phys_addr_t phys, size_t len, unsigned long prot)
@@ -2442,6 +2564,8 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
 		goto err4;
 
 	kref_init(&mapping->kref);
+
+	iommu_mapping_list_add(mapping);
 	return mapping;
 err4:
 	kfree(mapping->bitmaps[0]);
@@ -2459,6 +2583,7 @@ static void release_iommu_mapping(struct kref *kref)
 	struct dma_iommu_mapping *mapping =
 		container_of(kref, struct dma_iommu_mapping, kref);
 
+	iommu_mapping_list_del(mapping);
 	iommu_domain_free(mapping->domain);
 	for (i = 0; i < mapping->nr_bitmaps; i++)
 		kfree(mapping->bitmaps[i]);
