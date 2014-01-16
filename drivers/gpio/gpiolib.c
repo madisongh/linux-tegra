@@ -287,7 +287,7 @@ int gpiochip_add(struct gpio_chip *chip)
 		goto fail;
 	}
 
-	pr_debug("%s: registered GPIOs %d to %d on device: %s\n", __func__,
+	pr_info("%s: registered GPIOs %d to %d on device: %s\n", __func__,
 		chip->base, chip->base + chip->ngpio - 1,
 		chip->label ? : "generic");
 
