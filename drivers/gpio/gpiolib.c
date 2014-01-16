@@ -107,11 +107,42 @@ struct gpio_chip *gpiod_to_chip(const struct gpio_desc *desc)
 EXPORT_SYMBOL_GPL(gpiod_to_chip);
 
 /* dynamic allocation of GPIOs, e.g. on a hotplugged device */
-static int gpiochip_find_base(int ngpio)
+static int gpiochip_find_base(struct gpio_chip *req_chip)
 {
 	struct gpio_chip *chip;
-	int base = ARCH_NR_GPIOS - ngpio;
+	int ngpio = req_chip->ngpio;
+	int base = -1;
 
+#ifdef CONFIG_OF
+	if (req_chip->of_node) {
+		int gpio_nr;
+
+		gpio_nr = of_alias_get_id(req_chip->of_node, "gpio");
+		if (gpio_nr >= 0) {
+			int start_gpio = gpio_nr;
+			int end_gpio = gpio_nr + req_chip->ngpio;
+
+			list_for_each_entry(chip, &gpio_chips, list) {
+				if (chip->base > end_gpio)
+					continue;
+
+				if ((chip->base < start_gpio) &&
+					((chip->base + chip->ngpio) < start_gpio))
+						continue;
+				pr_err("GPIO %d to %d is already allocated\n",
+						start_gpio, end_gpio);
+				gpio_nr = -1;
+				break;
+			}
+		}
+		base = gpio_nr;
+	}
+#endif
+
+	if (base >= 0)
+		goto found;
+
+	base = ARCH_NR_GPIOS - ngpio;
 	list_for_each_entry_reverse(chip, &gpio_chips, list) {
 		/* found a free space? */
 		if (chip->base + chip->ngpio <= base)
@@ -121,6 +152,7 @@ static int gpiochip_find_base(int ngpio)
 			base = chip->base - ngpio;
 	}
 
+found:
 	if (gpio_is_valid(base)) {
 		pr_debug("%s: found new base at %d\n", __func__, base);
 		return base;
@@ -236,7 +268,7 @@ int gpiochip_add(struct gpio_chip *chip)
 	spin_lock_irqsave(&gpio_lock, flags);
 
 	if (base < 0) {
-		base = gpiochip_find_base(chip->ngpio);
+		base = gpiochip_find_base(chip);
 		if (base < 0) {
 			status = base;
 			goto unlock;
