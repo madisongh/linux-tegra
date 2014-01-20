@@ -372,6 +372,8 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	/* External loopback is valid for sdmmc3 only */
 	if (soc_data->nvquirks & NVQUIRK_DISABLE_EXTERNAL_LOOPBACK)
 		misc_ctrl &= ~(1 << SDHCI_VNDR_MISC_CTRL_EN_EXT_LOOPBACK_SHIFT);
+	else
+		misc_ctrl |= (1 << SDHCI_VNDR_MISC_CTRL_EN_EXT_LOOPBACK_SHIFT);
 	sdhci_writel(host, misc_ctrl, SDHCI_VNDR_MISC_CTRL);
 }
 
