@@ -217,7 +217,7 @@ static int tegra_wdt_release(struct inode *inode, struct file *file)
 {
 	struct tegra_wdt *wdt = file->private_data;
 
-	if (wdt->status == WDT_ENABLED) {
+	if (wdt->status & WDT_ENABLED) {
 #ifndef CONFIG_WATCHDOG_NOWAYOUT
 		tegra_wdt_disable(wdt);
 		wdt->status = WDT_DISABLED;
