@@ -2326,7 +2326,6 @@ void __init tegra_init_late(void)
 	tegra_powergate_debugfs_init();
 }
 
-#ifdef CONFIG_TEGRA_PRE_SILICON_SUPPORT
 #define ASIM_SHUTDOWN_REG	0x538f0ffc
 
 static void asim_power_off(void)
@@ -2375,7 +2374,6 @@ static int __init asim_enet_smc91x_init(void)
 }
 
 rootfs_initcall(asim_enet_smc91x_init);
-#endif
 #endif
 
 #if defined(CONFIG_SMSC911X)
