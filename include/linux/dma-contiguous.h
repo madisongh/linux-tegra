@@ -125,6 +125,8 @@ int dma_get_contiguous_stats(struct device *dev,
 
 #else
 
+struct dma_contiguous_stats;
+
 static inline struct cma *dev_get_cma_area(struct device *dev)
 {
 	return NULL;
