@@ -1,4 +1,4 @@
-subdir-ccflags-y := -Werror
+subdir-ccflags-$(CONFIG_ARM) := -Werror
 obj-y				+= avp/
 obj-y				+= cam_dev/
 obj-$(CONFIG_TEGRA_MEDIASERVER)		+= mediaserver/
