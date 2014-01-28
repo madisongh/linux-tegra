@@ -50,4 +50,66 @@ config TSL2x7x
 	 tmd2672, tsl2772, tmd2772 devices.
 	 Provides iio_events and direct access via sysfs.
 
+config SENSORS_LTR558
+	tristate "LTR558 Ambient light and proximity sensor"
+	depends on I2C
+	default n
+	help
+	  If you say yes here you get support for ambient light sensing and
+	  proximity ir sensing from Lite On Technology LTR558.
+
+config SENSORS_MAX44005
+	tristate "MAX44005 ALS, RGB, temperature, IR, proximity Sensor"
+	depends on I2C
+	default n
+	help
+	  If you say yes here you get support for ambient light, RGB, IR,
+	  Proximity and temperature sensing from MAX44005.
+
+config SENSORS_STM8T143
+	tristate "STM8T143 proximity sensor"
+	default n
+	help
+	  If you say yes here you get support for ST Microelectronics
+	  STM8T143 sensor driver.
+	  The STM8T143 sensor driver provices suport for proximity sensing.
+	  Data from sensor is accessible via sysfs.
+
+config SENSORS_TCS3772
+	tristate "TCS3772 Ambient light, RGB and proximity Sensor"
+	depends on I2C
+	select REGMAP_I2C
+	default n
+	help
+	  If you say yes here you get support for ambient light, RGB and
+	  Proximity sensing from TCS3772.
+
+config SENSORS_CM3217
+	tristate "CM3217 Ambient light sensor"
+	depends on I2C
+	default n
+	help
+	  Say Y here to enable the CM3217 Ambient Light Sensor.
+
+config LS_OF
+	tristate "Device Tree parsing for Light sensor specification details"
+	depends on OF
+	default n
+	help
+	  Say Y for helpers to retrieve the sensor specification details like
+	  vendor, power consumed, max range, resolution and integration.
+	  This information is common to most Ambient light sensors as well as
+	  proximity sensors. Hence, have common callbacks to retrive this
+	  information from the respective device tree nodes.
+
+config LS_SYSFS
+	tristate "IIO registration for sensor meta data"
+	depends on LS_OF
+	default n
+	help
+	  Say Y for to share sensor specification details to user space.
+	  The information is retrieved from device platform data. If you are
+	  using helpers from this file, make sure device's platform data
+	  contains all the required information.
+
 endmenu
