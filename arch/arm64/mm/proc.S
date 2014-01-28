@@ -213,6 +213,20 @@ ENTRY(__cpu_setup)
 	ret					// return to head.S
 ENDPROC(__cpu_setup)
 
+#ifdef CONFIG_ARMV7_COMPAT_CP15_BARRIER
+	/*
+	 *                 n n            T
+	 *       U E      WT T UD     US IHBS
+	 *       CE0      XWHW CZ     ME TEEA S
+	 * .... .IEE .... NEAI TE.I ..AD DEN0 ACAM
+	 * 0011 0... 1101 ..0. ..0. 10.. .... .... < hardware reserved
+	 * .... .100 .... 01.1 11.1 ..01 0011 1101 < software settings
+	 */
+	.type	crval, #object
+crval:
+	.word	0x030802e2			// clear
+	.word	0x0405d13d			// set
+#else
 	/*
 	 * We set the desired value explicitly, including those of the
 	 * reserved bits. The values of bits EE & E0E were set early in
@@ -229,3 +243,5 @@ ENDPROC(__cpu_setup)
 crval:
 	.word	0xfcffffff			// clear
 	.word	0x34d5d91d			// set
+#endif
+>>>>>>> 2ec6f25... arm64: optionally set CP15BEN in SCTLR
