@@ -1830,6 +1830,38 @@ void __tegra_clear_framebuffer(struct platform_device *pdev,
 	iounmap(to_io);
 }
 
+#ifdef CONFIG_PSTORE_RAM
+static struct ramoops_platform_data ramoops_data;
+
+static struct platform_device ramoops_dev  = {
+	.name = "ramoops",
+	.dev = {
+		.platform_data = &ramoops_data,
+	},
+};
+
+
+static void __init tegra_reserve_ramoops_memory(unsigned long reserve_size)
+{
+	ramoops_data.mem_size = reserve_size;
+	ramoops_data.mem_address = memblock_end_of_4G() - reserve_size;
+	ramoops_data.console_size = reserve_size;
+	ramoops_data.dump_oops = 1;
+	memblock_reserve(ramoops_data.mem_address, ramoops_data.mem_size);
+}
+
+static int __init tegra_register_ramoops_device(void)
+{
+	int ret = platform_device_register(&ramoops_dev);
+	if (ret) {
+		pr_info("Unable to register ramoops platform device\n");
+		return ret;
+	}
+	return ret;
+}
+core_initcall(tegra_register_ramoops_device);
+#endif
+
 void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 	unsigned long fb2_size)
 {
@@ -2121,6 +2153,9 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 #endif
 
 	tegra_fb_linear_set(map);
+#ifdef CONFIG_PSTORE_RAM
+	tegra_reserve_ramoops_memory(SZ_1M);
+#endif
 }
 
 void tegra_get_fb_resource(struct resource *fb_res)
@@ -2137,37 +2172,7 @@ void tegra_get_fb2_resource(struct resource *fb2_res)
 			(resource_size_t) tegra_fb2_size - 1;
 }
 
-#ifdef CONFIG_PSTORE_RAM
-static struct ramoops_platform_data ramoops_data;
 
-static struct platform_device ramoops_dev  = {
-	.name = "ramoops",
-	.dev = {
-		.platform_data = &ramoops_data,
-	},
-};
-
-
-void __init tegra_reserve_ramoops_memory(unsigned long reserve_size)
-{
-	ramoops_data.mem_size = reserve_size;
-	ramoops_data.mem_address = memblock_end_of_4G() - reserve_size;
-	ramoops_data.console_size = reserve_size;
-	ramoops_data.dump_oops = 1;
-	memblock_reserve(ramoops_data.mem_address, ramoops_data.mem_size);
-}
-
-static int __init tegra_register_ramoops_device(void)
-{
-	int ret = platform_device_register(&ramoops_dev);
-	if (ret) {
-		pr_info("Unable to register ramoops platform device\n");
-		return ret;
-	}
-	return ret;
-}
-core_initcall(tegra_register_ramoops_device);
-#endif
 
 int __init tegra_register_fuse(void)
 {
