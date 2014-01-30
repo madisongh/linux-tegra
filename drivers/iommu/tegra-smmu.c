@@ -1861,6 +1861,10 @@ static int tegra_smmu_device_notifier(struct notifier_block *nb,
 	struct dma_iommu_mapping *map;
 	struct device *dev = _dev;
 
+	map = tegra_smmu_get_map(dev, tegra_smmu_of_get_swgids(dev));
+	if (!map)
+		return NOTIFY_DONE;
+
 	switch (event) {
 	case BUS_NOTIFY_BIND_DRIVER:
 		if (get_dma_ops(dev) != &arm_dma_ops)
@@ -1875,9 +1879,7 @@ static int tegra_smmu_device_notifier(struct notifier_block *nb,
 			break;
 		}
 
-		map = tegra_smmu_get_map(dev, tegra_smmu_of_get_swgids(dev));
-		if (!map)
-			break;
+		WARN_ON(to_dma_iommu_mapping(dev) == map);
 
 		if (arm_iommu_attach_device(dev, map)) {
 			dev_err(dev, "Failed to attach %s\n", dev_name(dev));
@@ -1891,6 +1893,8 @@ static int tegra_smmu_device_notifier(struct notifier_block *nb,
 			break;
 		/* FALLTHROUGH */
 	case BUS_NOTIFY_UNBOUND_DRIVER:
+		WARN_ON(!to_dma_iommu_mapping(dev));
+
 		dev_dbg(dev, "Detaching %s from map %p\n", dev_name(dev),
 			to_dma_iommu_mapping(dev));
 		arm_iommu_detach_device(dev);
