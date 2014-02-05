@@ -429,13 +429,14 @@ out:
  * @pdd: Domain data of the device to restore the state of.
  * @genpd: PM domain the device belongs to.
  */
-static void __pm_genpd_restore_device(struct pm_domain_data *pdd,
+static int __pm_genpd_restore_device(struct pm_domain_data *pdd,
 				      struct generic_pm_domain *genpd)
 	__releases(&genpd->lock) __acquires(&genpd->lock)
 {
 	struct generic_pm_domain_data *gpd_data = to_gpd_data(pdd);
 	struct device *dev = pdd->dev;
 	int need_restore = gpd_data->need_restore;
+	int err = 0;
 
 	gpd_data->need_restore = 0;
 	mutex_unlock(&genpd->lock);
@@ -447,9 +448,11 @@ static void __pm_genpd_restore_device(struct pm_domain_data *pdd,
 	 * is negative then).
 	 */
 	if (need_restore)
-		genpd_restore_dev(genpd, dev);
+		err = genpd_restore_dev(genpd, dev);
 
 	mutex_lock(&genpd->lock);
+
+	return err;
 }
 
 /**
@@ -782,7 +785,12 @@ static int pm_genpd_runtime_resume(struct device *dev)
 		mutex_lock(&genpd->lock);
 	}
 	finish_wait(&genpd->status_wait_queue, &wait);
-	__pm_genpd_restore_device(dev->power.subsys_data->domain_data, genpd);
+	ret = __pm_genpd_restore_device(dev->power.subsys_data->domain_data, genpd);
+	if (ret < 0) {
+		mutex_unlock(&genpd->lock);
+		return ret;
+	}
+
 	genpd->resume_count--;
 	genpd_set_active(genpd);
 	wake_up_all(&genpd->status_wait_queue);
