@@ -26,6 +26,8 @@
 #ifndef __LINUX_MFD_AS3722_H__
 #define __LINUX_MFD_AS3722_H__
 
+#include <linux/i2c.h>
+#include <linux/mutex.h>
 #include <linux/regmap.h>
 
 /* AS3722 registers */
@@ -392,6 +394,7 @@ enum as3722_irq {
 struct as3722 {
 	struct device *dev;
 	struct regmap *regmap;
+	struct i2c_client *client;
 	int chip_irq;
 	unsigned long irq_flags;
 	bool en_intern_int_pullup;
@@ -400,6 +403,8 @@ struct as3722 {
 	struct regmap_irq_chip_data *irq_data;
 	u32 major_rev;
 	u32 minor_rev;
+	struct mutex mutex_config;
+	bool shutdown;
 };
 
 
@@ -500,6 +505,11 @@ static inline int as3722_update_bits(struct as3722 *as3722, u32 reg,
 		u32 mask, u8 val)
 {
 	return regmap_update_bits(as3722->regmap, reg, mask, val);
+}
+
+static inline void as3722_allow_atomic_xfer(struct as3722 *as3722)
+{
+	i2c_shutdown_clear_adapter(as3722->client->adapter);
 }
 
 static inline int as3722_irq_get_virq(struct as3722 *as3722, int irq)

@@ -323,6 +323,29 @@ static const struct regmap_range as3722_writable_ranges[] = {
 	regmap_reg_range(AS3722_LOCK_REG, AS3722_LOCK_REG),
 };
 
+static void as3722_regmap_config_lock(void *lock)
+{
+	struct as3722 *as3722 = lock;
+
+	if (as3722->shutdown && (in_atomic() || irqs_disabled())) {
+		dev_info(as3722->dev, "Xfer without lock\n");
+		return;
+	}
+
+	mutex_lock(&as3722->mutex_config);
+}
+
+static void as3722_regmap_config_unlock(void *lock)
+{
+	struct as3722 *as3722 = lock;
+
+	if (as3722->shutdown && (in_atomic() || irqs_disabled()))
+		return;
+
+	mutex_unlock(&as3722->mutex_config);
+}
+
+
 static const struct regmap_access_table as3722_writable_table = {
 	.yes_ranges = as3722_writable_ranges,
 	.n_yes_ranges = ARRAY_SIZE(as3722_writable_ranges),
@@ -338,7 +361,7 @@ static const struct regmap_access_table as3722_volatile_table = {
 	.n_no_ranges = ARRAY_SIZE(as3722_cacheable_ranges),
 };
 
-static const struct regmap_config as3722_regmap_config = {
+static struct regmap_config as3722_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 	.max_register = AS3722_MAX_REGISTER,
@@ -346,6 +369,8 @@ static const struct regmap_config as3722_regmap_config = {
 	.rd_table = &as3722_readable_table,
 	.wr_table = &as3722_writable_table,
 	.volatile_table = &as3722_volatile_table,
+	.lock = as3722_regmap_config_lock,
+	.unlock = as3722_regmap_config_unlock,
 };
 
 static int as3722_i2c_of_probe(struct i2c_client *i2c,
@@ -412,6 +437,7 @@ static int as3722_i2c_probe(struct i2c_client *i2c,
 	as3722->dev = &i2c->dev;
 	as3722->chip_irq = i2c->irq;
 	i2c_set_clientdata(i2c, as3722);
+	as3722->client = i2c;
 
 	ret = as3722_i2c_non_of_probe(i2c, as3722);
 	if (ret < 0) {
@@ -420,7 +446,10 @@ static int as3722_i2c_probe(struct i2c_client *i2c,
 			return ret;
 	}
 
-	as3722->regmap = devm_regmap_init_i2c(i2c, &as3722_regmap_config);
+	mutex_init(&as3722->mutex_config);
+	as3722_regmap_config.lock_arg = as3722;
+	as3722->regmap = devm_regmap_init_i2c(i2c,
+			(const struct regmap_config *)&as3722_regmap_config);
 	if (IS_ERR(as3722->regmap)) {
 		ret = PTR_ERR(as3722->regmap);
 		dev_err(&i2c->dev, "regmap init failed: %d\n", ret);
@@ -478,6 +507,13 @@ static int as3722_i2c_remove(struct i2c_client *i2c)
 	return 0;
 }
 
+static void as3722_i2c_shutdown(struct i2c_client *i2c)
+{
+	struct as3722 *as3722 = i2c_get_clientdata(i2c);
+
+	as3722->shutdown = true;
+}
+
 static const struct of_device_id as3722_of_match[] = {
 	{ .compatible = "ams,as3722", },
 	{},
@@ -498,6 +534,7 @@ static struct i2c_driver as3722_i2c_driver = {
 	},
 	.probe = as3722_i2c_probe,
 	.remove = as3722_i2c_remove,
+	.shutdown = as3722_i2c_shutdown,
 	.id_table = as3722_i2c_id,
 };
 
