@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2014, NVIDIA Corporation. All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -31,15 +33,6 @@
 #include <asm/smp_plat.h>
 #include <asm/suspend.h>
 #include <asm/system_misc.h>
-
-#define PSCI_POWER_STATE_TYPE_STANDBY		0
-#define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
-
-struct psci_power_state {
-	u16	id;
-	u8	type;
-	u8	affinity_level;
-};
 
 struct psci_operations {
 	int (*cpu_suspend)(struct psci_power_state state,
@@ -87,7 +80,7 @@ static int psci_to_linux_errno(int errno)
 	return -EINVAL;
 }
 
-static u32 psci_power_state_pack(struct psci_power_state state)
+u32 psci_power_state_pack(struct psci_power_state state)
 {
 	return ((state.id << PSCI_0_2_POWER_STATE_ID_SHIFT)
 			& PSCI_0_2_POWER_STATE_ID_MASK) |
@@ -107,6 +100,20 @@ static void psci_power_state_unpack(u32 power_state,
 	state->affinity_level =
 			(power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
 			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
+}
+
+struct psci_power_state to_psci_power_state(unsigned long arg)
+{
+	struct psci_power_state ps;
+
+	ps.id = (arg >> PSCI_0_2_POWER_STATE_ID_SHIFT)
+			& PSCI_0_2_POWER_STATE_ID_MASK;
+	ps.type = (arg >> PSCI_0_2_POWER_STATE_TYPE_SHIFT)
+			& PSCI_0_2_POWER_STATE_TYPE_MASK;
+	ps.affinity_level = (arg >> PSCI_0_2_POWER_STATE_AFFL_SHIFT)
+			& PSCI_0_2_POWER_STATE_AFFL_MASK;
+
+	return ps;
 }
 
 /*
