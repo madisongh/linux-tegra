@@ -152,6 +152,9 @@ static void thermal_zone_trip_update(struct thermal_zone_device *tz, int trip)
 		if (old_target == instance->target)
 			continue;
 
+		if (old_target == instance->target)
+			continue;
+
 		/* Activate a passive thermal instance */
 		if (old_target == THERMAL_NO_TARGET &&
 			instance->target != THERMAL_NO_TARGET)
