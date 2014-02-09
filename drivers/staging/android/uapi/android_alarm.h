@@ -28,7 +28,6 @@ enum android_alarm_type {
 	ANDROID_ALARM_SYSTEMTIME,
 
 	ANDROID_ALARM_TYPE_COUNT,
-
 	ANDROID_ALARM_WAKENUP_BY_RTCCHIP = 11,
 
 	/* return code bit numbers */
