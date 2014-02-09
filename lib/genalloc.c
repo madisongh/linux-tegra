@@ -297,9 +297,9 @@ unsigned long gen_pool_alloc_addr(struct gen_pool *pool, size_t size,
 		end_bit = chunk_size(chunk) >> order;
 		if (alloc_addr) {
 			if (alloc_addr < chunk->start_addr ||
-				alloc_addr > chunk->end_addr)
+				alloc_addr >= chunk->end_addr)
 				continue;
-			if (alloc_addr + size - 1 > chunk->end_addr)
+			if (alloc_addr + size > chunk->end_addr)
 				return 0;
 			alloc_bit_needed = start_bit =
 				(alloc_addr - chunk->start_addr) >> order;
