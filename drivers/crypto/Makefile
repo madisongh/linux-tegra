@@ -1,3 +1,5 @@
+GCOV_PROFILE := y
+
 subdir-ccflags-y += -Werror
 obj-$(CONFIG_CRYPTO_DEV_ATMEL_AES) += atmel-aes.o
 obj-$(CONFIG_CRYPTO_DEV_ATMEL_SHA) += atmel-sha.o

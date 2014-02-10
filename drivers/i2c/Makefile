@@ -1,6 +1,7 @@
 #
 # Makefile for the i2c core.
 #
+GCOV_PROFILE := y
 
 ccflags-y += -Werror
 obj-$(CONFIG_I2C_BOARDINFO)	+= i2c-boardinfo.o

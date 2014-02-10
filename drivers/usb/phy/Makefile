@@ -1,6 +1,9 @@
 #
 # Makefile for physical layer USB drivers
 #
+GCOV_PROFILE_tegra-otg.o := y
+GCOV_PROFILE_tegra-xotg.o := y
+
 obj-$(CONFIG_USB_PHY)			+= phy.o
 obj-$(CONFIG_OF)			+= of.o
 

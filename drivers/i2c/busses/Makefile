@@ -1,6 +1,7 @@
 #
 # Makefile for the i2c bus drivers.
 #
+GCOV_PROFILE := y
 
 ccflags-y += -Werror
 # ACPI drivers

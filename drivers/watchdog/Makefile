@@ -1,6 +1,7 @@
 #
 # Makefile for the WatchDog device drivers.
 #
+GCOV_PROFILE_tegra_wdt.o := y
 
 ccflags-y += -Werror
 # The WatchDog Timer Driver Core.

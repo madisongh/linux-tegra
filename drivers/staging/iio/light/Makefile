@@ -1,6 +1,7 @@
 #
 # Makefile for industrial I/O Light sensors
 #
+GCOV_PROFILE := y
 
 ccflags-y := -Werror
 
