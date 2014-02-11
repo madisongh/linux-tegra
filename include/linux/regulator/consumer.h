@@ -272,6 +272,8 @@ unsigned int regulator_get_mode(struct regulator *regulator);
 int regulator_set_vsel_volatile(struct regulator *regulator, bool is_volatile);
 int regulator_set_load(struct regulator *regulator, int load_uA);
 
+int regulator_set_vsel_volatile(struct regulator *regulator, bool is_volatile);
+
 int regulator_allow_bypass(struct regulator *regulator, bool allow);
 
 struct regmap *regulator_get_regmap(struct regulator *regulator);
@@ -531,6 +533,12 @@ static inline int regulator_set_vsel_volatile(struct regulator *regulator, bool 
 static inline int regulator_set_load(struct regulator *regulator, int load_uA)
 {
 	return REGULATOR_MODE_NORMAL;
+}
+
+static inline int regulator_set_vsel_volatile(struct regulator *regulator,
+					      bool is_volatile)
+{
+	return 0;
 }
 
 static inline int regulator_allow_bypass(struct regulator *regulator,
