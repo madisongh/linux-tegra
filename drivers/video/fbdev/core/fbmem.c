@@ -1200,9 +1200,9 @@ static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		console_unlock();
 		break;
 	case FBIOBLANK:
-		pr_info("FBIOBLANK acquiring console_lock\n");
+		pr_debug("FBIOBLANK acquiring console_lock\n");
 		console_lock();
-		pr_info("FBIOBLANK console_lock taken\n");
+		pr_debug("FBIOBLANK console_lock taken\n");
 		if (!lock_fb_info(info)) {
 			console_unlock();
 			return -ENODEV;
@@ -1212,7 +1212,7 @@ static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		info->flags &= ~FBINFO_MISC_USEREVENT;
 		unlock_fb_info(info);
 		console_unlock();
-		pr_info("FBIOBLANK console_unlock done\n");
+		pr_debug("FBIOBLANK console_unlock done\n");
 		break;
 	default:
 		if (!lock_fb_info(info))
