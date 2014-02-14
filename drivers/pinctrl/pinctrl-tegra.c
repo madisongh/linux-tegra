@@ -799,6 +799,8 @@ static void pinctrl_resume(void)
 static struct syscore_ops pinctrl_syscore_ops = {
 	.suspend = pinctrl_suspend,
 	.resume = pinctrl_resume,
+	.save = pinctrl_suspend,
+	.restore = pinctrl_resume,
 };
 
 #endif
