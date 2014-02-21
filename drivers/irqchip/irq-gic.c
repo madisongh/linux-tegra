@@ -1,6 +1,8 @@
 /*
  *  Copyright (C) 2002 ARM Limited, All Rights Reserved.
  *
+ *  Copyright (C) 2014, NVIDIA CORPORATION.  All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -85,6 +87,7 @@ struct gic_chip_data {
 #ifdef CONFIG_GIC_NON_BANKED
 	void __iomem *(*get_base)(union gic_base *);
 #endif
+	bool is_percpu;
 };
 
 static DEFINE_RAW_SPINLOCK(irq_controller_lock);
@@ -104,6 +107,8 @@ static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
 #endif
 
 static struct gic_chip_data gic_data[MAX_GIC_NR] __read_mostly;
+
+static u8 gic_get_cpumask(struct gic_chip_data *gic);
 
 #ifdef CONFIG_GIC_NON_BANKED
 static void __iomem *gic_get_percpu_base(union gic_base *base)
@@ -170,8 +175,25 @@ static inline bool cascading_gic_irq(struct irq_data *d)
  */
 static void gic_poke_irq(struct irq_data *d, u32 offset)
 {
+	struct gic_chip_data *gic = irq_data_get_irq_chip_data(d);
+	u8 val8;
 	u32 mask = 1 << (gic_irq(d) % 32);
+	u8 curr_cpu = gic_get_cpumask(gic);
+	u32 irq_target = GIC_DIST_TARGET + gic_irq(d);
+
+	raw_spin_lock(&irq_controller_lock);
+	/*
+	 * if it is not per-cpu then we should make sure the irq has
+	 * been routed to CPU.
+	 */
+	val8 = readb_relaxed(gic_dist_base(d) + irq_target);
+	if (!gic->is_percpu && !(val8 & curr_cpu))
+		goto end;
+
 	writel_relaxed(mask, gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4);
+
+end:
+	raw_spin_unlock(&irq_controller_lock);
 }
 
 static int gic_peek_irq(struct irq_data *d, u32 offset)
@@ -203,6 +225,16 @@ static void gic_eoimode1_mask_irq(struct irq_data *d)
 static void gic_unmask_irq(struct irq_data *d)
 {
 	gic_poke_irq(d, GIC_DIST_ENABLE_SET);
+}
+
+static inline void gic_irq_enable(struct irq_data *d)
+{
+	gic_unmask_irq(d);
+}
+
+static inline void gic_irq_disable(struct irq_data *d)
+{
+	gic_mask_irq(d);
 }
 
 static void gic_eoi_irq(struct irq_data *d)
@@ -304,6 +336,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 {
 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
 	unsigned int cpu, shift = (gic_irq(d) % 4) * 8;
+	struct gic_chip_data *gic = irq_data_get_irq_chip_data(d);
 	u32 val, mask, bit;
 	unsigned long flags;
 
@@ -315,13 +348,16 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
 		return -EINVAL;
 
+	/* do not set affinity to gic's which are not per cpu*/
+	if (!gic->is_percpu)
+		goto end;
 	raw_spin_lock_irqsave(&irq_controller_lock, flags);
 	mask = 0xff << shift;
 	bit = gic_cpu_map[cpu] << shift;
 	val = readl_relaxed(reg) & ~mask;
 	writel_relaxed(val | bit, reg);
 	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
-
+end:
 	return IRQ_SET_MASK_OK;
 }
 #endif
@@ -709,6 +745,15 @@ static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
 		if (!gic_data[i].get_base)
 			continue;
 #endif
+		/*
+		 * FIXME:This disables save/restore for gics which
+		 * are not per cpu.Need to provide a mechansim for
+		 * then to save and restore the state of their
+		 * registers
+		 */
+		if (!gic_data[i].is_percpu)
+			continue;
+
 		switch (cmd) {
 		case CPU_PM_ENTER:
 			gic_cpu_save(i);
@@ -1034,7 +1079,8 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
 
 static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
 			   void __iomem *dist_base, void __iomem *cpu_base,
-			   u32 percpu_offset, struct fwnode_handle *handle)
+			   u32 percpu_offset, bool is_percpu,
+			   struct fwnode_handle *handle)
 {
 	irq_hw_number_t hwirq_base;
 	struct gic_chip_data *gic;
@@ -1045,6 +1091,9 @@ static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
 	gic_check_cpu_features();
 
 	gic = &gic_data[gic_nr];
+
+	gic->is_percpu = is_percpu;
+
 #ifdef CONFIG_GIC_NON_BANKED
 	if (percpu_offset) { /* Frankein-GIC without banked registers... */
 		unsigned int cpu;
@@ -1131,8 +1180,10 @@ static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
 		for (i = 0; i < NR_GIC_CPU_IF; i++)
 			gic_cpu_map[i] = 0xff;
 #ifdef CONFIG_SMP
-		set_smp_cross_call(gic_raise_softirq);
-		register_cpu_notifier(&gic_cpu_notifier);
+		if (gic->is_percpu) {
+			set_smp_cross_call(gic_raise_softirq);
+			register_cpu_notifier(&gic_cpu_notifier);
+		}
 #endif
 		set_handle_irq(gic_handle_irq);
 		if (static_key_true(&supports_deactivate))
@@ -1152,7 +1203,8 @@ void __init gic_init(unsigned int gic_nr, int irq_start,
 	 * bother with these...
 	 */
 	static_key_slow_dec(&supports_deactivate);
-	__gic_init_bases(gic_nr, irq_start, dist_base, cpu_base, 0, NULL);
+	__gic_init_bases(gic_nr, irq_start, dist_base, cpu_base, 0, false,
+			NULL);
 }
 
 #ifdef CONFIG_OF
@@ -1202,6 +1254,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 	void __iomem *cpu_base;
 	void __iomem *dist_base;
 	u32 percpu_offset;
+	bool is_percpu;
 	int irq;
 
 	if (WARN_ON(!node))
@@ -1223,7 +1276,10 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
 		percpu_offset = 0;
 
-	__gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset,
+	is_percpu = !of_property_read_bool(node, "not-per-cpu");
+
+	__gic_init_bases(gic_cnt, -1, dist_base, cpu_base,
+			 percpu_offset, is_percpu,
 			 &node->fwnode);
 	if (!gic_cnt)
 		gic_init_physaddr(node);
@@ -1356,7 +1412,7 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
 		return -ENOMEM;
 	}
 
-	__gic_init_bases(0, -1, dist_base, cpu_base, 0, domain_handle);
+	__gic_init_bases(0, -1, dist_base, cpu_base, 0, false, domain_handle);
 
 	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
 	return 0;
