@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/dma-buf.h>
+#include <linux/moduleparam.h>
 #include <linux/nvmap.h>
 #include <linux/tegra-soc.h>
 
@@ -38,6 +39,8 @@
 #include "nvmap_priv.h"
 #include "nvmap_ioctl.h"
 
+static bool zero_memory;
+module_param(zero_memory, bool, 0644);
 u32 nvmap_max_handle_count;
 
 #define NVMAP_SECURE_HEAPS	(NVMAP_HEAP_CARVEOUT_IRAM | NVMAP_HEAP_IOVMM | \
@@ -157,7 +160,7 @@ static int handle_page_alloc(struct nvmap_client *client,
 	unsigned long kaddr;
 	pte_t **pte = NULL;
 
-	if (h->userflags & NVMAP_HANDLE_ZEROED_PAGES) {
+	if (h->userflags & NVMAP_HANDLE_ZEROED_PAGES || zero_memory) {
 		gfp |= __GFP_ZERO;
 		prot = nvmap_pgprot(h, PG_PROT_KERNEL);
 		pte = nvmap_alloc_pte(nvmap_dev, (void **)&kaddr);
@@ -197,7 +200,8 @@ static int handle_page_alloc(struct nvmap_client *client,
 
 			if (!pages[i])
 				break;
-			if (h->userflags & NVMAP_HANDLE_ZEROED_PAGES) {
+			if (h->userflags & NVMAP_HANDLE_ZEROED_PAGES ||
+			    zero_memory) {
 				/*
 				 * Just memset low mem pages; they will for
 				 * sure have a virtual address. Otherwise, build
@@ -236,7 +240,7 @@ static int handle_page_alloc(struct nvmap_client *client,
 	if (err)
 		goto fail;
 
-	if (h->userflags & NVMAP_HANDLE_ZEROED_PAGES)
+	if (h->userflags & NVMAP_HANDLE_ZEROED_PAGES || zero_memory)
 		nvmap_free_pte(nvmap_dev, pte);
 	h->size = size;
 	h->pgalloc.pages = pages;
@@ -244,7 +248,7 @@ static int handle_page_alloc(struct nvmap_client *client,
 	return 0;
 
 fail:
-	if (h->userflags & NVMAP_HANDLE_ZEROED_PAGES)
+	if (h->userflags & NVMAP_HANDLE_ZEROED_PAGES || zero_memory)
 		nvmap_free_pte(nvmap_dev, pte);
 	while (i--)
 		__free_page(pages[i]);
