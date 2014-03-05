@@ -36,6 +36,7 @@
 #include <linux/pstore_ram.h>
 #include <linux/dma-mapping.h>
 #include <linux/sys_soc.h>
+#include <linux/tegra-pmc.h>
 #if defined(CONFIG_SMSC911X)
 #include <linux/smsc911x.h>
 #endif
@@ -75,7 +76,6 @@
 #include "sleep.h"
 #include "reset.h"
 #include "devices.h"
-#include "pmc.h"
 
 #define MC_SECURITY_CFG2	0x7c
 
