@@ -24,6 +24,8 @@
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <linux/debugfs.h>
+#include <linux/tegra-soc.h>
+#include <linux/tegra-fuse.h>
 
 void tegra_pd_in_idle(bool enable) {}
 
@@ -39,7 +41,7 @@ static int denver_enter_c_state(
 
 	local_irq_enable();
 
-	return index;
+	return pmstate_map[index] ? index : 0;
 }
 
 static struct cpuidle_driver denver_idle_driver = {
@@ -90,6 +92,9 @@ static int __init denver_power_states_init(void)
 
 		if (of_property_read_u32(child, "pmstate", &prop) != 0)
 			continue;
+
+		if ((prop == 9) && (tegra_revision == TEGRA_REVISION_A01))
+			prop = 0;
 
 		/* Map index to the actual LP state */
 		pmstate_map[state_count] = prop;
