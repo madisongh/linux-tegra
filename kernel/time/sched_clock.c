@@ -203,7 +203,7 @@ static int sched_clock_suspend(void)
 
 static void sched_clock_resume(void)
 {
-	cd.epoch_cyc = read_sched_clock();
+	update_sched_clock();
 	hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
 	cd.suspended = false;
 }
