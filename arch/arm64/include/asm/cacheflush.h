@@ -81,6 +81,8 @@ extern void __flush_dcache_all(void *arg);
 extern void __clean_dcache_all(void *arg);
 extern void __clean_dcache_area(void *addr, size_t len);
 
+#define flush_cache_louis() flush_dcache_louis()
+
 static inline void flush_cache_mm(struct mm_struct *mm)
 {
 }
