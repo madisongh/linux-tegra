@@ -1121,6 +1121,7 @@ static void __init ardbeg_sysedp_init(void)
 		else
 			shield_new_sysedp_init();
 		break;
+	case BOARD_E1971:
 	case BOARD_E1922:
 	case BOARD_E1784:
 	case BOARD_P1761:
@@ -1147,6 +1148,7 @@ static void __init ardbeg_sysedp_dynamic_capping_init(void)
 		else
 			shield_sysedp_dynamic_capping_init();
 		break;
+	case BOARD_E1971:
 	case BOARD_E1922:
 	case BOARD_E1784:
 	case BOARD_P1761:
