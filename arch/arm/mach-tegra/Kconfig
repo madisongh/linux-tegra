@@ -146,7 +146,6 @@ comment "Tegra board type"
 config MACH_BONAIRE
        bool "Bonaire board"
        depends on ARCH_TEGRA_12x_SOC
-       select TEGRA_FPGA_PLATFORM
        help
          Support for NVIDIA Bonaire FPGA development platform
 
@@ -209,14 +208,6 @@ config TEGRA_SIMULATION_PLATFORM
           Select this only if you are an NVIDIA developer working
           on a simulation platform.
 
-config TEGRA_FPGA_PLATFORM
-        bool "FPGA"
-	select LESS_GCC_OPT if DEBUG_KERNEL
-	select READABLE_ASM if DEBUG_KERNEL
-        help
-          This enables support for a Tegra FPGA platform.
-          Select this only if you are an NVIDIA developer working
-          on a FPGA platform.
 endchoice
 
 config TEGRA_SIMULATION_SPLIT_MEM
