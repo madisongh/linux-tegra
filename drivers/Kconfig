@@ -188,4 +188,6 @@ source "drivers/ras/Kconfig"
 
 source "drivers/thunderbolt/Kconfig"
 
+source "drivers/edp/Kconfig"
+
 endmenu
