@@ -511,6 +511,8 @@ struct i2c_adapter {
 	int retries;
 	struct device dev;		/* the adapter device */
 
+	bool atomic_xfer_only;
+
 	int nr;
 	char name[48];
 	struct completion dev_released;
