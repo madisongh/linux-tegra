@@ -50,7 +50,7 @@
 #ifdef CONFIG_TRUSTED_LITTLE_KERNEL
 #include <linux/ote_protocol.h>
 #endif
-#include <linux/nvhost.h>
+#include <linux/gk20a.h>
 
 #ifdef CONFIG_ARM64
 #include <linux/irqchip/arm-gic.h>
