@@ -4443,8 +4443,8 @@ unlock:
 late_initcall_sync(regulator_init_complete);
 
 #ifdef CONFIG_DEBUG_FS
-static int regulator_syncevent(struct file *file, const char __user *user_buf,
-				size_t count, loff_t *ppos)
+static ssize_t regulator_syncevent(struct file *file,
+		const char __user *user_buf, size_t count, loff_t *ppos)
 {
 	struct regulator_dev *rdev;
 	char buffer[40];
