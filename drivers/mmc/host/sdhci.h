@@ -301,7 +301,8 @@ struct sdhci_ops {
 	void    (*adma_workaround)(struct sdhci_host *host, u32 intmask);
 	void	(*platform_init)(struct sdhci_host *host);
 	void    (*card_event)(struct sdhci_host *host);
-	void	(*switch_signal_voltage_exit)(struct sdhci_host *host);
+	void	(*switch_signal_voltage_exit)(struct sdhci_host *host,
+				unsigned char signal_voltage);
 	int	(*suspend)(struct sdhci_host *host);
 	int	(*resume)(struct sdhci_host *host);
 	int	(*get_tuning_counter)(struct sdhci_host *sdhci);
