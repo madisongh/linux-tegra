@@ -586,13 +586,16 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	mutex_unlock(&tegra_host->set_clock_mutex);
 }
 
-static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci)
+static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
+	unsigned char signal_voltage)
 {
 	unsigned int val;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	unsigned int timeout = 10;
+	unsigned int calib_offsets = 0;
+
 
 	/*
 	 * Do not enable auto calibration if the platform doesn't
@@ -613,14 +616,20 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci)
 	val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE;
 	val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START;
 	if (unlikely(soc_data->nvquirks & NVQUIRK_SET_CALIBRATION_OFFSETS)) {
-		/* Program Auto cal PD offset(bits 8:14) */
-		val &= ~(0x7F <<
-			SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET_SHIFT);
-		val |= (SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET <<
-			SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET_SHIFT);
-		/* Program Auto cal PU offset(bits 0:6) */
-		val &= ~0x7F;
-		val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PU_OFFSET;
+		if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+			calib_offsets = tegra_host->plat->calib_3v3_offsets;
+		else if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
+			calib_offsets = tegra_host->plat->calib_1v8_offsets;
+		if (calib_offsets) {
+			/* Program Auto cal PD offset(bits 8:14) */
+			val &= ~(0x7F <<
+				SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET_SHIFT);
+			val |= (((calib_offsets >> 8) & 0xFF) <<
+				SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET_SHIFT);
+			/* Program Auto cal PU offset(bits 0:6) */
+			val &= ~0x7F;
+			val |= (calib_offsets & 0xFF);
+		}
 	}
 	sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
 
@@ -708,6 +717,9 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 {
 	/* Setting the min identification clock of freq 400KHz */
 	tegra_sdhci_set_clock(sdhci, 400000);
+
+	if (sdhci->mmc->pm_flags & MMC_PM_KEEP_POWER)
+		tegra_sdhci_do_calibration(sdhci, MMC_SIGNAL_VOLTAGE_330);
 }
 
 static void sdhci_tegra_error_stats_debugfs(struct sdhci_host *host)
