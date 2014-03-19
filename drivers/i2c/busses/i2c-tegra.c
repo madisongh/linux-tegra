@@ -814,13 +814,11 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
 	if (!i2c_dev->msg_read && (status & I2C_INT_TX_FIFO_DATA_REQ)) {
 		if (i2c_dev->msg_buf_remaining) {
 
-			if (!i2c_dev->chipdata->has_xfer_complete_interrupt)
-				spin_lock_irqsave(&i2c_dev->fifo_lock, flags);
+			spin_lock_irqsave(&i2c_dev->fifo_lock, flags);
 
 			tegra_i2c_fill_tx_fifo(i2c_dev);
 
-			if (!i2c_dev->chipdata->has_xfer_complete_interrupt)
-				spin_unlock_irqrestore(&i2c_dev->fifo_lock, flags);
+			spin_unlock_irqrestore(&i2c_dev->fifo_lock, flags);
 
 		}
 		else
@@ -963,8 +961,7 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
 	i2c_dev->msg_read = (msg->flags & I2C_M_RD);
 	reinit_completion(&i2c_dev->msg_complete);
 
-	if (!i2c_dev->chipdata->has_xfer_complete_interrupt)
-		spin_lock_irqsave(&i2c_dev->fifo_lock, flags);
+	spin_lock_irqsave(&i2c_dev->fifo_lock, flags);
 
 	cnfg = I2C_CNFG_NEW_MASTER_FSM | I2C_CNFG_PACKET_MODE_EN
 		| (0x2 << I2C_CNFG_DEBOUNCE_CNT_SHIFT);
@@ -1056,8 +1053,7 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
 			i2c_dev->chipdata->has_xfer_complete_interrupt))
 		int_mask |= I2C_INT_ALL_PACKETS_XFER_COMPLETE;
 
-	if (!i2c_dev->chipdata->has_xfer_complete_interrupt)
-		spin_unlock_irqrestore(&i2c_dev->fifo_lock, flags);
+	spin_unlock_irqrestore(&i2c_dev->fifo_lock, flags);
 
 	tegra_i2c_unmask_irq(i2c_dev, int_mask);
 
@@ -1569,8 +1565,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 			pdata->bit_banging_xfer_after_shutdown;
 	init_completion(&i2c_dev->msg_complete);
 
-	if (!i2c_dev->chipdata->has_xfer_complete_interrupt)
-		spin_lock_init(&i2c_dev->fifo_lock);
+	spin_lock_init(&i2c_dev->fifo_lock);
 
 	spin_lock_init(&i2c_dev->mem_lock);
 
