@@ -1843,10 +1843,10 @@ static void tegra_pcie_pll_pdn(void)
 }
 
 #if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-static void tegra_pcie_config_l1ss_tpwr_on(int pos)
+static void tegra_pcie_config_l1ss_tpwr_on(void)
 {
 	struct pci_dev *pdev = NULL;
-	u32 data = 0, data1 = 0, data2 = 0;
+	u32 data = 0, data1 = 0, data2 = 0, pos = 0;
 	unsigned long max1 = 0, max2 = 0;
 
 	PR_FUNC_LINE;
@@ -1854,7 +1854,7 @@ static void tegra_pcie_config_l1ss_tpwr_on(int pos)
 	/* and program same in ctrl2 reg of both RP & EP */
 	for_each_pci_dev(pdev) {
 		if (pci_pcie_type(pdev) != PCI_EXP_TYPE_ROOT_PORT) {
-
+			pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_L1SS);
 			pci_read_config_dword(pdev->bus->self,
 				pos + PCI_L1SS_CAP, &data1);
 			max1 = (((data1 & PCI_L1SS_CAP_PWRN_SCL_MASK) >>
@@ -1881,11 +1881,11 @@ static void tegra_pcie_config_l1ss_tpwr_on(int pos)
 	}
 }
 
-static void tegra_pcie_config_l1ss_cm_rtime(int pos)
+static void tegra_pcie_config_l1ss_cm_rtime(void)
 {
 	struct pci_dev *pdev = NULL;
 	u32 data = 0, data1 = 0, max[MAX_PCIE_SUPPORTED_PORTS] = {0};
-	int i = -1;
+	int i = -1, pos = 0;
 
 	PR_FUNC_LINE;
 	/* find max of common mode restore time reported by all */
@@ -1894,6 +1894,7 @@ static void tegra_pcie_config_l1ss_cm_rtime(int pos)
 	for_each_pci_dev(pdev) {
 		if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT)
 			i++;
+		pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_L1SS);
 		pci_read_config_dword(pdev, pos + PCI_L1SS_CAP, &data);
 		data &= PCI_L1SS_CAP_CM_RTM_MASK;
 		if (max[i] < data)
@@ -1902,6 +1903,7 @@ static void tegra_pcie_config_l1ss_cm_rtime(int pos)
 	i = 0;
 	for_each_pci_dev(pdev) {
 		if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT) {
+			pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_L1SS);
 			pci_read_config_dword(pdev,
 				pos + PCI_L1SS_CTRL1, &data);
 			data &= ~PCI_L1SS_CAP_CM_RTM_MASK;
@@ -1918,40 +1920,46 @@ static void tegra_pcie_config_l1ss_cm_rtime(int pos)
 	}
 }
 
-static void tegra_pcie_config_l1ss_l12_thtime(int pos)
+static void tegra_pcie_config_l1ss_l12_thtime(void)
 {
 	struct pci_dev *pdev = NULL;
-	u32 data = 0;
+	u32 data = 0, pos = 0;
 
 	PR_FUNC_LINE;
 	/* program same LTR L1.2 threshold = 106us for all devices */
 	for_each_pci_dev(pdev) {
+		pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_L1SS);
 		pci_read_config_dword(pdev, pos + PCI_L1SS_CTRL1, &data);
 		data |= 0x6A << PCI_L1SS_CTRL1_L12TH_VAL_SHIFT;
 		pci_write_config_dword(pdev, pos + PCI_L1SS_CTRL1, data);
 		pci_read_config_dword(pdev, pos + PCI_L1SS_CTRL1, &data);
 		data |= 0x02 << PCI_L1SS_CTRL1_L12TH_SCALE_SHIFT;
 		pci_write_config_dword(pdev, pos + PCI_L1SS_CTRL1, data);
+		if (pci_pcie_type(pdev) != PCI_EXP_TYPE_ROOT_PORT)
+			break;
 	}
 }
 
-static void tegra_pcie_enable_l1ss_support(int pos)
+static void tegra_pcie_enable_l1ss_support(void)
 {
 	struct pci_dev *pdev = NULL;
-	u32 aspm = 0, data = 0;
+	u32 aspm = 0, data = 0, pos = 0;
 
 	PR_FUNC_LINE;
 	for_each_pci_dev(pdev) {
+		pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_L1SS);
 		/* enable L1 substate as per device capability */
 		pci_read_config_dword(pdev, pos + PCI_L1SS_CAP, &aspm);
 		pci_read_config_dword(pdev, pos + PCI_L1SS_CTRL1, &data);
 		data &= ~PCI_L1SS_CAP_L1PM_MASK;
 		data |= (aspm & PCI_L1SS_CAP_L1PM_MASK);
 		pci_write_config_dword(pdev, pos + PCI_L1SS_CTRL1, data);
+		if (pci_pcie_type(pdev) != PCI_EXP_TYPE_ROOT_PORT)
+			break;
 	}
 }
 
-static void tegra_pcie_enable_ltr_support(int pos)
+static void tegra_pcie_enable_ltr_support(void)
 {
 	struct pci_dev *pdev = NULL;
 	u16 val = 0;
@@ -1966,6 +1974,8 @@ static void tegra_pcie_enable_ltr_support(int pos)
 			val |= PCI_EXP_LTR_EN;
 			pcie_capability_write_word(pdev, PCI_EXP_DEVCTL2, val);
 		}
+		if (pci_pcie_type(pdev) != PCI_EXP_TYPE_ROOT_PORT)
+			break;
 	}
 }
 #endif
@@ -2016,6 +2026,8 @@ static void tegra_pcie_enable_aspm(void)
 			config_l1ss = false;
 			break;
 		}
+		if (pci_pcie_type(pdev) != PCI_EXP_TYPE_ROOT_PORT)
+			break;
 	}
 	if (config_l1ss) {
 		/* Make CLKREQ# bi-directional if L1 PM SS are enabled */
@@ -2031,11 +2043,11 @@ static void tegra_pcie_enable_aspm(void)
 		tegra_pinmux_set_od(
 			TEGRA_PINGROUP_PEX_L1_CLKREQ_N,
 			TEGRA_PIN_OD_ENABLE);
-		tegra_pcie_config_l1ss_tpwr_on(pos);
-		tegra_pcie_config_l1ss_cm_rtime(pos);
-		tegra_pcie_config_l1ss_l12_thtime(pos);
-		tegra_pcie_enable_l1ss_support(pos);
-		tegra_pcie_enable_ltr_support(pos);
+		tegra_pcie_config_l1ss_tpwr_on();
+		tegra_pcie_config_l1ss_cm_rtime();
+		tegra_pcie_config_l1ss_l12_thtime();
+		tegra_pcie_enable_l1ss_support();
+		tegra_pcie_enable_ltr_support();
 	}
 #endif
 }
