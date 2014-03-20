@@ -41,6 +41,7 @@
 #include <linux/iio/consumer.h>
 #include <linux/iio/types.h>
 #include <linux/iio/iio.h>
+#include <linux/iio/types.h>
 
 #define JETI_TEMP_COLD		0
 #define JETI_TEMP_COOL		10
