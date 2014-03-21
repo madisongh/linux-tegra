@@ -79,7 +79,9 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 			bool updated = false;
 
 			if (!prot_numa) {
+				pte_t old_ptent;
 				ptent = ptep_modify_prot_start(mm, addr, pte);
+				old_ptent = ptent;
 				if (pte_numa(ptent))
 					ptent = pte_mknonnuma(ptent);
 				ptent = pte_modify(ptent, newprot);
@@ -91,8 +93,9 @@ static unsigned long change_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 				    (pte_soft_dirty(ptent) ||
 				     !(vma->vm_flags & VM_SOFTDIRTY)))
 					ptent = pte_mkwrite(ptent);
+				if (ptent != old_ptent)
+					updated = true;
 				ptep_modify_prot_commit(mm, addr, pte, ptent);
-				updated = true;
 			} else {
 				struct page *page;
 
