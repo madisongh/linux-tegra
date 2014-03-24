@@ -58,10 +58,6 @@
 #if defined(__KERNEL__)
 
 struct nvmap_handle;
-struct nvmap_handle_ref;
-
-struct nvmap_client;
-struct nvmap_device;
 
 struct dma_buf *nvmap_alloc_dmabuf(size_t size, size_t align,
 				   unsigned int flags,
@@ -96,8 +92,6 @@ struct nvmap_platform_data {
 	const struct nvmap_platform_carveout *carveouts;
 	unsigned int nr_carveouts;
 };
-
-extern struct nvmap_device *nvmap_dev;
 
 #endif /* __KERNEL__ */
 

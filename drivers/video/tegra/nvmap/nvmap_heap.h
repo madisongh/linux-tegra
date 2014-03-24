@@ -25,6 +25,7 @@
 
 struct device;
 struct nvmap_heap;
+struct nvmap_client;
 
 struct nvmap_heap_block {
 	unsigned long	base;
