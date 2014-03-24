@@ -65,6 +65,12 @@
 #define SDHCI_VENDOR_MISC_CNTRL_INFINITE_ERASE_TIMEOUT	0x1
 #define SDHCI_VNDR_MISC_CTRL_EN_EXT_LOOPBACK_SHIFT	17
 
+#define SDHCI_VNDR_TUN_CTRL				0x1c0
+/* Enable Re-tuning request only when CRC error is detected
+ * in SDR50/SDR104/HS200 modes
+ */
+#define SDHCI_VNDR_TUN_CTRL_RETUNE_REQ_EN		0x8000000
+
 #define SDMMC_SDMEMCOMPPADCTRL	0x1E0
 #define SDMMC_SDMEMCOMPPADCTRL_VREF_SEL_MASK	0xF
 #define SDMMC_SDMEMCOMPPADCTRL_PAD_E_INPUT_OR_E_PWRD_MASK	0x80000000
@@ -82,11 +88,6 @@
 #define SDHCI_TEGRA_MAX_TAP_VALUES	0xFF
 #define SDHCI_TEGRA_MAX_TRIM_VALUES	0x1F
 #define DEFAULT_SDHOST_FREQ	50000000
-
-/* Shadow write xfer mode reg and write it alongwith CMD register */
-#define NVQUIRK_SHADOW_XFER_MODE_REG	BIT(6)
-#define NVQUIRK_DISABLE_AUTO_CALIBRATION	BIT(7)
-#define NVQUIRK_SET_CALIBRATION_OFFSETS	BIT(8)
 
 /* Erratum: Version register is invalid in HW */
 #define NVQUIRK_FORCE_SDHCI_SPEC_200		BIT(0)
@@ -132,6 +133,8 @@
 #define NVQUIRK_SET_PIPE_STAGES_MASK_0		BIT(20)
 /* Disable SDMMC3 external loopback */
 #define NVQUIRK_DISABLE_EXTERNAL_LOOPBACK	BIT(23)
+/* Disable Timer Based Re-tuning mode */
+#define NVQUIRK_DISABLE_TIMER_BASED_TUNING	BIT(24)
 
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
@@ -387,6 +390,13 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	else
 		misc_ctrl |= (1 << SDHCI_VNDR_MISC_CTRL_EN_EXT_LOOPBACK_SHIFT);
 	sdhci_writel(host, misc_ctrl, SDHCI_VNDR_MISC_CTRL);
+
+	if (soc_data->nvquirks &
+		NVQUIRK_DISABLE_TIMER_BASED_TUNING) {
+		vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_TUN_CTRL);
+		vendor_ctrl |= SDHCI_VNDR_TUN_CTRL_RETUNE_REQ_EN;
+		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_TUN_CTRL);
+	}
 }
 
 static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
