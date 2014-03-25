@@ -161,19 +161,28 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 
 static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
 				  unsigned long end, phys_addr_t phys,
-				  int map_io)
+				  unsigned int type)
 {
 	pmd_t *pmd;
 	unsigned long next;
 	pmdval_t prot_sect;
 	pgprot_t prot_pte;
 
-	if (map_io) {
+	switch(type) {
+	case MT_NORMAL_NC:
+		prot_sect = PROT_SECT_NORMAL_NC;
+		prot_pte = PROT_NORMAL_NC;
+		break;
+	case MT_DEVICE_nGnRE:
 		prot_sect = PROT_SECT_DEVICE_nGnRE;
 		prot_pte = __pgprot(PROT_DEVICE_nGnRE);
-	} else {
+		break;
+	case MT_MEMORY_KERNEL_EXEC:
 		prot_sect = PROT_SECT_NORMAL_EXEC;
 		prot_pte = PAGE_KERNEL_EXEC;
+		break;
+	default:
+		BUG();
 	}
 
 	/*
@@ -207,7 +216,7 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
 
 static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
 				  unsigned long end, phys_addr_t phys,
-				  int map_io)
+				  unsigned int type)
 {
 	pud_t *pud;
 	unsigned long next;
@@ -225,7 +234,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
 		/*
 		 * For 4K granule only, attempt to put down a 1GB block
 		 */
-		if (!map_io && (PAGE_SHIFT == 12) &&
+		if (type == MT_NORMAL_NC && (PAGE_SHIFT == 12) &&
 		    ((addr | next | phys) & ~PUD_MASK) == 0) {
 			pud_t old_pud = *pud;
 			set_pud(pud, __pud(phys | PROT_SECT_NORMAL_EXEC));
@@ -243,7 +252,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
 				flush_tlb_all();
 			}
 		} else {
-			alloc_init_pmd(pud, addr, next, phys, map_io);
+			alloc_init_pmd(pud, addr, next, phys, type);
 		}
 		phys += next - addr;
 	} while (pud++, addr = next, addr != end);
@@ -255,7 +264,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
  */
 static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
 				    unsigned long virt, phys_addr_t size,
-				    int map_io)
+				    unsigned int type)
 {
 	unsigned long addr, length, end, next;
 
@@ -265,20 +274,23 @@ static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
 	end = addr + length;
 	do {
 		next = pgd_addr_end(addr, end);
-		alloc_init_pud(pgd, addr, next, phys, map_io);
+		alloc_init_pud(pgd, addr, next, phys, type);
 		phys += next - addr;
 	} while (pgd++, addr = next, addr != end);
 }
 
-static void __init create_mapping(phys_addr_t phys, unsigned long virt,
-				  phys_addr_t size)
+static void __init create_mapping(struct map_desc *io_desc)
 {
+	unsigned long virt = io_desc->virtual;
+	unsigned long phys = __pfn_to_phys(io_desc->pfn);
+
 	if (virt < VMALLOC_START) {
 		pr_warn("BUG: not creating mapping for %pa at 0x%016lx - outside kernel range\n",
 			&phys, virt);
 		return;
 	}
-	__create_mapping(pgd_offset_k(virt & PAGE_MASK), phys, virt, size, 0);
+	__create_mapping(pgd_offset_k(virt & PAGE_MASK), phys,
+			 virt, io_desc->length, io_desc->type);
 }
 
 void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
@@ -288,7 +300,8 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
 		return;
 	}
 	__create_mapping(&idmap_pg_dir[pgd_index(addr)],
-			 addr, addr, size, map_io);
+			 addr, addr, size,
+			 map_io ? MT_DEVICE_nGnRE : MT_MEMORY_KERNEL_EXEC);
 }
 
 /* To support old-style static device memory mapping. */
@@ -300,7 +313,7 @@ __init void iotable_init(struct map_desc *io_desc, int nr)
 	vm = early_alloc(sizeof(*vm) * nr);
 
 	for (md = io_desc; nr; md++, nr--) {
-		__create_mapping(__pfn_to_phys(md->pfn), md->virtual, md->length, 1);
+		create_mapping(md);
 		vm->addr = (void *)(md->virtual & PAGE_MASK);
 		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 		vm->phys_addr = __pfn_to_phys(md->pfn);
@@ -313,6 +326,7 @@ __init void iotable_init(struct map_desc *io_desc, int nr)
 static void __init map_mem(void)
 {
 	struct memblock_region *reg;
+	struct map_desc md;
 	phys_addr_t limit;
 
 	/*
@@ -355,7 +369,12 @@ static void __init map_mem(void)
 		}
 #endif
 
-		create_mapping(start, __phys_to_virt(start), end - start, 0);
+		md.virtual = __phys_to_virt(start);
+		md.pfn = __phys_to_pfn(start);
+		md.length = end - start;
+		md.type = MT_MEMORY_KERNEL_EXEC;
+
+		create_mapping(&md);
 	}
 
 	/* Limit no longer required. */
