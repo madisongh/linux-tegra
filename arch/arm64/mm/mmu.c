@@ -50,8 +50,10 @@ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
  * Empty_zero_page is a special page that is used for zero-initialized data
  * and COW.
  */
-struct page *empty_zero_page;
+unsigned long empty_zero_page;
 EXPORT_SYMBOL(empty_zero_page);
+unsigned long zero_page_mask;
+static zero_page_order = 3;
 
 pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 			      unsigned long size, pgprot_t vma_prot)
@@ -465,17 +467,15 @@ void fixup_init(void)
  */
 void __init paging_init(void)
 {
-	void *zero_page;
-
 	map_mem();
 	fixup_executable();
 
 	/* allocate the zero page. */
-	zero_page = early_alloc(PAGE_SIZE);
+	empty_zero_page = (ulong)early_alloc(PAGE_SIZE << zero_page_order);
+	zero_page_mask = ((PAGE_SIZE << zero_page_order) - 1) & PAGE_MASK;
 
 	bootmem_init();
 
-	empty_zero_page = virt_to_page(zero_page);
 
 	dma_contiguous_remap();
 	/*
