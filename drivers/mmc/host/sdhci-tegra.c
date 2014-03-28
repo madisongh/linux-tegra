@@ -32,6 +32,7 @@
 #include <linux/mmc/sd.h>
 #include <linux/regulator/consumer.h>
 #include <linux/delay.h>
+#include <linux/tegra_pm_domains.h>
 
 #include <asm/gpio.h>
 #include <linux/debugfs.h>
@@ -39,7 +40,6 @@
 #include <linux/reboot.h>
 
 #include <mach/hardware.h>
-#include <mach/pm_domains.h>
 
 #include <linux/platform_data/mmc-sdhci-tegra.h>
 
@@ -498,10 +498,32 @@ static void tegra_sdhci_clock_set_parent(struct sdhci_host *host,
 #ifdef CONFIG_TEGRA_FPGA_PLATFORM
 	return;
 #endif
-	pll_c_freq = (pll_c_rate >= desired_rate) ?
-		get_nearest_clock_freq(pll_c_rate, desired_rate) : pll_c_rate;
-	pll_p_freq = (pll_p_rate >= desired_rate) ?
-		get_nearest_clock_freq(pll_p_rate, desired_rate) : pll_p_rate;
+	/*
+	 * Currently pll_p and pll_c are used as clock sources for SDMMC. If clk
+	 * rate is missing for either of them, then no selection is needed and
+	 * the default parent is used.
+	 */
+	if (!pll_c_rate || !pll_p_rate)
+		return ;
+
+	pll_c_freq = get_nearest_clock_freq(pll_c_rate, desired_rate);
+	pll_p_freq = get_nearest_clock_freq(pll_p_rate, desired_rate);
+
+	/*
+	 * For low freq requests, both the desired rates might be higher than
+	 * the requested clock frequency. In such cases, select the parent
+	 * with the lower frequency rate.
+	 */
+	if ((pll_c_freq > desired_rate) && (pll_p_freq > desired_rate)) {
+		if (pll_p_freq <= pll_c_freq) {
+			desired_rate = pll_p_freq;
+			pll_c_freq = 0;
+		} else {
+			desired_rate = pll_c_freq;
+			pll_p_freq = 0;
+		}
+		rc = clk_set_rate(pltfm_host->clk, desired_rate);
+	}
 
 	if (pll_c_freq > pll_p_freq) {
 		if (!tegra_host->is_parent_pllc) {
