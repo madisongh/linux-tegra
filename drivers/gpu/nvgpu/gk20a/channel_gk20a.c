@@ -1413,6 +1413,7 @@ static int gk20a_submit_channel_gpfifo(struct channel_gk20a *c,
 	/* we might need two extra gpfifo entries - one for pre fence
 	 * and one for post fence. */
 	const int extra_entries = 2;
+	bool need_wfi = !(flags & NVHOST_SUBMIT_GPFIFO_FLAGS_SUPPRESS_WFI);
 
 	if (c->has_timedout)
 		return -ETIMEDOUT;
@@ -1505,10 +1506,12 @@ static int gk20a_submit_channel_gpfifo(struct channel_gk20a *c,
 			flags & NVHOST_SUBMIT_GPFIFO_FLAGS_SYNC_FENCE)
 		err = c->sync->incr_user_fd(c->sync, &incr_cmd,
 					    &c->last_submit_fence,
+					    need_wfi,
 					    &fence->syncpt_id);
 	else if (flags & NVHOST_SUBMIT_GPFIFO_FLAGS_FENCE_GET)
 		err = c->sync->incr_user_syncpt(c->sync, &incr_cmd,
 						&c->last_submit_fence,
+						need_wfi,
 						&fence->syncpt_id,
 						&fence->value);
 	else
@@ -1523,7 +1526,8 @@ static int gk20a_submit_channel_gpfifo(struct channel_gk20a *c,
 		c->gpfifo.cpu_va[c->gpfifo.put].entry1 =
 			u64_hi32(wait_cmd->gva) |
 			pbdma_gp_entry1_length_f(wait_cmd->size);
-		trace_write_pushbuffer(c, &c->gpfifo.cpu_va[c->gpfifo.put]);
+		trace_gk20a_push_cmdbuf(c->g->dev->name,
+			0, wait_cmd->size, 0, wait_cmd->ptr);
 
 		c->gpfifo.put = (c->gpfifo.put + 1) &
 			(c->gpfifo.entry_num - 1);
@@ -1548,7 +1552,8 @@ static int gk20a_submit_channel_gpfifo(struct channel_gk20a *c,
 		c->gpfifo.cpu_va[c->gpfifo.put].entry1 =
 			u64_hi32(incr_cmd->gva) |
 			pbdma_gp_entry1_length_f(incr_cmd->size);
-		trace_write_pushbuffer(c, &c->gpfifo.cpu_va[c->gpfifo.put]);
+		trace_gk20a_push_cmdbuf(c->g->dev->name,
+			0, incr_cmd->size, 0, incr_cmd->ptr);
 
 		c->gpfifo.put = (c->gpfifo.put + 1) &
 			(c->gpfifo.entry_num - 1);
