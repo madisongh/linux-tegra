@@ -307,6 +307,8 @@ struct sdhci_ops {
 	int	(*resume)(struct sdhci_host *host);
 	int	(*get_tuning_counter)(struct sdhci_host *sdhci);
 	int	(*sd_error_stats)(struct sdhci_host *host, u32 int_status);
+	int	(*get_drive_strength)(struct sdhci_host *host,
+		unsigned int max_dtr, int host_drv, int card_drv);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
