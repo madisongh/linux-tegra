@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -27,6 +27,8 @@
 #define TEGRA30_FUSE_SATA_CALIB	0x124
 
 #ifndef __ASSEMBLY__
+
+#include <linux/of.h>
 
 u32 tegra_read_chipid(void);
 u8 tegra_get_chip_id(void);
@@ -88,6 +90,19 @@ unsigned int tegra_get_minor_rev(void);
 int tegra_get_lane_owner_info(void);
 
 int tegra_split_mem_active(void);
+
+#ifdef CONFIG_OF
+static inline bool is_tegra_hypervisor_mode(void)
+{
+	return of_property_read_bool(of_chosen,
+			"nvidia,tegra-hypervisor-mode");
+}
+#else
+static inline bool is_tegra_hypervisor_mode(void)
+{
+	return false;
+}
+#endif
 
 #ifdef CONFIG_TEGRA_PRE_SILICON_SUPPORT
 void tegra_get_netlist_revision(u32 *netlist, u32* patchid);
