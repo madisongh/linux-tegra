@@ -9774,10 +9774,226 @@ static void tegra12_init_xusb_clocks(void)
 		tegra12_init_one_clock(&tegra_xusb_coupled_clks[i]);
 }
 
+#ifdef CONFIG_TEGRA_PREINIT_CLOCKS
+
+#define CLK_RSTENB_DEV_V_0_AUDIO_BIT	(1 << 10)
+#define CLK_RSTENB_DEV_V_0_3D2_BIT	(1 << 2)
+
+#define CLK_RSTENB_DEV_L_0_HOST1X_BIT	(1 << 28)
+#define CLK_RSTENB_DEV_L_0_DISP1_BIT	(1 << 27)
+#define CLK_RSTENB_DEV_L_0_3D_BIT	(1 << 24)
+#define CLK_RSTENB_DEV_L_0_ISP_BIT	(1 << 23)
+#define CLK_RSTENB_DEV_L_0_2D_BIT	(1 << 21)
+#define CLK_RSTENB_DEV_L_0_VI_BIT	(1 << 20)
+#define CLK_RSTENB_DEV_L_0_EPP_BIT	(1 << 19)
+
+#define CLK_RSTENB_DEV_H_0_VDE_BIT	(1 << 29)
+#define CLK_RSTENB_DEV_H_0_MPE_BIT	(1 << 28)
+
+#define CLK_RSTENB_DEV_U_0_CSITE_BIT	(1 << 9)
+
+#define CLK_RSTENB_DEV_X_0_HDMI_AUDIO_BIT	(1 << 16)
+
+#define HOST1X_CLK_REG_OFFSET		0x180
+#define HOST1X_CLK_SRC_SHIFT		30
+#define HOST1X_CLK_SRC_MASK		(0x3 << HOST1X_CLK_SRC_SHIFT)
+#define HOST1X_CLK_SRC_PLLM_OUT0	0
+#define HOST1X_CLK_SRC_PLLC_OUT0	1
+#define HOST1X_CLK_SRC_PLLP_OUT0	2
+#define HOST1X_CLK_SRC_PLLA_OUT0	3
+#define HOST1X_CLK_SRC_DEFAULT (\
+		HOST1X_CLK_SRC_PLLP_OUT0 << HOST1X_CLK_SRC_SHIFT)
+#define HOST1X_CLK_IDLE_DIV_SHIFT	8
+#define HOST1X_CLK_IDLE_DIV_MASK	(0xff << HOST1X_CLK_IDLE_DIV_SHIFT)
+#define HOST1X_CLK_IDLE_DIV_DEFAULT	(0 << HOST1X_CLK_IDLE_DIV_SHIFT)
+#define HOST1X_CLK_DIV_SHIFT		0
+#define HOST1X_CLK_DIV_MASK		(0xff << HOST1X_CLK_DIV_SHIFT)
+#define HOST1X_CLK_DIV_DEFAULT		(3 << HOST1X_CLK_DIV_SHIFT)
+
+#define VCLK_SRC_SHIFT			30
+#define VCLK_SRC_MASK			(0x3 << VCLK_SRC_SHIFT)
+#define VCLK_SRC_PLLM_OUT0		0
+#define VCLK_SRC_PLLC_OUT0		1
+#define VCLK_SRC_PLLP_OUT0		2
+#define VCLK_SRC_PLLA_OUT0		3
+#define VCLK_SRC_DEFAULT		(VCLK_SRC_PLLM_OUT0 << VCLK_SRC_SHIFT)
+#define VCLK_IDLE_DIV_SHIFT		8
+#define VCLK_IDLE_DIV_MASK		(0xff << VCLK_IDLE_DIV_SHIFT)
+#define VCLK_IDLE_DIV_DEFAULT		(0 << VCLK_IDLE_DIV_SHIFT)
+#define VCLK_DIV_SHIFT			0
+#define VCLK_DIV_MASK			(0xff << VCLK_DIV_SHIFT)
+#define VCLK_DIV_DEFAULT		(0xa << VCLK_DIV_SHIFT)
+
+#define ISP_CLK_REG_OFFSET		0x144
+#define VI_CLK_REG_OFFSET		0x148
+#define  VI_SENSOR_CLK_REG_OFFSET	0x1a8
+#define  VI_SENSOR2_CLK_REG_OFFSET	0x658
+#define  VI_CLK_DIV_DEFAULT		(0x12 << VCLK_DIV_SHIFT)
+#define G3D_CLK_REG_OFFSET		0x158
+#define G2D_CLK_REG_OFFSET		0x15c
+#define EPP_CLK_REG_OFFSET		0x16c
+#define MPE_CLK_REG_OFFSET		0x170
+#define VDE_CLK_REG_OFFSET		0x170
+#define G3D2_CLK_REG_OFFSET		0x3b0
+#define HDMI_AUDIO_CLK_REG_OFFSET	0x668
+#define  HDMI_AUDIO_CLK_DIV_DEFAULT	(0x12 << VCLK_DIV_SHIFT)
+#define CSITE_CLK_REG_OFFSET		0x1d4
+#define  CSITE_CLK_DIV_DEFAULT		(0x4 << VCLK_DIV_SHIFT)
+
+static void __init clk_setbit(u32 reg, u32 bit)
+{
+	u32 val = clk_readl(reg);
+
+	if ((val & bit) == bit)
+		return;
+	val |= bit;
+	clk_writel(val, reg);
+	udelay(2);
+}
+
+static void __init clk_clrbit(u32 reg, u32 bit)
+{
+	u32 val = clk_readl(reg);
+
+	if ((val & bit) == 0)
+		return;
+	val &= ~bit;
+	clk_writel(val, reg);
+	udelay(2);
+}
+
+static void __init clk_setbits(u32 reg, u32 bits, u32 mask)
+{
+	u32 val = clk_readl(reg);
+
+	if ((val & mask) == bits)
+		return;
+	val &= ~mask;
+	val |= bits;
+	clk_writel(val, reg);
+	udelay(2);
+}
+
+static void __init vclk_init(int tag, u32 src, u32 rebit)
+{
+	u32 rst, enb;
+
+	switch (tag) {
+	case 'L':
+		rst = RST_DEVICES_L;
+		enb = CLK_OUT_ENB_L;
+		break;
+	case 'H':
+		rst = RST_DEVICES_H;
+		enb = CLK_OUT_ENB_H;
+		break;
+	case 'U':
+		rst = RST_DEVICES_U;
+		enb = CLK_OUT_ENB_U;
+		break;
+	case 'V':
+		rst = RST_DEVICES_V;
+		enb = CLK_OUT_ENB_V;
+		break;
+	case 'W':
+		rst = RST_DEVICES_W;
+		enb = CLK_OUT_ENB_W;
+		break;
+	case 'X':
+		rst = RST_DEVICES_X;
+		enb = CLK_OUT_ENB_X;
+		break;
+	default:
+		/* Quietly ignore. */
+		return;
+	}
+
+	clk_setbit(rst, rebit);
+	clk_clrbit(enb, rebit);
+
+	clk_setbits(src, VCLK_SRC_DEFAULT, VCLK_SRC_MASK);
+	clk_setbits(src, VCLK_DIV_DEFAULT, VCLK_DIV_MASK);
+
+	clk_clrbit(rst, rebit);
+}
+
+static int __init tegra_soc_preinit_clocks(void)
+{
+	/*
+	 * Make sure host1x clock configuration has:
+	 *	HOST1X_CLK_SRC    : PLLP_OUT0.
+	 *	HOST1X_CLK_DIVISOR: >2 to start from safe enough frequency.
+	 */
+	clk_setbit(RST_DEVICES_L, CLK_RSTENB_DEV_L_0_HOST1X_BIT);
+	clk_setbit(CLK_OUT_ENB_L, CLK_RSTENB_DEV_L_0_HOST1X_BIT);
+	clk_setbits(HOST1X_CLK_REG_OFFSET,
+		    HOST1X_CLK_DIV_DEFAULT, HOST1X_CLK_DIV_MASK);
+	clk_setbits(HOST1X_CLK_REG_OFFSET,
+		    HOST1X_CLK_IDLE_DIV_DEFAULT, HOST1X_CLK_IDLE_DIV_MASK);
+	clk_setbits(HOST1X_CLK_REG_OFFSET,
+		    HOST1X_CLK_SRC_DEFAULT, HOST1X_CLK_SRC_MASK);
+	clk_clrbit(RST_DEVICES_L, CLK_RSTENB_DEV_L_0_HOST1X_BIT);
+
+	/*
+	 *  Make sure vi clock configuration has:
+	 *	VI_CLK_DIVISOR:	0x12
+	 *	VI_SENSOR_CLK_DIVISOR:	0x12
+	 *	VI_SENSOR2_CLK_DIVISOR:	0x12
+	 */
+	clk_setbit(RST_DEVICES_L, CLK_RSTENB_DEV_L_0_VI_BIT);
+	clk_setbit(CLK_OUT_ENB_L, CLK_RSTENB_DEV_L_0_VI_BIT);
+	clk_setbits(VI_CLK_REG_OFFSET,
+		    VCLK_SRC_DEFAULT, VCLK_SRC_MASK);
+	clk_setbits(VI_CLK_REG_OFFSET, VI_CLK_DIV_DEFAULT, VCLK_DIV_MASK);
+	clk_setbits(VI_SENSOR_CLK_REG_OFFSET, VCLK_SRC_DEFAULT, VCLK_SRC_MASK);
+	clk_setbits(VI_SENSOR_CLK_REG_OFFSET,
+		    VI_CLK_DIV_DEFAULT, VCLK_DIV_MASK);
+	clk_setbits(VI_SENSOR2_CLK_REG_OFFSET, VCLK_SRC_DEFAULT, VCLK_SRC_MASK);
+	clk_setbits(VI_SENSOR2_CLK_REG_OFFSET,
+		    VI_CLK_DIV_DEFAULT, VCLK_DIV_MASK);
+	clk_clrbit(RST_DEVICES_L, CLK_RSTENB_DEV_L_0_VI_BIT);
+
+	/*
+	 *  Make sure hdmi_audio clock configuration has:
+	 *	HDMI_AUDIO_CLK_DIVISOR:	0x12
+	 */
+	clk_setbit(RST_DEVICES_X, CLK_RSTENB_DEV_X_0_HDMI_AUDIO_BIT);
+	clk_setbit(CLK_OUT_ENB_X, CLK_RSTENB_DEV_X_0_HDMI_AUDIO_BIT);
+	clk_setbits(HDMI_AUDIO_CLK_REG_OFFSET,
+		    HDMI_AUDIO_CLK_DIV_DEFAULT, VCLK_DIV_MASK);
+	clk_clrbit(RST_DEVICES_X, CLK_RSTENB_DEV_X_0_HDMI_AUDIO_BIT);
+
+	/*
+	 *  Make sure csite clock configuration has:
+	 *	CSITE_CLK_DIVISOR:	0x4
+	 */
+	clk_setbit(RST_DEVICES_U, CLK_RSTENB_DEV_U_0_CSITE_BIT);
+	clk_setbit(CLK_OUT_ENB_U, CLK_RSTENB_DEV_U_0_CSITE_BIT);
+	clk_setbits(CSITE_CLK_REG_OFFSET, CSITE_CLK_DIV_DEFAULT, VCLK_DIV_MASK);
+	clk_clrbit(RST_DEVICES_U, CLK_RSTENB_DEV_U_0_CSITE_BIT);
+
+	/* Pre-initialize Video clocks. */
+	vclk_init('L', G3D_CLK_REG_OFFSET, CLK_RSTENB_DEV_L_0_3D_BIT);
+	vclk_init('L', G2D_CLK_REG_OFFSET, CLK_RSTENB_DEV_L_0_2D_BIT);
+	vclk_init('L', ISP_CLK_REG_OFFSET, CLK_RSTENB_DEV_L_0_ISP_BIT);
+	vclk_init('L', EPP_CLK_REG_OFFSET, CLK_RSTENB_DEV_L_0_EPP_BIT);
+	vclk_init('H', VDE_CLK_REG_OFFSET, CLK_RSTENB_DEV_H_0_VDE_BIT);
+	vclk_init('H', MPE_CLK_REG_OFFSET, CLK_RSTENB_DEV_H_0_MPE_BIT);
+	vclk_init('V', G3D2_CLK_REG_OFFSET, CLK_RSTENB_DEV_V_0_3D2_BIT);
+
+	return 0;
+}
+#endif /* CONFIG_TEGRA_PREINIT_CLOCKS */
+
 void __init tegra12x_init_clocks(void)
 {
 	int i;
 	struct clk *c;
+
+
+#ifdef CONFIG_TEGRA_PREINIT_CLOCKS
+	tegra_soc_preinit_clocks();
+#endif /* CONFIG_TEGRA_PREINIT_CLOCKS */
 
 	for (i = 0; i < ARRAY_SIZE(tegra_ptr_clks); i++)
 		tegra12_init_one_clock(tegra_ptr_clks[i]);
