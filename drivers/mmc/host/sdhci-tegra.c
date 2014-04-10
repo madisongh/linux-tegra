@@ -33,6 +33,10 @@
 #include <linux/regulator/consumer.h>
 #include <linux/delay.h>
 #include <linux/tegra_pm_domains.h>
+#include <linux/pinctrl/pinctrl.h>
+#include <linux/pinctrl/consumer.h>
+#include <linux/pinctrl/pinconf-tegra.h>
+#include <mach/pinmux-defines.h>
 
 #include <asm/gpio.h>
 #include <linux/debugfs.h>
@@ -173,6 +177,8 @@ struct sdhci_tegra {
 	/* Override debug config data */
 	struct dbg_cfg_data dbg_cfg;
 #endif
+	struct pinctrl_dev *pinctrl;
+	int drive_group_sel;
 };
 
 static struct clk *pll_c;
@@ -687,7 +693,7 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	if (unlikely(soc_data->nvquirks & NVQUIRK_SET_DRIVE_STRENGTH)) {
 		unsigned int pulldown_code;
 		unsigned int pullup_code;
-		int pg;
+		unsigned long pin_config;
 		int err;
 
 		/* Disable Auto calibration */
@@ -695,15 +701,16 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 		val &= ~SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE;
 		sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
 
-		pg = tegra_drive_get_pingroup(mmc_dev(sdhci->mmc));
-		if (pg != -1) {
+		if (tegra_host->pinctrl && tegra_host->drive_group_sel >= 0) {
 			/* Get the pull down codes from auto cal status reg */
 			pulldown_code = (
 				sdhci_readl(sdhci, SDMMC_AUTO_CAL_STATUS) >>
 				SDMMC_AUTO_CAL_STATUS_PULLDOWN_OFFSET);
-			/* Set the pull down in the pinmux reg */
-			err = tegra_drive_pinmux_set_pull_down(pg,
-				pulldown_code);
+			pin_config = TEGRA_PINCONF_PACK(
+					TEGRA_PINCONF_PARAM_DRIVE_DOWN_STRENGTH,
+					pulldown_code);
+			err = pinctrl_set_config_for_group_sel(tegra_host->pinctrl,
+					tegra_host->drive_group_sel, pin_config);
 			if (err)
 				dev_err(mmc_dev(sdhci->mmc),
 				"Failed to set pulldown codes %d err %d\n",
@@ -713,8 +720,12 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 			pullup_code = pulldown_code + PULLUP_ADJUSTMENT_OFFSET;
 			if (pullup_code >= TEGRA_MAX_PULL)
 				pullup_code = TEGRA_MAX_PULL - 1;
+			pin_config = TEGRA_PINCONF_PACK(
+					TEGRA_PINCONF_PARAM_DRIVE_UP_STRENGTH,
+					pullup_code);
 			/* Set the pull up code in the pinmux reg */
-			err = tegra_drive_pinmux_set_pull_up(pg, pullup_code);
+			err = pinctrl_set_config_for_group_sel(tegra_host->pinctrl,
+					tegra_host->drive_group_sel, pin_config);
 			if (err)
 				dev_err(mmc_dev(sdhci->mmc),
 				"Failed to set pullup codes %d err %d\n",
@@ -1133,6 +1144,27 @@ static int tegra_sdhci_get_drive_strength(struct sdhci_host *sdhci,
 	return plat->default_drv_type;
 }
 
+static int sdhci_tegra_init_pinctrl_info(struct device *dev,
+		struct sdhci_tegra *tegra_host,
+		struct tegra_sdhci_platform_data *plat)
+{
+	struct device_node *np = dev->of_node;
+	const char *drive_gname;
+
+	if (!np)
+		return 0;
+
+	tegra_host->pinctrl = pinctrl_get_dev_from_of_property(np,
+					"drive-pin-pinctrl");
+	if (!tegra_host->pinctrl)
+		 return -EINVAL;
+
+	drive_gname = of_get_property(np, "drive-pin-name", 0);
+	tegra_host->drive_group_sel = pinctrl_get_selector_from_group_name(
+					tegra_host->pinctrl, drive_gname);
+	return 0;
+}
+
 static int sdhci_tegra_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
@@ -1163,9 +1195,11 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	}
 
 	tegra_host->plat = plat;
-	tegra_host->sd_stat_head =
-		devm_kzalloc(&pdev->dev, sizeof(struct sdhci_tegra_sd_stats),
-			     GFP_KERNEL);
+
+	sdhci_tegra_init_pinctrl_info(&pdev->dev, tegra_host, plat);
+
+	tegra_host->sd_stat_head = devm_kzalloc(&pdev->dev,
+		sizeof(struct sdhci_tegra_sd_stats), GFP_KERNEL);
 	if (!tegra_host->sd_stat_head) {
 		dev_err(mmc_dev(host->mmc), "failed to allocate sd_stat_head\n");
 		rc = -ENOMEM;
