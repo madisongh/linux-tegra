@@ -53,7 +53,7 @@ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
 unsigned long empty_zero_page;
 EXPORT_SYMBOL(empty_zero_page);
 unsigned long zero_page_mask;
-static zero_page_order = 3;
+static int zero_page_order = 3;
 
 pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 			      unsigned long size, pgprot_t vma_prot)
