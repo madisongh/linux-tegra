@@ -48,7 +48,7 @@
 unsigned long empty_zero_page;
 EXPORT_SYMBOL(empty_zero_page);
 unsigned long zero_page_mask;
-static zero_page_order = 3;
+static int zero_page_order = 3;
 
 struct cachepolicy {
 	const char	policy[16];
