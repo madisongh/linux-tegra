@@ -25,6 +25,19 @@ struct psci_power_state {
 	u8	affinity_level;
 };
 
+struct psci_operations {
+	int (*cpu_suspend)(struct psci_power_state state,
+			   unsigned long entry_point);
+	int (*cpu_off)(struct psci_power_state state);
+	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
+	int (*migrate)(unsigned long cpuid);
+	int (*affinity_info)(unsigned long target_affinity,
+			unsigned long lowest_affinity_level);
+	int (*migrate_info_type)(void);
+};
+
+extern struct psci_operations psci_ops;
+
 int psci_init(void);
 u32 psci_power_state_pack(struct psci_power_state state);
 struct psci_power_state to_psci_power_state(unsigned long arg);
