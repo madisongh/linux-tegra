@@ -574,6 +574,8 @@ source "drivers/cpuidle/Kconfig"
 
 source "drivers/cpufreq/Kconfig"
 
+source "drivers/cpuquiet/Kconfig"
+
 endmenu
 
 source "net/Kconfig"
