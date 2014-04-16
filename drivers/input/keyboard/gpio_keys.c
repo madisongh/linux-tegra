@@ -29,6 +29,7 @@
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 #include <linux/of.h>
+#include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/of_gpio.h>
 #include <linux/spinlock.h>
@@ -634,14 +635,27 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 
 	i = 0;
 	for_each_child_of_node(node, pp) {
-		int gpio;
+		int gpio = -1;
+		unsigned int irq = 0;
 		enum of_gpio_flags flags;
+		bool gpio_props = false;
+		bool irq_prop = false;
 
-		if (!of_find_property(pp, "gpios", NULL)) {
+		if (of_find_property(pp, "gpios", NULL))
+			gpio_props = true;
+
+		irq = irq_of_parse_and_map(pp, 0);
+		if (irq > 0)
+			irq_prop = true;
+
+		if (!gpio_props && !irq_prop) {
+			dev_warn(dev, "Found button without gpios/irq\n");
 			pdata->nbuttons--;
-			dev_warn(dev, "Found button without gpios\n");
 			continue;
 		}
+
+		if (!gpio_props)
+			goto gpio_get;
 
 		gpio = of_get_gpio_flags(pp, 0, &flags);
 		if (gpio < 0) {
@@ -653,9 +667,11 @@ gpio_keys_get_devtree_pdata(struct device *dev)
 			return ERR_PTR(error);
 		}
 
+gpio_get:
 		button = &pdata->buttons[i++];
 
 		button->gpio = gpio;
+		button->irq = irq;
 		button->active_low = flags & OF_GPIO_ACTIVE_LOW;
 
 		if (of_property_read_u32(pp, "linux,code", &button->code)) {
