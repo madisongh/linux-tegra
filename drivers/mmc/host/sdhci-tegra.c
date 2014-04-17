@@ -1628,6 +1628,17 @@ static int tegra_sdhci_enable_dma(struct sdhci_host *host)
 	return 0;
 }
 
+static int tegra_sdhci_get_drive_strength(struct sdhci_host *sdhci,
+	struct mmc_card *card, unsigned int max_dtr,
+	int host_drv, int card_drv, int *drv_type)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
+
+	return plat->default_drv_type;
+}
+
 static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_ro     = tegra_sdhci_get_ro,
 	.card_event = sdhci_tegra_card_event,
@@ -1657,6 +1668,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.enable_dma		= tegra_sdhci_enable_dma,
 	.do_calibration	= tegra_sdhci_do_calibration,
 	.config_strobe	= tegra_sdhci_config_strobe,
+	.select_drive_strength	= tegra_sdhci_get_drive_strength,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -1808,6 +1820,7 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
 	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
 	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
+	of_property_read_u32(np, "default-drv-type", &plat->default_drv_type);
 	plat->en_strobe =
 		of_property_read_bool(np, "nvidia,enable-strobe-mode");
 

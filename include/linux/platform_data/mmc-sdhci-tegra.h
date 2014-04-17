@@ -65,6 +65,7 @@ struct tegra_sdhci_platform_data {
 	bool rate_change_needs_clk;
 	bool disable_clk_gate;
 	bool update_pinctrl_settings;
+	unsigned int default_drv_type;
 };
 
 #endif
