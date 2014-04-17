@@ -1112,6 +1112,16 @@ static int tegra_sdhci_reboot_notify(struct notifier_block *nb,
 	return NOTIFY_DONE;
 }
 
+static int tegra_sdhci_get_drive_strength(struct sdhci_host *sdhci,
+		unsigned int max_dtr, int host_drv, int card_drv)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
+
+	return plat->default_drv_type;
+}
+
 static int sdhci_tegra_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
