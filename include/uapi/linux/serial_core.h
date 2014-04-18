@@ -261,4 +261,7 @@
 /* STM32 USART */
 #define PORT_STM32	113
 
+/* Tegra HV */
+#define PORT_TEGRA_HV	114
+
 #endif /* _UAPILINUX_SERIAL_CORE_H */
