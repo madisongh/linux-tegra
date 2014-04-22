@@ -12,3 +12,4 @@ obj-$(CONFIG_TEGRA_NVMAP)  += $(call tegra-path,nvmap/,drivers/video/tegra/nvmap
 obj-$(CONFIG_TEGRA_DC)     += $(call tegra-path,display,drivers/video/tegra/dc/)
 obj-$(CONFIG_FB_TEGRA)     += $(call tegra-path,display,drivers/video/tegra/fb.o)
 obj-$(CONFIG_TEGRA_CAMERA_PLATFORM) += camera/
+obj-$(CONFIG_TEGRA_GR_VIRTUALIZATION) += virt/
