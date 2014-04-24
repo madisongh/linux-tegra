@@ -62,6 +62,11 @@ void __weak panic_smp_self_stop(void)
 		cpu_relax();
 }
 
+#ifdef CONFIG_TEGRA_NVDUMPER
+#include <mach/nvdumper.h>
+static int is_oops_called;
+#endif /* CONFIG_TEGRA_NVDUMPER */
+
 /**
  *	panic - halt the system
  *	@fmt: The text string to print
@@ -77,6 +82,12 @@ void panic(const char *fmt, ...)
 	va_list args;
 	long i, i_next = 0;
 	int state = 0;
+
+#ifdef CONFIG_TEGRA_NVDUMPER
+	/* if panic is called directly */
+	if (!is_oops_called)
+		nvdumper_crash_setup_regs();
+#endif
 
 	/*
 	 * Disable local interrupts. This will prevent panic_smp_self_stop
@@ -374,6 +385,10 @@ int oops_may_print(void)
  */
 void oops_enter(void)
 {
+#ifdef CONFIG_TEGRA_NVDUMPER
+	is_oops_called = 1;
+#endif
+
 	tracing_off();
 	/* can't trust the integrity of the kernel anymore: */
 	debug_locks_off();
