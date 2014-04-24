@@ -117,6 +117,9 @@ config LOCKDEP_SUPPORT
 config TRACE_IRQFLAGS_SUPPORT
 	def_bool y
 
+config FIQ_GLUE
+	bool
+
 config RWSEM_GENERIC_SPINLOCK
 	def_bool y
 
