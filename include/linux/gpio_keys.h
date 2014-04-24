@@ -28,7 +28,7 @@ struct gpio_keys_button {
 	int debounce_interval;
 	bool can_disable;
 	int value;
-	unsigned int irq;
+	int irq;
 };
 
 /**

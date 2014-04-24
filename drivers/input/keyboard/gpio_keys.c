@@ -475,7 +475,7 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 	bdata->button = button;
 	spin_lock_init(&bdata->lock);
 
-	if (gpio_is_valid(button->gpio) && !button->irq) {
+	if (gpio_is_valid(button->gpio) && (button->irq <= 0)) {
 		error = devm_gpio_request_one(&pdev->dev, button->gpio,
 					      GPIOF_IN, desc);
 		if (error < 0) {
@@ -511,7 +511,7 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 		irqflags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING;
 
 	} else {
-		if (!button->irq) {
+		if (button->irq <= 0) {
 			dev_err(dev, "No IRQ specified\n");
 			return -EINVAL;
 		}
