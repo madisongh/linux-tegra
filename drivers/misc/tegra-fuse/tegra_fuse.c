@@ -615,6 +615,7 @@ enum tegra_platform tegra_get_platform(void)
 		tegra_get_tegraid_from_hw();
 	return tegra_platform;
 }
+EXPORT_SYMBOL(tegra_get_platform);
 
 bool tegra_cpu_is_asim(void)
 {
