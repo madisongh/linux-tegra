@@ -1413,7 +1413,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	ret = arm_smmu_domain_add_master(smmu_domain, cfg);
 	if (!ret) {
 		dev->archdata.iommu = domain;
-		add_smmu_master_debugfs(smmu_domain, dev, master);
+		add_smmu_master_debugfs(smmu_domain, dev, cfg);
 	}
 	return ret;
 }
@@ -1428,7 +1428,7 @@ static void arm_smmu_detach_dev(struct iommu_domain *domain, struct device *dev)
 		return;
 
 	dev->archdata.iommu = NULL;
-	debugfs_remove_recursive(master->debugfs_root);
+	debugfs_remove_recursive(cfg->debugfs_root);
 	arm_smmu_domain_remove_master(smmu_domain, cfg);
 }
 
