@@ -1900,6 +1900,12 @@ static int __spi_validate(struct spi_device *spi, struct spi_message *message)
 		    xfer->speed_hz > master->max_speed_hz)
 			xfer->speed_hz = master->max_speed_hz;
 
+		if (xfer->len == 0)
+			return -EINVAL;
+
+		if (!xfer->rx_buf && !xfer->tx_buf)
+			return -EINVAL;
+
 		if (master->bits_per_word_mask) {
 			/* Only 32 bits fit in the mask */
 			if (xfer->bits_per_word > 32)
