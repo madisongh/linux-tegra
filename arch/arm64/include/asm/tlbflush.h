@@ -156,11 +156,7 @@ static inline void __flush_tlb_kernel_range(unsigned long start, unsigned long e
 	isb();
 }
 
-/*
- * This is meant to avoid soft lock-ups on large TLB flushing ranges and not
- * necessarily a performance improvement.
- */
-#define MAX_TLB_RANGE	(1024UL << PAGE_SHIFT)
+#define MAX_TLB_RANGE (PAGE_SIZE * 128)
 
 static inline void flush_tlb_range(struct vm_area_struct *vma,
 				   unsigned long start, unsigned long end)
