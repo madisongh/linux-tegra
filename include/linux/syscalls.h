@@ -79,6 +79,8 @@ union bpf_attr;
 #include <linux/quota.h>
 #include <linux/key.h>
 #include <trace/syscall.h>
+#undef CREATE_TRACE_POINTS
+#include <trace/events/sys_calls.h>
 
 /*
  * __MAP - apply a macro to syscall arguments
@@ -198,7 +200,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));	\
 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
 	{								\
-		long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
+		long ret;						\
+		trace_syscall_enter(""#name);				\
+		ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
+		trace_syscall_exit(""#name);				\
 		__MAP(x,__SC_TEST,__VA_ARGS__);				\
 		__PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));	\
 		return ret;						\
