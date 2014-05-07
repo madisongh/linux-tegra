@@ -21,6 +21,9 @@
 #include <linux/math64.h>
 #include <linux/module.h>
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/idle.h>
+
 /*
  * Please note when changing the tuning values:
  * If (MAX_INTERESTING-1) * RESOLUTION > UINT_MAX, the result of
@@ -321,6 +324,7 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 					 data->correction_factor[data->bucket],
 					 RESOLUTION * DECAY);
 
+	trace_idle_entry(data->predicted_us);
 	get_typical_interval(data);
 
 	/*
