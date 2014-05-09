@@ -191,6 +191,28 @@ ENTRY(__flush_dcache_area)
 ENDPROC(__flush_dcache_area)
 
 /*
+ *	__clean_dcache_area(kaddr)
+ *
+ *	Ensure that the data held in the passed area is cleaned from the
+ *	cache.
+ *
+ *	- kaddr   - kernel address
+ *	- size    - size in question
+ */
+ENTRY(__clean_dcache_area)
+	dcache_line_size x2, x3
+	add	x1, x0, x1
+	sub	x3, x2, #1
+	bic	x0, x0, x3
+1:	dc	cvac, x0			// clean D line / unified line
+	add	x0, x0, x2
+	cmp	x0, x1
+	b.lo	1b
+	dsb	sy
+	ret
+ENDPROC(__clean_dcache_area)
+
+/*
  *	__inval_cache_range(start, end)
  *	- start   - start address of region
  *	- end     - end address of region
