@@ -567,7 +567,7 @@ struct platform_device tegra11_spi_device5 = {
 	.resource       = spi_resource5,
 	.num_resources  = ARRAY_SIZE(spi_resource5),
 	.dev  = {
-		.coherent_dma_mask	= DMA_BIT_MASK(64),
+		.coherent_dma_mask      = DMA_BIT_MASK(64),
 	},
 };
 
@@ -577,7 +577,7 @@ struct platform_device tegra11_spi_device6 = {
 	.resource       = spi_resource6,
 	.num_resources  = ARRAY_SIZE(spi_resource6),
 	.dev  = {
-		.coherent_dma_mask	= DMA_BIT_MASK(64),
+		.coherent_dma_mask      = DMA_BIT_MASK(64),
 	},
 };
 #endif
