@@ -17,6 +17,7 @@
 
 #define pr_fmt(fmt) "psci: " fmt
 
+#include <linux/export.h>
 #include <linux/init.h>
 #include <linux/of.h>
 #include <linux/smp.h>
@@ -78,6 +79,7 @@ u32 psci_power_state_pack(struct psci_power_state state)
 		((state.affinity_level << PSCI_0_2_POWER_STATE_AFFL_SHIFT)
 		 & PSCI_0_2_POWER_STATE_AFFL_MASK);
 }
+EXPORT_SYMBOL(psci_power_state_pack);
 
 static void psci_power_state_unpack(u32 power_state,
 				    struct psci_power_state *state)
