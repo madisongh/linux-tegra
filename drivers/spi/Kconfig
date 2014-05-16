@@ -538,6 +538,13 @@ config SPI_TEGRA20_SLINK
 	help
 	  SPI driver for Nvidia Tegra20/Tegra30 SLINK Controller interface.
 
+config QSPI_TEGRA210
+	tristate "Nvidia Tegra210 QSPI Controller"
+	depends on ARCH_TEGRA && TEGRA20_APB_DMA
+	help
+	  QSPI driver for Nvidia Tegra210 QSPI Controller interface. This controller
+	  is different from the spi controller and first time introduces on Tegra210 soc.
+
 config SPI_TOPCLIFF_PCH
 	tristate "Intel EG20T PCH/LAPIS Semicon IOH(ML7213/ML7223/ML7831) SPI"
 	depends on PCI && (X86_32 || COMPILE_TEST)
