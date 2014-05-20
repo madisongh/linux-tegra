@@ -1125,7 +1125,7 @@ int tegra_get_sku_override(void)
 	return sku_override;
 }
 
-#ifndef CONFIG_TRUSTED_LITTLE_KERNEL
+#ifndef CONFIG_NVMAP_USE_CMA_FOR_CARVEOUT
 static int __init tegra_vpr_arg(char *options)
 {
 	char *p = options;
