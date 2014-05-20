@@ -122,6 +122,13 @@ config COMMON_CLK_KEYSTONE
           Supports clock drivers for Keystone based SOCs. These SOCs have local
 	  a power sleep control module that gate the clock to the IPs and PLLs.
 
+config CLK_MAX77620
+	tristate "Clock driver for Max77620 PMIC"
+	depends on MFD_MAX77620
+	---help---
+          Supports the clocking subsystem of the MAX77620
+	  PMIC from Maxim. Say Y here to enable support for the same.
+
 config COMMON_CLK_PALMAS
 	tristate "Clock driver for TI Palmas devices"
 	depends on MFD_PALMAS
