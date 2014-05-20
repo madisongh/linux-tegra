@@ -289,6 +289,12 @@ struct smmu_debugfs_info {
 	int cache;
 };
 
+struct smmu_domain {
+	struct smmu_as *as[1];
+};
+
+#define to_smmu_domain_as(domain) (((struct smmu_domain *)domain->priv)->as[0])
+
 /*
  * Per SMMU device - IOMMU device
  */
@@ -1064,7 +1070,7 @@ static int __smmu_iommu_map_largepage(struct smmu_as *as, dma_addr_t iova,
 static int smmu_iommu_map(struct iommu_domain *domain, unsigned long iova,
 			  phys_addr_t pa, size_t bytes, unsigned long prot)
 {
-	struct smmu_as *as = domain->priv;
+	struct smmu_as *as = to_smmu_domain_as(domain);
 	unsigned long flags;
 	int err;
 	int (*fn)(struct smmu_as *as, dma_addr_t iova, phys_addr_t pa,
@@ -1093,7 +1099,7 @@ static int smmu_iommu_map(struct iommu_domain *domain, unsigned long iova,
 static int smmu_iommu_map_pages(struct iommu_domain *domain, unsigned long iova,
 				struct page **pages, size_t total, unsigned long prot)
 {
-	struct smmu_as *as = domain->priv;
+	struct smmu_as *as = to_smmu_domain_as(domain);
 	struct smmu_device *smmu = as->smmu;
 	u32 *pdir = page_address(as->pdir_page);
 	int err = 0;
@@ -1170,7 +1176,7 @@ static int smmu_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
 	int err = 0;
 	unsigned long iova_base = iova;
 	bool flush_all = (npages > smmu_flush_all_th_pages) ? true : false;
-	struct smmu_as *as = domain->priv;
+	struct smmu_as *as = to_smmu_domain_as(domain);
 	u32 *pdir = page_address(as->pdir_page);
 	struct smmu_device *smmu = as->smmu;
 	int attrs = as->pte_attr;
@@ -1260,7 +1266,7 @@ static int __smmu_iommu_unmap(struct smmu_as *as, dma_addr_t iova,
 static size_t smmu_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
 			       size_t bytes)
 {
-	struct smmu_as *as = domain->priv;
+	struct smmu_as *as = to_smmu_domain_as(domain);
 	unsigned long flags;
 	size_t unmapped;
 
@@ -1275,7 +1281,7 @@ static size_t smmu_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
 static phys_addr_t smmu_iommu_iova_to_phys(struct iommu_domain *domain,
 					   dma_addr_t iova)
 {
-	struct smmu_as *as = domain->priv;
+	struct smmu_as *as = to_smmu_domain_as(domain);
 	unsigned long flags;
 	int pdn = SMMU_ADDR_TO_PDN(iova);
 	u32 *pdir = page_address(as->pdir_page);
@@ -1318,7 +1324,7 @@ char *debug_dma_platformdata(struct device *dev)
 	int asid = -1;
 
 	if (mapping) {
-		as = mapping->domain->priv;
+		as = to_smmu_domain_as(mapping->domain);
 		asid = as->asid;
 	}
 
@@ -1371,7 +1377,7 @@ found:
 static int smmu_iommu_attach_dev(struct iommu_domain *domain,
 				 struct device *dev)
 {
-	struct smmu_as *as;
+	struct smmu_as *as = to_smmu_domain_as(domain);
 	struct smmu_device *smmu;
 	struct smmu_client *client, *c;
 	struct iommu_linear_map *area = NULL;
@@ -1390,14 +1396,13 @@ static int smmu_iommu_attach_dev(struct iommu_domain *domain,
 	if (!map)
 		map = temp;
 
-	if (domain->priv) {
-		as = domain->priv;
-	} else {
+	if (!as) {
+		struct smmu_domain *sd = domain->priv;
+
 		as = smmu_as_alloc();
 		if (IS_ERR(as))
 			return PTR_ERR(as);
-
-		domain->priv = as;
+		sd->as[0] = as;
 	}
 	smmu = as->smmu;
 
@@ -1470,7 +1475,7 @@ err_hwgrp:
 static void smmu_iommu_detach_dev(struct iommu_domain *domain,
 				  struct device *dev)
 {
-	struct smmu_as *as = domain->priv;
+	struct smmu_as *as = to_smmu_domain_as(domain);
 	struct smmu_device *smmu = as->smmu;
 	struct smmu_client *c;
 
@@ -1494,8 +1499,15 @@ out:
 static int smmu_iommu_domain_init(struct iommu_domain *domain)
 {
 	struct smmu_device *smmu = smmu_handle;
+	struct smmu_domain *smmu_domain;
 
 	BUG_ON(domain->priv);
+	smmu_domain = devm_kzalloc(smmu->dev, sizeof(*smmu_domain), GFP_KERNEL);
+	if (!smmu_domain)
+		return -ENOMEM;
+
+	domain->priv = smmu_domain;
+
 	domain->geometry.aperture_start = smmu->iovmm_base;
 	domain->geometry.aperture_end   = smmu->iovmm_base +
 		smmu->page_count * SMMU_PAGE_SIZE - 1;
@@ -1505,7 +1517,7 @@ static int smmu_iommu_domain_init(struct iommu_domain *domain)
 
 static void smmu_iommu_domain_destroy(struct iommu_domain *domain)
 {
-	struct smmu_as *as = domain->priv;
+	struct smmu_as *as = to_smmu_domain_as(domain);
 	struct smmu_device *smmu = as->smmu;
 	unsigned long flags;
 
@@ -1533,6 +1545,7 @@ static void smmu_iommu_domain_destroy(struct iommu_domain *domain)
 
 	spin_unlock_irqrestore(&as->lock, flags);
 
+	devm_kfree(smmu->dev, domain->priv);
 	domain->priv = NULL;
 	dev_dbg(smmu->dev, "smmu_as@%p\n", as);
 }
