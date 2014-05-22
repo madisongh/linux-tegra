@@ -311,6 +311,15 @@ struct tuning_t2t_coeffs t11x_tuning_coeffs[] = {
 		82,	180096,	238,	444285),
 };
 
+struct tuning_t2t_coeffs t12x_automotive_tuning_coeffs[] = {
+	SET_TUNING_COEFFS("sdhci-tegra.3",	1150,	950,	29,	130687,
+			29,	130687,	29,	130687),
+	SET_TUNING_COEFFS("sdhci-tegra.2",	1150,	950,	37,	148855,
+			36,	148855, 37,	148855),
+	SET_TUNING_COEFFS("sdhci-tegra.0",	1150,	950,	38,	149783,
+			38,	149783,	38,	149783),
+};
+
 struct tuning_t2t_coeffs t12x_tuning_coeffs[] = {
 	SET_TUNING_COEFFS("sdhci-tegra.3",	1150,	950,	27,	118295,
 		27,	118295,	48,	188148),
@@ -370,6 +379,17 @@ struct tap_hole_coeffs t11x_tap_hole_coeffs[] = {
 		104850,	179,	50204),
 	SET_TAP_HOLE_COEFFS("sdhci-tegra.0",	81600,	1893,	264746,	1333,
 		221722,	354,	109880),
+};
+
+struct tap_hole_coeffs t12x_automotive_tap_hole_coeffs[] = {
+	SET_TAP_HOLE_COEFFS("sdhci-tegra.3",	198000,	9259,	107053,	9259,
+		107053,	9259,	107053),
+	SET_TAP_HOLE_COEFFS("sdhci-tegra.3",	189000,	9846,	114635,	9846,
+		114635,	9846,	114635),
+	SET_TAP_HOLE_COEFFS("sdhci-tegra.2",	204000,	2956,	27274,	2956,
+		27274,	2956,	27274),
+	SET_TAP_HOLE_COEFFS("sdhci-tegra.0",	204000,	5781,	67417,	5781,
+		67417,	5781,	67417),
 };
 
 struct tap_hole_coeffs t12x_tap_hole_coeffs[] = {
