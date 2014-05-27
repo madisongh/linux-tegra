@@ -756,7 +756,7 @@ int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
 		kfree(pin_range);
 		return ret;
 	}
-	chip_dbg(chip, "created GPIO range %d->%d ==> %s PIN %d->%d\n",
+	chip_info(chip, "created GPIO range %d->%d ==> %s PIN %d->%d\n",
 		 gpio_offset, gpio_offset + npins - 1,
 		 pinctl_name,
 		 pin_offset, pin_offset + npins - 1);
