@@ -30,15 +30,15 @@ extern void __cpu_flush_kern_tlb_range(unsigned long, unsigned long);
 extern struct cpu_tlb_fns cpu_tlb;
 
 
-/* cpumask_ran_on_only()
+/* cpumask_ran_on_only_one()
  *
- * Returns 1 if cpu is the only cpu present in mask. Otherwise,
+ * Returns 1 if only one cpu is in mask. Otherwise,
  * return 0. This is a fast check for systems with NR_CPUS <= 64.
 */
 
-static inline int cpumask_ran_on_only(const struct cpumask *mask, unsigned int cpu)
+static inline int cpumask_ran_on_only_one(const struct cpumask *mask)
 {
-	return (mask->bits[0] & ~(1 << cpu) ? 0 : 1);
+	return (hweight64(mask->bits[0]) == 1);
 }
 
 
@@ -104,7 +104,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
 	unsigned long asid = (unsigned long)ASID(mm) << 48;
 
 	dsb(ishst);
-	if (cpumask_ran_on_only(mm_cpumask(mm), smp_processor_id()))
+	if (cpumask_ran_on_only_one(mm_cpumask(mm)))
 		asm("tlbi	aside1, %0" : : "r" (asid));
 	else
 		asm("tlbi	aside1is, %0" : : "r" (asid));
@@ -118,7 +118,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
 		((unsigned long)ASID(vma->vm_mm) << 48);
 
 	dsb(ishst);
-	if (cpumask_ran_on_only(mm_cpumask(vma->vm_mm), smp_processor_id()))
+	if (cpumask_ran_on_only_one(mm_cpumask(vma->vm_mm)))
 		asm("tlbi	vae1, %0" : : "r" (addr));
 	else
 		asm("tlbi	vae1is, %0" : : "r" (addr));
@@ -134,7 +134,7 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
 	end = asid | (end >> 12);
 
 	dsb(ishst);
-	if (cpumask_ran_on_only(mm_cpumask(vma->vm_mm), smp_processor_id()))
+	if (cpumask_ran_on_only_one(mm_cpumask(vma->vm_mm)))
 		for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
 			asm("tlbi vae1, %0" : : "r"(addr));
 	else
