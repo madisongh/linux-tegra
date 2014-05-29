@@ -58,6 +58,9 @@ struct tegra_pmx {
 
 static struct tegra_pmx *pmx;
 
+static int tegra_pinconf_group_set(struct pinctrl_dev *pctldev,
+		   unsigned group, unsigned long config);
+
 static inline u32 pmx_readl(struct tegra_pmx *pmx, u32 bank, u32 reg)
 {
 	return readl(pmx->regs[bank] + reg);
@@ -370,6 +373,21 @@ static int tegra_pinctrl_get_func_groups(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
+static int tegra_pinconfig_froup_set(struct pinctrl_dev *pctldev,
+		unsigned group, unsigned long param, unsigned long arg)
+{
+	unsigned long config;
+	int ret;
+
+	config = TEGRA_PINCONF_PACK(TEGRA_PINCONF_PARAM_TRISTATE, arg);
+	ret = tegra_pinconf_group_set(pctldev, group, config);
+	if (ret < 0)
+		dev_err(pctldev->dev,
+			"Pinctrl group %u tristate config failed: %d\n",
+			group, ret);
+	return ret;
+}
+
 static int tegra_pinctrl_enable(struct pinctrl_dev *pctldev, unsigned req_function,
 			       unsigned group)
 {
@@ -379,6 +397,7 @@ static int tegra_pinctrl_enable(struct pinctrl_dev *pctldev, unsigned req_functi
 	int i;
 	u32 val;
 	unsigned long flags;
+	int ret;
 
 	g = &pmx->soc->groups[group];
 
