@@ -1290,6 +1290,12 @@ static struct dma_buf_ops dma_buf_ops = {
 	.get_drvdata = ion_dma_buf_get_private,
 };
 
+bool dmabuf_is_ion(struct dma_buf *dmabuf)
+{
+	return dmabuf->ops == &dma_buf_ops;
+}
+EXPORT_SYMBOL(dmabuf_is_ion);
+
 struct dma_buf *ion_share_dma_buf(struct ion_client *client,
 						struct ion_handle *handle)
 {
@@ -1348,7 +1354,7 @@ struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd)
 		return ERR_CAST(dmabuf);
 	/* if this memory came from ion */
 
-	if (dmabuf->ops != &dma_buf_ops) {
+	if (dmabuf_is_ion(dmabuf)) {
 		pr_err("%s: can not import dmabuf from another exporter\n",
 		       __func__);
 		dma_buf_put(dmabuf);
@@ -1394,7 +1400,7 @@ static int ion_sync_for_device(struct ion_client *client, int fd)
 		return PTR_ERR(dmabuf);
 
 	/* if this memory came from ion */
-	if (dmabuf->ops != &dma_buf_ops) {
+	if (!dmabuf_is_ion(dmabuf)) {
 		pr_err("%s: can not sync dmabuf from another exporter\n",
 		       __func__);
 		dma_buf_put(dmabuf);
