@@ -150,6 +150,7 @@ struct regulation_constraints {
 	unsigned ramp_disable:1; /* disable ramp delay */
 	unsigned boot_off:1;	/* bootloader/firmware disabled regulator */
 	unsigned int ignore_current_constraint_init:1;
+	unsigned disable_parent_after_enable:1; /* SW based overcurrent protection */
 };
 
 /**
