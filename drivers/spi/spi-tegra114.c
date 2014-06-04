@@ -182,7 +182,6 @@ struct tegra_spi_data {
 	u32					cur_speed;
 
 	struct spi_device			*cur_spi;
-	struct spi_device			*cs_control;
 	unsigned				cur_pos;
 	unsigned				cur_len;
 	unsigned				words_per_32bit;
@@ -677,12 +676,15 @@ static void tegra_spi_deinit_dma_param(struct tegra_spi_data *tspi,
 	dma_release_channel(dma_chan);
 }
 
-static unsigned long tegra_spi_setup_transfer_one(struct spi_device *spi,
-		struct spi_transfer *t, bool is_first_of_msg)
+static int tegra_spi_start_transfer_one(struct spi_device *spi,
+		struct spi_transfer *t, bool is_first_of_msg,
+		bool is_single_xfer)
 {
 	struct tegra_spi_data *tspi = spi_master_get_devdata(spi->master);
 	u32 speed = t->speed_hz;
 	u8 bits_per_word = t->bits_per_word;
+	unsigned total_fifo_words;
+	int ret;
 	unsigned long command1;
 	int req_mode;
 
@@ -696,6 +698,7 @@ static unsigned long tegra_spi_setup_transfer_one(struct spi_device *spi,
 	tspi->cur_rx_pos = 0;
 	tspi->cur_tx_pos = 0;
 	tspi->curr_xfer = t;
+	total_fifo_words = tegra_spi_calculate_curr_xfer_param(spi, tspi, t);
 
 	if (is_first_of_msg) {
 		tegra_spi_clear_status(tspi);
@@ -714,12 +717,7 @@ static unsigned long tegra_spi_setup_transfer_one(struct spi_device *spi,
 		else if (req_mode == SPI_MODE_3)
 			command1 |= SPI_CONTROL_MODE_3;
 
-		if (tspi->cs_control) {
-			if (tspi->cs_control != spi)
-				tegra_spi_writel(tspi, command1, SPI_COMMAND1);
-			tspi->cs_control = NULL;
-		} else
-			tegra_spi_writel(tspi, command1, SPI_COMMAND1);
+		tegra_spi_writel(tspi, command1, SPI_COMMAND1);
 
 		command1 |= SPI_CS_SW_HW;
 		if (spi->mode & SPI_CS_HIGH)
@@ -733,18 +731,6 @@ static unsigned long tegra_spi_setup_transfer_one(struct spi_device *spi,
 		command1 &= ~SPI_BIT_LENGTH(~0);
 		command1 |= SPI_BIT_LENGTH(bits_per_word - 1);
 	}
-
-	return command1;
-}
-
-static int tegra_spi_start_transfer_one(struct spi_device *spi,
-		struct spi_transfer *t, unsigned long command1)
-{
-	struct tegra_spi_data *tspi = spi_master_get_devdata(spi->master);
-	unsigned total_fifo_words;
-	int ret;
-
-	total_fifo_words = tegra_spi_calculate_curr_xfer_param(spi, tspi, t);
 
 	if (tspi->is_packed)
 		command1 |= SPI_PACKED;
@@ -817,50 +803,29 @@ static int tegra_spi_setup(struct spi_device *spi)
 	return 0;
 }
 
-static void tegra_spi_transfer_delay(int delay)
-{
-	if (!delay)
-		return;
-
-	if (delay >= 1000)
-		mdelay(delay / 1000);
-
-	udelay(delay % 1000);
-}
-
 static int tegra_spi_transfer_one_message(struct spi_master *master,
 			struct spi_message *msg)
 {
 	bool is_first_msg = true;
+	int single_xfer;
 	struct tegra_spi_data *tspi = spi_master_get_devdata(master);
 	struct spi_transfer *xfer;
 	struct spi_device *spi = msg->spi;
 	int ret;
-	bool skip = false;
 
 	msg->status = 0;
 	msg->actual_length = 0;
 
+	single_xfer = list_is_singular(&msg->transfers);
 	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
-		unsigned long cmd1;
-
-		reinit_completion(&tspi->xfer_completion);
-
-		cmd1 = tegra_spi_setup_transfer_one(spi, xfer, is_first_msg);
-
-		if (!xfer->len) {
-			ret = 0;
-			skip = true;
-			goto complete_xfer;
-		}
-
-		ret = tegra_spi_start_transfer_one(spi, xfer, cmd1);
+		INIT_COMPLETION(tspi->xfer_completion);
+		ret = tegra_spi_start_transfer_one(spi, xfer,
+					is_first_msg, single_xfer);
 		if (ret < 0) {
 			dev_err(tspi->dev,
 				"spi can not start transfer, err %d\n", ret);
-			goto complete_xfer;
+			goto exit;
 		}
-
 		is_first_msg = false;
 		ret = wait_for_completion_timeout(&tspi->xfer_completion,
 						SPI_DMA_TIMEOUT);
@@ -868,40 +833,24 @@ static int tegra_spi_transfer_one_message(struct spi_master *master,
 			dev_err(tspi->dev,
 				"spi trasfer timeout, err %d\n", ret);
 			ret = -EIO;
-			goto complete_xfer;
+			goto exit;
 		}
 
 		if (tspi->tx_status ||  tspi->rx_status) {
 			dev_err(tspi->dev, "Error in Transfer\n");
 			ret = -EIO;
-			goto complete_xfer;
+			goto exit;
 		}
 		msg->actual_length += xfer->len;
-
-complete_xfer:
-		if (ret < 0 || skip) {
+		if (xfer->cs_change && xfer->delay_usecs) {
 			tegra_spi_writel(tspi, tspi->def_command1_reg,
 					SPI_COMMAND1);
-			tegra_spi_transfer_delay(xfer->delay_usecs);
-			goto exit;
-		} else if (msg->transfers.prev == &xfer->transfer_list) {
-			/* This is the last transfer in message */
-			if (xfer->cs_change)
-				tspi->cs_control = spi;
-			else {
-				tegra_spi_writel(tspi, tspi->def_command1_reg,
-						SPI_COMMAND1);
-				tegra_spi_transfer_delay(xfer->delay_usecs);
-			}
-		} else if (xfer->cs_change) {
-			tegra_spi_writel(tspi, tspi->def_command1_reg,
-					SPI_COMMAND1);
-			tegra_spi_transfer_delay(xfer->delay_usecs);
+			udelay(xfer->delay_usecs);
 		}
-
 	}
 	ret = 0;
 exit:
+	tegra_spi_writel(tspi, tspi->def_command1_reg, SPI_COMMAND1);
 	msg->status = ret;
 	spi_finalize_current_message(master);
 	return ret;
