@@ -17,10 +17,25 @@
 #ifndef __MACH_TEGRA_CPUIDLE_H
 #define __MACH_TEGRA_CPUIDLE_H
 
-#ifdef CONFIG_CPU_IDLE
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 int tegra20_cpuidle_init(void);
+#else
+static inline int tegra20_cpuidle_init(void) { return -ENODEV; }
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
 int tegra30_cpuidle_init(void);
+#else
+static inline int tegra30_cpuidle_init(void) { return -ENODEV; }
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_114_SOC
 int tegra114_cpuidle_init(void);
+#else
+static inline int tegra114_cpuidle_init(void) { return -ENODEV; }
+#endif
+
+#ifdef CONFIG_CPU_IDLE
 void tegra_cpuidle_init(void);
 #else
 static inline void tegra_cpuidle_init(void) {}
