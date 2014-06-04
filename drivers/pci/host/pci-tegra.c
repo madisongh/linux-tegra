@@ -41,7 +41,6 @@
 #include <linux/reset.h>
 #include <linux/sizes.h>
 #include <linux/slab.h>
-#include <linux/tegra-cpuidle.h>
 #include <linux/tegra-powergate.h>
 #include <linux/vmalloc.h>
 #include <linux/regulator/consumer.h>
@@ -640,8 +639,6 @@ static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
 {
 	struct tegra_pcie *pcie = sys_to_pcie(pdev->bus->sysdata);
 
-	tegra_cpuidle_pcie_irqs_in_use();
-
 	return pcie->irq;
 }
 
@@ -1234,8 +1231,6 @@ static int tegra_msi_map(struct irq_domain *domain, unsigned int irq,
 	irq_set_chip_and_handler(irq, &tegra_msi_irq_chip, handle_simple_irq);
 	irq_set_chip_data(irq, domain->host_data);
 	set_irq_flags(irq, IRQF_VALID);
-
-	tegra_cpuidle_pcie_irqs_in_use();
 
 	return 0;
 }
