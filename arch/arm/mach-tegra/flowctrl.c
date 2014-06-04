@@ -86,7 +86,6 @@ void flowctrl_cpu_suspend_enter(unsigned int cpuid)
 		reg |= TEGRA20_FLOW_CTRL_CSR_WFE_CPU0 << cpuid;
 		break;
 	case TEGRA30:
-	case TEGRA114:
 		/* clear wfe bitmap */
 		reg &= ~TEGRA30_FLOW_CTRL_CSR_WFE_BITMAP;
 		/* clear wfi bitmap */
@@ -124,7 +123,6 @@ void flowctrl_cpu_suspend_exit(unsigned int cpuid)
 		reg &= ~TEGRA20_FLOW_CTRL_CSR_WFI_BITMAP;
 		break;
 	case TEGRA30:
-	case TEGRA114:
 		/* clear wfe bitmap */
 		reg &= ~TEGRA30_FLOW_CTRL_CSR_WFE_BITMAP;
 		/* clear wfi bitmap */
