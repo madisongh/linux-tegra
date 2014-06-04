@@ -25,6 +25,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/clk/tegra.h>
 #include <linux/delay.h>
 #include <linux/export.h>
 #include <linux/interrupt.h>
@@ -38,7 +39,6 @@
 #include <linux/of_platform.h>
 #include <linux/pci.h>
 #include <linux/platform_device.h>
-#include <linux/reset.h>
 #include <linux/sizes.h>
 #include <linux/slab.h>
 #include <linux/tegra-powergate.h>
@@ -258,12 +258,9 @@ struct tegra_pcie {
 
 	struct clk *pex_clk;
 	struct clk *afi_clk;
+	struct clk *pcie_xclk;
 	struct clk *pll_e;
 	struct clk *cml_clk;
-
-	struct reset_control *pex_rst;
-	struct reset_control *afi_rst;
-	struct reset_control *pcie_xrst;
 
 	struct tegra_msi msi;
 
@@ -858,7 +855,7 @@ static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
 	pads_writel(pcie, value, PADS_CTL);
 
 	/* take the PCIe interface module out of reset */
-	reset_control_deassert(pcie->pcie_xrst);
+	tegra_periph_reset_deassert(pcie->pcie_xclk);
 
 	/* finally enable PCIe */
 	value = afi_readl(pcie, AFI_CONFIGURATION);
@@ -891,9 +888,9 @@ static void tegra_pcie_power_off(struct tegra_pcie *pcie)
 
 	/* TODO: disable and unprepare clocks? */
 
-	reset_control_assert(pcie->pcie_xrst);
-	reset_control_assert(pcie->afi_rst);
-	reset_control_assert(pcie->pex_rst);
+	tegra_periph_reset_assert(pcie->pcie_xclk);
+	tegra_periph_reset_assert(pcie->afi_clk);
+	tegra_periph_reset_assert(pcie->pex_clk);
 
 	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
 
@@ -921,9 +918,9 @@ static int tegra_pcie_power_on(struct tegra_pcie *pcie)
 	const struct tegra_pcie_soc_data *soc = pcie->soc_data;
 	int err;
 
-	reset_control_assert(pcie->pcie_xrst);
-	reset_control_assert(pcie->afi_rst);
-	reset_control_assert(pcie->pex_rst);
+	tegra_periph_reset_assert(pcie->pcie_xclk);
+	tegra_periph_reset_assert(pcie->afi_clk);
+	tegra_periph_reset_assert(pcie->pex_clk);
 
 	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
 
@@ -958,7 +955,7 @@ static int tegra_pcie_power_on(struct tegra_pcie *pcie)
 		return err;
 	}
 
-	reset_control_deassert(pcie->afi_rst);
+	tegra_periph_reset_deassert(pcie->afi_clk);
 
 	err = clk_prepare_enable(pcie->afi_clk);
 	if (err < 0) {
@@ -996,6 +993,10 @@ static int tegra_pcie_clocks_get(struct tegra_pcie *pcie)
 	if (IS_ERR(pcie->afi_clk))
 		return PTR_ERR(pcie->afi_clk);
 
+	pcie->pcie_xclk = devm_clk_get(pcie->dev, "pcie_xclk");
+	if (IS_ERR(pcie->pcie_xclk))
+		return PTR_ERR(pcie->pcie_xclk);
+
 	pcie->pll_e = devm_clk_get(pcie->dev, "pll_e");
 	if (IS_ERR(pcie->pll_e))
 		return PTR_ERR(pcie->pll_e);
@@ -1009,23 +1010,6 @@ static int tegra_pcie_clocks_get(struct tegra_pcie *pcie)
 	return 0;
 }
 
-static int tegra_pcie_resets_get(struct tegra_pcie *pcie)
-{
-	pcie->pex_rst = devm_reset_control_get(pcie->dev, "pex");
-	if (IS_ERR(pcie->pex_rst))
-		return PTR_ERR(pcie->pex_rst);
-
-	pcie->afi_rst = devm_reset_control_get(pcie->dev, "afi");
-	if (IS_ERR(pcie->afi_rst))
-		return PTR_ERR(pcie->afi_rst);
-
-	pcie->pcie_xrst = devm_reset_control_get(pcie->dev, "pcie_x");
-	if (IS_ERR(pcie->pcie_xrst))
-		return PTR_ERR(pcie->pcie_xrst);
-
-	return 0;
-}
-
 static int tegra_pcie_get_resources(struct tegra_pcie *pcie)
 {
 	struct platform_device *pdev = to_platform_device(pcie->dev);
@@ -1035,12 +1019,6 @@ static int tegra_pcie_get_resources(struct tegra_pcie *pcie)
 	err = tegra_pcie_clocks_get(pcie);
 	if (err) {
 		dev_err(&pdev->dev, "failed to get clocks: %d\n", err);
-		return err;
-	}
-
-	err = tegra_pcie_resets_get(pcie);
-	if (err) {
-		dev_err(&pdev->dev, "failed to get resets: %d\n", err);
 		return err;
 	}
 
