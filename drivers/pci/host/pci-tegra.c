@@ -248,7 +248,7 @@ struct tegra_pcie {
 	void __iomem *afi;
 	int irq;
 
-	struct list_head buses;
+	struct list_head busses;
 	struct resource *cs;
 
 	struct resource io;
@@ -398,14 +398,14 @@ free:
 
 /*
  * Look up a virtual address mapping for the specified bus number. If no such
- * mapping exists, try to create one.
+ * mapping existis, try to create one.
  */
 static void __iomem *tegra_pcie_bus_map(struct tegra_pcie *pcie,
 					unsigned int busnr)
 {
 	struct tegra_pcie_bus *bus;
 
-	list_for_each_entry(bus, &pcie->buses, list)
+	list_for_each_entry(bus, &pcie->busses, list)
 		if (bus->nr == busnr)
 			return (void __iomem *)bus->area->addr;
 
@@ -413,7 +413,7 @@ static void __iomem *tegra_pcie_bus_map(struct tegra_pcie *pcie,
 	if (IS_ERR(bus))
 		return NULL;
 
-	list_add_tail(&bus->list, &pcie->buses);
+	list_add_tail(&bus->list, &pcie->busses);
 
 	return (void __iomem *)bus->area->addr;
 }
@@ -805,7 +805,7 @@ static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
 	value &= ~AFI_FUSE_PCIE_T0_GEN2_DIS;
 	afi_writel(pcie, value, AFI_FUSE);
 
-	/* initialize internal PHY, enable up to 16 PCIE lanes */
+	/* initialze internal PHY, enable up to 16 PCIE lanes */
 	pads_writel(pcie, 0x0, PADS_CTL_SEL);
 
 	/* override IDDQ to 1 on all 4 lanes */
@@ -1619,7 +1619,7 @@ static int tegra_pcie_probe(struct platform_device *pdev)
 	if (!pcie)
 		return -ENOMEM;
 
-	INIT_LIST_HEAD(&pcie->buses);
+	INIT_LIST_HEAD(&pcie->busses);
 	INIT_LIST_HEAD(&pcie->ports);
 	pcie->soc_data = match->data;
 	pcie->dev = &pdev->dev;
