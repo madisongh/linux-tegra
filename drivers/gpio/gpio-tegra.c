@@ -425,7 +425,6 @@ static int tegra_gpio_probe(struct platform_device *pdev)
 	struct tegra_gpio_soc_config *config;
 	struct resource *res;
 	struct tegra_gpio_bank *bank;
-	int ret;
 	int gpio;
 	int i;
 	int j;
@@ -498,11 +497,7 @@ static int tegra_gpio_probe(struct platform_device *pdev)
 
 	tegra_gpio_chip.of_node = pdev->dev.of_node;
 
-	ret = gpiochip_add(&tegra_gpio_chip);
-	if (ret < 0) {
-		irq_domain_remove(irq_domain);
-		return ret;
-	}
+	gpiochip_add(&tegra_gpio_chip);
 
 	for (gpio = 0; gpio < tegra_gpio_chip.ngpio; gpio++) {
 		int irq = irq_create_mapping(irq_domain, gpio);
