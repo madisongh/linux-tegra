@@ -1334,7 +1334,7 @@ static int tegra_dma_probe(struct platform_device *pdev)
 		if (ret) {
 			dev_err(&pdev->dev,
 				"request_irq failed with err %d channel %d\n",
-				ret, i);
+				i, ret);
 			goto err_irq;
 		}
 
