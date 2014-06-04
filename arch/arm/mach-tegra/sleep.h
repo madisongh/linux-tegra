@@ -84,16 +84,6 @@
 	str	\tmp2, [\tmp1]			@ invalidate SCU tags for CPU
 	dsb
 .endm
-
-/* Macro to check Tegra revision */
-#define APB_MISC_GP_HIDREV	0x804
-.macro tegra_get_soc_id base, tmp1
-	mov32	\tmp1, \base
-	ldr	\tmp1, [\tmp1, #APB_MISC_GP_HIDREV]
-	and	\tmp1, \tmp1, #0xff00
-	mov	\tmp1, \tmp1, lsr #8
-.endm
-
 #else
 void tegra_pen_lock(void);
 void tegra_pen_unlock(void);
