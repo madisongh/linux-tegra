@@ -650,9 +650,25 @@ int tegra_pinctrl_probe(struct platform_device *pdev,
 
 	for (i = 0; i < pmx->nbanks; i++) {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
-		pmx->regs[i] = devm_ioremap_resource(&pdev->dev, res);
-		if (IS_ERR(pmx->regs[i]))
-			return PTR_ERR(pmx->regs[i]);
+		if (!res) {
+			dev_err(&pdev->dev, "Missing MEM resource\n");
+			return -ENODEV;
+		}
+
+		if (!devm_request_mem_region(&pdev->dev, res->start,
+					    resource_size(res),
+					    dev_name(&pdev->dev))) {
+			dev_err(&pdev->dev,
+				"Couldn't request MEM resource %d\n", i);
+			return -ENODEV;
+		}
+
+		pmx->regs[i] = devm_ioremap(&pdev->dev, res->start,
+					    resource_size(res));
+		if (!pmx->regs[i]) {
+			dev_err(&pdev->dev, "Couldn't ioremap regs %d\n", i);
+			return -ENODEV;
+		}
 	}
 
 	pmx->pctl = pinctrl_register(&tegra_pinctrl_desc, &pdev->dev, pmx);
