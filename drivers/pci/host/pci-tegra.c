@@ -1,5 +1,5 @@
 /*
- * PCIe host controller driver for Tegra SoCs
+ * PCIe host controller driver for TEGRA(2) SOCs
  *
  * Copyright (c) 2010, CompuLab, Ltd.
  * Author: Mike Rapoport <mike@compulab.co.il>
@@ -50,6 +50,7 @@
 #include <asm/mach/pci.h>
 
 #define INT_PCI_MSI_NR (8 * 32)
+#define TEGRA_MAX_PORTS 2
 
 /* register definitions */
 
@@ -141,29 +142,21 @@
 #define  AFI_INTR_EN_DFPCI_DECERR	(1 << 5)
 #define  AFI_INTR_EN_AXI_DECERR		(1 << 6)
 #define  AFI_INTR_EN_FPCI_TIMEOUT	(1 << 7)
-#define  AFI_INTR_EN_PRSNT_SENSE	(1 << 8)
 
 #define AFI_PCIE_CONFIG					0x0f8
 #define  AFI_PCIE_CONFIG_PCIE_DISABLE(x)		(1 << ((x) + 1))
 #define  AFI_PCIE_CONFIG_PCIE_DISABLE_ALL		0xe
 #define  AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_MASK	(0xf << 20)
 #define  AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_SINGLE	(0x0 << 20)
-#define  AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_420	(0x0 << 20)
 #define  AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_DUAL	(0x1 << 20)
-#define  AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_222	(0x1 << 20)
-#define  AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_411	(0x2 << 20)
 
 #define AFI_FUSE			0x104
 #define  AFI_FUSE_PCIE_T0_GEN2_DIS	(1 << 2)
 
 #define AFI_PEX0_CTRL			0x110
 #define AFI_PEX1_CTRL			0x118
-#define AFI_PEX2_CTRL			0x128
 #define  AFI_PEX_CTRL_RST		(1 << 0)
-#define  AFI_PEX_CTRL_CLKREQ_EN		(1 << 1)
 #define  AFI_PEX_CTRL_REFCLK_EN		(1 << 3)
-
-#define AFI_PEXBIAS_CTRL_0		0x168
 
 #define RP_VEND_XP	0x00000F00
 #define  RP_VEND_XP_DL_UP	(1 << 30)
@@ -179,8 +172,7 @@
 #define  PADS_CTL_TX_DATA_EN_1L	(1 << 6)
 #define  PADS_CTL_RX_DATA_EN_1L	(1 << 10)
 
-#define PADS_PLL_CTL_TEGRA20			0x000000B8
-#define PADS_PLL_CTL_TEGRA30			0x000000B4
+#define PADS_PLL_CTL				0x000000B8
 #define  PADS_PLL_CTL_RST_B4SM			(1 << 1)
 #define  PADS_PLL_CTL_LOCKDET			(1 << 8)
 #define  PADS_PLL_CTL_REFCLK_MASK		(0x3 << 16)
@@ -190,10 +182,6 @@
 #define  PADS_PLL_CTL_TXCLKREF_MASK		(0x1 << 20)
 #define  PADS_PLL_CTL_TXCLKREF_DIV10		(0 << 20)
 #define  PADS_PLL_CTL_TXCLKREF_DIV5		(1 << 20)
-#define  PADS_PLL_CTL_TXCLKREF_BUF_EN		(1 << 22)
-
-#define PADS_REFCLK_CFG0			0x000000C8
-#define PADS_REFCLK_CFG1			0x000000CC
 
 struct tegra_msi {
 	struct msi_chip chip;
@@ -202,19 +190,6 @@ struct tegra_msi {
 	unsigned long pages;
 	struct mutex lock;
 	int irq;
-};
-
-/* used to differentiate between Tegra SoC generations */
-struct tegra_pcie_soc_data {
-	unsigned int num_ports;
-	unsigned int msi_base_shift;
-	u32 pads_pll_ctl;
-	u32 tx_ref_sel;
-	bool has_pex_clkreq_en;
-	bool has_pex_bias_ctrl;
-	bool has_intr_prsnt_sense;
-	bool has_avdd_supply;
-	bool has_cml_clk;
 };
 
 static inline struct tegra_msi *to_tegra_msi(struct msi_chip *chip)
@@ -241,7 +216,6 @@ struct tegra_pcie {
 	struct clk *afi_clk;
 	struct clk *pcie_xclk;
 	struct clk *pll_e;
-	struct clk *cml_clk;
 
 	struct tegra_msi msi;
 
@@ -251,9 +225,6 @@ struct tegra_pcie {
 
 	struct regulator *pex_clk_supply;
 	struct regulator *vdd_supply;
-	struct regulator *avdd_supply;
-
-	const struct tegra_pcie_soc_data *soc_data;
 };
 
 struct tegra_pcie_port {
@@ -498,10 +469,6 @@ static unsigned long tegra_pcie_port_get_pex_ctrl(struct tegra_pcie_port *port)
 	case 1:
 		ret = AFI_PEX1_CTRL;
 		break;
-
-	case 2:
-		ret = AFI_PEX2_CTRL;
-		break;
 	}
 
 	return ret;
@@ -526,17 +493,12 @@ static void tegra_pcie_port_reset(struct tegra_pcie_port *port)
 
 static void tegra_pcie_port_enable(struct tegra_pcie_port *port)
 {
-	const struct tegra_pcie_soc_data *soc = port->pcie->soc_data;
 	unsigned long ctrl = tegra_pcie_port_get_pex_ctrl(port);
 	unsigned long value;
 
 	/* enable reference clock */
 	value = afi_readl(port->pcie, ctrl);
 	value |= AFI_PEX_CTRL_REFCLK_EN;
-
-	if (soc->has_pex_clkreq_en)
-		value |= AFI_PEX_CTRL_CLKREQ_EN;
-
 	afi_writel(port->pcie, value, ctrl);
 
 	tegra_pcie_port_reset(port);
@@ -589,8 +551,6 @@ static void tegra_pcie_fixup_class(struct pci_dev *dev)
 }
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_NVIDIA, 0x0bf0, tegra_pcie_fixup_class);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_NVIDIA, 0x0bf1, tegra_pcie_fixup_class);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_NVIDIA, 0x0e1c, tegra_pcie_fixup_class);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_NVIDIA, 0x0e1d, tegra_pcie_fixup_class);
 
 /* Tegra PCIE requires relaxed ordering */
 static void tegra_pcie_relax_enable(struct pci_dev *dev)
@@ -763,14 +723,9 @@ static void tegra_pcie_setup_translations(struct tegra_pcie *pcie)
 
 static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
 {
-	const struct tegra_pcie_soc_data *soc = pcie->soc_data;
 	struct tegra_pcie_port *port;
 	unsigned int timeout;
 	unsigned long value;
-
-	/* power down PCIe slot clock bias pad */
-	if (soc->has_pex_bias_ctrl)
-		afi_writel(pcie, 0, AFI_PEXBIAS_CTRL_0);
 
 	/* configure mode and disable all ports */
 	value = afi_readl(pcie, AFI_PCIE_CONFIG);
@@ -798,26 +753,27 @@ static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
 	 * Set up PHY PLL inputs select PLLE output as refclock,
 	 * set TX ref sel to div10 (not div5).
 	 */
-	value = pads_readl(pcie, soc->pads_pll_ctl);
+	value = pads_readl(pcie, PADS_PLL_CTL);
 	value &= ~(PADS_PLL_CTL_REFCLK_MASK | PADS_PLL_CTL_TXCLKREF_MASK);
-	value |= PADS_PLL_CTL_REFCLK_INTERNAL_CML | soc->tx_ref_sel;
-	pads_writel(pcie, value, soc->pads_pll_ctl);
+	value |= PADS_PLL_CTL_REFCLK_INTERNAL_CML |
+		 PADS_PLL_CTL_TXCLKREF_DIV10;
+	pads_writel(pcie, value, PADS_PLL_CTL);
 
 	/* take PLL out of reset  */
-	value = pads_readl(pcie, soc->pads_pll_ctl);
+	value = pads_readl(pcie, PADS_PLL_CTL);
 	value |= PADS_PLL_CTL_RST_B4SM;
-	pads_writel(pcie, value, soc->pads_pll_ctl);
+	pads_writel(pcie, value, PADS_PLL_CTL);
 
 	/*
 	 * Hack, set the clock voltage to the DEFAULT provided by hw folks.
 	 * This doesn't exist in the documentation.
 	 */
-	pads_writel(pcie, 0xfa5cfa5c, PADS_REFCLK_CFG0);
+	pads_writel(pcie, 0xfa5cfa5c, 0xc8);
 
 	/* wait for the PLL to lock */
 	timeout = 300;
 	do {
-		value = pads_readl(pcie, soc->pads_pll_ctl);
+		value = pads_readl(pcie, PADS_PLL_CTL);
 		usleep_range(1000, 2000);
 		if (--timeout == 0) {
 			pr_err("Tegra PCIe error: timeout waiting for PLL\n");
@@ -846,10 +802,6 @@ static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
 	value = AFI_INTR_EN_INI_SLVERR | AFI_INTR_EN_INI_DECERR |
 		AFI_INTR_EN_TGT_SLVERR | AFI_INTR_EN_TGT_DECERR |
 		AFI_INTR_EN_TGT_WRERR | AFI_INTR_EN_DFPCI_DECERR;
-
-	if (soc->has_intr_prsnt_sense)
-		value |= AFI_INTR_EN_PRSNT_SENSE;
-
 	afi_writel(pcie, value, AFI_AFI_INTR_ENABLE);
 	afi_writel(pcie, 0xffffffff, AFI_SM_INTR_ENABLE);
 
@@ -864,7 +816,6 @@ static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
 
 static void tegra_pcie_power_off(struct tegra_pcie *pcie)
 {
-	const struct tegra_pcie_soc_data *soc = pcie->soc_data;
 	int err;
 
 	/* TODO: disable and unprepare clocks? */
@@ -875,28 +826,19 @@ static void tegra_pcie_power_off(struct tegra_pcie *pcie)
 
 	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
 
-	if (soc->has_avdd_supply) {
-		err = regulator_disable(pcie->avdd_supply);
-		if (err < 0)
-			dev_warn(pcie->dev,
-				 "failed to disable AVDD regulator: %d\n",
-				 err);
-	}
-
 	err = regulator_disable(pcie->pex_clk_supply);
 	if (err < 0)
-		dev_warn(pcie->dev, "failed to disable pex-clk regulator: %d\n",
-			 err);
+		dev_err(pcie->dev, "failed to disable pex-clk regulator: %d\n",
+			err);
 
 	err = regulator_disable(pcie->vdd_supply);
 	if (err < 0)
-		dev_warn(pcie->dev, "failed to disable VDD regulator: %d\n",
-			 err);
+		dev_err(pcie->dev, "failed to disable VDD regulator: %d\n",
+			err);
 }
 
 static int tegra_pcie_power_on(struct tegra_pcie *pcie)
 {
-	const struct tegra_pcie_soc_data *soc = pcie->soc_data;
 	int err;
 
 	tegra_periph_reset_assert(pcie->pcie_xclk);
@@ -919,16 +861,6 @@ static int tegra_pcie_power_on(struct tegra_pcie *pcie)
 		return err;
 	}
 
-	if (soc->has_avdd_supply) {
-		err = regulator_enable(pcie->avdd_supply);
-		if (err < 0) {
-			dev_err(pcie->dev,
-				"failed to enable AVDD regulator: %d\n",
-				err);
-			return err;
-		}
-	}
-
 	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_PCIE,
 						pcie->pex_clk);
 	if (err) {
@@ -944,15 +876,6 @@ static int tegra_pcie_power_on(struct tegra_pcie *pcie)
 		return err;
 	}
 
-	if (soc->has_cml_clk) {
-		err = clk_prepare_enable(pcie->cml_clk);
-		if (err < 0) {
-			dev_err(pcie->dev, "failed to enable CML clock: %d\n",
-				err);
-			return err;
-		}
-	}
-
 	err = clk_prepare_enable(pcie->pll_e);
 	if (err < 0) {
 		dev_err(pcie->dev, "failed to enable PLLE clock: %d\n", err);
@@ -964,8 +887,6 @@ static int tegra_pcie_power_on(struct tegra_pcie *pcie)
 
 static int tegra_pcie_clocks_get(struct tegra_pcie *pcie)
 {
-	const struct tegra_pcie_soc_data *soc = pcie->soc_data;
-
 	pcie->pex_clk = devm_clk_get(pcie->dev, "pex");
 	if (IS_ERR(pcie->pex_clk))
 		return PTR_ERR(pcie->pex_clk);
@@ -981,12 +902,6 @@ static int tegra_pcie_clocks_get(struct tegra_pcie *pcie)
 	pcie->pll_e = devm_clk_get(pcie->dev, "pll_e");
 	if (IS_ERR(pcie->pll_e))
 		return PTR_ERR(pcie->pll_e);
-
-	if (soc->has_cml_clk) {
-		pcie->cml_clk = devm_clk_get(pcie->dev, "cml");
-		if (IS_ERR(pcie->cml_clk))
-			return PTR_ERR(pcie->cml_clk);
-	}
 
 	return 0;
 }
@@ -1212,7 +1127,6 @@ static const struct irq_domain_ops msi_domain_ops = {
 static int tegra_pcie_enable_msi(struct tegra_pcie *pcie)
 {
 	struct platform_device *pdev = to_platform_device(pcie->dev);
-	const struct tegra_pcie_soc_data *soc = pcie->soc_data;
 	struct tegra_msi *msi = &pcie->msi;
 	unsigned long base;
 	int err;
@@ -1250,7 +1164,7 @@ static int tegra_pcie_enable_msi(struct tegra_pcie *pcie)
 	msi->pages = __get_free_pages(GFP_KERNEL, 0);
 	base = virt_to_phys((void *)msi->pages);
 
-	afi_writel(pcie, base >> soc->msi_base_shift, AFI_MSI_FPCI_BAR_ST);
+	afi_writel(pcie, base, AFI_MSI_FPCI_BAR_ST);
 	afi_writel(pcie, base, AFI_MSI_AXI_BAR_ST);
 	/* this register is in 4K increments */
 	afi_writel(pcie, 1, AFI_MSI_BAR_SZ);
@@ -1319,35 +1233,16 @@ static int tegra_pcie_get_xbar_config(struct tegra_pcie *pcie, u32 lanes,
 {
 	struct device_node *np = pcie->dev->of_node;
 
-	if (of_device_is_compatible(np, "nvidia,tegra30-pcie")) {
-		switch (lanes) {
-		case 0x00000204:
-			dev_info(pcie->dev, "4x1, 2x1 configuration\n");
-			*xbar = AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_420;
-			return 0;
+	switch (lanes) {
+	case 0x00000004:
+		dev_info(pcie->dev, "single-mode configuration\n");
+		*xbar = AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_SINGLE;
+		return 0;
 
-		case 0x00020202:
-			dev_info(pcie->dev, "2x3 configuration\n");
-			*xbar = AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_222;
-			return 0;
-
-		case 0x00010104:
-			dev_info(pcie->dev, "4x1, 1x2 configuration\n");
-			*xbar = AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_411;
-			return 0;
-		}
-	} else if (of_device_is_compatible(np, "nvidia,tegra20-pcie")) {
-		switch (lanes) {
-		case 0x00000004:
-			dev_info(pcie->dev, "single-mode configuration\n");
-			*xbar = AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_SINGLE;
-			return 0;
-
-		case 0x00000202:
-			dev_info(pcie->dev, "dual-mode configuration\n");
-			*xbar = AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_DUAL;
-			return 0;
-		}
+	case 0x00000202:
+		dev_info(pcie->dev, "dual-mode configuration\n");
+		*xbar = AFI_PCIE_CONFIG_SM2TMS0_XBAR_CONFIG_DUAL;
+		return 0;
 	}
 
 	return -EINVAL;
@@ -1355,7 +1250,6 @@ static int tegra_pcie_get_xbar_config(struct tegra_pcie *pcie, u32 lanes,
 
 static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
 {
-	const struct tegra_pcie_soc_data *soc = pcie->soc_data;
 	struct device_node *np = pcie->dev->of_node, *port;
 	struct of_pci_range_parser parser;
 	struct of_pci_range range;
@@ -1375,12 +1269,6 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
 	pcie->pex_clk_supply = devm_regulator_get(pcie->dev, "pex-clk");
 	if (IS_ERR(pcie->pex_clk_supply))
 		return PTR_ERR(pcie->pex_clk_supply);
-
-	if (soc->has_avdd_supply) {
-		pcie->avdd_supply = devm_regulator_get(pcie->dev, "avdd");
-		if (IS_ERR(pcie->avdd_supply))
-			return PTR_ERR(pcie->avdd_supply);
-	}
 
 	for_each_of_pci_range(&parser, &range) {
 		of_pci_range_to_resource(&range, np, &res);
@@ -1428,7 +1316,7 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
 
 		index = PCI_SLOT(err);
 
-		if (index < 1 || index > soc->num_ports) {
+		if (index < 1 || index > TEGRA_MAX_PORTS) {
 			dev_err(pcie->dev, "invalid port number: %d\n", index);
 			return -EINVAL;
 		}
@@ -1566,46 +1454,10 @@ static int tegra_pcie_enable(struct tegra_pcie *pcie)
 	return 0;
 }
 
-static const struct tegra_pcie_soc_data tegra20_pcie_data = {
-	.num_ports = 2,
-	.msi_base_shift = 0,
-	.pads_pll_ctl = PADS_PLL_CTL_TEGRA20,
-	.tx_ref_sel = PADS_PLL_CTL_TXCLKREF_DIV10,
-	.has_pex_clkreq_en = false,
-	.has_pex_bias_ctrl = false,
-	.has_intr_prsnt_sense = false,
-	.has_avdd_supply = false,
-	.has_cml_clk = false,
-};
-
-static const struct tegra_pcie_soc_data tegra30_pcie_data = {
-	.num_ports = 3,
-	.msi_base_shift = 8,
-	.pads_pll_ctl = PADS_PLL_CTL_TEGRA30,
-	.tx_ref_sel = PADS_PLL_CTL_TXCLKREF_BUF_EN,
-	.has_pex_clkreq_en = true,
-	.has_pex_bias_ctrl = true,
-	.has_intr_prsnt_sense = true,
-	.has_avdd_supply = true,
-	.has_cml_clk = true,
-};
-
-static const struct of_device_id tegra_pcie_of_match[] = {
-	{ .compatible = "nvidia,tegra30-pcie", .data = &tegra30_pcie_data },
-	{ .compatible = "nvidia,tegra20-pcie", .data = &tegra20_pcie_data },
-	{ },
-};
-MODULE_DEVICE_TABLE(of, tegra_pcie_of_match);
-
 static int tegra_pcie_probe(struct platform_device *pdev)
 {
-	const struct of_device_id *match;
 	struct tegra_pcie *pcie;
 	int err;
-
-	match = of_match_device(tegra_pcie_of_match, &pdev->dev);
-	if (!match)
-		return -ENODEV;
 
 	pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
 	if (!pcie)
@@ -1613,7 +1465,6 @@ static int tegra_pcie_probe(struct platform_device *pdev)
 
 	INIT_LIST_HEAD(&pcie->busses);
 	INIT_LIST_HEAD(&pcie->ports);
-	pcie->soc_data = match->data;
 	pcie->dev = &pdev->dev;
 
 	err = tegra_pcie_parse_dt(pcie);
@@ -1661,6 +1512,12 @@ put_resources:
 	tegra_pcie_put_resources(pcie);
 	return err;
 }
+
+static const struct of_device_id tegra_pcie_of_match[] = {
+	{ .compatible = "nvidia,tegra20-pcie", },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, tegra_pcie_of_match);
 
 static struct platform_driver tegra_pcie_driver = {
 	.driver = {
