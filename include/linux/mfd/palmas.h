@@ -20,8 +20,6 @@
 #include <linux/leds.h>
 #include <linux/regmap.h>
 #include <linux/regulator/driver.h>
-#include <linux/extcon.h>
-#include <linux/usb/phy_companion.h>
 
 #define PALMAS_NUM_CLIENTS		3
 
@@ -38,12 +36,6 @@ struct palmas_pmic;
 struct palmas_gpadc;
 struct palmas_resource;
 struct palmas_usb;
-
-enum palmas_usb_state {
-	PALMAS_USB_STATE_DISCONNECT,
-	PALMAS_USB_STATE_VBUS,
-	PALMAS_USB_STATE_ID,
-};
 
 struct palmas {
 	struct device *dev;
@@ -188,6 +180,9 @@ struct palmas_pmic_platform_data {
 };
 
 struct palmas_usb_platform_data {
+	/* Set this if platform wishes its own vbus control */
+	int no_control_vbus;
+
 	/* Do we enable the wakeup comparator on probe */
 	int wakeup;
 };
@@ -355,14 +350,17 @@ struct palmas_usb {
 	struct palmas *palmas;
 	struct device *dev;
 
-	struct extcon_dev edev;
+	/* for vbus reporting with irqs disabled */
+	spinlock_t lock;
 
-	int id_otg_irq;
-	int id_irq;
-	int vbus_otg_irq;
-	int vbus_irq;
+	struct regulator *vbus_reg;
 
-	enum palmas_usb_state linkstat;
+	int irq1;
+	int irq2;
+	int irq3;
+	int irq4;
+
+	u8 linkstat;
 };
 
 #define comparator_to_palmas(x) container_of((x), struct palmas_usb, comparator)
