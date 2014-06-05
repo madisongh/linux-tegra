@@ -57,7 +57,6 @@ static irqreturn_t palmas_vbus_irq_handler(int irq, void *_palmas_usb)
 		if (palmas_usb->linkstat != PALMAS_USB_STATE_VBUS) {
 			palmas_usb->linkstat = PALMAS_USB_STATE_VBUS;
 			extcon_set_cable_state(&palmas_usb->edev, "USB", true);
-			dev_info(palmas_usb->dev, "USB cable is attached\n");
 		} else {
 			dev_dbg(palmas_usb->dev,
 				"Spurious connect event detected\n");
@@ -66,7 +65,6 @@ static irqreturn_t palmas_vbus_irq_handler(int irq, void *_palmas_usb)
 		if (palmas_usb->linkstat == PALMAS_USB_STATE_VBUS) {
 			palmas_usb->linkstat = PALMAS_USB_STATE_DISCONNECT;
 			extcon_set_cable_state(&palmas_usb->edev, "USB", false);
-			dev_info(palmas_usb->dev, "USB cable is detached\n");
 		} else {
 			dev_dbg(palmas_usb->dev,
 				"Spurious disconnect event detected\n");
@@ -86,23 +84,28 @@ static irqreturn_t palmas_id_irq_handler(int irq, void *_palmas_usb)
 
 	if (set & PALMAS_USB_ID_INT_SRC_ID_GND) {
 		palmas_write(palmas_usb->palmas, PALMAS_USB_OTG_BASE,
+			PALMAS_USB_ID_INT_EN_HI_SET,
+			PALMAS_USB_ID_INT_EN_HI_SET_ID_FLOAT);
+		palmas_write(palmas_usb->palmas, PALMAS_USB_OTG_BASE,
+			PALMAS_USB_ID_INT_EN_HI_CLR,
+			PALMAS_USB_ID_INT_EN_HI_CLR_ID_GND);
+		palmas_write(palmas_usb->palmas, PALMAS_USB_OTG_BASE,
 			PALMAS_USB_ID_INT_LATCH_CLR,
 			PALMAS_USB_ID_INT_EN_HI_CLR_ID_GND);
 		palmas_usb->linkstat = PALMAS_USB_STATE_ID;
 		extcon_set_cable_state(&palmas_usb->edev, "USB-HOST", true);
-		dev_info(palmas_usb->dev, "USB-HOST cable is attached\n");
 	} else if (set & PALMAS_USB_ID_INT_SRC_ID_FLOAT) {
+		palmas_write(palmas_usb->palmas, PALMAS_USB_OTG_BASE,
+			PALMAS_USB_ID_INT_EN_HI_SET,
+			PALMAS_USB_ID_INT_EN_HI_SET_ID_GND);
+		palmas_write(palmas_usb->palmas, PALMAS_USB_OTG_BASE,
+			PALMAS_USB_ID_INT_EN_HI_CLR,
+			PALMAS_USB_ID_INT_EN_HI_CLR_ID_FLOAT);
 		palmas_write(palmas_usb->palmas, PALMAS_USB_OTG_BASE,
 			PALMAS_USB_ID_INT_LATCH_CLR,
 			PALMAS_USB_ID_INT_EN_HI_CLR_ID_FLOAT);
 		palmas_usb->linkstat = PALMAS_USB_STATE_DISCONNECT;
 		extcon_set_cable_state(&palmas_usb->edev, "USB-HOST", false);
-		dev_info(palmas_usb->dev, "USB-HOST cable is detached\n");
-	} else if ((palmas_usb->linkstat == PALMAS_USB_STATE_ID) &&
-				(!(set & PALMAS_USB_ID_INT_SRC_ID_GND))) {
-		palmas_usb->linkstat = PALMAS_USB_STATE_DISCONNECT;
-		extcon_set_cable_state(&palmas_usb->edev, "USB-HOST", false);
-		dev_info(palmas_usb->dev, "USB-HOST cable is detached\n");
 	}
 
 	return IRQ_HANDLED;
@@ -119,8 +122,7 @@ static void palmas_enable_irq(struct palmas_usb *palmas_usb)
 
 	palmas_write(palmas_usb->palmas, PALMAS_USB_OTG_BASE,
 		PALMAS_USB_ID_INT_EN_HI_SET,
-		PALMAS_USB_ID_INT_EN_HI_SET_ID_GND |
-		PALMAS_USB_ID_INT_EN_HI_SET_ID_FLOAT);
+		PALMAS_USB_ID_INT_EN_HI_SET_ID_GND);
 
 	palmas_vbus_irq_handler(palmas_usb->vbus_irq, palmas_usb);
 
