@@ -23,7 +23,7 @@
 #include <linux/err.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/palmas.h>
-#include <linux/of_device.h>
+#include <linux/of_platform.h>
 
 #define PALMAS_EXT_REQ (PALMAS_EXT_CONTROL_ENABLE1 |	\
 			PALMAS_EXT_CONTROL_ENABLE2 |	\
@@ -354,16 +354,6 @@ static void palmas_power_off(void)
 				__func__, ret);
 }
 
-static unsigned int palmas_features = PALMAS_PMIC_FEATURE_SMPS10_BOOST;
-
-static const struct of_device_id of_palmas_match_tbl[] = {
-	{
-		.compatible = "ti,palmas",
-		.data = &palmas_features,
-	},
-	{ },
-};
-
 static int palmas_i2c_probe(struct i2c_client *i2c,
 			    const struct i2c_device_id *id)
 {
@@ -371,9 +361,8 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 	struct palmas_platform_data *pdata;
 	struct device_node *node = i2c->dev.of_node;
 	int ret = 0, i;
-	unsigned int reg, addr, *features;
+	unsigned int reg, addr;
 	int slave;
-	const struct of_device_id *match;
 
 	pdata = dev_get_platdata(&i2c->dev);
 
@@ -395,15 +384,8 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 
 	i2c_set_clientdata(i2c, palmas);
 	palmas->dev = &i2c->dev;
+	palmas->id = id->driver_data;
 	palmas->irq = i2c->irq;
-
-	match = of_match_device(of_match_ptr(of_palmas_match_tbl), &i2c->dev);
-
-	if (!match)
-		return -ENODATA;
-
-	features = (unsigned int *)match->data;
-	palmas->features = *features;
 
 	for (i = 0; i < PALMAS_NUM_CLIENTS; i++) {
 		if (i == 0)
@@ -589,6 +571,11 @@ static const struct i2c_device_id palmas_i2c_id[] = {
 	{ /* end */ }
 };
 MODULE_DEVICE_TABLE(i2c, palmas_i2c_id);
+
+static struct of_device_id of_palmas_match_tbl[] = {
+	{ .compatible = "ti,palmas", },
+	{ /* end */ }
+};
 
 static struct i2c_driver palmas_i2c_driver = {
 	.driver = {
