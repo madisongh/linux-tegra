@@ -398,7 +398,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 				dev_err(palmas->dev,
 					"can't attach client %d\n", i);
 				ret = -ENOMEM;
-				goto err_i2c;
+				goto err;
 			}
 			palmas->i2c_clients[i]->dev.of_node = of_node_get(node);
 		}
@@ -409,7 +409,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 			dev_err(palmas->dev,
 				"Failed to allocate regmap %d, err: %d\n",
 				i, ret);
-			goto err_i2c;
+			goto err;
 		}
 	}
 
@@ -428,7 +428,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 			reg);
 	if (ret < 0) {
 		dev_err(palmas->dev, "POLARITY_CTRL updat failed: %d\n", ret);
-		goto err_i2c;
+		goto err;
 	}
 
 	/* Change IRQ into clear on read mode for efficiency */
@@ -442,7 +442,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 			IRQF_ONESHOT | pdata->irq_flags, 0, &palmas_irq_chip,
 			&palmas->irq_data);
 	if (ret < 0)
-		goto err_i2c;
+		goto err;
 
 no_irq:
 	slave = PALMAS_BASE_TO_SLAVE(PALMAS_PU_PD_OD_BASE);
@@ -528,6 +528,7 @@ no_irq:
 		} else if (pdata->pm_off && !pm_power_off) {
 			palmas_dev = palmas;
 			pm_power_off = palmas_power_off;
+			return ret;
 		}
 	}
 
@@ -535,25 +536,15 @@ no_irq:
 
 err_irq:
 	regmap_del_irq_chip(palmas->irq, palmas->irq_data);
-err_i2c:
-	for (i = 1; i < PALMAS_NUM_CLIENTS; i++) {
-		if (palmas->i2c_clients[i])
-			i2c_unregister_device(palmas->i2c_clients[i]);
-	}
+err:
 	return ret;
 }
 
 static int palmas_i2c_remove(struct i2c_client *i2c)
 {
 	struct palmas *palmas = i2c_get_clientdata(i2c);
-	int i;
 
 	regmap_del_irq_chip(palmas->irq, palmas->irq_data);
-
-	for (i = 1; i < PALMAS_NUM_CLIENTS; i++) {
-		if (palmas->i2c_clients[i])
-			i2c_unregister_device(palmas->i2c_clients[i]);
-	}
 
 	if (palmas == palmas_dev) {
 		pm_power_off = NULL;
