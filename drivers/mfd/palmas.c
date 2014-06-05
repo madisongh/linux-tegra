@@ -355,16 +355,11 @@ static void palmas_power_off(void)
 }
 
 static unsigned int palmas_features = PALMAS_PMIC_FEATURE_SMPS10_BOOST;
-static unsigned int tps659038_features;
 
 static const struct of_device_id of_palmas_match_tbl[] = {
 	{
 		.compatible = "ti,palmas",
 		.data = &palmas_features,
-	},
-	{
-		.compatible = "ti,tps659038",
-		.data = &tps659038_features,
 	},
 	{ },
 };
