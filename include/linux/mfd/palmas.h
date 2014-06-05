@@ -160,8 +160,7 @@ enum palmas_regulators {
 	PALMAS_REG_SMPS7,
 	PALMAS_REG_SMPS8,
 	PALMAS_REG_SMPS9,
-	PALMAS_REG_SMPS10_OUT2,
-	PALMAS_REG_SMPS10_OUT1,
+	PALMAS_REG_SMPS10,
 	/* LDO regulators */
 	PALMAS_REG_LDO1,
 	PALMAS_REG_LDO2,
@@ -401,9 +400,9 @@ struct palmas_pmic {
 	int smps123;
 	int smps457;
 
-	int range[PALMAS_REG_SMPS10_OUT1];
-	unsigned int ramp_delay[PALMAS_REG_SMPS10_OUT1];
-	unsigned int current_reg_mode[PALMAS_REG_SMPS10_OUT1];
+	int range[PALMAS_REG_SMPS10];
+	unsigned int ramp_delay[PALMAS_REG_SMPS10];
+	unsigned int current_reg_mode[PALMAS_REG_SMPS10];
 };
 
 struct palmas_resource {
