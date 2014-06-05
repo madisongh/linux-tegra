@@ -1037,8 +1037,10 @@ static int palmas_regulators_probe(struct platform_device *pdev)
 				else
 					ret = palmas_extreg_init(palmas,
 							id, reg_init);
-				if (ret)
+				if (ret) {
+					regulator_unregister(pmic->rdev[id]);
 					return ret;
+				}
 			}
 		}
 	}
