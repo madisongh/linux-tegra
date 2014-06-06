@@ -192,17 +192,6 @@ config PINCTRL_COH901
 	  COH 901 335 and COH 901 571/3. They contain 3, 5 or 7
 	  ports of 8 GPIO pins each.
 
-config PINCTRL_PALMAS
-	bool "Pinctrl driver for the PALMAS Series MFD devices"
-	depends on OF && MFD_PALMAS
-	select PINMUX
-	select GENERIC_PINCONF
-	help
-	  Palmas device supports the configuration of pins for different
-	  functionality. This driver supports the pinmux, push-pull and
-	  open drain configuration for the Palmas series devices like
-	  TPS65913, TPS80036 etc.
-
 source "drivers/pinctrl/berlin/Kconfig"
 source "drivers/pinctrl/freescale/Kconfig"
 source "drivers/pinctrl/mvebu/Kconfig"
