@@ -88,7 +88,8 @@ static void tegra132_tear_down_cpu(void)
 	flowctrl_writel(reg, FLOW_CTRL_CPU_CSR(cpu));
 	reg = readl(FLOW_CTRL_CPU_CSR(cpu));
 
-	cpu_suspend(T132_CORE_C7, tegra132_enter_sleep);
+	BUG(); /* our cpu_suspend implemenation needs work to support single-arg */
+	cpu_suspend(T132_CORE_C7 /*, tegra132_enter_sleep */);
 
 	cpu_pm_exit();
 }

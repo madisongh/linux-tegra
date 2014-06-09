@@ -446,12 +446,14 @@ static void tegra_sleep_core(enum tegra_suspend_mode mode,
 	}
 
 	tegra_get_suspend_time();
-	cpu_suspend(v2p, tegra_sleep_core_finish);
+	BUG(); /* our cpu_suspend implementation needs work to support single-arg */
+	cpu_suspend(v2p /*, tegra_sleep_core_finish */);
 }
 
 static inline void tegra_sleep_cpu(unsigned long v2p)
 {
-	cpu_suspend(v2p, tegra_sleep_cpu_finish);
+	BUG(); /* our cpu_suspend implementation needs work to support single-arg */
+	cpu_suspend(v2p /*, tegra_sleep_cpu_finish */);
 }
 
 static int tegra_common_suspend(void)
