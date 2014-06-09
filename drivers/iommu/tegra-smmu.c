@@ -1962,6 +1962,10 @@ static int tegra_smmu_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
+	smmu->num_translation_enable = 3;
+	smmu->num_asid_security = 1;
+	smmu->ptc_cache_size = SZ_16K;
+
 	if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) &&
 	    (tegra_get_chipid() == TEGRA_CHIPID_TEGRA3))
 		smmu->swgids = 0x00000000000779ff;
@@ -1987,10 +1991,6 @@ static int tegra_smmu_probe(struct platform_device *pdev)
 		smmu->num_asid_security = 8;
 		smmu->ptc_cache_size = SZ_32K;
 
-	} else {
-		smmu->num_translation_enable = 3;
-		smmu->num_asid_security = 1;
-		smmu->ptc_cache_size = SZ_16K;
 	}
 
 	for (i = 0; i < smmu->num_translation_enable; i++)
