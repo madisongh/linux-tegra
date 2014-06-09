@@ -242,6 +242,9 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 		goto exit;
 	}
 
+	if (chip->pre_irq && chip->pre_post_irq_data)
+		chip->pre_irq(chip->pre_post_irq_data);
+
 	if (chip->runtime_pm) {
 		ret = pm_runtime_get_sync(map->dev);
 		if (ret < 0) {
@@ -345,6 +348,9 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 		pm_runtime_put(map->dev);
 
 exit:
+	if (chip->post_irq && chip->pre_post_irq_data)
+		chip->post_irq(chip->pre_post_irq_data);
+
 	mutex_unlock(&data->shutdown_lock);
 	if (handled)
 		return IRQ_HANDLED;
