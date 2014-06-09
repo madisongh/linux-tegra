@@ -86,6 +86,32 @@ static struct mfd_cell max20024_children[] = {
 	MAX77620_MFD_CELL_NAME("max20024-clock"),
 };
 
+int max77620_top_irq_chip_pre_irq(void *data)
+{
+	struct max77620_chip *chip = data;
+	int ret = 0;
+
+	ret = regmap_update_bits(chip->rmap, MAX77620_REG_INTENLBT,
+		MAX77620_GLBLM_MASK, MAX77620_GLBLM_MASK);
+	if (ret < 0)
+		dev_err(chip->dev, "GLBLM masking failed: %d\n", ret);
+
+	return ret;
+}
+
+int max77620_top_irq_chip_post_irq(void *data)
+{
+	struct max77620_chip *chip = data;
+	int ret = 0;
+
+	ret = regmap_update_bits(chip->rmap, MAX77620_REG_INTENLBT,
+			MAX77620_GLBLM_MASK, 0);
+	if (ret < 0)
+		dev_err(chip->dev, "GLBLM unmasking failed: %d\n", ret);
+
+	return ret;
+}
+
 static struct regmap_irq_chip max77620_top_irq_chip = {
 	.name = "max77620-top",
 	.irqs = max77620_top_irqs,
@@ -93,6 +119,8 @@ static struct regmap_irq_chip max77620_top_irq_chip = {
 	.num_regs = 2,
 	.status_base = MAX77620_REG_IRQTOP,
 	.mask_base = MAX77620_REG_IRQTOPM,
+	.pre_irq = max77620_top_irq_chip_pre_irq,
+	.post_irq = max77620_top_irq_chip_post_irq,
 };
 
 static const struct regmap_range max77620_readable_ranges[] = {
@@ -371,6 +399,8 @@ static int max77620_probe(struct i2c_client *client,
 	ret = max77620_read_es_version(chip);
 	if (ret < 0)
 		return ret;
+
+	max77620_top_irq_chip.pre_post_irq_data = chip;
 
 	ret = regmap_add_irq_chip(chip->rmap, client->irq,
 				  IRQF_ONESHOT | IRQF_SHARED,

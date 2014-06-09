@@ -275,6 +275,7 @@
 #define MAX77620_FPS_COUNT			3
 
 /* Interrupts */
+
 enum {
 	MAX77620_IRQ_TOP_GLBL,		/* Low-Battery */
 	MAX77620_IRQ_TOP_SD,		/* SD power fail */
