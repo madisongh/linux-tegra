@@ -4,7 +4,6 @@ dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
 
 targets += dtbs
 dtb-$(CONFIG_MACH_EXUMA) += tegra132-exuma.dtb
-dtb-$(CONFIG_MACH_T132REF) += tegra132-norrin.dtb
 dtb-$(CONFIG_MACH_T132REF) += tegra132-norrin-pm374-0001-a00-00.dtb
 dtb-$(CONFIG_MACH_T132REF) += tegra132-norrin-pm374-0001-a01-00.dtb
 dtb-$(CONFIG_MACH_T132REF) += tegra132-laguna.dtb
