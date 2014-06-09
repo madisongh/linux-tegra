@@ -96,7 +96,7 @@
 					regulator-max-microamp = <3500000>;
 					regulator-always-on;
 					regulator-boot-on;
-					ams,ext-control = <AS3722_EXT_CONTROL_ENABLE2>;
+					ams,ext-control = <AS3722_EXT_CONTROL_PIN_ENABLE2>;
 					consumers {
 						c1 {
 							regulator-consumer-supply = "vdd_cpu";
@@ -111,7 +111,7 @@
 					regulator-max-microamp = <3500000>;
 					regulator-always-on;
 					regulator-boot-on;
-					ams,ext-control = <AS3722_EXT_CONTROL_ENABLE1>;
+					ams,ext-control = <AS3722_EXT_CONTROL_PIN_ENABLE1>;
 
 					consumers {
 						c0 {
@@ -345,7 +345,7 @@
 					regulator-name = "avdd-pll";
 					regulator-always-on;
 					regulator-boot-on;
-					ams,ext-control = <AS3722_EXT_CONTROL_ENABLE1>;
+					ams,ext-control = <AS3722_EXT_CONTROL_PIN_ENABLE1>;
 
 					consumers {
 						c0 {
