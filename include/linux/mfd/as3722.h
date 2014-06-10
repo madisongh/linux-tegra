@@ -28,6 +28,7 @@
 
 #include <linux/i2c.h>
 #include <linux/mutex.h>
+#include <linux/mfd/as3722-plat.h>
 #include <linux/regmap.h>
 
 /* AS3722 registers */
