@@ -2367,7 +2367,7 @@ int cpufreq_set_gov(char *target_gov, unsigned int cpu)
 	if (!cur_policy)
 		return -EINVAL;
 
-	if (lock_policy_rwsem_read(cur_policy->cpu) < 0) {
+	if (!down_read_trylock(&cur_policy->rwsem)) {
 		ret = -EINVAL;
 		goto err_out;
 	}
@@ -2376,11 +2376,11 @@ int cpufreq_set_gov(char *target_gov, unsigned int cpu)
 		ret = strncmp(cur_policy->governor->name, target_gov,
 					strlen(target_gov));
 	else {
-		unlock_policy_rwsem_read(cur_policy->cpu);
+		up_read(&cur_policy->rwsem);
 		ret = -EINVAL;
 		goto err_out;
 	}
-	unlock_policy_rwsem_read(cur_policy->cpu);
+	up_read(&cur_policy->rwsem);
 
 	if (!ret) {
 		pr_debug(" Target governer & current governer is same\n");
@@ -2394,7 +2394,7 @@ int cpufreq_set_gov(char *target_gov, unsigned int cpu)
 			goto err_out;
 		}
 
-		if (lock_policy_rwsem_write(cur_policy->cpu) < 0) {
+		if (!down_read_trylock(&cur_policy->rwsem)) {
 			ret = -EINVAL;
 			goto err_out;
 		}
@@ -2404,7 +2404,7 @@ int cpufreq_set_gov(char *target_gov, unsigned int cpu)
 		cur_policy->user_policy.policy = cur_policy->policy;
 		cur_policy->user_policy.governor = cur_policy->governor;
 
-		unlock_policy_rwsem_write(cur_policy->cpu);
+		up_read(&cur_policy->rwsem);
 	}
 err_out:
 	cpufreq_cpu_put(cur_policy);
