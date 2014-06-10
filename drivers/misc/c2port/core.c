@@ -1235,6 +1235,9 @@ static ssize_t c2port_write_internal_ram(struct file *filp,
 	return c2port_operation_execute(&write_iram_ops, filp, kobj, buffer,
 					offset, count);
 }
+/* size is computed at run-time */
+static BIN_ATTR(internal_ram, 0644, c2port_read_internal_ram,
+		c2port_write_internal_ram, 0);
 
 static ssize_t c2port_read_sfr(struct file *filp, struct kobject *kobj,
 				struct bin_attribute *attr,
@@ -1251,6 +1254,8 @@ static ssize_t c2port_write_sfr(struct file *filp, struct kobject *kobj,
 	return c2port_operation_execute(&write_sfr_ops, filp, kobj, buffer,
 					offset, count);
 }
+/* size is computed at run-time */
+static BIN_ATTR(sfr, 0644, c2port_read_sfr, c2port_write_sfr, 0);
 
 static ssize_t c2port_read_xram(struct file *filp, struct kobject *kobj,
 				struct bin_attribute *attr,
@@ -1267,6 +1272,8 @@ static ssize_t c2port_write_xram(struct file *filp, struct kobject *kobj,
 	return c2port_operation_execute(&write_xram_ops, filp, kobj, buffer,
 					offset, count);
 }
+/* size is computed at run-time */
+static BIN_ATTR(xram, 0644, c2port_read_xram, c2port_write_xram, 0);
 
 /*
  * Class attributes
@@ -1289,6 +1296,9 @@ static struct attribute *c2port_attrs[] = {
 
 static struct bin_attribute *c2port_bin_attrs[] = {
 	&bin_attr_flash_data,
+	&bin_attr_internal_ram,
+	&bin_attr_sfr,
+	&bin_attr_xram,
 	NULL,
 };
 
@@ -1300,33 +1310,6 @@ static const struct attribute_group c2port_group = {
 static const struct attribute_group *c2port_groups[] = {
 	&c2port_group,
 	NULL,
-};
-
-/* Add supports for ram read/write */
-static struct bin_attribute c2port_bin_ram_attrs = {
-	.attr = {
-		.name = "internal_ram",
-		.mode = 0644},
-	.read = c2port_read_internal_ram,
-	.write = c2port_write_internal_ram
-};
-
-/* Add supports for sfr read/write */
-static struct bin_attribute c2port_bin_sfr_attrs = {
-	.attr = {
-		 .name = "sfr",
-		 .mode = 0644},
-	.read = c2port_read_sfr,
-	.write = c2port_write_sfr
-};
-
-/* Add supports for xram read/write */
-static struct bin_attribute c2port_bin_xram_attrs = {
-	.attr = {
-		 .name = "xram",
-		 .mode = 0644},
-	.read = c2port_read_xram,
-	.write = c2port_write_xram
 };
 
 /*
@@ -1360,6 +1343,15 @@ struct c2port_device *c2port_device_register(char *name,
 	c2dev->id = ret;
 
 	bin_attr_flash_data.size = ops->blocks_num * ops->block_size;
+	if (ops->ram_size) {
+		bin_attr_internal_ram.size = ops->ram_size;
+	}
+	if (ops->sfr_size) {
+		bin_attr_sfr.size = ops->sfr_size;
+	}
+	if (ops->xram_size) {
+		bin_attr_xram.size = ops->xram_size;
+	}
 
 	c2dev->dev = device_create(c2port_class, NULL, 0, c2dev,
 				   "c2port%d", c2dev->id);
@@ -1372,31 +1364,6 @@ struct c2port_device *c2port_device_register(char *name,
 	strncpy(c2dev->name, name, C2PORT_NAME_LEN);
 	c2dev->ops = ops;
 	mutex_init(&c2dev->mutex);
-
-	/* Create binary file for ram read/write */
-	if (ops->sfr_size) {
-		c2port_bin_ram_attrs.size = ops->ram_size;
-		ret = device_create_bin_file(c2dev->dev, &c2port_bin_ram_attrs);
-		if (unlikely(ret))
-			goto error_device_create_bin_file;
-	}
-
-	/* Create binary file for sfr read/write */
-	if (ops->sfr_size) {
-		c2port_bin_sfr_attrs.size = ops->sfr_size;
-		ret = device_create_bin_file(c2dev->dev, &c2port_bin_sfr_attrs);
-		if (unlikely(ret))
-			goto error_device_create_bin_file;
-	}
-
-	/* Create binary file for xram read/write */
-	if (ops->xram_size) {
-		c2port_bin_xram_attrs.size = ops->xram_size;
-		ret = device_create_bin_file(c2dev->dev,
-				&c2port_bin_xram_attrs);
-		if (unlikely(ret))
-			goto error_device_create_bin_file;
-	}
 
 	/* By default C2 port access is off */
 	c2dev->access = c2dev->flash_access = 0;
