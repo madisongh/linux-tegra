@@ -147,7 +147,7 @@ int pinctrl_set_config_for_pin(struct pinctrl_dev *pctldev, unsigned pin,
 	}
 
 	mutex_lock(&pctldev->mutex);
-	ret = ops->pin_config_set(pctldev, pin, config);
+	ret = ops->pin_config_set(pctldev, pin, &config, 1);
 	if (ret) {
 		dev_err(pctldev->dev,
 			"unable to set pin configuration on pin %d\n", pin);
@@ -206,7 +206,7 @@ int pinctrl_set_config_for_group_sel(struct pinctrl_dev *pctldev,
 	 * capability.
 	 */
 	if (ops->pin_config_group_set) {
-		ret = ops->pin_config_group_set(pctldev, group_sel, config);
+		ret = ops->pin_config_group_set(pctldev, group_sel, &config, 1);
 		/*
 		 * If the pin controller prefer that a certain group be handled
 		 * pin-by-pin as well, it returns -EAGAIN.
@@ -225,7 +225,7 @@ int pinctrl_set_config_for_group_sel(struct pinctrl_dev *pctldev,
 	}
 
 	for (i = 0; i < num_pins; i++) {
-		ret = ops->pin_config_set(pctldev, pins[i], config);
+		ret = ops->pin_config_set(pctldev, pins[i], &config, 1);
 		if (ret < 0)
 			goto unlock;
 	}
