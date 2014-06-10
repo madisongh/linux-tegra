@@ -355,10 +355,15 @@ struct palmas_usb {
 
 	struct regulator *vbus_reg;
 
+	/* used to set vbus, in atomic path */
+	struct work_struct set_vbus_work;
+
 	int irq1;
 	int irq2;
 	int irq3;
 	int irq4;
+
+	int vbus_enable;
 
 	u8 linkstat;
 };
