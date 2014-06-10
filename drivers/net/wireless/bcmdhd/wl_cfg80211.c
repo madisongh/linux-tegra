@@ -1830,7 +1830,7 @@ static void wl_scan_prep(struct wl_scan_params *params, struct cfg80211_scan_req
 			/* SKIP DFS channels for Secondary interface */
 			if ((cfg->escan_info.ndev != bcmcfg_to_prmry_ndev(cfg)) &&
 				(request->channels[i]->flags &
-				(IEEE80211_CHAN_RADAR | IEEE80211_CHAN_PASSIVE_SCAN)))
+				(IEEE80211_CHAN_RADAR | IEEE80211_CHAN_NO_IR)))
 				continue;
 
 			if (request->channels[i]->band == IEEE80211_BAND_2GHZ) {
@@ -2066,7 +2066,7 @@ wl_run_escan(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 					/* ignore DFS channels */
 					if (request->channels[i]->flags &
 						(IEEE80211_CHAN_RADAR
-						| IEEE80211_CHAN_PASSIVE_SCAN))
+						| IEEE80211_CHAN_NO_IR))
 						continue;
 
 					for (j = 0; j < n_valid_chan; j++) {
@@ -10036,7 +10036,7 @@ static int wl_construct_reginfo(struct bcm_cfg80211 *cfg, s32 bw_cap)
 								IEEE80211_CHAN_NO_IBSS);
 						if (channel & WL_CHAN_PASSIVE)
 							band_chan_arr[index].flags |=
-								IEEE80211_CHAN_PASSIVE_SCAN;
+								IEEE80211_CHAN_NO_IR;
 					} else if (err == BCME_UNSUPPORTED) {
 						dfs_radar_disabled = TRUE;
 						WL_ERR(("does not support per_chan_info\n"));
