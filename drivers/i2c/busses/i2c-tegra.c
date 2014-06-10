@@ -32,6 +32,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <linux/i2c-tegra.h>
+#include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/module.h>
 #include <linux/clk/tegra.h>
