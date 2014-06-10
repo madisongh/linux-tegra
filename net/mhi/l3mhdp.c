@@ -568,7 +568,7 @@ mhdp_netdev_rx(struct sk_buff *skb, struct net_device *dev)
 
 		newskb->pkt_type = PACKET_HOST;
 
-		skb_tunnel_rx(newskb, dev);
+		skb_tunnel_rx(newskb, dev, dev_net(dev));
 
 		tunnel = mhdp_locate_tunnel(mhdp_net_dev(dev), pdn_id);
 		if (tunnel) {
