@@ -70,6 +70,10 @@
 #define SDHCI_VENDOR_MISC_CNTRL_INFINITE_ERASE_TIMEOUT	0x1
 #define SDHCI_VNDR_MISC_CTRL_EN_EXT_LOOPBACK_SHIFT	17
 
+#define SDHCI_VNDR_CAP_OVERRIDES_0			0x10c
+#define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT	8
+#define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_MASK	0x3F
+
 #define SDHCI_VNDR_TUN_CTRL				0x1c0
 /* Enable Re-tuning request only when CRC error is detected
  * in SDR50/SDR104/HS200 modes
@@ -299,6 +303,24 @@ static unsigned int tegra_sdhci_get_ro(struct sdhci_host *sdhci)
 	return mmc_gpio_get_ro(host->mmc);
 }
 
+static inline int sdhci_tegra_set_dqs_trim_delay(struct sdhci_host *sdhci,
+	u8 dqs_trim_delay)
+{
+	u32 vend_ovrds;
+
+	if ((dqs_trim_delay > SDHCI_TEGRA_MAX_DQS_TRIM_VALUES) &&
+		(dqs_trim_delay < 0)) {
+		dev_err(mmc_dev(sdhci->mmc), "Invalid dqs trim value\n");
+		return -1;
+	}
+	vend_ovrds = sdhci_readl(sdhci, SDHCI_VNDR_CAP_OVERRIDES_0);
+	vend_ovrds &= ~(SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_MASK <<
+			SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT);
+	vend_ovrds |= (dqs_trim_delay <<
+			SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT);
+	sdhci_writel(host, vend_ovrds, SDHCI_VNDR_CAP_OVERRIDES_0);
+}
+
 static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 	u8 trim_delay)
 {
@@ -441,6 +463,9 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 	/* Set the UHS signaling mode */
 	sdhci_set_uhs_signaling(host, timing);
 
+	if (uhs == MMC_TIMING_MMC_HS400)
+		sdhci_tegra_set_dqs_trim_delay(host, plat->dqs_trim_delay);       
+
 	/*
 	 * Tegra SDMMC controllers support only a clock divisor of 2 in DDR
 	 * mode. No other divisors are supported.
@@ -450,17 +475,13 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		clk &= ~(0xFF << SDHCI_DIVIDER_SHIFT);
 		clk |= 1 << SDHCI_DIVIDER_SHIFT;
 		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+		
+		/* Set ddr mode tap delay */
+		sdhci_tegra_set_tap_delay(host, plat->ddr_tap_delay);
 
 		/* Set the ddr mode trim delay if required */
-		if (plat->ddr_trim_delay != -1)
-			sdhci_tegra_set_trim_delay(host, plat->ddr_trim_delay);
+		sdhci_tegra_set_trim_delay(host, plat->ddr_trim_delay);
 	}
-
-	/* Set tap delay */
-	if (timing == MMC_TIMING_UHS_DDR50)
-		sdhci_tegra_set_tap_delay(host, plat->ddr_tap_delay);
-	else
-		sdhci_tegra_set_tap_delay(host, plat->tap_delay);
 
 	return 0;
 }
@@ -958,6 +979,7 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
 	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
 	of_property_read_u32(np, "ddr-trim-delay", &plat->ddr_trim_delay);
+	of_property_read_u32(np, "dqs-trim-delay", &plat->dqs_trim_delay);
 	of_property_read_u32(np, "ddr-clk-limit", &plat->ddr_clk_limit);
 	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
 	of_property_read_u32(np, "uhs_mask", &plat->uhs_mask);
