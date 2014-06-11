@@ -630,6 +630,12 @@ int regcache_lookup_reg(struct regmap *map, unsigned int reg)
 		return -ENOENT;
 }
 
+/*static void regcache_clear_reg_present(struct regmap *map, unsigned int reg)
+{
+	if ((map->cache_present) && (reg < map->cache_present_nbits))
+		clear_bit(reg, map->cache_present);
+}*/
+
 static bool regcache_reg_present(unsigned long *cache_present, unsigned int idx)
 {
 	if (!cache_present)
