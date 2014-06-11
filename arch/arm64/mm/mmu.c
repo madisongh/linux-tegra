@@ -391,11 +391,13 @@ void __init paging_init(void)
 {
 	map_mem();
 
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 	/*
 	 * Ask the machine support to map in the statically mapped devices.
 	 */
 	if (machine_desc->map_io)
 		machine_desc->map_io();
+#endif
 
 	/*
 	 * Finally flush the caches and tlb to ensure that we're in a

@@ -158,9 +158,11 @@ void __init arm64_memblock_init(void)
 
 	early_init_fdt_scan_reserved_mem();
 
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 	/* reserve any platform specific memblock areas */
 	if (machine_desc->reserve)
 		machine_desc->reserve();
+#endif
 
 	/* 4GB maximum for 32-bit only capable devices */
 	if (IS_ENABLED(CONFIG_ZONE_DMA))

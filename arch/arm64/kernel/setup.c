@@ -83,7 +83,9 @@ unsigned int compat_elf_hwcap2 __read_mostly;
 
 static const char *cpu_name;
 
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 const struct machine_desc *machine_desc __initdata;
+#endif
 phys_addr_t __fdt_pointer __initdata;
 
 /*
@@ -303,11 +305,17 @@ static void __init setup_processor(void)
 #endif
 }
 
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 static const struct machine_desc * __init setup_machine_fdt(phys_addr_t dt_phys)
+#else
+static void __init setup_machine_fdt(phys_addr_t dt_phys)
+#endif
 {
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 	const struct machine_desc *mdesc, *mdesc_best = NULL;
 	unsigned int score, mdesc_score = ~1;
 	unsigned long dt_root;
+#endif
 
 	if (!dt_phys || !early_init_dt_scan(phys_to_virt(dt_phys))) {
 		early_print("\n"
@@ -320,6 +328,7 @@ static const struct machine_desc * __init setup_machine_fdt(phys_addr_t dt_phys)
 			cpu_relax();
 	}
 
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 	dt_root = of_get_flat_dt_root();
 
 	for_each_machine_desc(mdesc) {
@@ -347,10 +356,13 @@ static const struct machine_desc * __init setup_machine_fdt(phys_addr_t dt_phys)
 		while (true)
 			/* can't use cpu_relax() here as it may require MMU setup */;
 	}
+#endif
 
 	dump_stack_set_arch_desc("%s (DT)", of_flat_dt_get_machine_name());
 
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 	return mdesc_best;
+#endif
 }
 
 /*
@@ -404,11 +416,18 @@ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
 
 void __init setup_arch(char **cmdline_p)
 {
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 	const struct machine_desc *mdesc;
+#endif
 
 	setup_processor();
+
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 	mdesc = setup_machine_fdt(__fdt_pointer);
 	machine_desc = mdesc;
+#else
+	setup_machine_fdt(__fdt_pointer);
+#endif
 
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code   = (unsigned long) _etext;
@@ -443,7 +462,9 @@ void __init setup_arch(char **cmdline_p)
 	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
 	cpu_read_bootcpu_ops();
 #ifdef CONFIG_SMP
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 	smp_set_ops(machine_desc->smp);
+#endif
 	smp_init_cpus();
 	smp_build_mpidr_hash();
 #endif
@@ -456,13 +477,17 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 	if (machine_desc->init_early)
 		machine_desc->init_early();
+#endif
 }
 
 static int __init arm64_device_init(void)
 {
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 	if (!machine_desc->init_machine)
+#endif
 		of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 	return 0;
 }
@@ -619,6 +644,7 @@ const struct seq_operations cpuinfo_op = {
 	.show	= c_show
 };
 
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
 static int __init customize_machine(void)
 {
 	/* customizes platform devices, or adds new ones */
@@ -635,3 +661,4 @@ static int __init init_machine_late(void)
 	return 0;
 }
 late_initcall(init_machine_late);
+#endif
