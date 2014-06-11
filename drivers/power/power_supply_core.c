@@ -409,11 +409,28 @@ static int power_supply_read_temp(struct thermal_zone_device *tzd,
 	return ret;
 }
 
+static int power_supply_get_temp(void *data, long *temp)
+{
+	struct power_supply *psy = data;
+	union power_supply_propval val;
+	int ret;
+
+	WARN_ON(psy->tzd == NULL);
+	ret = psy->get_property(psy, POWER_SUPPLY_PROP_TEMP, &val);
+
+	/* Convert tenths of degree Celsius to milli degree Celsius. */
+	if (!ret)
+		*temp = val.intval * 100;
+
+	return ret;
+}
+
 static struct thermal_zone_device_ops psy_tzd_ops = {
 	.get_temp = power_supply_read_temp,
 };
 
-static int psy_register_thermal(struct power_supply *psy)
+static int psy_register_thermal(struct device *dev, int sensor_id,
+		struct power_supply *psy)
 {
 	int i;
 
@@ -423,6 +440,15 @@ static int psy_register_thermal(struct power_supply *psy)
 	/* Register battery zone device psy reports temperature */
 	for (i = 0; i < psy->num_properties; i++) {
 		if (psy->properties[i] == POWER_SUPPLY_PROP_TEMP) {
+#ifdef CONFIG_THERMAL_OF
+			psy->tzd = thermal_zone_of_sensor_register(dev,
+					sensor_id, psy, power_supply_get_temp,
+					NULL);
+			if (!IS_ERR(psy->tzd)) {
+				psy->thermal_zone_sensor = true;
+				break;
+			}
+#endif
 			psy->tzd = thermal_zone_device_register(psy->name, 0, 0,
 					psy, &psy_tzd_ops, NULL, 0, 0);
 			return PTR_ERR_OR_ZERO(psy->tzd);
@@ -431,10 +457,17 @@ static int psy_register_thermal(struct power_supply *psy)
 	return 0;
 }
 
-static void psy_unregister_thermal(struct power_supply *psy)
+static void psy_unregister_thermal(struct device *dev, struct power_supply *psy)
 {
 	if (IS_ERR_OR_NULL(psy->tzd))
 		return;
+
+#ifdef CONFIG_THERMAL_OF
+	if (psy->thermal_zone_sensor) {
+		thermal_zone_of_sensor_unregister(dev, psy->tzd);
+		return;
+	}
+#endif
 	thermal_zone_device_unregister(psy->tzd);
 }
 
@@ -516,12 +549,13 @@ static void psy_unregister_cooler(struct power_supply *psy)
 	thermal_cooling_device_unregister(psy->tcd);
 }
 #else
-static int psy_register_thermal(struct power_supply *psy)
+static int psy_register_thermal(struct device *dev, int sensor_id,
+		struct power_supply *psy)
 {
 	return 0;
 }
 
-static void psy_unregister_thermal(struct power_supply *psy)
+static void psy_unregister_thermal(struct device *dev, struct power_supply *psy)
 {
 }
 
@@ -575,7 +609,7 @@ static int __power_supply_register(struct device *parent,
 	if (rc)
 		goto device_add_failed;
 
-	rc = psy_register_thermal(psy);
+	rc = psy_register_thermal(parent, 0, psy);
 	if (rc)
 		goto register_thermal_failed;
 
@@ -594,7 +628,7 @@ static int __power_supply_register(struct device *parent,
 create_triggers_failed:
 	psy_unregister_cooler(psy);
 register_cooler_failed:
-	psy_unregister_thermal(psy);
+	psy_unregister_thermal(parent, psy);
 register_thermal_failed:
 	device_del(dev);
 device_add_failed:
@@ -623,7 +657,7 @@ void power_supply_unregister(struct power_supply *psy)
 	sysfs_remove_link(&psy->dev->kobj, "powers");
 	power_supply_remove_triggers(psy);
 	psy_unregister_cooler(psy);
-	psy_unregister_thermal(psy);
+	psy_unregister_thermal(psy->dev->parent, psy);
 	device_init_wakeup(psy->dev, false);
 	device_unregister(psy->dev);
 }
