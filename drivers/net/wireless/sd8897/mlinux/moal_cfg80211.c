@@ -1508,8 +1508,8 @@ woal_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
 	/* Fill MCS rates */
-	rate_cfg->bitmap_rates[2] = mask->control[band].mcs[0];
-	rate_cfg->bitmap_rates[2] |= mask->control[band].mcs[1] << 8;
+	rate_cfg->bitmap_rates[2] = mask->control[band].ht_mcs[0];
+	rate_cfg->bitmap_rates[2] |= mask->control[band].ht_mcs[1] << 8;
 #endif
 
 	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
