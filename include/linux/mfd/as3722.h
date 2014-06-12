@@ -414,6 +414,7 @@ struct as3722 {
 	DECLARE_BITMAP(volatile_vsel_registers, AS3722_LDO11_VOLTAGE_REG);
 	int chip_irq;
 	unsigned long irq_flags;
+	int irq_base;
 	bool en_intern_int_pullup;
 	bool en_intern_i2c_pullup;
 	bool en_ac_ok_pwr_on;
