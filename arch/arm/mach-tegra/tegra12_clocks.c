@@ -9176,7 +9176,7 @@ struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 
 	/* Clean table */
 	for (i = 0; i < CPU_FREQ_TABLE_MAX_SIZE; i++) {
-		freq_table[i].index = i;
+		freq_table[i].driver_data = i;
 		freq_table[i].frequency = CPUFREQ_TABLE_END;
 	}
 
