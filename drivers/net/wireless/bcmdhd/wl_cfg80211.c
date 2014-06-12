@@ -6764,6 +6764,12 @@ wl_cfg80211_reg_notifier(
 }
 #endif /* CONFIG_CFG80211_INTERNAL_REGDB */
 
+#if defined(CONFIG_PM) && defined(WL_CFG80211_P2P_DEV_IF)
+static const struct wiphy_wowlan_support wl_wowlan_support = {
+	.flags = WIPHY_WOWLAN_ANY,
+};
+#endif
+
 static s32 wl_setup_wiphy(struct wireless_dev *wdev, struct device *sdiofunc_dev, void *context)
 {
 	s32 err = 0;
@@ -6888,20 +6894,20 @@ static s32 wl_setup_wiphy(struct wireless_dev *wdev, struct device *sdiofunc_dev
 	 * disconnection of connected network before suspend. So a dummy wowlan
 	 * filter is configured for kernels linux-3.8 and above.
 	 */
-	wdev->wiphy->wowlan.flags = WIPHY_WOWLAN_ANY;
+	wdev->wiphy->wowlan = &wl_wowlan_support;
 #endif /* CONFIG_PM && WL_CFG80211_P2P_DEV_IF */
 
 	WL_DBG(("Registering custom regulatory)\n"));
-	wdev->wiphy->flags |= WIPHY_FLAG_CUSTOM_REGULATORY;
+	wdev->wiphy->regulatory_flags |= REGULATORY_CUSTOM_REG;
 	wiphy_apply_custom_regulatory(wdev->wiphy, &brcm_regdom);
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 13, 0)) || defined(WL_VENDOR_EXT_SUPPORT)
+#if defined(WL_VENDOR_EXT_SUPPORT)
 	WL_ERR(("Registering Vendor80211)\n"));
 	err = wl_cfgvendor_attach(wdev->wiphy);
 	if (unlikely(err < 0)) {
 		WL_ERR(("Couldn not attach vendor commands (%d)\n", err));
 	}
-#endif /* (LINUX_VERSION_CODE > KERNEL_VERSION(3, 13, 0)) || defined(WL_VENDOR_EXT_SUPPORT) */
+#endif /* defined(WL_VENDOR_EXT_SUPPORT) */
 
 
 	/* Now we can register wiphy with cfg80211 module */
@@ -6929,9 +6935,9 @@ static void wl_free_wdev(struct bcm_cfg80211 *cfg)
 	}
 	wiphy = wdev->wiphy;
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 13, 0)) || defined(WL_VENDOR_EXT_SUPPORT)
+#if defined(WL_VENDOR_EXT_SUPPORT)
 	wl_cfgvendor_detach(wdev->wiphy);
-#endif /* if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 13, 0)) || defined(WL_VENDOR_EXT_SUPPORT) */
+#endif /* if defined(WL_VENDOR_EXT_SUPPORT) */
 
 	wiphy_unregister(wdev->wiphy);
 	wdev->wiphy->dev.parent = NULL;
@@ -7261,19 +7267,19 @@ wl_notify_connect_status_ap(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 
 	if (event == WLC_E_ASSOC_IND && reason == DOT11_SC_SUCCESS) {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0))
-		cfg80211_rx_mgmt(ndev, freq, 0, mgmt_frame, len, GFP_ATOMIC);
+		cfg80211_rx_mgmt(ndev, freq, 0, mgmt_frame, len, 0, GFP_ATOMIC);
 #else
 		cfg80211_rx_mgmt(ndev, freq, mgmt_frame, len, GFP_ATOMIC);
 #endif 
 	} else if (event == WLC_E_DISASSOC_IND) {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0))
-		cfg80211_rx_mgmt(ndev, freq, 0, mgmt_frame, len, GFP_ATOMIC);
+		cfg80211_rx_mgmt(ndev, freq, 0, mgmt_frame, len, 0, GFP_ATOMIC);
 #else
 		cfg80211_rx_mgmt(ndev, freq, mgmt_frame, len, GFP_ATOMIC);
 #endif 
 	} else if ((event == WLC_E_DEAUTH_IND) || (event == WLC_E_DEAUTH)) {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0))
-		cfg80211_rx_mgmt(ndev, freq, 0, mgmt_frame, len, GFP_ATOMIC);
+		cfg80211_rx_mgmt(ndev, freq, 0, mgmt_frame, len, 0, GFP_ATOMIC);
 #else
 		cfg80211_rx_mgmt(ndev, freq, mgmt_frame, len, GFP_ATOMIC);
 #endif 
@@ -8237,7 +8243,7 @@ wl_notify_rx_mgmt_frame(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
 	}
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0))
-	cfg80211_rx_mgmt(cfgdev, freq, 0, mgmt_frame, mgmt_frame_len, GFP_ATOMIC);
+	cfg80211_rx_mgmt(cfgdev, freq, 0, mgmt_frame, mgmt_frame_len, 0, GFP_ATOMIC);
 #else
 	cfg80211_rx_mgmt(cfgdev, freq, mgmt_frame, mgmt_frame_len, GFP_ATOMIC);
 #endif 
@@ -8614,39 +8620,6 @@ wl_cfg80211_netdev_notifier_call(struct notifier_block * nb,
 		return NOTIFY_DONE;
 
 	switch (state) {
-		case NETDEV_DOWN:
-		{
-			int max_wait_timeout = 2;
-			int max_wait_count = 100;
-			unsigned long limit = jiffies + max_wait_timeout * HZ;
-			while (work_pending(&wdev->cleanup_work)) {
-				if (refcnt%5 == 0) {
-					WL_ERR(("[NETDEV_DOWN] wait for "
-						"complete of cleanup_work"
-						" (%d th)\n", refcnt));
-				}
-				if (!time_before(jiffies, limit)) {
-					WL_ERR(("[NETDEV_DOWN] cleanup_work"
-						" of CFG80211 is not"
-						" completed in %d sec\n",
-						max_wait_timeout));
-					break;
-				}
-				if (refcnt >= max_wait_count) {
-					WL_ERR(("[NETDEV_DOWN] cleanup_work"
-						" of CFG80211 is not"
-						" completed in %d loop\n",
-						max_wait_count));
-					break;
-				}
-				set_current_state(TASK_INTERRUPTIBLE);
-				schedule_timeout(100);
-				set_current_state(TASK_RUNNING);
-				refcnt++;
-			}
-			break;
-		}
-
 		case NETDEV_UNREGISTER:
 			/* after calling list_del_rcu(&wdev->list) */
 			wl_dealloc_netinfo(cfg, ndev);
@@ -10033,7 +10006,7 @@ static int wl_construct_reginfo(struct bcm_cfg80211 *cfg, s32 bw_cap)
 						if (channel & WL_CHAN_RADAR)
 							band_chan_arr[index].flags |=
 								(IEEE80211_CHAN_RADAR |
-								IEEE80211_CHAN_NO_IBSS);
+								IEEE80211_CHAN_NO_IR);
 						if (channel & WL_CHAN_PASSIVE)
 							band_chan_arr[index].flags |=
 								IEEE80211_CHAN_NO_IR;
