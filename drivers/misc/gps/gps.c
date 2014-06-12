@@ -59,8 +59,8 @@
 
 
 struct mtk_gps_hardware{
-	int (*ext_power_on)();
-	int (*ext_power_off)();
+	int (*ext_power_on)(void);
+	int (*ext_power_off)(void);
 	int ext_force_on;
 };
 
@@ -219,7 +219,7 @@ static char *str_reason[] = {"none", "init", "monitor", "wakeup", "TTFF", "force
 /******************************************************************************
 * Functions
 ******************************************************************************/
-static int mt3332_gps_ext_power_on()
+static int mt3332_gps_ext_power_on(void)
 {
 	int ret = 0;
 
@@ -233,7 +233,7 @@ static int mt3332_gps_ext_power_on()
 	return ret;
 }
 
-int mt3332_gps_ext_power_off()
+int mt3332_gps_ext_power_off(void)
 {
 	int ret = 0;
 
