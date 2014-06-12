@@ -101,8 +101,6 @@ struct dev_data {
 	struct chip_access_method    chip;
 	struct spi_device            *spi;
 	struct genl_family           nl_family;
-	struct genl_ops              *nl_ops;
-	struct genl_multicast_group  *nl_mc_groups;
 	struct sk_buff               *outgoing_skb;
 	struct sk_buff_head          incoming_skb_queue;
 	struct task_struct           *thread;
@@ -117,6 +115,25 @@ struct dev_data {
 #if FB_CALLBACK
 	struct notifier_block        fb_notifier;
 #endif
+};
+
+static int nl_callback_driver(struct sk_buff *skb, struct genl_info *info);
+static int nl_callback_fusion(struct sk_buff *skb, struct genl_info *info);
+
+static const struct genl_multicast_group touch_mcgrps[] = {
+	[MC_DRIVER] = { .name = MC_DRIVER_NAME, },
+	[MC_FUSION] = { .name = MC_FUSION_NAME, },
+};
+
+static const struct genl_ops touch_ops[] = {
+	{
+		.cmd = MC_DRIVER,
+		.doit = nl_callback_driver,
+	},
+	{
+		.cmd = MC_FUSION,
+		.doit = nl_callback_fusion,
+	},
 };
 
 atomic_t touch_dvdd_on = ATOMIC_INIT(0);
@@ -1113,6 +1130,8 @@ nl_process_driver_msg(struct dev_data *dd, u16 msg_id, void *msg)
 #endif
 
 	switch (msg_id) {
+#if 0
+/* This no longer works in 3.14 */
 	case DR_ADD_MC_GROUP:
 		add_mc_group_msg = msg;
 		if (add_mc_group_msg->number >= pdata->nl_mc_groups) {
@@ -1136,6 +1155,7 @@ nl_process_driver_msg(struct dev_data *dd, u16 msg_id, void *msg)
 		if (ret < 0)
 			ERROR("failed to add multicast group (%d)", ret);
 		return false;
+#endif
 	case DR_ECHO_REQUEST:
 		echo_msg = msg;
 		echo_response = nl_alloc_attr(dd->outgoing_skb->data,
@@ -1488,9 +1508,9 @@ static int nl_process_msg(struct dev_data *dd, struct sk_buff *skb)
 					      dd->outgoing_skb,
 					      NETLINK_CB(skb).portid);
 		else
-			ret = genlmsg_multicast(dd->outgoing_skb, 0,
-					dd->nl_mc_groups[MC_FUSION].id,
-					GFP_KERNEL);
+			ret = genlmsg_multicast(&dd->nl_family,
+					dd->outgoing_skb, 0,
+					MC_FUSION, GFP_KERNEL);
 		if (ret < 0)
 			ERROR("could not reply to fusion (%d)", ret);
 
@@ -1552,8 +1572,8 @@ nl_callback_fusion(struct sk_buff *skb, struct genl_info *info)
 	if (!dd->nl_enabled)
 		return -EAGAIN;
 
-	(void)genlmsg_multicast(skb_clone(skb, GFP_ATOMIC), 0,
-				dd->nl_mc_groups[MC_FUSION].id, GFP_ATOMIC);
+	(void)genlmsg_multicast(&dd->nl_family, skb_clone(skb, GFP_ATOMIC), 0,
+				MC_FUSION, GFP_ATOMIC);
 	return 0;
 }
 
@@ -1663,9 +1683,8 @@ static void service_irq_legacy_acceleration(struct dev_data *dd)
 	} else {
 		(void)skb_put(dd->outgoing_skb,
 			      NL_SIZE(dd->outgoing_skb->data));
-		ret = genlmsg_multicast(dd->outgoing_skb, 0,
-					dd->nl_mc_groups[MC_FUSION].id,
-					GFP_KERNEL);
+		ret = genlmsg_multicast(&dd->nl_family, dd->outgoing_skb, 0,
+					MC_FUSION, GFP_KERNEL);
 		if (ret < 0) {
 			ERROR("can't send IRQ buffer %d", ret);
 			msleep(300);
@@ -1787,9 +1806,8 @@ static void service_irq(struct dev_data *dd)
 	} else {
 		(void)skb_put(dd->outgoing_skb,
 			      NL_SIZE(dd->outgoing_skb->data));
-		ret = genlmsg_multicast(dd->outgoing_skb, 0,
-					dd->nl_mc_groups[MC_FUSION].id,
-					GFP_KERNEL);
+		ret = genlmsg_multicast(&dd->nl_family, dd->outgoing_skb, 0,
+					MC_FUSION, GFP_KERNEL);
 		if (ret < 0) {
 			ERROR("can't send IRQ buffer %d", ret);
 			msleep(300);
@@ -1937,9 +1955,9 @@ static int processing_thread(void *arg)
 				}
 				(void)skb_put(dd->outgoing_skb,
 					      NL_SIZE(dd->outgoing_skb->data));
-				ret = genlmsg_multicast(dd->outgoing_skb, 0,
-						dd->nl_mc_groups[MC_FUSION].id,
-						GFP_KERNEL);
+				ret = genlmsg_multicast(&dd->nl_family,
+						dd->outgoing_skb, 0,
+						MC_FUSION, GFP_KERNEL);
 				if (ret < 0) {
 					ERROR("can't send resume message %d",
 					      ret);
@@ -1980,7 +1998,7 @@ static int probe(struct spi_device *spi)
 	struct maxim_sti_pdata  *pdata = spi->dev.platform_data;
 	struct dev_data         *dd;
 	unsigned long           flags;
-	int                     ret, i;
+	int                     ret;
 	void                    *ptr;
 
 #ifdef CONFIG_OF
@@ -2004,16 +2022,14 @@ static int probe(struct spi_device *spi)
 		pdata->irq == NULL || pdata->touch_fusion == NULL ||
 		pdata->config_file == NULL || pdata->nl_family == NULL ||
 		GENL_CHK(pdata->nl_family) ||
-		pdata->nl_mc_groups < MC_REQUIRED_GROUPS ||
+		pdata->nl_mc_groups != MC_REQUIRED_GROUPS ||
 		pdata->chip_access_method == 0 ||
 		pdata->chip_access_method > ARRAY_SIZE(chip_access_methods) ||
 		pdata->default_reset_state > 1)
 			return -EINVAL;
 
 	/* device context: allocate structure */
-	dd = kzalloc(sizeof(*dd) + pdata->tx_buf_size + pdata->rx_buf_size +
-		     sizeof(*dd->nl_ops) * pdata->nl_mc_groups +
-		     sizeof(*dd->nl_mc_groups) * pdata->nl_mc_groups,
+	dd = kzalloc(sizeof(*dd) + pdata->tx_buf_size + pdata->rx_buf_size,
 		     GFP_KERNEL);
 	if (dd == NULL)
 		return -ENOMEM;
@@ -2028,9 +2044,6 @@ static int probe(struct spi_device *spi)
 		dd->rx_buf = ptr;
 		ptr += pdata->rx_buf_size;
 	}
-	dd->nl_ops = ptr;
-	ptr += sizeof(*dd->nl_ops) * pdata->nl_mc_groups;
-	dd->nl_mc_groups = ptr;
 
 	/* device context: initialize structure members */
 	spi_set_drvdata(spi, dd);
@@ -2070,32 +2083,12 @@ static int probe(struct spi_device *spi)
 	dd->nl_family.id      = GENL_ID_GENERATE;
 	dd->nl_family.version = NL_FAMILY_VERSION;
 	GENL_COPY(dd->nl_family.name, pdata->nl_family);
-	ret = genl_register_family(&dd->nl_family);
+
+	ret = genl_register_family_with_ops_groups(&dd->nl_family, touch_ops,
+						   touch_mcgrps);
 	if (ret < 0)
 		goto nl_family_failure;
 
-	/* Netlink: register family ops */
-	for (i = 0; i < MC_REQUIRED_GROUPS; i++) {
-		dd->nl_ops[i].cmd = i;
-		dd->nl_ops[i].doit = nl_callback_noop;
-	}
-	dd->nl_ops[MC_DRIVER].doit = nl_callback_driver;
-	dd->nl_ops[MC_FUSION].doit = nl_callback_fusion;
-	for (i = 0; i < MC_REQUIRED_GROUPS; i++) {
-		ret = genl_register_ops(&dd->nl_family, &dd->nl_ops[i]);
-		if (ret < 0)
-			goto nl_failure;
-	}
-
-	/* Netlink: register family multicast groups */
-	GENL_COPY(dd->nl_mc_groups[MC_DRIVER].name, MC_DRIVER_NAME);
-	GENL_COPY(dd->nl_mc_groups[MC_FUSION].name, MC_FUSION_NAME);
-	for (i = 0; i < MC_REQUIRED_GROUPS; i++) {
-		ret = genl_register_mc_group(&dd->nl_family,
-					     &dd->nl_mc_groups[i]);
-		if (ret < 0)
-			goto nl_failure;
-	}
 	dd->nl_mc_group_count = MC_REQUIRED_GROUPS;
 
 	/* Netlink: pre-allocate outgoing skb */
