@@ -60,4 +60,14 @@
 #define AS3722_IRQ_OCCUR_ALARM_SD6	30
 #define AS3722_IRQ_ADC			31
 
+/* Power Good OC Mask macro */
+#define AS3722_OC_PG_MASK_AC_OK            0x1
+#define AS3722_OC_PG_MASK_GPIO3            0x2
+#define AS3722_OC_PG_MASK_GPIO4            0x4
+#define AS3722_OC_PG_MASK_GPIO5            0x8
+#define AS3722_OC_PG_MASK_PWRGOOD_SD0      0x10
+#define AS3722_OC_PG_MASK_OVCURR_SD0       0x20
+#define AS3722_OC_PG_MASK_POWERGOOD_SD6    0x40
+#define AS3722_OC_PG_MASK_OVCURR_SD6       0x80
+
 #endif /* __DT_BINDINGS_AS3722_H__ */
