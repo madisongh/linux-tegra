@@ -615,6 +615,7 @@ int tegra_update_cpu_speed(unsigned long rate)
 {
 	int ret = 0;
 	struct cpufreq_freqs freqs;
+	struct cpufreq_policy *policy = cpufreq_cpu_get(0); /* boot CPU */
 	unsigned int mode, mode_limit = cpu_reg_mode_predict_idle_limit();
 
 	freqs.old = tegra_getspeed(0);
@@ -630,7 +631,7 @@ int tegra_update_cpu_speed(unsigned long rate)
 		if (reg_mode != mode) {
 			ret = tegra_dvfs_rail_set_mode(tegra_cpu_rail, mode);
 			if (ret)
-				return ret;
+				goto _err;
 			reg_mode = mode;
 		}
 	}
@@ -647,7 +648,7 @@ int tegra_update_cpu_speed(unsigned long rate)
 		if (ret) {
 			pr_err("cpu-tegra: Failed to scale mselect for cpu"
 			       " frequency %u kHz\n", freqs.new);
-			return ret;
+			goto _err;
 		}
 
 		if (emc_clk) {
@@ -656,13 +657,12 @@ int tegra_update_cpu_speed(unsigned long rate)
 			if (ret) {
 				pr_err("cpu-tegra: Failed to scale emc for cpu"
 				       " frequency %u kHz\n", freqs.new);
-				return ret;
+				goto _err;
 			}
 		}
 	}
 
-	for_each_online_cpu(freqs.cpu)
-		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 
 #ifdef CONFIG_CPU_FREQ_DEBUG
 	printk(KERN_DEBUG "cpufreq-tegra: transition: %u --> %u\n",
@@ -673,11 +673,10 @@ int tegra_update_cpu_speed(unsigned long rate)
 	if (ret) {
 		pr_err("cpu-tegra: Failed to set cpu frequency to %d kHz\n",
 			freqs.new);
-		return ret;
+		goto _err;
 	}
 
-	for_each_online_cpu(freqs.cpu)
-		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 
 	if (freqs.old > freqs.new) {
 		if (emc_clk)
@@ -691,7 +690,9 @@ _out:
 		if (!tegra_dvfs_rail_set_mode(tegra_cpu_rail, mode))
 			reg_mode = mode;
 
-	return 0;
+_err:
+	cpufreq_cpu_put(policy);
+	return ret;
 }
 
 unsigned int tegra_count_slow_cpus(unsigned long speed_limit)
