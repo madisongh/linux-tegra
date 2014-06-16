@@ -51,9 +51,6 @@ struct char_dev {
 /** Changes permissions of the dev */
 int mbtchar_chmod(char *name, mode_t mode);
 
-/** Changes ownership of the dev */
-int mbtchar_chown(char *name, uid_t user, gid_t group);
-
 /**	This function creates the char dev */
 int register_char_dev(struct char_dev *dev, struct class *char_class,
 		      char *mod_name, char *dev_name);
