@@ -43,6 +43,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/debugfs.h>
 
 #include <linux/amba/bus.h>
 
@@ -392,6 +393,8 @@ struct arm_smmu_device {
 
 	struct list_head		list;
 	struct rb_root			masters;
+
+	struct dentry			*debugfs_root;
 };
 
 struct arm_smmu_cfg {
@@ -1933,6 +1936,26 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	return 0;
 }
 
+static void arm_smmu_debugfs_delete(struct arm_smmu_device *smmu)
+{
+	debugfs_remove_recursive(smmu->debugfs_root);
+}
+
+static void arm_smmu_debugfs_create(struct arm_smmu_device *smmu)
+{
+	struct dentry *root;
+
+	root = debugfs_create_dir(dev_name(smmu->dev), NULL);
+	if (!root)
+		goto err_out;
+
+	smmu->debugfs_root = root;
+	return;
+
+err_out:
+	arm_smmu_debugfs_delete(smmu);
+}
+
 static const struct of_device_id arm_smmu_of_match[] = {
 	{ .compatible = "arm,smmu-v1", .data = (void *)ARM_SMMU_V1 },
 	{ .compatible = "arm,smmu-v2", .data = (void *)ARM_SMMU_V2 },
@@ -2055,6 +2078,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 	spin_unlock(&arm_smmu_devices_lock);
 
 	arm_smmu_device_reset(smmu);
+	arm_smmu_debugfs_create(smmu);
 	return 0;
 
 out_free_irqs:
@@ -2078,6 +2102,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
 	struct arm_smmu_device *curr, *smmu = NULL;
 	struct rb_node *node;
 
+	arm_smmu_debugfs_delete(smmu);
 	spin_lock(&arm_smmu_devices_lock);
 	list_for_each_entry(curr, &arm_smmu_devices, list) {
 		if (curr->dev == dev) {
