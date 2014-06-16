@@ -56,10 +56,6 @@ static char mbt_driver_version[] = "SD8897-%s-" VERSION "-(" "FP" FPNUM ")"
 /** Declare and initialize fw_version */
 static char fw_version[32] = "0.0.0.p0";
 
-#define AID_SYSTEM        1000	/* system server */
-
-#define AID_BLUETOOTH     1002	/* bluetooth subsystem */
-
 /** Define module name */
 #define MODULE_NAME  "bt_fm_nfc"
 
@@ -1889,7 +1885,6 @@ sbi_register_conf_dpc(bt_private * priv)
 				  mbt_dev->name);
 
 		/** chmod & chown for BT char device */
-		mbtchar_chown(dev_file, AID_SYSTEM, AID_BLUETOOTH);
 		mbtchar_chmod(dev_file, 0660);
 
 		/** create proc device */
