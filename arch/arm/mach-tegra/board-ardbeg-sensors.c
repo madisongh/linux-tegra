@@ -1755,7 +1755,8 @@ static int ardbeg_nct72_init(void)
 			board_info.board_id == BOARD_PM363)
 		i2c_register_board_info(1, ardbeg_i2c_nct72_board_info,
 		ARRAY_SIZE(ardbeg_i2c_nct72_board_info));
-	else if (board_info.board_id == BOARD_PM375) {
+	else if (board_info.board_id == BOARD_PM375 ||
+			board_info.board_id == BOARD_PM377) {
 		ardbeg_nct72_pdata.sensors[EXT].shutdown_limit = 100;
 		ardbeg_nct72_pdata.sensors[LOC].shutdown_limit = 95;
 		i2c_register_board_info(0, ardbeg_i2c_nct72_board_info,
@@ -1935,7 +1936,8 @@ int __init ardbeg_sensors_init(void)
 		board_info.board_id != BOARD_PM359 &&
 		!of_machine_is_compatible("nvidia,tn8") &&
 		!of_machine_is_compatible("nvidia,bowmore") &&
-		board_info.board_id != BOARD_PM375)
+		board_info.board_id != BOARD_PM375 &&
+		board_info.board_id != BOARD_PM377)
 		mpuirq_init();
 	ardbeg_camera_init();
 
@@ -1955,7 +1957,8 @@ int __init ardbeg_sensors_init(void)
 	/* TN8 and PM359 don't have ALS CM32181 */
 	if (!of_machine_is_compatible("nvidia,tn8") &&
 	    board_info.board_id != BOARD_PM359 &&
-	    board_info.board_id != BOARD_PM375)
+	    board_info.board_id != BOARD_PM375 &&
+	    board_info.board_id != BOARD_PM377)
 		i2c_register_board_info(0, ardbeg_i2c_board_info_cm32181,
 			ARRAY_SIZE(ardbeg_i2c_board_info_cm32181));
 #endif

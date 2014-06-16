@@ -100,7 +100,8 @@ static inline void fill_reg_map(void)
 	struct board_info board_info;
 
 	tegra_get_board_info(&board_info);
-	if (board_info.board_id == BOARD_PM375 ||
+	if ((board_info.board_id == BOARD_PM375 ||
+	board_info.board_id == BOARD_PM377) ||
 	((board_info.board_id == BOARD_PM359) &&
 	((board_info.sku >= 0x0003) ||
 	((board_info.sku == 0x0002) && (board_info.major_revision == 'B')) ||

@@ -338,6 +338,7 @@ static void ardbeg_audio_init(void)
 			board_info.board_id == BOARD_PM370 ||
 			board_info.board_id == BOARD_PM374 ||
 			board_info.board_id == BOARD_PM375 ||
+			board_info.board_id == BOARD_PM377 ||
 			board_info.board_id == BOARD_PM363) {
 		/*Laguna*/
 		ardbeg_audio_pdata_rt5639.gpio_hp_det = TEGRA_GPIO_HP_DET;
@@ -636,6 +637,7 @@ static void ardbeg_usb_init(void)
 			board_info.board_id == BOARD_PM370 ||
 			board_info.board_id == BOARD_PM374 ||
 			board_info.board_id == BOARD_PM375 ||
+			board_info.board_id == BOARD_PM377 ||
 			board_info.board_id == BOARD_PM363) {
 		/* Laguna */
 		/* Host cable is detected through AMS PMU Interrupt */
@@ -1208,6 +1210,7 @@ static void __init ardbeg_sysedp_init(void)
 	case BOARD_PM358:
 	case BOARD_PM359:
 	case BOARD_PM375:
+	case BOARD_PM377:
 	default:
 		break;
 	}
@@ -1236,6 +1239,7 @@ static void __init ardbeg_sysedp_dynamic_capping_init(void)
 	case BOARD_PM358:
 	case BOARD_PM359:
 	case BOARD_PM375:
+	case BOARD_PM377:
 	default:
 		break;
 	}
@@ -1258,6 +1262,7 @@ static void __init ardbeg_sysedp_batmon_init(void)
 	case BOARD_PM358:
 	case BOARD_PM359:
 	case BOARD_PM375:
+	case BOARD_PM377:
 	default:
 		break;
 	}
@@ -1284,6 +1289,7 @@ static void __init edp_init(void)
 	case BOARD_PM358:
 	case BOARD_PM359:
 	case BOARD_PM375:
+	case BOARD_PM377:
 			laguna_edp_init();
 			break;
 	case BOARD_P2530:
@@ -1379,10 +1385,12 @@ static void __init tegra_ardbeg_late_init(void)
 		loki_sdhci_init();
 	else
 		ardbeg_sdhci_init();
+
 	if (board_info.board_id == BOARD_PM359 ||
 			board_info.board_id == BOARD_PM358 ||
 			board_info.board_id == BOARD_PM370 ||
 			board_info.board_id == BOARD_PM375 ||
+			board_info.board_id == BOARD_PM377 ||
 			board_info.board_id == BOARD_PM363)
 		laguna_regulator_init();
 	else if (board_info.board_id == BOARD_PM374)
@@ -1433,6 +1441,7 @@ static void __init tegra_ardbeg_late_init(void)
 		board_info.board_id == BOARD_PM358 ||
 		board_info.board_id == BOARD_PM370 ||
 		board_info.board_id == BOARD_PM375 ||
+		board_info.board_id == BOARD_PM377 ||
 		board_info.board_id == BOARD_PM363) {
 		ardbeg_sensors_init();
 		norrin_soctherm_init();
@@ -1478,6 +1487,11 @@ static void __init tegra_ardbeg_dt_init(void)
 		of_default_bus_match_table, ardbeg_auxdata_lookup,
 		&platform_bus);
 #endif
+	tegra_get_board_info(&board_info);
+	pr_info("board_info: id:sku:fab:major:minor = 0x%04x:0x%04x:0x%02x:0x%02x:0x%02x\n",
+		board_info.board_id, board_info.sku,
+		board_info.fab, board_info.major_revision,
+		board_info.minor_revision);
 
 	tegra_ardbeg_late_init();
 }
