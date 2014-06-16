@@ -391,8 +391,7 @@ void power_supply_unreg_notifier(struct notifier_block *nb)
 EXPORT_SYMBOL_GPL(power_supply_unreg_notifier);
 
 #ifdef CONFIG_THERMAL
-static int power_supply_read_temp(struct thermal_zone_device *tzd,
-		unsigned long *temp)
+static int power_supply_read_temp(struct thermal_zone_device *tzd, long *temp)
 {
 	struct power_supply *psy;
 	union power_supply_propval val;
