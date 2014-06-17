@@ -673,6 +673,8 @@ int tegra_update_cpu_speed(unsigned long rate)
 	if (ret) {
 		pr_err("cpu-tegra: Failed to set cpu frequency to %d kHz\n",
 			freqs.new);
+		freqs.new = freqs.old;
+		cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 		goto _err;
 	}
 
