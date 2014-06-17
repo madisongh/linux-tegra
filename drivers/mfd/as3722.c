@@ -43,6 +43,7 @@ enum {
 	AS3722_ADC,
 	AS3722_POWER_OFF_ID,
 	AS3722_CLK_ID,
+	AS3722_THERMAL_ID,
 	AS3722_WATCHDOG_ID,
 };
 
@@ -60,6 +61,27 @@ static const struct resource as3722_adc_resource[] = {
 		.name = "as3722-adc",
 		.start = AS3722_IRQ_ADC,
 		.end = AS3722_IRQ_ADC,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+static const struct resource as3722_thermal_resource[] = {
+	{
+		.name = "as3722-sd0-alarm",
+		.start = AS3722_IRQ_TEMP_SD0_ALARM,
+		.end = AS3722_IRQ_TEMP_SD0_ALARM,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "as3722-sd1-alarm",
+		.start = AS3722_IRQ_TEMP_SD1_ALARM,
+		.end = AS3722_IRQ_TEMP_SD1_ALARM,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "as3722-sd6-alarm",
+		.start = AS3722_IRQ_TEMP_SD6_ALARM,
+		.end = AS3722_IRQ_TEMP_SD6_ALARM,
 		.flags = IORESOURCE_IRQ,
 	},
 };
@@ -92,6 +114,12 @@ static const struct mfd_cell as3722_devs[] = {
 	{
 		.name = "as3722-power-off",
 		.id = AS3722_POWER_OFF_ID,
+	},
+	{
+		.name = "as3722-thermal",
+		.num_resources = ARRAY_SIZE(as3722_thermal_resource),
+		.resources = as3722_thermal_resource,
+		.id = AS3722_THERMAL_ID,
 	},
 	{
 		.name = "as3722-wdt",
