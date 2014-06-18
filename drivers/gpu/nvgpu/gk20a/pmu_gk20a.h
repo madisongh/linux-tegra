@@ -3,7 +3,7 @@
  *
  * GK20A PMU (aka. gPMU outside gk20a context)
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -988,11 +988,13 @@ struct pmu_pg_stats {
 
 /* Choices for pmu_state */
 #define PMU_STATE_OFF			0 /* PMU is off */
-#define PMU_STATE_STARTING		1 /* PMU is booting */
-#define PMU_STATE_ELPG_BOOTED		2 /* ELPG is initialized */
-#define PMU_STATE_LOADING_PG_BUF	3 /* Loading PG buf */
-#define PMU_STATE_LOADING_ZBC		4 /* Loading ZBC buf */
-#define PMU_STATE_STARTED		5 /* Fully unitialized */
+#define PMU_STATE_STARTING		1 /* PMU is on, but not booted */
+#define PMU_STATE_ELPG_BOOTING		2 /* PMU is booting */
+#define PMU_STATE_ELPG_BOOTED		3 /* ELPG is initialized */
+#define PMU_STATE_LOADING_PG_BUF	4 /* Loading PG buf */
+#define PMU_STATE_LOADING_ZBC		5 /* Loading ZBC buf */
+#define PMU_STATE_STARTED		6 /* Fully unitialized */
+
 
 struct pmu_gk20a {
 

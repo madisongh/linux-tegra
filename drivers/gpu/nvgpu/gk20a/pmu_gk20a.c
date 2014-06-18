@@ -3,7 +3,7 @@
  *
  * GK20A PMU (aka. gPMU outside gk20a context)
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1995,6 +1995,8 @@ int gk20a_init_pmu_support(struct gk20a *g)
 		err = gk20a_init_pmu_setup_hw1(g);
 		if (err)
 			return err;
+
+		pmu->pmu_state = PMU_STATE_STARTING;
 	}
 
 	return err;
@@ -2025,7 +2027,7 @@ static void pmu_handle_pg_elpg_msg(struct gk20a *g, struct pmu_msg *msg,
 	case PMU_PG_ELPG_MSG_DISALLOW_ACK:
 		gk20a_dbg_pmu("DISALLOW is acknowledged from PMU");
 		pmu->elpg_stat = PMU_ELPG_STAT_OFF;
-		if (pmu->pmu_state == PMU_STATE_STARTING)
+		if (pmu->pmu_state == PMU_STATE_ELPG_BOOTING)
 			pmu->pmu_state = PMU_STATE_ELPG_BOOTED;
 		schedule_work(&pmu->pg_init);
 		break;
@@ -2122,7 +2124,10 @@ static int pmu_init_powergating(struct pmu_gk20a *pmu)
 	gk20a_pmu_cmd_post(g, &cmd, NULL, NULL, PMU_COMMAND_QUEUE_HPQ,
 			pmu_handle_pg_elpg_msg, pmu, &seq, ~0);
 
-	pmu->pmu_state = PMU_STATE_STARTING;
+	/* start with elpg disabled until first enable call */
+	pmu->elpg_refcnt = 0;
+
+	pmu->pmu_state = PMU_STATE_ELPG_BOOTING;
 
 	return 0;
 }
@@ -2891,7 +2896,8 @@ void gk20a_pmu_isr(struct gk20a *g)
 
 	gk20a_dbg_pmu("received falcon interrupt: 0x%08x", intr);
 
-	if (!intr) {
+	if (!intr || pmu->pmu_state == PMU_STATE_OFF) {
+		gk20a_writel(g, pwr_falcon_irqsclr_r(), intr);
 		mutex_unlock(&pmu->isr_mutex);
 		mutex_unlock(&pmu->isr_enable_lock);
 		return;
