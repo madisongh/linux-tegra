@@ -450,6 +450,10 @@ static int cpuloadmon_start(void)
 	if (atomic_inc_return(&active_count) > 1)
 		return 0;
 
+	rc = cpufreq_get_global_kobject();
+	if (rc)
+		return rc;
+
 	rc = sysfs_create_group(cpufreq_global_kobject,
 			&cpuload_attr_group);
 	if (rc)
@@ -470,6 +474,7 @@ static int cpuloadmon_stop(void)
 	idle_notifier_unregister(&cpuloadmon_idle_nb);
 	sysfs_remove_group(cpufreq_global_kobject,
 			&cpuload_attr_group);
+	cpufreq_put_global_kobject();
 
 	return 0;
 }
