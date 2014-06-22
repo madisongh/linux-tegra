@@ -107,7 +107,7 @@ static int tegra210_enter_c7(struct cpuidle_device *dev,
 
 	cpu_pm_enter();
 	arg = psci_power_state_pack(ps);
-	cpu_suspend(arg, NULL);
+	cpu_suspend(arg);
 	cpu_pm_exit();
 
 	return idx;
@@ -139,7 +139,7 @@ static int tegra210_enter_cc_state(struct cpuidle_device *dev,
 	}
 
 	arg = psci_power_state_pack(ps);
-	cpu_suspend(arg, NULL);
+	cpu_suspend(arg);
 
 	cpu_pm_exit();
 
@@ -243,7 +243,7 @@ static int tegra210_enter_sc7(struct cpuidle_device *dev,
 	}
 
 	arg = psci_power_state_pack(ps);
-	cpu_suspend(arg, NULL);
+	cpu_suspend(arg);
 
 	tegra_pm_post_sc7();
 prepare_failed:
