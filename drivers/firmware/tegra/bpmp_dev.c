@@ -190,14 +190,12 @@ static void bpmp_module_ready(const struct firmware *fw, void *context)
 
 	mutex_unlock(&bpmp_lock);
 	release_firmware(fw);
-	uncache_firmware(m->name);
 	return;
 
 err:
 	mutex_unlock(&bpmp_lock);
 err_nolock:
 	release_firmware(fw);
-	uncache_firmware(m->name);
 	debugfs_remove_recursive(m->root);
 	kfree(m);
 }
@@ -431,7 +429,6 @@ static void bpmp_fwready(const struct firmware *fw, void *context)
 	mutex_unlock(&bpmp_lock);
 
 	release_firmware(fw);
-	uncache_firmware(BPMP_FIRMWARE_NAME);
 }
 
 static int bpmp_reset_store(void *data, u64 val)
