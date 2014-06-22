@@ -66,7 +66,7 @@ static void shutdown_core(void *info)
 
 	if (*pending) {
 		cpu_pm_enter();
-		cpu_suspend(pg_core_arg, NULL);
+		cpu_suspend(pg_core_arg);
 		cpu_pm_exit();
 	}
 }
@@ -75,7 +75,7 @@ static void shutdown_cluster(void)
 {
 	cpu_pm_enter();
 
-	cpu_suspend(pg_cluster_arg, NULL);
+	cpu_suspend(pg_cluster_arg);
 
 	cpu_pm_exit();
 }
