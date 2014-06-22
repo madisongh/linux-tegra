@@ -2056,7 +2056,7 @@ static void tegra_pcie_enable_ltr_support(void)
 		pcie_capability_read_dword(pdev, PCI_EXP_DEVCAP2, &data);
 		if (data & PCI_EXP_DEVCAP2_LTR) {
 			pcie_capability_read_word(pdev, PCI_EXP_DEVCTL2, &val);
-			val |= PCI_EXP_LTR_EN;
+			val |= PCI_EXP_DEVCTL2_LTR_EN;
 			pcie_capability_write_word(pdev, PCI_EXP_DEVCTL2, val);
 		}
 		if (pci_pcie_type(pdev) != PCI_EXP_TYPE_ROOT_PORT)
