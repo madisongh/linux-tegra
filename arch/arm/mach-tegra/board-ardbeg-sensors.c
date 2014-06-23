@@ -1319,6 +1319,8 @@ static struct balanced_throttle emergency_throttle = {
 
 static int __init ardbeg_balanced_throttle_init(void)
 {
+	if (of_machine_is_compatible("nvidia,e2141"))
+		return 0;
 	if (!balanced_throttle_register(&cpu_throttle, "cpu-balanced"))
 		pr_err("balanced_throttle_register 'cpu-balanced' FAILED.\n");
 	if (!balanced_throttle_register(&gpu_throttle, "gpu-balanced"))
@@ -1514,6 +1516,10 @@ static int __init ardbeg_skin_init(void)
 	struct board_info board_info;
 
 	tegra_get_board_info(&board_info);
+
+
+	if (of_machine_is_compatible("nvidia,e2141"))
+		return 0;
 
 	if (board_info.board_id == BOARD_P1761 ||
 			board_info.board_id == BOARD_E1784 ||
