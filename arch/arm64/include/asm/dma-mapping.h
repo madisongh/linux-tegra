@@ -64,6 +64,8 @@ static inline int set_arch_dma_coherent_ops(struct device *dev)
 }
 #define set_arch_dma_coherent_ops	set_arch_dma_coherent_ops
 
+void set_dummy_dma_ops(struct device *dev);
+
 #include <asm-generic/dma-mapping-common.h>
 
 static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
