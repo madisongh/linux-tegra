@@ -140,6 +140,9 @@ struct sdhci_host {
 /* Stop command (CMD12) can set Transfer Complete when not using MMC_RSP_BUSY */
 #define SDHCI_QUIRK2_STOP_WITH_TC			(1<<8)
 
+	unsigned int  acmd12_ctrl;
+	unsigned int  ier;
+	unsigned int  command;
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
 

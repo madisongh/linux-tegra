@@ -1350,7 +1350,8 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 	    cmd->opcode == MMC_SEND_TUNING_BLOCK_HS200)
 		flags |= SDHCI_CMD_DATA;
 
-	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
+	host->command = SDHCI_MAKE_CMD(cmd->opcode, flags);
+	sdhci_writew(host, host->command, SDHCI_COMMAND);
 }
 EXPORT_SYMBOL_GPL(sdhci_send_command);
 
@@ -2693,7 +2694,7 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 
 	/* CMD19 generates _only_ Buffer Read Ready interrupt */
 	if (intmask & SDHCI_INT_DATA_AVAIL) {
-		command = SDHCI_GET_CMD(sdhci_readw(host, SDHCI_COMMAND));
+		command = SDHCI_GET_CMD(host->command);
 		if (command == MMC_SEND_TUNING_BLOCK ||
 		    command == MMC_SEND_TUNING_BLOCK_HS200) {
 			host->tuning_done = 1;
@@ -2746,7 +2747,7 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 		pr_err("%s: Data END Bit error, intmask: %x Interface clock = %uHz\n",
 			mmc_hostname(host->mmc), intmask, host->max_clk);
 	} else if ((intmask & SDHCI_INT_DATA_CRC) &&
-		SDHCI_GET_CMD(sdhci_readw(host, SDHCI_COMMAND))
+		SDHCI_GET_CMD(host->command)
 			!= MMC_BUS_TEST_R) {
 		host->data->error = -EILSEQ;
 		pr_err("%s: Data CRC error, intmask: %x Interface clock = %uHz\n",
