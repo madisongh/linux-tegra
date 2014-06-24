@@ -78,6 +78,7 @@ struct extcon_cable;
  * struct extcon_dev - An extcon device represents one external connector.
  * @name:		The name of this extcon device. Parent device name is
  *			used if NULL.
+ * @node:		Devicetree node of parent device.
  * @supported_cable:	Array of supported cable names ending with NULL.
  *			If supported_cable is NULL, cable name related APIs
  *			are disabled.
@@ -113,6 +114,7 @@ struct extcon_cable;
 struct extcon_dev {
 	/* Optional user initializing data */
 	const char *name;
+	const struct device_node *node;
 	const char **supported_cable;
 	const u32 *mutually_exclusive;
 
@@ -190,6 +192,12 @@ extern int devm_extcon_dev_register(struct device *dev,
 extern void devm_extcon_dev_unregister(struct device *dev,
 				       struct extcon_dev *edev);
 extern struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name);
+extern struct extcon_cable *extcon_get_extcon_cable(struct device *dev,
+		const char *cable_name);
+extern struct extcon_cable *extcon_get_extcon_cable_by_extcon_name(
+		const char *extcon_name, const char *cable_name);
+extern struct extcon_dev *extcon_get_extcon_dev_by_cable(struct device *dev,
+			const char *cable_name);
 
 /*
  * Following APIs control the memory of extcon device.
@@ -242,6 +250,8 @@ extern int extcon_register_interest(struct extcon_specific_cable_nb *obj,
 				    struct notifier_block *nb);
 extern int extcon_unregister_interest(struct extcon_specific_cable_nb *nb);
 
+extern int  extcon_register_cable_interest(struct extcon_specific_cable_nb *obj,
+		struct extcon_cable *ext_cable, struct notifier_block *nb);
 /*
  * Following APIs are to monitor every action of a notifier.
  * Registrar gets notified for every external port of a connection device.
@@ -342,6 +352,25 @@ static inline struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name)
 	return NULL;
 }
 
+static inline struct extcon_cable *extcon_get_extcon_cable(struct device *dev,
+		const char *cable_name)
+{
+	return NULL;
+}
+
+static inline struct extcon_cable *extcon_get_extcon_cable_by_extcon_name(
+		const char *extcon_name, const char *cable_name)
+{
+	return NULL;
+}
+
+static inline struct extcon_dev *extcon_get_extcon_dev_by_cable(
+		struct device *dev, const char *cable_name)
+
+{
+	return NULL;
+}
+
 static inline int extcon_register_notifier(struct extcon_dev *edev,
 					   struct notifier_block *nb)
 {
@@ -364,6 +393,13 @@ static inline int extcon_register_interest(struct extcon_specific_cable_nb *obj,
 
 static inline int extcon_unregister_interest(struct extcon_specific_cable_nb
 						    *obj)
+{
+	return 0;
+}
+
+static inline int extcon_register_cable_interest(
+	struct extcon_specific_cable_nb *obj,
+	struct extcon_cable *ext_cable, struct notifier_block *nb)
 {
 	return 0;
 }
