@@ -141,9 +141,13 @@
 /* Disable Timer Based Re-tuning mode */
 #define NVQUIRK_DISABLE_TIMER_BASED_TUNING	BIT(24)
 
+/* Max number of clock parents for sdhci is fixed to 2 */
+#define TEGRA_SDHCI_MAX_PLL_SOURCE 2
+
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
 	u32 nvquirks;
+	const char *parent_clk_list[TEGRA_SDHCI_MAX_PLL_SOURCE];
 };
 
 struct sdhci_tegra_sd_stats {
@@ -151,6 +155,11 @@ struct sdhci_tegra_sd_stats {
 	unsigned int cmd_crc_count;
 	unsigned int data_to_count;
 	unsigned int cmd_to_count;
+};
+
+struct sdhci_tegra_pll_parent {
+	struct clk *pll;
+	unsigned long pll_rate;
 };
 
 #ifdef CONFIG_DEBUG_FS
@@ -172,7 +181,8 @@ struct sdhci_tegra {
 	unsigned int ddr_clk_limit;
 	struct sdhci_tegra_sd_stats *sd_stat_head;
 	struct notifier_block reboot_notify;
-	bool is_parent_pllc;
+	struct sdhci_tegra_pll_parent pll_source[TEGRA_SDHCI_MAX_PLL_SOURCE];
+	bool is_parent_pll_source_1;
 	bool set_1v8_calib_offsets;
 #ifdef CONFIG_DEBUG_FS
 	/* Override debug config data */
@@ -181,11 +191,6 @@ struct sdhci_tegra {
 	struct pinctrl_dev *pinctrl;
 	int drive_group_sel;
 };
-
-static struct clk *pll_c;
-static struct clk *pll_p;
-static unsigned long pll_c_rate;
-static unsigned long pll_p_rate;
 
 static int show_error_stats_dump(struct seq_file *s, void *data)
 {
@@ -508,8 +513,9 @@ static void tegra_sdhci_clock_set_parent(struct sdhci_host *host,
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	struct clk *parent_clk;
-	unsigned long pll_c_freq;
-	unsigned long pll_p_freq;
+	unsigned long pll_source_1_freq;
+	unsigned long pll_source_2_freq;
+	struct sdhci_tegra_pll_parent *pll_source = tegra_host->pll_source;
 	int rc;
 
 #ifdef CONFIG_TEGRA_FPGA_PLATFORM
@@ -520,38 +526,42 @@ static void tegra_sdhci_clock_set_parent(struct sdhci_host *host,
 	 * rate is missing for either of them, then no selection is needed and
 	 * the default parent is used.
 	 */
-	if (!pll_c_rate || !pll_p_rate)
+	if (!pll_source[0].pll_rate || !pll_source[1].pll_rate)
 		return ;
 
-	pll_c_freq = get_nearest_clock_freq(pll_c_rate, desired_rate);
-	pll_p_freq = get_nearest_clock_freq(pll_p_rate, desired_rate);
+	pll_source_1_freq = get_nearest_clock_freq(pll_source[0].pll_rate,
+			desired_rate);
+	pll_source_2_freq = get_nearest_clock_freq(pll_source[1].pll_rate,
+			desired_rate);
 
 	/*
 	 * For low freq requests, both the desired rates might be higher than
 	 * the requested clock frequency. In such cases, select the parent
 	 * with the lower frequency rate.
 	 */
-	if ((pll_c_freq > desired_rate) && (pll_p_freq > desired_rate)) {
-		if (pll_p_freq <= pll_c_freq) {
-			desired_rate = pll_p_freq;
-			pll_c_freq = 0;
+	if ((pll_source_1_freq > desired_rate)
+		&& (pll_source_2_freq > desired_rate)) {
+		if (pll_source_2_freq <= pll_source_1_freq) {
+			desired_rate = pll_source_2_freq;
+			pll_source_1_freq = 0;
 		} else {
-			desired_rate = pll_c_freq;
-			pll_p_freq = 0;
+			desired_rate = pll_source_1_freq;
+			pll_source_2_freq = 0;
 		}
 		rc = clk_set_rate(pltfm_host->clk, desired_rate);
 	}
 
-	if (pll_c_freq > pll_p_freq) {
-		if (!tegra_host->is_parent_pllc) {
-			parent_clk = pll_c;
-			tegra_host->is_parent_pllc = true;
+	if (pll_source_1_freq > pll_source_2_freq) {
+		if (!tegra_host->is_parent_pll_source_1) {
+			parent_clk = pll_source[0].pll;
+			tegra_host->is_parent_pll_source_1 = true;
 			clk_set_rate(pltfm_host->clk, DEFAULT_SDHOST_FREQ);
 		} else
 			return;
-	} else if (tegra_host->is_parent_pllc) {
-		parent_clk = pll_p;
-		tegra_host->is_parent_pllc = false;
+	} else if (tegra_host->is_parent_pll_source_1) {
+		parent_clk = pll_source[1].pll;
+		tegra_host->is_parent_pll_source_1 = false;
+		clk_set_rate(pltfm_host->clk, DEFAULT_SDHOST_FREQ);
 	} else
 		return;
 
@@ -877,8 +887,31 @@ static struct sdhci_tegra_soc_data soc_data_tegra114 = {
 		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD,
 };
 
+static struct sdhci_pltfm_data sdhci_tegra210_pdata = {
+	.quirks = TEGRA_SDHCI_QUIRKS,
+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+		   SDHCI_QUIRK2_NON_STD_VOLTAGE_SWITCHING |
+		   SDHCI_QUIRK2_NO_CALC_MAX_DISCARD_TO |
+		   SDHCI_QUIRK2_REG_ACCESS_REQ_HOST_CLK |
+		   SDHCI_QUIRK2_SUPPORT_64BIT_DMA,
+	.ops  = &tegra_sdhci_ops,
+};
+
+static struct sdhci_tegra_soc_data soc_data_tegra210 = {
+	.pdata = &sdhci_tegra21_pdata,
+	.nvquirks = TEGRA_SDHCI_NVQUIRKS |
+		    NVQUIRK_SET_TRIM_DELAY |
+		    NVQUIRK_ENABLE_DDR50 |
+		    NVQUIRK_ENABLE_AUTO_CMD23 |
+		    NVQUIRK_INFINITE_ERASE_TIMEOUT |
+		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
+		    NVQUIRK_SET_CALIBRATION_OFFSETS |
+		    NVQUIRK_DISABLE_TIMER_BASED_TUNING |
+		    NVQUIRK_DISABLE_EXTERNAL_LOOPBACK,
+};
+
 static const struct of_device_id sdhci_tegra_dt_match[] = {
-	{ .compatible = "nvidia,tegra210-sdhci", .data = &soc_data_tegra114 },
+	{ .compatible = "nvidia,tegra210-sdhci", .data = &soc_data_tegra210 },
 	{ .compatible = "nvidia,tegra124-sdhci", .data = &soc_data_tegra114 },
 	{ .compatible = "nvidia,tegra114-sdhci", .data = &soc_data_tegra114 },
 	{ .compatible = "nvidia,tegra30-sdhci", .data = &soc_data_tegra30 },
@@ -1145,6 +1178,36 @@ static int tegra_sdhci_get_drive_strength(struct sdhci_host *sdhci,
 	return plat->default_drv_type;
 }
 
+static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
+		const char **parent_clk_list, int size)
+{
+	struct device_node *np = pdev->dev.of_node;
+	const char *pll_str;
+	int i, cnt;
+
+	if (!np)
+		return -EINVAL;
+
+	if (!of_find_property(np, "pll_source", NULL))
+		return -ENXIO;
+
+	cnt = of_property_count_strings(np, "pll_source");
+	if (!cnt)
+		return -EINVAL;
+
+	if (cnt > size) {
+		dev_warn(&pdev->dev,
+			"pll list provide in DT exceeds max supported\n");
+		cnt = size;
+	}
+
+	for (i = 0; i < cnt; i++) {
+		of_property_read_string_index(np, "pll_source", i, &pll_str);
+		parent_clk_list[i] = pll_str;
+	}
+	return 0;
+}
+
 static int sdhci_tegra_init_pinctrl_info(struct device *dev,
 		struct sdhci_tegra *tegra_host,
 		struct tegra_sdhci_platform_data *plat)
@@ -1175,6 +1238,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	struct sdhci_tegra *tegra_host;
 	struct tegra_sdhci_platform_data *plat;
 	struct clk *clk;
+	const char *parent_clk_list[TEGRA_SDHCI_MAX_PLL_SOURCE];
 	int rc;
 
 	match = of_match_device(sdhci_tegra_dt_match, &pdev->dev);
@@ -1220,6 +1284,30 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	rc = sdhci_tegra_parse_dt(&pdev->dev);
 	if (rc)
 		goto err_parse_dt;
+	/* check if DT provide list possible pll parents */
+	if (sdhci_tegra_get_pll_from_dt(pdev,
+		parent_clk_list, ARRAY_SIZE(parent_clk_list))) {
+		parent_clk_list[0] = soc_data->parent_clk_list[0];
+		parent_clk_list[1] = soc_data->parent_clk_list[1];
+	}
+
+	for (i = 0; i < ARRAY_SIZE(parent_clk_list); i++) {
+		if (!parent_clk_list[i])
+			continue;
+		tegra_host->pll_source[i].pll = clk_get_sys(NULL,
+				parent_clk_list[i]);
+		if (IS_ERR(tegra_host->pll_source[i].pll)) {
+			rc = PTR_ERR(tegra_host->pll_source[i].pll);
+			dev_err(mmc_dev(host->mmc),
+					"clk error in getting %s: %d\n",
+					parent_clk_list[i], rc);
+		}
+		tegra_host->pll_source[i].pll_rate =
+			clk_get_rate(tegra_host->pll_source[i].pll);
+
+		dev_info(mmc_dev(host->mmc), "Parent select= %s rate=%ld\n",
+				parent_clk_list[i], tegra_host->pll_source[i].pll_rate);
+	}
 
 	if (gpio_is_valid(tegra_host->power_gpio)) {
 		rc = gpio_request(tegra_host->power_gpio, "sdhci_power");
@@ -1256,8 +1344,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		goto err_clk_get;
 	}
 
-	if (clk_get_parent(clk) == pll_c)
-		tegra_host->is_parent_pllc = true;
+	if (clk_get_parent(pltfm_host->clk) == tegra_host->pll_source[0].pll)
+		tegra_host->is_parent_pll_source_1 = true;
 
 	rc = clk_prepare_enable(clk);
 	if (rc != 0)
