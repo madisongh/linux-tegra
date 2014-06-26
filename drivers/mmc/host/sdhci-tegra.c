@@ -74,6 +74,9 @@
 #define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT	8
 #define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_MASK	0x3F
 
+#define SDMMC_VENDOR_IO_TRIM_CNTRL_0	0x1AC
+#define SDMMC_VENDOR_IO_TRIM_CNTRL_0_SEL_VREG_MASK	0x4
+
 #define SDHCI_VNDR_DLLCAL_CFG				0x1b0
 #define SDHCI_VNDR_DLLCAL_CFG_EN_CALIBRATE		0x10000000
 
@@ -99,6 +102,9 @@
 
 #define SDMMC_AUTO_CAL_STATUS	0x1EC
 #define SDMMC_AUTO_CAL_STATUS_AUTO_CAL_ACTIVE	0x80000000
+
+#define SDMMC_IO_SPARE_0	0x1F0
+#define SPARE_OUT_3_OFFSET	19
 
 #define SDHCI_TEGRA_MAX_TAP_VALUES	0xFF
 #define SDHCI_TEGRA_MAX_TRIM_VALUES	0x1F
@@ -147,11 +153,13 @@
 /* Set Pipe stages value o zero */
 #define NVQUIRK_SET_PIPE_STAGES_MASK_0		BIT(20)
 /* Disable SDMMC3 external loopback */
-#define NVQUIRK_DISABLE_EXTERNAL_LOOPBACK	BIT(23)
+#define NVQUIRK_DISABLE_EXTERNAL_LOOPBACK	BIT(21)
 /* Disable Timer Based Re-tuning mode */
-#define NVQUIRK_DISABLE_TIMER_BASED_TUNING	BIT(24)
+#define NVQUIRK_DISABLE_TIMER_BASED_TUNING	BIT(22)
 /* Set SDMEMCOMP VREF sel values based on IO voltage */
-#define NVQUIRK_SET_SDMEMCOMP_VREF_SEL		BIT(25)
+#define NVQUIRK_SET_SDMEMCOMP_VREF_SEL		BIT(23)
+#define NVQUIRK_UPDATE_PAD_CNTRL_REG		BIT(24)
+#define NVQUIRK_UPDATE_PIN_CNTRL_REG		BIT(25)
 
 /* Max number of clock parents for sdhci is fixed to 2 */
 #define TEGRA_SDHCI_MAX_PLL_SOURCE 2
@@ -201,6 +209,9 @@ struct sdhci_tegra {
 	struct dbg_cfg_data dbg_cfg;
 #endif
 	struct pinctrl_dev *pinctrl;
+	struct pinctrl *pinctrl_sdmmc;
+	struct pinctrl_state *schmitt_enable[2];
+	struct pinctrl_state *schmitt_disable[2];
 	int drive_group_sel;
 };
 
@@ -215,6 +226,8 @@ static inline int sdhci_tegra_set_dqs_trim_delay(struct sdhci_host *sdhci,
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	unsigned char signal_voltage);
 static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci);
+static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
+		bool set);
 
 static int show_error_stats_dump(struct seq_file *s, void *data)
 {
@@ -445,6 +458,15 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		misc_ctrl |= (1 << SDHCI_VNDR_MISC_CTRL_EN_EXT_LOOPBACK_SHIFT);
 	sdhci_writel(host, misc_ctrl, SDHCI_VNDR_MISC_CTRL);
 
+	if (soc_data->nvquirks & NVQUIRK_UPDATE_PAD_CNTRL_REG) {
+		misc_ctrl = sdhci_readl(host, SDMMC_IO_SPARE_0);
+		misc_ctrl |= (1 << SPARE_OUT_3_OFFSET);
+		sdhci_writel(host, misc_ctrl, SDMMC_IO_SPARE_0);
+
+		vendor_ctrl = sdhci_readl(host, SDMMC_VENDOR_IO_TRIM_CNTRL_0);
+		vendor_ctrl &= ~(SDMMC_VENDOR_IO_TRIM_CNTRL_0_SEL_VREG_MASK);
+		sdhci_writel(host, vendor_ctrl, SDMMC_VENDOR_IO_TRIM_CNTRL_0);
+	}
 	if (soc_data->nvquirks &
 		NVQUIRK_DISABLE_TIMER_BASED_TUNING) {
 		vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_TUN_CTRL);
@@ -702,6 +724,32 @@ static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci)
 	}
 }
 
+static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
+		bool set)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	struct pinctrl_state *set_schmitt[2];
+	int ret;
+	int i;
+
+	if (set) {
+		set_schmitt[0] = tegra_host->schmitt_enable[0];
+		set_schmitt[1] = tegra_host->schmitt_enable[1];
+	} else {
+		set_schmitt[0] = tegra_host->schmitt_disable[0];
+		set_schmitt[1] = tegra_host->schmitt_disable[1];
+	}
+
+	for (i = 0; i < 2; i++) {
+		ret = pinctrl_select_state(tegra_host->pinctrl_sdmmc,
+				set_schmitt[i]);
+		if (ret < 0)
+			dev_warn(mmc_dev(sdhci->mmc),
+				"setting schmitt state failed\n");
+	}
+}
+
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	unsigned char signal_voltage)
 {
@@ -712,6 +760,7 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	unsigned int timeout = 10;
 	unsigned int calib_offsets = 0;
 
+	tegra_sdhci_update_sdmmc_pinctrl_register(sdhci, set);
 
 	/*
 	 * Do not enable auto calibration if the platform doesn't
@@ -984,7 +1033,8 @@ static struct sdhci_tegra_soc_data soc_data_tegra210 = {
 		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
 		    NVQUIRK_SET_CALIBRATION_OFFSETS |
 		    NVQUIRK_DISABLE_TIMER_BASED_TUNING |
-		    NVQUIRK_DISABLE_EXTERNAL_LOOPBACK,
+		    NVQUIRK_DISABLE_EXTERNAL_LOOPBACK |
+		    NVQUIRK_UPDATE_PAD_CNTRL_REG,
 	.parent_clk_list = {"pll_p"},
 };
 
@@ -1043,6 +1093,9 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	of_property_read_u32(np, "compad-vref-1v8", &plat->compad_vref_1v8);
 	of_property_read_u32(np, "calib_3v3_offsets", &plat->calib_3v3_offsets);
 	of_property_read_u32(np, "calib_1v8_offsets", &plat->calib_1v8_offsets);
+	of_property_read_u8(np, "default-drv-type", &plat->default_drv_type);
+	plat->update_pinctrl_settings = of_property_read_bool(np,
+		"update-pinctrl-settings");
 
 	return mmc_of_parse(host->mmc);
 }
@@ -1300,6 +1353,38 @@ static int sdhci_tegra_init_pinctrl_info(struct device *dev,
 	if (!np)
 		return 0;
 
+	if (plat->update_pinctrl_settings) {
+		tegra_host->pinctrl_sdmmc = devm_pinctrl_get(dev);
+		if (IS_ERR(tegra_host->pinctrl_sdmmc)) {
+			dev_err(dev, "Missing pinctrl info\n");
+			return -EINVAL;
+		}
+
+		tegra_host->schmitt_enable[0] =
+			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+			"sdmmc_schmitt_enable");
+		if (IS_ERR(tegra_host->schmitt_enable[0]))
+			dev_warn(dev, "Missing schmitt enable state\n");
+
+		tegra_host->schmitt_enable[1] =
+			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+			"sdmmc_clk_schmitt_enable");
+		if (IS_ERR(tegra_host->schmitt_enable[1]))
+			dev_warn(dev, "Missing clk schmitt enable state\n");
+
+		tegra_host->schmitt_disable[0] =
+			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+			"sdmmc_schmitt_disable");
+		if (IS_ERR(tegra_host->schmitt_disable[0]))
+			dev_warn(dev, "Missing schmitt disable state\n");
+
+		tegra_host->schmitt_disable[1] =
+			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+			"sdmmc_clk_schmitt_disable");
+		if (IS_ERR(tegra_host->schmitt_disable[1]))
+			dev_warn(dev, "Missing clk schmitt disable state\n");
+	}
+
 	tegra_host->pinctrl = pinctrl_get_dev_from_of_property(np,
 					"drive-pin-pinctrl");
 	if (!tegra_host->pinctrl)
@@ -1350,8 +1435,6 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	}
 
 	tegra_host->plat = plat;
-
-	sdhci_tegra_init_pinctrl_info(&pdev->dev, tegra_host, plat);
 
 	tegra_host->sd_stat_head = devm_kzalloc(&pdev->dev,
 		sizeof(struct sdhci_tegra_sd_stats), GFP_KERNEL);
@@ -1438,6 +1521,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	mutex_init(&tegra_host->set_clock_mutex);
 
 	tegra_host->max_clk_limit = plat->max_clk_limit;
+
+	sdhci_tegra_init_pinctrl_info(&pdev->dev, tegra_host, plat);
 
 	host->mmc->pm_caps |= plat->pm_caps;
 	host->mmc->pm_flags |= plat->pm_flags;
