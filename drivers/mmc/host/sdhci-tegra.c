@@ -33,6 +33,7 @@
 #include <linux/gpio/consumer.h>
 #include <linux/clk/tegra.h>
 #include <linux/tegra_prod.h>
+#include <linux/dma-mapping.h>
 #include <linux/platform_data/mmc-sdhci-tegra.h>
 #include <linux/padctrl/padctrl.h>
 
@@ -1296,6 +1297,14 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	if (IS_ERR(host))
 		return PTR_ERR(host);
 	pltfm_host = sdhci_priv(host);
+
+	/* FIXME: This is for until dma-mask binding is supported in DT.
+	 *        Set coherent_dma_mask for each Tegra SKUs.
+	 *        If dma_mask is NULL, set it to coherent_dma_mask. */
+	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+
+	if (!pdev->dev.dma_mask)
+		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
 
 	tegra_host = devm_kzalloc(&pdev->dev, sizeof(*tegra_host), GFP_KERNEL);
 	if (!tegra_host) {
