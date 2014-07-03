@@ -174,7 +174,7 @@ int is_partition_clk_disabled(struct powergate_partition_info *pg_info)
 int powergate_module(int id)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return -EINVAL;
 	}
 
@@ -189,7 +189,7 @@ int powergate_module(int id)
 int unpowergate_module(int id)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return -EINVAL;
 	}
 
@@ -328,7 +328,7 @@ int tegra_powergate_reset_module(struct powergate_partition_info *pg_info)
 bool tegra_powergate_check_clamping(int id)
 {
 	if (!pg_ops || !pg_ops->powergate_check_clamping) {
-		pr_info("This SOC can't check clamping status\n");
+		WARN_ON_ONCE("This SOC can't check clamping status\n");
 		return -EINVAL;
 	}
 
@@ -344,7 +344,7 @@ int tegra_powergate_remove_clamping(int id)
 	int contention_timeout = 100;
 
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return -EINVAL;
 	}
 
@@ -410,7 +410,7 @@ EXPORT_SYMBOL(tegra_powergate_is_powered);
 int tegra_cpu_powergate_id(int cpuid)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return -EINVAL;
 	}
 
@@ -431,7 +431,7 @@ EXPORT_SYMBOL(tegra_cpu_powergate_id);
 int tegra_powergate_partition(int id)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return -EINVAL;
 	}
 
@@ -456,7 +456,7 @@ EXPORT_SYMBOL(tegra_powergate_partition);
 int tegra_unpowergate_partition(int id)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support un-powergating\n");
 		return -EINVAL;
 	}
 
@@ -481,7 +481,7 @@ EXPORT_SYMBOL(tegra_unpowergate_partition);
 int tegra_powergate_partition_with_clk_off(int id)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return -EINVAL;
 	}
 
@@ -506,7 +506,7 @@ EXPORT_SYMBOL(tegra_powergate_partition_with_clk_off);
 int tegra_unpowergate_partition_with_clk_on(int id)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return -EINVAL;
 	}
 
@@ -531,7 +531,7 @@ EXPORT_SYMBOL(tegra_unpowergate_partition_with_clk_on);
 int tegra_powergate_mc_enable(int id)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return -EINVAL;
 	}
 
@@ -552,7 +552,7 @@ EXPORT_SYMBOL(tegra_powergate_mc_enable);
 int tegra_powergate_mc_disable(int id)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return -EINVAL;
 	}
 
@@ -573,7 +573,7 @@ EXPORT_SYMBOL(tegra_powergate_mc_disable);
 int tegra_powergate_mc_flush(int id)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return -EINVAL;
 	}
 
@@ -594,7 +594,7 @@ EXPORT_SYMBOL(tegra_powergate_mc_flush);
 int tegra_powergate_mc_flush_done(int id)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return -EINVAL;
 	}
 
@@ -615,7 +615,7 @@ EXPORT_SYMBOL(tegra_powergate_mc_flush_done);
 const char *tegra_powergate_get_name(int id)
 {
 	if (!pg_ops) {
-		pr_info("This SOC doesn't support powergating\n");
+		WARN_ON_ONCE("This SOC doesn't support powergating\n");
 		return NULL;
 	}
 
