@@ -1492,8 +1492,7 @@ static int tegra_get_board_info_properties(struct board_info *bi,
 	board_info = of_find_node_by_path(board_info_path);
 	memset(bi, 0, sizeof(*bi));
 
-	if (!board_info) {
-
+	if (board_info) {
 		err = of_property_read_u32(board_info, "id", &prop_val);
 		if (err < 0) {
 			pr_err("failed to read %s/id\n", board_info_path);
@@ -1533,6 +1532,7 @@ static int tegra_get_board_info_properties(struct board_info *bi,
 		return 0;
 	}
 
+	pr_err("Node path %s not found\n", board_info_path);
 out:
 	return -1;
 }
@@ -1544,9 +1544,7 @@ void tegra_get_board_info(struct board_info *bi)
 
 	if (!parsed) {
 		parsed = 1;
-		ret = tegra_get_board_info_properties(bi, "board_info");
-		if (ret)
-			ret = tegra_get_board_info_properties(bi, "proc-board");
+		ret = tegra_get_board_info_properties(bi, "proc-board");
 		if (!ret) {
 			memcpy(&main_board_info, bi, sizeof(struct board_info));
 			system_serial_high = (bi->board_id << 16) | bi->sku;
@@ -1569,30 +1567,6 @@ void tegra_get_board_info(struct board_info *bi)
 	memcpy(bi, &main_board_info, sizeof(struct board_info));
 }
 
-static int __init tegra_main_board_info(char *info)
-{
-	char *p = info;
-	main_board_info.board_id = memparse(p, &p);
-	main_board_info.sku = memparse(p+1, &p);
-	main_board_info.fab = memparse(p+1, &p);
-	main_board_info.major_revision = memparse(p+1, &p);
-	main_board_info.minor_revision = memparse(p+1, &p);
-	return 1;
-}
-__setup("board_info=", tegra_main_board_info);
-
-static int __init tegra_pmu_board_info(char *info)
-{
-	char *p = info;
-	pmu_board_info.board_id = memparse(p, &p);
-	pmu_board_info.sku = memparse(p+1, &p);
-	pmu_board_info.fab = memparse(p+1, &p);
-	pmu_board_info.major_revision = memparse(p+1, &p);
-	pmu_board_info.minor_revision = memparse(p+1, &p);
-	return 0;
-}
-early_param("pmuboard", tegra_pmu_board_info);
-
 void tegra_get_pmu_board_info(struct board_info *bi)
 {
 	static bool parsed = 0;
@@ -1607,18 +1581,6 @@ void tegra_get_pmu_board_info(struct board_info *bi)
 	memcpy(bi, &pmu_board_info, sizeof(struct board_info));
 }
 
-static int __init tegra_display_board_info(char *info)
-{
-	char *p = info;
-	display_board_info.board_id = memparse(p, &p);
-	display_board_info.sku = memparse(p+1, &p);
-	display_board_info.fab = memparse(p+1, &p);
-	display_board_info.major_revision = memparse(p+1, &p);
-	display_board_info.minor_revision = memparse(p+1, &p);
-	return 1;
-}
-__setup("displayboard=", tegra_display_board_info);
-
 void tegra_get_display_board_info(struct board_info *bi)
 {
 	static bool parsed = 0;
@@ -1632,18 +1594,6 @@ void tegra_get_display_board_info(struct board_info *bi)
 	}
 	memcpy(bi, &display_board_info, sizeof(struct board_info));
 }
-
-static int __init tegra_camera_board_info(char *info)
-{
-	char *p = info;
-	camera_board_info.board_id = memparse(p, &p);
-	camera_board_info.sku = memparse(p+1, &p);
-	camera_board_info.fab = memparse(p+1, &p);
-	camera_board_info.major_revision = memparse(p+1, &p);
-	camera_board_info.minor_revision = memparse(p+1, &p);
-	return 1;
-}
-__setup("cameraboard=", tegra_camera_board_info);
 
 void tegra_get_camera_board_info(struct board_info *bi)
 {
@@ -1660,18 +1610,6 @@ void tegra_get_camera_board_info(struct board_info *bi)
 	memcpy(bi, &camera_board_info, sizeof(struct board_info));
 }
 
-static int __init tegra_leftspeaker_board_info(char *info)
-{
-	char *p = info;
-	leftspeaker_board_info.board_id = memparse(p, &p);
-	leftspeaker_board_info.sku = memparse(p+1, &p);
-	leftspeaker_board_info.fab = memparse(p+1, &p);
-	leftspeaker_board_info.major_revision = memparse(p+1, &p);
-	leftspeaker_board_info.minor_revision = memparse(p+1, &p);
-	return 1;
-}
-__setup("leftspeakerboard=", tegra_leftspeaker_board_info);
-
 void tegra_get_leftspeaker_board_info(struct board_info *bi)
 {
 	static bool parsed = 0;
@@ -1686,19 +1624,6 @@ void tegra_get_leftspeaker_board_info(struct board_info *bi)
 	}
 	memcpy(bi, &leftspeaker_board_info, sizeof(struct board_info));
 }
-
-
-static int __init tegra_rightspeaker_board_info(char *info)
-{
-	char *p = info;
-	rightspeaker_board_info.board_id = memparse(p, &p);
-	rightspeaker_board_info.sku = memparse(p+1, &p);
-	rightspeaker_board_info.fab = memparse(p+1, &p);
-	rightspeaker_board_info.major_revision = memparse(p+1, &p);
-	rightspeaker_board_info.minor_revision = memparse(p+1, &p);
-	return 1;
-}
-__setup("rightspeakerboard=", tegra_rightspeaker_board_info);
 
 void tegra_get_rightspeaker_board_info(struct board_info *bi)
 {
@@ -1715,19 +1640,6 @@ void tegra_get_rightspeaker_board_info(struct board_info *bi)
 	memcpy(bi, &rightspeaker_board_info, sizeof(struct board_info));
 }
 
-
-static int __init tegra_joystick_board_info(char *info)
-{
-	char *p = info;
-	joystick_board_info.board_id = memparse(p, &p);
-	joystick_board_info.sku = memparse(p+1, &p);
-	joystick_board_info.fab = memparse(p+1, &p);
-	joystick_board_info.major_revision = memparse(p+1, &p);
-	joystick_board_info.minor_revision = memparse(p+1, &p);
-	return 1;
-}
-__setup("joystickboard=", tegra_joystick_board_info);
-
 void tegra_get_joystick_board_info(struct board_info *bi)
 {
 	static bool parsed = 0;
@@ -1743,19 +1655,6 @@ void tegra_get_joystick_board_info(struct board_info *bi)
 	memcpy(bi, &joystick_board_info, sizeof(struct board_info));
 }
 
-
-static int __init tegra_button_board_info(char *info)
-{
-	char *p = info;
-	button_board_info.board_id = memparse(p, &p);
-	button_board_info.sku = memparse(p+1, &p);
-	button_board_info.fab = memparse(p+1, &p);
-	button_board_info.major_revision = memparse(p+1, &p);
-	button_board_info.minor_revision = memparse(p+1, &p);
-	return 1;
-}
-__setup("buttonboard=", tegra_button_board_info);
-
 void tegra_get_button_board_info(struct board_info *bi)
 {
 	static bool parsed = 0;
@@ -1770,18 +1669,6 @@ void tegra_get_button_board_info(struct board_info *bi)
 	}
 	memcpy(bi, &button_board_info, sizeof(struct board_info));
 }
-
-static int __init tegra_io_board_info(char *info)
-{
-	char *p = info;
-	io_board_info.board_id = memparse(p, &p);
-	io_board_info.sku = memparse(p+1, &p);
-	io_board_info.fab = memparse(p+1, &p);
-	io_board_info.major_revision = memparse(p+1, &p);
-	io_board_info.minor_revision = memparse(p+1, &p);
-	return 1;
-}
-__setup("ioboard=", tegra_io_board_info);
 
 void tegra_get_io_board_info(struct board_info *bi)
 {
