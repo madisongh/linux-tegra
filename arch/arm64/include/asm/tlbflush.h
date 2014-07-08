@@ -106,7 +106,8 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
 	dsb(ishst);
 	if (cpumask_ran_on_only_one(mm_cpumask(mm)))
 		asm("tlbi	aside1, %0" : : "r" (asid));
-	else
+	barrier();
+	if (!cpumask_ran_on_only_one(mm_cpumask(mm)))
 		asm("tlbi	aside1is, %0" : : "r" (asid));
 	dsb(ish);
 }
@@ -120,7 +121,8 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
 	dsb(ishst);
 	if (cpumask_ran_on_only_one(mm_cpumask(vma->vm_mm)))
 		asm("tlbi	vae1, %0" : : "r" (addr));
-	else
+	barrier();
+	if (!cpumask_ran_on_only_one(mm_cpumask(vma->vm_mm)))
 		asm("tlbi	vae1is, %0" : : "r" (addr));
 	dsb(ish);
 }
@@ -137,7 +139,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
 	if (cpumask_ran_on_only_one(mm_cpumask(vma->vm_mm)))
 		for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
 			asm("tlbi vae1, %0" : : "r"(addr));
-	else
+	barrier();
+	if (!cpumask_ran_on_only_one(mm_cpumask(vma->vm_mm)))
 		for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
 			asm("tlbi vae1is, %0" : : "r"(addr));
 	dsb(ish);
