@@ -139,10 +139,6 @@ static inline int tegra_dvfs_override_core_voltage(struct clk *c, int override_m
 {
 	return -EINVAL;
 }
-static inline int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
-{
-	return -EINVAL;
-}
 #else
 void tegra_periph_reset_deassert(struct clk *c);
 void tegra_periph_reset_assert(struct clk *c);
