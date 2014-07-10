@@ -1611,6 +1611,19 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
 	}
 }
 
+/* Execute DLL calibration once for MMC device if it is
+ * enumerated in HS400 mode at 200MHz clock freq before
+ * starting any data transfer.
+ */
+static void sdhci_post_init(struct mmc_host *mmc)
+{
+	struct sdhci_host *host;
+
+	host = mmc_priv(mmc);
+
+	if (host->ops->post_init)
+		host->ops->post_init(host);
+}
 /*****************************************************************************\
  *                                                                           *
  * MMC callbacks                                                             *
@@ -2458,6 +2471,7 @@ static const struct mmc_host_ops sdhci_ops = {
 	.card_event			= sdhci_card_event,
 	.card_busy	= sdhci_card_busy,
 	.select_drive_strength		= sdhci_select_drive_strength,
+	.post_init	= sdhci_post_init,
 };
 
 /*****************************************************************************\

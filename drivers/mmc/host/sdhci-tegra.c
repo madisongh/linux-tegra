@@ -74,6 +74,12 @@
 #define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT	8
 #define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_MASK	0x3F
 
+#define SDHCI_VNDR_DLLCAL_CFG				0x1b0
+#define SDHCI_VNDR_DLLCAL_CFG_EN_CALIBRATE		0x10000000
+
+#define SDHCI_VNDR_DLLCAL_CFG_STATUS			0x1bc
+#define SDHCI_VNDR_DLLCAL_CFG_STATUS_DLL_ACTIVE		0x10000000
+
 #define SDHCI_VNDR_TUN_CTRL				0x1c0
 /* Enable Re-tuning request only when CRC error is detected
  * in SDR50/SDR104/HS200 modes
@@ -197,6 +203,18 @@ struct sdhci_tegra {
 	struct pinctrl_dev *pinctrl;
 	int drive_group_sel;
 };
+
+static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
+		unsigned long desired_rate);
+static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
+	unsigned int tap_delay);
+static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
+	unsigned int trim_delay);
+static inline int sdhci_tegra_set_dqs_trim_delay(struct sdhci_host *sdhci,
+	unsigned int dqs_trim_delay);
+static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
+	unsigned char signal_voltage);
+static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci);
 
 static int show_error_stats_dump(struct seq_file *s, void *data)
 {
@@ -656,6 +674,32 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 		tegra_host->clk_enabled = false;
 	}
 	mutex_unlock(&tegra_host->set_clock_mutex);
+}
+
+static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci)
+{
+	u32 dll_cfg;
+	unsigned timeout = 5;
+
+	dll_cfg = sdhci_readl(sdhci, SDHCI_VNDR_DLLCAL_CFG);
+	dll_cfg |= SDHCI_VNDR_DLLCAL_CFG_EN_CALIBRATE;
+	sdhci_writel(sdhci, dll_cfg, SDHCI_VNDR_DLLCAL_CFG);
+
+	mdelay(1);
+
+	/* Wait until the dll calibration is done */
+	do {
+		if (!(sdhci_readl(sdhci, SDHCI_VNDR_DLLCAL_CFG_STATUS) &
+			SDHCI_VNDR_DLLCAL_CFG_STATUS_DLL_ACTIVE))
+			break;
+
+		mdelay(1);
+		timeout--;
+	} while (timeout);
+
+	if (!timeout) {
+		dev_err(mmc_dev(sdhci->mmc), "DLL calibration is failed\n");
+	}
 }
 
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,

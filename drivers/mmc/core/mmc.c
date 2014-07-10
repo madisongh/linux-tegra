@@ -1546,6 +1546,13 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		host->card = card;
 
 	mmc_free_ext_csd(ext_csd);
+
+	if (mmc_card_hs400(card) && card->host->ops->post_init) {
+		mmc_host_clk_hold(card->host);
+		card->host->ops->post_init(card->host);
+		mmc_host_clk_release(card->host);
+	}
+
 	return 0;
 
 free_card:
