@@ -218,3 +218,10 @@ void tegra_add_core_vmax_trips(struct thermal_trip_info *trips, int *num_trips)
 	tegra_add_trip_points(trips, num_trips,
 			      tegra_dvfs_get_core_vmax_cdev());
 }
+
+void tegra_add_cpu_clk_switch_trips(struct thermal_trip_info *trips,
+							int *num_trips)
+{
+	tegra_add_trip_points(trips, num_trips,
+				 tegra_dvfs_get_cpu_clk_switch_cdev());
+}

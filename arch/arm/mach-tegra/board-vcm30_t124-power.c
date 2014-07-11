@@ -175,6 +175,57 @@ static struct i2c_board_info __initdata max15569_vddcpu_boardinfo[] = {
 	},
 };
 
+#ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
+/* board parameters for cpu dfll */
+static struct tegra_cl_dvfs_cfg_param vcm30_t124_cl_dvfs_param = {
+	.sample_rate = 12500,
+
+	.force_mode = TEGRA_CL_DVFS_FORCE_FIXED,
+	.cf = 10,
+	.ci = 0,
+	.cg = 2,
+
+	.droop_cut_value = 0xF,
+	.droop_restore_ramp = 0x0,
+	.scale_out_ramp = 0x0,
+};
+
+/* MAX15569: fixed 10mV steps from 600mV to 1400mV, with offset 0x0b */
+#define PMU_CPU_VDD_MAP_SIZE ((1400000 - 600000) / 10000 + 1)
+static struct voltage_reg_map pmu_cpu_vdd_map[PMU_CPU_VDD_MAP_SIZE];
+static inline void fill_reg_map(void)
+{
+	int i;
+	for (i = 0; i < PMU_CPU_VDD_MAP_SIZE; i++) {
+		pmu_cpu_vdd_map[i].reg_value = i + 0x0b;
+		pmu_cpu_vdd_map[i].reg_uV = 600000 + 10000 * i;
+	}
+}
+
+static struct tegra_cl_dvfs_platform_data vcm30_t124_cl_dvfs_data = {
+	.dfll_clk_name = "dfll_cpu",
+	.pmu_if = TEGRA_CL_DVFS_PMU_I2C,
+	.u.pmu_i2c = {
+		.fs_rate = 400000,
+		.slave_addr = 0x74,
+		.reg = 0x07,
+	},
+	.vdd_map = pmu_cpu_vdd_map,
+	.vdd_map_size = PMU_CPU_VDD_MAP_SIZE,
+	.flags = TEGRA_CL_DVFS_DYN_OUTPUT_CFG,
+	.cfg_param = &vcm30_t124_cl_dvfs_param,
+};
+
+static int __init vcm30_t124_cl_dvfs_init(void)
+{
+	fill_reg_map();
+	tegra_cl_dvfs_device.dev.platform_data = &vcm30_t124_cl_dvfs_data;
+	platform_device_register(&tegra_cl_dvfs_device);
+
+	return 0;
+}
+#endif
+
 /* MAX15569 switching regulator for vdd_gpu */
 static struct regulator_consumer_supply max15569_vddgpu_supply[] = {
 	REGULATOR_SUPPLY("vdd_gpu", NULL),
@@ -213,6 +264,25 @@ static struct i2c_board_info __initdata max15569_vddgpu_boardinfo[] = {
 
 static int __init vcm30_t124_max77663_regulator_init(void)
 {
+	int sku_rev;
+	sku_rev = tegra_board_get_skurev("61859");
+
+	tegra_pmc_pmu_interrupt_polarity(true);
+
+#ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
+	vcm30_t124_cl_dvfs_init();
+#endif
+
+	/* C01 boards have tegra gpio for gpu_pwr_req and
+	 *   boards before C01 have PMU gpio for gpu_pwr_req
+	 */
+	if (sku_rev >= 300) {
+		max15569_vddgpu_pdata.ena_gpio = TEGRA_GPIO_PR2;
+	} else {
+		max77663_pdata.num_gpio_cfgs = ARRAY_SIZE(max77663_gpio_cfgs);
+		max77663_pdata.gpio_cfgs = max77663_gpio_cfgs;
+	}
+
 	i2c_register_board_info(4, max77663_regulators,
 				ARRAY_SIZE(max77663_regulators));
 
@@ -355,7 +425,8 @@ int __init vcm30_t124_soctherm_init(void)
 
 	vcm30_t124_soctherm_data.tshut_pmu_trip_data = &tpdata_max77663;
 
-	tegra_add_cpu_vmax_trips(vcm30_t124_soctherm_data.therm[THERM_CPU].trips,
+	tegra_add_cpu_clk_switch_trips(
+			vcm30_t124_soctherm_data.therm[THERM_CPU].trips,
 			&vcm30_t124_soctherm_data.therm[THERM_CPU].num_trips);
 	/*tegra_add_vc_trips(vcm30_t124_soctherm_data.therm[THERM_CPU].trips,
 			&vcm30_t124_soctherm_data.therm[THERM_CPU].num_trips);
