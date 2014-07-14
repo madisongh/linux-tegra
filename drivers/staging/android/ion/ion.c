@@ -888,7 +888,7 @@ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
 	struct ion_buffer *buffer = dmabuf->priv;
 	unsigned int nents = buffer->sg_table->nents;
 	struct ion_mapping *map_ptr;
-	struct scatterlist *sg;
+	struct scatterlist *sg, *sg2;
 
 	ion_buffer_sync_for_device(buffer, attachment->dev, direction);
 
@@ -911,7 +911,7 @@ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
 		}
 	}
 
-	if (!empty) {
+	if (empty == -1) {
 		err = -ENOMEM;
 		goto err_no_space;
 	}
@@ -921,8 +921,11 @@ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
 	if (err)
 		goto err_sg_alloc_table;
 
-	for_each_sg(buffer->sg_table->sgl, sg, nents, i)
-		memcpy(map_ptr->sgt.sgl + i, sg, sizeof(*sg));
+	sg2 = map_ptr->sgt.sgl;
+	for_each_sg(buffer->sg_table->sgl, sg, nents, i) {
+		*sg2 = *sg;
+		sg2 = sg_next(sg2);
+	}
 
 	nents = dma_map_sg(attachment->dev, map_ptr->sgt.sgl, nents, direction);
 	if (!nents) {
