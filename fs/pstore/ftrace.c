@@ -118,6 +118,7 @@ void pstore_register_ftrace(void)
 		pr_err("%s: unable to create pstore directory\n", __func__);
 		return;
 	}
+	psinfo->debugfs_dir = pstore_ftrace_dir;
 
 	file = debugfs_create_file("record_ftrace", 0600, pstore_ftrace_dir,
 				   NULL, &pstore_knob_fops);

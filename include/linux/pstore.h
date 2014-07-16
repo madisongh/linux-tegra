@@ -2,6 +2,7 @@
  * Persistent Storage - pstore.h
  *
  * Copyright (C) 2010 Intel Corporation <tony.luck@intel.com>
+ * Copyright (C) 2016 NVIDIA Corporation. All rights reserved.
  *
  * This code is the generic layer to export data records from platform
  * level persistent storage via a file system.
@@ -35,12 +36,13 @@ enum pstore_type_id {
 	PSTORE_TYPE_MCE		= 1,
 	PSTORE_TYPE_CONSOLE	= 2,
 	PSTORE_TYPE_FTRACE	= 3,
+	PSTORE_TYPE_RTRACE	= 4,
 	/* PPC64 partition types */
-	PSTORE_TYPE_PPC_RTAS	= 4,
-	PSTORE_TYPE_PPC_OF	= 5,
-	PSTORE_TYPE_PPC_COMMON	= 6,
-	PSTORE_TYPE_PMSG	= 7,
-	PSTORE_TYPE_PPC_OPAL	= 8,
+	PSTORE_TYPE_PPC_RTAS	= 5,
+	PSTORE_TYPE_PPC_OF	= 6,
+	PSTORE_TYPE_PPC_COMMON	= 7,
+	PSTORE_TYPE_PMSG	= 8,
+	PSTORE_TYPE_PPC_OPAL	= 9,
 	PSTORE_TYPE_UNKNOWN	= 255
 };
 
@@ -71,7 +73,21 @@ struct pstore_info {
 			int count, struct timespec time,
 			struct pstore_info *psi);
 	void		*data;
+	struct dentry *debugfs_dir;
 };
+
+enum rtrace_event_type {
+	RTRACE_READ = 0,
+	RTRACE_WRITE = 1,
+};
+
+#ifdef CONFIG_PSTORE_RTRACE
+extern void pstore_rtrace_call(enum rtrace_event_type log_type, void *data);
+#else
+static inline void
+pstore_rtrace_call(enum rtrace_event_type log_type, void *data)
+{ }
+#endif
 
 #define	PSTORE_FLAGS_FRAGILE	1
 

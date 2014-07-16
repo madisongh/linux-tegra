@@ -3,6 +3,7 @@
  *
  * Copyright (C) 1996-2000 Russell King
  * Copyright (C) 2012 ARM Ltd.
+ * Copyright (C) 2016 NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -24,6 +25,7 @@
 #include <linux/types.h>
 #include <linux/blk_types.h>
 
+#include <linux/pstore.h>
 #include <asm/byteorder.h>
 #include <asm/barrier.h>
 #include <asm/memory.h>
@@ -40,24 +42,28 @@
 #define __raw_writeb __raw_writeb
 static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
 {
+	pstore_rtrace_call(RTRACE_WRITE, (void __force *)addr);
 	asm volatile("strb %w0, [%1]" : : "r" (val), "r" (addr));
 }
 
 #define __raw_writew __raw_writew
 static inline void __raw_writew(u16 val, volatile void __iomem *addr)
 {
+	pstore_rtrace_call(RTRACE_WRITE, (void __force *)addr);
 	asm volatile("strh %w0, [%1]" : : "r" (val), "r" (addr));
 }
 
 #define __raw_writel __raw_writel
 static inline void __raw_writel(u32 val, volatile void __iomem *addr)
 {
+	pstore_rtrace_call(RTRACE_WRITE, (void __force *)addr);
 	asm volatile("str %w0, [%1]" : : "r" (val), "r" (addr));
 }
 
 #define __raw_writeq __raw_writeq
 static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
 {
+	pstore_rtrace_call(RTRACE_WRITE, (void __force *)addr);
 	asm volatile("str %0, [%1]" : : "r" (val), "r" (addr));
 }
 
@@ -65,6 +71,7 @@ static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
 static inline u8 __raw_readb(const volatile void __iomem *addr)
 {
 	u8 val;
+	pstore_rtrace_call(RTRACE_READ, (void __force *)addr);
 	asm volatile(ALTERNATIVE("ldrb %w0, [%1]",
 				 "ldarb %w0, [%1]",
 				 ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE)
@@ -77,6 +84,7 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
 {
 	u16 val;
 
+	pstore_rtrace_call(RTRACE_READ, (void __force *)addr);
 	asm volatile(ALTERNATIVE("ldrh %w0, [%1]",
 				 "ldarh %w0, [%1]",
 				 ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE)
@@ -88,6 +96,7 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
 static inline u32 __raw_readl(const volatile void __iomem *addr)
 {
 	u32 val;
+	pstore_rtrace_call(RTRACE_READ, (void __force *)addr);
 	asm volatile(ALTERNATIVE("ldr %w0, [%1]",
 				 "ldar %w0, [%1]",
 				 ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE)
@@ -99,6 +108,7 @@ static inline u32 __raw_readl(const volatile void __iomem *addr)
 static inline u64 __raw_readq(const volatile void __iomem *addr)
 {
 	u64 val;
+	pstore_rtrace_call(RTRACE_READ, (void __force *)addr);
 	asm volatile(ALTERNATIVE("ldr %0, [%1]",
 				 "ldar %0, [%1]",
 				 ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE)
