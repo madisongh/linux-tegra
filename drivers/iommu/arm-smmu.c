@@ -1455,7 +1455,7 @@ static void debugfs_create_smmu_cb(struct arm_smmu_domain *smmu_domain,
 	char name[] = "cb000";
 	struct debugfs_regset32	*cb;
 	u8 cbndx = smmu_domain->cfg.cbndx;
-	struct arm_smmu_device *smmu = dev->archdata.iommu;
+	struct arm_smmu_device *smmu = smmu_domain->smmu;
 
 	sprintf(name, "cb%03d", cbndx);
 	dent = debugfs_create_dir(name, smmu->debugfs_root);
@@ -1504,7 +1504,7 @@ static void add_smmu_master_debugfs(struct arm_smmu_domain *smmu_domain,
 				    struct arm_smmu_master *master)
 {
 	struct dentry *dent;
-	struct arm_smmu_device *smmu = dev->archdata.iommu;
+	struct arm_smmu_device *smmu = smmu_domain->smmu;
 	char name[] = "cb000";
 	char target[] = "../../cb000";
 	u8 cbndx = smmu_domain->cfg.cbndx;
@@ -1582,8 +1582,8 @@ static void arm_smmu_detach_dev(struct iommu_domain *domain, struct device *dev)
 	if (!cfg)
 		return;
 
-	dev->archdata.iommu = NULL;
 	debugfs_remove_recursive(cfg->debugfs_root);
+	dev->archdata.iommu = NULL;
 	arm_smmu_domain_remove_master(smmu_domain, cfg);
 }
 
