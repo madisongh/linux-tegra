@@ -698,6 +698,7 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 			if (ret) {
 				dev_err(mmc_dev(sdhci->mmc),
 					"clock enable is failed, ret: %d\n", ret);
+				mutex_unlock(&tegra_host->set_clock_mutex);
 				return;
 			}
 			vendor_ctrl = sdhci_readb(sdhci, SDHCI_VNDR_CLK_CTRL);
