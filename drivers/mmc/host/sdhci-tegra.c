@@ -144,6 +144,8 @@
 #define NVQUIRK_DISABLE_EXTERNAL_LOOPBACK	BIT(23)
 /* Disable Timer Based Re-tuning mode */
 #define NVQUIRK_DISABLE_TIMER_BASED_TUNING	BIT(24)
+/* Set SDMEMCOMP VREF sel values based on IO voltage */
+#define NVQUIRK_SET_SDMEMCOMP_VREF_SEL		BIT(25)
 
 /* Max number of clock parents for sdhci is fixed to 2 */
 #define TEGRA_SDHCI_MAX_PLL_SOURCE 2
@@ -678,7 +680,14 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	val &= ~SDMMC_SDMEMCOMPPADCTRL_VREF_SEL_MASK;
 	if (soc_data->nvquirks & NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD)
 		val |= SDMMC_SDMEMCOMPPADCTRL_PAD_E_INPUT_OR_E_PWRD_MASK;
-	val |= 0x7;
+	if (soc_data->nvquirks & NVQUIRK_SET_SDMEMCOMP_VREF_SEL) {
+		if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+			val |= tegra_host->plat->compad_vref_3v3;
+		else if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
+			val |= tegra_host->plat->compad_vref_1v8;
+	} else {
+		val |= 0x7;
+	}
 	sdhci_writel(sdhci, val, SDMMC_SDMEMCOMPPADCTRL);
 
 	/* Enable Auto Calibration*/
@@ -941,8 +950,7 @@ static const struct of_device_id sdhci_tegra_dt_match[] = {
 };
 MODULE_DEVICE_TABLE(of, sdhci_tegra_dt_match);
 
-static int sdhci_tegra_parse_dt(struct device *dev)
-{
+static int sdhci_tegra_parse_dt(struct device *dev) {
 	struct device_node *np = dev->of_node;
 	struct sdhci_host *host = dev_get_drvdata(dev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
@@ -983,6 +991,10 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	of_property_read_u32(np, "ddr-clk-limit", &plat->ddr_clk_limit);
 	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
 	of_property_read_u32(np, "uhs_mask", &plat->uhs_mask);
+	of_property_read_u32(np, "compad-vref-3v3", &plat->compad_vref_3v3);
+	of_property_read_u32(np, "compad-vref-1v8", &plat->compad_vref_1v8);
+	of_property_read_u32(np, "calib_3v3_offsets", &plat->calib_3v3_offsets);
+	of_property_read_u32(np, "calib_1v8_offsets", &plat->calib_1v8_offsets);
 
 	return mmc_of_parse(host->mmc);
 }
