@@ -887,8 +887,18 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 	if (!mask)
 		return NULL;
 
-	if (mask < 0xffffffffULL)
+#ifdef CONFIG_ZONE_DMA
+	if (mask == (u64)arm_dma_limit) {
+		if ((gfp & GFP_ZONEMASK) != GFP_DMA &&
+		    (gfp & GFP_ZONEMASK) != 0) {
+			dev_warn(dev, "Invalid GFP flags(%x) passed. "
+				"GFP_DMA should only be set.",
+				 gfp & GFP_ZONEMASK);
+			return NULL;
+		}
 		gfp |= GFP_DMA;
+	}
+#endif
 
 	/*
 	 * Following is a work-around (a.k.a. hack) to prevent pages
