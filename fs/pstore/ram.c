@@ -333,10 +333,13 @@ static int ramoops_pstore_erase(enum pstore_type_id type, u64 id, int count,
 
 	switch (type) {
 	case PSTORE_TYPE_DMESG:
+		return -EINVAL;
+		/* disable erase for the moment
 		if (id >= cxt->max_dump_cnt)
 			return -EINVAL;
 		prz = cxt->przs[id];
 		break;
+		*/
 	case PSTORE_TYPE_CONSOLE:
 		prz = cxt->cprz;
 		break;
@@ -369,6 +372,23 @@ static struct ramoops_context oops_cxt = {
 		.erase	= ramoops_pstore_erase,
 	},
 };
+
+static unsigned int
+ramoops_pstore_get_count(struct persistent_ram_zone *przs[],
+				   enum pstore_type_id pstore_type,
+				   unsigned int max)
+{
+	u64 id;
+	enum pstore_type_id type;
+	unsigned int count = 0;
+
+	while (ramoops_get_next_prz(przs, &count, max, &id, &type,
+				    pstore_type, 0))
+		;
+	if (count)
+		count--;
+	return count;
+}
 
 static void ramoops_free_przs(struct ramoops_context *cxt)
 {
@@ -422,6 +442,10 @@ static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
 		}
 		*paddr += sz;
 	}
+
+	cxt->dump_write_cnt = ramoops_pstore_get_count(cxt->przs,
+					PSTORE_TYPE_DMESG, cxt->max_dump_cnt);
+	cxt->dump_write_cnt %= cxt->max_dump_cnt;
 
 	return 0;
 fail_prz:
