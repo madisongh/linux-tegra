@@ -567,6 +567,7 @@ struct imx135_platform_data ardbeg_imx135_data = {
 		.repeat = 1,
 		.delay_frm = 0,
 	},
+	.ext_reg = true,
 	.power_on = ardbeg_imx135_power_on,
 	.power_off = ardbeg_imx135_power_off,
 };
@@ -588,7 +589,7 @@ static int ardbeg_dw9718_power_on(struct dw9718_power_rail *pw)
 	int err;
 	pr_info("%s\n", __func__);
 
-	if (unlikely(!pw || !pw->vdd || !pw->vdd_i2c))
+	if (unlikely(!pw || !pw->vdd || !pw->vdd_i2c || !pw->vana))
 		return -EFAULT;
 
 	err = regulator_enable(pw->vdd);
@@ -599,11 +600,18 @@ static int ardbeg_dw9718_power_on(struct dw9718_power_rail *pw)
 	if (unlikely(err))
 		goto dw9718_i2c_fail;
 
+	err = regulator_enable(pw->vana);
+	if (unlikely(err))
+		goto dw9718_ana_fail;
+
 	usleep_range(1000, 1020);
 
 	/* return 1 to skip the in-driver power_on sequence */
 	pr_debug("%s --\n", __func__);
 	return 1;
+
+dw9718_ana_fail:
+	regulator_disable(pw->vdd_i2c);
 
 dw9718_i2c_fail:
 	regulator_disable(pw->vdd);
@@ -617,11 +625,12 @@ static int ardbeg_dw9718_power_off(struct dw9718_power_rail *pw)
 {
 	pr_info("%s\n", __func__);
 
-	if (unlikely(!pw || !pw->vdd || !pw->vdd_i2c))
+	if (unlikely(!pw || !pw->vdd || !pw->vdd_i2c || !pw->vana))
 		return -EFAULT;
 
 	regulator_disable(pw->vdd);
 	regulator_disable(pw->vdd_i2c);
+	regulator_disable(pw->vana);
 
 	return 1;
 }
