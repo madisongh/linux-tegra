@@ -24,33 +24,17 @@ void __attribute__((weak)) arch_report_meminfo(struct seq_file *m)
 {
 }
 
-static int meminfo_proc_show(struct seq_file *m, void *v)
+long get_available_memory(void)
 {
-	struct sysinfo i;
-	unsigned long committed;
-	struct vmalloc_info vmi;
-	long cached;
 	long available;
 	unsigned long pagecache;
 	unsigned long wmark_low = 0;
-	unsigned long pages[NR_LRU_LISTS];
 	struct zone *zone;
+	unsigned long pages[NR_LRU_LISTS];
+	struct sysinfo i;
 	int lru;
 
-/*
- * display in kilobytes.
- */
-#define K(x) ((x) << (PAGE_SHIFT - 10))
 	si_meminfo(&i);
-	si_swapinfo(&i);
-	committed = percpu_counter_read_positive(&vm_committed_as);
-
-	cached = global_page_state(NR_FILE_PAGES) -
-			total_swapcache_pages() - i.bufferram;
-	if (cached < 0)
-		cached = 0;
-
-	get_vmalloc_info(&vmi);
 
 	for (lru = LRU_BASE; lru < NR_LRU_LISTS; lru++)
 		pages[lru] = global_page_state(NR_LRU_BASE + lru);
@@ -86,6 +70,39 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 	if (available < 0)
 		available = 0;
 
+	return available;
+}
+EXPORT_SYMBOL(get_available_memory);
+
+static int meminfo_proc_show(struct seq_file *m, void *v)
+{
+	struct sysinfo i;
+	unsigned long committed;
+	struct vmalloc_info vmi;
+	long cached;
+	long available;
+	unsigned long pages[NR_LRU_LISTS];
+	int lru;
+
+/*
+ * display in kilobytes.
+ */
+#define K(x) ((x) << (PAGE_SHIFT - 10))
+	si_meminfo(&i);
+	si_swapinfo(&i);
+	committed = percpu_counter_read_positive(&vm_committed_as);
+
+	cached = global_page_state(NR_FILE_PAGES) -
+			total_swapcache_pages() - i.bufferram;
+	if (cached < 0)
+		cached = 0;
+
+	get_vmalloc_info(&vmi);
+
+	for (lru = LRU_BASE; lru < NR_LRU_LISTS; lru++)
+		pages[lru] = global_page_state(NR_LRU_BASE + lru);
+
+	available = get_available_memory();
 	/*
 	 * Tagged format, for easy grepping and expansion.
 	 */
