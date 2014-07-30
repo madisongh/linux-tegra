@@ -31,7 +31,7 @@ config PCI_IMX6
 	select PCIE_DW
 
 config PCI_TEGRA
-        bool "NVIDIA Tegra PCIe controller"
+        tristate "NVIDIA Tegra PCIe controller"
         select TEGRA_USB_SHARED_PAD
         depends on ARCH_TEGRA_HAS_PCIE
         help
