@@ -1402,7 +1402,7 @@ static void debugfs_create_smmu_cb(struct arm_smmu_domain *smmu_domain,
 	cb->regs = arm_smmu_cb_regs;
 	cb->nregs = ARRAY_SIZE(arm_smmu_cb_regs);
 	cb->base = smmu->base + (smmu->size >> 1) +
-		cbndx * smmu->pagesize;
+		cbndx * (1 << smmu->pgshift);
 	debugfs_create_regset32("regdump", S_IRUGO, dent, cb);
 	debugfs_create_file("ptdump", S_IRUGO, dent, smmu_domain,
 			    &smmu_ptdump_fops);
@@ -2326,11 +2326,11 @@ static void arm_smmu_debugfs_create(struct arm_smmu_device *smmu)
 		regs++;
 
 		regs->name = kasprintf(GFP_KERNEL, "GR1_CBAR%03d", i);
-		regs->offset = smmu->pagesize + ARM_SMMU_GR1_CBAR(i);
+		regs->offset = (1 << smmu->pgshift) + ARM_SMMU_GR1_CBAR(i);
 		regs++;
 
 		regs->name = kasprintf(GFP_KERNEL, "GR1_CBA2R%03d", i);
-		regs->offset = smmu->pagesize + ARM_SMMU_GR1_CBA2R(i);
+		regs->offset = (1 << smmu->pgshift) + ARM_SMMU_GR1_CBA2R(i);
 		regs++;
 	}
 
