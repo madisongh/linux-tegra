@@ -57,6 +57,7 @@ config ARCH_TEGRA_21x_SOC
 	select PINCTRL_TEGRA210
 	select SYSTEM_PMIC
 	select HAVE_FUNCTION_TRACER
+	select TEGRA_HMP_CLUSTER_CONTROL
 	help
 	  Support for NVIDIA Tegra 21x family of SoCs, based upon the
 	  NVIDIA Denver CPU
@@ -95,3 +96,8 @@ config TEGRA_CPU_FREQ_GOVERNOR_KERNEL_START
 		a faster boot up. Selecting this option will make the system to choose
 		a performance governor once the DVFS initialization is complete. Userspace
 		or init script can override the governor chosen here.
+
+config TEGRA_HMP_CLUSTER_CONTROL
+	bool "HMP Cluster control"
+	help
+	  Supports a cluster switch model for heterogenous clusters.
