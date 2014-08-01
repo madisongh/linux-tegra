@@ -15,14 +15,14 @@
  *
  */
 
-#include <linux/nvmap.h>
+#include <linux/gfp.h>
+#include <media/videobuf2-dma-contig.h>
 #include <video/adf.h>
 #include <video/adf_fbdev.h>
 #include <video/adf_format.h>
 
 #include "dc/dc_config.h"
 #include "dc/dc_priv.h"
-#include "nvmap/nvmap_priv.h"
 #include "tegra_adf.h"
 
 struct tegra_adf_info {
@@ -30,6 +30,7 @@ struct tegra_adf_info {
 	struct adf_interface		intf;
 	struct adf_overlay_engine	eng;
 	struct tegra_dc			*dc;
+	void				*vb2_dma_conf;
 };
 
 #define adf_dev_to_tegra(p) \
@@ -810,6 +811,9 @@ static int tegra_adf_intf_alloc_simple_buffer(struct adf_interface *intf,
 		struct dma_buf **dma_buf, u32 *offset, u32 *pitch)
 {
 	size_t i;
+	struct tegra_adf_info *adf_info = adf_intf_to_tegra(intf);
+	const struct vb2_mem_ops *mem_ops = &vb2_dma_contig_memops;
+	void *vb2_buf;
 	bool format_valid = false;
 
 	for (i = 0; i < ARRAY_SIZE(tegra_adf_formats); i++) {
@@ -959,6 +963,10 @@ struct tegra_adf_info *tegra_adf_init(struct platform_device *ndev,
 	err = adf_attachment_allow(&adf_info->base, &adf_info->eng,
 			&adf_info->intf);
 	if (err < 0)
+		goto err_attach;
+
+	adf_info->vb2_dma_conf = vb2_dma_contig_init_ctx(&ndev->dev);
+	if ((err = IS_ERR(adf_info->vb2_dma_conf)))
 		goto err_attach;
 
 	if (dc->out->n_modes) {
