@@ -78,6 +78,7 @@ struct fiq_debugger_state {
 	bool ignore_next_wakeup_irq;
 	struct timer_list sleep_timer;
 	spinlock_t sleep_timer_lock;
+	spinlock_t debug_fiq_lock;
 	bool uart_enabled;
 	struct wake_lock debugger_wake_lock;
 	bool console_enable;
@@ -732,6 +733,13 @@ static void fiq_debugger_fiq(struct fiq_glue_handler *h,
 	unsigned int this_cpu = THREAD_INFO(svc_sp)->cpu;
 	bool need_irq;
 
+	spin_lock(&state->debug_fiq_lock);
+	fiq_debugger_printf(&state->output, "Dump for CPU%d:\n", this_cpu);
+	/* execute "allregs" command */
+	fiq_debugger_fiq_exec(state, "bt", regs, svc_sp);
+	fiq_debugger_fiq_exec(state, "allregs", regs, svc_sp);
+	spin_unlock(&state->debug_fiq_lock);
+
 	need_irq = fiq_debugger_handle_uart_interrupt(state, this_cpu, regs,
 			svc_sp);
 	if (need_irq)
@@ -1076,6 +1084,7 @@ static int fiq_debugger_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, state);
 
 	spin_lock_init(&state->sleep_timer_lock);
+	spin_lock_init(&state->debug_fiq_lock);
 
 	if (state->wakeup_irq < 0 && fiq_debugger_have_fiq(state))
 		state->no_sleep = true;
