@@ -100,7 +100,7 @@ static struct fb_videomode tegra_dc_vga_mode = {
 static struct tegra_dc_mode override_disp_mode[3];
 
 static void _tegra_dc_controller_disable(struct tegra_dc *dc);
-
+static void tegra_dc_disable_nosync(struct tegra_dc *dc);
 struct tegra_dc *tegra_dcs[TEGRA_MAX_DC];
 
 DEFINE_MUTEX(tegra_dc_lock);
@@ -2035,7 +2035,7 @@ static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 	mutex_unlock(&dc->lock);
 
 	if (need_disable)
-		tegra_dc_disable(dc);
+		tegra_dc_disable_nosync(dc);
 	return IRQ_HANDLED;
 }
 
@@ -2665,6 +2665,42 @@ static void _tegra_dc_disable(struct tegra_dc *dc)
 	pm_runtime_put(&dc->ndev->dev);
 
 	tegra_log_suspend_time();
+}
+
+static void tegra_dc_disable_nosync(struct tegra_dc *dc)
+{
+	if (WARN_ON(!dc || !dc->out || !dc->out_ops))
+		return;
+
+	tegra_dc_ext_disable(dc->ext);
+
+	/* it's important that new underflow work isn't scheduled before the
+	 * lock is acquired. */
+	cancel_delayed_work_sync(&dc->underflow_work);
+
+	if (dc->out->flags & TEGRA_DC_OUT_ONE_SHOT_MODE)
+		mutex_lock(&dc->one_shot_lp_lock);
+	mutex_lock(&dc->lock);
+
+	if (dc->enabled) {
+		dc->enabled = false;
+		dc->blanked = false;
+
+		if (!dc->suspended)
+			_tegra_dc_disable(dc);
+	}
+
+#ifdef CONFIG_SWITCH
+	switch_set_state(&dc->modeset_switch, 0);
+#endif
+	mutex_unlock(&dc->lock);
+	if (dc->out->flags & TEGRA_DC_OUT_ONE_SHOT_MODE)
+		mutex_unlock(&dc->one_shot_lp_lock);
+	trace_display_mode(dc, &dc->mode);
+
+	/* disable pending clks due to uncompleted frames */
+	while (tegra_is_clk_enabled(dc->clk))
+		tegra_dc_put(dc);
 }
 
 void tegra_dc_disable(struct tegra_dc *dc)
