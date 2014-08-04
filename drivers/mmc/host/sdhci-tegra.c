@@ -103,6 +103,8 @@
 #define SDMMC_AUTO_CAL_STATUS	0x1EC
 #define SDMMC_AUTO_CAL_STATUS_AUTO_CAL_ACTIVE	0x80000000
 
+#define SDMMC_VENDOR_ERR_INTR_STATUS_0	0x108
+
 #define SDMMC_IO_SPARE_0	0x1F0
 #define SPARE_OUT_3_OFFSET	19
 
@@ -228,6 +230,23 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci);
 static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
 		bool set);
+
+static void tegra_sdhci_dumpregs(struct sdhci_host *sdhci)
+{
+	u32 tap_delay;
+	u32 trim_delay;
+
+	tap_delay = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
+	trim_delay = tap_delay;
+	tap_delay >>= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT;
+	tap_delay &= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK;
+	trim_delay >>= SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT;
+	trim_delay &= SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK;
+	pr_info("sdhci: Tap value: %u | Trim value: %u\n", tap_delay,
+			trim_delay);
+	pr_info("sdhci: SDMMC Interrupt status: 0x%08x\n", sdhci_readl(sdhci,
+				SDMMC_VENDOR_ERR_INTR_STATUS_0));
+}
 
 static int show_error_stats_dump(struct seq_file *s, void *data)
 {
