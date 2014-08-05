@@ -1300,6 +1300,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 				cpufreq_put_global_kobject();
 
 			common_tunables = NULL;
+			kfree(tunables);
 		}
 
 		policy->governor_data = NULL;
