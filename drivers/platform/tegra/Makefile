@@ -3,6 +3,7 @@
 # Tegra Platform-Specific Drivers
 #
 subdir-ccflags-y += -Werror
+subdir-ccflags-y += -I$(srctree)/drivers/platform/tegra/include
 
 obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
 obj-$(CONFIG_TEGRA_IOMMU_SMMU)          += iommu.o
