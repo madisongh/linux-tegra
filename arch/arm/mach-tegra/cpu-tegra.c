@@ -690,6 +690,8 @@ int tegra_update_cpu_speed(unsigned long rate)
 		goto _err;
 	}
 
+	freqs.new = tegra_getspeed(0);
+
 	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 
 	if (freqs.old > freqs.new) {
