@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2010 Google, Inc.
  *
- * Copyright (c) 2012-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -215,6 +215,7 @@ struct sdhci_tegra {
 	struct pinctrl_state *schmitt_enable[2];
 	struct pinctrl_state *schmitt_disable[2];
 	int drive_group_sel;
+	u32 dll_calib;
 };
 
 static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
@@ -481,17 +482,30 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		misc_ctrl = sdhci_readl(host, SDMMC_IO_SPARE_0);
 		misc_ctrl |= (1 << SPARE_OUT_3_OFFSET);
 		sdhci_writel(host, misc_ctrl, SDMMC_IO_SPARE_0);
-
-		vendor_ctrl = sdhci_readl(host, SDMMC_VENDOR_IO_TRIM_CNTRL_0);
-		vendor_ctrl &= ~(SDMMC_VENDOR_IO_TRIM_CNTRL_0_SEL_VREG_MASK);
-		sdhci_writel(host, vendor_ctrl, SDMMC_VENDOR_IO_TRIM_CNTRL_0);
 	}
+
 	if (soc_data->nvquirks &
 		NVQUIRK_DISABLE_TIMER_BASED_TUNING) {
 		vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_TUN_CTRL);
 		vendor_ctrl |= SDHCI_VNDR_TUN_CTRL_RETUNE_REQ_EN;
 		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_TUN_CTRL);
 	}
+
+	/* Restore DLL calibration and DQS Trim delay values */
+	if (plat->dll_calib_needed && tegra_host->dll_calib)
+		sdhci_writel(host, tegra_host->dll_calib,
+				SDHCI_VNDR_DLLCAL_CFG);
+	if (plat->dqs_trim_delay)
+		sdhci_tegra_set_dqs_trim_delay(host, plat->dqs_trim_delay);
+
+	/*
+	 * Enable Band Gap trimmers and VIO supply.
+	 * Wait for 3usec after enabling the trimmers.
+	 */
+	vendor_ctrl = sdhci_readl(host, SDMMC_VENDOR_IO_TRIM_CNTRL_0);
+	vendor_ctrl &= ~(SDMMC_VENDOR_IO_TRIM_CNTRL_0_SEL_VREG_MASK);
+	sdhci_writel(host, vendor_ctrl, SDMMC_VENDOR_IO_TRIM_CNTRL_0);
+	udelay(3);
 }
 
 static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
@@ -722,6 +736,8 @@ static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci)
 {
 	u32 dll_cfg;
 	unsigned timeout = 5;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 
 	dll_cfg = sdhci_readl(sdhci, SDHCI_VNDR_DLLCAL_CFG);
 	dll_cfg |= SDHCI_VNDR_DLLCAL_CFG_EN_CALIBRATE;
@@ -742,6 +758,7 @@ static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci)
 	if (!timeout) {
 		dev_err(mmc_dev(sdhci->mmc), "DLL calibration is failed\n");
 	}
+	tegra_host->dll_calib = sdhci_readl(sdhci, SDHCI_VNDR_DLLCAL_CFG);
 }
 
 static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
@@ -1116,6 +1133,7 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	of_property_read_u8(np, "default-drv-type", &plat->default_drv_type);
 	plat->update_pinctrl_settings = of_property_read_bool(np,
 		"update-pinctrl-settings");
+	plat->dll_calib_needed = of_property_read_bool(np, "dll-calib-needed");
 
 	return mmc_of_parse(host->mmc);
 }
