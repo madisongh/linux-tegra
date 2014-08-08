@@ -72,6 +72,7 @@
 
 #define SDHCI_VNDR_SYS_SW_CTRL				0x104
 #define SDHCI_VNDR_SYS_SW_CTRL_WR_CRC_USE_TMCLK		0x40000000
+#define SDHCI_VNDR_SYS_SW_CTRL_STROBE_SHIFT		31
 
 #define SDHCI_VNDR_CAP_OVERRIDES_0			0x10c
 #define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT	8
@@ -174,6 +175,7 @@
 #define NVQUIRK_DISABLE_EXTERNAL_LOOPBACK	BIT(27)
 /* Enable T210 specific SDMMC WAR - Tuning Step Size, Tuning Iterations*/
 #define NVQUIRK_UPDATE_HW_TUNING_CONFG		BIT(28)
+#define NVQUIRK2_EN_STROBE_SUPPORT		BIT(29)
 
 /* Max number of clock parents for sdhci is fixed to 2 */
 #define TEGRA_SDHCI_MAX_PLL_SOURCE 2
@@ -228,6 +230,7 @@ struct sdhci_tegra {
 	struct pinctrl_state *schmitt_disable[2];
 	int drive_group_sel;
 	u32 dll_calib;
+	bool en_strobe;
 };
 
 static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
@@ -762,6 +765,19 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	mutex_unlock(&tegra_host->set_clock_mutex);
 }
 
+static void tegra_sdhci_en_strobe(struct sdhci_host *host)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	u32 vndr_ctrl;
+
+	vndr_ctrl = sdhci_readl(host, SDHCI_VNDR_SYS_SW_CTRL);
+	vndr_ctrl |= (1 <<
+		SDHCI_VNDR_SYS_SW_CTRL_STROBE_SHIFT);
+	sdhci_writel(host, vndr_ctrl, SDHCI_VNDR_SYS_SW_CTRL);
+	tegra_host->en_strobe = true;
+}
+
 static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci)
 {
 	u32 dll_cfg;
@@ -789,6 +805,9 @@ static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci)
 		dev_err(mmc_dev(sdhci->mmc), "DLL calibration is failed\n");
 	}
 	tegra_host->dll_calib = sdhci_readl(sdhci, SDHCI_VNDR_DLLCAL_CFG);
+
+	if (tegra_host->en_strobe)
+		tegra_sdhci_en_strobe(host);
 }
 
 static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
@@ -1613,12 +1632,14 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	host->mmc->pm_caps |= plat->pm_caps;
 	host->mmc->pm_flags |= plat->pm_flags;
 
-	/* disable access to boot partitions */
-	host->mmc->caps2 |= MMC_CAP2_BOOTPART_NOACC;
 
 	tegra_pd_add_device(&pdev->dev);
-	host->mmc->caps2 |= MMC_CAP2_PACKED_CMD;
 
+	/* disable access to boot partitions */
+	host->mmc->caps2 |= MMC_CAP2_BOOTPART_NOACC;
+	host->mmc->caps2 |= MMC_CAP2_PACKED_CMD;
+	if (soc_data->nvquirks2 & NVQUIRK2_EN_STROBE_SUPPORT)
+		host->mmc->caps2 |= MMC_CAP2_EN_STROBE;
 	if (plat->pwr_off_during_lp0)
 		host->mmc->caps2 |= MMC_CAP2_NO_SLEEP_CMD;
 

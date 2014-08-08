@@ -624,6 +624,10 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 			ext_csd[EXT_CSD_MAX_PACKED_WRITES];
 		card->ext_csd.max_packed_reads =
 			ext_csd[EXT_CSD_MAX_PACKED_READS];
+
+		/* Check whether the eMMC card supports STROBE */
+		if (ext_csd[EXT_CSD_STROBE_SUPPORT] & 0x1)
+			card->ext_csd.strobe_support = 1;
 	} else {
 		card->ext_csd.data_sector_size = 512;
 	}
@@ -1049,6 +1053,7 @@ static int mmc_select_hs400(struct mmc_card *card)
 {
 	struct mmc_host *host = card->host;
 	int err = 0;
+	unsigned int strobe = 0;
 
 	/*
 	 * HS400 mode requires 8-bit bus width
@@ -1074,9 +1079,14 @@ static int mmc_select_hs400(struct mmc_card *card)
 		return err;
 	}
 
+	/* Enable enhanced strobe support if supported by both host and card */
+	if (card->ext_csd.strobe_support &&
+		(host->caps2 & MMC_CAP2_EN_STROBE))
+		strobe = EXT_CSD_STROBE_MODE;
+
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			 EXT_CSD_BUS_WIDTH,
-			 EXT_CSD_DDR_BUS_WIDTH_8,
+			 EXT_CSD_DDR_BUS_WIDTH_8 | strobe,
 			 card->ext_csd.generic_cmd6_time);
 	if (err) {
 		pr_warn("%s: switch to bus width for hs400 failed, err:%d\n",
@@ -1215,6 +1225,8 @@ static int mmc_hs200_tuning(struct mmc_card *card)
 {
 	struct mmc_host *host = card->host;
 	int err = 0;
+	bool strobe_en = (host->caps2 & MMC_CAP2_EN_STROBE) ?
+		(card->ext_csd.strobe_support) : false;
 
 	/*
 	 * Timing should be adjusted to the HS400 target
@@ -1225,7 +1237,7 @@ static int mmc_hs200_tuning(struct mmc_card *card)
 		if (host->ops->prepare_hs400_tuning)
 			host->ops->prepare_hs400_tuning(host, &host->ios);
 
-	if (host->ops->execute_tuning) {
+	if (host->ops->execute_tuning && !strobe_en) {
 		mmc_host_clk_hold(host);
 		err = host->ops->execute_tuning(host,
 				MMC_SEND_TUNING_BLOCK_HS200);
