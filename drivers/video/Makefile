@@ -7,6 +7,7 @@ obj-y				  += backlight/
 
 obj-y				  += fbdev/
 obj-$(CONFIG_DS90UH925Q_SER)      += ds90uh925q_ser.o
+obj-$(CONFIG_DS90UH949_SER)      += ds90uh949_ser.o
 obj-y                             += tegra/
 
 obj-$(CONFIG_VIDEOMODE_HELPERS) += display_timing.o videomode.o
