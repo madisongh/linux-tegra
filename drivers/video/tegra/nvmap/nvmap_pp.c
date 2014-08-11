@@ -28,6 +28,8 @@
 #include <linux/shrinker.h>
 #include <linux/kthread.h>
 #include <linux/debugfs.h>
+#include <linux/freezer.h>
+#include <linux/highmem.h>
 
 #include "nvmap_priv.h"
 
@@ -39,6 +41,7 @@ static bool enable_pp = 1;
 static int pool_size;
 
 static struct task_struct *background_allocator;
+static DECLARE_WAIT_QUEUE_HEAD(nvmap_bg_wait);
 static struct page *pending_pages[PENDING_PAGES_SIZE];
 static atomic_t bg_pages_to_fill;
 
@@ -72,6 +75,17 @@ static inline struct page *get_page_list_page(struct nvmap_page_pool *pool)
 	pool->count--;
 
 	return page;
+}
+
+static inline bool nvmap_bg_should_run(struct nvmap_page_pool *pool)
+{
+	bool ret;
+
+	mutex_lock(&pool->lock);
+	ret = (pool->to_zero > 0 || atomic_read(&bg_pages_to_fill));
+	mutex_unlock(&pool->lock);
+
+	return ret;
 }
 
 /*
@@ -155,17 +169,20 @@ static void nvmap_pp_do_background_fill(struct nvmap_page_pool *pool)
  */
 static int nvmap_background_zero_allocator(void *arg)
 {
+	struct nvmap_page_pool *pool = &nvmap_dev->pool;
+	struct sched_param param = { .sched_priority = 0 };
+
 	pr_info("PP alloc thread starting.\n");
 
-	while (1) {
-		if (kthread_should_stop())
-			break;
+	set_freezable();
+	sched_setscheduler(current, SCHED_IDLE, &param);
 
-		nvmap_pp_do_background_fill(&nvmap_dev->pool);
+	while (!kthread_should_stop()) {
+		nvmap_pp_do_background_fill(pool);
 
-		/* Pending work is done - go to sleep. */
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule();
+		wait_event_freezable(nvmap_bg_wait,
+				nvmap_bg_should_run(pool) ||
+				kthread_should_stop());
 	}
 
 	return 0;
@@ -206,7 +223,7 @@ static inline void nvmap_pp_wake_up_allocator(void)
 	/* Let the background thread know how much memory to fill. */
 	atomic_set(&bg_pages_to_fill,
 		   min(tmp, (int)(pool->max - pool->count)));
-	wake_up_process(background_allocator);
+	wake_up_interruptible(&nvmap_bg_wait);
 }
 
 /*
@@ -617,12 +634,6 @@ int nvmap_page_pool_init(struct nvmap_device *dev)
 	unsigned long totalram_mb;
 	struct sysinfo info;
 	struct nvmap_page_pool *pool = &dev->pool;
-#ifdef CONFIG_NVMAP_PAGE_POOLS_INIT_FILLUP
-	int i;
-	struct page *page;
-	int pages_to_fill;
-	int highmem_pages = 0;
-#endif
 
 	memset(pool, 0x0, sizeof(*pool));
 	mutex_init(&pool->lock);
@@ -655,30 +666,6 @@ int nvmap_page_pool_init(struct nvmap_device *dev)
 	if (IS_ERR_OR_NULL(background_allocator))
 		goto fail;
 
-#ifdef CONFIG_NVMAP_PAGE_POOLS_INIT_FILLUP
-	pages_to_fill = CONFIG_NVMAP_PAGE_POOLS_INIT_FILLUP_SIZE * SZ_1M /
-			PAGE_SIZE;
-	pages_to_fill = pages_to_fill ? : pool->count;
-
-	for (i = 0; i < pages_to_fill; i++) {
-		page = alloc_page(GFP_NVMAP);
-		if (!page)
-			goto done;
-		if (!nvmap_page_pool_fill_locked(pool, page)) {
-			__free_page(page);
-			goto done;
-		}
-		if (PageHighMem(page))
-			highmem_pages++;
-	}
-
-	si_meminfo(&info);
-	pr_info("highmem=%d, pool_size=%d,"
-		"totalram=%lu, freeram=%lu, totalhigh=%lu, freehigh=%lu\n",
-		highmem_pages, pool->count,
-		info.totalram, info.freeram, info.totalhigh, info.freehigh);
-done:
-#endif
 	return 0;
 fail:
 	nvmap_page_pool_fini(dev);
