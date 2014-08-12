@@ -53,7 +53,7 @@ static void gpio_extcon_work(struct work_struct *work)
 		container_of(to_delayed_work(work), struct gpio_extcon_data,
 			     work);
 
-	state = gpio_get_value(data->gpio);
+	state = gpio_get_value_cansleep(data->gpio);
 	if (data->gpio_active_low)
 		state = !state;
 	extcon_set_state(data->edev, state);
@@ -63,8 +63,12 @@ static irqreturn_t gpio_irq_handler(int irq, void *dev_id)
 {
 	struct gpio_extcon_data *extcon_data = dev_id;
 
-	queue_delayed_work(system_power_efficient_wq, &extcon_data->work,
+	if (extcon_data->debounce_jiffies)
+		queue_delayed_work(system_power_efficient_wq, &extcon_data->work,
 			      extcon_data->debounce_jiffies);
+	else
+		gpio_extcon_work(&extcon_data->work.work);
+
 	return IRQ_HANDLED;
 }
 
@@ -148,6 +152,7 @@ static int gpio_extcon_probe(struct platform_device *pdev)
 	if (!extcon_data)
 		return -ENOMEM;
 
+	extcon_data->dev = &pdev->dev;
 	extcon_data->edev = devm_extcon_dev_allocate(&pdev->dev, NULL);
 	if (IS_ERR(extcon_data->edev)) {
 		dev_err(&pdev->dev, "failed to allocate extcon device\n");
