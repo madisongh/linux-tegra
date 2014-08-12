@@ -32,6 +32,7 @@
  *			If false, high state of gpio means active.
  * @debounce:		Debounce time for GPIO IRQ in ms.
  * @irq_flags:		IRQ Flags (e.g., IRQF_TRIGGER_LOW).
+ * @connection_state_low: Connection state is GPIO low state.
  * @state_on:		print_state is overriden with state_on if attached.
  *			If NULL, default method of extcon class is used.
  * @state_off:		print_state is overriden with state_off if detached.
@@ -49,6 +50,7 @@ struct gpio_extcon_platform_data {
 	bool gpio_active_low;
 	unsigned long debounce;
 	unsigned long irq_flags;
+	bool connection_state_low;
 
 	/* if NULL, "0" or "1" will be printed */
 	const char *state_on;

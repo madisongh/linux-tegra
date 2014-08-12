@@ -27,11 +27,14 @@
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 
 struct gpio_extcon_data {
+	struct device *dev;
 	struct extcon_dev *edev;
 	unsigned gpio;
 	bool gpio_active_low;
@@ -81,14 +84,60 @@ static ssize_t extcon_gpio_print_state(struct extcon_dev *edev, char *buf)
 	return -EINVAL;
 }
 
+static struct gpio_extcon_platform_data *of_get_platform_data(
+		struct platform_device *pdev)
+{
+	struct gpio_extcon_platform_data *pdata;
+	struct device_node *np = pdev->dev.of_node;
+	int gpio;
+	u32 pval;
+	int ret;
+
+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata)
+		return ERR_PTR(-ENOMEM);
+
+	of_property_read_string(np, "extcon-gpio,name", &pdata->name);
+	if (!pdata->name)
+		pdata->name = np->name;
+
+	gpio = of_get_named_gpio(np, "gpio", 0);
+	if (gpio < 0)
+		return ERR_PTR(gpio);
+
+	pdata->gpio = gpio;
+
+	ret = of_property_read_u32(np, "extcon-gpio,irq-flags", &pval);
+	if (!ret)
+		pdata->irq_flags = pval;
+	else
+		pdata->irq_flags = IRQF_TRIGGER_RISING |
+						IRQF_TRIGGER_FALLING;
+
+	ret = of_property_read_u32(np, "extcon-gpio,debounce", &pval);
+	if (!ret)
+		pdata->debounce = pval;
+
+	pdata->gpio_active_low = of_property_read_bool(np,
+				"extcon-gpio,connection-state-low");
+	return pdata;
+}
+
 static int gpio_extcon_probe(struct platform_device *pdev)
 {
 	struct gpio_extcon_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	struct gpio_extcon_data *extcon_data;
 	int ret;
 
+	if (!pdata && pdev->dev.of_node) {
+		pdata = of_get_platform_data(pdev);
+		if (IS_ERR(pdata))
+			return PTR_ERR(pdata);
+	}
+
 	if (!pdata)
 		return -EBUSY;
+
 	if (!pdata->irq_flags) {
 		dev_err(&pdev->dev, "IRQ flag is not specified.\n");
 		return -EINVAL;
@@ -176,6 +225,12 @@ static int gpio_extcon_resume(struct device *dev)
 
 static SIMPLE_DEV_PM_OPS(gpio_extcon_pm_ops, NULL, gpio_extcon_resume);
 
+static struct of_device_id of_extcon_gpio_tbl[] = {
+	{ .compatible = "extcon-gpio", },
+	{ /* end */ }
+};
+MODULE_DEVICE_TABLE(of, of_extcon_gpio_tbl);
+
 static struct platform_driver gpio_extcon_driver = {
 	.probe		= gpio_extcon_probe,
 	.remove		= gpio_extcon_remove,
@@ -183,10 +238,21 @@ static struct platform_driver gpio_extcon_driver = {
 		.name	= "extcon-gpio",
 		.owner	= THIS_MODULE,
 		.pm	= &gpio_extcon_pm_ops,
+		.of_match_table = of_extcon_gpio_tbl,
 	},
 };
 
-module_platform_driver(gpio_extcon_driver);
+static int __init gpio_extcon_driver_init(void)
+{
+        return platform_driver_register(&gpio_extcon_driver);
+}
+subsys_initcall_sync(gpio_extcon_driver_init);
+
+static void __exit gpio_extcon_driver_exit(void)
+{
+        platform_driver_unregister(&gpio_extcon_driver);
+}
+module_exit(gpio_extcon_driver_exit);
 
 MODULE_AUTHOR("Mike Lockwood <lockwood@android.com>");
 MODULE_DESCRIPTION("GPIO extcon driver");
