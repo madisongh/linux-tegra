@@ -24681,7 +24681,7 @@ int __init ardbeg_emc_init(void)
 			break;
 		case BOARD_PM375:
 			if (of_machine_is_compatible("nvidia,jetson-tk1")) {
-				if (tegra_get_memory_type()) {
+				if (tegra_get_memory_type() == 1) {
 					pr_info("Loading jetson TK132 4GB EMC tables.\n");
 					tegra_emc_device.dev.platform_data =
 						&jetson_tk1_4GB_emc_pdata;
