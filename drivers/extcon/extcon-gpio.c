@@ -44,6 +44,7 @@ struct gpio_extcon_data {
 	struct delayed_work work;
 	unsigned long debounce_jiffies;
 	bool check_on_resume;
+	const char *supported_cable[2];
 };
 
 static void gpio_extcon_work(struct work_struct *work)
@@ -124,6 +125,11 @@ static struct gpio_extcon_platform_data *of_get_platform_data(
 
 	pdata->gpio_active_low = of_property_read_bool(np,
 				"extcon-gpio,connection-state-low");
+
+	of_property_read_string(np, "extcon-gpio,cable-name", &pdata->cable_name);
+	if (!pdata->cable_name)
+		pdata->cable_name = pdata->name;
+
 	return pdata;
 }
 
@@ -167,6 +173,9 @@ static int gpio_extcon_probe(struct platform_device *pdev)
 	extcon_data->check_on_resume = pdata->check_on_resume;
 	if (pdata->state_on && pdata->state_off)
 		extcon_data->edev->print_state = extcon_gpio_print_state;
+	extcon_data->supported_cable[0] = pdata->cable_name;
+	extcon_data->supported_cable[1] = NULL;
+	extcon_data->edev->supported_cable = extcon_data->supported_cable;
 
 	ret = devm_gpio_request_one(&pdev->dev, extcon_data->gpio, GPIOF_DIR_IN,
 				    pdev->name);

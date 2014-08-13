@@ -39,6 +39,7 @@
  *			If NUll, default method of extcon class is used.
  * @check_on_resume:	Boolean describing whether to check the state of gpio
  *			while resuming from sleep.
+ * @cable_name		Extcon cable name.
  *
  * Note that in order for state_on or state_off to be valid, both state_on
  * and state_off should be not NULL. If at least one of them is NULL,
@@ -56,6 +57,7 @@ struct gpio_extcon_platform_data {
 	const char *state_on;
 	const char *state_off;
 	bool check_on_resume;
+	const char *cable_name;
 };
 
 #endif /* __EXTCON_GPIO_H__ */
