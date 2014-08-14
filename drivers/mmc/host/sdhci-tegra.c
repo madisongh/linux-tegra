@@ -1148,6 +1148,8 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	plat->update_pinctrl_settings = of_property_read_bool(np,
 		"nvidia,update-pinctrl-settings");
 	plat->dll_calib_needed = of_property_read_bool(np, "nvidia,dll-calib-needed");
+	plat->pwr_off_during_lp0 = of_property_read_bool(np,
+		"pwr-off-during-lp0");
 
 	return mmc_of_parse(host->mmc);
 }
@@ -1595,6 +1597,10 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 	tegra_pd_add_device(&pdev->dev);
 	host->mmc->caps2 |= MMC_CAP2_PACKED_CMD;
+
+	if (plat->pwr_off_during_lp0)
+		host->mmc->caps2 |= MMC_CAP2_NO_SLEEP_CMD;
+
 	rc = sdhci_add_host(host);
 	sdhci_tegra_error_stats_debugfs(host);
 	if (rc)

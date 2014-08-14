@@ -107,6 +107,7 @@ struct tegra_sdhci_platform_data {
 	bool enb_feedback_clock;
 	bool en_periodic_calib;
 	bool dll_calib_needed;
+	bool pwr_off_during_lp0;
 };
 
 #endif
