@@ -923,7 +923,6 @@ void __init tegra20_init_early(void)
 	tegra20_hotplug_init();
 	tegra_init_power();
 	tegra_init_ahb_gizmo_settings();
-	tegra_init_debug_uart_rate();
 }
 #endif
 #ifdef CONFIG_ARCH_TEGRA_3x_SOC
@@ -962,7 +961,6 @@ void __init tegra30_init_early(void)
 	tegra30_hotplug_init();
 	tegra_init_power();
 	tegra_init_ahb_gizmo_settings();
-	tegra_init_debug_uart_rate();
 
 	init_dma_coherent_pool_size(SZ_1M);
 }
@@ -985,7 +983,6 @@ void __init tegra11x_init_early(void)
 	tegra30_hotplug_init();
 	tegra_init_power();
 	tegra_init_ahb_gizmo_settings();
-	tegra_init_debug_uart_rate();
 
 	init_dma_coherent_pool_size(SZ_2M);
 }
@@ -1017,7 +1014,6 @@ void __init tegra12x_init_early(void)
 #endif
 	tegra_init_power();
 	tegra_init_ahb_gizmo_settings();
-	tegra_init_debug_uart_rate();
 }
 #endif
 #ifdef CONFIG_ARCH_TEGRA_14x_SOC
