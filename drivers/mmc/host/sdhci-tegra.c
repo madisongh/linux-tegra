@@ -70,6 +70,9 @@
 #define SDHCI_VENDOR_MISC_CNTRL_INFINITE_ERASE_TIMEOUT	0x1
 #define SDHCI_VNDR_MISC_CTRL_EN_EXT_LOOPBACK_SHIFT	17
 
+#define SDHCI_VNDR_SYS_SW_CTRL				0x104
+#define SDHCI_VNDR_SYS_SW_CTRL_WR_CRC_USE_TMCLK		0x40000000
+
 #define SDHCI_VNDR_CAP_OVERRIDES_0			0x10c
 #define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT	8
 #define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_MASK	0x3F
@@ -162,6 +165,8 @@
 #define NVQUIRK_SET_SDMEMCOMP_VREF_SEL		BIT(23)
 #define NVQUIRK_UPDATE_PAD_CNTRL_REG		BIT(24)
 #define NVQUIRK_UPDATE_PIN_CNTRL_REG		BIT(25)
+/* Use timeout clk for write crc status data timeout counter */
+#define NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT	BIT(26)
 
 /* Max number of clock parents for sdhci is fixed to 2 */
 #define TEGRA_SDHCI_MAX_PLL_SOURCE 2
@@ -506,6 +511,14 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	vendor_ctrl &= ~(SDMMC_VENDOR_IO_TRIM_CNTRL_0_SEL_VREG_MASK);
 	sdhci_writel(host, vendor_ctrl, SDMMC_VENDOR_IO_TRIM_CNTRL_0);
 	udelay(3);
+
+	/* Use timeout clk data timeout counter for generating wr crc status */
+	if (soc_data->nvquirks &
+		NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT) {
+		vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_SYS_SW_CTRL);
+		vendor_ctrl |= SDHCI_VNDR_SYS_SW_CTRL_WR_CRC_USE_TMCLK;
+		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_SYS_SW_CTRL);
+	}
 }
 
 static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
@@ -1071,7 +1084,8 @@ static struct sdhci_tegra_soc_data soc_data_tegra210 = {
 		    NVQUIRK_SET_CALIBRATION_OFFSETS |
 		    NVQUIRK_DISABLE_TIMER_BASED_TUNING |
 		    NVQUIRK_DISABLE_EXTERNAL_LOOPBACK |
-		    NVQUIRK_UPDATE_PAD_CNTRL_REG,
+		    NVQUIRK_UPDATE_PAD_CNTRL_REG |
+		    NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT,
 	.parent_clk_list = {"pll_p"},
 };
 
