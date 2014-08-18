@@ -3,7 +3,7 @@
  *
  * Tegra Graphics ISP
  *
- * Copyright (c) 2012-2014, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -44,11 +44,7 @@
 #define T12_ISPA_DEV_ID		0
 #define T12_ISPB_DEV_ID		1
 
-/*
- * MAX_BW = max(default ISP clock) * 2BPP, in KBps.
- * Here default max ISP clock is 420MHz.
- */
-#define ISP_DEFAULT_MAX_BW	840000
+#define	ISP_MAX_BPP		2
 
 static struct of_device_id tegra_isp_of_match[] = {
 #ifdef TEGRA_12X_OR_HIGHER_CONFIG
@@ -82,17 +78,28 @@ int nvhost_isp_t124_finalize_poweron(struct platform_device *pdev)
 static int isp_isomgr_register(struct isp *tegra_isp)
 {
 	int iso_client_id = TEGRA_ISO_CLIENT_ISP_A;
+	struct clk *isp_clk;
+	unsigned long max_bw = 0;
+	struct nvhost_device_data *pdata =
+				platform_get_drvdata(tegra_isp->ndev);
 
 	dev_dbg(&tegra_isp->ndev->dev, "%s++\n", __func__);
+
+	if (WARN_ONCE(pdata == NULL, "pdata not found, %s failed\n", __func__))
+		return -ENODEV;
 
 	if (tegra_isp->dev_id == T12_ISPB_DEV_ID)
 		iso_client_id = TEGRA_ISO_CLIENT_ISP_B;
 	if (tegra_isp->dev_id == T12_ISPA_DEV_ID)
 		iso_client_id = TEGRA_ISO_CLIENT_ISP_A;
 
+	/* Get max ISP BW */
+	isp_clk = pdata->clk[0];
+	max_bw = (clk_round_rate(isp_clk, UINT_MAX) / 1000) * ISP_MAX_BPP;
+
 	/* Register with max possible BW for ISP usecases.*/
 	tegra_isp->isomgr_handle = tegra_isomgr_register(iso_client_id,
-					ISP_DEFAULT_MAX_BW,
+					max_bw,
 					NULL,	/* tegra_isomgr_renegotiate */
 					NULL);	/* *priv */
 
