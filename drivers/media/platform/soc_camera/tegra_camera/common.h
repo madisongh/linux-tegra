@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -75,6 +75,8 @@ struct tegra_camera_ops {
 	void (*activate)(struct tegra_camera_dev *vi2_cam);
 	void (*deactivate)(struct tegra_camera_dev *vi2_cam);
 	int (*port_is_valid)(int port);
+
+	int (*mipi_calibration)(struct tegra_camera_dev *vi2_cam);
 };
 
 struct tegra_camera_dev {
@@ -120,6 +122,8 @@ struct tegra_camera_dev {
 	int				tpg_mode;
 
 	int				sof;
+
+	int				cal_done;
 };
 
 #define TC_VI_REG_RD(dev, offset) readl(dev->reg_base + offset)

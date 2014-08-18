@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -16,6 +16,7 @@
 
 #include <linux/delay.h>
 #include <linux/clk.h>
+#include <linux/regmap.h>
 #include <linux/platform_device.h>
 
 #include <media/soc_camera.h>
@@ -285,6 +286,52 @@
 #define TEGRA_IMAGE_DT_RAW10				43
 #define TEGRA_IMAGE_DT_RAW12				44
 #define TEGRA_IMAGE_DT_RAW14				45
+
+#define MIPI_CAL_CTRL		0x00
+#define		STARTCAL	(1 << 0)
+#define		CLKEN_OVR	(1 << 4)
+#define MIPI_CAL_AUTOCAL_CTRL0	0x04
+#define CIL_MIPI_CAL_STATUS	0x08
+#define		CAL_DONE	(1 << 16)
+#define CIL_MIPI_CAL_STATUS_2	0x0c
+#define CILA_MIPI_CAL_CONFIG	0x14
+#define		SELA		(1 << 21)
+#define CILB_MIPI_CAL_CONFIG	0x18
+#define		SELB		(1 << 21)
+#define CILC_MIPI_CAL_CONFIG	0x1c
+#define		SELC		(1 << 21)
+#define CILD_MIPI_CAL_CONFIG	0x20
+#define		SELD		(1 << 21)
+#define CILE_MIPI_CAL_CONFIG	0x24
+#define		SELE		(1 << 21)
+#define DSIA_MIPI_CAL_CONFIG	0x38
+#define		SELDSIA		(1 << 21)
+#define DSIB_MIPI_CAL_CONFIG	0x3c
+#define		SELDSIB		(1 << 21)
+#define MIPI_BIAS_PAD_CFG0	0x58
+#define		E_VCLAMP_REF	(1 << 0)
+#define MIPI_BIAS_PAD_CFG1	0x5c
+#define MIPI_BIAS_PAD_CFG2	0x60
+#define		PDVREG		(1 << 1)
+#define DSIA_MIPI_CAL_CONFIG_2	0x64
+#define		CLKSELDSIA	(1 << 21)
+#define DSIB_MIPI_CAL_CONFIG_2	0x68
+#define		CLKSELDSIB	(1 << 21)
+#define CILC_MIPI_CAL_CONFIG_2	0x6c
+#define		CLKSELC		(1 << 21)
+#define CILD_MIPI_CAL_CONFIG_2	0x70
+#define		CLKSELD		(1 << 21)
+#define CSIE_MIPI_CAL_CONFIG_2	0x74
+#define		CLKSELE		(1 << 21)
+
+#define MIPI_CAL_BASE	0x700e3000
+
+static const struct regmap_config mipi_cal_config = {
+	.reg_bits = 32,
+	.reg_stride = 4,
+	.val_bits = 32,
+	.cache_type = REGCACHE_RBTREE,
+};
 
 static int vi2_port_is_valid(int port)
 {
@@ -983,6 +1030,148 @@ static void vi2_sw_reset(struct tegra_camera_dev *cam)
 	udelay(10);
 }
 
+
+
+static int vi2_mipi_calibration(struct tegra_camera_dev *cam)
+{
+	void __iomem *mipi_cal;
+	struct regmap *regs;
+	struct platform_device *pdev = cam->ndev;
+	struct vb2_buffer *vb = cam->active;
+	struct tegra_camera_buffer *buf = to_tegra_vb(vb);
+	struct soc_camera_device *icd = buf->icd;
+	struct soc_camera_subdev_desc *ssdesc = &icd->sdesc->subdev_desc;
+	struct tegra_camera_platform_data *pdata = ssdesc->drv_priv;
+	int port = pdata->port;
+	u32 val;
+	struct clk *clk_mipi_cal = NULL, *clk_72mhz = NULL;
+	int retry = 500;
+
+	/* TPG mode doesn't need any calibration */
+	if (cam->tpg_mode)
+		return 0;
+
+	/* Get clks for MIPI Calibration */
+	clk_mipi_cal = clk_get_sys("mipi-cal", NULL);
+	if (IS_ERR_OR_NULL(clk_mipi_cal)) {
+		dev_err(&pdev->dev, "cannot get mipi-cal clk.\n");
+		return PTR_ERR(clk_mipi_cal);
+	}
+
+	clk_72mhz = clk_get_sys("clk72mhz", NULL);
+	if (IS_ERR_OR_NULL(clk_72mhz)) {
+		dev_err(&pdev->dev, "cannot get 72MHz clk.\n");
+		return PTR_ERR(clk_72mhz);
+	}
+
+	/* Map registers */
+	mipi_cal = ioremap(MIPI_CAL_BASE, 0x100);
+	if (!mipi_cal)
+		return -ENOMEM;
+
+	regs = devm_regmap_init_mmio(&pdev->dev, mipi_cal, &mipi_cal_config);
+	if (IS_ERR(regs)) {
+		dev_err(&pdev->dev, "regmap init failed\n");
+		iounmap(mipi_cal);
+		return PTR_ERR(regs);
+	}
+
+	/* Enable MIPI Calibration clocks */
+	if (clk_mipi_cal)
+		clk_prepare_enable(clk_mipi_cal);
+	if (clk_72mhz)
+		clk_prepare_enable(clk_72mhz);
+
+	/* MIPI_CAL_CLKEN_OVR = 1 */
+	regmap_update_bits(regs, MIPI_CAL_CTRL, CLKEN_OVR, CLKEN_OVR);
+
+	/* Clear MIPI CAL status flags */
+	regmap_write(regs, CIL_MIPI_CAL_STATUS, 0xF1F10000);
+	regmap_update_bits(regs, DSIA_MIPI_CAL_CONFIG, SELDSIA, 0);
+	regmap_update_bits(regs, DSIB_MIPI_CAL_CONFIG, SELDSIB, 0);
+	regmap_update_bits(regs, MIPI_BIAS_PAD_CFG0,
+			   E_VCLAMP_REF, E_VCLAMP_REF);
+	regmap_update_bits(regs, MIPI_BIAS_PAD_CFG2, PDVREG, 0);
+	regmap_update_bits(regs, CILA_MIPI_CAL_CONFIG, SELA, 0);
+	regmap_update_bits(regs, DSIA_MIPI_CAL_CONFIG_2, CLKSELDSIA, 0);
+	regmap_update_bits(regs, CILB_MIPI_CAL_CONFIG, SELB, 0);
+	regmap_update_bits(regs, DSIB_MIPI_CAL_CONFIG_2, CLKSELDSIB, 0);
+	regmap_update_bits(regs, CILC_MIPI_CAL_CONFIG, SELC, 0);
+	regmap_update_bits(regs, CILC_MIPI_CAL_CONFIG_2, CLKSELC, 0);
+	regmap_update_bits(regs, CILD_MIPI_CAL_CONFIG, SELD, 0);
+	regmap_update_bits(regs, CILD_MIPI_CAL_CONFIG_2, CLKSELD, 0);
+	regmap_update_bits(regs, CILC_MIPI_CAL_CONFIG, SELE, 0);
+	regmap_update_bits(regs, CSIE_MIPI_CAL_CONFIG_2, CLKSELE, 0);
+
+	/* Select the CIL pad for auto calibration */
+	switch (port) {
+	case TEGRA_CAMERA_PORT_CSI_A:
+		regmap_update_bits(regs, CILA_MIPI_CAL_CONFIG, SELA, SELA);
+		regmap_update_bits(regs, DSIA_MIPI_CAL_CONFIG_2, CLKSELDSIA, 0);
+		if (pdata->lanes > 2) {
+			regmap_update_bits(regs, CILB_MIPI_CAL_CONFIG,
+					   SELB, SELB);
+			regmap_update_bits(regs, DSIB_MIPI_CAL_CONFIG_2,
+					   CLKSELDSIB, 0);
+		}
+		break;
+	case TEGRA_CAMERA_PORT_CSI_B:
+		regmap_update_bits(regs, CILC_MIPI_CAL_CONFIG, SELC, SELC);
+		regmap_update_bits(regs, CILC_MIPI_CAL_CONFIG_2, CLKSELC, 0);
+		if (pdata->lanes > 2) {
+			regmap_update_bits(regs, CILD_MIPI_CAL_CONFIG,
+					   SELD, SELD);
+			regmap_update_bits(regs, CILD_MIPI_CAL_CONFIG_2,
+					   CLKSELD, 0);
+		}
+		break;
+	case TEGRA_CAMERA_PORT_CSI_C:
+		regmap_update_bits(regs, CILE_MIPI_CAL_CONFIG, SELE, SELE);
+		regmap_update_bits(regs, CSIE_MIPI_CAL_CONFIG_2,
+				   CLKSELE, CLKSELE);
+		break;
+	default:
+		dev_err(&pdev->dev, "wrong port %d\n", port);
+	}
+
+	/* Trigger calibration */
+	regmap_update_bits(regs, MIPI_CAL_CTRL, STARTCAL, STARTCAL);
+	while (--retry) {
+		regmap_read(regs, CIL_MIPI_CAL_STATUS, &val);
+		if (val & CAL_DONE)
+			break;
+		usleep_range(200, 300);
+	}
+
+	/* Cleanup: un-select to avoid interference with DSI */
+	regmap_update_bits(regs, CILA_MIPI_CAL_CONFIG, SELA, 0);
+	regmap_update_bits(regs, DSIA_MIPI_CAL_CONFIG_2,
+			   CLKSELDSIA, CLKSELDSIA);
+	regmap_update_bits(regs, CILB_MIPI_CAL_CONFIG, SELB, 0);
+	regmap_update_bits(regs, DSIB_MIPI_CAL_CONFIG_2,
+			   CLKSELDSIB, CLKSELDSIB);
+	regmap_update_bits(regs, CILC_MIPI_CAL_CONFIG, SELC, 0);
+	regmap_update_bits(regs, CILC_MIPI_CAL_CONFIG_2, CLKSELC, CLKSELC);
+	regmap_update_bits(regs, CILD_MIPI_CAL_CONFIG, SELD, 0);
+	regmap_update_bits(regs, CILD_MIPI_CAL_CONFIG_2, CLKSELD, CLKSELD);
+	regmap_update_bits(regs, CILE_MIPI_CAL_CONFIG, SELE, 0);
+	regmap_update_bits(regs, CSIE_MIPI_CAL_CONFIG_2, CLKSELE, 0);
+
+	/* Disable clocks */
+	if (clk_mipi_cal)
+		clk_disable_unprepare(clk_mipi_cal);
+	if (clk_72mhz)
+		clk_disable_unprepare(clk_72mhz);
+
+	if (!retry) {
+		dev_err(&pdev->dev, "MIPI calibration timeout!\n");
+		return -EBUSY;
+	}
+
+	dev_info(&pdev->dev, "MIPI calibration for CSI is done\n");
+	return 0;
+}
+
 struct tegra_camera_ops vi2_ops = {
 	.clks_init = vi2_clks_init,
 	.clks_deinit = vi2_clks_deinit,
@@ -1001,6 +1190,8 @@ struct tegra_camera_ops vi2_ops = {
 	.incr_syncpts = vi2_incr_syncpts,
 
 	.port_is_valid = vi2_port_is_valid,
+
+	.mipi_calibration = vi2_mipi_calibration,
 };
 
 int vi2_register(struct tegra_camera_dev *cam)

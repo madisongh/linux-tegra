@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -216,6 +216,13 @@ static int tegra_camera_capture_frame(struct tegra_camera_dev *cam)
 	cam->ops->capture_setup(cam);
 
 	cam->ops->incr_syncpts(cam);
+
+	/* MIPI CSI pads calibration after starting capture */
+	if (cam->ops->mipi_calibration && !cam->cal_done) {
+		err = cam->ops->mipi_calibration(cam);
+		if (!err)
+			cam->cal_done = 1;
+	}
 
 	while (retry) {
 		err = cam->ops->capture_start(cam, buf);
