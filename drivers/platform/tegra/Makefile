@@ -166,4 +166,5 @@ obj-y += dummy.o # generate a built-in.o
 
 endif
 
+obj-y					+= asim.o
 obj-y					+= hier_ictlr/
