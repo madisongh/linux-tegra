@@ -196,31 +196,20 @@ static int __gk20a_channel_syncpt_incr(struct gk20a_channel_sync *s,
 		return -EAGAIN;
 	}
 
-	if (gfx_class) {
-		WARN_ON(wfi_cmd); /* No sense to use gfx class + wfi. */
-		/* setobject KEPLER_C */
-		incr_cmd->ptr[j++] = 0x20010000;
-		incr_cmd->ptr[j++] = KEPLER_C;
-		/* syncpt incr */
-		incr_cmd->ptr[j++] = 0x200100B2;
-		incr_cmd->ptr[j++] = sp->id |
-			(0x1 << 20) | (0x1 << 16);
-	} else {
-		if (wfi_cmd) {
-			/* wfi */
-			incr_cmd->ptr[j++] = 0x2001001E;
-			/* handle, ignored */
-			incr_cmd->ptr[j++] = 0x00000000;
-		}
-		/* syncpoint_a */
-		incr_cmd->ptr[j++] = 0x2001001C;
-		/* payload, ignored */
-		incr_cmd->ptr[j++] = 0;
-		/* syncpoint_b */
-		incr_cmd->ptr[j++] = 0x2001001D;
-		/* syncpt_id, incr */
-		incr_cmd->ptr[j++] = (sp->id << 8) | 0x1;
+	if (wfi_cmd) {
+		/* wfi */
+		incr_cmd->ptr[j++] = 0x2001001E;
+		/* handle, ignored */
+		incr_cmd->ptr[j++] = 0x00000000;
 	}
+	/* syncpoint_a */
+	incr_cmd->ptr[j++] = 0x2001001C;
+	/* payload, ignored */
+	incr_cmd->ptr[j++] = 0;
+	/* syncpoint_b */
+	incr_cmd->ptr[j++] = 0x2001001D;
+	/* syncpt_id, incr */
+	incr_cmd->ptr[j++] = (sp->id << 8) | 0x1;
 	WARN_ON(j != incr_cmd_size);
 
 	thresh = nvhost_syncpt_incr_max_ext(sp->host1x_pdev, sp->id, 1);
