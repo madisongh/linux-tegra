@@ -1468,6 +1468,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	const char *parent_clk_list[TEGRA_SDHCI_MAX_PLL_SOURCE];
 	int rc;
 
+	for (i = 0; i < ARRAY_SIZE(parent_clk_list); i++)
+		parent_clk_list[i] = NULL;
 	match = of_match_device(sdhci_tegra_dt_match, &pdev->dev);
 	if (!match)
 		return -EINVAL;
@@ -1511,7 +1513,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		goto err_parse_dt;
 	/* check if DT provide list possible pll parents */
 	if (sdhci_tegra_get_pll_from_dt(pdev,
-		parent_clk_list, ARRAY_SIZE(parent_clk_list))) {
+		&parent_clk_list[0], ARRAY_SIZE(parent_clk_list))) {
 		parent_clk_list[0] = soc_data->parent_clk_list[0];
 		parent_clk_list[1] = soc_data->parent_clk_list[1];
 	}
@@ -1524,8 +1526,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		if (IS_ERR(tegra_host->pll_source[i].pll)) {
 			rc = PTR_ERR(tegra_host->pll_source[i].pll);
 			dev_err(mmc_dev(host->mmc),
-					"clk error in getting %s: %d\n",
-					parent_clk_list[i], rc);
+					"clk[%d] error in getting %s: %d\n",
+					i, parent_clk_list[i], rc);
+			goto err_power_req;
 		}
 		tegra_host->pll_source[i].pll_rate =
 			clk_get_rate(tegra_host->pll_source[i].pll);
