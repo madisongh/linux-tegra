@@ -548,9 +548,9 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
 	return mask;
 }
 
-static void gic_cpu_if_up(void)
+static void gic_cpu_if_up(struct gic_chip_data *gic)
 {
-	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+	void __iomem *cpu_base = gic_data_cpu_base(gic);
 	u32 bypass = 0;
 
 	/*
@@ -558,6 +558,9 @@ static void gic_cpu_if_up(void)
 	*/
 	bypass = readl(cpu_base + GIC_CPU_CTRL);
 	bypass &= GICC_DIS_BYPASS_MASK;
+
+	if (!gic->is_percpu)
+		bypass |= (1 << 1) | (1 << 2);
 
 	writel_relaxed(bypass | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
 }
@@ -583,7 +586,16 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
 
 	gic_dist_config(base, gic_irqs, NULL);
 
-	writel_relaxed(GICD_ENABLE, base + GIC_DIST_CTRL);
+	/* make all interrupts as group 1 interrupts */
+	if (!gic->is_percpu)
+		for (i = 0; i < gic_irqs; i += 32)
+			writel_relaxed(0xffffffff,
+					base + GIC_DIST_IGROUP + i * 4 / 32);
+
+	if (gic->is_percpu)
+		writel_relaxed(GICD_ENABLE, base + GIC_DIST_CTRL);
+	else
+		writel_relaxed(3, base + GIC_DIST_CTRL);
 }
 
 static void gic_cpu_init(struct gic_chip_data *gic)
@@ -611,7 +623,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
 	gic_cpu_config(dist_base, NULL);
 
 	writel_relaxed(GICC_INT_PRI_THRESHOLD, base + GIC_CPU_PRIMASK);
-	gic_cpu_if_up();
+	gic_cpu_if_up(gic);
 }
 
 void gic_cpu_if_down(void)
@@ -763,7 +775,7 @@ static void gic_cpu_restore(struct gic_chip_data *gic)
 					dist_base + GIC_DIST_PRI + i * 4);
 
 	writel_relaxed(GICC_INT_PRI_THRESHOLD, cpu_base + GIC_CPU_PRIMASK);
-	gic_cpu_if_up();
+	gic_cpu_if_up(gic);
 }
 
 static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
