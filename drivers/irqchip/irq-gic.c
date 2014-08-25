@@ -612,6 +612,9 @@ static void gic_cpu_if_up(struct gic_chip_data *gic)
 	bypass = readl(cpu_base + GIC_CPU_CTRL);
 	bypass &= GICC_DIS_BYPASS_MASK;
 
+	if (!gic->is_percpu)
+		bypass |= (1 << 1) | (1 << 2);
+
 	writel_relaxed(bypass | mode | GICC_ENABLE, cpu_base + GIC_CPU_CTRL);
 }
 
@@ -636,7 +639,16 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
 
 	gic_dist_config(base, gic_irqs, NULL);
 
-	writel_relaxed(GICD_ENABLE, base + GIC_DIST_CTRL);
+	/* make all interrupts as group 1 interrupts */
+	if (!gic->is_percpu)
+		for (i = 0; i < gic_irqs; i += 32)
+			writel_relaxed(0xffffffff,
+					base + GIC_DIST_IGROUP + i * 4 / 32);
+
+	if (gic->is_percpu)
+		writel_relaxed(GICD_ENABLE, base + GIC_DIST_CTRL);
+	else
+		writel_relaxed(3, base + GIC_DIST_CTRL);
 }
 
 static void gic_cpu_init(struct gic_chip_data *gic)
