@@ -45,6 +45,7 @@ struct gpio_extcon_data {
 	unsigned long debounce_jiffies;
 	bool check_on_resume;
 	const char *supported_cable[2];
+	bool default_state;
 };
 
 static void gpio_extcon_work(struct work_struct *work)
@@ -55,8 +56,13 @@ static void gpio_extcon_work(struct work_struct *work)
 			     work);
 
 	state = gpio_get_value_cansleep(data->gpio);
-	if (data->gpio_active_low)
-		state = !state;
+	if (gpio_is_valid(data->gpio)) {
+		state = gpio_get_value_cansleep(data->gpio);
+		if (data->gpio_active_low)
+			state = !state;
+	} else {
+		state = data->default_state;
+	}
 	extcon_set_state(data->edev, state);
 }
 
@@ -107,11 +113,17 @@ static struct gpio_extcon_platform_data *of_get_platform_data(
 		pdata->name = np->name;
 
 	gpio = of_get_named_gpio(np, "gpio", 0);
-	if (gpio < 0)
+	if ((gpio < 0) && (gpio != -EINVAL))
 		return ERR_PTR(gpio);
 
-	pdata->gpio = gpio;
+	if (gpio == -EINVAL)
+		pdata->gpio = -1;
+	else
+		pdata->gpio = gpio;
 
+	if (pdata->gpio < 0)
+		pdata->default_state = of_property_read_bool(np,
+					"extcon-gpio,default-connected");
 	ret = of_property_read_u32(np, "extcon-gpio,irq-flags", &pval);
 	if (!ret)
 		pdata->irq_flags = pval;
@@ -168,6 +180,7 @@ static int gpio_extcon_probe(struct platform_device *pdev)
 
 	extcon_data->gpio = pdata->gpio;
 	extcon_data->gpio_active_low = pdata->gpio_active_low;
+	extcon_data->default_state = pdata->default_state;
 	extcon_data->state_on = pdata->state_on;
 	extcon_data->state_off = pdata->state_off;
 	extcon_data->check_on_resume = pdata->check_on_resume;
@@ -176,6 +189,15 @@ static int gpio_extcon_probe(struct platform_device *pdev)
 	extcon_data->supported_cable[0] = pdata->cable_name;
 	extcon_data->supported_cable[1] = NULL;
 	extcon_data->edev->supported_cable = extcon_data->supported_cable;
+
+	ret = devm_extcon_dev_register(&pdev->dev, extcon_data->edev);
+	if (ret < 0)
+		return ret;
+
+	INIT_DELAYED_WORK(&extcon_data->work, gpio_extcon_work);
+
+	if (!gpio_is_valid(extcon_data->gpio))
+		goto skip_gpio;
 
 	ret = devm_gpio_request_one(&pdev->dev, extcon_data->gpio, GPIOF_DIR_IN,
 				    pdev->name);
@@ -190,12 +212,6 @@ static int gpio_extcon_probe(struct platform_device *pdev)
 				msecs_to_jiffies(pdata->debounce);
 	}
 
-	ret = devm_extcon_dev_register(&pdev->dev, extcon_data->edev);
-	if (ret < 0)
-		return ret;
-
-	INIT_DELAYED_WORK(&extcon_data->work, gpio_extcon_work);
-
 	extcon_data->irq = gpio_to_irq(extcon_data->gpio);
 	if (extcon_data->irq < 0)
 		return extcon_data->irq;
@@ -207,9 +223,11 @@ static int gpio_extcon_probe(struct platform_device *pdev)
 		return ret;
 
 	platform_set_drvdata(pdev, extcon_data);
+	device_set_wakeup_capable(extcon_data->dev, true);
+
+skip_gpio:
 	/* Perform initial detection */
 	gpio_extcon_work(&extcon_data->work.work);
-	device_set_wakeup_capable(extcon_data->dev, true);
 
 	return 0;
 }
@@ -219,7 +237,8 @@ static int gpio_extcon_remove(struct platform_device *pdev)
 	struct gpio_extcon_data *extcon_data = platform_get_drvdata(pdev);
 
 	cancel_delayed_work_sync(&extcon_data->work);
-	free_irq(extcon_data->irq, extcon_data);
+	if (gpio_is_valid(extcon_data->gpio))
+		free_irq(extcon_data->irq, extcon_data);
 
 	return 0;
 }
