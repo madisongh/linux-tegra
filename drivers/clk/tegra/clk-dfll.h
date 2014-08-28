@@ -22,6 +22,8 @@
 #include <linux/reset.h>
 #include <linux/types.h>
 
+struct thermal_tv;
+
 /**
  * struct tegra_dfll_soc_data - SoC-specific hooks/integration for the DFLL driver
  * @opp_dev: struct device * that holds the OPP table for the DFLL
@@ -33,6 +35,10 @@
  * @deassert_dvco_reset: fn ptr to release the DVCO reset
  * @set_clock_trimmers_high: fn ptr to tune clock trimmers for high voltage
  * @set_clock_trimmers_low: fn ptr to tune clock trimmers for low voltage
+ * @thermal_floor_table: table mapping a given temperature to a minimum voltage
+ * @thermal_cap_table: table mapping a given temperature to a maximum voltage
+ * @thermal_floor_table_size: size of thermal_floor_table
+ * @thermal_cap_table_size: size of thermal_cap_table
  */
 struct tegra_dfll_soc_data {
 	struct device *dev;
@@ -45,6 +51,10 @@ struct tegra_dfll_soc_data {
 	void (*init_clock_trimmers)(void);
 	void (*set_clock_trimmers_high)(void);
 	void (*set_clock_trimmers_low)(void);
+	const struct thermal_tv *thermal_floor_table;
+	const struct thermal_tv *thermal_cap_table;
+	unsigned int thermal_floor_table_size;
+	unsigned int thermal_cap_table_size;
 };
 
 int tegra_dfll_register(struct platform_device *pdev,
@@ -54,5 +64,4 @@ void tegra_dfll_suspend(struct platform_device *pdev);
 void tegra_dfll_resume(struct platform_device *pdev);
 int tegra_dfll_runtime_suspend(struct device *dev);
 int tegra_dfll_runtime_resume(struct device *dev);
-
 #endif /* __DRIVERS_CLK_TEGRA_CLK_DFLL_H */
