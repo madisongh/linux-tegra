@@ -81,8 +81,6 @@ unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
 unsigned int compat_elf_hwcap2 __read_mostly;
 #endif
 
-static const char *cpu_name;
-
 #ifdef CONFIG_ARM64_MACH_FRAMEWORK
 const struct machine_desc *machine_desc __initdata;
 #endif
@@ -219,10 +217,8 @@ static void __init setup_processor(void)
 		while (1);
 	}
 
-	cpu_name = cpu_info->cpu_name;
-
 	pr_info("CPU: %s [%08x] revision %d\n",
-	       cpu_name, read_cpuid_id(), read_cpuid_id() & 15);
+	       cpu_info->cpu_name, read_cpuid_id(), read_cpuid_id() & 15);
 
 	sprintf(init_utsname()->machine, ELF_PLATFORM);
 	elf_hwcap = 0;
