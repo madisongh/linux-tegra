@@ -1512,6 +1512,7 @@ void tegra_get_board_info(struct board_info *bi)
 	}
 #endif
 }
+EXPORT_SYMBOL(tegra_get_board_info);
 
 #ifdef CONFIG_OF
 void find_dc_node(struct device_node **dc1_node,
