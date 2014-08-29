@@ -1832,6 +1832,7 @@ int tegra30_make_voice_call_connections(struct codec_config *codec_info,
 
 	return 0;
 }
+EXPORT_SYMBOL(tegra30_make_voice_call_connections);
 
 int tegra30_break_voice_call_connections(struct codec_config *codec_info,
 			struct codec_config *bb_info, int uses_voice_codec)
@@ -1956,6 +1957,7 @@ int tegra30_break_voice_call_connections(struct codec_config *codec_info,
 
 	return 0;
 }
+EXPORT_SYMBOL(tegra30_break_voice_call_connections);
 
 int tegra30_make_bt_voice_call_connections(struct codec_config *codec_info,
 			struct codec_config *bb_info, int uses_voice_codec)
@@ -2098,6 +2100,7 @@ int tegra30_make_bt_voice_call_connections(struct codec_config *codec_info,
 
 	return 0;
 }
+EXPORT_SYMBOL(tegra30_make_bt_voice_call_connections);
 
 int tegra30_break_bt_voice_call_connections(struct codec_config *codec_info,
 			struct codec_config *bb_info, int uses_voice_codec)
@@ -2218,6 +2221,7 @@ int tegra30_break_bt_voice_call_connections(struct codec_config *codec_info,
 
 	return 0;
 }
+EXPORT_SYMBOL(tegra30_break_bt_voice_call_connections);
 
 
 static int tegra30_i2s_platform_probe(struct platform_device *pdev)
