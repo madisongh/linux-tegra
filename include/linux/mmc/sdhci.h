@@ -139,6 +139,12 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_BROKEN_DDR50			(1<<7)
 /* Stop command (CMD12) can set Transfer Complete when not using MMC_RSP_BUSY */
 #define SDHCI_QUIRK2_STOP_WITH_TC			(1<<8)
+/* Controller supports 64 BIT DMA mode */
+#define SDHCI_QUIRK2_SUPPORT_64BIT_DMA			(1<<9)
+/* Use 64 BIT addressing */
+#define SDHCI_QUIRK2_USE_64BIT_ADDR			(1<<10)
+/* Turn off/on card clock before sending/after tuning command*/
+#define SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK		(1<<13)
 
 	unsigned int  acmd12_ctrl;
 	unsigned int  ier;
