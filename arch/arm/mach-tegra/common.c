@@ -776,13 +776,31 @@ static void __init tegra_perf_init(void)
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC) && !defined(CONFIG_ARCH_TEGRA_3x_SOC)
 static void __init tegra_ramrepair_init(void)
 {
+#define RAM_REPAIR_TIMEOUT 500 /*usec */
 #if defined(CONFIG_ARCH_TEGRA_11x_SOC)
 	if (tegra_spare_fuse(10)  | tegra_spare_fuse(11)) {
 #endif
 		u32 reg;
+		u32 timeout = RAM_REPAIR_TIMEOUT;
+		/* ram repair for Fast Cluster0*/
 		reg = readl(FLOW_CTRL_RAM_REPAIR);
 		reg &= ~FLOW_CTRL_RAM_REPAIR_BYPASS_EN;
 		writel(reg, FLOW_CTRL_RAM_REPAIR);
+
+#if defined(CONFIG_ARCH_TEGRA_12x_SOC)
+		/* Ram Repair for Slow Cluster1 */
+		reg = readl(FLOW_CTRL_RAM_REPAIR_1);
+		reg |= FLOW_CTRL_RAM_REPAIR_REQ;
+		writel(reg, FLOW_CTRL_RAM_REPAIR_1);
+		do {
+			udelay(1);
+			reg = readl(FLOW_CTRL_RAM_REPAIR_1);
+		} while (!(reg & FLOW_CTRL_RAM_REPAIR_STS) && (timeout--));
+		if (!timeout) {
+			pr_err("Slow Cluster Ram Repair failed");
+			pr_err("reg 0x%x timeout %d\n", reg, timeout);
+		}
+#endif
 #if defined(CONFIG_ARCH_TEGRA_11x_SOC)
 	}
 #endif

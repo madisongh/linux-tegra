@@ -138,6 +138,9 @@ unsigned long tegra_lp1bb_emc_min_rate_get(void);
 #define FLOW_CTRL_RAM_REPAIR_STS	(1<<1)
 #define FLOW_CTRL_RAM_REPAIR_REQ	(1<<0)
 
+#define FLOW_CTRL_RAM_REPAIR_1 \
+	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x58)
+
 #define FUSE_SKU_DIRECT_CONFIG \
 	(IO_ADDRESS(TEGRA_FUSE_BASE) + 0x1F4)
 #define FUSE_SKU_DISABLE_ALL_CPUS	(1<<5)
