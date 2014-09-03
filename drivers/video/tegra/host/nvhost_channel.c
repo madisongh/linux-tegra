@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Channel
  *
- * Copyright (c) 2010-2014, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -168,9 +168,6 @@ static int nvhost_channel_unmap_locked(struct nvhost_channel *ch)
 
 		if (pdata->keepalive)
 			nvhost_module_enable_poweroff(pdata->pdev);
-
-		if (pdata->deinit)
-			pdata->deinit(ch->dev);
 
 		/*
 		 * when ALL of the channels are unmapped from device,

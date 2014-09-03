@@ -3,7 +3,7 @@
  *
  * Tegra graphics host driver
  *
- * Copyright (c) 2009-2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2009-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -233,9 +233,6 @@ struct nvhost_device_data {
 
 	/* Device is initialized */
 	int (*init)(struct platform_device *dev);
-
-	/* Device is de-initialized. */
-	void (*deinit)(struct platform_device *dev);
 
 	/* Preparing for power off. Used for context save. */
 	int (*prepare_poweroff)(struct platform_device *dev);

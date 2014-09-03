@@ -1,7 +1,7 @@
 /*
 * Tegra flcn common driver
 *
-* Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+* Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
 *
 * This program is free software; you can redistribute it and/or modify it
 * under the terms and conditions of the GNU General Public License,
@@ -380,6 +380,9 @@ int nvhost_flcn_init(struct platform_device *dev)
 
 	nvhost_dbg_fn("in dev:%p v:%p", dev, v);
 
+	if (v)
+		return 0;
+
 	v = kzalloc(sizeof(*v), GFP_KERNEL);
 	if (!v) {
 		dev_err(&dev->dev, "couldn't alloc flcn support");
@@ -397,41 +400,11 @@ int nvhost_flcn_init(struct platform_device *dev)
 	err = nvhost_flcn_boot(dev);
 	nvhost_module_idle(dev);
 
-	if (pdata->scaling_init)
-		nvhost_scale_hw_init(dev);
-
 	return 0;
 
  clean_up:
 	nvhost_err(&dev->dev, "failed");
 	return err;
-}
-
-void nvhost_flcn_deinit(struct platform_device *dev)
-{
-	struct flcn *v = get_flcn(dev);
-	struct nvhost_device_data *pdata = nvhost_get_devdata(dev);
-
-	DEFINE_DMA_ATTRS(attrs);
-	dma_set_attr(DMA_ATTR_READ_ONLY, &attrs);
-
-	if (!v)
-		return;
-
-	if (pdata->scaling_init)
-		nvhost_scale_hw_deinit(dev);
-
-	if (v->mapped) {
-		dma_free_attrs(&dev->dev,
-			v->size, v->mapped,
-			v->dma_addr, &attrs);
-		v->mapped = NULL;
-		v->dma_addr = 0;
-	}
-
-	/* zap, free */
-	set_flcn(dev, NULL);
-	kfree(v);
 }
 
 static struct nvhost_hwctx *vic03_alloc_hwctx(struct nvhost_hwctx_handler *h,
@@ -575,6 +548,8 @@ struct nvhost_hwctx_handler *nvhost_vic03_alloc_hwctx_handler(u32 syncpt,
 
 int nvhost_vic_finalize_poweron(struct platform_device *pdev)
 {
+	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
+
 	nvhost_dbg_fn("");
 
 	host1x_writel(pdev, flcn_slcg_override_high_a_r(), 0);
@@ -582,13 +557,40 @@ int nvhost_vic_finalize_poweron(struct platform_device *pdev)
 		     flcn_cg_idle_cg_dly_cnt_f(4) |
 		     flcn_cg_idle_cg_en_f(1) |
 		     flcn_cg_wakeup_dly_cnt_f(4));
+
+	if (pdata->scaling_init)
+		nvhost_scale_hw_init(pdev);
+
 	return nvhost_flcn_boot(pdev);
+}
+
+int nvhost_flcn_finalize_poweron(struct platform_device *pdev)
+{
+	struct nvhost_device_data *pdata = nvhost_get_devdata(pdev);
+
+	nvhost_dbg_fn("");
+
+	if (pdata->scaling_init)
+		nvhost_scale_hw_init(pdev);
+
+	return nvhost_flcn_boot(pdev);
+}
+
+int nvhost_flcn_prepare_poweroff(struct platform_device *dev)
+{
+	struct nvhost_device_data *pdata = nvhost_get_devdata(dev);
+
+	nvhost_dbg_fn("");
+
+	if (pdata->scaling_deinit)
+		nvhost_scale_hw_deinit(dev);
+
+	return 0;
 }
 
 int nvhost_vic_prepare_poweroff(struct platform_device *dev)
 {
 	struct nvhost_device_data *pdata = nvhost_get_devdata(dev);
-	struct flcn *v;
 	struct nvhost_channel *ch = pdata->channels[0];
 
 	nvhost_dbg_fn("");
@@ -599,7 +601,8 @@ int nvhost_vic_prepare_poweroff(struct platform_device *dev)
 		mutex_unlock(&ch->submitlock);
 	}
 
-	v = get_flcn(pdata->pdev);
+	if (pdata->scaling_deinit)
+		nvhost_scale_hw_deinit(dev);
 
 	return 0;
 }

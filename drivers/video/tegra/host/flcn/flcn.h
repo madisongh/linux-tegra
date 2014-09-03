@@ -1,7 +1,7 @@
 /*
  * Tegra flcn common Module Support
  *
- * Copyright (c) 2011-2014, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -93,9 +93,8 @@ void nvhost_flcn_busy(struct platform_device *);
 void nvhost_flcn_idle(struct platform_device *);
 void nvhost_flcn_suspend(struct platform_device *);
 int nvhost_flcn_init(struct platform_device *);
-void nvhost_flcn_deinit(struct platform_device *);
-
-
+int nvhost_flcn_finalize_poweron(struct platform_device *);
+int nvhost_flcn_prepare_poweroff(struct platform_device *);
 
 /* hack, get these from elsewhere */
 #define NVA0B6_VIDEO_COMPOSITOR_SET_APPLICATION_ID		(0x00000200)
