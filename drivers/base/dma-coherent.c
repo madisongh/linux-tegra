@@ -425,11 +425,11 @@ alloc_success:
 
 		if (PageHighMem(page)) {
 			void *ptr = kmap_atomic(page);
-			dmac_flush_range(ptr, ptr + PAGE_SIZE);
+//			dmac_flush_range(ptr, ptr + PAGE_SIZE);
 			kunmap_atomic(ptr);
 		} else {
 			void *ptr = page_address(page);
-			dmac_flush_range(ptr, ptr + PAGE_SIZE);
+//			dmac_flush_range(ptr, ptr + PAGE_SIZE);
 		}
 	}
 
