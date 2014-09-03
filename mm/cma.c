@@ -24,6 +24,8 @@
 #endif
 #endif
 
+#include <linux/buffer_head.h>
+#include <linux/delay.h>
 #include <linux/memblock.h>
 #include <linux/err.h>
 #include <linux/mm.h>
@@ -401,6 +403,9 @@ struct page *cma_alloc_at(struct cma *cma, int count,
 	start = start_pfn ? start_pfn - cma->base_pfn : start;
 
 	for (;;) {
+		unsigned long timeout = jiffies + msecs_to_jiffies(8000);
+		int retries = 0;
+
 		mutex_lock(&cma->lock);
 		bitmap_no = bitmap_find_next_zero_area(cma->bitmap,
 				bitmap_maxno, start, bitmap_count, mask);
@@ -417,6 +422,7 @@ struct page *cma_alloc_at(struct cma *cma, int count,
 		mutex_unlock(&cma->lock);
 
 		pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
+retry:
 		mutex_lock(&cma_mutex);
 		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
 		mutex_unlock(&cma_mutex);
@@ -426,7 +432,19 @@ struct page *cma_alloc_at(struct cma *cma, int count,
 		}
 
 		cma_clear_bitmap(cma, pfn, count);
-		if (ret != -EBUSY || start)
+		if (start && time_before(jiffies, timeout)) {
+			/* Possible migration contention from
+			 * __get_user_pages(). Retry after a bit of sleep.
+			 */
+			if (retries >= 5) {
+				msleep(retries > 10 ? 3 : 1);
+				invalidate_bh_lrus();
+			} else {
+				cond_resched();
+			}
+			retries++;
+			goto retry;
+		} else if (ret != -EBUSY || start)
 			break;
 
 		pr_debug("%s(): memory range at %p is busy, retrying\n",
