@@ -86,11 +86,15 @@
 #define SDHCI_VNDR_DLLCAL_CFG_STATUS			0x1bc
 #define SDHCI_VNDR_DLLCAL_CFG_STATUS_DLL_ACTIVE		0x80000000
 
-#define SDHCI_VNDR_TUN_CTRL				0x1c0
+#define SDHCI_VNDR_TUN_CTRL0_0				0x1c0
+#define SDHCI_VNDR_TUN_CTRL1_0				0x1c4
 /* Enable Re-tuning request only when CRC error is detected
  * in SDR50/SDR104/HS200 modes
  */
 #define SDHCI_VNDR_TUN_CTRL_RETUNE_REQ_EN		0x8000000
+#define SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS		0x4000
+#define SDHCI_VNDR_TUN_CTRL1_TUN_STEP_SIZE		0x77
+
 
 #define SDMMC_SDMEMCOMPPADCTRL	0x1E0
 #define SDMMC_SDMEMCOMPPADCTRL_VREF_SEL_MASK	0xF
@@ -167,6 +171,9 @@
 #define NVQUIRK_UPDATE_PIN_CNTRL_REG		BIT(25)
 /* Use timeout clk for write crc status data timeout counter */
 #define NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT	BIT(26)
+#define NVQUIRK_DISABLE_EXTERNAL_LOOPBACK	BIT(27)
+/* Enable T210 specific SDMMC WAR - Tuning Step Size, Tuning Iterations*/
+#define NVQUIRK_UPDATE_HW_TUNING_CONFG		BIT(28)
 
 /* Max number of clock parents for sdhci is fixed to 2 */
 #define TEGRA_SDHCI_MAX_PLL_SOURCE 2
@@ -252,6 +259,11 @@ static void tegra_sdhci_dumpregs(struct sdhci_host *sdhci)
 			trim_delay);
 	pr_info("sdhci: SDMMC Interrupt status: 0x%08x\n", sdhci_readl(sdhci,
 				SDMMC_VENDOR_ERR_INTR_STATUS_0));
+}
+
+static int sdhci_tegra_get_max_tuning_loop_counter(struct sdhci_host *sdhci)
+{
+	return 256;
 }
 
 static int show_error_stats_dump(struct seq_file *s, void *data)
@@ -493,7 +505,12 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		NVQUIRK_DISABLE_TIMER_BASED_TUNING) {
 		vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_TUN_CTRL);
 		vendor_ctrl |= SDHCI_VNDR_TUN_CTRL_RETUNE_REQ_EN;
-		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_TUN_CTRL);
+		vendor_ctrl |= SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS;
+		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_TUN_CTRL0_0);
+
+		vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_TUN_CTRL1_0);
+		vendor_ctrl &= ~(SDHCI_VNDR_TUN_CTRL1_TUN_STEP_SIZE);
+		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_TUN_CTRL1_0);
 	}
 
 	/* Restore DLL calibration and DQS Trim delay values */
@@ -1086,7 +1103,8 @@ static struct sdhci_tegra_soc_data soc_data_tegra210 = {
 		    NVQUIRK_DISABLE_TIMER_BASED_TUNING |
 		    NVQUIRK_DISABLE_EXTERNAL_LOOPBACK |
 		    NVQUIRK_UPDATE_PAD_CNTRL_REG |
-		    NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT,
+		    NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT |
+		    NVQUIRK_UPDATE_HW_TUNING_CONFG,
 	.parent_clk_list = {"pll_p"},
 };
 

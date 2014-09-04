@@ -145,6 +145,7 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_USE_64BIT_ADDR			(1<<10)
 /* Turn off/on card clock before sending/after tuning command*/
 #define SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK		(1<<13)
+#define SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR		(1<<14)
 
 	unsigned int  acmd12_ctrl;
 	unsigned int  ier;

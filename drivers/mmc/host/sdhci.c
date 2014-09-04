@@ -2194,6 +2194,11 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	sdhci_runtime_pm_get(host);
 	spin_lock_irqsave(&host->lock, flags);
 
+	if ((host->quirks2 & SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR) &&
+		(host->ops->get_max_tuning_loop_counter))
+		tuning_loop_counter =
+			host->ops->get_max_tuning_loop_counter(host);
+
 	/*
 	 * The Host Controller needs tuning only in case of SDR104 mode
 	 * and for SDR50 mode when Use Tuning for SDR50 is set in the
