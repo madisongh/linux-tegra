@@ -5,6 +5,7 @@
 obj-$(CONFIG_EXTCON)		+= extcon-class.o
 obj-$(CONFIG_EXTCON_ADC_JACK)	+= extcon-adc-jack.o
 obj-$(CONFIG_EXTCON_ARIZONA)	+= extcon-arizona.o
+obj-$(CONFIG_EXTCON_CABLE_XLATE) += extcon-cable-xlate.o
 obj-$(CONFIG_EXTCON_GPIO)	+= extcon-gpio.o
 obj-$(CONFIG_EXTCON_GPIO)	+= extcon-gpio-states.o
 obj-$(CONFIG_EXTCON_GPIO_OTG)	+= extcon-gpio-otg.o

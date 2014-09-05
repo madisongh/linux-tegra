@@ -28,6 +28,13 @@ config EXTCON_ARIZONA
 	  with Wolfson Arizona devices. These are audio CODECs with
 	  advanced audio accessory detection support.
 
+config EXTCON_CABLE_XLATE
+	tristate "Cable translator based on different cable type"
+	help
+	  Say Y here to enable cable translator which receives the cable states
+	  from different extcon and report as different cable state based on the
+	  state table.
+
 config EXTCON_MAX77665
 	tristate "MAX77665 EXTCON Support"
 	depends on MFD_MAX77665 && EXTCON
