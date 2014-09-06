@@ -133,6 +133,14 @@ enum tegra_clk_ex_param {
 #ifdef CONFIG_COMMON_CLK
 void tegra_clocks_apply_init_table(void);
 
+/* Keep using these functions until the replacement in place */
+int tegra_dvfs_get_freqs(struct clk *c, unsigned long **freqs, int *num_freqs);
+int tegra_dvfs_set_rate(struct clk *c, unsigned long rate);
+int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting);
+struct clk *tegra_get_clock_by_name(const char *name);
+int tegra_is_clk_enabled(struct clk *clk);
+int tegra_dvfs_use_alt_freqs_on_clk(struct clk *c, bool use_alt_freq);
+
 #else
 void tegra_periph_reset_deassert(struct clk *c);
 void tegra_periph_reset_assert(struct clk *c);
