@@ -460,6 +460,7 @@ acm_function_bind_config(struct android_usb_function *f,
 		}
 	}
 
+	c->bmAttributes |= USB_CONFIG_ATT_WAKEUP;
 	return 0;
 
 err_usb_add_function:
@@ -637,6 +638,8 @@ rndis_function_bind_config(struct android_usb_function *f,
 		return ret;
 	}
 	rndis->dev = dev;
+
+	c->bmAttributes |= USB_CONFIG_ATT_WAKEUP;
 
 	if (rndis->wceis) {
 		/* "Wireless" RNDIS; auto-detected by Windows */
@@ -828,6 +831,8 @@ ecm_function_bind_config(struct android_usb_function *f,
 	}
 	ecm->dev = dev;
 
+	c->bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+
 	return ecm_bind_config(c, ecm->ethaddr, ecm->dev);
 }
 
@@ -924,6 +929,8 @@ eem_function_bind_config(struct android_usb_function *f,
 		return ret;
 	}
 	eem->dev = dev;
+
+	c->bmAttributes |= USB_CONFIG_ATT_WAKEUP;
 
 	return eem_bind_config(c, eem->dev);
 }
@@ -1022,6 +1029,7 @@ ncm_function_bind_config(struct android_usb_function *f,
 	}
 	ncm->dev = dev;
 
+	c->bmAttributes |= USB_CONFIG_ATT_WAKEUP;
 	return ncm_bind_config(c, ncm->ethaddr, ncm->dev);
 }
 
