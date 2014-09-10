@@ -259,6 +259,7 @@ static int adc_jack_probe(struct platform_device *pdev)
 	}
 
 	device_set_wakeup_capable(data->dev, true);
+	adc_jack_handler(&data->handler.work);
 
 	return 0;
 }
