@@ -41,13 +41,6 @@
 		interrupt-controller;
 	};
 
-	se: se@70012000 {
-		compatible = "nvidia,tegra124-se";
-		reg = <0x0 0x70012000 0x0 0x2000 /* SE base */
-			0x0 0x7000e400 0x0 0x400>; /* PMC base */
-		interrupts = <0 58 0x04>;
-	};
-
 	tegra_car: clock {
 		compatible = "nvidia,tegra124-car";
 		reg = <0x0 0x60006000 0x0 0x1000>;
@@ -316,11 +309,12 @@
 		dma-names = "rx", "tx";
 	};
 
-	pmc {
-		compatible = "nvidia,tegra124-pmc";
-		reg = <0x0 0x7000e400 0x0 0x400>;
-		clocks = <&tegra_car 261>, <&clk32k_in>;
-		clock-names = "pclk", "clk32k_in";
+	sata@0x70020000 {
+		compatible = "nvidia,tegra114-ahci-sata";
+		reg = <0x0 0x70027000 0x0 0x00002000>,
+			<0x0 0x70021000 0x0 0x00001000>;
+		interrupts = <0 23 0x04>;
+		status = "disabled";
 	};
 
 	efuse@7000f800 {
@@ -646,14 +640,6 @@
 		status = "disabled";
 	};
 
-	sata@0x70020000 {
-		compatible = "nvidia,tegra114-ahci-sata";
-		reg = <0x0 0x70027000 0x0 0x00002000>,
-			<0x0 0x70021000 0x0 0x00001000>;
-		interrupts = <0 23 0x04>;
-		status = "disabled";
-	};
-
 	psci {
 		compatible = "arm,psci";
 		method = "smc";
@@ -688,5 +674,19 @@
 		interrupts = < 0 14 0x04 >;
 		nvidia,memory-clients = <25>;
 		status = "disabled";
+	};
+
+	pmc {
+		compatible = "nvidia,tegra124-pmc";
+		reg = <0x0 0x7000e400 0x0 0x400>;
+		clocks = <&tegra_car 261>, <&clk32k_in>;
+		clock-names = "pclk", "clk32k_in";
+	};
+
+	se: se@70012000 {
+		compatible = "nvidia,tegra124-se";
+		reg = <0x0 0x70012000 0x0 0x2000 /* SE base */
+			0x0 0x7000e400 0x0 0x400>; /* PMC base */
+		interrupts = <0 58 0x04>;
 	};
 };
