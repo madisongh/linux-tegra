@@ -14793,8 +14793,8 @@ static struct tegra12_emc_table ardbeg_lpddr3_emc_table_E1781[] = {
 
 static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 	{
-		0x19,       /* V5.0.17 */
-		"01_12750_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_12750_V02_V5.0.18_V1.1", /* DVFS table version */
 		12750,      /* SDRAM frequency */
 		800,        /* min voltage */
 		800,        /* gpu min voltage */
@@ -15007,7 +15007,7 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		0x00000802, /* EMC_CTT_TERM_CTRL */
 		0x73240000, /* EMC_CFG */
 		0x000008c5, /* EMC_CFG_2 */
-		0x00040128, /* EMC_SEL_DPD_CTRL */
+		0x00040000, /* EMC_SEL_DPD_CTRL */
 		0x002c0068, /* EMC_CFG_DIG_DLL */
 		0x00000008, /* EMC_BGBIAS_CTL0 */
 		0x00000000, /* EMC_AUTO_CAL_CONFIG2 */
@@ -15020,8 +15020,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		57820,      /* expected dvfs latency (ns) */
 	},
 	{
-		0x19,       /* V5.0.17 */
-		"01_20400_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_20400_V02_V5.0.18_V1.1", /* DVFS table version */
 		20400,      /* SDRAM frequency */
 		800,        /* min voltage */
 		800,        /* gpu min voltage */
@@ -15234,7 +15234,7 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		0x00000802, /* EMC_CTT_TERM_CTRL */
 		0x73240000, /* EMC_CFG */
 		0x000008c5, /* EMC_CFG_2 */
-		0x00040128, /* EMC_SEL_DPD_CTRL */
+		0x00040000, /* EMC_SEL_DPD_CTRL */
 		0x002c0068, /* EMC_CFG_DIG_DLL */
 		0x00000008, /* EMC_BGBIAS_CTL0 */
 		0x00000000, /* EMC_AUTO_CAL_CONFIG2 */
@@ -15247,8 +15247,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		35610,      /* expected dvfs latency (ns) */
 	},
 	{
-		0x19,       /* V5.0.17 */
-		"01_40800_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_40800_V02_V5.0.18_V1.1", /* DVFS table version */
 		40800,      /* SDRAM frequency */
 		800,        /* min voltage */
 		800,        /* gpu min voltage */
@@ -15461,7 +15461,7 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		0x00000802, /* EMC_CTT_TERM_CTRL */
 		0x73240000, /* EMC_CFG */
 		0x000008c5, /* EMC_CFG_2 */
-		0x00040128, /* EMC_SEL_DPD_CTRL */
+		0x00040000, /* EMC_SEL_DPD_CTRL */
 		0x002c0068, /* EMC_CFG_DIG_DLL */
 		0x00000008, /* EMC_BGBIAS_CTL0 */
 		0x00000000, /* EMC_AUTO_CAL_CONFIG2 */
@@ -15474,8 +15474,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		20850,      /* expected dvfs latency (ns) */
 	},
 	{
-		0x19,       /* V5.0.17 */
-		"01_68000_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_68000_V02_V5.0.18_V1.1", /* DVFS table version */
 		68000,      /* SDRAM frequency */
 		800,        /* min voltage */
 		800,        /* gpu min voltage */
@@ -15688,7 +15688,7 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		0x00000802, /* EMC_CTT_TERM_CTRL */
 		0x73240000, /* EMC_CFG */
 		0x000008c5, /* EMC_CFG_2 */
-		0x00040128, /* EMC_SEL_DPD_CTRL */
+		0x00040000, /* EMC_SEL_DPD_CTRL */
 		0x002c0068, /* EMC_CFG_DIG_DLL */
 		0x00000008, /* EMC_BGBIAS_CTL0 */
 		0x00000000, /* EMC_AUTO_CAL_CONFIG2 */
@@ -15701,8 +15701,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		10720,      /* expected dvfs latency (ns) */
 	},
 	{
-		0x19,       /* V5.0.17 */
-		"01_102000_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_102000_V02_V5.0.18_V1.1", /* DVFS table version */
 		102000,     /* SDRAM frequency */
 		800,        /* min voltage */
 		800,        /* gpu min voltage */
@@ -15915,7 +15915,7 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		0x00000802, /* EMC_CTT_TERM_CTRL */
 		0x73240000, /* EMC_CFG */
 		0x000008c5, /* EMC_CFG_2 */
-		0x00040128, /* EMC_SEL_DPD_CTRL */
+		0x00040000, /* EMC_SEL_DPD_CTRL */
 		0x002c0068, /* EMC_CFG_DIG_DLL */
 		0x00000008, /* EMC_BGBIAS_CTL0 */
 		0x00000000, /* EMC_AUTO_CAL_CONFIG2 */
@@ -15928,8 +15928,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		6890,       /* expected dvfs latency (ns) */
 	},
 	{
-		0x19,       /* V5.0.17 */
-		"01_204000_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_204000_V02_V5.0.18_V1.1", /* DVFS table version */
 		204000,     /* SDRAM frequency */
 		800,        /* min voltage */
 		800,        /* gpu min voltage */
@@ -16141,8 +16141,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		0x001fffff, /* EMC_AUTO_CAL_INTERVAL */
 		0x00000802, /* EMC_CTT_TERM_CTRL */
 		0x73240000, /* EMC_CFG */
-		0x000008cd, /* EMC_CFG_2 */
-		0x00040128, /* EMC_SEL_DPD_CTRL */
+		0x0000088d, /* EMC_CFG_2 */
+		0x00040000, /* EMC_SEL_DPD_CTRL */
 		0x002c0068, /* EMC_CFG_DIG_DLL */
 		0x00000008, /* EMC_BGBIAS_CTL0 */
 		0x00000000, /* EMC_AUTO_CAL_CONFIG2 */
@@ -16155,8 +16155,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		3420,       /* expected dvfs latency (ns) */
 	},
 	{
-		0x19,       /* V5.0.17 */
-		"01_300000_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_300000_V02_V5.0.18_V1.1", /* DVFS table version */
 		300000,     /* SDRAM frequency */
 		820,        /* min voltage */
 		820,        /* gpu min voltage */
@@ -16369,7 +16369,7 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		0x00000802, /* EMC_CTT_TERM_CTRL */
 		0x73340000, /* EMC_CFG */
 		0x000008d5, /* EMC_CFG_2 */
-		0x00040128, /* EMC_SEL_DPD_CTRL */
+		0x00040000, /* EMC_SEL_DPD_CTRL */
 		0x002c0068, /* EMC_CFG_DIG_DLL */
 		0x00000000, /* EMC_BGBIAS_CTL0 */
 		0x00000000, /* EMC_AUTO_CAL_CONFIG2 */
@@ -16382,8 +16382,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		2680,       /* expected dvfs latency (ns) */
 	},
 	{
-		0x19,       /* V5.0.17 */
-		"01_396000_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_396000_V02_V5.0.18_V1.1", /* DVFS table version */
 		396000,     /* SDRAM frequency */
 		850,        /* min voltage */
 		850,        /* gpu min voltage */
@@ -16596,7 +16596,7 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		0x00000802, /* EMC_CTT_TERM_CTRL */
 		0x73340000, /* EMC_CFG */
 		0x00000895, /* EMC_CFG_2 */
-		0x00040008, /* EMC_SEL_DPD_CTRL */
+		0x00040000, /* EMC_SEL_DPD_CTRL */
 		0x002c0068, /* EMC_CFG_DIG_DLL */
 		0x00000000, /* EMC_BGBIAS_CTL0 */
 		0x00000000, /* EMC_AUTO_CAL_CONFIG2 */
@@ -16609,8 +16609,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		2180,       /* expected dvfs latency (ns) */
 	},
 	{
-		0x19,       /* V5.0.17 */
-		"01_528000_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_528000_V02_V5.0.18_V1.1", /* DVFS table version */
 		528000,     /* SDRAM frequency */
 		880,        /* min voltage */
 		870,        /* gpu min voltage */
@@ -16823,7 +16823,7 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		0x00000802, /* EMC_CTT_TERM_CTRL */
 		0x73300000, /* EMC_CFG */
 		0x0000089d, /* EMC_CFG_2 */
-		0x00040008, /* EMC_SEL_DPD_CTRL */
+		0x00040000, /* EMC_SEL_DPD_CTRL */
 		0xe0120069, /* EMC_CFG_DIG_DLL */
 		0x00000000, /* EMC_BGBIAS_CTL0 */
 		0x00000000, /* EMC_AUTO_CAL_CONFIG2 */
@@ -16836,8 +16836,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		1440,       /* expected dvfs latency (ns) */
 	},
 	{
-		0x19,       /* V5.0.17 */
-		"01_600000_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_600000_V02_V5.0.18_V1.1", /* DVFS table version */
 		600000,     /* SDRAM frequency */
 		910,        /* min voltage */
 		910,        /* gpu min voltage */
@@ -17050,7 +17050,7 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		0x00000802, /* EMC_CTT_TERM_CTRL */
 		0x73300000, /* EMC_CFG */
 		0x0000089d, /* EMC_CFG_2 */
-		0x00040008, /* EMC_SEL_DPD_CTRL */
+		0x00040000, /* EMC_SEL_DPD_CTRL */
 		0xe00e0069, /* EMC_CFG_DIG_DLL */
 		0x00000000, /* EMC_BGBIAS_CTL0 */
 		0x00000000, /* EMC_AUTO_CAL_CONFIG2 */
@@ -17063,8 +17063,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		1440,       /* expected dvfs latency (ns) */
 	},
 	{
-		0x19,       /* V5.0.17 */
-		"01_792000_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_792000_V02_V5.0.18_V1.1", /* DVFS table version */
 		792000,     /* SDRAM frequency */
 		980,        /* min voltage */
 		980,        /* gpu min voltage */
@@ -17290,8 +17290,8 @@ static struct tegra12_emc_table jetson_tk1_ddr3_emc_table[] = {
 		1200,       /* expected dvfs latency (ns) */
 	},
 	{
-		0x19,       /* V5.0.17 */
-		"01_924000_01_V5.0.17_V1.1", /* DVFS table version */
+		0x19,       /* V5.0.18 */
+		"01_924000_V02_V5.0.18_V1.1", /* DVFS table version */
 		924000,     /* SDRAM frequency */
 		1010,       /* min voltage */
 		1010,       /* gpu min voltage */
