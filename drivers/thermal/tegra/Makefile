@@ -1,4 +1,5 @@
 obj-$(CONFIG_TEGRA_SOCTHERM)	+= tegra-soctherm.o
+obj-$(CONFIG_TEGRA_AOTAG)	+= aotag.o
 
 tegra-soctherm-y				:= soctherm.o tsensor-fuse.o
 tegra-soctherm-$(CONFIG_ARCH_TEGRA_124_SOC)	+= tegra124-soctherm.o

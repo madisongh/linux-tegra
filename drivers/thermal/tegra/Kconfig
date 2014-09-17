@@ -10,4 +10,9 @@ config TEGRA_SOCTHERM
 	  zones to manage temperatures. This option is also required for the
 	  emergency thermal reset (thermtrip) feature to function.
 
+config TEGRA_AOTAG
+	bool "Tegra Always-On-Thermal-Alert-Generator"
+	help
+	  Support for Tegra Always-On thermal Alert Generator
+
 endmenu
