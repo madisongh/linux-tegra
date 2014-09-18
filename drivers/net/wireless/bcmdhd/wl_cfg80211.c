@@ -1369,7 +1369,11 @@ wl_cfg80211_add_virtual_iface(struct wiphy *wiphy,
 				dhd_mode = DHD_FLAG_P2P_GO_MODE;
 			DNGL_FUNC(dhd_cfg80211_set_p2p_info, (cfg, dhd_mode));
 			/* reinitialize completion to clear previous count */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 13, 0))
 			INIT_COMPLETION(cfg->iface_disable);
+#else
+			init_completion(&cfg->iface_disable);
+#endif
 
 			return ndev_to_cfgdev(new_ndev);
 		} else {
@@ -1841,7 +1845,11 @@ static void wl_scan_prep(struct wl_scan_params *params, struct cfg80211_scan_req
 			/* SKIP DFS channels for Secondary interface */
 			if ((cfg->escan_info.ndev != bcmcfg_to_prmry_ndev(cfg)) &&
 				(request->channels[i]->flags &
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
 				(IEEE80211_CHAN_RADAR | IEEE80211_CHAN_PASSIVE_SCAN)))
+#else
+				(IEEE80211_CHAN_RADAR | IEEE80211_CHAN_NO_IR)))
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0) */
 				continue;
 
 			if (request->channels[i]->band == IEEE80211_BAND_2GHZ) {
@@ -2076,8 +2084,13 @@ wl_run_escan(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 
 					/* ignore DFS channels */
 					if (request->channels[i]->flags &
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+						(IEEE80211_CHAN_NO_IR
+						| IEEE80211_CHAN_RADAR))
+#else
 						(IEEE80211_CHAN_RADAR
 						| IEEE80211_CHAN_PASSIVE_SCAN))
+#endif
 						continue;
 
 					for (j = 0; j < n_valid_chan; j++) {
@@ -6837,6 +6850,14 @@ wl_cfg80211_reg_notifier(
 }
 #endif /* CONFIG_CFG80211_INTERNAL_REGDB */
 
+#ifdef CONFIG_PM
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
+static const struct wiphy_wowlan_support brcm_wowlan_support = {
+	.flags = WIPHY_WOWLAN_ANY,
+};
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0) */
+#endif /* CONFIG_PM */
+
 static s32 wl_setup_wiphy(struct wireless_dev *wdev, struct device *sdiofunc_dev, void *context)
 {
 	s32 err = 0;
@@ -6961,11 +6982,19 @@ static s32 wl_setup_wiphy(struct wireless_dev *wdev, struct device *sdiofunc_dev
 	 * disconnection of connected network before suspend. So a dummy wowlan
 	 * filter is configured for kernels linux-3.8 and above.
 	 */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
+	wdev->wiphy->wowlan = &brcm_wowlan_support;
+#else
 	wdev->wiphy->wowlan.flags = WIPHY_WOWLAN_ANY;
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)) */
 #endif /* CONFIG_PM && WL_CFG80211_P2P_DEV_IF */
 
 	WL_DBG(("Registering custom regulatory)\n"));
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+	wdev->wiphy->regulatory_flags |= REGULATORY_CUSTOM_REG;
+#else
 	wdev->wiphy->flags |= WIPHY_FLAG_CUSTOM_REGULATORY;
+#endif
 	wiphy_apply_custom_regulatory(wdev->wiphy, &brcm_regdom);
 
 #if defined(WL_VENDOR_EXT_SUPPORT)
@@ -7908,8 +7937,12 @@ wl_bss_connect_done(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 					AP_ENV_INDETERMINATE);
 #endif /* ROAM_AP_ENV_DETECTION */
 			if (ndev != bcmcfg_to_prmry_ndev(cfg)) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0)
+				init_completion(&cfg->iface_disable);
+#else
 				/* reinitialize completion to clear previous count */
 				INIT_COMPLETION(cfg->iface_disable);
+#endif
 			}
 #ifdef CUSTOM_SET_CPUCORE
 			if (wl_get_chan_isvht80(ndev, dhd)) {
@@ -8310,11 +8343,14 @@ wl_notify_rx_mgmt_frame(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
 		}
 	}
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+	cfg80211_rx_mgmt(cfgdev, freq, 0,  mgmt_frame, mgmt_frame_len, 0, GFP_ATOMIC);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)) || \
+	defined(WL_COMPAT_WIRELESS)
 	cfg80211_rx_mgmt(cfgdev, freq, 0, mgmt_frame, mgmt_frame_len, GFP_ATOMIC);
 #else
 	cfg80211_rx_mgmt(cfgdev, freq, mgmt_frame, mgmt_frame_len, GFP_ATOMIC);
-#endif 
+#endif  /* LINUX_VERSION >= VERSION(3, 14, 0) */
 
 	WL_DBG(("mgmt_frame_len (%d) , e->datalen (%d), channel (%d), freq (%d)\n",
 		mgmt_frame_len, ntoh32(e->datalen), channel, freq));
@@ -8690,6 +8726,7 @@ wl_cfg80211_netdev_notifier_call(struct notifier_block * nb,
 	switch (state) {
 		case NETDEV_DOWN:
 		{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 11, 0))
 			int max_wait_timeout = 2;
 			int max_wait_count = 100;
 			unsigned long limit = jiffies + max_wait_timeout * HZ;
@@ -8718,6 +8755,7 @@ wl_cfg80211_netdev_notifier_call(struct notifier_block * nb,
 				set_current_state(TASK_RUNNING);
 				refcnt++;
 			}
+#endif
 			break;
 		}
 
@@ -9327,8 +9365,10 @@ static void wl_dealloc_netinfo(struct work_struct *work)
 	list_for_each_entry_safe(_net_info, next, &cfg->dealloc_list, list) {
 		list_del(&_net_info->list);
 		if (_net_info->wdev) {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 11, 0))
 			flush_work(&_net_info->wdev->cleanup_work);
 			WARN_ON(work_pending(&_net_info->wdev->cleanup_work));
+#endif
 			kfree(_net_info->wdev);
 		}
 		kfree(_net_info);
@@ -10123,12 +10163,22 @@ static int wl_construct_reginfo(struct bcm_cfg80211 *cfg, s32 bw_cap)
 					err = wldev_iovar_getint(dev, "per_chan_info", &channel);
 					if (!err) {
 						if (channel & WL_CHAN_RADAR)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
 							band_chan_arr[index].flags |=
 								(IEEE80211_CHAN_RADAR |
 								IEEE80211_CHAN_NO_IBSS);
+#else
+							band_chan_arr[index].flags |=
+								IEEE80211_CHAN_RADAR;
+#endif
 						if (channel & WL_CHAN_PASSIVE)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
 							band_chan_arr[index].flags |=
 								IEEE80211_CHAN_PASSIVE_SCAN;
+#else
+							band_chan_arr[index].flags |=
+								IEEE80211_CHAN_NO_IR;
+#endif
 					} else if (err == BCME_UNSUPPORTED) {
 						dfs_radar_disabled = TRUE;
 						WL_ERR(("does not support per_chan_info\n"));
