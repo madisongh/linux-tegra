@@ -35,6 +35,7 @@
 #include <dhd.h>
 #include <dhdioctl.h>
 #include <brcm_nl80211.h>
+#include "dhd_dbg.h"
 
 #ifdef VENDOR_EXT_SUPPORT
 static int dhd_cfgvendor_priv_string_handler(struct wiphy *wiphy,
