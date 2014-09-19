@@ -31,7 +31,6 @@
 #include <linux/i2c-tegra.h>
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
-#include <linux/of_i2c.h>
 #include <linux/module.h>
 #include <linux/clk/tegra.h>
 #include <linux/spinlock.h>
@@ -748,7 +747,6 @@ static int tegra_vii2c_probe(struct platform_device *pdev)
 
 	tegra_register_pm_notifier(&i2c_dev->pm_nb);
 
-	of_i2c_register_devices(&i2c_dev->adapter);
 	pm_runtime_enable(&i2c_dev->adapter.dev);
 	tegra_vii2c_gpio_init(i2c_dev);
 
