@@ -36,6 +36,7 @@ obj-$(CONFIG_VIDEO_IMX091)	+= imx091.o nvc_utilities.o
 obj-$(CONFIG_VIDEO_IMX135)	+= imx135.o
 obj-$(CONFIG_VIDEO_IMX179)	+= imx179.o
 obj-$(CONFIG_VIDEO_IMX132)	+= imx132.o
+obj-$(CONFIG_VIDEO_AR0330)	+= ar0330.o
 obj-$(CONFIG_VIDEO_AR0261)	+= ar0261.o
 obj-$(CONFIG_DEBUG_FS)		+= nvc_debugfs.o
 obj-$(CONFIG_VIDEO_OV5693)	+= ov5693.o

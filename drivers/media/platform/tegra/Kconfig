@@ -91,6 +91,15 @@ config VIDEO_AR0261
         ---help---
           This is a driver for the AR0261 camera sensor
 
+config VIDEO_AR0330
+        tristate "AR0330 camera sensor support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the AR0330 camera sensor
+	  for use with the tegra isp.  The sensor has a
+	  maximum of 3MP resolution with slave mode
+	  capability.
+
 config VIDEO_IMX132
         tristate "IMX132 camera sensor support"
         depends on I2C && ARCH_TEGRA
