@@ -524,15 +524,6 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	if (plat->dqs_trim_delay)
 		sdhci_tegra_set_dqs_trim_delay(host, plat->dqs_trim_delay);
 
-	/*
-	 * Enable Band Gap trimmers and VIO supply.
-	 * Wait for 3usec after enabling the trimmers.
-	 */
-	vendor_ctrl = sdhci_readl(host, SDMMC_VENDOR_IO_TRIM_CNTRL_0);
-	vendor_ctrl &= ~(SDMMC_VENDOR_IO_TRIM_CNTRL_0_SEL_VREG_MASK);
-	sdhci_writel(host, vendor_ctrl, SDMMC_VENDOR_IO_TRIM_CNTRL_0);
-	udelay(3);
-
 	/* Use timeout clk data timeout counter for generating wr crc status */
 	if (soc_data->nvquirks &
 		NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT) {
@@ -565,6 +556,7 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		unsigned int timing)
 {
 	u16 clk;
+	u32 vndr_ctrl;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
@@ -572,7 +564,7 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 	/* Set the UHS signaling mode */
 	sdhci_set_uhs_signaling(host, timing);
 
-	if (uhs == MMC_TIMING_MMC_HS400)
+	if (timing == MMC_TIMING_MMC_HS400)
 		sdhci_tegra_set_dqs_trim_delay(host, plat->dqs_trim_delay);       
 
 	/*
@@ -591,6 +583,22 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		/* Set the ddr mode trim delay if required */
 		sdhci_tegra_set_trim_delay(host, plat->ddr_trim_delay);
 	}
+
+	/* T21x: Enable Band Gap trimmers and VIO supply for eMMC all modes
+	 * and for SD/SDIO tunable modes only.
+	 * Wait for 3usec after enabling the trimmers.
+	 */
+	if (!plat->en_io_trim_volt)
+	       return 0;
+
+	vndr_ctrl = sdhci_readl(host, SDMMC_VNDR_IO_TRIM_CNTRL_0);
+	if (plat->is_emmc || (timing == MMC_TIMING_UHS_SDR104) ||
+			(timing == MMC_TIMING_UHS_SDR50))
+		vndr_ctrl &= ~(SDMMC_VNDR_IO_TRIM_CNTRL_0_SEL_VREG);
+	else
+		vndr_ctrl |= (SDMMC_VNDR_IO_TRIM_CNTRL_0_SEL_VREG);
+	sdhci_writel(host, vndr_ctrl, SDMMC_VNDR_IO_TRIM_CNTRL_0);
+	udelay(3);
 
 	return 0;
 }
@@ -1202,6 +1210,8 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	of_property_read_u32(np, "auto-cal-step", &plat->auto_cal_step);
 	plat->disable_auto_cal = of_property_read_bool(np,
 		"nvidia,disable-auto-cal");
+	plat->en_io_trim_volt = of_property_read_bool(np,
+			"nvidia,en-io-trim-volt");
 
 	return mmc_of_parse(host->mmc);
 }
