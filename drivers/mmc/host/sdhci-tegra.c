@@ -94,6 +94,7 @@
  */
 #define SDHCI_VNDR_TUN_CTRL_RETUNE_REQ_EN		0x8000000
 #define SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS		0x4000
+#define SDHCI_VNDR_TUN_CTRL0_TUN_HW_TAP			0x20000
 #define SDHCI_VNDR_TUN_CTRL1_TUN_STEP_SIZE		0x77
 
 
@@ -232,6 +233,7 @@ struct sdhci_tegra {
 	int drive_group_sel;
 	u32 dll_calib;
 	bool en_strobe;
+	unsigned int tuned_tap_delay;
 };
 
 static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
@@ -247,6 +249,7 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci);
 static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
 		bool set);
+static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option);
 
 static void tegra_sdhci_dumpregs(struct sdhci_host *sdhci)
 {
@@ -1058,6 +1061,10 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.platform_reset_exit	= tegra_sdhci_reset_exit,
 	.switch_signal_voltage_exit = tegra_sdhci_do_calibration,
 	.sd_error_stats		= sdhci_tegra_sd_error_stats,
+	.get_drive_strength	= tegra_sdhci_get_drive_strength,
+	.dump_host_cust_regs	= tegra_sdhci_dumpregs,
+	.get_max_tuning_loop_counter = sdhci_tegra_get_max_tuning_loop_counter,
+	.config_tap_delay	= tegra_sdhci_config_tap,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -1427,6 +1434,32 @@ static int tegra_sdhci_get_drive_strength(struct sdhci_host *sdhci,
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
 
 	return plat->default_drv_type;
+}
+
+static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	u32 tap_delay;
+
+	switch (option) {
+	case SAVE_TUNED_TAP:
+		tap_delay = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
+		tap_delay >>= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT;
+		tap_delay &= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK;
+		tegra_host->tuned_tap_delay = tap_delay;
+		tegra_host->tuning_status = TUNING_STATUS_DONE;
+		break;
+	case SET_DEFAULT_TAP:
+		sdhci_tegra_set_tap_delay(sdhci, tegra_host->plat->tap_delay);
+		break;
+	case SET_TUNED_TAP:
+		sdhci_tegra_set_tap_delay(sdhci, tegra_host->tuned_tap_delay);
+		break;
+	default:
+		dev_err(mmc_dev(sdhci->mmc),
+			"Invalid argument passed to tap config\n");
+	}
 }
 
 static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
