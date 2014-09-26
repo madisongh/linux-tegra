@@ -492,6 +492,7 @@
 	backlight {
 		compatible = "pwm-backlight";
 		status = "okay";
+		pwms = <&tegra_pwm 0 29334>;
 	};
 
 	camera-pcl {
