@@ -244,13 +244,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 static int op_cpu_disable(unsigned int cpu)
 {
 	/*
-	 * If we don't have a cpu_die method, abort before we reach the point
-	 * of no return. CPU0 may not have an cpu_ops, so test for it.
-	 */
-	if (!cpu_ops[cpu] || !cpu_ops[cpu]->cpu_die)
-		return -EOPNOTSUPP;
-
-	/*
 	 * We may need to abort a hot unplug for some other mechanism-specific
 	 * reason.
 	 */
@@ -360,7 +353,8 @@ void cpu_die(void)
 	 * mechanism must perform all required cache maintenance to ensure that
 	 * no dirty lines are lost in the process of shutting down the CPU.
 	 */
-	cpu_ops[cpu]->cpu_die(cpu);
+	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
+		cpu_ops[cpu]->cpu_die(cpu);
 
 	/*
 	 * actual CPU shutdown procedure is at least platform (if not
