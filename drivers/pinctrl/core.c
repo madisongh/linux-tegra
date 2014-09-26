@@ -548,18 +548,15 @@ int pinctrl_get_pinctrl_dev_pin_id_from_gpio(unsigned gpio,
 	struct pinctrl_gpio_range *range;
 	int ret;
 
-	mutex_lock(&pinctrldev_list_mutex);
-
 	ret = pinctrl_get_device_gpio_range(gpio, &pctldev, &range);
 	if (ret < 0) {
 		pr_err("Pincontrol not found for gpio %d\n", gpio);
-		goto unlock;
+		return ret;
 	}
 
 	*pctl_dev = pctldev;
 	*pin_id = gpio - range->base + range->pin_base;
-unlock:
-	mutex_unlock(&pinctrldev_list_mutex);
+
 	return ret;
 }
 
