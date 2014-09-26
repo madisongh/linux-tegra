@@ -325,6 +325,31 @@ __init void iotable_init(struct map_desc *io_desc, int nr)
 	}
 }
 
+__init void iotable_init_va(struct map_desc *io_desc, int nr)
+{
+	struct map_desc *md;
+	struct vm_struct *vm;
+
+	vm = early_alloc(sizeof(*vm) * nr);
+
+	for (md = io_desc; nr; md++, nr--) {
+		vm->addr = (void *)(md->virtual & PAGE_MASK);
+		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
+		vm->phys_addr = __pfn_to_phys(md->pfn);
+		vm->flags = VM_IOREMAP;
+		vm->caller = iotable_init;
+		vm_area_add_early(vm++);
+	}
+}
+
+__init void iotable_init_mapping(struct map_desc *io_desc, int nr)
+{
+	struct map_desc *md;
+
+	for (md = io_desc; nr; md++, nr--)
+		create_mapping(md);
+}
+
 static void __init map_mem(void)
 {
 	struct memblock_region *reg;
