@@ -8,6 +8,7 @@
 #include <linux/rmap.h>
 #include <linux/swap.h>
 #include <linux/swapops.h>
+#include <linux/dma-contiguous.h>
 
 #include <linux/sched.h>
 #include <linux/rwsem.h>
@@ -584,7 +585,8 @@ retry:
 			return i ? i : PTR_ERR(page);
 		}
 
-		if (is_cma_page(page) && (foll_flags & FOLL_GET)) {
+		if (dma_contiguous_should_replace_page(page) &&
+			(foll_flags & FOLL_GET)) {
 			struct page *old_page = page;
 			unsigned int fault_flags = 0;
 
@@ -623,7 +625,8 @@ retry:
 		}
 
 		mutex_unlock(&s_follow_page_lock);
-		BUG_ON(is_cma_page(page) && (foll_flags & FOLL_GET));
+		BUG_ON(dma_contiguous_should_replace_page(page) &&
+			(foll_flags & FOLL_GET));
 
 		if (pages) {
 			pages[i] = page;
