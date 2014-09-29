@@ -336,7 +336,7 @@ static bool fw_get_filesystem_firmware(struct device *device,
 	__putname(path);
 
 	if (success) {
-		dev_dbg(device, "firmware: direct-loading firmware %s\n",
+		dev_info(device, "firmware: direct-loading firmware %s\n",
 			buf->fw_id);
 		mutex_lock(&fw_lock);
 		set_bit(FW_STATUS_DONE, &buf->status);
