@@ -1918,8 +1918,8 @@ static int adjust_window_boundaries(struct sdhci_host *sdhci,
 	struct tap_window_data *temp_tap_data)
 {
 	struct tap_window_data *tap_data;
-	int vmin_tap_hole;
-	int vmax_tap_hole;
+	int vmin_tap_hole = 0;
+	int vmax_tap_hole = 0;
 	u8 i = 0;
 
 	for (i = 0; i < tuning_data->num_of_valid_tap_wins; i++) {
