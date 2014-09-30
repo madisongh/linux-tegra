@@ -89,7 +89,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 	int selected_tasksize = 0;
 	short selected_oom_score_adj;
 	int array_size = ARRAY_SIZE(lowmem_adj);
-	struct sysinfo swap_info;
 	int other_free = global_page_state(NR_FREE_PAGES) - totalreserve_pages
 #ifdef CONFIG_TEGRA_NVMAP
 			 + nvmap_page_pool_get_unused_pages()
@@ -98,9 +97,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 	int other_file = global_page_state(NR_FILE_PAGES) -
 						global_page_state(NR_SHMEM) -
 						total_swapcache_pages();
-
-	si_swapinfo(&swap_info);
-	other_free += swap_info.freeswap;
 
 	if (lowmem_adj_size < array_size)
 		array_size = lowmem_adj_size;
