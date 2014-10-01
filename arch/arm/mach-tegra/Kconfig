@@ -675,17 +675,8 @@ config REGULATOR_TEGRA_DFLL_BYPASS
 	  Enables use of dfll bypass interfaces for voltage control
 	  by s/w driver.
 
-config TEGRA_USE_SECURE_KERNEL
-	bool "Boot the linux kernel in non-secure mode"
-	help
-	 When enabled, the CPU will boot in the non-secure mode and issue
-	 SMCs in order to access secure registers. SMC requests would be
-	 serviced by a third party software component running in the secure
-	 mode.
-
 config TEGRA_VIRTUAL_CPUID
 	bool "virtualized CPUID"
-	depends on !TEGRA_USE_SECURE_KERNEL
 	depends on ARCH_TEGRA_HAS_SYMMETRIC_CPU_PWR_GATE
 	default n
 	help
