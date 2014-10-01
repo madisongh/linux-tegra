@@ -108,6 +108,7 @@ struct tegra_sdhci_platform_data {
 	bool en_periodic_calib;
 	bool dll_calib_needed;
 	bool pwr_off_during_lp0;
+	unsigned int auto_cal_step;
 };
 
 #endif
