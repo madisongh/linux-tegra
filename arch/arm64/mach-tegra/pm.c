@@ -612,7 +612,7 @@ int tegra_pm_post_sc7(void)
 
 	return 0;
 }
-#endif
+#endif /* CONFIG_ARCH_TEGRA_21x_SOC */
 
 static void tegra_pm_set(enum tegra_suspend_mode mode)
 {
@@ -680,6 +680,7 @@ static const char *lp_state[TEGRA_MAX_SUSPEND_MODE] = {
 	[TEGRA_SUSPEND_LP0] = "LP0",
 };
 
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 int tegra210_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 {
 	int err = 0;
@@ -742,6 +743,7 @@ int tegra210_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 fail:
 	return err;
 }
+#endif /* CONFIG_ARCH_TEGRA_21x_SOC */
 
 static int tegra_suspend_enter(suspend_state_t state)
 {
