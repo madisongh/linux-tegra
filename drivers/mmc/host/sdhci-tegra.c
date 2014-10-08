@@ -1029,9 +1029,13 @@ static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
 	 * In ddr mode, tegra sdmmc controller clock frequency
 	 * should be double the card clock frequency.
 	 */
-	if (sdhci->mmc->card &&	mmc_card_ddr_mode(sdhci->mmc->card))
-		clk_rate = clock * 2;
-	else
+	if (sdhci->mmc->card &&	mmc_card_ddr_mode(sdhci->mmc->card)) {
+		if (tegra_host->ddr_clk limit &&
+				(tegra_host->ddr_clk_limit < clock))
+			clk_rate = tegra_host->ddr_clk_limit * 2;
+		else
+			clk_rate = clock * 2;
+	} else
 		clk_rate = clock;
 
 	if (tegra_host->max_clk_limit && (clk_rate > tegra_host->max_clk_limit))
