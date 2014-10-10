@@ -309,6 +309,10 @@
 						     regulator-consumer-supply = "vdd_i2c";
 						     regulator-consumer-device = "2-000c";
 					     };
+					     c7 {
+						     regulator-consumer-supply = "vdd_i2c";
+						     regulator-consumer-device = "2-0010";
+					     };
 				     };
 			     };
 
@@ -439,6 +443,10 @@
 					     };
 					     c2 {
 						     regulator-consumer-supply = "imx135_reg2";
+					     };
+					     c3 {
+						     regulator-consumer-supply = "vdig_lv";
+						     regulator-consumer-device = "2-0010";
 					     };
 				     };
 			     };
