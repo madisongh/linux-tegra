@@ -9,7 +9,7 @@ subdir-ccflags-y += -Werror
 subdir-ccflags-y += -I$(srctree)/drivers/platform/tegra/include
 
 obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
-obj-$(CONFIG_TEGRA_IOMMU_SMMU)          += iommu.o
+obj-$(CONFIG_OF_TEGRA_IOMMU_SMMU)       += iommu.o
 obj-$(CONFIG_TEGRA_BOOTLOADER_DEBUG)    += tegra_bootloader_debug.o
 
 obj-$(CONFIG_TEGRA_CAMERA_MIPI_CAL)     += mipi-cal.o
