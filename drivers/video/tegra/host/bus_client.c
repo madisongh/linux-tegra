@@ -173,6 +173,9 @@ struct nvhost_channel_userctx {
 	u32 priority;
 	int clientid;
 	bool timeout_debug_dump;
+
+	/* lock to protect this structure from concurrent ioctl usage */
+	struct mutex ioctl_lock;
 };
 
 static int nvhost_channelrelease(struct inode *inode, struct file *filp)
@@ -276,6 +279,7 @@ static int __nvhost_channelopen(struct inode *inode,
 	pdata = dev_get_drvdata(ch->dev->dev.parent);
 	priv->timeout = pdata->nvhost_timeout_default;
 	priv->timeout_debug_dump = true;
+	mutex_init(&priv->ioctl_lock);
 	if (!tegra_platform_is_silicon())
 		priv->timeout = 0;
 	mutex_unlock(&channel_lock);
@@ -752,8 +756,12 @@ static long nvhost_channelctl(struct file *filp,
 			return -EFAULT;
 	}
 
+	/* serialize calls from this fd */
+	mutex_lock(&priv->ioctl_lock);
+
 	if (!priv->ch->dev) {
 		pr_warn("Channel already unmapped\n");
+		mutex_unlock(&priv->ioctl_lock);
 		return -EFAULT;
 	}
 
@@ -811,8 +819,12 @@ static long nvhost_channelctl(struct file *filp,
 			platform_get_drvdata(priv->ch->dev);
 		struct nvhost_get_param_arg *arg =
 			(struct nvhost_get_param_arg *)buf;
-		if (arg->param >= NVHOST_MODULE_MAX_SYNCPTS)
-			return -EINVAL;
+
+		if (arg->param >= NVHOST_MODULE_MAX_SYNCPTS) {
+			err = -EINVAL;
+			break;
+		}
+
 		/* if we already have required syncpt then return it ... */
 		if (pdata->syncpts[arg->param]) {
 			arg->value = pdata->syncpts[arg->param];
@@ -821,8 +833,10 @@ static long nvhost_channelctl(struct file *filp,
 		/* ... otherwise get a new syncpt dynamically */
 		arg->value = nvhost_get_syncpt_host_managed(pdata->pdev,
 							    arg->param);
-		if (!arg->value)
-			return -EAGAIN;
+		if (!arg->value) {
+			err = -EAGAIN;
+			break;
+		}
 		/* ... and store it for further references */
 		pdata->syncpts[arg->param] = arg->value;
 		break;
@@ -840,8 +854,10 @@ static long nvhost_channelctl(struct file *filp,
 
 		if (args_name) {
 			if (strncpy_from_user(name, args_name,
-							sizeof(name)) < 0)
-				return -EFAULT;
+			    sizeof(name)) < 0) {
+				err = -EFAULT;
+				break;
+			}
 			name[sizeof(name) - 1] = '\0';
 		} else {
 			name[0] = '\0';
@@ -855,8 +871,10 @@ static long nvhost_channelctl(struct file *filp,
 		snprintf(set_name, sizeof(set_name),
 				"%s_%s", dev_name(&pdata->pdev->dev), name);
 		args->value = nvhost_get_syncpt_client_managed(set_name);
-		if (!args->value)
-			return -EAGAIN;
+		if (!args->value) {
+			err = -EAGAIN;
+			break;
+		}
 		/* ... and store it for further references */
 		pdata->client_managed_syncpt = args->value;
 		break;
@@ -869,8 +887,10 @@ static long nvhost_channelctl(struct file *filp,
 			platform_get_drvdata(priv->ch->dev);
 		if (!args->value)
 			break;
-		if (args->value != pdata->client_managed_syncpt)
-			return -EINVAL;
+		if (args->value != pdata->client_managed_syncpt) {
+			err = -EINVAL;
+			break;
+		}
 		nvhost_free_syncpt(args->value);
 		pdata->client_managed_syncpt = 0;
 		break;
@@ -891,8 +911,10 @@ static long nvhost_channelctl(struct file *filp,
 		struct nvhost_get_param_arg *arg =
 			(struct nvhost_get_param_arg *)buf;
 		if (arg->param >= NVHOST_MODULE_MAX_WAITBASES
-				|| !pdata->waitbases[arg->param])
-			return -EINVAL;
+				|| !pdata->waitbases[arg->param]) {
+			err = -EINVAL;
+			break;
+		}
 		arg->value = pdata->waitbases[arg->param];
 		break;
 	}
@@ -911,9 +933,13 @@ static long nvhost_channelctl(struct file *filp,
 			platform_get_drvdata(priv->ch->dev);
 		struct nvhost_get_param_arg *arg =
 			(struct nvhost_get_param_arg *)buf;
-		if (arg->param >= NVHOST_MODULE_MAX_MODMUTEXES
-				|| !pdata->modulemutexes[arg->param])
-			return -EINVAL;
+
+		if (arg->param >= NVHOST_MODULE_MAX_MODMUTEXES ||
+		    !pdata->modulemutexes[arg->param]) {
+			err = -EINVAL;
+			break;
+		}
+
 		arg->value = pdata->modulemutexes[arg->param];
 		break;
 	}
@@ -1031,6 +1057,8 @@ static long nvhost_channelctl(struct file *filp,
 		err = -ENOTTY;
 		break;
 	}
+
+	mutex_unlock(&priv->ioctl_lock);
 
 	if ((err == 0) && (_IOC_DIR(cmd) & _IOC_READ))
 		err = copy_to_user((void __user *)arg, buf, _IOC_SIZE(cmd));
