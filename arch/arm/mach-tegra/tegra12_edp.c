@@ -337,6 +337,10 @@ static struct tegra_edp_cpu_powermodel_params t12x_cpu_powermodel_params[] = {
 		.cpu_speedo_id = 6, /* Prod SKU */
 		.common = EDP_PARAMS_COMMON_PART,
 	},
+	{
+		.cpu_speedo_id = 7, /* Prod SKU */
+		.common = EDP_PARAMS_COMMON_PART,
+	},
 };
 
 struct tegra_edp_cpu_powermodel_params *tegra12x_get_cpu_powermodel_params(

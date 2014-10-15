@@ -35,6 +35,7 @@
 #include <linux/reboot.h>
 #include <linux/clk/tegra.h>
 #include <linux/tegra-soc.h>
+#include <linux/tegra-fuse.h>
 
 #include "board.h"
 #include "clock.h"
@@ -46,6 +47,7 @@
 struct dvfs_rail *tegra_cpu_rail;
 struct dvfs_rail *tegra_core_rail;
 struct dvfs_rail *tegra_gpu_rail;
+int tegra_override_dfll_range;
 
 static LIST_HEAD(dvfs_rail_list);
 static DEFINE_MUTEX(dvfs_lock);
@@ -1821,7 +1823,7 @@ static int tegra_dvfs_rail_set_clk_switch_cdev_state(
 	enum dfll_range use_dfll;
 	struct dvfs_rail *rail = (struct dvfs_rail *)cdev->devdata;
 
-	if (CONFIG_TEGRA_USE_DFLL_RANGE == TEGRA_USE_DFLL_CDEV_CNTRL) {
+	if (tegra_override_dfll_range == TEGRA_USE_DFLL_CDEV_CNTRL) {
 		if (rail->therm_scale_idx != cur_state) {
 			rail->therm_scale_idx = cur_state;
 			if (rail->therm_scale_idx == 0)
