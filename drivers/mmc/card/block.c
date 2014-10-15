@@ -45,7 +45,7 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/sd.h>
-
+#include <linux/mmc/ffu.h>
 #include <asm/uaccess.h>
 
 #include "queue.h"
@@ -533,8 +533,12 @@ static int _mmc_blk_ioctl_cmd_locked(struct mmc_blk_data *md,
 
 	mrq.cmd = &cmd;
 
-	mmc_get_card(card);
+	if (cmd.opcode == MMC_FFU_INSTALL_OP) {
+		err = mmc_ffu_install(card);
+		goto cmd_err;
+	}
 
+	mmc_get_card(card);
 	err = mmc_blk_part_switch(card, md);
 	if (err)
 		goto cmd_err;
@@ -641,6 +645,14 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 		mmc_resume_bus(card->host);
 #endif
 
+	if (idata->ic.opcode == MMC_FFU_DOWNLOAD_OP) {
+		dev_err(mmc_dev(card->host), "%s: FFU opcode %d\n",
+			__func__, idata->ic.opcode);
+		err = mmc_ffu_download(card, idata->buf);
+		dev_err(mmc_dev(card->host), "%s: exit FFU opcode %d\n",
+			__func__, idata->ic.opcode);
+		goto cmd_err;
+	}
 	mmc_claim_host(card->host);
 
 	err = _mmc_blk_ioctl_cmd_locked(md, idata);
