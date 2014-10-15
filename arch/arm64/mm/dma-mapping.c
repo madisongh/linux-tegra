@@ -855,7 +855,8 @@ static void *__alloc_simple_buffer(struct device *dev, size_t size, gfp_t gfp,
 
 
 static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
-			 gfp_t gfp, pgprot_t prot, bool is_coherent, const void *caller)
+			 gfp_t gfp, pgprot_t prot, bool is_coherent,
+			 struct dma_attrs *attrs, const void *caller)
 {
 	u64 mask = get_coherent_dma_mask(dev);
 	struct page *page = NULL;
@@ -909,6 +910,20 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 	if (addr)
 		*handle = pfn_to_dma(dev, page_to_pfn(page));
 
+	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs)) {
+		int i;
+		int count = (size >> PAGE_SHIFT);
+		int array_size = count * sizeof(struct page *);
+		struct page **pages;
+
+		if (array_size <= PAGE_SIZE)
+			pages = kzalloc(array_size, gfp & ~(__GFP_HIGHMEM | __GFP_DMA));
+		else
+			pages = vzalloc(array_size);
+		for (i = 0; i < count; i++)
+			pages[i] = page + i;
+		return pages;
+	}
 	return addr;
 }
 
@@ -926,7 +941,7 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 		return memory;
 
 	return __dma_alloc(dev, size, handle, gfp, prot, false,
-			   __builtin_return_address(0));
+			   attrs, __builtin_return_address(0));
 }
 
 static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
@@ -939,7 +954,7 @@ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
 		return memory;
 
 	return __dma_alloc(dev, size, handle, gfp, prot, true,
-			   __builtin_return_address(0));
+			   attrs, __builtin_return_address(0));
 }
 
 /*
@@ -983,6 +998,18 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
 
 	if (dma_release_from_coherent_attr(dev, size, cpu_addr, attrs))
 		return;
+
+	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs)) {
+		int count = size >> PAGE_SHIFT;
+		int array_size = count * sizeof(struct page *);
+		struct page **pages = (struct page **)cpu_addr;
+
+		cpu_addr = (void *)page_address(pages[0]);
+		if (array_size <= PAGE_SIZE)
+			kfree(pages);
+		else
+			vfree(pages);
+	}
 
 	size = PAGE_ALIGN(size);
 
