@@ -116,6 +116,26 @@
 #include <net/busy_poll.h>
 #include "udp_impl.h"
 
+#ifdef CONFIG_BCMDHD_CUSTOM_SYSFS_TEGRA
+
+#include "../../drivers/net/wireless/bcmdhd/include/dhd_custom_sysfs_tegra.h"
+
+#define UDP_DROP(skb)\
+	{\
+		struct net_device *netdev = skb ? skb->dev : NULL;\
+		char *netif = netdev ? netdev->name : "";\
+		tcpdump_pkt_save('D', netif, __func__, __LINE__,\
+			skb->data,\
+			skb_headlen(skb),\
+			skb->data_len);\
+	}\
+
+#else
+
+#define UDP_DROP(skb)
+
+#endif
+
 struct udp_table udp_table __read_mostly;
 EXPORT_SYMBOL(udp_table);
 
@@ -1185,6 +1205,7 @@ static unsigned int first_packet_length(struct sock *sk)
 		UDP_INC_STATS_BH(sock_net(sk), UDP_MIB_INERRORS,
 				 IS_UDPLITE(sk));
 		atomic_inc(&sk->sk_drops);
+		UDP_DROP(skb);
 		__skb_unlink(skb, rcvq);
 		__skb_queue_tail(&list_kill, skb);
 	}
@@ -1298,6 +1319,7 @@ try_again:
 		trace_kfree_skb(skb, udp_recvmsg);
 		if (!peeked) {
 			atomic_inc(&sk->sk_drops);
+			UDP_DROP(skb);
 			UDP_INC_STATS_USER(sock_net(sk),
 					   UDP_MIB_INERRORS, is_udplite);
 		}
@@ -1550,6 +1572,7 @@ int udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		if (up->pcrlen == 0) {          /* full coverage was set  */
 			LIMIT_NETDEBUG(KERN_WARNING "UDPLite: partial coverage %d while full coverage %d requested\n",
 				       UDP_SKB_CB(skb)->cscov, skb->len);
+			UDP_DROP(skb);
 			goto drop;
 		}
 		/* The next case involves violating the min. coverage requested
@@ -1561,6 +1584,7 @@ int udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		if (UDP_SKB_CB(skb)->cscov  <  up->pcrlen) {
 			LIMIT_NETDEBUG(KERN_WARNING "UDPLite: coverage %d too small, need min %d\n",
 				       UDP_SKB_CB(skb)->cscov, up->pcrlen);
+			UDP_DROP(skb);
 			goto drop;
 		}
 	}
@@ -1573,6 +1597,7 @@ int udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	if (sk_rcvqueues_full(sk, sk->sk_rcvbuf)) {
 		UDP_INC_STATS_BH(sock_net(sk), UDP_MIB_RCVBUFERRORS,
 				 is_udplite);
+		UDP_DROP(skb);
 		goto drop;
 	}
 
@@ -1584,6 +1609,7 @@ int udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		rc = __udp_queue_rcv_skb(sk, skb);
 	else if (sk_add_backlog(sk, skb, sk->sk_rcvbuf)) {
 		bh_unlock_sock(sk);
+		UDP_DROP(skb);
 		goto drop;
 	}
 	bh_unlock_sock(sk);
@@ -1614,6 +1640,7 @@ static void flush_stack(struct sock **stack, unsigned int count,
 
 		if (!skb1) {
 			atomic_inc(&sk->sk_drops);
+			UDP_DROP(skb1);
 			UDP_INC_STATS_BH(sock_net(sk), UDP_MIB_RCVBUFERRORS,
 					 IS_UDPLITE(sk));
 			UDP_INC_STATS_BH(sock_net(sk), UDP_MIB_INERRORS,
@@ -1743,7 +1770,10 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 	 *  Validate the packet.
 	 */
 	if (!pskb_may_pull(skb, sizeof(struct udphdr)))
+{
+		UDP_DROP(skb);
 		goto drop;		/* No space for header. */
+}
 
 	uh   = udp_hdr(skb);
 	ulen = ntohs(uh->len);
@@ -1806,7 +1836,10 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 	}
 
 	if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb))
+{
+		UDP_DROP(skb);
 		goto drop;
+}
 	nf_reset(skb);
 
 	/* No socket. Drop packet silently, if checksum is wrong */
@@ -1829,6 +1862,7 @@ short_packet:
 		       &saddr, ntohs(uh->source),
 		       ulen, skb->len,
 		       &daddr, ntohs(uh->dest));
+	UDP_DROP(skb);
 	goto drop;
 
 csum_error:
