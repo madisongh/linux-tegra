@@ -235,6 +235,7 @@ struct sdhci_tegra {
 	struct pinctrl *pinctrl_sdmmc;
 	struct pinctrl_state *schmitt_enable[2];
 	struct pinctrl_state *schmitt_disable[2];
+	struct pinctrl_state *sdmmc_pad_ctrl[MMC_TIMINGS_MAX_MODES];
 	int drive_group_sel;
 	u32 dll_calib;
 	bool en_strobe;
@@ -257,6 +258,8 @@ static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
 		bool set);
 static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option);
 static void vendor_trim_clear_sel_vreg(struct sdhci_host *host, bool enable);
+static void sdhci_tegra_select_drive_strength(struct sdhci_host *host,
+		unsigned int uhs);
 
 static void tegra_sdhci_dumpregs(struct sdhci_host *sdhci)
 {
@@ -475,6 +478,8 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 
 	if (!(mask & SDHCI_RESET_ALL))
 		return;
+
+	sdhci_tegra_select_drive_strength(host, uhs);
 
 	if (tegra_host->sd_stat_head != NULL) {
 		tegra_host->sd_stat_head->data_crc_count = 0;
@@ -1837,6 +1842,28 @@ static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option)
 	}
 }
 
+static void sdhci_tegra_select_drive_strength(struct sdhci_host *host,
+		unsigned int uhs)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	int ret = 0;
+
+	if (!IS_ERR_OR_NULL(tegra_host->pinctrl_sdmmc)) {
+		if (!IS_ERR_OR_NULL(tegra_host->sdmmc_pad_ctrl[uhs])) {
+			ret = pinctrl_select_state(tegra_host->pinctrl_sdmmc,
+					tegra_host->sdmmc_pad_ctrl[uhs]);
+			if (ret < 0)
+				dev_warn(mmc_dev(host->mmc),
+					"setting pad strength for sdcard mode %d failed\n", uhs);
+
+		} else {
+			dev_dbg(mmc_dev(host->mmc),
+				"No custom pad-ctrl strength settings present for sdcard %d mode\n", uhs);
+		}
+	}
+}
+
 static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
 		const char **parent_clk_list, int size)
 {
@@ -1875,13 +1902,14 @@ static int sdhci_tegra_init_pinctrl_info(struct device *dev,
 	const char *drive_gname;
 	int i = 0;
 	int ret = 0;
+	struct pinctrl_state *pctl_state;
 
 	if (!np)
 		return 0;
 
 	if (plat->update_pinctrl_settings) {
 		tegra_host->pinctrl_sdmmc = devm_pinctrl_get(dev);
-		if (IS_ERR(tegra_host->pinctrl_sdmmc)) {
+		if (IS_ERR_OR_NULL(tegra_host->pinctrl_sdmmc)) {
 			dev_err(dev, "Missing pinctrl info\n");
 			return -EINVAL;
 		}
@@ -1889,33 +1917,78 @@ static int sdhci_tegra_init_pinctrl_info(struct device *dev,
 		tegra_host->schmitt_enable[0] =
 			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
 			"sdmmc_schmitt_enable");
-		if (IS_ERR(tegra_host->schmitt_enable[0]))
+		if (IS_ERR_OR_NULL(tegra_host->schmitt_enable[0]))
 			dev_warn(dev, "Missing schmitt enable state\n");
 
 		tegra_host->schmitt_enable[1] =
 			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
 			"sdmmc_clk_schmitt_enable");
-		if (IS_ERR(tegra_host->schmitt_enable[1]))
+		if (IS_ERR_OR_NULL(tegra_host->schmitt_enable[1]))
 			dev_warn(dev, "Missing clk schmitt enable state\n");
 
 		tegra_host->schmitt_disable[0] =
 			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
 			"sdmmc_schmitt_disable");
-		if (IS_ERR(tegra_host->schmitt_disable[0]))
+		if (IS_ERR_OR_NULL(tegra_host->schmitt_disable[0]))
 			dev_warn(dev, "Missing schmitt disable state\n");
 
 		tegra_host->schmitt_disable[1] =
 			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
 			"sdmmc_clk_schmitt_disable");
-		if (IS_ERR(tegra_host->schmitt_disable[1]))
+		if (IS_ERR_OR_NULL(tegra_host->schmitt_disable[1]))
 			dev_warn(dev, "Missing clk schmitt disable state\n");
+
 		for (i = 0; i < 2; i++) {
-			if (!IS_ERR(tegra_host->schmitt_disable[i])) {
+			if (!IS_ERR_OR_NULL(tegra_host->schmitt_disable[i])) {
 				ret = pinctrl_select_state(tegra_host->pinctrl_sdmmc,
 						tegra_host->schmitt_disable[i]);
 				if (ret < 0)
 					dev_warn(dev, "setting schmitt state failed\n");
 			}
+		}
+
+		/* Since default mode pad strengths apply for many SD/eMMC card
+			modes lookup once and assign the same pointer */
+		pctl_state = pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+						"sdcard_default_mode");
+		if (IS_ERR_OR_NULL(pctl_state)) {
+			dev_warn(dev, "Missing default mode pad control state\n");
+		}
+		else {
+			tegra_host->sdmmc_pad_ctrl[MMC_TIMING_LEGACY] = pctl_state;
+			tegra_host->sdmmc_pad_ctrl[MMC_TIMING_MMC_HS] = pctl_state;
+			tegra_host->sdmmc_pad_ctrl[MMC_TIMING_SD_HS] = pctl_state;
+			tegra_host->sdmmc_pad_ctrl[MMC_TIMING_UHS_SDR12] = pctl_state;
+			tegra_host->sdmmc_pad_ctrl[MMC_TIMING_UHS_SDR25] = pctl_state;
+			tegra_host->sdmmc_pad_ctrl[MMC_TIMING_MMC_HS200] = pctl_state;
+			tegra_host->sdmmc_pad_ctrl[MMC_TIMING_MMC_HS400] = pctl_state;
+		}
+
+		pctl_state = pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+						"sdcard_uhs_sdr50_mode");
+		if (IS_ERR_OR_NULL(pctl_state)) {
+			dev_warn(dev, "Missing sdr50 pad control state\n");
+		}
+		else {
+			tegra_host->sdmmc_pad_ctrl[MMC_TIMING_UHS_SDR50] = pctl_state;
+			tegra_host->sdmmc_pad_ctrl[MMC_TIMING_UHS_DDR50] = pctl_state;
+		}
+
+		pctl_state = pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+						"sdcard_uhs_sdr104_mode");
+		if (IS_ERR_OR_NULL(pctl_state)) {
+			dev_warn(dev, "Missing sdr104 pad control state\n");
+		}
+		else {
+			tegra_host->sdmmc_pad_ctrl[MMC_TIMING_UHS_SDR104] = pctl_state;
+		}
+
+		/*Select the default state*/
+		if (!IS_ERR_OR_NULL(tegra_host->sdmmc_pad_ctrl[MMC_TIMING_MMC_HS])) {
+			ret = pinctrl_select_state(tegra_host->pinctrl_sdmmc,
+					tegra_host->sdmmc_pad_ctrl[MMC_TIMING_MMC_HS]);
+			if (ret < 0)
+				dev_warn(dev, "setting default pad state failed\n");
 		}
 	}
 
