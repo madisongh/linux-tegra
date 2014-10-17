@@ -24,6 +24,7 @@
 #include <linux/kernel.h>
 #include <mach/dc.h>
 #include <mach/fb.h>
+#include <linux/console.h>
 #ifdef CONFIG_SWITCH
 #include <linux/switch.h>
 #endif
@@ -172,6 +173,26 @@ static void hdmi_state_machine_handle_hpd_l(int cur_hpd)
  * internal state handlers and dispatch table
  *
  ************************************************************/
+static void handle_enable_l(struct tegra_dc_hdmi_data *hdmi)
+{
+	struct fb_event event;
+	struct fb_info *pfb = hdmi->dc->fb->info;
+	int blank = 1;
+
+	event.info = pfb;
+	event.data = &blank;
+
+	tegra_dc_enable(hdmi->dc);
+
+	console_lock();
+	/* blank */
+	fb_notifier_call_chain(FB_EVENT_BLANK, &event);
+	blank = 0;
+	/* unblank */
+	fb_notifier_call_chain(FB_EVENT_BLANK, &event);
+	console_unlock();
+}
+
 static void hdmi_disable_l(struct tegra_dc_hdmi_data *hdmi)
 {
 #ifdef CONFIG_SWITCH
@@ -305,7 +326,7 @@ static void handle_check_edid_l(struct tegra_dc_hdmi_data *hdmi)
 		tegra_dc_io_end(hdmi->dc);
 	}
 
-	hdmi_state_machine_set_state_l(HDMI_STATE_DONE_ENABLED, -1);
+	hdmi_state_machine_set_state_l(HDMI_STATE_DONE_ENABLED, 0);
 
 	return;
 
@@ -429,7 +450,7 @@ static const dispatch_func_t state_machine_dispatch[] = {
 	handle_check_plug_state_l,	/* STATE_CHECK_PLUG_STATE */
 	handle_check_edid_l,		/* STATE_CHECK_EDID */
 	NULL,				/* STATE_DONE_DISABLED */
-	NULL,				/* STATE_DONE_ENABLED */
+	handle_enable_l,		/* STATE_DONE_ENABLED */
 	handle_wait_for_hpd_reassert_l,	/* STATE_DONE_WAIT_FOR_HPD_REASSERT */
 	handle_recheck_edid_l,		/* STATE_DONE_RECHECK_EDID */
 	NULL,				/* STATE_INIT_FROM_BOOTLOADER */

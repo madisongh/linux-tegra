@@ -25,8 +25,24 @@
 struct platform_device;
 struct tegra_dc;
 struct tegra_fb_data;
-struct tegra_fb_info;
 struct resource;
+
+struct tegra_fb_info {
+	struct tegra_dc_win     win;
+	struct platform_device  *ndev;
+	struct fb_info          *info;
+	bool                    valid;
+
+	struct resource         *fb_mem;
+
+	int                     xres;
+	int                     yres;
+	int                     curr_xoffset;
+	int                     curr_yoffset;
+
+	struct fb_videomode     mode;
+	phys_addr_t             phys_start;
+};
 
 #ifdef CONFIG_FB_TEGRA
 struct tegra_fb_info *tegra_fb_register(struct platform_device *ndev,
