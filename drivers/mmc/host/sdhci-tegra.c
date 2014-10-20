@@ -177,7 +177,10 @@
 #define NVQUIRK_DISABLE_EXTERNAL_LOOPBACK	BIT(27)
 /* Enable T210 specific SDMMC WAR - Tuning Step Size, Tuning Iterations*/
 #define NVQUIRK_UPDATE_HW_TUNING_CONFG		BIT(28)
-#define NVQUIRK2_EN_STROBE_SUPPORT		BIT(29)
+/* Enable Enhanced strobe mode support */
+#define NVQUIRK_EN_STROBE_SUPPORT		BIT(29)
+/*controller does not support cards if 1.8 V is not supported by cards*/
+#define NVQUIRK_BROKEN_SD2_0_SUPPORT		BIT(30)
 
 /* Max number of clock parents for sdhci is fixed to 2 */
 #define TEGRA_SDHCI_MAX_PLL_SOURCE 2
@@ -976,6 +979,31 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	}
 }
 
+static int tegra_sdhci_validate_sd2_0(struct sdhci_host *sdhci)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	struct platform_device *pdev = to_platform_device(mmc_dev(sdhci->mmc));
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+	struct tegra_sdhci_platform_data *plat;
+
+	plat = pdev->dev.platform_data;
+
+	if ((soc_data->nvquirks2 & NVQUIRK2_BROKEN_SD2_0_SUPPORT) &&
+		(plat->limit_vddio_max_volt)) {
+		/* T210: Bug 1561291
+		 * Design issue where a cap connected to IO node is stressed
+		 * to 3.3v while it can only tolerate up to 1.8v.
+		 */
+		dev_err(mmc_dev(sdhci->mmc),
+			"SD cards with out 1.8V is not supported\n");
+		return -EPERM;
+	} else {
+		return 0;
+	}
+
+}
+
 static int sdhci_tegra_sd_error_stats(struct sdhci_host *host, u32 int_status)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
@@ -1065,6 +1093,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.dump_host_cust_regs	= tegra_sdhci_dumpregs,
 	.get_max_tuning_loop_counter = sdhci_tegra_get_max_tuning_loop_counter,
 	.config_tap_delay	= tegra_sdhci_config_tap,
+	.validate_sd2_0		= tegra_sdhci_validate_sd2_0,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -1082,7 +1111,6 @@ static struct sdhci_tegra_soc_data soc_data_tegra20 = {
 	.pdata = &sdhci_tegra20_pdata,
 	.nvquirks = NVQUIRK_FORCE_SDHCI_SPEC_200 |
 		    NVQUIRK_ENABLE_BLOCK_GAP_DET,
-	.parent_clk_list = {"pll_p"},
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra30_pdata = {
@@ -1101,7 +1129,6 @@ static struct sdhci_tegra_soc_data soc_data_tegra30 = {
 	.nvquirks = NVQUIRK_ENABLE_SDHCI_SPEC_300 |
 		    NVQUIRK_DISABLE_SDR50 |
 		    NVQUIRK_DISABLE_SDR104,
-	.parent_clk_list = {"pll_p"},
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra114_pdata = {
@@ -1122,7 +1149,6 @@ static struct sdhci_tegra_soc_data soc_data_tegra114 = {
 		    NVQUIRK_DISABLE_SDR104 |
 		    NVQUIRK_SHADOW_XFER_MODE_REG |
 		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD,
-	.parent_clk_list = {"pll_p"},
 };
 
 static struct sdhci_pltfm_data sdhci_tegra210_pdata = {

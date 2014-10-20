@@ -141,6 +141,7 @@ struct mmc_host_ops {
 
 	/* Prepare HS400 target operating frequency depending host driver */
 	int	(*prepare_hs400_tuning)(struct mmc_host *host, struct mmc_ios *ios);
+	int	(*validate_sd2_0)(struct mmc_host *host);
 	int	(*select_drive_strength)(struct mmc_host *host,
 					 unsigned int max_dtr,
 					 int host_drv, int card_drv);

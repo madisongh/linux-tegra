@@ -68,6 +68,7 @@ static void sdhci_finish_data(struct sdhci_host *);
 
 static void sdhci_finish_command(struct sdhci_host *);
 static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
+static int sdhci_validate_sd2_0(struct mmc_host *mmc);
 static void sdhci_tuning_timer(unsigned long data);
 static void sdhci_enable_preset_value(struct sdhci_host *host, bool enable);
 
@@ -2202,6 +2203,18 @@ static void sdhci_config_tap(struct mmc_host *mmc, u8 option)
 		host->ops->config_tap_delay(host, option);
 }
 
+static int sdhci_validate_sd2_0(struct mmc_host *mmc)
+{
+	struct sdhci_host *host;
+	int err = 0;
+
+	host = mmc_priv(mmc);
+
+	if (host->ops->validate_sd2_0)
+		err = host->ops->validate_sd2_0(host);
+	return err;
+}
+
 static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
@@ -2514,6 +2527,7 @@ static const struct mmc_host_ops sdhci_ops = {
 	.enable_sdio_irq = sdhci_enable_sdio_irq,
 	.start_signal_voltage_switch	= sdhci_start_signal_voltage_switch,
 	.execute_tuning			= sdhci_execute_tuning,
+	.validate_sd2_0			= sdhci_validate_sd2_0,
 	.card_event			= sdhci_card_event,
 	.card_busy	= sdhci_card_busy,
 	.select_drive_strength		= sdhci_select_drive_strength,

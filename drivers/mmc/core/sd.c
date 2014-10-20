@@ -5,6 +5,8 @@
  *  SD support Copyright (C) 2004 Ian Molton, All Rights Reserved.
  *  Copyright (C) 2005-2007 Pierre Ossman, All Rights Reserved.
  *
+ *  Copyright (c) 2013-2015, NVIDIA CORPORATION. All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -192,7 +194,6 @@ static int mmc_decode_scr(struct mmc_card *card)
 	struct sd_scr *scr = &card->scr;
 	unsigned int scr_struct;
 	u32 resp[4];
-
 	resp[3] = card->raw_scr[1];
 	resp[2] = card->raw_scr[0];
 
@@ -216,6 +217,7 @@ static int mmc_decode_scr(struct mmc_card *card)
 
 	if (scr->sda_spec3)
 		scr->cmds = UNSTUFF_BITS(resp, 32, 2);
+
 	return 0;
 }
 
@@ -781,6 +783,12 @@ try_again:
 		} else if (err) {
 			retries = 0;
 			goto try_again;
+		}
+	} else {
+		if (host->ops->validate_sd2_0) {
+			err = host->ops->validate_sd2_0(host);
+			if (err)
+				return err;
 		}
 	}
 
