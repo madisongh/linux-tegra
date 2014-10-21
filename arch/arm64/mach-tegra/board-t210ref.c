@@ -311,6 +311,8 @@ static void __init tegra_t210ref_early_init(void)
 		tegra_soc_device_init("loki_e");
 	else if (of_machine_is_compatible("nvidia,foster-e"))
 		tegra_soc_device_init("foster_e");
+	else if (of_machine_is_compatible("nvidia,jetson-e"))
+		tegra_soc_device_init("jetson_e");
 }
 
 static struct tegra_io_dpd pexbias_io = {
@@ -506,6 +508,7 @@ static const char * const t210ref_dt_board_compat[] = {
 	"nvidia,grenada",
 	"nvidia,loki-e",
 	"nvidia,foster-e",
+	"nvidia,jetson-e",
 	NULL
 };
 
