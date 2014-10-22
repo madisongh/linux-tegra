@@ -2,6 +2,7 @@
 # Makefile for the i2c bus drivers.
 #
 
+ccflags-y += -Werror
 # ACPI drivers
 obj-$(CONFIG_I2C_SCMI)		+= i2c-scmi.o
 
