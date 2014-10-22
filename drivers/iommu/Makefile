@@ -1,5 +1,7 @@
 GCOV_PROFILE := y
 
+subdir-ccflags-y += -Werror
+
 obj-$(CONFIG_IOMMU_API) += iommu.o
 obj-$(CONFIG_IOMMU_API) += iommu-traces.o
 obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
@@ -15,9 +17,7 @@ obj-$(CONFIG_IRQ_REMAP) += intel_irq_remapping.o irq_remapping.o
 obj-$(CONFIG_OMAP_IOMMU) += omap-iommu.o
 obj-$(CONFIG_OMAP_IOMMU) += omap-iommu2.o
 obj-$(CONFIG_OMAP_IOMMU_DEBUG) += omap-iommu-debug.o
-CFLAGS_tegra-gart.o	= -Werror
 obj-$(CONFIG_TEGRA_IOMMU_GART) += tegra-gart.o
-CFLAGS_tegra-smmu.o	= -Werror
 obj-$(CONFIG_TEGRA_IOMMU_SMMU) += tegra-smmu.o
 obj-$(CONFIG_OF_TEGRA_IOMMU_SMMU) += of_tegra-smmu.o
 obj-$(CONFIG_EXYNOS_IOMMU) += exynos-iommu.o
