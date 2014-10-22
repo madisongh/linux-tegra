@@ -24,6 +24,7 @@
 #include <linux/kernel.h>
 #include <linux/utsname.h>
 #include <linux/platform_device.h>
+#include <linux/suspend.h>
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/composite.h>
@@ -111,6 +112,9 @@ struct android_dev {
 	struct work_struct work;
 	char ffs_aliases[256];
 	unsigned short ffs_string_ids;
+
+	bool uevent_in_suspend;
+	bool is_suspend;
 };
 
 static struct class *android_class;
@@ -188,6 +192,15 @@ static void android_work(struct work_struct *data)
 	unsigned long flags;
 
 	spin_lock_irqsave(&cdev->lock, flags);
+	/* Don't send an uevent for USB state while suspending.
+	 * It will be handled after resume. */
+	if (dev->is_suspend && !dev->uevent_in_suspend) {
+		spin_unlock_irqrestore(&cdev->lock, flags);
+		pr_info("%s: didn't send uevent (%d %d %p) due to suspending\n",
+			__func__, dev->connected, dev->sw_connected,
+			cdev->config);
+		return;
+	}
 	if (cdev->config)
 		uevent_envp = configured;
 	else if (dev->connected != dev->sw_connected)
@@ -1613,6 +1626,38 @@ out:
 	return sprintf(buf, "%s\n", state);
 }
 
+static ssize_t uevent_in_suspend_show(struct device *pdev,
+				      struct device_attribute *attr, char *buf)
+{
+	struct android_dev *dev = dev_get_drvdata(pdev);
+
+	return sprintf(buf, "%c\n", dev->uevent_in_suspend ? 'Y' : 'N');
+}
+
+static ssize_t uevent_in_suspend_store(struct device *pdev,
+				       struct device_attribute *attr,
+				       const char *buff, size_t size)
+{
+	struct android_dev *dev = dev_get_drvdata(pdev);
+	struct usb_composite_dev *cdev = dev->cdev;
+	bool uevent_in_suspend;
+	int ret;
+	unsigned long flags;
+
+	if (!cdev)
+		goto out;
+
+	ret = strtobool(buff, &uevent_in_suspend);
+	if (ret)
+		return ret;
+
+	spin_lock_irqsave(&cdev->lock, flags);
+	dev->uevent_in_suspend = uevent_in_suspend;
+	spin_unlock_irqrestore(&cdev->lock, flags);
+out:
+	return size;
+}
+
 #define DESCRIPTOR_ATTR(field, format_string)				\
 static ssize_t								\
 field ## _show(struct device *dev, struct device_attribute *attr,	\
@@ -1685,6 +1730,8 @@ static DEVICE_ATTR(functions, S_IRUGO | S_IWUSR, functions_show,
 						 functions_store);
 static DEVICE_ATTR(enable, S_IRUGO | S_IWUSR, enable_show, enable_store);
 static DEVICE_ATTR(state, S_IRUGO, state_show, NULL);
+static DEVICE_ATTR(uevent_in_suspend, S_IRUGO | S_IWUSR,
+		   uevent_in_suspend_show, uevent_in_suspend_store);
 
 static struct device_attribute *android_usb_attributes[] = {
 	&dev_attr_idVendor,
@@ -1699,6 +1746,7 @@ static struct device_attribute *android_usb_attributes[] = {
 	&dev_attr_functions,
 	&dev_attr_enable,
 	&dev_attr_state,
+	&dev_attr_uevent_in_suspend,
 	NULL
 };
 
@@ -1886,6 +1934,30 @@ static void android_disconnect(struct usb_composite_dev *cdev)
 	schedule_work(&dev->work);
 }
 
+static int android_pm_notify(struct notifier_block *nb,
+				 unsigned long event, void *data)
+{
+	struct android_dev *dev = _android_dev;
+	struct usb_composite_dev *cdev = dev->cdev;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cdev->lock, flags);
+	if (event == PM_SUSPEND_PREPARE) {
+		dev->is_suspend = true;
+	} else if (event == PM_POST_SUSPEND) {
+		dev->is_suspend = false;
+		schedule_work(&dev->work);
+	}
+	spin_unlock_irqrestore(&cdev->lock, flags);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block android_pm_nb = {
+	.notifier_call = android_pm_notify,
+	.priority = -1,
+};
+
 static struct usb_composite_driver android_usb_driver = {
 	.name		= "android_usb",
 	.dev		= &device_desc,
@@ -1941,6 +2013,10 @@ static int __init init(void)
 	INIT_WORK(&dev->work, android_work);
 	mutex_init(&dev->mutex);
 
+	dev->uevent_in_suspend = true;
+	dev->is_suspend = false;
+	register_pm_notifier(&android_pm_nb);
+
 	err = android_create_device(dev);
 	if (err) {
 		pr_err("%s: failed to create android device %d", __func__, err);
@@ -1973,6 +2049,7 @@ late_initcall(init);
 
 static void __exit cleanup(void)
 {
+	unregister_pm_notifier(&android_pm_nb);
 	usb_composite_unregister(&android_usb_driver);
 	class_destroy(android_class);
 	kfree(_android_dev);
