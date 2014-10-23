@@ -6,7 +6,7 @@
 #include "tegra124-platforms/tegra124-jetson_tk1-fixed-pm375-0000-c00-00.dtsi"
 
 / {
-	model = "NVIDIA Tegra132 PM375";
+	model = "jetson_t132";
 	compatible = "nvidia,jetson-tk1","nvidia,laguna", "nvidia,tegra132";
 	nvidia,dtsfilename = __FILE__;
 	#address-cells = <2>;
