@@ -195,7 +195,8 @@ struct sdhci_host {
 	bool bus_on;		/* Bus power prevents runtime suspend */
 	bool preset_enabled;	/* Preset is enabled */
 
-	struct mmc_request *mrq;	/* Current request */
+	struct mmc_request *mrq_cmd;	/* Current request */
+	struct mmc_request *mrq_dat;	/* Current request with data*/
 	struct mmc_command *cmd;	/* Current command */
 	struct mmc_data *data;	/* Current data request */
 	unsigned int data_early:1;	/* Data finished before cmd */
@@ -215,6 +216,8 @@ struct sdhci_host {
 	dma_addr_t align_addr;	/* Mapped bounce buffer */
 
 	struct tasklet_struct finish_tasklet;	/* Tasklet structures */
+	struct tasklet_struct finish_dat_tasklet;
+	struct tasklet_struct finish_cmd_tasklet;
 
 	struct timer_list timer;	/* Timer for timeouts */
 

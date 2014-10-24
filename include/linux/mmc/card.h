@@ -118,6 +118,11 @@ struct mmc_ext_csd {
 	u8			raw_pwr_cl_ddr_200_360;	/* 253 */
 	u8			raw_bkops_status;	/* 246 */
 	u8			raw_sectors[4];		/* 212 - 4 bytes */
+	u8			cmdq_support;
+	u8			cmdq_mode_en;
+	u8			cmdq_depth;
+	u8			qrdy_support;
+	u8			qrdy_function;
 
 	unsigned int            feature_support;
 #define MMC_DISCARD_FEATURE	BIT(0)                  /* CMD38 feature */
@@ -281,9 +286,9 @@ struct mmc_card {
 #define MMC_QUIRK_BROKEN_IRQ_POLLING	(1<<11)	/* Polling SDIO_CCCR_INTx could create a fake interrupt */
 
 	unsigned int		erase_size;	/* erase size in sectors */
- 	unsigned int		erase_shift;	/* if erase unit is power 2 */
- 	unsigned int		pref_erase;	/* in sectors */
- 	u8			erased_byte;	/* value of erased bytes */
+	unsigned int		erase_shift;	/* if erase unit is power 2 */
+	unsigned int		pref_erase;	/* in sectors */
+	u8			erased_byte;	/* value of erased bytes */
 	u8			speed_class;	/* speed class of card */
 
 	u32			raw_cid[4];	/* raw card CID */
@@ -516,7 +521,7 @@ static inline int mmc_card_broken_irq_polling(const struct mmc_card *c)
 
 #define mmc_list_to_card(l)	container_of(l, struct mmc_card, node)
 #define mmc_get_drvdata(c)	dev_get_drvdata(&(c)->dev)
-#define mmc_set_drvdata(c,d)	dev_set_drvdata(&(c)->dev, d)
+#define mmc_set_drvdata(c, d)	dev_set_drvdata(&(c)->dev, d)
 
 /*
  * MMC device driver (e.g., Flash card, I/O card...)
