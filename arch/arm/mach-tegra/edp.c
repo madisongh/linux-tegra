@@ -113,7 +113,7 @@ static struct tegra_edp_gpu_limits gpu_edp_default_limits[] = {
 };
 
 static const int gpu_temperatures[] = { /* degree celcius (C) */
-	20, 50, 70, 75, 80, 85, 90, 95, 100, 105,
+	0, 20, 50, 70, 75, 80, 85, 90, 95, 100, 105,
 };
 #endif
 
@@ -866,7 +866,10 @@ static int init_gpu_edp_limits_calculated(void)
 	for (i = 0; i < ARRAY_SIZE(gpu_temperatures); i++) {
 		gpu_edp_calculated_limits[i].temperature =
 			gpu_temperatures[i];
-		limit = gpu_edp_calculate_maxf(params,
+		if (gpu_temperatures[i] == 0 && tegra_gpu_speedo_id() == 5)
+			limit = 708000;
+		else
+			limit = gpu_edp_calculate_maxf(params,
 					       gpu_temperatures[i],
 					       gpu_iddq_ma);
 		if (limit == -EINVAL) {

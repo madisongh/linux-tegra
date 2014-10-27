@@ -1290,7 +1290,6 @@ static void __init edp_init(void)
 			break;
 	case BOARD_PM358:
 	case BOARD_PM359:
-	case BOARD_PM375:
 	case BOARD_PM377:
 			laguna_edp_init();
 			break;
@@ -1298,6 +1297,7 @@ static void __init edp_init(void)
 	case BOARD_E2548:
 			loki_edp_init();
 			break;
+	case BOARD_PM375:
 	default:
 			ardbeg_edp_init();
 			break;
