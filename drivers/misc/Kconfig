@@ -383,6 +383,7 @@ config SENSORS_NCT1008
 	tristate "ON Semiconductor Temperature Sensor"
 	default n
 	depends on I2C
+	depends on THERMAL
 	help
 	 Say yes here if you wish to include the ON Semiconductor
 	 NCT1008 Temperature sensor.
@@ -565,6 +566,7 @@ config APANIC_PLABEL
 
 config THERM_EST
 	bool "Thermal estimator driver"
+	depends on THERMAL
 	default n
 	---help---
 	Thermal driver which estimates temperature based of other sensors.
@@ -578,6 +580,7 @@ config TEGRA_THROUGHPUT
 
 config FAN_THERM_EST
 	bool "Fan driving temp estimator"
+	depends on THERMAL
 	---help---
 	Thermal driver that estimates the fan driving temperature based on
 	other sensors.
