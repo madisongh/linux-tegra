@@ -885,11 +885,6 @@ static void tegra_sdhci_reset_exit(struct sdhci_host *host, u8 mask)
 		vendor_ctrl &= ~(SDHCI_VNDR_TUN_CTRL1_TUN_STEP_SIZE);
 		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_TUN_CTRL1_0);
 	}
-
-	/* Restore DLL calibration and DQS Trim delay values */
-	if (plat->dll_calib_needed && tegra_host->dll_calib)
-		sdhci_writel(host, tegra_host->dll_calib,
-				SDHCI_VNDR_DLLCAL_CFG);
 	if (plat->dqs_trim_delay) {
 		misc_ctrl = sdhci_readl(host, SDHCI_VNDR_CAP_OVERRIDES_0);
 		misc_ctrl &= ~(SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_MASK <<
@@ -1408,11 +1403,18 @@ static void tegra_sdhci_post_resume(struct sdhci_host *sdhci)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	bool dll_calib_req = false;
 
 	/* Turn OFF the clocks if removable card is not present */
 	if (!(sdhci->mmc->caps & MMC_CAP_NONREMOVABLE) &&
 		(mmc_gpio_get_cd(sdhci->mmc) != 0) && tegra_host->clk_enabled)
 		tegra_sdhci_set_clock(sdhci, 0);
+
+	dll_calib_req = (sdhci->mmc->card &&
+		(sdhci->mmc->card->type == MMC_TYPE_MMC) &&
+		(sdhci->mmc->ios.timing == MMC_TIMING_MMC_HS400));
+	if (dll_calib_req)
+		tegra_sdhci_do_dll_calibration(sdhci);
 }
 
 static const struct sdhci_ops tegra_sdhci_ops = {
