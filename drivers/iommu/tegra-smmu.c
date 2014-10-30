@@ -2019,7 +2019,7 @@ err_out:
 	smmu_debugfs_delete(smmu);
 }
 
-int tegra_smmu_suspend(struct device *dev)
+static int tegra_smmu_suspend(struct device *dev)
 {
 	int i;
 	struct smmu_device *smmu = dev_get_drvdata(dev);
@@ -2034,20 +2034,13 @@ int tegra_smmu_suspend(struct device *dev)
 
 	return 0;
 }
-EXPORT_SYMBOL(tegra_smmu_suspend);
 
 int tegra_smmu_save(void)
 {
 	return tegra_smmu_suspend(save_smmu_device);
 }
 
-struct device *get_smmu_device(void)
-{
-	return save_smmu_device;
-}
-EXPORT_SYMBOL(get_smmu_device);
-
-int tegra_smmu_resume(struct device *dev)
+static int tegra_smmu_resume(struct device *dev)
 {
 	struct smmu_device *smmu = dev_get_drvdata(dev);
 	unsigned long flags;
@@ -2057,7 +2050,6 @@ int tegra_smmu_resume(struct device *dev)
 	spin_unlock_irqrestore(&smmu->lock, flags);
 	return 0;
 }
-EXPORT_SYMBOL(tegra_smmu_resume);
 
 int tegra_smmu_restore(void)
 {
@@ -2304,7 +2296,7 @@ end:
 	return NOTIFY_DONE;
 }
 
-struct notifier_block tegra_smmu_device_nb = {
+static struct notifier_block tegra_smmu_device_nb = {
 	.notifier_call = tegra_smmu_device_notifier,
 };
 
