@@ -148,6 +148,7 @@ static void apply_constraints(void)
 	int action, cpu;
 	bool up = true;
 	struct cpumask cpu_online;
+	struct device *dev;
 
 	mutex_lock(&cpuquiet_lock);
 
@@ -171,13 +172,15 @@ static void apply_constraints(void)
 			cpu = cpumask_next_zero(cpu, &cpu_online);
 			if (cpu >= nr_cpu_ids)
 				break;
-			cpu_up(cpu);
+			dev = get_cpu_device(cpu);
+			device_online(dev);
 			cpumask_set_cpu(cpu, &cpu_online);
 		} else {
 			cpu = cpumask_next(cpu, &cpu_online);
 			if (cpu >= nr_cpu_ids)
 				break;
-			cpu_down(cpu);
+			dev = get_cpu_device(cpu);
+			device_offline(cpu);
 			cpumask_clear_cpu(cpu, &cpu_online);
 		}
 	}
@@ -188,7 +191,7 @@ static void apply_constraints(void)
 static int update_core_config(unsigned int cpu, bool up)
 {
 	int err;
-
+	struct device *dev = get_cpu_device(cpu);
 	mutex_lock(&cpuquiet_lock);
 
 	if (cpq_state == CPQ_DISABLED || !cpu || cpu >= nr_cpu_ids) {
@@ -207,13 +210,13 @@ static int update_core_config(unsigned int cpu, bool up)
 		if (err)
 			goto ret;
 
-		err = cpu_up(cpu);
+		err = device_online(dev);
 	} else {
 		err = violates_constraints(-1);
 		if (err)
 			goto ret;
 
-		err = cpu_down(cpu);
+		err = device_offline(dev);
 	}
 ret:
 	mutex_unlock(&cpuquiet_lock);
