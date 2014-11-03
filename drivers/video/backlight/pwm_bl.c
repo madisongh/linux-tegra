@@ -145,7 +145,8 @@ static void pwm_backlight_notify_after(struct device *dev, int brightness)
 #ifdef CONFIG_OF
 static int pwm_backlight_parse_dt(struct device *dev,
 				  struct platform_pwm_backlight_data *data,
-				  const char *blnode_compatible)
+				  const char *blnode_compatible,
+				  struct device_node **target_bl_node)
 {
 	struct device_node *node = dev->of_node;
 	struct device_node *bl_node = NULL;
@@ -155,7 +156,7 @@ static int pwm_backlight_parse_dt(struct device *dev,
 	u32 u;
 	int length;
 	u32 value;
-	int ret;
+	int ret = 0;
 	int n_bl_measured = 0;
 
 	if (!node)
@@ -174,6 +175,8 @@ static int pwm_backlight_parse_dt(struct device *dev,
 	else
 		bl_node = compat_node;
 
+	*target_bl_node = bl_node;
+
 	/* determine the number of brightness levels */
 	prop = of_find_property(bl_node, "brightness-levels", &length);
 	if (!prop) {
@@ -185,7 +188,7 @@ static int pwm_backlight_parse_dt(struct device *dev,
 					   &value);
 		if (ret < 0) {
 			pr_info("fail to parse max-brightness\n");
-			return ret;
+			goto fail_parse_dt;
 		}
 
 		data->max_brightness = value;
@@ -201,7 +204,7 @@ static int pwm_backlight_parse_dt(struct device *dev,
 					   &value);
 		if (ret < 0) {
 			pr_info("fail to parse default-brightness\n");
-			return ret;
+			goto fail_parse_dt;
 		}
 
 		data->dft_brightness = value;
@@ -214,7 +217,8 @@ static int pwm_backlight_parse_dt(struct device *dev,
 
 		data->levels = devm_kzalloc(dev, size, GFP_KERNEL);
 		if (!data->levels)
-			return -ENOMEM;
+			ret = -ENOMEM;
+			goto fail_parse_dt;
 
 		ret = of_property_read_u32_array(bl_node,
 						 "brightness-levels",
@@ -222,7 +226,7 @@ static int pwm_backlight_parse_dt(struct device *dev,
 						 item_counts);
 		if (ret < 0) {
 			pr_info("fail to parse brightness-levels\n");
-			return ret;
+			goto fail_parse_dt;
 		}
 
 		/*
@@ -235,7 +239,7 @@ static int pwm_backlight_parse_dt(struct device *dev,
 					   &value);
 		if (ret < 0) {
 			pr_info("fail to parse default-brightness-level\n");
-			return ret;
+			goto fail_parse_dt;
 		}
 
 		data->dft_brightness = data->levels[value];
@@ -258,15 +262,20 @@ static int pwm_backlight_parse_dt(struct device *dev,
 			sizeof(*data->bl_measured) * n_bl_measured, GFP_KERNEL);
 		if (!data->bl_measured) {
 			pr_err("bl_measured memory allocation failed\n");
-			return -ENOMEM;
+			ret = -ENOMEM;
+			goto fail_parse_dt;
 		}
 		n_bl_measured = 0;
 		of_property_for_each_u32(bl_node,
 			"bl-measured", prop, p, u)
 			data->bl_measured[n_bl_measured++] = u;
 	}
-
+	of_node_put(compat_node);
 	return 0;
+
+fail_parse_dt:
+	of_node_put(compat_node);
+	return ret;
 }
 
 static struct of_device_id pwm_backlight_of_match[] = {
@@ -278,7 +287,8 @@ MODULE_DEVICE_TABLE(of, pwm_backlight_of_match);
 #else
 static int pwm_backlight_parse_dt(struct device *dev,
 				  struct platform_pwm_backlight_data *data,
-				  const char *blnode_compatible)
+				  const char *blnode_compatible,
+				  struct device_node **target_bl_node)
 {
 	return -ENODEV;
 }
@@ -292,6 +302,9 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	struct backlight_properties props;
 	struct backlight_device *bl;
 	struct pwm_bl_data *pb;
+	struct device_node *target_bl_node = NULL;
+
+
 	int ret;
 	const char *blnode_compatible = NULL;
 
@@ -318,7 +331,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 		}
 
 		ret = pwm_backlight_parse_dt(&pdev->dev, &defdata,
-			blnode_compatible);
+			blnode_compatible, &target_bl_node);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "fail to find platform data\n");
 			return ret;
@@ -398,11 +411,13 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	 */
 
 	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
-	if (IS_ERR(pb->pwm) && PTR_ERR(pb->pwm) != -EPROBE_DEFER
-	    && !pdev->dev.of_node) {
-		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
-		pb->legacy = true;
-		pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
+	if (IS_ERR(pb->pwm) && PTR_ERR(pb->pwm) != -EPROBE_DEFER) {
+		pb->pwm = of_pwm_get(target_bl_node, NULL);
+		if (IS_ERR(pb->pwm) && !pdev->dev.of_node) {
+			dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
+			pb->legacy = true;
+			pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
+		}
 	}
 
 	if (IS_ERR(pb->pwm)) {
