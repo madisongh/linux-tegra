@@ -4,6 +4,7 @@
 
 GCOV_PROFILE := y
 
+ccflags-y += -Werror
 # When adding new entries keep the list in alphabetical order
 obj-$(CONFIG_AK09911)	+= ak09911.o
 obj-$(CONFIG_AK8975)	+= ak8975.o
