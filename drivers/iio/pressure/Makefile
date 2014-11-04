@@ -4,6 +4,7 @@
 
 GCOV_PROFILE := y
 
+ccflags-y += -Werror
 # When adding new entries keep the list in alphabetical order
 obj-$(CONFIG_HID_SENSOR_PRESS)   += hid-sensor-press.o
 obj-$(CONFIG_MPL115) += mpl115.o
