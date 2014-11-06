@@ -244,6 +244,12 @@ enum image_type {
 	rck_image,
 };
 
+/* Usage Model */
+enum chip_personality {
+	normal = 0,
+	always_on,
+};
+
 void tegra_get_board_info(struct board_info *);
 void tegra_get_pmu_board_info(struct board_info *bi);
 void tegra_get_display_board_info(struct board_info *bi);

@@ -1398,6 +1398,9 @@ static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
 		(clk_rate > tegra_host->max_clk_limit))
 		clk_rate = tegra_host->max_clk_limit;
 
+	if (clk_rate > clk_get_max_rate(pltfm_host->clk))
+		clk_rate = clk_get_max_rate(pltfm_host->clk);
+
 	tegra_sdhci_clock_set_parent(sdhci, clk_rate);
 	clk_set_rate(pltfm_host->clk, clk_rate);
 	sdhci->max_clk = clk_get_rate(pltfm_host->clk);

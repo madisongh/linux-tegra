@@ -1146,7 +1146,8 @@ int __init tegra_enable_dvfs_on_clk(struct clk *c, struct dvfs *d)
 	}
 
 	for (i = 0; i < MAX_DVFS_FREQS; i++) {
-		if (d->millivolts[i] == 0)
+		if (d->millivolts[i] == 0 ||
+				d->millivolts[i] > d->max_millivolts)
 			break;
 
 		d->freqs[i] *= d->freqs_mult;

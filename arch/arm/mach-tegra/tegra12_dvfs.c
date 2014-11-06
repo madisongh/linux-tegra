@@ -152,8 +152,8 @@ void __init tegra12x_vdd_cpu_align(int step_uv, int offset_uv)
 
 /* CPU DVFS tables */
 static unsigned long cpu_max_freq[] = {
-/* speedo_id	0	 1	  2	   3	    4	     5	     */
-		2014500, 2320500, 2116500, 2524500, 1811000, 2218500,
+/* speedo_id	0	 1	  2	   3	    4	     5	      6		*/
+		2014500, 2320500, 2116500, 2524500, 1811000, 2218500, 1938000,
 };
 
 static struct cpu_cvb_dvfs cpu_cvb_dvfs_table[] = {
@@ -277,11 +277,24 @@ static const int core_millivolts[MAX_DVFS_FREQS] = {
 		.dvfs_rail	= &tegra12_dvfs_rail_vdd_core,	\
 	}
 
+#define DEFER_DVFS(_clk_name, _speedo_id, _process_id, _auto, _mult, _freqs...) \
+	{							\
+		.clk_name	= _clk_name,			\
+		.speedo_id	= _speedo_id,			\
+		.process_id	= _process_id,			\
+		.freqs		= {_freqs},			\
+		.freqs_mult	= _mult,			\
+		.millivolts	= core_millivolts,		\
+		.auto_dvfs	= _auto,			\
+		.defer_override = true,				\
+		.dvfs_rail	= &tegra12_dvfs_rail_vdd_core,	\
+	}
+
 static struct dvfs core_dvfs_table[] = {
 	/* Core voltages (mV):		         800,    850,    900,	 950,    1000,	1050,    1100,	 1110,    1150 */
 	/* Clock limits for internal blocks, PLLs */
 
-	CORE_DVFS("emc",        -1, -1, 1, KHZ, 264000, 348000, 384000, 384000, 528000, 528000, 1200000, 1200000, 1200000),
+	CORE_DVFS("emc",        -1, -1, 1, KHZ, 264000, 348000, 384000, 384000, 792000, 792000, 1200000, 1200000, 1200000),
 
         CORE_DVFS("cpu_lp",     0, 0, 1, KHZ,   312000, 528000, 660000, 804000, 912000, 1044000, 1044000, 1044000, 1044000),
         CORE_DVFS("cpu_lp",     0, 1, 1, KHZ,   312000, 564000, 696000, 828000, 960000, 1044000, 1044000, 1044000, 1044000),
@@ -440,19 +453,6 @@ static struct dvfs core_dvfs_table_automotive[] = {
  * clock capabilities specified in DVFS table.
  *
  */
-#define DEFER_DVFS(_clk_name, _speedo_id, _process_id, _auto, _mult, _freqs...) \
-	{							\
-		.clk_name	= _clk_name,			\
-		.speedo_id	= _speedo_id,			\
-		.process_id	= _process_id,			\
-		.freqs		= {_freqs},			\
-		.freqs_mult	= _mult,			\
-		.millivolts	= core_millivolts,		\
-		.auto_dvfs	= _auto,			\
-		.defer_override = true,				\
-		.dvfs_rail	= &tegra12_dvfs_rail_vdd_core,	\
-	}
-
 static struct dvfs disp_dvfs_table[] = {
 	/*
 	 * The clock rate for the display controllers that determines the
@@ -478,8 +478,8 @@ static int resolve_core_override(int min_override_mv)
 
 /* GPU DVFS tables */
 static unsigned long gpu_max_freq[] = {
-/* speedo_id	0	1	2	 3	*/
-		648000, 852000, 1008000, 600000
+/* speedo_id	0	1	2	 3	 4	*/
+		648000, 852000, 1008000, 600000, 804000
 };
 static struct gpu_cvb_dvfs gpu_cvb_dvfs_table[] = {
 	{
