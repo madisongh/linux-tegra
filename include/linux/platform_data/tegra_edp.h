@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -17,48 +17,7 @@
 #ifndef _LINUX_TEGRA_EDP_H
 #define _LINUX_TEGRA_EDP_H
 
-#include <linux/kernel.h>
-#include <linux/errno.h>
-
-struct tegra_system_edp_entry {
-	char speedo_id;
-	char power_limit_100mW;
-	unsigned int freq_limits[4];
-};
-
-struct tegra_sysedp_devcap {
-	unsigned int cpu_power;
-	unsigned int gpu_cap; /* may be freq or power */
-	unsigned int emcfreq;
-	unsigned int gpu_supp_freq;
-};
-
-struct tegra_sysedp_corecap {
-	unsigned int power;
-	struct tegra_sysedp_devcap cpupri;
-	struct tegra_sysedp_devcap gpupri;
-	unsigned int pthrot;
-};
-
-enum tegra_sysedp_corecap_method {
-	TEGRA_SYSEDP_CAP_METHOD_DEFAULT = 0,
-	TEGRA_SYSEDP_CAP_METHOD_DIRECT,
-	TEGRA_SYSEDP_CAP_METHOD_SIGNAL,
-	TEGRA_SYSEDP_CAP_METHOD_RELAX,
-};
-
-struct tegra_sysedp_platform_data {
-	struct tegra_sysedp_corecap *corecap;
-	unsigned int corecap_size;
-	unsigned int core_gain;
-	unsigned int init_req_watts;
-	unsigned int pthrot_ratio;
-	unsigned int cap_method;
-	bool gpu_cap_as_mw;
-	bool gpu_supp_freq;
-};
-
-#if defined(CONFIG_EDP_FRAMEWORK) || defined(CONFIG_SYSEDP_FRAMEWORK)
+#if defined(CONFIG_TEGRA_SYS_EDP)
 void tegra_edp_notify_gpu_load(unsigned int load, unsigned int freq_in_hz);
 #else
 static inline void tegra_edp_notify_gpu_load(

@@ -29,3 +29,4 @@ config TEGRA_210_DVFS
 	  defined in generic Tegra DVFS driver, so while enabled it
 	  needs the config TEGRA_DVFS to be enabled as well.
 
+source "drivers/soc/tegra/sysedp/Kconfig"
