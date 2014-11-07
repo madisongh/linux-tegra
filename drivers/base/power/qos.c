@@ -2,6 +2,7 @@
  * Devices PM QoS constraints management
  *
  * Copyright (C) 2011 Texas Instruments, Inc.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -295,6 +296,7 @@ void dev_pm_qos_constraints_destroy(struct device *dev)
 	spin_unlock_irq(&dev->power.lock);
 
 	kfree(c->notifiers);
+	kfree(qos->flags.notifiers);
 	kfree(qos);
 
  out:
