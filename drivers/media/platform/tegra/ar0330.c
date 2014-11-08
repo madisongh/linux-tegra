@@ -1262,7 +1262,6 @@ static int ar0330_power_get(struct ar0330_info *info)
 	err |= ar0330_regulator_get(info, &pw->avdd, "vana"); /* ananlog 2.7v */
 	err |= ar0330_regulator_get(info, &pw->dvdd, "vdig"); /* digital 1.2v */
 	err |= ar0330_regulator_get(info, &pw->iovdd, "vif"); /* IO 1.8v */
-	err |= ar0330_regulator_get(info, &pw->vdd_af, "avdd_af1_cam"); /* IO 1.8v */
 
 	return err;
 }

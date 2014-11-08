@@ -300,56 +300,31 @@ static int ardbeg_ar0330_front_power_on(struct ar0330_power_rail *pw)
 {
 	int err;
 
-	if (unlikely(WARN_ON(!pw || !pw->avdd || !pw->iovdd || !pw->dvdd)))
+	if (unlikely(WARN_ON(!pw || !pw->avdd || !pw->iovdd)))
 		return -EFAULT;
 
-	pr_info("!!! mach-tegra front power on\n");
 	/* disable CSIE IOs DPD mode to turn on front camera for ardbeg */
 	tegra_io_dpd_disable(&csie_io);
 
-	if (ardbeg_get_extra_regulators())
-		goto ardbeg_ar0330_front_poweron_fail;
-
-	gpio_set_value(CAM_RSTN, 0);
-	gpio_set_value(CAM_AF_PWDN, 1);
-
-
-	err = regulator_enable(ardbeg_vcmvdd);
-	if (unlikely(err))
-		goto ar0330_front_vcm_fail;
-
-	err = regulator_enable(pw->dvdd);
-	if (unlikely(err))
-		goto ar0330_front_dvdd_fail;
-
-	err = regulator_enable(pw->avdd);
-	if (unlikely(err))
-		goto ar0330_front_avdd_fail;
+	gpio_set_value(CAM2_PWDN, 0);
 
 	err = regulator_enable(pw->iovdd);
 	if (unlikely(err))
 		goto ar0330_front_iovdd_fail;
 
+	usleep_range(1000, 1100);
+	err = regulator_enable(pw->avdd);
+	if (unlikely(err))
+		goto ar0330_front_avdd_fail;
+
 	usleep_range(1, 2);
 	gpio_set_value(CAM2_PWDN, 1);
 
-	gpio_set_value(CAM_RSTN, 1);
-
 	return 0;
-ar0330_front_iovdd_fail:
-	regulator_disable(pw->dvdd);
-
-ar0330_front_dvdd_fail:
-	regulator_disable(pw->avdd);
-
 ar0330_front_avdd_fail:
-	regulator_disable(ardbeg_vcmvdd);
+	regulator_disable(pw->iovdd);
 
-ar0330_front_vcm_fail:
-	pr_err("%s vcmvdd failed.\n", __func__);
-	return -ENODEV;
-
-ardbeg_ar0330_front_poweron_fail:
+ar0330_front_iovdd_fail:
 	/* put CSIE IOs into DPD mode to save additional power for ardbeg */
 	tegra_io_dpd_enable(&csie_io);
 	pr_err("%s failed.\n", __func__);
@@ -358,8 +333,7 @@ ardbeg_ar0330_front_poweron_fail:
 
 static int ardbeg_ar0330_front_power_off(struct ar0330_power_rail *pw)
 {
-	if (unlikely(WARN_ON(!pw || !pw->avdd || !pw->iovdd || !pw->dvdd ||
-					!ardbeg_vcmvdd))) {
+	if (unlikely(WARN_ON(!pw || !pw->avdd || !pw->iovdd))) {
 		/* put CSIE IOs into DPD mode to
 		 * save additional power for ardbeg
 		 */
@@ -367,14 +341,12 @@ static int ardbeg_ar0330_front_power_off(struct ar0330_power_rail *pw)
 		return -EFAULT;
 	}
 
-	gpio_set_value(CAM_RSTN, 0);
+	gpio_set_value(CAM2_PWDN, 0);
 
 	usleep_range(1, 2);
 
 	regulator_disable(pw->iovdd);
-	regulator_disable(pw->dvdd);
 	regulator_disable(pw->avdd);
-	regulator_disable(ardbeg_vcmvdd);
 	/* put CSIE IOs into DPD mode to save additional power for ardbeg */
 	tegra_io_dpd_enable(&csie_io);
 	return 0;
@@ -384,64 +356,39 @@ struct ar0330_platform_data ardbeg_ar0330_front_data = {
 	.power_on = ardbeg_ar0330_front_power_on,
 	.power_off = ardbeg_ar0330_front_power_off,
 	.dev_name	= "ar0330.1",
-	.mclk_name = "mclk",
+	.mclk_name = "mclk2",
 };
 
 static int ardbeg_ar0330_power_on(struct ar0330_power_rail *pw)
 {
 	int err;
 
-	if (unlikely(WARN_ON(!pw || !pw->avdd || !pw->iovdd || !pw->dvdd)))
+	if (unlikely(WARN_ON(!pw || !pw->avdd || !pw->iovdd)))
 		return -EFAULT;
 
-	pr_info("!!! mach-tegra rear power on\n");
 	/* disable CSIE IOs DPD mode to turn on front camera for ardbeg */
 	tegra_io_dpd_disable(&csia_io);
 	tegra_io_dpd_disable(&csib_io);
 
-	if (ardbeg_get_extra_regulators())
-		goto ardbeg_ar0330_poweron_fail;
-
-	gpio_set_value(CAM_RSTN, 0);
-	gpio_set_value(CAM_AF_PWDN, 1);
-
-
-	err = regulator_enable(ardbeg_vcmvdd);
-	if (unlikely(err))
-		goto ar0330_vcm_fail;
-
-	err = regulator_enable(pw->dvdd);
-	if (unlikely(err))
-		goto ar0330_dvdd_fail;
-
-	err = regulator_enable(pw->avdd);
-	if (unlikely(err))
-		goto ar0330_avdd_fail;
+	gpio_set_value(CAM1_PWDN, 0);
 
 	err = regulator_enable(pw->iovdd);
 	if (unlikely(err))
 		goto ar0330_iovdd_fail;
 
-	usleep_range(1, 2);
-	gpio_set_value(CAM2_PWDN, 1);
+	usleep_range(1000, 1100);
+	err = regulator_enable(pw->avdd);
+	if (unlikely(err))
+		goto ar0330_avdd_fail;
 
-	gpio_set_value(CAM_RSTN, 1);
+	usleep_range(1, 2);
+	gpio_set_value(CAM1_PWDN, 1);
 
 	return 0;
-ar0330_iovdd_fail:
-	regulator_disable(pw->dvdd);
-
-ar0330_dvdd_fail:
-	regulator_disable(pw->avdd);
-
 ar0330_avdd_fail:
-	regulator_disable(ardbeg_vcmvdd);
+	regulator_disable(pw->iovdd);
 
-ar0330_vcm_fail:
-	pr_err("%s vcmvdd failed.\n", __func__);
-	return -ENODEV;
-
-ardbeg_ar0330_poweron_fail:
+ar0330_iovdd_fail:
 	/* put CSIE IOs into DPD mode to save additional power for ardbeg */
 	tegra_io_dpd_enable(&csia_io);
 	tegra_io_dpd_enable(&csib_io);
@@ -451,8 +398,7 @@ ardbeg_ar0330_poweron_fail:
 
 static int ardbeg_ar0330_power_off(struct ar0330_power_rail *pw)
 {
-	if (unlikely(WARN_ON(!pw || !pw->avdd || !pw->iovdd || !pw->dvdd ||
-					!ardbeg_vcmvdd))) {
+	if (unlikely(WARN_ON(!pw || !pw->avdd || !pw->iovdd))) {
 		/* put CSIE IOs into DPD mode to
 		 * save additional power for ardbeg
 		 */
@@ -461,14 +407,12 @@ static int ardbeg_ar0330_power_off(struct ar0330_power_rail *pw)
 		return -EFAULT;
 	}
 
-	gpio_set_value(CAM_RSTN, 0);
+	gpio_set_value(CAM1_PWDN, 0);
 
 	usleep_range(1, 2);
 
 	regulator_disable(pw->iovdd);
-	regulator_disable(pw->dvdd);
 	regulator_disable(pw->avdd);
-	regulator_disable(ardbeg_vcmvdd);
 	/* put CSIE IOs into DPD mode to save additional power for ardbeg */
 	tegra_io_dpd_enable(&csia_io);
 	tegra_io_dpd_enable(&csib_io);
