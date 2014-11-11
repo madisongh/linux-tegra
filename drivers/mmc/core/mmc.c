@@ -282,13 +282,19 @@ static void mmc_select_card_type(struct mmc_card *card)
 
 	if (caps2 & MMC_CAP2_HS400_1_8V &&
 	    card_type & EXT_CSD_CARD_TYPE_HS400_1_8V) {
-		hs200_max_dtr = MMC_HS200_MAX_DTR;
+		if (caps2 & MMC_CAP2_HS533)
+			hs200_max_dtr = MMC_HS533_MAX_DTR;
+		else
+			hs200_max_dtr = MMC_HS200_MAX_DTR;
 		avail_type |= EXT_CSD_CARD_TYPE_HS400_1_8V;
 	}
 
 	if (caps2 & MMC_CAP2_HS400_1_2V &&
 	    card_type & EXT_CSD_CARD_TYPE_HS400_1_2V) {
-		hs200_max_dtr = MMC_HS200_MAX_DTR;
+		if (caps2 & MMC_CAP2_HS533)
+			hs200_max_dtr = MMC_HS533_MAX_DTR;
+		else
+			hs200_max_dtr = MMC_HS200_MAX_DTR;
 		avail_type |= EXT_CSD_CARD_TYPE_HS400_1_2V;
 	}
 
@@ -799,8 +805,10 @@ static int __mmc_select_powerclass(struct mmc_card *card,
 			pwrclass_val = (bus_width <= EXT_CSD_BUS_WIDTH_8) ?
 				ext_csd->raw_pwr_cl_52_195 :
 				ext_csd->raw_pwr_cl_ddr_52_195;
-		else if (host->ios.clock <= MMC_HS200_MAX_DTR)
-			pwrclass_val = ext_csd->raw_pwr_cl_200_195;
+		else if (host->ios.clock <= MMC_HS533_MAX_DTR)
+			pwrclass_val = (bus_width == EXT_CSD_DDR_BUS_WIDTH_8) ?
+				ext_csd->raw_pwr_cl_ddr_200_195 :
+				ext_csd->raw_pwr_cl_200_195;
 		break;
 	case MMC_VDD_27_28:
 	case MMC_VDD_28_29:
@@ -817,7 +825,7 @@ static int __mmc_select_powerclass(struct mmc_card *card,
 			pwrclass_val = (bus_width <= EXT_CSD_BUS_WIDTH_8) ?
 				ext_csd->raw_pwr_cl_52_360 :
 				ext_csd->raw_pwr_cl_ddr_52_360;
-		else if (host->ios.clock <= MMC_HS200_MAX_DTR)
+		else if (host->ios.clock <= MMC_HS533_MAX_DTR)
 			pwrclass_val = (bus_width == EXT_CSD_DDR_BUS_WIDTH_8) ?
 				ext_csd->raw_pwr_cl_ddr_200_360 :
 				ext_csd->raw_pwr_cl_200_360;

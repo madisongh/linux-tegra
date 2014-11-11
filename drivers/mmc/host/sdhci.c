@@ -3499,6 +3499,10 @@ int sdhci_add_host(struct sdhci_host *host)
 			>> SDHCI_CLOCK_BASE_SHIFT;
 
 	host->max_clk *= 1000000;
+
+	if (mmc->caps2 & MMC_CAP2_HS533)
+		host->max_clk = MMC_HS533_MAX_DTR;
+
 	if (host->max_clk == 0 || host->quirks &
 			SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN) {
 		if (!host->ops->get_max_clock) {

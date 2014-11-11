@@ -301,6 +301,8 @@ struct mmc_host {
 				 MMC_CAP2_HS400_1_2V)
 #define MMC_CAP2_SDIO_IRQ_NOTHREAD (1 << 17)
 #define MMC_CAP2_EN_STROBE	(1 << 18)       /* can support enhanced strobe*/
+#define MMC_CAP2_HS533		(1 << 19)       /* can support HS533*/
+
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
 #ifdef CONFIG_MMC_CLKGATE
