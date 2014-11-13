@@ -324,8 +324,8 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 					 data->correction_factor[data->bucket],
 					 RESOLUTION * DECAY);
 
-	trace_idle_entry(data->predicted_us);
 	get_typical_interval(data);
+	trace_idle_entry(data->predicted_us);
 
 	/*
 	 * Performance multiplier defines a minimum predicted idle
