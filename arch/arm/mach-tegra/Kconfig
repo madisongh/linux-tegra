@@ -59,4 +59,12 @@ comment "Tegra board type"
 config TEGRA_EMC_SCALING_ENABLE
 	bool "Enable scaling the memory frequency"
 
+config AID_FUSE
+	bool "Support AID fuse reads"
+	default n if (ARCH_TEGRA_12x_SOC && !ARCH_TEGRA_13x_SOC)
+	default y
+	help
+	  When enabled, allows sysfs reads of the AID fuse, which contains
+	  the chip family ID and a chip-unique Tegra ID. Supported on t132.
+
 endif
