@@ -240,7 +240,6 @@ struct sdhci_tegra {
 	u32 dll_calib;
 	bool en_strobe;
 	unsigned int tuned_tap_delay;
-	bool tuning_mode;
 };
 
 static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
@@ -628,19 +627,6 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		sdhci_tegra_set_trim_delay(host, plat->ddr_trim_delay);
 	}
 
-	tegra_host->tuning_mode = (uhs == MMC_TIMING_UHS_SDR104) ||
-			(uhs == MMC_TIMING_UHS_SDR50);
-
-	/* T21x: Enable Band Gap trimmers and VIO supply for eMMC all modes
-	 * and for SD/SDIO tunable modes only.
-	 * Wait for 3usec after enabling the trimmers.
-	 */
-	if (!plat->en_io_trim_volt)
-	       return 0;
-
-	vendor_trim_clear_sel_vreg(host,
-		(plat->is_emmc || tegra_host->tuning_mode));
-
 	return 0;
 }
 
@@ -857,6 +843,11 @@ static void tegra_sdhci_reset_exit(struct sdhci_host *host, u8 mask)
 		sdhci_writel(host, misc_ctrl, SDMMC_IO_SPARE_0);
 	}
 
+	/* SEL_VREG should be 0 for all modes*/
+	if (soc_data->nvquirks2 &
+		NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH)
+		vendor_trim_clear_sel_vreg(host, true);
+
 	if (soc_data->nvquirks & NVQUIRK_DISABLE_AUTO_CMD23)
 		host->flags &= ~SDHCI_AUTO_CMD23;
 
@@ -888,7 +879,7 @@ static void tegra_sdhci_reset_exit(struct sdhci_host *host, u8 mask)
 		host->mmc->caps2 &= ~MMC_CAP2_HS200;
 #endif
 
-	if (soc_data->nvquirks2 & NVQUIRK2_UPDATE_HW_TUNING_CONFG) {
+	if (soc_data->nvquirks2 & NVQUIRK_UPDATE_HW_TUNING_CONFG) {
 		vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_TUN_CTRL0_0);
 		vendor_ctrl |= SDHCI_VNDR_TUN_CTRL_RETUNE_REQ_EN;
 		vendor_ctrl |= SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS;
@@ -1089,7 +1080,6 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	u8 vendor_ctrl;
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
 	int ret = 0;
-	bool io_trim_en_config = plat->is_emmc || tegra_host->tuning_mode;
 
 	mutex_lock(&tegra_host->set_clock_mutex);
 	pr_debug("%s %s %u enabled=%u\n", __func__,
@@ -1108,9 +1098,8 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 			vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_SDMMC_CLK;
 			sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 			tegra_host->clk_enabled = true;
-			if ((tegra_host->soc_data->nvquirks2 &
-				NVQUIRK2_DYNAMIC_TRIM_SUPPLY_SWITCH) &&
-				io_trim_en_config) {
+			if (tegra_host->soc_data->nvquirks2 &
+				NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH) {
 				/* power up / active state */
 				vendor_trim_clear_sel_vreg(sdhci, true);
 			}
@@ -1118,9 +1107,8 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 		sdhci_set_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
 		sdhci_set_clock(sdhci, 0);
-		if ((tegra_host->soc_data->nvquirks2 &
-			NVQUIRK2_DYNAMIC_TRIM_SUPPLY_SWITCH) &&
-			io_trim_en_config) {
+		if (tegra_host->soc_data->nvquirks2 &
+			NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH){
 			/* power down / idle state */
 			vendor_trim_clear_sel_vreg(sdhci, false);
 		}
@@ -1344,7 +1332,7 @@ static int tegra_sdhci_validate_sd2_0(struct sdhci_host *sdhci)
 
 	plat = pdev->dev.platform_data;
 
-	if ((soc_data->nvquirks2 & NVQUIRK2_BROKEN_SD2_0_SUPPORT) &&
+	if ((soc_data->nvquirks2 & NVQUIRK_BROKEN_SD2_0_SUPPORT) &&
 		(plat->limit_vddio_max_volt)) {
 		/* T210: Bug 1561291
 		 * Design issue where a cap connected to IO node is stressed
@@ -2183,7 +2171,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	/* disable access to boot partitions */
 	host->mmc->caps2 |= MMC_CAP2_BOOTPART_NOACC;
 	host->mmc->caps2 |= MMC_CAP2_PACKED_CMD;
-	if (soc_data->nvquirks2 & NVQUIRK2_EN_STROBE_SUPPORT)
+	if (soc_data->nvquirks2 & NVQUIRK_EN_STROBE_SUPPORT)
 		host->mmc->caps2 |= MMC_CAP2_EN_STROBE;
 	if (plat->pwr_off_during_lp0)
 		host->mmc->caps2 |= MMC_CAP2_NO_SLEEP_CMD;
