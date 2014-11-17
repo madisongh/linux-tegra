@@ -67,6 +67,7 @@ struct gic_chip_data {
 	u32 saved_spi_enable[DIV_ROUND_UP(1020, 32)];
 	u32 saved_spi_conf[DIV_ROUND_UP(1020, 16)];
 	u32 saved_spi_target[DIV_ROUND_UP(1020, 4)];
+	u32 saved_spi_group[DIV_ROUND_UP(1020, 32)];
 	u32 __percpu *saved_ppi_enable;
 	u32 __percpu *saved_ppi_conf;
 #endif
@@ -749,6 +750,11 @@ static void gic_dist_save(struct gic_chip_data *gic)
 		gic->saved_spi_enable[i] =
 			readl_relaxed(dist_base + GIC_DIST_ENABLE_SET + i * 4);
 
+	if (!gic->is_percpu)
+		for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++)
+			gic->saved_spi_group[i] =
+			readl_relaxed(dist_base + GIC_DIST_IGROUP + i * 4);
+
 	writel_relaxed(0, dist_base + GIC_DIST_CTRL);
 }
 
@@ -785,11 +791,19 @@ static void gic_dist_restore(struct gic_chip_data *gic)
 		writel_relaxed(gic->saved_spi_target[i],
 			dist_base + GIC_DIST_TARGET + i * 4);
 
+	if (!gic->is_percpu)
+		for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++)
+			writel_relaxed(gic->saved_spi_group[i],
+				dist_base + GIC_DIST_IGROUP + i * 4);
+
 	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++)
 		writel_relaxed(gic->saved_spi_enable[i],
 			dist_base + GIC_DIST_ENABLE_SET + i * 4);
 
-	writel_relaxed(GICD_ENABLE, dist_base + GIC_DIST_CTRL);
+	if (gic->is_percpu)
+		writel_relaxed(GICD_ENABLE, dist_base + GIC_DIST_CTRL);
+	else
+		writel_relaxed(3, dist_base + GIC_DIST_CTRL);
 }
 
 static void gic_cpu_save(struct gic_chip_data *gic)
