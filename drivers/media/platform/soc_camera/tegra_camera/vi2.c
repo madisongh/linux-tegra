@@ -517,7 +517,8 @@ static int vi2_capture_setup_csi_0(struct tegra_camera_dev *cam,
 				icd->user_width * 3);
 	} else {
 		/* output format RAW10 T_R16_I, only support direct to mem */
-		TC_VI_REG_WT(cam, TEGRA_VI_CSI_0_IMAGE_DEF, (32 << 16) | 0x1);
+		TC_VI_REG_WT(cam, TEGRA_VI_CSI_0_IMAGE_DEF,
+			     (1 << 24) | (32 << 16) | 0x1);
 		/* input format is RAW10 */
 		TC_VI_REG_WT(cam, TEGRA_VI_CSI_0_CSI_IMAGE_DT, 43);
 
@@ -539,7 +540,7 @@ static int vi2_capture_setup_csi_1(struct tegra_camera_dev *cam,
 
 	TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_PPB_COMMAND, 0xf007);
 	TC_VI_REG_WT(cam, TEGRA_CSI_CSI_PIXEL_PARSER_B_INTERRUPT_MASK, 0x0);
-	TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_B_CONTROL0, 0x280301f0);
+	TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_B_CONTROL0, 0x280301f1);
 	TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_PPB_COMMAND, 0xf007);
 	TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_B_CONTROL1, 0x11);
 	TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_B_GAP, 0x140000);
@@ -569,13 +570,22 @@ static int vi2_capture_setup_csi_1(struct tegra_camera_dev *cam,
 		TC_VI_REG_WT(cam, TEGRA_VI_CSI_1_IMAGE_DEF, (64 << 16) | 0x1);
 		/* input format is RGB888 */
 		TC_VI_REG_WT(cam, TEGRA_VI_CSI_1_CSI_IMAGE_DT, 36);
+
+		TC_VI_REG_WT(cam, TEGRA_VI_CSI_1_CSI_IMAGE_SIZE_WC,
+				icd->user_width * 3);
+	} else {
+		/* output format RAW10 T_R16_I, only support direct to mem */
+		TC_VI_REG_WT(cam, TEGRA_VI_CSI_1_IMAGE_DEF,
+			     (1 << 24) | (32 << 16) | 0x1);
+		/* input format is RAW10 */
+		TC_VI_REG_WT(cam, TEGRA_VI_CSI_1_CSI_IMAGE_DT, 43);
+
+		TC_VI_REG_WT(cam, TEGRA_VI_CSI_1_CSI_IMAGE_SIZE_WC,
+				icd->user_width * 10 / 8);
 	}
 
 	TC_VI_REG_WT(cam, TEGRA_VI_CSI_1_CSI_IMAGE_SIZE,
 		     (icd->user_height << 16) | icd->user_width);
-
-	TC_VI_REG_WT(cam, TEGRA_VI_CSI_1_CSI_IMAGE_SIZE_WC,
-		     icd->user_width * 3);
 
 	return 0;
 }
