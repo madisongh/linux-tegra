@@ -53,6 +53,7 @@ struct cma {
 static struct cma cma_areas[MAX_CMA_AREAS];
 static unsigned cma_area_count;
 static DEFINE_MUTEX(cma_mutex);
+static unsigned long cma_total_pages;
 
 phys_addr_t cma_get_base(struct cma *cma)
 {
@@ -195,8 +196,14 @@ int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
 	cma->order_per_bit = order_per_bit;
 	*res_cma = cma;
 	cma_area_count++;
+	cma_total_pages += ((unsigned long)size / PAGE_SIZE);
 
 	return 0;
+}
+
+unsigned long cma_get_total_pages(void)
+{
+	return cma_total_pages;
 }
 
 /**
