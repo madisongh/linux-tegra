@@ -1456,6 +1456,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_max_tuning_loop_counter = sdhci_tegra_get_max_tuning_loop_counter,
 	.config_tap_delay	= tegra_sdhci_config_tap,
 	.validate_sd2_0		= tegra_sdhci_validate_sd2_0,
+	.get_max_pio_transfer_limits = tegra_sdhci_set_max_pio_transfer_limits,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -1872,6 +1873,38 @@ static void sdhci_tegra_select_drive_strength(struct sdhci_host *host,
 			dev_dbg(mmc_dev(host->mmc),
 				"No custom pad-ctrl strength settings present for sdcard %d mode\n", uhs);
 		}
+	}
+}
+
+/*
+ * Set the max pio transfer limits to allow for dynamic switching between dma
+ * and pio modes if the platform data indicates support for it. Option to set
+ * different limits for different interfaces.
+ */
+static void tegra_sdhci_set_max_pio_transfer_limits(struct sdhci_host *sdhci)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+
+	if (!tegra_host->plat->dynamic_dma_pio_switch || !sdhci->mmc->card)
+		return;
+
+	switch (sdhci->mmc->card->type) {
+	case MMC_TYPE_MMC:
+		sdhci->max_pio_size = 0;
+		sdhci->max_pio_blocks = 0;
+		break;
+	case MMC_TYPE_SD:
+		sdhci->max_pio_size = 0;
+		sdhci->max_pio_blocks = 0;
+		break;
+	case MMC_TYPE_SDIO:
+		sdhci->max_pio_size = 0;
+		sdhci->max_pio_blocks = 0;
+		break;
+	default:
+		dev_err(mmc_dev(sdhci->mmc),
+			"Unknown device type. No max pio limits set\n");
 	}
 }
 
