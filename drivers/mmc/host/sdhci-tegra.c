@@ -47,6 +47,7 @@
 #include <mach/hardware.h>
 
 #include <linux/platform_data/mmc-sdhci-tegra.h>
+#include <linux/platform/tegra/common.h>
 
 #include "sdhci-pltfm.h"
 
@@ -1603,6 +1604,7 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	plat->power_off_rail = of_property_read_bool(np,
 		"power-off-rail");
 	plat->is_emmc = of_property_read_bool(np, "nvidia,is-emmc");
+	plat->is_sd_device = of_property_read_bool(np, "nvidia,sd-device");
 	plat->enable_hs533_mode = of_property_read_bool(np, "nvidia,enable-hs533-mode");
 	return mmc_of_parse(host->mmc);
 }
@@ -2046,6 +2048,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	struct clk *clk;
 	const char *parent_clk_list[TEGRA_SDHCI_MAX_PLL_SOURCE];
 	int rc;
+	u8 i;
+	u32 opt_subrevision;
 
 	for (i = 0; i < ARRAY_SIZE(parent_clk_list); i++)
 		parent_clk_list[i] = NULL;
@@ -2124,6 +2128,14 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 			goto err_power_req;
 		}
 		gpio_direction_output(tegra_host->power_gpio, 1);
+	}
+
+	if (plat->is_sd_device &&
+		(tegra_get_chipid() == TEGRA_CHIPID_TEGRA21) &&
+		(tegra_chip_get_revision() == TEGRA_REVISION_A01)) {
+		opt_subrevision = tegra_get_fuse_opt_subrevision();
+		if ((opt_subrevision == 0) || (opt_subrevision == 1))
+			plat->limit_vddio_max_volt = true;
 	}
 
 	pll_c = clk_get_sys(NULL, "pll_c");
