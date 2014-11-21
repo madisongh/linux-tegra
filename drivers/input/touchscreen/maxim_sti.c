@@ -1099,17 +1099,10 @@ nl_msg_new(struct dev_data *dd, u8 dst)
 	return 0;
 }
 
-static int
-nl_callback_noop(struct sk_buff *skb, struct genl_info *info)
-{
-	return 0;
-}
-
 static inline bool
 nl_process_driver_msg(struct dev_data *dd, u16 msg_id, void *msg)
 {
 	struct maxim_sti_pdata        *pdata = dd->spi->dev.platform_data;
-	struct dr_add_mc_group        *add_mc_group_msg;
 	struct dr_echo_request        *echo_msg;
 	struct fu_echo_response       *echo_response;
 	struct dr_chip_read           *read_msg;
