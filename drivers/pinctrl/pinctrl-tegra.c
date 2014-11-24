@@ -692,7 +692,7 @@ static int tegra_pinconf_group_set(struct pinctrl_dev *pctldev,
 	enum tegra_pinconf_param param;
 	u16 arg;
 	const struct tegra_pingroup *g;
-	int ret, i;
+	int ret = 0, i;
 	s8 bank, bit, width;
 	s16 reg;
 	u32 val, mask;
