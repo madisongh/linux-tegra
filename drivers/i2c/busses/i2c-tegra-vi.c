@@ -894,7 +894,7 @@ static int tegra_vi_i2c_xfer_msg(struct tegra_vi_i2c_dev *i2c_dev,
 	i2c_dev->msg_buf_remaining = msg->len;
 	i2c_dev->msg_err = I2C_ERR_NONE;
 	i2c_dev->msg_read = (msg->flags & I2C_M_RD);
-	INIT_COMPLETION(i2c_dev->msg_complete);
+	reinit_completion(&i2c_dev->msg_complete);
 
 	spin_lock_irqsave(&i2c_dev->fifo_lock, flags);
 
@@ -1110,7 +1110,7 @@ static int tegra_vi_i2c_xfer_msg(struct tegra_vi_i2c_dev *i2c_dev,
 	/* Arbitration Lost occurs, Start recovery */
 	if (i2c_dev->msg_err == I2C_ERR_ARBITRATION_LOST) {
 		if (i2c_dev->chipdata->has_hw_arb_support) {
-			INIT_COMPLETION(i2c_dev->msg_complete);
+			reinit_completion(&i2c_dev->msg_complete);
 			i2c_writel(i2c_dev, I2C_BC_ENABLE
 					| I2C_BC_SCLK_THRESHOLD
 					| I2C_BC_STOP_COND
