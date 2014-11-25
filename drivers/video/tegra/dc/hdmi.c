@@ -2187,7 +2187,7 @@ static unsigned long  tegra12x_hdmi_determine_parent(
 	for (n = 4; (ref / 2 * n) <= pmax; n++) {
 		if ((ref / 2 * n) < pmin)  /* too low */
 			continue;
-		m = (ref / 2 * n) / (pclk / 1000);
+		m = DIV_ROUND_UP((ref / 2 * n), (pclk / 1000));
 		if (m <= 1700)  /* for 2 <= m */
 			continue;
 		f = m % 1000;  /* fractional parts */
