@@ -798,9 +798,10 @@ static int vi2_capture_start(struct tegra_camera_dev *cam,
 		cam->sof = 0;
 
 	/* Capture syncpt timeout err, then dump error status */
-	if (err)
-		err = vi2_capture_error_status(cam);
-
+	if (err) {
+		dev_err(&cam->ndev->dev, "CSI sync point failure\n");
+		vi2_capture_error_status(cam);
+	}
 	return err;
 }
 
