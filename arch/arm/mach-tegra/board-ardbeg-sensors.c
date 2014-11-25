@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-ardbeg-sensors.c
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -39,6 +39,7 @@
 #include <media/ad5823.h>
 #include <media/max77387.h>
 
+#include <media/ov4689.h>
 #include <linux/platform_device.h>
 #include <media/soc_camera.h>
 #include <media/soc_camera_platform.h>
@@ -464,6 +465,34 @@ struct ar0330_platform_data ardbeg_ar0330_data = {
 	.dev_name	= "ar0330",
 };
 
+static int ardbeg_ov4689_power_on(struct ov4689_power_rail *pw)
+{
+	pr_info("%s: ++\n", __func__);
+	/* disable CSIA/B IOs DPD mode to turn on camera for ardbeg */
+	tegra_io_dpd_disable(&csia_io);
+	tegra_io_dpd_disable(&csib_io);
+
+	gpio_set_value(TEGRA_GPIO_PBB5, 0);
+	usleep_range(10, 20);
+	gpio_set_value(TEGRA_GPIO_PBB5, 1);
+	usleep_range(820, 1000);
+
+	return 1;
+}
+
+static int ardbeg_ov4689_power_off(struct ov4689_power_rail *pw)
+{
+	pr_info("%s: ++\n", __func__);
+
+	gpio_set_value(TEGRA_GPIO_PBB5, 0);
+
+	/* put CSIA/B IOs into DPD mode to save additional power for ardbeg */
+	tegra_io_dpd_enable(&csia_io);
+	tegra_io_dpd_enable(&csib_io);
+
+	return 0;
+}
+
 static int ardbeg_ar0261_power_on(struct ar0261_power_rail *pw)
 {
 	int err;
@@ -751,6 +780,18 @@ struct imx179_platform_data ardbeg_imx179_data = {
 	},
 	.power_on = ardbeg_imx179_power_on,
 	.power_off = ardbeg_imx179_power_off,
+};
+
+struct ov4689_platform_data ardbeg_ov4689_data = {
+	.flash_cap = {
+		.enable = 0,
+		.edge_trig_en = 1,
+		.start_edge = 0,
+		.repeat = 1,
+		.delay_frm = 0,
+	},
+	.power_on = ardbeg_ov4689_power_on,
+	.power_off = ardbeg_ov4689_power_off,
 };
 
 static int ardbeg_dw9718_power_on(struct dw9718_power_rail *pw)
@@ -1285,6 +1326,7 @@ static struct camera_data_blob ardbeg_camera_lut[] = {
 	{"ardbeg_ov5693f_pdata", &ardbeg_ov5693_front_pdata},
 	{"ardbeg_ar0330_pdata", &ardbeg_ar0330_data},
 	{"ardbeg_ar0330_front_pdata", &ardbeg_ar0330_front_data},
+	{"ardbeg_ov4689_pdata", &ardbeg_ov4689_data},
 	{},
 };
 

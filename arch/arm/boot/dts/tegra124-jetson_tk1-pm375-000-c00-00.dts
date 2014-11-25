@@ -67,6 +67,19 @@
 		reg = <0x0 0x80000000 0x0 0x80000000>;
 	};
 
+	camera-pcl {
+		profiles {
+			ov4689@2_0036 {
+				use_of_node = "yes";
+				reset-gpios = <&gpio TEGRA_GPIO(BB, 3) 0>;
+				cam1-gpios = <&gpio TEGRA_GPIO(BB, 5) 0>;
+			};
+		};
+		dpd {
+			default-enable;
+		};
+	};
+
 	spi@7000d400 {
 		status = "okay";
 		spi-max-frequency = <25000000>;

@@ -1,7 +1,7 @@
 /*
  * arch/arm/boot/dts/tegra124-platforms/tegra124-pm359-camera-a00.dtsi
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -69,6 +69,15 @@
 				sensor {
 					profile = <&ar0330_2>;
 					platformdata = "ardbeg_ar0330_front_pdata";
+				};
+			};
+			module5: module5@modules {
+				compatible = "sensor,rear";
+				badge_info = "e1633_ov4689";
+
+				sensor {
+					profile = <&ov4689_1>;
+					platformdata = "ardbeg_ov4689_pdata";
 				};
 			};
 		};
@@ -292,6 +301,41 @@
 					CAMERA_REGULATOR_OFF(2)
 					CAMERA_REGULATOR_OFF(1)
 					CAMERA_REGULATOR_OFF(0)
+					CAMERA_END
+					>;
+			};
+			ov4689_1: ov4689@2_0036 {
+				index = <6>;
+				chipname = "pcl_OV4689";
+				type = "sensor";
+				guid = "s_OV4689";
+				position = <0>;
+				bustype = "i2c";
+				busnum = <2>;
+				addr = <0x36>;
+				datalen = <2>;
+				pinmuxgrp = <0xFFFF>;
+				gpios = <3>;
+				regulators = "vana", "vdig", "vif";
+				clocks = "mclk";
+				drivername = "ov4689";
+				detect = <0x0002 0x300A 0xFFFF 0x4688>;
+				devid = <0x4689>;
+				poweron = <
+					CAMERA_IND_CLK_SET(10000)
+					CAMERA_GPIO_CLR(221)
+					CAMERA_GPIO_CLR(219)
+					CAMERA_WAITMS(40)
+					CAMERA_REGULATOR_ON(2)
+					CAMERA_GPIO_SET(221)
+					CAMERA_GPIO_SET(219)
+					CAMERA_WAITMS(10)
+					CAMERA_END
+					>;
+				poweroff = <
+					CAMERA_GPIO_CLR(221)
+					CAMERA_IND_CLK_CLR
+					CAMERA_WAITUS(10)
 					CAMERA_END
 					>;
 			};
