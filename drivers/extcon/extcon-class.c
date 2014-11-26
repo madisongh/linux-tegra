@@ -1165,6 +1165,12 @@ struct extcon_cable *extcon_get_extcon_cable(struct device *dev,
 }
 EXPORT_SYMBOL_GPL(extcon_get_extcon_cable);
 
+void extcon_put_extcon_cable(struct extcon_cable *ecable)
+{
+	kfree(ecable);
+}
+EXPORT_SYMBOL_GPL(extcon_put_extcon_cable);
+
 struct extcon_cable *extcon_get_extcon_cable_by_extcon_name(
 		const char *extcon_name, const char *cable_name)
 {

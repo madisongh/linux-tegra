@@ -198,6 +198,7 @@ extern void devm_extcon_dev_unregister(struct device *dev,
 extern struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name);
 extern struct extcon_cable *extcon_get_extcon_cable(struct device *dev,
 		const char *cable_name);
+extern void extcon_put_extcon_cable(struct extcon_cable *ecable);
 extern struct extcon_cable *extcon_get_extcon_cable_by_extcon_name(
 		const char *extcon_name, const char *cable_name);
 extern struct extcon_dev *extcon_get_extcon_dev_by_cable(struct device *dev,
@@ -360,6 +361,10 @@ static inline struct extcon_cable *extcon_get_extcon_cable(struct device *dev,
 		const char *cable_name)
 {
 	return NULL;
+}
+
+static inline void extcon_put_extcon_cable(struct extcon_cable *ecable)
+{
 }
 
 static inline struct extcon_cable *extcon_get_extcon_cable_by_extcon_name(
