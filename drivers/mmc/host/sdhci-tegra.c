@@ -273,6 +273,8 @@ static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option);
 static void vendor_trim_clear_sel_vreg(struct sdhci_host *host, bool enable);
 static void sdhci_tegra_select_drive_strength(struct sdhci_host *host,
 		unsigned int uhs);
+static void tegra_sdhci_get_clock_freq_for_mode(struct sdhci_host *sdhci,
+			unsigned int *clock);
 
 static void tegra_sdhci_dumpregs(struct sdhci_host *sdhci)
 {
@@ -800,6 +802,35 @@ static void tegra_sdhci_clock_set_parent(struct sdhci_host *host,
 			mmc_hostname(host->mmc), rc);
 }
 
+static void tegra_sdhci_get_clock_freq_for_mode(struct sdhci_host *sdhci,
+			unsigned int *clock)
+{
+	struct platform_device *pdev = to_platform_device(mmc_dev(sdhci->mmc));
+	const struct tegra_sdhci_platform_data *plat = pdev->dev.platform_data;
+	unsigned int ios_timing = sdhci->mmc->ios.timing;
+	unsigned int index;
+
+	if (!(plat->is_fix_clock_freq) || !(pdev->dev.of_node)
+		|| (ios_timing >= MMC_TIMINGS_MAX_MODES))
+		return;
+
+	/*
+	* Index 0 is for ID mode and rest mapped with index being ios timings.
+	* If the frequency for some particular mode is set as 0 then return
+	* without updating the clock
+	*/
+	if (*clock <= 400000)
+		index = 0;
+	else
+		index = ios_timing + 1;
+
+	if (plat->fixed_clk_freq_table[index] != 0)
+		*clock = plat->fixed_clk_freq_table[index];
+	else
+		pr_warn("%s: The fixed_clk_freq_table entry for ios timing %d is 0. So using clock rate as requested by card\n",
+			mmc_hostname(sdhci->mmc), ios_timing);
+}
+
 static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
 	unsigned int clock)
 {
@@ -820,6 +851,7 @@ static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
 	} else
 		clk_rate = clock;
 
+	tegra_sdhci_get_clock_freq_for_mode(sdhci, &clk_rate);
 	if (tegra_host->max_clk_limit && (clk_rate > tegra_host->max_clk_limit))
 		clk_rate = tegra_host->max_clk_limit;
 
@@ -1387,6 +1419,14 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	plat->is_emmc = of_property_read_bool(np, "nvidia,is-emmc");
 	plat->is_sd_device = of_property_read_bool(np, "nvidia,sd-device");
 	plat->enable_hs533_mode = of_property_read_bool(np, "nvidia,enable-hs533-mode");
+	if (of_find_property(np, "fixed-clock-freq", NULL)) {
+		plat->is_fix_clock_freq = true;
+		of_property_read_u32_array(np,
+					"fixed-clock-freq",
+					(u32 *)&plat->fixed_clk_freq_table,
+					MMC_TIMINGS_MAX_MODES);
+	}
+
 	return mmc_of_parse(host->mmc);
 }
 
