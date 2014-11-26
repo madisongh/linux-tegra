@@ -791,23 +791,58 @@ static struct android_usb_function rndis_function = {
 	.attributes	= rndis_function_attributes,
 };
 
+#define MAX_ECM_INSTANCES 1
 struct ecm_function_config {
 	u8      ethaddr[ETH_ALEN];
 	struct eth_dev *dev;
+	struct usb_function *f_ecm[MAX_ECM_INSTANCES];
+	struct usb_function_instance *f_ecm_inst[MAX_ECM_INSTANCES];
 };
 
 static int
 ecm_function_init(struct android_usb_function *f,
 		struct usb_composite_dev *cdev)
 {
-	f->config = kzalloc(sizeof(struct ecm_function_config), GFP_KERNEL);
-	if (!f->config)
+	struct ecm_function_config *config;
+	int ret = 0;
+	int i;
+
+	config = kzalloc(sizeof(struct ecm_function_config), GFP_KERNEL);
+	if (!config)
 		return -ENOMEM;
+	f->config = config;
+
+	for (i = 0; i < MAX_ECM_INSTANCES; i++) {
+		config->f_ecm_inst[i] = usb_get_function_instance("ecm");
+		if (IS_ERR(config->f_ecm_inst[i])) {
+			ret =  PTR_ERR(config->f_ecm_inst[i]);
+			goto err_usb_get_function_instance;
+		}
+		config->f_ecm[i] = usb_get_function(config->f_ecm_inst[i]);
+		if (IS_ERR(config->f_ecm[i])) {
+			ret = PTR_ERR(config->f_ecm[i]);
+			goto err_usb_get_function;
+		}
+	}
 	return 0;
+err_usb_get_function_instance:
+	while (i-- > 0) {
+		usb_put_function(config->f_ecm[i]);
+err_usb_get_function:
+		usb_put_function_instance(config->f_ecm_inst[i]);
+	}
+	return ret;
 }
 
 static void ecm_function_cleanup(struct android_usb_function *f)
 {
+	int i;
+	struct ecm_function_config *ecm = f->config;
+
+	for (i = 0; i < MAX_ECM_INSTANCES; i++) {
+		usb_put_function(ecm->f_ecm[i]);
+		usb_put_function_instance(ecm->f_ecm_inst[i]);
+	}
 	kfree(f->config);
 	f->config = NULL;
 }
@@ -819,6 +854,7 @@ ecm_function_bind_config(struct android_usb_function *f,
 	int ret;
 	struct eth_dev *dev;
 	struct ecm_function_config *ecm = f->config;
+	int i;
 
 	if (!ecm) {
 		pr_err("%s: ecm_pdata\n", __func__);
@@ -839,13 +875,34 @@ ecm_function_bind_config(struct android_usb_function *f,
 
 	c->bmAttributes |= USB_CONFIG_ATT_WAKEUP;
 
-	return ecm_bind_config(c, ecm->ethaddr, ecm->dev);
+	/*
+	 * Fix me: Old ecm binding interface has been removed. Replacing this
+	 * with usb_get_function and usb_add_function. This change is done to
+	 * fix compilation issues on new kernel. The changes are done as per
+	 * acm function binding setup.
+	 */
+	for (i = 0; i < MAX_ECM_INSTANCES; i++) {
+		ret = usb_add_function(c, ecm->f_ecm[i]);
+		if (ret) {
+			pr_err("Could not bind ecm%u config\n", i);
+			goto err_usb_add_function;
+		}
+	}
+	return 0;
+err_usb_add_function:
+	while (i-- > 0)
+		usb_remove_function(c, ecm->f_ecm[i]);
+	return ret;
 }
 
 static void ecm_function_unbind_config(struct android_usb_function *f,
 						struct usb_configuration *c)
 {
 	struct ecm_function_config *ecm = f->config;
+	int i;
+
+	for (i = 0; i < MAX_ECM_INSTANCES; i++)
+		usb_remove_function(c, ecm->f_ecm[i]);
 	gether_cleanup(ecm->dev);
 }
 
@@ -890,23 +947,58 @@ static struct android_usb_function ecm_function = {
 	.attributes	= ecm_function_attributes,
 };
 
+#define MAX_EEM_INSTANCES 1
 struct eem_function_config {
 	u8      ethaddr[ETH_ALEN];
 	struct eth_dev *dev;
+	struct usb_function *f_eem[MAX_EEM_INSTANCES];
+	struct usb_function_instance *f_eem_inst[MAX_EEM_INSTANCES];
 };
 
 static int
 eem_function_init(struct android_usb_function *f,
 		struct usb_composite_dev *cdev)
 {
-	f->config = kzalloc(sizeof(struct eem_function_config), GFP_KERNEL);
-	if (!f->config)
+	struct eem_function_config *config;
+	int ret = 0;
+	int i;
+
+	config = kzalloc(sizeof(struct eem_function_config), GFP_KERNEL);
+	if (!config)
 		return -ENOMEM;
+	f->config = config;
+
+	for (i = 0; i < MAX_EEM_INSTANCES; i++) {
+		config->f_eem_inst[i] = usb_get_function_instance("eem");
+		if (IS_ERR(config->f_eem_inst[i])) {
+			ret =  PTR_ERR(config->f_eem_inst[i]);
+			goto err_usb_get_function_instance;
+		}
+		config->f_eem[i] = usb_get_function(config->f_eem_inst[i]);
+		if (IS_ERR(config->f_eem[i])) {
+			ret = PTR_ERR(config->f_eem[i]);
+			goto err_usb_get_function;
+		}
+	}
 	return 0;
+err_usb_get_function_instance:
+	while (i-- > 0) {
+		usb_put_function(config->f_eem[i]);
+err_usb_get_function:
+		usb_put_function_instance(config->f_eem_inst[i]);
+	}
+	return ret;
 }
 
 static void eem_function_cleanup(struct android_usb_function *f)
 {
+	int i;
+	struct eem_function_config *eem = f->config;
+
+	for (i = 0; i < MAX_EEM_INSTANCES; i++) {
+		usb_put_function(eem->f_eem[i]);
+		usb_put_function_instance(eem->f_eem_inst[i]);
+	}
 	kfree(f->config);
 	f->config = NULL;
 }
@@ -918,6 +1010,7 @@ eem_function_bind_config(struct android_usb_function *f,
 	int ret;
 	struct eem_function_config *eem = f->config;
 	struct eth_dev *dev;
+	int i;
 
 	if (!eem) {
 		pr_err("%s: eem_pdata\n", __func__);
@@ -938,13 +1031,34 @@ eem_function_bind_config(struct android_usb_function *f,
 
 	c->bmAttributes |= USB_CONFIG_ATT_WAKEUP;
 
-	return eem_bind_config(c, eem->dev);
+	/*
+	 * Fix me: Old eem binding interface has been removed. Replacing this
+	 * with usb_get_function and usb_add_function. This change is done to
+	 * fix compilation issues on new kernel. The changes are done as per
+	 * acm function binding setup.
+	 */
+	for (i = 0; i < MAX_EEM_INSTANCES; i++) {
+		ret = usb_add_function(c, eem->f_eem[i]);
+		if (ret) {
+			pr_err("Could not bind eem%u config\n", i);
+			goto err_usb_add_function;
+		}
+	}
+	return 0;
+err_usb_add_function:
+	while (i-- > 0)
+		usb_remove_function(c, eem->f_eem[i]);
+	return ret;
 }
 
 static void eem_function_unbind_config(struct android_usb_function *f,
 						struct usb_configuration *c)
 {
 	struct eem_function_config *eem = f->config;
+	int i;
+
+	for (i = 0; i < MAX_EEM_INSTANCES; i++)
+		usb_remove_function(c, eem->f_eem[i]);
 	gether_cleanup(eem->dev);
 }
 
@@ -989,23 +1103,58 @@ static struct android_usb_function eem_function = {
 	.attributes	= eem_function_attributes,
 };
 
+#define MAX_NCM_INSTANCES 1
 struct ncm_function_config {
 	u8      ethaddr[ETH_ALEN];
 	struct eth_dev *dev;
+	struct usb_function *f_ncm[MAX_NCM_INSTANCES];
+	struct usb_function_instance *f_ncm_inst[MAX_NCM_INSTANCES];
 };
 
 static int
 ncm_function_init(struct android_usb_function *f,
 		struct usb_composite_dev *cdev)
 {
-	f->config = kzalloc(sizeof(struct ncm_function_config), GFP_KERNEL);
-	if (!f->config)
+	struct ncm_function_config *config;
+	int ret = 0;
+	int i;
+
+	config = kzalloc(sizeof(struct ncm_function_config), GFP_KERNEL);
+	if (!config)
 		return -ENOMEM;
+	f->config = config;
+
+	for (i = 0; i < MAX_NCM_INSTANCES; i++) {
+		config->f_ncm_inst[i] = usb_get_function_instance("ncm");
+		if (IS_ERR(config->f_ncm_inst[i])) {
+			ret =  PTR_ERR(config->f_ncm_inst[i]);
+			goto err_usb_get_function_instance;
+		}
+		config->f_ncm[i] = usb_get_function(config->f_ncm_inst[i]);
+		if (IS_ERR(config->f_ncm[i])) {
+			ret = PTR_ERR(config->f_ncm[i]);
+			goto err_usb_get_function;
+		}
+	}
 	return 0;
+err_usb_get_function_instance:
+	while (i-- > 0) {
+		usb_put_function(config->f_ncm[i]);
+err_usb_get_function:
+		usb_put_function_instance(config->f_ncm_inst[i]);
+	}
+	return ret;
 }
 
 static void ncm_function_cleanup(struct android_usb_function *f)
 {
+	int i;
+	struct ncm_function_config *ncm = f->config;
+
+	for (i = 0; i < MAX_NCM_INSTANCES; i++) {
+		usb_put_function(ncm->f_ncm[i]);
+		usb_put_function_instance(ncm->f_ncm_inst[i]);
+	}
 	kfree(f->config);
 	f->config = NULL;
 }
@@ -1017,6 +1166,7 @@ ncm_function_bind_config(struct android_usb_function *f,
 	int ret;
 	struct ncm_function_config *ncm = f->config;
 	struct eth_dev *dev;
+	int i;
 
 	if (!ncm) {
 		pr_err("%s: ncm_pdata\n", __func__);
@@ -1036,14 +1186,36 @@ ncm_function_bind_config(struct android_usb_function *f,
 	ncm->dev = dev;
 
 	c->bmAttributes |= USB_CONFIG_ATT_WAKEUP;
-	return ncm_bind_config(c, ncm->ethaddr, ncm->dev);
+
+	/*
+	 * Fix me: Old ncm binding interface has been removed. Replacing this
+	 * with usb_get_function and usb_add_function. This change is done to
+	 * fix compilation issues on new kernel. The changes are done as per
+	 * acm function binding setup.
+	 */
+	for (i = 0; i < MAX_NCM_INSTANCES; i++) {
+		ret = usb_add_function(c, ncm->f_ncm[i]);
+		if (ret) {
+			pr_err("Could not bind ncm%u config\n", i);
+			goto err_usb_add_function;
+		}
+	}
+	return 0;
+err_usb_add_function:
+	while (i-- > 0)
+		usb_remove_function(c, ncm->f_ncm[i]);
+	return ret;
 }
 
 static void ncm_function_unbind_config(struct android_usb_function *f,
 						struct usb_configuration *c)
 {
-	struct ecm_function_config *ecm = f->config;
-	gether_cleanup(ecm->dev);
+	struct ncm_function_config *ncm = f->config;
+	int i;
+
+	for (i = 0; i < MAX_NCM_INSTANCES; i++)
+		usb_remove_function(c, ncm->f_ncm[i]);
+	gether_cleanup(ncm->dev);
 }
 
 static ssize_t ncm_ethaddr_show(struct device *dev,
