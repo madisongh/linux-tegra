@@ -143,6 +143,9 @@ static void rev_sku_to_speedo_ids(int rev, int sku)
 		threshold_index = 1;
 		break;
 	case 0x80:
+		cpu_speedo_id = 8;
+		soc_speedo_id = 4;
+		gpu_speedo_id = 6;
 		if (chip_personality == always_on) {
 			cpu_speedo_id = 7;
 			soc_speedo_id = 3;
@@ -337,6 +340,8 @@ int tegra_core_speedo_mv(void)
 		return 1110;
 	case 3:
 		return 1000;
+	case 4:
+		return 1100;
 	default:
 		BUG();
 	}

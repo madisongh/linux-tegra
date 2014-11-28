@@ -868,6 +868,8 @@ static int init_gpu_edp_limits_calculated(void)
 			gpu_temperatures[i];
 		if (gpu_temperatures[i] == 0 && tegra_gpu_speedo_id() == 5)
 			limit = 708000;
+		else if (gpu_temperatures[i] == 0 && tegra_gpu_speedo_id() == 6)
+			limit = 852000;
 		else
 			limit = gpu_edp_calculate_maxf(params,
 					       gpu_temperatures[i],
