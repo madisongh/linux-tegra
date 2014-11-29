@@ -2,7 +2,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (C) 2011-2013 NVIDIA Corporation
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -144,7 +144,9 @@ static void show_channel_gathers(struct output *o, struct host1x_cdma *cdma)
 		unsigned int i;
 
 		host1x_debug_output(o, "\n%p: JOB, syncpt_id=%d, syncpt_val=%d, first_get=%08x, timeout=%d num_slots=%d, num_handles=%d\n",
-				    job, job->syncpt_id, job->syncpt_end,
+				    job,
+				    (job->syncpts ? job->syncpts[0].id : 0),
+				    (job->syncpts ? job->syncpts[0].end : 0),
 				    job->first_get, job->timeout,
 				    job->num_slots, job->num_unpins);
 
