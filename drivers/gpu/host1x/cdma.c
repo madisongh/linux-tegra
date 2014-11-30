@@ -1,7 +1,7 @@
 /*
  * Tegra host1x Command DMA
  *
- * Copyright (c) 2010-2013, NVIDIA Corporation.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -304,6 +304,10 @@ void host1x_cdma_update_sync_queue(struct host1x_cdma *cdma,
 
 		host1x_job_dump(dev, job);
 	}
+
+	/* First, reset the engine */
+	if (job->reset)
+		job->reset(dev);
 
 	/*
 	 * Walk the sync_queue, first incrementing with the CPU syncpts that
