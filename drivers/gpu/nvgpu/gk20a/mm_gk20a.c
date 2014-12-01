@@ -1797,6 +1797,8 @@ static int update_gmmu_ptes_locked(struct vm_gk20a *vm,
 		unmap_gmmu_pages(pte->ref, pte->sgt, pte_kv_cur);
 
 		if (pte->ref_cnt == 0) {
+			void *pte_ref_ptr = pte->ref;
+
 			/* It can make sense to keep around one page table for
 			 * each flavor (empty)... in case a new map is coming
 			 * right back to alloc (and fill it in) again.
@@ -1804,13 +1806,15 @@ static int update_gmmu_ptes_locked(struct vm_gk20a *vm,
 			 * unmap/map/unmap/map cases where we'd trigger pte
 			 * free/alloc/free/alloc.
 			 */
-			free_gmmu_pages(vm, pte->ref, pte->sgt,
-				vm->mm->page_table_sizing[pgsz_idx].order,
-				pte->size);
 			pte->ref = NULL;
 
 			/* rewrite pde */
 			update_gmmu_pde_locked(vm, pde_i);
+
+			free_gmmu_pages(vm, pte_ref_ptr, pte->sgt,
+				vm->mm->page_table_sizing[pgsz_idx].order,
+				pte->size);
+
 		}
 
 	}
