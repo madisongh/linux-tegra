@@ -3691,9 +3691,6 @@ tegra_xhci_suspend(struct platform_device *pdev,
 	}
 	mutex_unlock(&tegra->sync_lock);
 
-	tegra_xhci_ss_wake_on_interrupts(tegra->bdata->portmap, false);
-	tegra_xhci_hs_wake_on_interrupts(tegra->bdata->portmap, false);
-
 	/* enable_irq_wake for ss ports */
 	ret = enable_irq_wake(tegra->padctl_irq);
 	if (ret < 0) {
