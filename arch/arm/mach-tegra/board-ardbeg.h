@@ -181,4 +181,10 @@ void tn8_sysedp_dynamic_capping_init(void);
 #define CLK_RST_CNTRL_RST_DEV_V_SET 0x7000E430
 #define SET_CEC_RST 0x100
 
+#ifdef CONFIG_NV_SENSORHUB
+/* Jetson Sensor-hub */
+#define SENSOR_HUB_RST		TEGRA_GPIO_PU0
+#define SENSOR_HUB_BOOT0	TEGRA_GPIO_PU1
+#endif
+
 #endif
