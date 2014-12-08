@@ -160,7 +160,7 @@ endif
 
 obj-$(CONFIG_TEGRA_GPU_EDP)             += gpu-edp.o
 obj-y					+= asim.o
-obj-y					+= hier_ictlr/
+obj-y					+= mselect.o
 
 obj-$(CONFIG_TEGRA_WDT_RECOVERY)        += wdt-recovery.o
 
