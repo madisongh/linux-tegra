@@ -6,7 +6,8 @@
 GCOV_PROFILE := y
 
 subdir-ccflags-y += -Werror
-subdir-ccflags-y += -I$(srctree)/drivers/platform/tegra/include
+subdir-ccflags-y += -I$(srctree)/drivers/platform/tegra/include \
+		    -I$(srctree)/arch/arm/mach-tegra
 
 obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
 obj-$(CONFIG_OF_TEGRA_IOMMU_SMMU)       += iommu.o
