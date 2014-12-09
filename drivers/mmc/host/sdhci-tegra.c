@@ -2003,6 +2003,15 @@ err_alloc_tegra_host:
 	return rc;
 }
 
+static void sdhci_tegra_shutdown(struct platform_device *pdev)
+{
+	struct sdhci_host *host = platform_get_drvdata(pdev);
+
+	dev_dbg(&pdev->dev, " %s shutting down\n",
+		mmc_hostname(host->mmc));
+	pm_runtime_forbid(&pdev->dev);
+}
+
 static struct platform_driver sdhci_tegra_driver = {
 	.driver		= {
 		.name	= "sdhci-tegra",
@@ -2012,6 +2021,7 @@ static struct platform_driver sdhci_tegra_driver = {
 	},
 	.probe		= sdhci_tegra_probe,
 	.remove		= sdhci_pltfm_unregister,
+	.shutdown	= sdhci_tegra_shutdown,
 };
 
 module_platform_driver(sdhci_tegra_driver);
