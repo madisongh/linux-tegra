@@ -116,7 +116,7 @@
 #include <net/busy_poll.h>
 #include "udp_impl.h"
 
-#ifdef CONFIG_BCMDHD_CUSTOM_SYSFS_TEGRA
+#if defined(CONFIG_BCMDHD_CUSTOM_SYSFS_TEGRA) && defined(CONFIG_BCMDHD) && !defined(CONFIG_BCMDHD_MODULE)
 
 #include "../../drivers/net/wireless/bcmdhd/include/dhd_custom_sysfs_tegra.h"
 
