@@ -155,3 +155,5 @@ config TEGRA_ACTMON
 	  Actmon is a hardware block that can be used to track the activity of
 	  certain hardware units. It can boost EMC clock or AVP clock depending
 	  on the memory trafic among various client. If unsure, say Y here.
+
+trysource "../kernel-t18x/drivers/platform/tegra/Kconfig"
