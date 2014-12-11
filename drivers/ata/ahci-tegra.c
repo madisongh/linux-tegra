@@ -344,6 +344,16 @@ enum clk_gate_state {
 	CLK_ON,
 };
 
+enum sata_connectors {
+	MINI_SATA,
+	MICRO_SATA,
+	SLIMLINE_SATA,
+	E_SATA,
+	E_SATA_P,
+	SATA_EXPRESS,
+	STANDARD_SATA,
+};
+
 char *sata_power_rails[] = {
 	"avdd_sata",
 	"vdd_sata",
@@ -372,6 +382,7 @@ struct tegra_ahci_host_priv {
 	struct device		*dev;
 	void			*pg_save;
 	enum sata_state		pg_state;
+	enum sata_connectors	sata_connector;
 	struct list_head	qc_list;
 	struct clk		*clk_sata;
 	struct clk		*clk_sata_oob;
@@ -1064,6 +1075,13 @@ static int tegra_ahci_controller_init(struct tegra_ahci_host_priv *tegra_hpriv,
 	val = misc_readl(SATA_AUX_MISC_CNTL_1_REG);
 	val &= ~NVA2SATA_OOB_ON_POR_MASK;
 	misc_writel(val, SATA_AUX_MISC_CNTL_1_REG);
+
+	if (tegra_hpriv->sata_connector != MINI_SATA) {
+		/* Disable DEVSLP Feature */
+		val = misc_readl(SATA_AUX_MISC_CNTL_1_REG);
+		val &= ~SDS_SUPPORT;
+		misc_writel(val, SATA_AUX_MISC_CNTL_1_REG);
+	}
 
 	val = sata_readl(SATA_CONFIGURATION_0_OFFSET);
 	val |= EN_FPCI;
@@ -2458,6 +2476,11 @@ static int tegra_ahci_init_one(struct platform_device *pdev)
 			tegra_ahci_sata_clk_gate();
 			goto fail;
 		}
+		if (of_property_read_u32(np, "nvidia,sata-connector-type",
+			&tegra_hpriv->sata_connector) < 0) {
+			tegra_hpriv->sata_connector = MINI_SATA;
+		}
+
 	} else {
 		ahci_pdata = tegra_hpriv->dev->platform_data;
 		tegra_hpriv->pexp_gpio = ahci_pdata->pexp_gpio;
