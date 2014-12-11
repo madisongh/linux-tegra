@@ -98,6 +98,7 @@
 
 	sata@0x70020000 {
 		nvidia,enable-sata-port;
+		nvidia,sata-connector-type=<STANDARD_SATA>;
 		vdd_sata-supply = <&as3722_sd4>;
 		avdd_sata_pll-supply =<&as3722_sd4>;
 		avdd_sata-supply = <&as3722_sd4>;
