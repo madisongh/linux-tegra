@@ -5,7 +5,7 @@
  *	Colin Cross <ccross@android.com>
  *	Erik Gilling <ccross@android.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -2160,6 +2160,19 @@ static struct resource tegra_wdt0_resources[] = {
 	},
 #endif
 #if defined(CONFIG_TRUSTED_LITTLE_KERNEL) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	[5] = {
+		.start  = TEGRA_WDT4_BASE,
+		.end    = TEGRA_WDT4_BASE + TEGRA_WDT4_SIZE - 1,
+		.flags  = IORESOURCE_MEM,
+	},
+	[6] = {
+		.start  = INT_WDT_AVP,
+		.end    = INT_WDT_AVP,
+		.flags  = IORESOURCE_IRQ,
+	},
+#endif
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
 	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
 	[5] = {
 		.start  = TEGRA_WDT4_BASE,

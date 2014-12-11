@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2010-2015 NVIDIA Corporation.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -39,6 +39,13 @@ void tegra_gic_dist_enable(void);
 void tegra_gic_disable_affinity(void);
 void tegra_gic_restore_affinity(void);
 void tegra_gic_affinity_to_cpu0(void);
+
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+void __cpuinit tegra_gic_secondary_init(void);
+void __cpuinit gic_secondary_init_t124(unsigned int);
+#endif
+
 #endif
 #endif
 
@@ -119,6 +126,11 @@ int get_vbus_id_cable_connect_state(bool *is_vbus_connected,
 /* enable/disable an interrupt that is an FIQ (safe from FIQ context?) */
 void tegra_fiq_enable(int n);
 void tegra_fiq_disable(int n);
+
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+void tegra_fiq_ack(unsigned int n);
+#endif
 
 void tegra_init_legacy_irq_cop(void);
 

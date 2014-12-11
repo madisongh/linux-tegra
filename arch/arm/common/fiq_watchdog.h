@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Google, Inc.
+ * Copyright (C) 2014 Google, Inc.
  * Copyright (C) 2010-2015 NVIDIA Corporation.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
@@ -10,22 +10,12 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
  */
 
-#ifndef __ASM_FIQ_GLUE_H
-#define __ASM_FIQ_GLUE_H
+#ifndef _FIQ_WATCHDOG_H_
+#define _FIQ_WATCHDOG_H_
 
-struct fiq_glue_handler {
-	void (*fiq)(struct fiq_glue_handler *h, void *regs, void *svc_sp);
-	void (*resume)(struct fiq_glue_handler *h);
-};
-
-int fiq_glue_register_handler(struct fiq_glue_handler *handler);
-
-#ifdef CONFIG_FIQ_GLUE
-void fiq_glue_resume(void);
-#else
-static inline void fiq_glue_resume(void) {}
-#endif
+void fiq_watchdog_triggered(const struct pt_regs *regs, void *svc_sp);
 
 #endif

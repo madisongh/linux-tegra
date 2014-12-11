@@ -2,6 +2,7 @@
  *  linux/arch/arm/common/gic.c
  *
  *  Copyright (C) 2002 ARM Limited, All Rights Reserved.
+ *  Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -426,7 +427,18 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
 	for (i = 32; i < gic_irqs; i += 32)
 		writel_relaxed(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
 
-	writel_relaxed(1, base + GIC_DIST_CTRL);
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	/*
+	 * Set all interrupts in group 1
+	 */
+	for (i = 0; i < gic_irqs; i += 32)
+		writel_relaxed(0xffffffff, base + GIC_DIST_IGROUP + i * 4 / 32);
+
+	writel_relaxed(0x3, base + GIC_DIST_CTRL);
+#else
+	writel_relaxed(0x1, base + GIC_DIST_CTRL);
+#endif
 }
 
 static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
@@ -465,7 +477,12 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
 
 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
-	writel_relaxed(1, base + GIC_CPU_CTRL);
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	writel_relaxed(0x1ef, base + GIC_CPU_CTRL);
+#else
+	writel_relaxed(0x1, base + GIC_CPU_CTRL);
+#endif
 }
 
 #ifdef CONFIG_CPU_PM
@@ -545,7 +562,15 @@ static void gic_dist_restore(unsigned int gic_nr)
 		writel_relaxed(gic_data[gic_nr].saved_spi_enable[i],
 			dist_base + GIC_DIST_ENABLE_SET + i * 4);
 
-	writel_relaxed(1, dist_base + GIC_DIST_CTRL);
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	for (i = 0; i < gic_irqs; i += 32)
+		writel_relaxed(0xffffffff, dist_base + GIC_DIST_IGROUP + i * 4 / 32);
+
+	writel_relaxed(0x3, dist_base + GIC_DIST_CTRL);
+#else
+	writel_relaxed(0x1, dist_base + GIC_DIST_CTRL);
+#endif
 }
 
 static void gic_cpu_save(unsigned int gic_nr)
@@ -601,8 +626,17 @@ static void gic_cpu_restore(unsigned int gic_nr)
 	for (i = 0; i < DIV_ROUND_UP(32, 4); i++)
 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
 
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	writel_relaxed(0xffffffff, dist_base + GIC_DIST_IGROUP);
+#endif
 	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
-	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	writel_relaxed(0x1ef, cpu_base + GIC_CPU_CTRL);
+#else
+	writel_relaxed(0x1, cpu_base + GIC_CPU_CTRL);
+#endif
 }
 
 static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
@@ -676,7 +710,15 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
 	dsb();
 
 	/* this always happens on GIC0 */
-	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	writel_relaxed(map << 16 | irq | 1<<15,
+		       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+#else
+	writel_relaxed(map << 16 | irq ,
+		       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+#endif
 }
 #endif
 
@@ -727,6 +769,18 @@ static int __cpuinit gic_secondary_init(struct notifier_block *nfb,
 	return NOTIFY_OK;
 }
 
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+void __cpuinit gic_secondary_init_t124(unsigned int gic_nr)
+{
+	void __iomem *dist_base = gic_data_dist_base(&gic_data[gic_nr]);
+
+	BUG_ON(gic_nr >= MAX_GIC_NR);
+
+	writel_relaxed(0xffffffff, dist_base + GIC_DIST_IGROUP);
+	gic_cpu_init(&gic_data[gic_nr]);
+}
+#endif
 /*
  * Notifier for enabling the GIC CPU interface. Set an arbitrarily high
  * priority because the GIC needs to be up before the ARM generic timers.

@@ -4,7 +4,7 @@
  * Serial Debugger Interface accessed through an FIQ interrupt.
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2010-2015 NVIDIA Corporation.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -96,6 +96,7 @@ struct fiq_debugger_state {
 	bool syslog_dumping;
 #endif
 
+	struct console *ram_console;
 	unsigned int last_irqs[NR_IRQS];
 	unsigned int last_local_timer_irqs[NR_CPUS];
 };
@@ -236,10 +237,12 @@ static void fiq_debugger_printf(struct fiq_debugger_output *output,
 	struct fiq_debugger_state *state;
 	char buf[256];
 	va_list ap;
-
+	int n;
 	state = container_of(output, struct fiq_debugger_state, output);
 	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);
+	n = vsnprintf(buf, sizeof(buf), fmt, ap);
+	if (NULL != state->ram_console)
+		state->ram_console->write(state->ram_console, buf, n);
 	va_end(ap);
 
 	fiq_debugger_puts(state, buf);
@@ -475,6 +478,8 @@ static bool fiq_debugger_fiq_exec(struct fiq_debugger_state *state,
 			void *svc_sp)
 {
 	bool signal_helper = false;
+
+	fiq_debugger_dump_allregs(&state->output, regs);
 
 	if (!strcmp(cmd, "help") || !strcmp(cmd, "?")) {
 		fiq_debugger_help(state);
@@ -712,6 +717,9 @@ static bool fiq_debugger_handle_uart_interrupt(struct fiq_debugger_state *state,
 	if (state->pdata->fiq_ack)
 		state->pdata->fiq_ack(state->pdev, state->fiq);
 
+	fiq_debugger_dump_allregs(&state->output, regs);
+	fiq_debugger_dump_pc(&state->output, regs);
+	fiq_debugger_dump_stacktrace(&state->output, regs, 100, svc_sp);
 	/* poke sleep timer if necessary */
 	if (state->debug_enable && !state->no_sleep)
 		signal_helper = true;
@@ -728,6 +736,7 @@ static void fiq_debugger_fiq(struct fiq_glue_handler *h,
 {
 	struct fiq_debugger_state *state =
 		container_of(h, struct fiq_debugger_state, handler);
+
 	unsigned int this_cpu = THREAD_INFO(svc_sp)->cpu;
 	bool need_irq;
 
@@ -1034,7 +1043,7 @@ static int fiq_debugger_probe(struct platform_device *pdev)
 	struct fiq_debugger_state *state;
 	int fiq;
 	int uart_irq;
-
+	struct console *console;
 	if (pdev->id >= MAX_FIQ_DEBUGGER_PORTS)
 		return -EINVAL;
 
@@ -1172,6 +1181,12 @@ static int fiq_debugger_probe(struct platform_device *pdev)
 	register_console(&state->console);
 	fiq_debugger_tty_init_one(state);
 #endif
+	for_each_console(console)
+		if (0 == strcmp(console->name, "pstore")) {
+			state->ram_console = console;
+			break;
+		}
+
 	return 0;
 
 err_register_irq:

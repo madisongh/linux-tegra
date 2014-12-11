@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-ardbeg.c
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -412,7 +412,12 @@ static void __init ardbeg_uart_init(void)
 			return;
 
 #ifdef CONFIG_TEGRA_FIQ_DEBUGGER
-		tegra_serial_debug_init(TEGRA_UARTD_BASE, INT_WDT_CPU, NULL, -1, -1);
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	tegra_serial_debug_init(TEGRA_UARTD_BASE, INT_WDT_AVP, NULL, -1, -1);
+#else
+	tegra_serial_debug_init(TEGRA_UARTD_BASE, INT_WDT_CPU, NULL, -1, -1);
+#endif
 #else
 		platform_device_register(uart_console_debug_device);
 #endif

@@ -4,7 +4,7 @@
  * Serial Debugger Interface for Tegra
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2012-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -124,6 +124,12 @@ static void fiq_enable(struct platform_device *pdev, unsigned int irq, bool on)
 		tegra_fiq_disable(irq);
 }
 
+
+static void fiq_ack(struct platform_device *pdev, unsigned int fiq)
+{
+	tegra_fiq_ack(fiq);
+}
+
 static int tegra_fiq_debugger_id;
 
 static void __tegra_serial_debug_init(unsigned int base, int fiq, int irq,
@@ -145,7 +151,7 @@ static void __tegra_serial_debug_init(unsigned int base, int fiq, int irq,
 	t->pdata.uart_putc = debug_putc;
 	t->pdata.uart_flush = debug_flush;
 	t->pdata.fiq_enable = fiq_enable;
-
+	t->pdata.fiq_ack = fiq_ack;
 	t->debug_port_base = ioremap(base, PAGE_SIZE);
 	if (!t->debug_port_base) {
 		pr_err("Failed to ioremap for fiq debugger\n");

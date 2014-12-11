@@ -4,7 +4,7 @@
  * Author:
  *	Colin Cross <ccross@android.com>
  *
- * Copyright (c) 2010-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -85,6 +85,35 @@ static u32 ictlr_wake_mask[NUM_ICTLRS];
 #endif
 
 #ifdef CONFIG_FIQ
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+void tegra_fiq_ack(unsigned int fiq)
+{
+	void __iomem *base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x2000);
+	readl_relaxed(base + GIC_CPU_INTACK);
+}
+
+static void tegra_legacy_avp_irq_mask(unsigned int irq)
+{
+	void __iomem *base;
+	pr_debug("%s: %d\n", __func__, irq);
+
+	irq -= FIRST_LEGACY_IRQ;
+	base = ictlr_reg_base[irq>>5];
+	writel(1 << (irq & 31), base + ICTLR_COP_IER_CLR);
+}
+
+static void tegra_legacy_avp_irq_unmask(unsigned int irq)
+{
+	void __iomem *base;
+	pr_debug("%s: %d\n", __func__, irq);
+
+	irq -= FIRST_LEGACY_IRQ;
+	base = ictlr_reg_base[irq>>5];
+	writel(1 << (irq & 31), base + ICTLR_COP_IER_SET);
+}
+#else
+
 static void tegra_legacy_select_fiq(unsigned int irq, bool fiq)
 {
 	void __iomem *base;
@@ -120,22 +149,33 @@ static void tegra_fiq_unmask(struct irq_data *d)
 	base = ictlr_reg_base[leg_irq >> 5];
 	writel(1 << (leg_irq & 31), base + ICTLR_CPU_IER_SET);
 }
-
+#endif
 void tegra_fiq_enable(int irq)
 {
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	tegra_legacy_avp_irq_mask(irq);
+#else
+	void __iomem *base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100);
 	/* enable FIQ */
-	u32 val = readl(gic_cpu_base + GIC_CPU_CTRL);
+	u32 val = readl(base + GIC_CPU_CTRL);
 	val &= ~8; /* pass FIQs through */
 	val |= 2; /* enableNS */
-	writel(val, gic_cpu_base + GIC_CPU_CTRL);
+	writel(val, base + GIC_CPU_CTRL);
 	tegra_legacy_select_fiq(irq, true);
 	tegra_fiq_unmask(irq_get_irq_data(irq));
+#endif
 }
 
 void tegra_fiq_disable(int irq)
 {
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	tegra_legacy_avp_irq_unmask(irq);
+#else
 	tegra_fiq_mask(irq_get_irq_data(irq));
 	tegra_legacy_select_fiq(irq, false);
+#endif
 }
 #endif /* CONFIG_FIQ */
 
@@ -156,6 +196,17 @@ void tegra_gic_cpu_disable(bool disable_pass_through)
 }
 #endif
 
+void tegra_gic_cpu_enable(void)
+{
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	writel(0x1EF, gic_cpu_base + GIC_CPU_CTRL);
+#else
+	writel(0x1, gic_cpu_base + GIC_CPU_CTRL);
+#endif
+}
+
+
 #ifdef CONFIG_PM_SLEEP
 int tegra_gic_pending_interrupt(void)
 {
@@ -173,7 +224,12 @@ void tegra_gic_dist_disable(void)
 
 void tegra_gic_dist_enable(void)
 {
-	writel(1, gic_dist_base + GIC_DIST_CTRL);
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	writel(0x3, gic_dist_base + GIC_DIST_CTRL);
+#else
+	writel(0x1, gic_dist_base + GIC_DIST_CTRL);
+#endif
 }
 
 void tegra_gic_disable_affinity(void)
@@ -228,6 +284,39 @@ void tegra_gic_affinity_to_cpu0(void)
 }
 #endif /* CONFIG_ARCH_TEGRA_2x_SOC */
 
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+static void tegra_gic_cpu_restore(void)
+{
+	u32 val = 0;
+	val = readl_relaxed(gic_dist_base + GIC_DIST_IGROUP +
+			    (INT_WDT_AVP/32)*4);
+	val &= ~(1 << (INT_WDT_AVP%32));
+	writel_relaxed(val, gic_dist_base + GIC_DIST_IGROUP +
+		       (INT_WDT_AVP/32)*4);
+	val = readl_relaxed(gic_dist_base + GIC_DIST_PRI +
+			    (INT_WDT_AVP/4)*4);
+	val &= ~(0xff << ((INT_WDT_AVP%4)*8));
+	writel_relaxed(val, gic_dist_base + GIC_DIST_PRI +
+		       (INT_WDT_AVP/4)*4);
+
+}
+static void tegra_gic_dist_restore(void)
+{
+	u32 val = 0;
+	val = readl_relaxed(gic_dist_base + GIC_DIST_IGROUP +
+			    (INT_WDT_AVP/32)*4);
+	val &= ~(1 << (INT_WDT_AVP%32));
+	writel_relaxed(val, gic_dist_base + GIC_DIST_IGROUP +
+		       (INT_WDT_AVP/32)*4);
+	val = readl_relaxed(gic_dist_base + GIC_DIST_PRI +
+			    (INT_WDT_AVP/4)*4);
+	val &= ~(0xff << ((INT_WDT_AVP%4)*8));
+	writel_relaxed(val, gic_dist_base + GIC_DIST_PRI +
+		       (INT_WDT_AVP/4)*4);
+}
+#endif
+
 static int tegra_gic_notifier(struct notifier_block *self,
 					unsigned long cmd, void *v)
 {
@@ -235,6 +324,17 @@ static int tegra_gic_notifier(struct notifier_block *self,
 	case CPU_PM_ENTER:
 		writel(0x1E0, gic_cpu_base + GIC_CPU_CTRL);
 		break;
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	case CPU_PM_ENTER_FAILED:
+	case CPU_PM_EXIT:
+		tegra_gic_cpu_restore();
+		break;
+	case CPU_CLUSTER_PM_ENTER_FAILED:
+	case CPU_CLUSTER_PM_EXIT:
+		tegra_gic_dist_restore();
+		break;
+#endif
 	}
 
 	return NOTIFY_OK;
@@ -244,6 +344,41 @@ static struct notifier_block tegra_gic_notifier_block = {
 	.notifier_call = tegra_gic_notifier,
 };
 #endif /* CONFIG_PM_SLEEP */
+
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+static void __init tegra_gic_dist_init(void)
+{
+	u32 val = 0;
+	val = readl_relaxed(gic_dist_base + GIC_DIST_IGROUP +
+			    (INT_WDT_AVP/32)*4);
+	val &= ~(1 << (INT_WDT_AVP%32));
+	writel_relaxed(val, gic_dist_base + GIC_DIST_IGROUP +
+		       (INT_WDT_AVP/32)*4);
+	val = readl_relaxed(gic_dist_base + GIC_DIST_PRI +
+			    (INT_WDT_AVP/4)*4);
+	val &= ~(0xff << ((INT_WDT_AVP%4)*8));
+	writel_relaxed(val, gic_dist_base + GIC_DIST_PRI +
+		       (INT_WDT_AVP/4)*4);
+}
+
+void __cpuinit tegra_gic_secondary_init(void)
+{
+	u32 val = 0;
+	val = readl_relaxed(gic_dist_base + GIC_DIST_IGROUP +
+			    (INT_WDT_AVP/32)*4);
+	val &= ~(1 << (INT_WDT_AVP%32));
+	writel_relaxed(val, gic_dist_base + GIC_DIST_IGROUP +
+		       (INT_WDT_AVP/32)*4);
+	val = readl_relaxed(gic_dist_base + GIC_DIST_PRI +
+			    (INT_WDT_AVP/4)*4);
+	val &= ~(0xff << ((INT_WDT_AVP%4)*8));
+	writel_relaxed(val, gic_dist_base + GIC_DIST_PRI +
+		       (INT_WDT_AVP/4)*4);
+}
+
+#endif
+
 
 int tegra_update_lp1_irq_wake(unsigned int irq, bool enable)
 {
@@ -503,7 +638,10 @@ static int __init tegra_gic_of_init(struct device_node *node,
 	if (gic_version == GIC_V2)
 		cpu_pm_register_notifier(&tegra_gic_notifier_block);
 #endif
-
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	tegra_gic_dist_init();
+#endif
 	return 0;
 }
 IRQCHIP_DECLARE(tegra_gic, "nvidia,tegra-gic", tegra_gic_of_init);

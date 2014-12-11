@@ -7,7 +7,7 @@
  *  Copyright (C) 2009 Palm
  *  All Rights Reserved
  *
- *  Copyright (C) 2010-2014, NVIDIA Corporation. All rights reserved.
+ *  Copyright (C) 2010-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -30,7 +30,10 @@
 #include <asm/smp_plat.h>
 #include <asm/smp_scu.h>
 #include <asm/fiq_glue.h>
-
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+#include <linux/irqchip/tegra.h>
+#endif
 #include "flowctrl.h"
 #include "reset.h"
 #include "pm.h"
@@ -165,6 +168,11 @@ static bool is_cpu_powered(unsigned int cpu)
 
 static void __cpuinit tegra_secondary_init(unsigned int cpu)
 {
+#if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
+	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
+	gic_secondary_init_t124(0);
+	tegra_gic_secondary_init();
+#endif
 	cpumask_set_cpu(cpu, to_cpumask(tegra_cpu_init_bits));
 	cpumask_set_cpu(cpu, tegra_cpu_power_mask);
 #ifdef CONFIG_TEGRA_FIQ_DEBUGGER
