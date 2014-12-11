@@ -217,6 +217,8 @@
 #define TEGRA_PCIE_MSELECT_CLK_408				408000000
 #define TEGRA_PCIE_XCLK_500					500000000
 #define TEGRA_PCIE_XCLK_250					250000000
+#define TEGRA_PCIE_EMC_CLK_102					102000000
+#define TEGRA_PCIE_EMC_CLK_508					508000000
 
 /*
  * AXI address map for the PCIe aperture , defines 1GB in the AXI
@@ -278,6 +280,7 @@ struct tegra_pcie_info {
 	struct regulator	*regulator_avdd_plle;
 	struct clk		*pcie_xclk;
 	struct clk		*pcie_mselect;
+	struct clk		*pcie_emc;
 	struct device		*dev;
 	struct tegra_pci_platform_data *plat_data;
 	struct list_head busses;
@@ -296,9 +299,10 @@ static struct resource pcie_prefetch_mem_space;
 static bool resume_path;
 /* used to avoid successive hotplug disconnect or connect */
 static bool hotplug_event;
-/* pcie mselect & xclk rate */
+/* pcie mselect, xclk & emc rate */
 static unsigned long tegra_pcie_mselect_rate = TEGRA_PCIE_MSELECT_CLK_204;
 static unsigned long tegra_pcie_xclk_rate = TEGRA_PCIE_XCLK_250;
+static unsigned long tegra_pcie_emc_rate = TEGRA_PCIE_EMC_CLK_102;
 
 static inline void afi_writel(u32 value, unsigned long offset)
 {
@@ -1142,6 +1146,11 @@ static int tegra_pcie_power_ungate(void)
 		pr_err("PCIE: pciex clk enable failed: %d\n", err);
 		return err;
 	}
+	err = clk_prepare_enable(tegra_pcie.pcie_emc);
+	if (err) {
+		pr_err("PCIE: emc clk enable failed: %d\n", err);
+		return err;
+	}
 
 	return 0;
 }
@@ -1303,6 +1312,8 @@ static int tegra_pcie_power_off(bool all)
 		clk_disable(tegra_pcie.pcie_mselect);
 	if (tegra_pcie.pcie_xclk)
 		clk_disable(tegra_pcie.pcie_xclk);
+	if (tegra_pcie.pcie_emc)
+		clk_disable(tegra_pcie.pcie_emc);
 	err = tegra_powergate_partition_with_clk_off(TEGRA_POWERGATE_PCIE);
 	if (err)
 		goto err_exit;
@@ -1334,6 +1345,11 @@ static int tegra_pcie_clocks_get(void)
 		pr_err("%s: unable to get PCIE mselect clock\n", __func__);
 		return -EINVAL;
 	}
+	tegra_pcie.pcie_emc = clk_get_sys("tegra_pcie", "emc");
+	if (IS_ERR_OR_NULL(tegra_pcie.pcie_emc)) {
+		pr_err("%s: unable to get PCIE emc clock\n", __func__);
+		return -EINVAL;
+	}
 	return 0;
 }
 
@@ -1344,6 +1360,8 @@ static void tegra_pcie_clocks_put(void)
 		clk_put(tegra_pcie.pcie_xclk);
 	if (tegra_pcie.pcie_mselect)
 		clk_put(tegra_pcie.pcie_mselect);
+	if (tegra_pcie.pcie_emc)
+		clk_put(tegra_pcie.pcie_emc);
 }
 
 static int tegra_pcie_get_resources(void)
@@ -1369,6 +1387,10 @@ static int tegra_pcie_get_resources(void)
 		return err;
 
 	err = clk_set_rate(tegra_pcie.pcie_xclk, tegra_pcie_xclk_rate);
+	if (err)
+		return err;
+
+	err = clk_set_rate(tegra_pcie.pcie_emc, tegra_pcie_emc_rate);
 	if (err)
 		return err;
 	err = request_irq(INT_PCIE_INTR, tegra_pcie_isr,
@@ -1654,23 +1676,30 @@ static int tegra_pcie_scale_voltage(bool isGen2)
 	PR_FUNC_LINE;
 	if (isGen2) {
 		if (tegra_pcie_xclk_rate == TEGRA_PCIE_XCLK_500 &&
-			tegra_pcie_mselect_rate == TEGRA_PCIE_MSELECT_CLK_408)
+			tegra_pcie_mselect_rate == TEGRA_PCIE_MSELECT_CLK_408 &&
+			tegra_pcie_emc_rate == TEGRA_PCIE_EMC_CLK_508)
 			goto skip;
 		/* Scale up voltage for Gen2 speed */
 		tegra_pcie_xclk_rate = TEGRA_PCIE_XCLK_500;
 		tegra_pcie_mselect_rate = TEGRA_PCIE_MSELECT_CLK_408;
+		tegra_pcie_emc_rate = TEGRA_PCIE_EMC_CLK_508;
 	} else {
 		if (tegra_pcie_xclk_rate == TEGRA_PCIE_XCLK_250 &&
-			tegra_pcie_mselect_rate == TEGRA_PCIE_MSELECT_CLK_204)
+			tegra_pcie_mselect_rate == TEGRA_PCIE_MSELECT_CLK_204 &&
+			tegra_pcie_emc_rate == TEGRA_PCIE_EMC_CLK_102)
 			goto skip;
 		/* Scale down voltage for Gen1 speed */
 		tegra_pcie_xclk_rate = TEGRA_PCIE_XCLK_250;
 		tegra_pcie_mselect_rate = TEGRA_PCIE_MSELECT_CLK_204;
+		tegra_pcie_emc_rate = TEGRA_PCIE_EMC_CLK_102;
 	}
 	err = clk_set_rate(tegra_pcie.pcie_xclk, tegra_pcie_xclk_rate);
 	if (err)
 		return err;
 	err = clk_set_rate(tegra_pcie.pcie_mselect, tegra_pcie_mselect_rate);
+	if (err)
+		return err;
+	err = clk_set_rate(tegra_pcie.pcie_emc, tegra_pcie_emc_rate);
 skip:
 	return err;
 
