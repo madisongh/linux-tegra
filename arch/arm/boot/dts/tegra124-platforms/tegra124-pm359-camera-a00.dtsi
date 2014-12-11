@@ -89,6 +89,17 @@
 					platformdata = "ardbeg_ar1335_pdata";
 				};
 			};
+
+			module7: module7@modules {
+				compatible = "sensor,rear";
+				badge_info = "imx185_camera";
+
+				sensor {
+					profile = <&imx185_1>;
+					platformdata = "ardbeg_imx185_pdata";
+				};
+			};
+
 		};
 		profiles {
 			imx135_1: imx135@2_0010 {
@@ -127,6 +138,41 @@
 					CAMERA_REGULATOR_OFF(2)
 					CAMERA_REGULATOR_OFF(1)
 					CAMERA_REGULATOR_OFF(0)
+					CAMERA_END
+					>;
+			};
+			imx185_1: imx185@2_001A {
+				index = <1>;
+				chipname = "pcl_IMX185";
+				type = "sensor";
+				guid = "s_IMX185";
+				position = <0>;
+				bustype = "i2c";
+				busnum = <2>;
+				addr = <0x1A>;
+				datalen = <2>;
+				pinmuxgrp = <0xFFFF>;
+				gpios = <0>;
+				regulators = "vif";
+				clocks = "mclk";
+				drivername = "imx185";
+				detect = <0x1 0x3010 0x00FF 0x39>;
+				devid = <0x0185>;
+				poweron = <
+					CAMERA_IND_CLK_SET(37125)
+					CAMERA_GPIO_CLR(221)
+					CAMERA_REGULATOR_ON(0)
+					CAMERA_WAITUS(10)
+					CAMERA_WAITMS(5)
+					CAMERA_GPIO_SET(221)
+					CAMERA_WAITUS(300)
+					CAMERA_END
+					>;
+				poweroff = <
+					CAMERA_IND_CLK_CLR
+					CAMERA_GPIO_CLR(221)
+					CAMERA_REGULATOR_OFF(0)
+					CAMERA_WAITUS(10)
 					CAMERA_END
 					>;
 			};

@@ -74,6 +74,10 @@
 				reset-gpios = <&gpio TEGRA_GPIO(BB, 3) 0>;
 				cam1-gpios = <&gpio TEGRA_GPIO(BB, 5) 0>;
 			};
+			imx185@2_001A {
+				use-of-node = "yes";
+				cam1-gpios = <&gpio TEGRA_GPIO(BB, 5) 0>;
+			};
 		};
 		dpd {
 			default-enable;

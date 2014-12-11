@@ -322,6 +322,10 @@
 						     regulator-consumer-supply = "vi2c";
 						     regulator-consumer-device = "2-0030";
 					     };
+					     c10 {
+						     regulator-consumer-supply = "vif";
+						     regulator-consumer-device = "2-001a";
+					     };
 				     };
 			     };
 

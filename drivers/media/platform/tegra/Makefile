@@ -35,6 +35,7 @@ obj-$(CONFIG_VIDEO_AD5816)	+= ad5816.o
 obj-$(CONFIG_VIDEO_IMX091)	+= imx091.o nvc_utilities.o
 obj-$(CONFIG_VIDEO_IMX135)	+= imx135.o
 obj-$(CONFIG_VIDEO_IMX179)	+= imx179.o
+obj-$(CONFIG_VIDEO_IMX185)	+= imx185.o
 obj-$(CONFIG_VIDEO_IMX132)	+= imx132.o
 obj-$(CONFIG_VIDEO_AR0330)	+= ar0330.o
 obj-$(CONFIG_VIDEO_AR0261)	+= ar0261.o
