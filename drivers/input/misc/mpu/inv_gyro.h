@@ -725,9 +725,13 @@ enum inv_clock_sel_e {
 	NUM_CLK
 };
 
-int inv_hw_self_test(struct inv_gyro_state_s *st, int *gyro_bias_regular);
-int inv_get_silicon_rev_mpu6050(struct inv_gyro_state_s *st);
-int inv_get_silicon_rev_mpu6500(struct inv_gyro_state_s *st);
+int inv_hwselftest_accel_fsr(struct inv_gyro_state_s *st);
+int inv_hwselftest_gyro_fsr(struct inv_gyro_state_s *st);
+int inv_hwselftest_setting(struct inv_gyro_state_s *st);
+int nvi_input_inv_hw_self_test(struct inv_gyro_state_s *st,
+	int *gyro_bias_regular);
+int nvi_input_inv_get_silicon_rev_mpu6050(struct inv_gyro_state_s *st);
+int nvi_input_inv_get_silicon_rev_mpu6500(struct inv_gyro_state_s *st);
 int inv_i2c_read_base(struct inv_gyro_state_s *st, unsigned short i2c_addr,
 	unsigned char reg, unsigned short length, unsigned char *data);
 int inv_i2c_single_write_base(struct inv_gyro_state_s *st,
@@ -741,16 +745,28 @@ int inv_i2c_single_write_base(struct inv_gyro_state_s *st,
 #define inv_secondary_write(reg, data) \
 	inv_i2c_single_write_base(st, st->plat_data.secondary_i2c_addr, \
 		reg, data)
+s64 nvi_ts_ns(void);
+int nvi_smplrt_div_wr(struct inv_gyro_state_s *inf, u8 smplrt_div);
+int nvi_config_wr(struct inv_gyro_state_s *inf, u8 val);
+int nvi_gyro_config_wr(struct inv_gyro_state_s *inf, u8 test, u8 fsr);
+int nvi_accel_config_wr(struct inv_gyro_state_s *inf, u8 test, u8 fsr, u8 hpf);
+int nvi_fifo_en_wr(struct inv_gyro_state_s *inf, u8 fifo_en);
+int nvi_int_enable_wr(struct inv_gyro_state_s *inf, bool enable);
+int nvi_user_ctrl_reset_wr(struct inv_gyro_state_s *inf, u8 val);
+int nvi_user_ctrl_en_wr(struct inv_gyro_state_s *inf, u8 val);
+int nvi_input_nvi_user_ctrl_en(struct inv_gyro_state_s *inf,
+		     bool fifo_enable, bool i2c_enable);
+int nvi_input_nvi_pm(struct inv_gyro_state_s *inf, int pm_req);
 int nvi_gyro_enable(struct inv_gyro_state_s *inf,
 		    unsigned char enable, unsigned char fifo_enable);
 int nvi_accl_enable(struct inv_gyro_state_s *inf,
 		    unsigned char enable, unsigned char fifo_enable);
 
-int mpu_memory_write(struct i2c_adapter *i2c_adap,
+int nvi_input_mpu_memory_write(struct i2c_adapter *i2c_adap,
 			    unsigned char mpu_addr,
 			    unsigned short mem_addr,
 			    unsigned int len, unsigned char const *data);
-int mpu_memory_read(struct i2c_adapter *i2c_adap,
+int nvi_input_mpu_memory_read(struct i2c_adapter *i2c_adap,
 			   unsigned char mpu_addr,
 			   unsigned short mem_addr,
 			   unsigned int len, unsigned char *data);
@@ -763,9 +779,8 @@ int inv_mpu3050_remove_sysfs(struct inv_gyro_state_s *st);
 int inv_register_kxtf9_slave(struct inv_gyro_state_s *st);
 int inv_get_accl_bias(struct inv_gyro_state_s *st, int *accl_bias_regular);
 
-int inv_enable_tap_dmp(struct inv_gyro_state_s *st, unsigned char on);
 int inv_enable_orientation_dmp(struct inv_gyro_state_s *st);
-unsigned short inv_dmp_get_address(unsigned short key);
+unsigned short nvi_input_inv_dmp_get_address(unsigned short key);
 
 ssize_t inv_dmp_firmware_write(struct file *fp, struct kobject *kobj,
 	struct bin_attribute *attr, char *buf, loff_t pos, size_t size);
@@ -774,10 +789,10 @@ ssize_t inv_dmp_firmware_read(struct file *filp, struct kobject *kobj,
 			      struct bin_attribute *bin_attr, char *buf,
 			      loff_t off, size_t count);
 
-#define mem_w(a, b, c) mpu_memory_write(st->sl_handle, \
+#define mem_w(a, b, c) nvi_input_mpu_memory_write(st->sl_handle, \
 			st->i2c_addr, a, b, c)
-#define mem_w_key(key, b, c) mpu_memory_write(st->sl_handle, \
-			st->i2c_addr, inv_dmp_get_address(key), b, c)
+#define mem_w_key(key, b, c) nvi_input_mpu_memory_write(st->sl_handle, \
+			st->i2c_addr, nvi_input_inv_dmp_get_address(key), b, c)
 
 #endif  /* #ifndef _INV_GYRO_H_ */
 

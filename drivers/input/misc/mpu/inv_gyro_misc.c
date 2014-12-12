@@ -205,7 +205,7 @@ static int gyro_3500_st_tb[255] = {
 	28538, 28823, 29112, 29403, 29697, 29994, 30294, 30597,
 	30903, 31212, 31524, 31839, 32157, 32479, 32804};
 
-int mpu_memory_write(struct i2c_adapter *i2c_adap,
+int nvi_input_mpu_memory_write(struct i2c_adapter *i2c_adap,
 		     unsigned char mpu_addr,
 		     unsigned short mem_addr,
 		     unsigned int len, unsigned char const *data)
@@ -251,7 +251,7 @@ int mpu_memory_write(struct i2c_adapter *i2c_adap,
 	return 0;
 }
 
-int mpu_memory_read(struct i2c_adapter *i2c_adap,
+int nvi_input_mpu_memory_read(struct i2c_adapter *i2c_adap,
 		    unsigned char mpu_addr,
 		    unsigned short mem_addr,
 		    unsigned int len, unsigned char *data)
@@ -366,7 +366,7 @@ static short index_of_key(unsigned short key)
 	return -1;
 }
 
-int inv_get_silicon_rev_mpu6500(struct inv_gyro_state_s *st)
+int nvi_input_inv_get_silicon_rev_mpu6500(struct inv_gyro_state_s *st)
 {
 	struct inv_chip_info_s *chip_info = &st->chip_info;
 	int result;
@@ -394,7 +394,7 @@ int inv_get_silicon_rev_mpu6500(struct inv_gyro_state_s *st)
 	return 0;
 }
 
-int inv_get_silicon_rev_mpu6050(struct inv_gyro_state_s *st)
+int nvi_input_inv_get_silicon_rev_mpu6050(struct inv_gyro_state_s *st)
 {
 	int result;
 	struct inv_reg_map_s *reg;
@@ -415,11 +415,11 @@ int inv_get_silicon_rev_mpu6050(struct inv_gyro_state_s *st)
 		return result;
 
 	prod_ver &= 0xf;
-	result = mpu_memory_read(st->sl_handle, st->i2c_addr, mem_addr,
-			1, &prod_rev);
+	result = nvi_input_mpu_memory_read(st->sl_handle, st->i2c_addr,
+			mem_addr, 1, &prod_rev);
 	mdelay(100);
-	result = mpu_memory_read(st->sl_handle, st->i2c_addr, mem_addr,
-			1, &prod_rev);
+	result = nvi_input_mpu_memory_read(st->sl_handle, st->i2c_addr,
+			mem_addr, 1, &prod_rev);
 	if (result)
 		return result;
 
@@ -515,7 +515,7 @@ static int read_accel_hw_self_test_prod_shift(struct inv_gyro_state_s *st,
 
 static int inv_check_accl_self_test(struct inv_gyro_state_s *st,
 	int *reg_avg, int *st_avg){
-	int gravity, reg_z_avg, g_z_sign, fs, j, ret_val;
+	int gravity, reg_z_avg, g_z_sign, j, ret_val;
 	int tmp1;
 	int st_shift_prod[3], st_shift_cust[3], st_shift_ratio[3];
 
@@ -667,7 +667,7 @@ static int inv_do_test(struct inv_gyro_state_s *st, int self_test_flag,
 		return result;
 
 	mdelay(POWER_UP_TIME);
-	result = inv_i2c_single_write(st, reg->pwr_mgmt_2, 0);
+	result = nvi_input_nvi_pm(st, NVI_PM_ON_FULL);
 	if (result)
 		return result;
 
@@ -683,6 +683,10 @@ static int inv_do_test(struct inv_gyro_state_s *st, int self_test_flag,
 
 	/* disable fifo reading */
 	result = inv_i2c_single_write(st, reg->user_ctrl, 0);
+	if (result)
+		return result;
+
+	result = nvi_input_nvi_user_ctrl_en(st, false, false);
 	if (result)
 		return result;
 
@@ -792,16 +796,28 @@ static int inv_do_test(struct inv_gyro_state_s *st, int self_test_flag,
  */
 static void inv_recover_setting(struct inv_gyro_state_s *st)
 {
-	nvi_gyro_enable(st, st->chip_config.gyro_enable,
-			st->chip_config.gyro_fifo_enable);
-	nvi_accl_enable(st, st->chip_config.accl_enable,
-			st->chip_config.accl_fifo_enable);
+	unsigned char enable;
+	unsigned char fifo_enable;
+
+	nvi_accel_config_wr(st, 0, st->chip_config.accl_fsr, 0);
+	nvi_gyro_config_wr(st, 0, st->chip_config.gyro_fsr);
+	enable = st->chip_config.accl_enable;
+	fifo_enable = st->chip_config.accl_fifo_enable;
+	st->chip_config.accl_enable ^= 7;
+	st->chip_config.accl_fifo_enable ^= 7;
+	nvi_accl_enable(st, enable, fifo_enable);
+	enable = st->chip_config.gyro_enable;
+	fifo_enable = st->chip_config.gyro_fifo_enable;
+	st->chip_config.gyro_enable ^= 7;
+	st->chip_config.gyro_fifo_enable ^= 7;
+	nvi_gyro_enable(st, enable, fifo_enable);
+	nvi_input_nvi_pm(st, NVI_PM_AUTO);
 }
 
 /**
  *  inv_hw_self_test() - main function to do hardware self test
  */
-int inv_hw_self_test(struct inv_gyro_state_s *st,
+int nvi_input_inv_hw_self_test(struct inv_gyro_state_s *st,
 		     int *gyro_bias_regular)
 {
 	int result;
@@ -913,7 +929,7 @@ static int inv_verify_firmware(struct inv_gyro_state_s *st,
 		else
 			write_size = size;
 		memaddr = ((bank << 8) | 0x00);
-		result = mpu_memory_read(st->sl_handle,
+		result = nvi_input_mpu_memory_read(st->sl_handle,
 			st->i2c_addr, memaddr, write_size, firmware);
 		if (result)
 			return result;
@@ -1297,7 +1313,7 @@ static int inv_set_interrupt_on_gesture_event(struct inv_gyro_state_s *st,
 /**
  * inv_enable_tap_dmp() -  calling this function will enable/disable tap function.
  */
-int inv_enable_tap_dmp(struct inv_gyro_state_s *st, unsigned char on)
+static int inv_enable_tap_dmp(struct inv_gyro_state_s *st, unsigned char on)
 {
 	int result;
 
@@ -1566,7 +1582,7 @@ ssize_t inv_dmp_firmware_read(struct file *filp, struct kobject *kobj,
 		else
 			write_size = size;
 		memaddr = ((bank << 8) | 0x00);
-		result = mpu_memory_read(st->sl_handle,
+		result = nvi_input_mpu_memory_read(st->sl_handle,
 			st->i2c_addr, memaddr, write_size, &buf[data]);
 		if (result)
 			return result;
