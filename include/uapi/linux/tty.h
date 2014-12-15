@@ -35,5 +35,6 @@
 #define N_TRACESINK	23	/* Trace data routing for MIPI P1149.7 */
 #define N_TRACEROUTER	24	/* Trace data routing for MIPI P1149.7 */
 #define N_PHONET   25  /* PHONET */
+#define N_NV_SENSHUB	26	/* Nvidia sensorhub */
 
 #endif /* _UAPI_LINUX_TTY_H */
