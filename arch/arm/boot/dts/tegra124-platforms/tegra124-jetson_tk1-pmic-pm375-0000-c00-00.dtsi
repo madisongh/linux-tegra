@@ -318,6 +318,10 @@
 						     regulator-consumer-supply = "vif";
 						     regulator-consumer-device = "2-0018";
 					     };
+					     c9 {
+						     regulator-consumer-supply = "vi2c";
+						     regulator-consumer-device = "2-0030";
+					     };
 				     };
 			     };
 
