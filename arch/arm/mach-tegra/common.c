@@ -988,6 +988,26 @@ void __init tegra30_init_early(void)
 	init_dma_coherent_pool_size(SZ_1M);
 }
 #endif
+
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC) && !defined(CONFIG_ARCH_TEGRA_3x_SOC)
+/* This register/field only exists on Tegra114 and later */
+#define APB_MISC_PP_PINMUX_GLOBAL_0 0x40
+#define CLAMP_INPUTS_WHEN_TRISTATED 1
+static void tegra_pinmux_set_tristate_input_clamping(bool enable)
+{
+	u32 val;
+	val = readl(IO_ADDRESS(TEGRA_APB_MISC_BASE +
+				APB_MISC_PP_PINMUX_GLOBAL_0));
+	if (enable)
+		val |= CLAMP_INPUTS_WHEN_TRISTATED;
+	else
+		val &= ~CLAMP_INPUTS_WHEN_TRISTATED;
+
+	writel(val, IO_ADDRESS(TEGRA_APB_MISC_BASE +
+				APB_MISC_PP_PINMUX_GLOBAL_0));
+}
+#endif
+
 #ifdef CONFIG_ARCH_TEGRA_11x_SOC
 void __init tegra11x_init_early(void)
 {
@@ -1006,6 +1026,7 @@ void __init tegra11x_init_early(void)
 	tegra30_hotplug_init();
 	tegra_init_power();
 	tegra_init_ahb_gizmo_settings();
+	tegra_pinmux_set_tristate_input_clamping(false);
 	tegra_init_debug_uart_rate();
 
 	init_dma_coherent_pool_size(SZ_2M);
@@ -1037,6 +1058,7 @@ void __init tegra12x_init_early(void)
 #endif
 	tegra_init_power();
 	tegra_init_ahb_gizmo_settings();
+	tegra_pinmux_set_tristate_input_clamping(false);
 	tegra_init_debug_uart_rate();
 }
 #endif
@@ -1066,6 +1088,7 @@ void __init tegra14x_init_early(void)
 	tegra30_hotplug_init();
 	tegra_init_power();
 	tegra_init_ahb_gizmo_settings();
+	tegra_pinmux_set_tristate_input_clamping(false);
 	tegra_init_debug_uart_rate();
 }
 #endif
