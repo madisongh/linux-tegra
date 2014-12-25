@@ -22,7 +22,7 @@
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
  *
- * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
  */
 
 #include <linux/bottom_half.h>
@@ -1728,9 +1728,7 @@ static void get_tcp6_sock(struct seq_file *seq, struct sock *sp, int i)
 	const struct tcp_sock *tp = tcp_sk(sp);
 	const struct inet_connection_sock *icsk = inet_csk(sp);
 	struct fastopen_queue *fastopenq = icsk->icsk_accept_queue.fastopenq;
-	unsigned long cmdline = __get_free_page(GFP_TEMPORARY);
-	if (cmdline == NULL)
-		return;
+	char cmdline[128] = {'\0'};
 
 	dest  = &sp->sk_v6_daddr;
 	src   = &sp->sk_v6_rcv_saddr;
@@ -1778,7 +1776,6 @@ static void get_tcp6_sock(struct seq_file *seq, struct sock *sp, int i)
 			(tcp_in_initial_slowstart(tp) ? -1 : tp->snd_ssthresh),
 		   sk_get_waiting_task_cmdline(sp, cmdline)
 		   );
-	free_page(cmdline);
 }
 
 static void get_timewait6_sock(struct seq_file *seq,
