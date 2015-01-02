@@ -1436,7 +1436,7 @@ static bool tegra_pcie_check_link(struct tegra_pcie_port *pp, int idx,
 		}
 
 		if (!timeout)  {
-			pr_err("PCIE: port %d: link down, retrying\n", idx);
+			pr_info("PCIE: port %d: link down, retrying\n", idx);
 			goto retry;
 		}
 
