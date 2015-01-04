@@ -90,6 +90,25 @@ static struct generic_pm_domain *dev_to_genpd(struct device *dev)
 	return pd_to_genpd(dev->pm_domain);
 }
 
+struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
+{
+	struct generic_pm_domain *genpd = NULL, *gpd;
+
+	if (IS_ERR_OR_NULL(domain_name))
+		return NULL;
+
+	mutex_lock(&gpd_list_lock);
+	list_for_each_entry(gpd, &gpd_list, gpd_list_node) {
+		if (!strcmp(gpd->name, domain_name)) {
+			genpd = gpd;
+			break;
+		}
+	}
+	mutex_unlock(&gpd_list_lock);
+	return genpd;
+}
+EXPORT_SYMBOL(pm_genpd_lookup_name);
+
 static void __update_genpd_status(struct generic_pm_domain *genpd,
 						enum gpd_status status)
 {
@@ -1860,6 +1879,59 @@ struct generic_pm_domain *of_genpd_get_from_provider(
 	return genpd;
 }
 EXPORT_SYMBOL_GPL(of_genpd_get_from_provider);
+
+int genpd_pm_subdomain_attach(struct generic_pm_domain *gpd)
+{
+	int ret;
+	struct generic_pm_domain *master;
+	struct of_phandle_args pd_args;
+
+	ret = of_parse_phandle_with_args(gpd->of_node, "power-domains",
+					"#power-domain-cells", 0, &pd_args);
+
+	if (ret < 0)
+		return ret;
+
+	master = of_genpd_get_from_provider(&pd_args);
+	if (IS_ERR(master)) {
+		pr_err("%s() failed to find PM domain: %ld\n",
+			__func__, PTR_ERR(master));
+		return PTR_ERR(master);
+	}
+
+	pr_info("Adding domain %s to PM domain %s\n", gpd->name, master->name);
+	pm_genpd_add_subdomain(master, gpd);
+
+	return 0;
+}
+EXPORT_SYMBOL(genpd_pm_subdomain_attach);
+
+int genpd_pm_subdomain_detach(struct generic_pm_domain *gpd)
+{
+	int ret;
+	struct generic_pm_domain *master;
+	struct of_phandle_args pd_args;
+
+	ret = of_parse_phandle_with_args(gpd->of_node, "power-domains",
+					"#power-domain-cells", 0, &pd_args);
+
+	if (ret < 0)
+		return ret;
+
+	 master = of_genpd_get_from_provider(&pd_args);
+	if (IS_ERR(master)) {
+		pr_err("%s() failed to find PM domain: %ld\n",
+			__func__, PTR_ERR(master));
+		return PTR_ERR(master);
+	}
+
+	pr_info("Removing domain %s from PM domain %s\n", gpd->name,
+		master->name);
+	pm_genpd_remove_subdomain(master, gpd);
+
+	return 0;
+}
+EXPORT_SYMBOL(genpd_pm_subdomain_detach);
 
 /**
  * genpd_dev_pm_detach - Detach a device from its PM domain.

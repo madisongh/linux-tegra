@@ -2,6 +2,7 @@
  * pm_domain.h - Definitions and headers related to device power domains.
  *
  * Copyright (C) 2011 Rafael J. Wysocki <rjw@sisk.pl>, Renesas Electronics Corp.
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This file is released under the GPLv2.
  */
@@ -61,6 +62,7 @@ struct generic_pm_domain {
 	s64 max_off_time_ns;	/* Maximum allowed "suspended" time. */
 	bool max_off_time_changed;
 	bool cached_power_down_ok;
+	struct device_node *of_node; /* Node in device tree */
 	int (*attach_dev)(struct generic_pm_domain *domain,
 			  struct device *dev);
 	void (*detach_dev)(struct generic_pm_domain *domain,
@@ -109,6 +111,8 @@ struct generic_pm_domain_data {
 };
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS
+struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name);
+
 static inline struct generic_pm_domain_data *to_gpd_data(struct pm_domain_data *pdd)
 {
 	return container_of(pdd, struct generic_pm_domain_data, base);
@@ -145,6 +149,11 @@ extern struct dev_power_governor simple_qos_governor;
 extern struct dev_power_governor pm_domain_always_on_gov;
 #else
 
+static inline struct generic_pm_domain *pm_genpd_lookup_name
+				   (const char *domain_name)
+{
+	return NULL;
+}
 static inline void pm_genpd_set_poweroff_delay(struct generic_pm_domain *genpd,
 	s64 delay) {}
 static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
@@ -224,6 +233,8 @@ struct generic_pm_domain *__of_genpd_xlate_onecell(
 					void *data);
 
 int genpd_dev_pm_attach(struct device *dev);
+int genpd_pm_subdomain_attach(struct generic_pm_domain *sd);
+int genpd_pm_subdomain_detach(struct generic_pm_domain *sd);
 #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
 static inline int __of_genpd_add_provider(struct device_node *np,
 					genpd_xlate_t xlate, void *data)
@@ -242,6 +253,14 @@ static inline struct generic_pm_domain *of_genpd_get_from_provider(
 #define __of_genpd_xlate_onecell	NULL
 
 static inline int genpd_dev_pm_attach(struct device *dev)
+{
+	return -ENODEV;
+}
+static inline int genpd_pm_subdomain_attach(struct generic_pm_domain *sd)
+{
+	return -ENODEV;
+}
+static inline int genpd_pm_subdomain_detach(struct generic_pm_domain *sd)
 {
 	return -ENODEV;
 }
