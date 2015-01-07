@@ -1437,6 +1437,7 @@ static int kmemleak_scan_thread(void *arg)
 	pr_info("Automatic memory scanning thread started\n");
 	set_user_nice(current, 10);
 
+#ifdef CONFIG_DEBUG_KMEMLEAK_SCAN_ON
 	/*
 	 * Wait before the first scan to allow the system to fully initialize.
 	 */
@@ -1444,6 +1445,7 @@ static int kmemleak_scan_thread(void *arg)
 		first_run = 0;
 		ssleep(SECS_FIRST_SCAN);
 	}
+#endif
 
 	while (!kthread_should_stop()) {
 		signed long timeout = jiffies_scan_wait;
@@ -1909,9 +1911,11 @@ static int __init kmemleak_late_init(void)
 				     &kmemleak_fops);
 	if (!dentry)
 		pr_warning("Failed to create the debugfs kmemleak file\n");
+#ifdef CONFIG_DEBUG_KMEMLEAK_SCAN_ON
 	mutex_lock(&scan_mutex);
 	start_scan_thread();
 	mutex_unlock(&scan_mutex);
+#endif
 
 	pr_info("Kernel memory leak detector initialized\n");
 
