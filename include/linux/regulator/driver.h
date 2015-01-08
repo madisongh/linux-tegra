@@ -376,6 +376,7 @@ struct regulator_dev {
 	struct regulation_constraints *constraints;
 	struct regulator *supply;	/* for tree */
 	struct regmap *regmap;
+	int machine_constraints;
 
 	struct delayed_work disable_work;
 	int deferred_disables;
@@ -383,6 +384,7 @@ struct regulator_dev {
 	void *reg_data;		/* regulator_dev data */
 
 	struct dentry *debugfs;
+	struct dentry *pdebugfs;
 
 	struct regulator_time_profile set_volt_profile;
 
