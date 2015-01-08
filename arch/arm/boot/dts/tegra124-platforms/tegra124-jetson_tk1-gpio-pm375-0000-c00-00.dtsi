@@ -59,6 +59,7 @@
 				TEGRA_GPIO(K, 6)
 				>;
 			gpio-output-high = <
+				TEGRA_GPIO(EE, 2)
 				>;
 		};
 	};
