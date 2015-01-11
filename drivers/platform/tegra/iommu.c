@@ -54,7 +54,7 @@ do { \
 	} \
 } while (0)
 
-#if defined(CONFIG_CMA) && defined(CONFIG_TEGRA_NVMAP)
+#if defined(CONFIG_DMA_CMA) && defined(CONFIG_TEGRA_NVMAP)
 static void carveout_linear_set(struct device *cma_dev)
 {
 	struct dma_contiguous_stats stats;
@@ -73,7 +73,7 @@ static void carveout_linear_set(struct device *cma_dev)
 
 static void cma_carveout_linear_set(void)
 {
-#if defined(CONFIG_CMA) && defined(CONFIG_TEGRA_NVMAP)
+#if defined(CONFIG_DMA_CMA) && defined(CONFIG_TEGRA_NVMAP)
 	if (tegra_vpr_resize) {
 		carveout_linear_set(&tegra_generic_cma_dev);
 		carveout_linear_set(&tegra_vpr_cma_dev);
