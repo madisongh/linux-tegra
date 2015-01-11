@@ -181,7 +181,7 @@ static void apply_constraints(struct work_struct *work)
 			if (cpu >= nr_cpu_ids)
 				break;
 			dev = get_cpu_device(cpu);
-			device_offline(cpu);
+			device_offline(dev);
 			cpumask_clear_cpu(cpu, &cpu_online);
 		}
 	}
