@@ -110,6 +110,7 @@ struct tegra_sdhci_platform_data {
 	bool pwr_off_during_lp0;
 	unsigned int auto_cal_step;
 	unsigned int fixed_clk_freq_table[MMC_TIMINGS_MAX_MODES + 1];
+	bool enable_autocal_slew_override;
 };
 
 #endif

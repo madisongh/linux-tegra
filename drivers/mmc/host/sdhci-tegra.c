@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2010 Google, Inc.
  *
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -119,6 +119,7 @@
 #define SDMMC_AUTO_CAL_CONFIG	0x1E4
 #define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START	0x80000000
 #define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE	0x20000000
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_SLW_OVERRIDE	0x10000000
 #define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET_SHIFT	0x8
 #define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET	0x70
 #define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PU_OFFSET	0x62
@@ -1052,6 +1053,8 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	val = sdhci_readl(sdhci, SDMMC_AUTO_CAL_CONFIG);
 	val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE;
 	val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START;
+	if (tegra_host->plat->enable_autocal_slew_override)
+		val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_SLW_OVERRIDE;
 	if (unlikely(soc_data->nvquirks & NVQUIRK_SET_CALIBRATION_OFFSETS)) {
 		if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
 			calib_offsets = tegra_host->plat->calib_3v3_offsets;
@@ -1426,6 +1429,8 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 					(u32 *)&plat->fixed_clk_freq_table,
 					MMC_TIMINGS_MAX_MODES);
 	}
+	plat->enable_autocal_slew_override = of_property_read_bool(np,
+					"nvidia,auto-cal-slew-override");
 
 	return mmc_of_parse(host->mmc);
 }
