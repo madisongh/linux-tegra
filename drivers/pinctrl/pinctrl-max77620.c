@@ -323,70 +323,77 @@ static int max77620_pinconf_get(struct pinctrl_dev *pctldev,
 }
 
 static int max77620_pinconf_set(struct pinctrl_dev *pctldev,
-		unsigned pin, unsigned long config)
+		unsigned pin, unsigned long *configs,
+		unsigned num_configs)
 {
 
 	struct max77620_pctrl_info *max77620_pci =
 					pinctrl_dev_get_drvdata(pctldev);
-	int param = pinconf_to_config_param(config);
-	u16 param_val = pinconf_to_config_argument(config);
+	int param;
+	u16 param_val;
 	unsigned int val;
 	int mask, shift;
 	int addr, ret;
+	int i;
 
-	switch (param) {
-	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
-		val = param_val ? 0 : 1;
-		max77620_reg_update(max77620_pci->max77620->dev,
-			MAX77620_PWR_SLAVE, MAX77620_REG_GPIO0 + pin,
-			MAX77620_PIN_PPDRV_MASK, val);
-		max77620_pci->pin_info[pin].drv_type = val ?
-			MAX77620_PIN_PP_DRV : MAX77620_PIN_OD_DRV;
-		break;
+	for (i = 0; i < num_configs; i++) {
+		param = pinconf_to_config_param(configs[i]);
+		param_val = pinconf_to_config_argument(configs[i]);
 
-	case PIN_CONFIG_DRIVE_PUSH_PULL:
-		val = param_val ? 1 : 0;
-		max77620_reg_update(max77620_pci->max77620->dev,
-			MAX77620_PWR_SLAVE, MAX77620_REG_GPIO0 + pin,
-			MAX77620_PIN_PPDRV_MASK, val);
-		max77620_pci->pin_info[pin].drv_type = val ?
-			MAX77620_PIN_PP_DRV : MAX77620_PIN_OD_DRV;
-		break;
+		switch (param) {
+		case PIN_CONFIG_DRIVE_OPEN_DRAIN:
+			val = param_val ? 0 : 1;
+			max77620_reg_update(max77620_pci->max77620->dev,
+				MAX77620_PWR_SLAVE, MAX77620_REG_GPIO0 + pin,
+				MAX77620_PIN_PPDRV_MASK, val);
+			max77620_pci->pin_info[pin].drv_type = val ?
+				MAX77620_PIN_PP_DRV : MAX77620_PIN_OD_DRV;
+			break;
 
-	case MAX77620_FPS_SOURCE:
-	case MAX77620_FPS_POWER_ON_PERIOD:
-	case MAX77620_FPS_POWER_OFF_PERIOD:
-		if ((pin < MAX77620_GPIO1) || (pin > MAX77620_GPIO3))
-			return -EINVAL;
+		case PIN_CONFIG_DRIVE_PUSH_PULL:
+			val = param_val ? 1 : 0;
+			max77620_reg_update(max77620_pci->max77620->dev,
+				MAX77620_PWR_SLAVE, MAX77620_REG_GPIO0 + pin,
+				MAX77620_PIN_PPDRV_MASK, val);
+			max77620_pci->pin_info[pin].drv_type = val ?
+				MAX77620_PIN_PP_DRV : MAX77620_PIN_OD_DRV;
+			break;
 
-		if (param_val == FPS_SRC_DEF)
-			return 0;
+		case MAX77620_FPS_SOURCE:
+		case MAX77620_FPS_POWER_ON_PERIOD:
+		case MAX77620_FPS_POWER_OFF_PERIOD:
+			if ((pin < MAX77620_GPIO1) || (pin > MAX77620_GPIO3))
+				return -EINVAL;
 
-		addr = MAX77620_REG_FPS_GPIO1 + pin - 1;
-		if (param == MAX77620_FPS_SOURCE) {
-			mask = MAX77620_FPS_SRC_MASK;
-			shift = MAX77620_FPS_SRC_SHIFT;
-		} else if (param == MAX77620_FPS_POWER_ON_PERIOD) {
-			mask = MAX77620_FPS_PU_PERIOD_MASK;
-			shift = MAX77620_FPS_PU_PERIOD_SHIFT;
-		} else {
-			mask = MAX77620_FPS_PD_PERIOD_MASK;
-			shift = MAX77620_FPS_PD_PERIOD_SHIFT;
+			if (param_val == FPS_SRC_DEF)
+				return 0;
+
+			addr = MAX77620_REG_FPS_GPIO1 + pin - 1;
+			if (param == MAX77620_FPS_SOURCE) {
+				mask = MAX77620_FPS_SRC_MASK;
+				shift = MAX77620_FPS_SRC_SHIFT;
+			} else if (param == MAX77620_FPS_POWER_ON_PERIOD) {
+				mask = MAX77620_FPS_PU_PERIOD_MASK;
+				shift = MAX77620_FPS_PU_PERIOD_SHIFT;
+			} else {
+				mask = MAX77620_FPS_PD_PERIOD_MASK;
+				shift = MAX77620_FPS_PD_PERIOD_SHIFT;
+			}
+
+			ret = max77620_reg_update(max77620_pci->max77620->dev,
+					MAX77620_PWR_SLAVE, addr, mask,
+					param_val << shift);
+			if (ret < 0) {
+				dev_err(max77620_pci->dev,
+					"Reg 0x%02x update failed %d\n", addr, ret);
+				return ret;
+			}
+			break;
+
+		default:
+			dev_err(max77620_pci->dev, "Properties not supported\n");
+			return -ENOTSUPP;
 		}
-
-		ret = max77620_reg_update(max77620_pci->max77620->dev,
-				MAX77620_PWR_SLAVE, addr, mask,
-				param_val << shift);
-		if (ret < 0) {
-			dev_err(max77620_pci->dev,
-				"Reg 0x%02x update failed %d\n", addr, ret);
-			return ret;
-		}
-		break;
-
-	default:
-		dev_err(max77620_pci->dev, "Properties not supported\n");
-		return -ENOTSUPP;
 	}
 
 	return 0;
