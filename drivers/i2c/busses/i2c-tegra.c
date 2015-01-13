@@ -105,6 +105,7 @@
 #define PACKET_HEADER0_HEADER_SIZE_SHIFT	28
 #define PACKET_HEADER0_PACKET_ID_SHIFT		16
 #define PACKET_HEADER0_CONT_ID_SHIFT		12
+#define PACKET_HEADER0_CONT_ID_MASK		0xF
 #define PACKET_HEADER0_PROTOCOL_I2C		(1<<4)
 
 #define I2C_HEADER_HIGHSPEED_MODE		(1<<22)
@@ -1630,7 +1631,6 @@ skip_pinctrl:
 	if (i2c_dev->chipdata->has_fast_clock)
 		i2c_dev->fast_clk = fast_clk;
 	i2c_dev->irq = irq;
-	i2c_dev->cont_id = pdev->id;
 	i2c_dev->dev = &pdev->dev;
 	i2c_dev->is_clkon_always = pdata->is_clkon_always;
 	i2c_dev->bus_clk_rate = pdata->bus_clk_rate ? pdata->bus_clk_rate: 100000;
@@ -1699,6 +1699,7 @@ skip_pinctrl:
 		dev_err(&pdev->dev, "Failed to add I2C adapter\n");
 		return ret;
 	}
+	i2c_dev->cont_id = i2c_dev->adapter.nr & PACKET_HEADER0_CONT_ID_MASK;
 
 	i2c_dev->pm_nb.notifier_call = tegra_i2c_pm_notifier;
 
