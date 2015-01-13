@@ -367,6 +367,10 @@
 					     c10 {
 						     regulator-consumer-supply = "avdd_hsic_mdm";
 					     };
+					     c11 {
+						     regulator-consumer-supply = "vdig_csi";
+						     regulator-consumer-device = "2-0036";
+					     };
 				     };
 			     };
 
@@ -404,6 +408,10 @@
 					     c5 {
 						     regulator-consumer-supply = "vana";
 						     regulator-consumer-device = "2-0018";
+					     };
+					     c6 {
+						     regulator-consumer-supply = "vana";
+						     regulator-consumer-device = "2-0036";
 					     };
 				     };
 			     };

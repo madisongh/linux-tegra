@@ -80,6 +80,15 @@
 					platformdata = "ardbeg_ov4689_pdata";
 				};
 			};
+			module6: module6@modules {
+				compatible = "sensor,rear";
+				badge_info = "e1633_ar1335";
+
+				sensor {
+					profile = <&ar1335_1>;
+					platformdata = "ardbeg_ar1335_pdata";
+				};
+			};
 		};
 		profiles {
 			imx135_1: imx135@2_0010 {
@@ -336,6 +345,44 @@
 					CAMERA_GPIO_CLR(221)
 					CAMERA_IND_CLK_CLR
 					CAMERA_WAITUS(10)
+					CAMERA_END
+					>;
+			};
+			ar1335_1: ar1335@2_0036 {
+				index = <7>;
+				chipname = "pcl_AR1335";
+				type = "sensor";
+				guid = "s_AR1335";
+				position = <0>;
+				bustype = "i2c";
+				busnum = <2>;
+				addr = <0x36>;
+				datalen = <2>;
+				pinmuxgrp = <0xFFFF>;
+				gpios = <3>;
+				regulators = "vana", "vif", "vdig_csi";
+				clocks = "mclk";
+				drivername = "ar1335";
+				detect = <0x0002 0x3000 0xFFFF 0x0153>;
+				devid = <0x1335>;
+				poweron = <
+					CAMERA_IND_CLK_SET(10000)
+					CAMERA_GPIO_CLR(219)
+					CAMERA_REGULATOR_ON(0)
+					CAMERA_REGULATOR_ON(1)
+					CAMERA_REGULATOR_ON(2)
+					CAMERA_WAITMS(10)
+					CAMERA_GPIO_SET(219)
+					CAMERA_WAITMS(20)
+					CAMERA_END
+					>;
+				poweroff = <
+					CAMERA_IND_CLK_CLR
+					CAMERA_GPIO_CLR(219)
+					CAMERA_WAITUS(10)
+					CAMERA_REGULATOR_OFF(2)
+					CAMERA_REGULATOR_OFF(1)
+					CAMERA_REGULATOR_OFF(0)
 					CAMERA_END
 					>;
 			};

@@ -29,6 +29,7 @@
 #include <media/camera.h>
 #include <media/ar0330.h>
 #include <media/ar0261.h>
+#include <media/ar1335.h>
 #include <media/imx135.h>
 #include <media/imx179.h>
 #include <media/dw9718.h>
@@ -690,6 +691,70 @@ static int ardbeg_imx135_power_off(struct imx135_power_rail *pw)
 	return 0;
 }
 
+static int ardbeg_ar1335_power_on(struct ar1335_power_rail *pw)
+{
+	int err;
+
+	if (unlikely(WARN_ON(!pw || !pw->iovdd || !pw->avdd)))
+		return -EFAULT;
+
+	/* disable CSIA/B IOs DPD mode to turn on camera for ardbeg */
+	tegra_io_dpd_disable(&csia_io);
+	tegra_io_dpd_disable(&csib_io);
+
+	gpio_set_value(CAM_RSTN, 0);
+	usleep_range(10, 20);
+
+	err = regulator_enable(pw->avdd);
+	if (err)
+		goto ar1335_avdd_fail;
+
+	err = regulator_enable(pw->iovdd);
+	if (err)
+		goto ar1335_iovdd_fail;
+
+	err = regulator_enable(pw->dvdd);
+	if (err)
+		goto ar1335_dvdd_fail;
+
+	usleep_range(1, 2);
+	gpio_set_value(CAM_RSTN, 1);
+
+	usleep_range(300, 310);
+
+	return 0;
+
+ar1335_dvdd_fail:
+	regulator_disable(pw->iovdd);
+
+ar1335_iovdd_fail:
+	regulator_disable(pw->avdd);
+
+ar1335_avdd_fail:
+	tegra_io_dpd_enable(&csia_io);
+	tegra_io_dpd_enable(&csib_io);
+	pr_err("%s failed.\n", __func__);
+	return -ENODEV;
+}
+
+static int ardbeg_ar1335_power_off(struct ar1335_power_rail *pw)
+{
+	if (unlikely(WARN_ON(!pw || !pw->iovdd || !pw->avdd))) {
+		tegra_io_dpd_enable(&csia_io);
+		tegra_io_dpd_enable(&csib_io);
+		return -EFAULT;
+	}
+
+	regulator_disable(pw->iovdd);
+	regulator_disable(pw->avdd);
+	regulator_disable(pw->dvdd);
+
+	/* put CSIA/B IOs into DPD mode to save additional power for ardbeg */
+	tegra_io_dpd_enable(&csia_io);
+	tegra_io_dpd_enable(&csib_io);
+	return 0;
+}
+
 static int ardbeg_imx179_power_on(struct imx179_power_rail *pw)
 {
 	int err;
@@ -756,6 +821,18 @@ static int ardbeg_imx179_power_off(struct imx179_power_rail *pw)
 	tegra_io_dpd_enable(&csib_io);
 	return 0;
 }
+
+struct ar1335_platform_data ardbeg_ar1335_data = {
+	.flash_cap = {
+		.enable = 1,
+		.edge_trig_en = 1,
+		.start_edge = 0,
+		.repeat = 1,
+		.delay_frm = 0,
+	},
+	.power_on = ardbeg_ar1335_power_on,
+	.power_off = ardbeg_ar1335_power_off,
+};
 
 struct imx135_platform_data ardbeg_imx135_data = {
 	.flash_cap = {
@@ -1327,6 +1404,7 @@ static struct camera_data_blob ardbeg_camera_lut[] = {
 	{"ardbeg_ar0330_pdata", &ardbeg_ar0330_data},
 	{"ardbeg_ar0330_front_pdata", &ardbeg_ar0330_front_data},
 	{"ardbeg_ov4689_pdata", &ardbeg_ov4689_data},
+	{"ardbeg_ar1335_pdata", &ardbeg_ar1335_data},
 	{},
 };
 

@@ -100,6 +100,15 @@ config VIDEO_AR0330
 	  maximum of 3MP resolution with slave mode
 	  capability.
 
+config VIDEO_AR1335
+        tristate "AR1335 camera sensor support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the AR1335 camera sensor
+          for use with the tegra isp.  The sensor has a
+          maximum resolution of 4208x3120 with 4 MIPI
+          lane configuration.
+
 config VIDEO_IMX132
         tristate "IMX132 camera sensor support"
         depends on I2C && ARCH_TEGRA
