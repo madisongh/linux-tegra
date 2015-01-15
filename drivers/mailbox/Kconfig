@@ -85,4 +85,7 @@ config MAILBOX_TEST
 	  Test client to help with testing new Controller driver
 	  implementations.
 
+config TEGRA_XUSB_MBOX
+	def_bool y if ARCH_TEGRA_18x_SOC
+
 endif
