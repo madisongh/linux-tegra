@@ -3,7 +3,7 @@
  *
  * Handle allocation and freeing routines for nvmap
  *
- * Copyright (c) 2009-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -255,7 +255,7 @@ static void alloc_handle(struct nvmap_client *client,
 	if (type & carveout_mask) {
 		struct nvmap_heap_block *b;
 
-		b = nvmap_carveout_alloc(client, h, type);
+		b = nvmap_carveout_alloc(client, h, type, NULL);
 		if (b) {
 			h->heap_type = type;
 			h->heap_pgalloc = false;
@@ -287,6 +287,7 @@ static void alloc_handle(struct nvmap_client *client,
 static const unsigned int heap_policy_small[] = {
 	NVMAP_HEAP_CARVEOUT_VPR,
 	NVMAP_HEAP_CARVEOUT_IRAM,
+	NVMAP_HEAP_CARVEOUT_IVM,
 	NVMAP_HEAP_CARVEOUT_MASK,
 	NVMAP_HEAP_IOVMM,
 	0,
@@ -296,6 +297,7 @@ static const unsigned int heap_policy_large[] = {
 	NVMAP_HEAP_CARVEOUT_VPR,
 	NVMAP_HEAP_CARVEOUT_IRAM,
 	NVMAP_HEAP_IOVMM,
+	NVMAP_HEAP_CARVEOUT_IVM,
 	NVMAP_HEAP_CARVEOUT_MASK,
 	0,
 };
@@ -304,7 +306,8 @@ int nvmap_alloc_handle(struct nvmap_client *client,
 		       struct nvmap_handle *h, unsigned int heap_mask,
 		       size_t align,
 		       u8 kind,
-		       unsigned int flags)
+		       unsigned int flags,
+		       int peer)
 {
 	const unsigned int *alloc_policy;
 	int nr_page;
@@ -331,12 +334,24 @@ int nvmap_alloc_handle(struct nvmap_client *client,
 	h->flags = (flags & NVMAP_HANDLE_CACHE_FLAG);
 	h->align = max_t(size_t, align, L1_CACHE_BYTES);
 	h->kind = kind;
+	h->peer = peer;
 
 	/* convert iovmm requests to generic carveout. */
 	if (heap_mask & NVMAP_HEAP_IOVMM) {
 		heap_mask = (heap_mask & ~NVMAP_HEAP_IOVMM) |
 			    NVMAP_HEAP_CARVEOUT_GENERIC;
 	}
+
+	/* If user specifies IVM carveout, allocation from no other heap should
+	 * be allowed.
+	 */
+	if (heap_mask & NVMAP_HEAP_CARVEOUT_IVM)
+		if (heap_mask & ~(NVMAP_HEAP_CARVEOUT_IVM)) {
+			pr_err("%s alloc mixes IVM and other heaps\n",
+			       current->group_leader->comm);
+			err = -EINVAL;
+			goto out;
+		}
 
 	if (!heap_mask) {
 		err = -EINVAL;
@@ -496,6 +511,7 @@ struct nvmap_handle_ref *nvmap_create_handle(struct nvmap_client *client,
 	BUG_ON(!h->owner);
 	h->size = h->orig_size = size;
 	h->flags = NVMAP_HANDLE_WRITE_COMBINE;
+	h->peer = NVMAP_IVM_INVALID_PEER;
 	mutex_init(&h->lock);
 	INIT_LIST_HEAD(&h->vmas);
 	INIT_LIST_HEAD(&h->lru);
