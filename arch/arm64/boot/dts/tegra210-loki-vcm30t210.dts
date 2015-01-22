@@ -580,7 +580,6 @@
 			plugin-name = "reverb";
 			firmware-name = "libnvreverbfx.elf";
 			widget-name = "REVERB";
-			param-type = <2>; /* SNDRV_CTL_ELEM_TYPE_INTEGER */
 		};
 		plugin-info-2 {
 			plugin-name = "wire";
