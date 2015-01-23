@@ -181,6 +181,12 @@ config KERNEL_MODE_NEON
 config FIX_EARLYCON_MEM
 	def_bool y
 
+config FIQ
+	bool
+
+config FIQ_GLUE
+	bool
+
 source "init/Kconfig"
 
 source "kernel/Kconfig.freezer"
