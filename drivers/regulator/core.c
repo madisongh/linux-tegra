@@ -1780,6 +1780,12 @@ static void _regulator_put(struct regulator *regulator)
 
 	rdev = regulator->rdev;
 
+	/* Disable regulator if it is enabled because of this client */
+	mutex_lock(&rdev->mutex);
+	if (regulator->use_count)
+		_regulator_disable(rdev);
+	mutex_unlock(&rdev->mutex);
+
 	debugfs_remove_recursive(regulator->debugfs);
 
 	/* remove any sysfs entries */
