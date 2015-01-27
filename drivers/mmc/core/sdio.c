@@ -641,8 +641,8 @@ try_again:
 		goto err;
 	}
 
-	if ((rocr & R4_MEMORY_PRESENT) &&
-	    mmc_sd_get_cid(host, ocr & rocr, card->raw_cid, NULL) == 0) {
+	if ((ocr & R4_MEMORY_PRESENT) &&
+		mmc_sd_get_cid(host, ocr & ocr, card->raw_cid, NULL, 1) == 0) {
 		card->type = MMC_TYPE_SD_COMBO;
 
 		if (oldcard && (oldcard->type != MMC_TYPE_SD_COMBO ||
