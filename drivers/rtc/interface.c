@@ -2,6 +2,7 @@
  * RTC subsystem, interface functions
  *
  * Copyright (C) 2005 Tower Technologies
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
  * Author: Alessandro Zummo <a.zummo@towertech.it>
  *
  * based on arch/arm/common/rtctime.c
@@ -38,6 +39,8 @@ int rtc_read_time(struct rtc_device *rtc, struct rtc_time *tm)
 {
 	int err;
 
+	if (unlikely(rtc->system_shutting))
+		return -ESHUTDOWN;
 	err = mutex_lock_interruptible(&rtc->ops_lock);
 	if (err)
 		return err;
@@ -52,6 +55,8 @@ int rtc_set_time(struct rtc_device *rtc, struct rtc_time *tm)
 {
 	int err;
 
+	if (unlikely(rtc->system_shutting))
+		return -ESHUTDOWN;
 	err = rtc_valid_tm(tm);
 	if (err != 0)
 		return err;
@@ -83,6 +88,8 @@ int rtc_set_mmss(struct rtc_device *rtc, unsigned long secs)
 {
 	int err;
 
+	if (unlikely(rtc->system_shutting))
+		return -ESHUTDOWN;
 	err = mutex_lock_interruptible(&rtc->ops_lock);
 	if (err)
 		return err;
@@ -125,6 +132,8 @@ static int rtc_read_alarm_internal(struct rtc_device *rtc, struct rtc_wkalrm *al
 {
 	int err;
 
+	if (unlikely(rtc->system_shutting))
+		return -ESHUTDOWN;
 	err = mutex_lock_interruptible(&rtc->ops_lock);
 	if (err)
 		return err;
@@ -305,6 +314,8 @@ int rtc_read_alarm(struct rtc_device *rtc, struct rtc_wkalrm *alarm)
 {
 	int err;
 
+	if (unlikely(rtc->system_shutting))
+		return -ESHUTDOWN;
 	err = mutex_lock_interruptible(&rtc->ops_lock);
 	if (err)
 		return err;
@@ -360,6 +371,8 @@ int rtc_set_alarm(struct rtc_device *rtc, struct rtc_wkalrm *alarm)
 {
 	int err;
 
+	if (unlikely(rtc->system_shutting))
+		return -ESHUTDOWN;
 	err = rtc_valid_tm(&alarm->time);
 	if (err != 0)
 		return err;
@@ -417,7 +430,11 @@ EXPORT_SYMBOL_GPL(rtc_initialize_alarm);
 
 int rtc_alarm_irq_enable(struct rtc_device *rtc, unsigned int enabled)
 {
-	int err = mutex_lock_interruptible(&rtc->ops_lock);
+	int err;
+
+	if (unlikely(rtc->system_shutting))
+		return -ESHUTDOWN;
+	err = mutex_lock_interruptible(&rtc->ops_lock);
 	if (err)
 		return err;
 
@@ -444,7 +461,11 @@ EXPORT_SYMBOL_GPL(rtc_alarm_irq_enable);
 
 int rtc_update_irq_enable(struct rtc_device *rtc, unsigned int enabled)
 {
-	int err = mutex_lock_interruptible(&rtc->ops_lock);
+	int err;
+
+	if (unlikely(rtc->system_shutting))
+		return -ESHUTDOWN;
+	err = mutex_lock_interruptible(&rtc->ops_lock);
 	if (err)
 		return err;
 
