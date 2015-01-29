@@ -1431,6 +1431,7 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	}
 	plat->enable_autocal_slew_override = of_property_read_bool(np,
 					"nvidia,auto-cal-slew-override");
+	plat->enable_cq = of_property_read_bool(np, "nvidia,enable-cq");
 
 	return mmc_of_parse(host->mmc);
 }
@@ -2030,6 +2031,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		host->mmc->caps2 |= MMC_CAP2_NO_SLEEP_CMD;
 	if ((plat->enable_hs533_mode) && (host->mmc->caps2 & MMC_CAP2_HS400))
 		host->mmc->caps2 |= MMC_CAP2_HS533;
+	if (plat->enable_cq)
+		host->mmc->caps2 |= MMC_CAP2_CQ;
 
 	rc = sdhci_add_host(host);
 	sdhci_tegra_error_stats_debugfs(host);
