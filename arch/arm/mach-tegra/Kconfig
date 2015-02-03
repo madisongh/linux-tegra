@@ -240,12 +240,68 @@ config TEGRA_SIMULATION_SPLIT_MEM
           setup. Select this only if you are an NVIDIA developer
           working on a simulation platform.
 
+config FIQ_DEBUGGER
+	bool "FIQ Mode Serial Debugger"
+	select FIQ
+	select FIQ_GLUE
+	default n
+	help
+	  The FIQ serial debugger can accept commands even when the
+	  kernel is unresponsive due to being stuck with interrupts
+	  disabled. Also, we can save kernel log in FIQ handler.
+	  It will not work if FIQ not work or hardware hang.
+
+config FIQ_DEBUGGER_NO_SLEEP
+	bool "Keep serial debugger active"
+	depends on FIQ_DEBUGGER
+	default n
+	help
+	  Enables the serial debugger at boot. Passing
+	  fiq_debugger.no_sleep on the kernel commandline will
+	  override this config option.
+	  Enable this config then serial debugger will never off.
+
+config FIQ_DEBUGGER_WAKEUP_IRQ_ALWAYS_ON
+	bool "Don't disable wakeup IRQ when debugger is active"
+	depends on FIQ_DEBUGGER
+	default n
+	help
+	  Don't disable the wakeup irq when enabling the uart clock.  This will
+	  cause extra interrupts, but it makes the serial debugger usable with
+	  on some MSM radio builds that ignore the uart clock request in power
+	  collapse.
+
+config FIQ_DEBUGGER_CONSOLE
+	bool "Console on FIQ Serial Debugger port"
+	depends on FIQ_DEBUGGER
+	default n
+	help
+	  Enables a console so that printk messages are displayed on
+	  the debugger serial port as the occur.
+
+config FIQ_DEBUGGER_CONSOLE_DEFAULT_ENABLE
+	bool "Put the FIQ debugger into console mode by default"
+	depends on FIQ_DEBUGGER_CONSOLE
+	default n
+	help
+	  If enabled, this puts the fiq debugger into console mode by default.
+	  Otherwise, the fiq debugger will start out in debug mode.
+
 config TEGRA_FIQ_DEBUGGER
 	bool "Enable the FIQ serial debugger on Tegra"
 	default n
 	select FIQ_DEBUGGER
 	help
 	  Enables the FIQ serial debugger on Tegra
+
+config TEGRA_WDT_FIQ_SOFT_HANG_STACK_DUMP
+	bool "Enable Tegra system soft hang stack dump"
+	default n
+	help
+	  This option will generate stack dump for all online CPUs upon
+	  soft hang detection by using the FIQ debugger mechanism even
+	  the IRQ is disabled on the CPU. This option is useful if we
+	  only have one watchdog generating FIQ for all CPUs.
 
 config TEGRA_PTM
 	bool "Enable PTM debugger on Tegra"

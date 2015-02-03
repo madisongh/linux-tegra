@@ -415,6 +415,7 @@ static void __init ardbeg_uart_init(void)
 #if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
 	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
 	tegra_serial_debug_init(TEGRA_UARTD_BASE, INT_WDT_AVP, NULL, -1, -1);
+	platform_device_register(uart_console_debug_device);
 #else
 	tegra_serial_debug_init(TEGRA_UARTD_BASE, INT_WDT_CPU, NULL, -1, -1);
 #endif

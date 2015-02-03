@@ -454,15 +454,21 @@ static void fiq_debugger_help(struct fiq_debugger_state *state)
 #endif
 }
 
-static void fiq_debugger_take_affinity(void *info)
+
+static void change_cpu_affinity(int fiq, int cpu)
 {
-	struct fiq_debugger_state *state = info;
 	struct cpumask cpumask;
 
 	cpumask_clear(&cpumask);
-	cpumask_set_cpu(get_cpu(), &cpumask);
+	cpumask_set_cpu(cpu, &cpumask);
+	irq_set_affinity(fiq, &cpumask);
+}
 
-	irq_set_affinity(state->uart_irq, &cpumask);
+static void fiq_debugger_take_affinity(void *info)
+{
+	struct fiq_debugger_state *state = info;
+
+	change_cpu_affinity(state->uart_irq, get_cpu());
 }
 
 static void fiq_debugger_switch_cpu(struct fiq_debugger_state *state, int cpu)
@@ -739,11 +745,33 @@ static void fiq_debugger_fiq(struct fiq_glue_handler *h,
 
 	unsigned int this_cpu = THREAD_INFO(svc_sp)->cpu;
 	bool need_irq;
+	unsigned int next_cpu;
+	static bool cpu0_again;
 
-	need_irq = fiq_debugger_handle_uart_interrupt(state, this_cpu, regs,
-			svc_sp);
-	if (need_irq)
-		fiq_debugger_force_irq(state);
+	/*
+	 * 1st FIQ always goes to CPU0. We will change FIQ CPU affinity, if CPU0
+	 * enter the FIQ handler 2nd time, we know we have already done the
+	 * stack dump for all CPUs and we can enter the debug console.
+	 */
+	if (cpu0_again) {
+		need_irq = fiq_debugger_handle_uart_interrupt(state,
+				this_cpu, regs, svc_sp);
+		if (need_irq)
+			fiq_debugger_force_irq(state);
+		return;
+	}
+
+	fiq_debugger_dump_allregs(&state->output, regs);
+	fiq_debugger_dump_pc(&state->output, regs);
+	fiq_debugger_dump_stacktrace(&state->output, regs, 100, svc_sp);
+	/* let another online CPU handle the FIQ */
+	next_cpu = cpumask_next(this_cpu, cpu_online_mask);
+	if (next_cpu >= nr_cpu_ids) {
+		next_cpu = 0;
+		cpu0_again = true;
+	}
+	change_cpu_affinity(state->fiq, next_cpu);
+
 }
 #endif
 

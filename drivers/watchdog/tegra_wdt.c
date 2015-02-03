@@ -157,6 +157,11 @@ static irqreturn_t tegra_wdt_interrupt(int irq, void *dev_id)
 #define PMC_RST_STATUS			0x1b4
 
 struct tegra_wdt *tegra_wdt[MAX_NR_CPU_WDT];
+/*
+ * In order to generate the stack dump for the CPU which has IRQ off, we must
+ * use the FIQ. TEGRA WDT can generate the FIQ if we do not ACK the IRQ.
+ */
+bool wdt_nmi_ack_off;
 
 static inline void tegra_wdt_ping(struct tegra_wdt *wdt)
 {
@@ -170,7 +175,8 @@ static inline void tegra_wdt_ping(struct tegra_wdt *wdt)
 
 #if !defined(CONFIG_TRUSTED_FOUNDATIONS) && \
 	defined(CONFIG_ARCH_TEGRA_12x_SOC) && defined(CONFIG_FIQ_DEBUGGER)
-	writel(WDT_CMD_START_COUNTER, wdt->wdt_avp_source + WDT_CMD);
+	if (wdt_nmi_ack_off == false)
+		writel(WDT_CMD_START_COUNTER, wdt->wdt_avp_source + WDT_CMD);
 #endif
 
 }

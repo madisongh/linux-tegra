@@ -1,6 +1,8 @@
 /*
  *  linux/include/linux/nmi.h
+ *  Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
  */
+
 #ifndef LINUX_NMI_H
 #define LINUX_NMI_H
 
@@ -56,5 +58,13 @@ extern int proc_dowatchdog(struct ctl_table *, int ,
 			   void __user *, size_t *, loff_t *);
 extern int watchdog_get_lockup_state(void);
 #endif
+
+static inline void set_wdt_nmi_ack_off(void)
+{
+#if defined(CONFIG_TEGRA_WDT_FIQ_SOFT_HANG_STACK_DUMP)
+	extern bool wdt_nmi_ack_off;
+	wdt_nmi_ack_off = true;
+#endif
+}
 
 #endif
