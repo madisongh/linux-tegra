@@ -70,4 +70,7 @@ config TEGRA_AHB
 	  which controls AHB bus master arbitration and some
 	  performance parameters(priority, prefech size).
 
+config TEGRA_EMC_SCALING_ENABLE
+	bool "Enable scaling the memory frequency"
+
 endmenu
