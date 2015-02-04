@@ -116,6 +116,7 @@ static void of_get_regulation_constraints(struct device_node *np,
 		constraints->valid_ops_mask |= REGULATOR_CHANGE_CURRENT;
 
 	constraints->boot_on = of_property_read_bool(np, "regulator-boot-on");
+	constraints->boot_off = of_property_read_bool(np, "regulator-boot-off");
 	constraints->always_on = of_property_read_bool(np, "regulator-always-on");
 	if (!constraints->always_on) /* status change should be possible. */
 		constraints->valid_ops_mask |= REGULATOR_CHANGE_STATUS;
