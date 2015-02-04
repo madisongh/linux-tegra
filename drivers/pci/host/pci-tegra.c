@@ -253,7 +253,6 @@ struct tegra_pcie {
 	struct list_head buses;
 	struct resource *cs;
 
-	struct resource all;
 	struct resource io;
 	struct resource mem;
 	struct resource prefetch;
@@ -627,16 +626,7 @@ DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, tegra_pcie_relax_enable);
 static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
 {
 	struct tegra_pcie *pcie = sys_to_pcie(sys);
-	int err;
 	phys_addr_t io_start;
-
-	err = devm_request_resource(pcie->dev, &pcie->all, &pcie->mem);
-	if (err < 0)
-		return err;
-
-	err = devm_request_resource(pcie->dev, &pcie->all, &pcie->prefetch);
-	if (err)
-		return err;
 
 	io_start = pci_pio_to_address(pcie->io.start);
 
@@ -1532,12 +1522,6 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
 	struct resource res;
 	int err;
 
-	memset(&pcie->all, 0, sizeof(pcie->all));
-	pcie->all.flags = IORESOURCE_MEM;
-	pcie->all.name = np->full_name;
-	pcie->all.start = ~0;
-	pcie->all.end = 0;
-
 	if (of_pci_range_parser_init(&parser, np)) {
 		dev_err(pcie->dev, "missing \"ranges\" property\n");
 		return -EINVAL;
@@ -1551,30 +1535,20 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
 		switch (res.flags & IORESOURCE_TYPE_BITS) {
 		case IORESOURCE_IO:
 			memcpy(&pcie->io, &res, sizeof(res));
-			pcie->io.name = np->full_name;
+			pcie->io.name = "I/O";
 			break;
 
 		case IORESOURCE_MEM:
 			if (res.flags & IORESOURCE_PREFETCH) {
 				memcpy(&pcie->prefetch, &res, sizeof(res));
-				pcie->prefetch.name = "prefetchable";
+				pcie->prefetch.name = "PREFETCH";
 			} else {
 				memcpy(&pcie->mem, &res, sizeof(res));
-				pcie->mem.name = "non-prefetchable";
+				pcie->mem.name = "MEM";
 			}
 			break;
 		}
-
-		if (res.start <= pcie->all.start)
-			pcie->all.start = res.start;
-
-		if (res.end >= pcie->all.end)
-			pcie->all.end = res.end;
 	}
-
-	err = devm_request_resource(pcie->dev, &iomem_resource, &pcie->all);
-	if (err < 0)
-		return err;
 
 	err = of_pci_parse_bus_range(np, &pcie->busn);
 	if (err < 0) {
