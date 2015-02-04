@@ -1,4 +1,4 @@
-menuconfig ARCH_TEGRA
+config ARCH_TEGRA
 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
 	select ARCH_REQUIRE_GPIOLIB
 	select ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
@@ -15,7 +15,8 @@ menuconfig ARCH_TEGRA
 	help
 	  This enables support for NVIDIA Tegra based systems.
 
-if ARCH_TEGRA
+menu "NVIDIA Tegra options"
+	depends on ARCH_TEGRA
 
 config ARCH_TEGRA_2x_SOC
 	bool "Enable support for Tegra20 family"
@@ -67,4 +68,4 @@ config TEGRA_AHB
 	  which controls AHB bus master arbitration and some
 	  performance parameters(priority, prefech size).
 
-endif
+endmenu
