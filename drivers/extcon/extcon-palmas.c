@@ -23,7 +23,6 @@
 #include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
-#include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/mfd/palmas.h>
 #include <linux/of.h>
@@ -189,13 +188,11 @@ static int palmas_usb_probe(struct platform_device *pdev)
 
 	palmas_usb->edev.supported_cable = palmas_extcon_cable;
 	palmas_usb->edev.dev.parent = palmas_usb->dev;
-	palmas_usb->edev.name = kstrdup(node->name, GFP_KERNEL);
 	palmas_usb->edev.mutually_exclusive = mutually_exclusive;
 
 	status = extcon_dev_register(&palmas_usb->edev);
 	if (status) {
 		dev_err(&pdev->dev, "failed to register extcon device\n");
-		kfree(palmas_usb->edev.name);
 		return status;
 	}
 
@@ -233,7 +230,6 @@ static int palmas_usb_probe(struct platform_device *pdev)
 
 fail_extcon:
 	extcon_dev_unregister(&palmas_usb->edev);
-	kfree(palmas_usb->edev.name);
 
 	return status;
 }
@@ -243,7 +239,6 @@ static int palmas_usb_remove(struct platform_device *pdev)
 	struct palmas_usb *palmas_usb = platform_get_drvdata(pdev);
 
 	extcon_dev_unregister(&palmas_usb->edev);
-	kfree(palmas_usb->edev.name);
 
 	return 0;
 }
