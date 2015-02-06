@@ -173,8 +173,10 @@ static int palmas_gpio_probe(struct platform_device *pdev)
 
 	palmas_gpio = devm_kzalloc(&pdev->dev,
 				sizeof(*palmas_gpio), GFP_KERNEL);
-	if (!palmas_gpio)
+	if (!palmas_gpio) {
+		dev_err(&pdev->dev, "Could not allocate palmas_gpio\n");
 		return -ENOMEM;
+	}
 
 	palmas_gpio->palmas = palmas;
 	palmas_gpio->gpio_chip.owner = THIS_MODULE;
