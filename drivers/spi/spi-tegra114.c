@@ -302,7 +302,6 @@ static unsigned tegra_spi_fill_tx_fifo_from_client_txbuf(
 		max_n_32bit = DIV_ROUND_UP(nbytes, 4);
 		for (count = 0; count < max_n_32bit; count++) {
 			u32 x = 0;
-
 			for (i = 0; (i < 4) && nbytes; i++, nbytes--)
 				x |= (u32)(*tx_buf++) << (i * 8);
 			tegra_spi_writel(tspi, x, SPI_TX_FIFO);
@@ -313,7 +312,6 @@ static unsigned tegra_spi_fill_tx_fifo_from_client_txbuf(
 		nbytes = written_words * tspi->bytes_per_word;
 		for (count = 0; count < max_n_32bit; count++) {
 			u32 x = 0;
-
 			for (i = 0; nbytes && (i < tspi->bytes_per_word);
 							i++, nbytes--)
 				x |= (u32)(*tx_buf++) << (i * 8);
@@ -340,7 +338,6 @@ static unsigned int tegra_spi_read_rx_fifo_to_client_rxbuf(
 		len = tspi->curr_dma_words * tspi->bytes_per_word;
 		for (count = 0; count < rx_full_count; count++) {
 			u32 x = tegra_spi_readl(tspi, SPI_RX_FIFO);
-
 			for (i = 0; len && (i < 4); i++, len--)
 				*rx_buf++ = (x >> i*8) & 0xFF;
 		}
@@ -348,10 +345,8 @@ static unsigned int tegra_spi_read_rx_fifo_to_client_rxbuf(
 		read_words += tspi->curr_dma_words;
 	} else {
 		u32 rx_mask = ((u32)1 << t->bits_per_word) - 1;
-
 		for (count = 0; count < rx_full_count; count++) {
 			u32 x = tegra_spi_readl(tspi, SPI_RX_FIFO) & rx_mask;
-
 			for (i = 0; (i < tspi->bytes_per_word); i++)
 				*rx_buf++ = (x >> (i*8)) & 0xFF;
 		}
@@ -370,7 +365,6 @@ static void tegra_spi_copy_client_txbuf_to_spi_txbuf(
 
 	if (tspi->is_packed) {
 		unsigned len = tspi->curr_dma_words * tspi->bytes_per_word;
-
 		memcpy(tspi->tx_dma_buf, t->tx_buf + tspi->cur_pos, len);
 	} else {
 		unsigned int i;
@@ -380,7 +374,6 @@ static void tegra_spi_copy_client_txbuf_to_spi_txbuf(
 
 		for (count = 0; count < tspi->curr_dma_words; count++) {
 			u32 x = 0;
-
 			for (i = 0; consume && (i < tspi->bytes_per_word);
 							i++, consume--)
 				x |= (u32)(*tx_buf++) << (i * 8);
@@ -403,7 +396,6 @@ static void tegra_spi_copy_spi_rxbuf_to_client_rxbuf(
 
 	if (tspi->is_packed) {
 		unsigned len = tspi->curr_dma_words * tspi->bytes_per_word;
-
 		memcpy(t->rx_buf + tspi->cur_rx_pos, tspi->rx_dma_buf, len);
 	} else {
 		unsigned int i;
@@ -413,7 +405,6 @@ static void tegra_spi_copy_spi_rxbuf_to_client_rxbuf(
 
 		for (count = 0; count < tspi->curr_dma_words; count++) {
 			u32 x = tspi->rx_dma_buf[count] & rx_mask;
-
 			for (i = 0; (i < tspi->bytes_per_word); i++)
 				*rx_buf++ = (x >> (i*8)) & 0xFF;
 		}
