@@ -148,13 +148,19 @@
 #define TEGRA_ADMA_BURST_COMPLETE_TIME	20
 
 #define TEGRA_ADMA_STATUS_COUNT_MASK		0xFFFC
+#define CH_REG_SIZE	0x80
 
-enum tegra210_adma_fetching_policy {
+enum tegra_adma_fetching_policy {
 	BURST_BASED = 0,
 	THRESHOLD_BASED = 1,
 };
 
-enum tegra210_adma_burst_size {
+enum {
+	GLOBAL_REG,
+	ADDR1,
+	ADMA_MAX_ADDR,
+};
+enum tegra_adma_burst_size {
 	WORD_1 = 1,
 	WORDS_2 = 2,
 	WORDS_4 = 3,
@@ -162,13 +168,13 @@ enum tegra210_adma_burst_size {
 	WORDS_16 = 5,
 };
 
-enum tegra210_adma_mode {
+enum tegra_adma_mode {
 	ADMA_MODE_ONESHOT = 1,
 	ADMA_MODE_CONTINUOUS = 2,
 	ADMA_MODE_LINKED_LIST = 4,
 };
 
-enum tegra210_adma_transfer_direction {
+enum tegra_adma_transfer_direction {
 	MEMORY_TO_MEMORY = 1,
 	AHUB_TO_MEMORY = 2,
 	MEMORY_TO_AHUB = 4,

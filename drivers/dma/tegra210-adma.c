@@ -1,5 +1,5 @@
 /*
- * ADMA driver for Nvidia's Tegra210 ADMA controller.
+ * ADMA driver for Nvidia's Tegra ADMA controller.
  *
  * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
@@ -39,10 +39,15 @@
 #include <linux/clk/tegra.h>
 #include <linux/irqchip/tegra-agic.h>
 #include <linux/tegra_pm_domains.h>
+#include <linux/tegra-soc.h>
 
 #include "dmaengine.h"
 
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 #include  "tegra210-adma.h"
+#else
+#include <sound/tegra_adma.h>
+#endif
 
 struct tegra_adma;
 
@@ -143,6 +148,7 @@ struct tegra_adma {
 	struct clk			*dma_clk;
 	struct clk			*ape_clk;
 	spinlock_t			global_lock;
+	void __iomem			*adma_addr[ADMA_MAX_ADDR];
 	void __iomem			*base_addr;
 	const struct tegra_adma_chip_data *chip_data;
 	/* number of channels available in the controller */
@@ -157,12 +163,17 @@ struct tegra_adma {
 
 static inline void global_write(struct tegra_adma *tdma, u32 reg, u32 val)
 {
+	writel(val, tdma->adma_addr[GLOBAL_REG] + reg);
+}
+
+static inline void global_ch_write(struct tegra_adma *tdma, u32 reg, u32 val)
+{
 	writel(val, tdma->base_addr + reg);
 }
 
 static inline u32 global_read(struct tegra_adma *tdma, u32 reg)
 {
-	return readl(tdma->base_addr + reg);
+	return readl(tdma->adma_addr[GLOBAL_REG] + reg);
 }
 
 static inline void channel_write(struct tegra_adma_chan *tdc,
@@ -181,7 +192,7 @@ static inline void channel_set_field(struct tegra_adma_chan *tdc,
 {
 	u32 t;
 
-	t = readl(tdc->tdma->base_addr + reg);
+	t = readl(tdc->tdma->base_addr + tdc->chan_base_offset + reg);
 	writel((t & ~((mask) << (shift))) + (((val) &
 		(mask)) << (shift)), tdc->tdma->base_addr +
 		tdc->chan_base_offset + reg);
@@ -927,7 +938,7 @@ static struct dma_async_tx_descriptor *tegra_adma_prep_slave_sg(
 		else
 			sg_req->ch_regs.tgt_ptr = mem;
 
-		sg_req->ch_regs.tc = len & 0xFFFC;
+		sg_req->ch_regs.tc = len & 0x3FFFFFFC;
 		sg_req->ch_regs.ctrl = ctrl;
 
 		sg_req->ch_regs.ahub_fifo_ctrl = ahub_fifo_ctrl;
@@ -1065,7 +1076,7 @@ static struct dma_async_tx_descriptor *tegra_adma_prep_dma_cyclic(
 		else
 			sg_req->ch_regs.tgt_ptr = mem;
 
-		sg_req->ch_regs.tc = len & 0xFFFC;
+		sg_req->ch_regs.tc = len & 0x3FFFFFFC;
 		sg_req->ch_regs.ctrl = ctrl;
 		sg_req->ch_regs.config = config;
 		sg_req->ch_regs.ahub_fifo_ctrl = ahub_fifo_ctrl;
@@ -1164,7 +1175,7 @@ static struct dma_chan *tegra_dma_of_xlate(struct of_phandle_args *dma_spec,
 }
 
 static const struct tegra_adma_chip_data tegra210_adma_chip_data = {
-	.channel_reg_size       = 0x80,
+	.channel_reg_size       = CH_REG_SIZE,
 	.max_dma_count          = 1024UL * 64,
 };
 
@@ -1228,26 +1239,32 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	tdma->nr_channels = nr_channels;
 	platform_set_drvdata(pdev, tdma);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!res) {
-		dev_err(&pdev->dev, "No mem resource for ADMA\n");
-		return -EINVAL;
+	for (i = 0; i < ADMA_MAX_ADDR; i++) {
+		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+		if (!res) {
+			dev_err(&pdev->dev, "No mem resource for ADMA\n");
+			return -EINVAL;
+		}
+
+		tdma->adma_addr[i] = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(tdma->adma_addr[i]))
+			return PTR_ERR(tdma->adma_addr[i]);
 	}
 
-	tdma->base_addr = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(tdma->base_addr))
-		return PTR_ERR(tdma->base_addr);
+	tdma->base_addr = tdma->adma_addr[ADDR1];
 
-	tdma->dma_clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(tdma->dma_clk)) {
-		dev_err(&pdev->dev, "Error: Missing controller clock\n");
-		return PTR_ERR(tdma->dma_clk);
-	}
+	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
+		tdma->dma_clk = devm_clk_get(&pdev->dev, NULL);
+		if (IS_ERR(tdma->dma_clk)) {
+			dev_err(&pdev->dev, "Error: Missing controller clock\n");
+			return PTR_ERR(tdma->dma_clk);
+		}
 
-	tdma->ape_clk = clk_get_sys(NULL, "adma.ape");
-	if (IS_ERR(tdma->ape_clk)) {
-		dev_err(&pdev->dev, "Error: Missing APE clock\n");
-		return PTR_ERR(tdma->ape_clk);
+		tdma->ape_clk = clk_get_sys(NULL, "adma.ape");
+		if (IS_ERR(tdma->ape_clk)) {
+			dev_err(&pdev->dev, "Error: Missing APE clock\n");
+			return PTR_ERR(tdma->ape_clk);
+		}
 	}
 
 	spin_lock_init(&tdma->global_lock);
@@ -1272,8 +1289,8 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	pm_runtime_get_sync(&pdev->dev);
 
 	/* Reset ADMA controller */
-	global_write(tdma, ADMA_GLOBAL_INT_CLEAR, 0x1);
-	global_write(tdma, ADMA_GLOBAL_INT_SET, 0x1);
+	global_ch_write(tdma, ADMA_GLOBAL_INT_CLEAR, 0x1);
+	global_ch_write(tdma, ADMA_GLOBAL_INT_SET, 0x1);
 	global_write(tdma, ADMA_GLOBAL_SOFT_RESET, 0x1);
 
 	INIT_LIST_HEAD(&tdma->dma_dev.channels);
@@ -1340,7 +1357,7 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	ret = dma_async_device_register(&tdma->dma_dev);
 	if (ret < 0) {
 		dev_err(&pdev->dev,
-			"Tegra210 ADMA driver registration failed %d\n", ret);
+			"Tegra ADMA driver registration failed %d\n", ret);
 		goto err_irq;
 	}
 
@@ -1348,11 +1365,11 @@ static int tegra_adma_probe(struct platform_device *pdev)
 					 tegra_dma_of_xlate, tdma);
 	if (ret < 0) {
 		dev_err(&pdev->dev,
-			"Tegra210 ADMA OF registration failed %d\n", ret);
+			"Tegra ADMA OF registration failed %d\n", ret);
 		goto err_unregister_dma_dev;
 	}
 
-	dev_info(&pdev->dev, "Tegra210 ADMA driver register %d channels\n",
+	dev_info(&pdev->dev, "Tegra ADMA driver register %d channels\n",
 			tdma->nr_channels);
 	return 0;
 
@@ -1400,8 +1417,11 @@ static int tegra_adma_runtime_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_adma *tdma = platform_get_drvdata(pdev);
 
-	clk_disable(tdma->dma_clk);
-	clk_disable(tdma->ape_clk);
+	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
+		clk_disable(tdma->dma_clk);
+		clk_disable(tdma->ape_clk);
+	}
+
 	return 0;
 }
 
@@ -1411,16 +1431,18 @@ static int tegra_adma_runtime_resume(struct device *dev)
 	struct tegra_adma *tdma = platform_get_drvdata(pdev);
 	int ret;
 
-	ret = clk_enable(tdma->ape_clk);
-	if (ret < 0) {
-		dev_err(dev, "clk_enable failed: %d\n", ret);
-		return ret;
-	}
+	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
+		ret = clk_enable(tdma->ape_clk);
+		if (ret < 0) {
+			dev_err(dev, "clk_enable failed: %d\n", ret);
+			return ret;
+		}
 
-	ret = clk_enable(tdma->dma_clk);
-	if (ret < 0) {
-		dev_err(dev, "clk_enable failed: %d\n", ret);
-		return ret;
+		ret = clk_enable(tdma->dma_clk);
+		if (ret < 0) {
+			dev_err(dev, "clk_enable failed: %d\n", ret);
+			return ret;
+		}
 	}
 	return 0;
 }
