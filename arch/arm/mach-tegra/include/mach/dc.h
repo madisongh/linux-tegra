@@ -6,7 +6,7 @@
  * Author:
  *	Erik Gilling <konkers@google.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -118,6 +118,8 @@ struct tegra_dsi_cmd {
 	u8   link_id;
 	bool	club_cmd;
 };
+
+extern struct fb_videomode tegra_dc_vga_mode;
 
 #define CMD_CLUBBED				true
 #define CMD_NOT_CLUBBED				false

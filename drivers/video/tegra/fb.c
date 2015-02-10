@@ -6,7 +6,7 @@
  *         Colin Cross <ccross@android.com>
  *         Travis Geiselbrecht <travis@palm.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -569,9 +569,6 @@ void tegra_fb_update_monspecs(struct tegra_fb_info *fb_info,
 {
 	struct fb_event event;
 	int i;
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-	struct tegra_dc_mode dcmode;
-#endif /* CONFIG_FRAMEBUFFER_CONSOLE */
 
 	mutex_lock(&fb_info->info->lock);
 	fb_destroy_modedb(fb_info->info->monspecs.modedb);
@@ -621,21 +618,19 @@ void tegra_fb_update_monspecs(struct tegra_fb_info *fb_info,
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	console_lock();
 	fb_notifier_call_chain(FB_EVENT_NEW_MODELIST, &event);
-	dcmode.pclk          = specs->modedb[0].pixclock;
-	dcmode.pclk          = PICOS2KHZ(dcmode.pclk);
-	dcmode.pclk         *= 1000;
-	dcmode.h_ref_to_sync = 1;
-	dcmode.v_ref_to_sync = 1;
-	dcmode.h_sync_width  = specs->modedb[0].hsync_len;
-	dcmode.v_sync_width  = specs->modedb[0].vsync_len;
-	dcmode.h_back_porch  = specs->modedb[0].left_margin;
-	dcmode.v_back_porch  = specs->modedb[0].upper_margin;
-	dcmode.h_active      = specs->modedb[0].xres;
-	dcmode.v_active      = specs->modedb[0].yres;
-	dcmode.h_front_porch = specs->modedb[0].right_margin;
-	dcmode.v_front_porch = specs->modedb[0].lower_margin;
-	tegra_dc_set_mode(fb_info->win.dc, &dcmode);
-	fb_videomode_to_var(&fb_info->info->var, &specs->modedb[0]);
+	/* When we can't satify the requested mode, we will fall back
+	 to default mode */
+	if (PICOS2KHZ(specs->modedb[0].pixclock) >
+		PICOS2KHZ(tegra_dc_get_out_max_pixclock(fb_info->win.dc))) {
+		/* Program DC with default mode */
+		tegra_dc_set_fb_mode(fb_info->win.dc,
+				&tegra_dc_vga_mode, false);
+		fb_videomode_to_var(&fb_info->info->var, &tegra_dc_vga_mode);
+	} else {
+		/* Program DC with first mode */
+		tegra_dc_set_fb_mode(fb_info->win.dc, specs->modedb, false);
+		fb_videomode_to_var(&fb_info->info->var, &specs->modedb[0]);
+	}
 	fb_notifier_call_chain(FB_EVENT_MODE_CHANGE_ALL, &event);
 	console_unlock();
 #else
