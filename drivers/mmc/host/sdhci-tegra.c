@@ -204,6 +204,8 @@
 #define NVQUIRK_BROKEN_SD2_0_SUPPORT		BIT(30)
 #define NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH	BIT(31)
 
+#define NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION	BIT(0)
+
 /* Max number of clock parents for sdhci is fixed to 2 */
 #define TEGRA_SDHCI_MAX_PLL_SOURCE 2
 
@@ -1069,6 +1071,10 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	}
 	sdhci_writel(sdhci, val, SDMMC_SDMEMCOMPPADCTRL);
 
+	/* Wait for 1us after e_input is enabled*/
+	if (soc_data->nvquirks2 & NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION)
+		udelay(1);
+
 	/* Enable Auto Calibration*/
 	val = sdhci_readl(sdhci, SDMMC_AUTO_CAL_CONFIG);
 	val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE;
@@ -1099,6 +1105,10 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 			SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_STEP_OFFSET_SHIFT);
 	}
 	sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
+
+	/* Wait for 1us after auto calibration is enabled*/
+	if (soc_data->nvquirks2 & NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION)
+		udelay(1);
 
 	/* Wait until the calibration is done */
 	do {
@@ -1368,7 +1378,7 @@ static struct sdhci_tegra_soc_data soc_data_tegra210 = {
 		    NVQUIRK_UPDATE_PAD_CNTRL_REG |
 		    NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT |
 		    NVQUIRK_UPDATE_HW_TUNING_CONFG,
-	.parent_clk_list = {"pll_p"},
+	.nvquirks2 = NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION,
 };
 
 static const struct of_device_id sdhci_tegra_dt_match[] = {
