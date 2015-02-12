@@ -38,6 +38,7 @@
 #include <linux/pinctrl/pinconf-tegra.h>
 #include <linux/dma-mapping.h>
 #include <linux/uaccess.h>
+#include <linux/ktime.h>
 
 #include <asm/gpio.h>
 #include <linux/debugfs.h>
@@ -264,6 +265,8 @@ struct sdhci_tegra {
 	int drive_group_sel;
 	bool en_strobe;
 	unsigned int tuned_tap_delay;
+	struct padctrl *sdmmc_padctrl;
+	ktime_t timestamp;
 };
 
 static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
@@ -895,6 +898,8 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	u8 vendor_ctrl;
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
 	int ret = 0;
+	ktime_t cur_time;
+	s64 period_time;
 
 	mutex_lock(&tegra_host->set_clock_mutex);
 	pr_debug("%s %s %u enabled=%u\n", __func__,
@@ -918,6 +923,15 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 				/* power up / active state */
 				vendor_trim_clear_sel_vreg(sdhci, true);
 			}
+		}
+		if (plat->en_periodic_calib &&
+			sdhci->is_calibration_done) {
+			cur_time = ktime_get();
+			period_time = ktime_to_ms(ktime_sub(cur_time,
+						tegra_host->timestamp));
+			if (period_time >= SDHCI_PERIODIC_CALIB_TIMEOUT)
+				tegra_sdhci_do_calibration(sdhci,
+						sdhci->mmc->ios.signal_voltage);
 		}
 		sdhci_set_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
@@ -1171,6 +1185,11 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 				"Failed to set pullup codes %d err %d\n",
 				pullup_code, err);
 		}
+	}
+	if (tegra_host->plat->en_periodic_calib) {
+		tegra_host->timestamp = ktime_get();
+		sdhci->timestamp = ktime_get();
+		sdhci->is_calibration_done = true;
 	}
 }
 
@@ -1463,6 +1482,8 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	plat->enable_autocal_slew_override = of_property_read_bool(np,
 					"nvidia,auto-cal-slew-override");
 	plat->enable_cq = of_property_read_bool(np, "nvidia,enable-cq");
+	plat->en_periodic_calib = of_property_read_bool(np,
+			"nvidia,en-periodic-calib");
 
 	return mmc_of_parse(host->mmc);
 }
@@ -2312,6 +2333,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		host->mmc->caps2 |= MMC_CAP2_HS533;
 	if (plat->enable_cq)
 		host->mmc->caps2 |= MMC_CAP2_CQ;
+	if (plat->en_periodic_calib)
+		host->quirks2 |= SDHCI_QUIRK2_PERIODIC_CALIBRATION;
 
 	rc = sdhci_add_host(host);
 	sdhci_tegra_error_stats_debugfs(host);

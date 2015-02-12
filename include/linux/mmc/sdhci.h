@@ -148,6 +148,7 @@ struct sdhci_host {
 /* Turn off/on card clock before sending/after tuning command*/
 #define SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK		(1<<13)
 #define SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR		(1<<14)
+#define SDHCI_QUIRK2_PERIODIC_CALIBRATION		(1<<15)
 
 	unsigned int  acmd12_ctrl;
 	unsigned int  ier;
@@ -250,6 +251,8 @@ struct sdhci_host {
 #ifdef CONFIG_DEBUG_FS
 	bool			enable_sdhci_perf_stats;
 #endif
+	ktime_t timestamp;
+	bool is_calibration_done;
 
 	unsigned long private[0] ____cacheline_aligned;
 };
