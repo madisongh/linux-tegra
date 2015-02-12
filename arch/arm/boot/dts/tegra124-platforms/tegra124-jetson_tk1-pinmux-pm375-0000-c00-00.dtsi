@@ -18,14 +18,6 @@
 				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
 			};
 
-			dap_mclk1_req_pee2 {
-				nvidia,pins = "dap_mclk1_req_pee2";
-				nvidia,function = "sata";
-				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
-			};
-
 			dap1_dout_pn2 {
 				nvidia,pins = "dap1_dout_pn2";
 				nvidia,function = "sata";
@@ -497,7 +489,7 @@
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
 				nvidia,lock = <TEGRA_PIN_DISABLE>;
-				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
 			};
 
 			pwr_i2c_sda_pz7 {
@@ -507,7 +499,7 @@
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
 				nvidia,lock = <TEGRA_PIN_DISABLE>;
-				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
 			};
 
 			jtag_rtck {
@@ -676,7 +668,20 @@
 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
 			};
 
+			mipi_pad_ctrl_dsi_b {
+				nvidia,pins = "mipi_pad_ctrl_dsi_b";
+				nvidia,function = "dsi_b";
+			};
+
 			/* GPIO Pin Configuration */
+			dap_mclk1_req_pee2 {
+				nvidia,pins = "dap_mclk1_req_pee2";
+				nvidia,function = "rsvd4";
+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+			};
+
 			gpio_x4_aud_px4 {
 				nvidia,pins = "gpio_x4_aud_px4";
 				nvidia,function = "gmi";
@@ -1563,8 +1568,8 @@
 		drive_default: drive {
 			drive_sdio1 {
 				nvidia,pins = "drive_sdio1";
-				nvidia,high-speed-mode = <TEGRA_PIN_DRIVE_HIGH_SPEED_MODE_ENABLE>;
-				nvidia,schmitt = <TEGRA_PIN_DRIVE_SCHMITT_DISABLE>;
+				nvidia,high-speed-mode = <TEGRA_PIN_ENABLE>;
+				nvidia,schmitt = <TEGRA_PIN_DISABLE>;
 				nvidia,pull-down-strength = <32>;
 				nvidia,pull-up-strength = <42>;
 				nvidia,slew-rate-rising = <TEGRA_PIN_SLEW_RATE_FASTEST>;
@@ -1573,8 +1578,8 @@
 
 			drive_sdio3 {
 				nvidia,pins = "drive_sdio3";
-				nvidia,high-speed-mode = <TEGRA_PIN_DRIVE_HIGH_SPEED_MODE_ENABLE>;
-				nvidia,schmitt = <TEGRA_PIN_DRIVE_SCHMITT_DISABLE>;
+				nvidia,high-speed-mode = <TEGRA_PIN_ENABLE>;
+				nvidia,schmitt = <TEGRA_PIN_DISABLE>;
 				nvidia,pull-down-strength = <20>;
 				nvidia,pull-up-strength = <36>;
 				nvidia,slew-rate-rising = <TEGRA_PIN_SLEW_RATE_FASTEST>;
@@ -1583,8 +1588,8 @@
 
 			drive_gma {
 				nvidia,pins = "drive_gma";
-				nvidia,high-speed-mode = <TEGRA_PIN_DRIVE_HIGH_SPEED_MODE_ENABLE>;
-				nvidia,schmitt = <TEGRA_PIN_DRIVE_SCHMITT_DISABLE>;
+				nvidia,high-speed-mode = <TEGRA_PIN_ENABLE>;
+				nvidia,schmitt = <TEGRA_PIN_DISABLE>;
 				nvidia,pull-down-strength = <1>;
 				nvidia,pull-up-strength = <2>;
 				nvidia,slew-rate-rising = <TEGRA_PIN_SLEW_RATE_FASTEST>;
