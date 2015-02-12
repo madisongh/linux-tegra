@@ -589,8 +589,8 @@ void tegra_fb_update_monspecs(struct tegra_fb_info *fb_info,
 		 * displayed on 'mode' device.
 		 */
 		fb_info->info->mode = (struct fb_videomode*) NULL;
-
-		memset(&fb_info->info->var, 0x0, sizeof(fb_info->info->var));
+		fb_add_videomode(&tegra_dc_vga_mode, &fb_info->info->modelist);
+		fb_videomode_to_var(&fb_info->info->var, &tegra_dc_vga_mode);
 
 		tegra_dc_set_mode(fb_info->win.dc, &mode);
 		mutex_unlock(&fb_info->info->lock);
