@@ -61,6 +61,7 @@ struct tegra_sdhci_platform_data {
 	bool en_periodic_cflush; /* Enable periodic cache flush for eMMC */
 	int cd_gpio;
 	bool cd_wakeup_capable;
+	bool en_periodic_calib;
 };
 
 #endif

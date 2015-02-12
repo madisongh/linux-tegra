@@ -275,6 +275,9 @@
 #define SDHCI_MAX_DIV_SPEC_200	256
 #define SDHCI_MAX_DIV_SPEC_300	2046
 
+/* Time (in milli sec) interval to run auto calibration */
+#define SDHCI_PERIODIC_CALIB_TIMEOUT	100
+
 /*
  * Host SDMA buffer boundary. Valid values from 4K to 512K in powers of 2.
  */
@@ -441,6 +444,7 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_SKIP_TUNING			(1<<20)
 #define SDHCI_QUIRK2_SEL_SDR104_UHS_MODE_IN_SDR50	(1<<21)
 #define SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR		(1<<22)
+#define SDHCI_QUIRK2_PERIODIC_CALIBRATION		(1<<23)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
@@ -538,6 +542,8 @@ struct sdhci_host {
 #define SDHCI_TUNING_MODE_1	0
 	struct cmdq_host	*cq_host;
 	bool			need_vmmc_ocr_bypass;
+	ktime_t timestamp;
+	bool is_calibration_done;
 
 	unsigned long private[0] ____cacheline_aligned;
 };

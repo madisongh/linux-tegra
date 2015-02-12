@@ -40,6 +40,7 @@
 #include <linux/mmc/cmdq_hci.h>
 #include <linux/pm_runtime.h>
 #include <linux/tegra-soc.h>
+#include <linux/ktime.h>
 
 #include "sdhci-pltfm.h"
 
@@ -198,6 +199,7 @@ struct sdhci_tegra {
 	unsigned char timing;
 	unsigned int cd_irq;
 	bool wake_enable_failed;
+	ktime_t timestamp;
 };
 
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
@@ -384,6 +386,7 @@ static void sdhci_tegra_card_event(struct sdhci_host *sdhci)
 		err = tegra_sdhci_configure_regulators(sdhci,
 				CONFIG_REG_DIS, 0, 0);
 
+		sdhci->is_calibration_done = false;
 		/*
 		 * Set retune request as tuning should be done next time
 		 * a card is inserted.
@@ -720,8 +723,11 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
 	u8 vendor_ctrl;
 	int ret = 0;
+	ktime_t cur_time;
+	s64 period_time;
 
 	if (tegra_platform_is_vdk())
 		return;
@@ -754,6 +760,15 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 			}
 		}
 		tegra_sdhci_set_clk_rate(sdhci, clock);
+		if (plat->en_periodic_calib &&
+			sdhci->is_calibration_done) {
+			cur_time = ktime_get();
+			period_time = ktime_to_ms(ktime_sub(cur_time,
+						tegra_host->timestamp));
+			if (period_time >= SDHCI_PERIODIC_CALIB_TIMEOUT)
+				tegra_sdhci_do_calibration(sdhci,
+						sdhci->mmc->ios.signal_voltage);
+		}
 		sdhci_set_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
 		/* power down / idle state */
@@ -1132,6 +1147,11 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 		clk |= SDHCI_CLOCK_CARD_EN;
 		sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
 	}
+	if (tegra_host->plat->en_periodic_calib) {
+		tegra_host->timestamp = ktime_get();
+		sdhci->timestamp = ktime_get();
+		sdhci->is_calibration_done = true;
+	}
 }
 
 static void tegra_sdhci_set_padctrl(struct sdhci_host *sdhci, int voltage)
@@ -1287,6 +1307,8 @@ static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
 	int ret = 0;
 
 	ret = tegra_sdhci_configure_regulators(sdhci, CONFIG_REG_DIS, 0, 0);
+
+	sdhci->is_calibration_done = false;
 
 	/* Enable wake irq at end of suspend */
 	if (device_may_wakeup(&pdev->dev)) {
@@ -1661,6 +1683,8 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	}
 
 	plat->cd_wakeup_capable = of_property_read_bool(np, "nvidia,cd-wakeup-capable");
+	plat->en_periodic_calib = of_property_read_bool(np,
+			"nvidia,en-periodic-calib");
 
 	tegra_host->plat = plat;
 	return mmc_of_parse(host->mmc);
@@ -1921,6 +1945,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 			pr_err("CMDQ: cmdq_platfm_init successful\n");
 	}
 #endif
+	if (plat->en_periodic_calib)
+		host->quirks2 |= SDHCI_QUIRK2_PERIODIC_CALIBRATION;
 
 	rc = sdhci_add_host(host);
 
