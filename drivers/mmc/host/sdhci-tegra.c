@@ -1436,7 +1436,7 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	of_property_read_u32(np, "compad-vref-1v8", &plat->compad_vref_1v8);
 	of_property_read_u32(np, "calib_3v3_offsets", &plat->calib_3v3_offsets);
 	of_property_read_u32(np, "calib_1v8_offsets", &plat->calib_1v8_offsets);
-	of_property_read_u8(np, "default-drv-type", &plat->default_drv_type);
+	of_property_read_u32(np, "default-drv-type", &plat->default_drv_type);
 	plat->update_pinctrl_settings = of_property_read_bool(np,
 		"nvidia,update-pinctrl-settings");
 	plat->dll_calib_needed = of_property_read_bool(np, "nvidia,dll-calib-needed");
