@@ -615,7 +615,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
 	}
 
 	/* phy-supply */
-	phy->pwr = regulator_get_optional(dev, "phy");
+	phy->pwr = regulator_get(dev, "phy");
 	if (IS_ERR(phy->pwr)) {
 		if (PTR_ERR(phy->pwr) == -EPROBE_DEFER) {
 			ret = -EPROBE_DEFER;
