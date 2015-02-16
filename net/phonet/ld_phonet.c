@@ -271,7 +271,8 @@ static int ld_phonet_ldisc_open(struct tty_struct *tty)
 	struct net_device *dev;
 	int err = 0;
 	/* Create net device */
-	dev = alloc_netdev(sizeof(*ld_pn), "upnlink%d", ld_pn_net_setup);
+	dev = alloc_netdev(sizeof(*ld_pn), "upnlink%d", NET_NAME_UNKNOWN,
+			   ld_pn_net_setup);
 	if (!dev)
 		return -ENOMEM;
 
