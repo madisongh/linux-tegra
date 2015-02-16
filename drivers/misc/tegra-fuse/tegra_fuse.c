@@ -40,6 +40,7 @@
 #include <../../arch/arm/mach-tegra/iomap.h>
 #include <linux/platform/tegra/common.h>
 
+#include <asm/fixmap.h>
 #ifdef CONFIG_ARM64
 #include <asm/mmu.h>
 #endif
@@ -599,12 +600,14 @@ static void tegra_get_tegraid_from_hw(void)
 	void __iomem *early_base;
 	extern bool iotable_init_done;
 	if (!iotable_init_done) {
+		early_base = early_ioremap(TEGRA_APB_MISC_BASE, TEGRA_APB_MISC_SIZE);
+		BUG_ON(!early_base);
 		/* Map in APB_BASE in case earlyprintk is not enabled */
-		early_base = early_io_map(TEGRA_APB_MISC_BASE, EARLYCON_IOBASE);
 		chip_id = early_base + 0x804;
 		netlist = early_base + 0x860;
 		cid = readl(chip_id);
 		nlist = readl(netlist);
+		early_iounmap(early_base, TEGRA_APB_MISC_SIZE);
 	} else {
 		cid = tegra_read_apb_misc_reg(0x804);
 		nlist = tegra_read_apb_misc_reg(0x860);
