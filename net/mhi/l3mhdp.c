@@ -269,7 +269,8 @@ mhdp_add_tunnel(struct net *net, struct mhdp_tunnel_parm *parms)
 		goto err_alloc_dev;
 
 	mhdp_dev = alloc_netdev(sizeof(struct mhdp_tunnel),
-				MHDP_IFNAME, mhdp_netdev_setup);
+				MHDP_IFNAME, NET_NAME_UNKNOWN,
+				mhdp_netdev_setup);
 	if (!mhdp_dev)
 		goto err_alloc_dev;
 
@@ -905,7 +906,7 @@ static int __net_init mhdp_init_net(struct net *net)
 	mhdpn->tunnels = NULL;
 
 	mhdpn->ctl_dev = alloc_netdev(sizeof(struct mhdp_tunnel),
-				      MHDP_CTL_IFNAME,
+				      MHDP_CTL_IFNAME, NET_NAME_UNKNOWN,
 				      mhdp_netdev_setup);
 	if (!mhdpn->ctl_dev)
 		return -ENOMEM;
