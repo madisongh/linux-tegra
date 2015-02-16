@@ -31,7 +31,6 @@
 #include <linux/of.h>
 
 u32 tegra_read_chipid(void);
-u8 tegra_get_chip_id(void);
 
 enum tegra_revision {
 	TEGRA_REVISION_UNKNOWN = 0,
