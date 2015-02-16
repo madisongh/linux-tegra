@@ -211,7 +211,9 @@ static int palmas_gpio_remove(struct platform_device *pdev)
 {
 	struct palmas_gpio *palmas_gpio = platform_get_drvdata(pdev);
 
-	return gpiochip_remove(&palmas_gpio->gpio_chip);
+	gpiochip_remove(&palmas_gpio->gpio_chip);
+
+	return 0;
 }
 
 static struct of_device_id of_palmas_gpio_match[] = {
