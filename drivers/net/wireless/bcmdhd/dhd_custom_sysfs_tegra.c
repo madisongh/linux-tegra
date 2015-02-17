@@ -18,23 +18,23 @@
 
 #include "dhd_custom_sysfs_tegra.h"
 
-static DEVICE_ATTR(ping, S_IRUGO | S_IWUGO,
+static DEVICE_ATTR(ping, S_IRUGO | S_IWUSR,
 	tegra_sysfs_histogram_ping_show,
 	tegra_sysfs_histogram_ping_store);
 
-static DEVICE_ATTR(rssi, S_IRUGO | S_IWUGO,
+static DEVICE_ATTR(rssi, S_IRUGO | S_IWUSR,
 	tegra_sysfs_histogram_rssi_show,
 	tegra_sysfs_histogram_rssi_store);
 
-static DEVICE_ATTR(scan, S_IRUGO | S_IWUGO,
+static DEVICE_ATTR(scan, S_IRUGO | S_IWUSR,
 	tegra_sysfs_histogram_scan_show,
 	tegra_sysfs_histogram_scan_store);
 
-static DEVICE_ATTR(stat, S_IRUGO | S_IWUGO,
+static DEVICE_ATTR(stat, S_IRUGO | S_IWUSR,
 	tegra_sysfs_histogram_stat_show,
 	tegra_sysfs_histogram_stat_store);
 
-static DEVICE_ATTR(tcpdump, S_IRUGO | S_IWUGO,
+static DEVICE_ATTR(tcpdump, S_IRUGO | S_IWUSR,
 	tegra_sysfs_histogram_tcpdump_show,
 	tegra_sysfs_histogram_tcpdump_store);
 
