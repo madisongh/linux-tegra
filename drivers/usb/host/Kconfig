@@ -211,6 +211,7 @@ config USB_EHCI_MSM
 config USB_EHCI_TEGRA
        tristate "NVIDIA Tegra HCD support"
        depends on ARCH_TEGRA
+       depends on RESET_CONTROLLER
        select USB_EHCI_ROOT_HUB_TT
        select USB_PHY
        help
