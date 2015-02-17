@@ -56,7 +56,6 @@
 
 #ifdef CONFIG_ARM64
 #include <linux/irqchip/arm-gic.h>
-#include <asm/system_info.h>
 #else
 #include <asm/system.h>
 #include <asm/hardware/cache-l2x0.h>
@@ -1345,6 +1344,7 @@ void tegra_get_board_info(struct board_info *bi)
 	static bool parsed = 0;
 
 	if (!parsed) {
+		unsigned int system_serial_high, system_serial_low;
 		parsed = 1;
 		ret = tegra_get_board_info_properties(bi, "proc-board");
 		if (!ret) {
@@ -1353,16 +1353,6 @@ void tegra_get_board_info(struct board_info *bi)
 			system_serial_low = (bi->fab << 24) |
 						(bi->major_revision << 16) |
 						(bi->minor_revision << 8);
-			return;
-		}
-
-		if (system_serial_high || system_serial_low) {
-			bi->board_id = (system_serial_high >> 16) & 0xFFFF;
-			bi->sku = (system_serial_high) & 0xFFFF;
-			bi->fab = (system_serial_low >> 24) & 0xFF;
-			bi->major_revision = (system_serial_low >> 16) & 0xFF;
-			bi->minor_revision = (system_serial_low >> 8) & 0xFF;
-			memcpy(&main_board_info, bi, sizeof(struct board_info));
 			return;
 		}
 	}
