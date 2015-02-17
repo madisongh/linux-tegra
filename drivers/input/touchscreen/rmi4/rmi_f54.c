@@ -1968,7 +1968,7 @@ static ssize_t rmi_fn_54_report_type_store(struct device *dev,
 	instance_data = fn_dev->data;
 
 	/* need to convert the string data to an actual value */
-	result = strict_strtoul(buf, 10, &val);
+	result = kstrtoul(buf, 10, &val);
 	if (result)
 		return result;
 	if (!is_report_type_valid(val)) {
@@ -2013,7 +2013,7 @@ static ssize_t rmi_fn_54_get_report_store(struct device *dev,
 	driver = fn_dev->rmi_dev->driver;
 
 	/* need to convert the string data to an actual value */
-	error = strict_strtoul(buf, 10, &val);
+	error = kstrtoul(buf, 10, &val);
 	if (error)
 		return error;
 	/* Do nothing if not set to 1. This prevents accidental commands. */
@@ -2100,7 +2100,7 @@ static ssize_t rmi_fn_54_force_cal_store(struct device *dev,
 	driver = fn_dev->rmi_dev->driver;
 
 	/* need to convert the string data to an actual value */
-	error = strict_strtoul(buf, 10, &val);
+	error = kstrtoul(buf, 10, &val);
 	if (error)
 		return error;
 	/* Do nothing if not set to 1. This prevents accidental commands. */
@@ -2182,7 +2182,7 @@ static ssize_t rmi_fn_54_no_auto_cal_store(struct device *dev,
 	instance_data = fn_dev->data;
 
 	/* need to convert the string data to an actual value */
-	result = strict_strtoul(buf, 10, &val);
+	result = kstrtoul(buf, 10, &val);
 
 	/* if an error occured, return it */
 	if (result)
@@ -2258,7 +2258,7 @@ static ssize_t rmi_fn_54_fifoindex_store(struct device *dev,
 	instance_data = fn_dev->data;
 
 	/* need to convert the string data to an actual value */
-	error = strict_strtoul(buf, 10, &val);
+	error = kstrtoul(buf, 10, &val);
 
 	if (error)
 		return error;

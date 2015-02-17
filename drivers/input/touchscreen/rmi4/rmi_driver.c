@@ -453,7 +453,7 @@ static ssize_t rmi_driver_bsr_store(struct device *dev,
 	data = dev_get_drvdata(&rmi_dev->dev);
 
 	/* need to convert the string data to an actual value */
-	retval = strict_strtoul(buf, 10, &val);
+	retval = kstrtoul(buf, 10, &val);
 	if (retval < 0 || val > 255) {
 		dev_err(dev, "Invalid value '%s' written to BSR.\n", buf);
 		return -EINVAL;

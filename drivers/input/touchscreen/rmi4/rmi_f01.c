@@ -428,7 +428,7 @@ static ssize_t rmi_fn_01_sleepmode_store(struct device *dev,
 
 	data = fn_dev->data;
 
-	retval = strict_strtoul(buf, 10, &new_value);
+	retval = kstrtoul(buf, 10, &new_value);
 	if (retval < 0 || !RMI_IS_VALID_SLEEPMODE(new_value)) {
 		dev_err(dev, "%s: Invalid sleep mode %s.", __func__, buf);
 		return -EINVAL;
@@ -469,7 +469,7 @@ static ssize_t rmi_fn_01_nosleep_store(struct device *dev,
 
 	data = fn_dev->data;
 
-	retval = strict_strtoul(buf, 10, &new_value);
+	retval = kstrtoul(buf, 10, &new_value);
 	if (retval < 0 || new_value > 1) {
 		dev_err(dev, "%s: Invalid nosleep bit %s.", __func__, buf);
 		return -EINVAL;
@@ -509,7 +509,7 @@ static ssize_t rmi_fn_01_chargerinput_store(struct device *dev,
 
 	data = fn_dev->data;
 
-	retval = strict_strtoul(buf, 10, &new_value);
+	retval = kstrtoul(buf, 10, &new_value);
 	if (retval < 0 || new_value > 1) {
 		dev_err(dev, "%s: Invalid chargerinput bit %s.", __func__, buf);
 		return -EINVAL;
@@ -549,7 +549,7 @@ static ssize_t rmi_fn_01_reportrate_store(struct device *dev,
 
 	data = fn_dev->data;
 
-	retval = strict_strtoul(buf, 10, &new_value);
+	retval = kstrtoul(buf, 10, &new_value);
 	if (retval < 0 || new_value > 1) {
 		dev_err(dev, "%s: Invalid reportrate bit %s.", __func__, buf);
 		return -EINVAL;
@@ -640,7 +640,7 @@ static ssize_t rmi_fn_01_doze_interval_store(struct device *dev,
 
 	data = fn_dev->data;
 
-	retval = strict_strtoul(buf, 10, &new_value);
+	retval = kstrtoul(buf, 10, &new_value);
 	if (retval < 0 || new_value > 255) {
 		dev_err(dev, "%s: Invalid doze interval %s.", __func__, buf);
 		return -EINVAL;
@@ -688,7 +688,7 @@ static ssize_t rmi_fn_01_wakeup_threshold_store(struct device *dev,
 
 	data = fn_dev->data;
 
-	retval = strict_strtoul(buf, 10, &new_value);
+	retval = kstrtoul(buf, 10, &new_value);
 	if (retval < 0 || new_value > 255) {
 		dev_err(dev, "%s: Invalid wakeup threshold %s.", __func__, buf);
 		return -EINVAL;
@@ -733,7 +733,7 @@ static ssize_t rmi_fn_01_doze_holdoff_store(struct device *dev,
 
 	data = fn_dev->data;
 
-	retval = strict_strtoul(buf, 10, &new_value);
+	retval = kstrtoul(buf, 10, &new_value);
 	if (retval < 0 || new_value > 255) {
 		dev_err(dev, "%s: Invalid doze holdoff %s.", __func__, buf);
 		return -EINVAL;

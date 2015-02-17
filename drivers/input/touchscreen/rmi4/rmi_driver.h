@@ -136,7 +136,7 @@ static ssize_t tricat(rmi_fn_, FNUM, _##propname##_store)(\
 	data = fc->data;\
 \
 	/* need to convert the string data to an actual value */\
-	result = strict_strtoul(buf, 10, &val);\
+	result = kstrtoul(buf, 10, &val);\
 \
 	/* if an error occured, return it */\
 	if (result)\

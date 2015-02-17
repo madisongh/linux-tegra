@@ -101,7 +101,7 @@ static ssize_t rmi_fn_34_bootloaderid_store(struct device *dev,
 	instance_data = fn_dev->data;
 
 	/* need to convert the string data to an actual value */
-	error = strict_strtoul(buf, 10, &val);
+	error = kstrtoul(buf, 10, &val);
 
 	if (error)
 		return error;
@@ -235,7 +235,7 @@ static ssize_t rmi_fn_34_cmd_store(struct device *dev,
 	data_base_addr = fn_dev->fd.data_base_addr;
 
 	/* need to convert the string data to an actual value */
-	error = strict_strtoul(buf, 10, &val);
+	error = kstrtoul(buf, 10, &val);
 	if (error)
 		return error;
 
@@ -322,7 +322,7 @@ static ssize_t rmi_fn_34_blocknum_store(struct device *dev,
 	data_base_addr = fn_dev->fd.data_base_addr;
 
 	/* need to convert the string data to an actual value */
-	error = strict_strtoul(buf, 10, &val);
+	error = kstrtoul(buf, 10, &val);
 
 	if (error)
 		return error;

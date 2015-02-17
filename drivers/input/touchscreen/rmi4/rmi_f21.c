@@ -785,7 +785,7 @@ static ssize_t rmi_fn_21_rezero_store(struct device *dev,
 	driver = fn_dev->rmi_dev->driver;
 
 	/* need to convert the string data to an actual value */
-	error = strict_strtoul(buf, 10, &val);
+	error = kstrtoul(buf, 10, &val);
 	if (error)
 		return error;
 	/* Do nothing if not set to 1. This prevents accidental commands. */
