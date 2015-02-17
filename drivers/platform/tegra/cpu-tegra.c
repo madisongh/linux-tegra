@@ -1290,8 +1290,7 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
 	}
 	clk_prepare_enable(cpu_clk);
 
-	cpufreq_frequency_table_cpuinfo(policy, freq_table);
-	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
+	cpufreq_table_validate_and_show(policy, freq_table);
 
 	/* clip boot frequency to table entry */
 	ret = cpufreq_frequency_table_target(policy, freq_table, freq,
