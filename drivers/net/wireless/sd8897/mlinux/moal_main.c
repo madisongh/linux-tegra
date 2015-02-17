@@ -6168,7 +6168,7 @@ MODULE_PARM_DESC(ps_mode,
 module_param(max_tx_buf, int, 0);
 MODULE_PARM_DESC(max_tx_buf, "Maximum Tx buffer size (2048/4096/8192)");
 #ifdef SDIO_SUSPEND_RESUME
-module_param(pm_keep_power, int, 1);
+module_param(pm_keep_power, int, S_IRUGO);
 MODULE_PARM_DESC(pm_keep_power, "1: PM keep power; 0: PM no power");
 module_param(shutdown_hs, int, 0);
 MODULE_PARM_DESC(shutdown_hs,
@@ -6188,7 +6188,7 @@ MODULE_PARM_DESC(txpwrlimit_cfg,
 		 "Set configuration data of Tx power limitation");
 module_param(init_hostcmd_cfg, charp, 0);
 MODULE_PARM_DESC(init_hostcmd_cfg, "Init hostcmd file name");
-module_param(minicard_pwrup, int, 1);
+module_param(minicard_pwrup, int, S_IRUGO);
 MODULE_PARM_DESC(minicard_pwrup,
 		 "1: Driver load clears PDn/Rst, unload sets (default); 0: Don't do this.");
 module_param(cfg80211_wext, int, 0);
