@@ -69,7 +69,6 @@
 
 #include <mach/irqs.h>
 #include <mach/io_dpd.h>
-#include <mach/i2s.h>
 #include <linux/platform/tegra/isomgr.h>
 #include <mach/tegra_asoc_pdata.h>
 #include <mach/dc.h>
@@ -152,13 +151,8 @@ static struct i2c_board_info __initdata rt5639_board_info = {
 	I2C_BOARD_INFO("rt5639", 0x1c),
 };
 
-static struct max98090_eq_cfg max98090_eq_cfg[] = {
-};
 
 static struct max98090_pdata norrin_max98090_pdata = {
-	/* Equalizer Configuration */
-	.eq_cfg = max98090_eq_cfg,
-	.eq_cfgcnt = ARRAY_SIZE(max98090_eq_cfg),
 
 	/* Microphone Configuration */
 	.digmic_left_mode = 1,

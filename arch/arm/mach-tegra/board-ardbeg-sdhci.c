@@ -29,6 +29,7 @@
 #include <linux/mfd/max77660/max77660-core.h>
 #include <linux/tegra-fuse.h>
 #include <linux/dma-mapping.h>
+#include <linux/slab.h>
 #include <linux/clk/tegra.h>
 
 #include <asm/mach-types.h>
