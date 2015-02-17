@@ -24,12 +24,10 @@
 #include <linux/fsl_devices.h>
 #include <linux/serial_8250.h>
 #include <linux/mipi-bif-tegra.h>
-#include <linux/platform_data/tegra_usb.h>
 #include <linux/nvhost.h>
 #include <linux/clk.h>
 #include <linux/tegra-soc.h>
 #include <mach/irqs.h>
-#include <linux/usb/tegra_usb_phy.h>
 #include <linux/tegra_smmu.h>
 #include <linux/dma-contiguous.h>
 
