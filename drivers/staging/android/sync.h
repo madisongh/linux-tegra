@@ -131,6 +131,8 @@ struct sync_pt {
 	struct list_head	active_list;
 };
 
+extern struct sync_pt *sync_pt_from_fence(struct fence *fence);
+
 static inline struct sync_timeline *sync_pt_parent(struct sync_pt *pt)
 {
 	return container_of(pt->base.lock, struct sync_timeline,

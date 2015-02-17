@@ -762,3 +762,10 @@ static const struct file_operations sync_fence_fops = {
 	.compat_ioctl = sync_fence_ioctl,
 };
 
+struct sync_pt *sync_pt_from_fence(struct fence *fence)
+{
+	if (fence->ops != &android_fence_ops)
+		return NULL;
+
+	return container_of(fence, struct sync_pt, base);
+}
