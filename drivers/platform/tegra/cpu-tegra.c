@@ -754,7 +754,7 @@ int tegra_update_cpu_speed(unsigned long rate)
 	}
 
 	if (freqs.old != freqs.new)
-		cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+		cpufreq_freq_transition_begin(policy, &freqs);
 
 #ifdef CONFIG_CPU_FREQ_DEBUG
 	printk(KERN_DEBUG "cpufreq-tegra: transition: %u --> %u\n",
@@ -766,14 +766,14 @@ int tegra_update_cpu_speed(unsigned long rate)
 		pr_err("cpu-tegra: Failed to set cpu frequency to %d kHz\n",
 			actual_freqs.new);
 		freqs.new = freqs.old;
-		cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+		cpufreq_freq_transition_end(policy, &freqs, 0);
 		goto _err;
 	}
 
 	freqs.new = tegra_getspeed(0);
 
 	if (freqs.old != freqs.new)
-		cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
+		cpufreq_freq_transition_end(policy, &freqs, 0);
 
 	if (actual_freqs.old > actual_freqs.new)
 		tegra_update_mselect_rate(actual_freqs.new);
