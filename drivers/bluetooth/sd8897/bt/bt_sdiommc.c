@@ -1761,5 +1761,5 @@ MODULE_PARM_DESC(fw_name, "Firmware name");
 module_param(req_fw_nowait, int, 0);
 MODULE_PARM_DESC(req_fw_nowait,
 		 "0: Use request_firmware API; 1: Use request_firmware_nowait API");
-module_param(multi_fn, int, 4);
+module_param(multi_fn, int, S_IRUGO);
 MODULE_PARM_DESC(multi_fn, "Bit 2: FN2;");

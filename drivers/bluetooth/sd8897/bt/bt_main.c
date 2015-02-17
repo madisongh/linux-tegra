@@ -2567,16 +2567,16 @@ MODULE_AUTHOR("Marvell International Ltd.");
 MODULE_DESCRIPTION("Marvell Bluetooth Driver Ver. " VERSION);
 MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");
-module_param(fw, int, 1);
+module_param(fw, int, S_IRUGO);
 MODULE_PARM_DESC(fw, "0: Skip firmware download; otherwise: Download firmware");
-module_param(psmode, int, 1);
+module_param(psmode, int, S_IRUGO);
 MODULE_PARM_DESC(psmode, "1: Enable powermode; 0: Disable powermode");
 #ifdef	DEBUG_LEVEL1
 module_param(mbt_drvdbg, uint, 0);
 MODULE_PARM_DESC(mbt_drvdbg, "BIT3:DBG_DATA BIT4:DBG_CMD 0xFF:DBG_ALL");
 #endif
 #ifdef SDIO_SUSPEND_RESUME
-module_param(mbt_pm_keep_power, int, 1);
+module_param(mbt_pm_keep_power, int, S_IRUGO);
 MODULE_PARM_DESC(mbt_pm_keep_power, "1: PM keep power; 0: PM no power");
 #endif
 module_param(init_cfg, charp, 0);
@@ -2598,7 +2598,7 @@ module_param(fm_name, charp, 0);
 MODULE_PARM_DESC(fm_name, "FM interface name");
 module_param(nfc_name, charp, 0);
 MODULE_PARM_DESC(nfc_name, "NFC interface name");
-module_param(debug_intf, int, 1);
+module_param(debug_intf, int, S_IRUGO);
 MODULE_PARM_DESC(debug_intf,
 		 "1: Enable debug interface; 0: Disable debug interface ");
 module_param(debug_name, charp, 0);
