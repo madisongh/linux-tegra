@@ -228,8 +228,8 @@ static struct miscdevice throughput_miscdev = {
 	.mode  = 0666,
 };
 
-static ssize_t show_fps(struct kobject *kobj,
-	struct attribute *attr, char *buf)
+static ssize_t fps_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
 {
 	int frame_time_avg;
 	ktime_t now;
@@ -251,11 +251,10 @@ DONE:
 	return sprintf(buf, "%d\n", fps);
 }
 
-static struct global_attr fps_attr = __ATTR(fps, 0444,
-		show_fps, NULL);
+static DEVICE_ATTR_RO(fps);
 
-static ssize_t show_framecount(struct kobject *kobj,
-	struct attribute *attr, char *buf)
+static ssize_t framecount_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
 {
 	u64 fcount;
 	u64 fstamp;
@@ -269,8 +268,7 @@ static ssize_t show_framecount(struct kobject *kobj,
 		       fcount, fstamp);
 }
 
-static struct global_attr framecount_attr = __ATTR(framecount, 0444,
-		show_framecount, NULL);
+static DEVICE_ATTR_RO(framecount);
 
 static int __init throughput_init_miscdev(void)
 {
@@ -282,10 +280,10 @@ static int __init throughput_init_miscdev(void)
 	INIT_WORK(&work, set_throughput_hint);
 
 	ret_md = misc_register(&throughput_miscdev);
-	ret_f1 = sysfs_create_file(&throughput_miscdev.this_device->kobj,
-				   &fps_attr.attr);
-	ret_f2 = sysfs_create_file(&throughput_miscdev.this_device->kobj,
-				   &framecount_attr.attr);
+	ret_f1 = device_create_file(throughput_miscdev.this_device,
+				    &dev_attr_fps);
+	ret_f2 = device_create_file(throughput_miscdev.this_device,
+				    &dev_attr_framecount);
 
 	if (ret_md == 0 && ret_f1 == 0 && ret_f2 == 0) {
 		tegra_dc_set_flip_callback(throughput_flip_callback);
@@ -294,11 +292,11 @@ static int __init throughput_init_miscdev(void)
 	}
 
 	if (ret_f2 == 0)
-		sysfs_remove_file(&throughput_miscdev.this_device->kobj,
-				  &framecount_attr.attr);
+		device_remove_file(throughput_miscdev.this_device,
+				   &dev_attr_framecount);
 	if (ret_f1 == 0)
-		sysfs_remove_file(&throughput_miscdev.this_device->kobj,
-				  &fps_attr.attr);
+		device_remove_file(throughput_miscdev.this_device,
+				   &dev_attr_fps);
 	if (ret_md == 0)
 		misc_deregister(&throughput_miscdev);
 
@@ -319,10 +317,10 @@ static void __exit throughput_exit_miscdev(void)
 
 	cancel_work_sync(&work);
 
-	sysfs_remove_file(&throughput_miscdev.this_device->kobj,
-			  &framecount_attr.attr);
-	sysfs_remove_file(&throughput_miscdev.this_device->kobj,
-			  &fps_attr.attr);
+	device_remove_file(throughput_miscdev.this_device,
+			   &dev_attr_framecount);
+	device_remove_file(throughput_miscdev.this_device,
+			   &dev_attr_fps);
 
 	misc_deregister(&throughput_miscdev);
 }
