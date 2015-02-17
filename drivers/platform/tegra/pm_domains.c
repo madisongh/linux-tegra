@@ -52,6 +52,8 @@ struct domain_client {
 	struct generic_pm_domain *domain;
 };
 
+#warning TODO: pm domain suspend ops removed
+#if 0
 #ifdef CONFIG_PM_SLEEP
 
 static int tegra_pd_suspend_dev(struct device *dev)
@@ -146,6 +148,7 @@ static struct gpd_dev_ops tegra_pd_ops = {
 	.thaw_early = tegra_pd_thaw_early,
 	.thaw = tegra_pd_thaw_dev,
 };
+#endif
 
 #ifdef CONFIG_ARCH_TEGRA_21x_SOC
 static int tegra_mc_clk_power_off(struct generic_pm_domain *genpd)
@@ -479,7 +482,9 @@ void tegra_pd_add_device(struct device *dev)
 	device_set_wakeup_capable(dev, 1);
 	pm_genpd_add_device(master, dev);
 	pm_genpd_dev_need_save(dev, false);
+#if 0
 	pm_genpd_add_callbacks(dev, &tegra_pd_ops, NULL);
+#endif
 }
 EXPORT_SYMBOL(tegra_pd_add_device);
 

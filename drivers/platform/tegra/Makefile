@@ -6,6 +6,7 @@
 GCOV_PROFILE := y
 
 subdir-ccflags-y += -Werror
+subdir-ccflags-y += -Wno-error=cpp
 subdir-ccflags-y += -I$(srctree)/drivers/platform/tegra/include \
 		    -I$(srctree)/arch/arm/mach-tegra
 
