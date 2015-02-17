@@ -144,7 +144,7 @@ static void of_get_regulation_constraints(struct device_node *np,
 
 	ret = of_property_read_u32(np, "regulator-disable-ramp-delay", &pval);
 	if (!ret)
-		constraints->disable_time = pval;
+		BUG(); // This needs to be converted to off_on_delay
 
 	ret = of_property_read_u32(np, "regulator-init-mode", &pval);
 	if (!ret)
