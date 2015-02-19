@@ -59,7 +59,11 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
 
 static inline int set_arch_dma_coherent_ops(struct device *dev)
 {
+#ifdef CONFIG_SWIOTLB
 	set_dma_ops(dev, &coherent_swiotlb_dma_ops);
+#else
+	BUG();
+#endif
 	return 0;
 }
 #define set_arch_dma_coherent_ops	set_arch_dma_coherent_ops
