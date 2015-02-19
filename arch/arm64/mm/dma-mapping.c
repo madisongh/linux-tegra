@@ -1597,12 +1597,12 @@ static dma_addr_t __alloc_iova_at(struct dma_iommu_mapping *mapping,
 				  dma_addr_t *iova, size_t size,
 				  struct dma_attrs *attrs)
 {
-#if 1
-	BUG(); /* TODO: Fix implementation for multiple bitmaps */
-#else
 	unsigned int count, start, orig;
+	size_t mapping_size = mapping->bits << PAGE_SHIFT;
 	unsigned long flags;
 	size_t bytes;
+	u32 bitmap_index;
+	dma_addr_t bitmap_base;
 
 	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
 
@@ -1610,30 +1610,41 @@ static dma_addr_t __alloc_iova_at(struct dma_iommu_mapping *mapping,
 
 	bytes = count << PAGE_SHIFT;
 
-	spin_lock_irqsave(&mapping->lock, flags);
+	bitmap_index = (u32) (*iova - mapping->base) / (u32) mapping_size;
+	bitmap_base = mapping->base + mapping_size * bitmap_index;
 
-	if ((*iova < mapping->base) || (bytes > mapping->end - *iova)) {
+	if ((*iova < mapping->base) || bitmap_index > mapping->extensions ||
+			(bytes > (bitmap_base + mapping_size) - *iova)) {
 		*iova = -ENXIO;
-		goto err_out;
+		return DMA_ERROR_CODE;
 	}
 
-	orig = (*iova - mapping->base) >> PAGE_SHIFT;
-	start = bitmap_find_next_zero_area(mapping->bitmap, mapping->bits,
-					   orig, count, 0);
+	orig = (*iova - bitmap_base) >> PAGE_SHIFT;
+
+	spin_lock_irqsave(&mapping->lock, flags);
+
+	while (mapping->nr_bitmaps <= bitmap_index) {
+		if (extend_iommu_mapping(mapping)) {
+			*iova = -ENXIO;
+			goto err_out;
+		}
+	}
+
+	start = bitmap_find_next_zero_area(mapping->bitmaps[bitmap_index],
+					   mapping->bits, orig, count, 0);
 
 	if ((start > mapping->bits) || (orig != start)) {
 		*iova = -EINVAL;
 		goto err_out;
 	}
 
-	bitmap_set(mapping->bitmap, start, count);
+	bitmap_set(mapping->bitmaps[bitmap_index], start, count);
 	spin_unlock_irqrestore(&mapping->lock, flags);
 
-	return mapping->base + (start << PAGE_SHIFT);
+	return bitmap_base + (start << PAGE_SHIFT);
 
 err_out:
 	spin_unlock_irqrestore(&mapping->lock, flags);
-#endif
 	return DMA_ERROR_CODE;
 }
 
