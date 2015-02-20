@@ -1598,11 +1598,13 @@ static dma_addr_t __alloc_iova_at(struct dma_iommu_mapping *mapping,
 				  struct dma_attrs *attrs)
 {
 	unsigned int count, start, orig;
+	unsigned int current_size, total_size;
 	size_t mapping_size = mapping->bits << PAGE_SHIFT;
 	unsigned long flags;
 	size_t bytes;
-	u32 bitmap_index;
+	u32 bitmap_index, bitmap_last_index, num_bitmaps;
 	dma_addr_t bitmap_base;
+	unsigned int i;
 
 	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
 
@@ -1611,10 +1613,13 @@ static dma_addr_t __alloc_iova_at(struct dma_iommu_mapping *mapping,
 	bytes = count << PAGE_SHIFT;
 
 	bitmap_index = (u32) (*iova - mapping->base) / (u32) mapping_size;
+	bitmap_last_index = (u32) (*iova + bytes - mapping->base) / (u32) mapping_size;
+	num_bitmaps = bitmap_last_index - bitmap_index + 1;
 	bitmap_base = mapping->base + mapping_size * bitmap_index;
 
 	if ((*iova < mapping->base) || bitmap_index > mapping->extensions ||
-			(bytes > (bitmap_base + mapping_size) - *iova)) {
+			bitmap_last_index > mapping->extensions ||
+			(bytes > (bitmap_base + mapping_size * num_bitmaps) - *iova)) {
 		*iova = -ENXIO;
 		return DMA_ERROR_CODE;
 	}
@@ -1623,22 +1628,45 @@ static dma_addr_t __alloc_iova_at(struct dma_iommu_mapping *mapping,
 
 	spin_lock_irqsave(&mapping->lock, flags);
 
-	while (mapping->nr_bitmaps <= bitmap_index) {
+	while (mapping->nr_bitmaps <= bitmap_last_index) {
 		if (extend_iommu_mapping(mapping)) {
 			*iova = -ENXIO;
 			goto err_out;
 		}
 	}
 
+	current_size = min((u32) (bitmap_base + mapping_size - *iova) >> PAGE_SHIFT, count);
+	total_size = count - current_size;
 	start = bitmap_find_next_zero_area(mapping->bitmaps[bitmap_index],
-					   mapping->bits, orig, count, 0);
+					   mapping->bits, orig, current_size, 0);
 
 	if ((start > mapping->bits) || (orig != start)) {
 		*iova = -EINVAL;
 		goto err_out;
 	}
 
-	bitmap_set(mapping->bitmaps[bitmap_index], start, count);
+	for (i = bitmap_index + 1; i <= bitmap_last_index; i++) {
+		current_size = min((u32) mapping->bits, total_size);
+		total_size = total_size - current_size;
+		start = bitmap_find_next_zero_area(mapping->bitmaps[i],
+					mapping->bits, 0, current_size, 0);
+
+		if (start != 0) {
+			*iova = -EINVAL;
+			goto err_out;
+		}
+	}
+
+	current_size = min((u32) (bitmap_base + mapping_size - *iova) >> PAGE_SHIFT, count);
+	total_size = count - current_size;
+	bitmap_set(mapping->bitmaps[bitmap_index], orig, current_size);
+
+	for (i = bitmap_index + 1; i <= bitmap_last_index; i++) {
+		current_size = min((u32) mapping->bits, total_size);
+		total_size = total_size - current_size;
+		bitmap_set(mapping->bitmaps[i], 0, current_size);
+	}
+
 	spin_unlock_irqrestore(&mapping->lock, flags);
 
 	return bitmap_base + (start << PAGE_SHIFT);
