@@ -466,6 +466,7 @@ static int __init arm64_dma_init(void)
 {
 	int ret = 0;
 
+	dma_ops = &arm_dma_ops;
 #ifdef CONFIG_SWIOTLB
 	ret |= swiotlb_late_init();
 #endif /* CONFIG_SWIOTLB */
