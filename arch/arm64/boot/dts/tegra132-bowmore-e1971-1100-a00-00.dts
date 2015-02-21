@@ -46,7 +46,8 @@
 	#size-cells = <2>;
 
 	chosen {
-		bootargs = "tegraid=40.0.0.00.00 vmalloc=256M video=tegrafb console=ttyS0,115200n8";
+		bootargs = "tegraid=40.0.0.00.00 vmalloc=256M video=tegrafb";
+		stdout-path = &uartd;
 		linux,initrd-start = <0x82080000>;
 		linux,initrd-end = <0x824B5300>;
 	};
