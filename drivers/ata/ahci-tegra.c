@@ -1,7 +1,7 @@
 /*
  * ahci-tegra.c - AHCI SATA support for TEGRA AHCI device
  *
- * Copyright (c) 2011-2014, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -309,6 +309,11 @@ static u32 tegra_ahci_idle_time = TEGRA_AHCI_DEFAULT_IDLE_TIME;
 #define T_SATA0_NVOOB_SQUELCH_FILTER_MODE_MASK	(3 << 24)
 #define T_SATA0_NVOOB_SQUELCH_FILTER_LENGTH_SHIFT	26
 #define T_SATA0_NVOOB_SQUELCH_FILTER_LENGTH_MASK	(3 << 26)
+
+#define T_SATA0_FIFO_0				0x170
+#define T_SATA0_FIFO_0_L2P_FIFO_DEPTH		(0x7 << 12)
+#define T_SATA0_FIFO_0_L2P_FIFO_DEPTH_MASK	(0xf << 12)
+
 
 #define PXSSTS_DEVICE_DETECTED			(1 << 0)
 
@@ -1106,6 +1111,11 @@ static int tegra_ahci_controller_init(struct tegra_ahci_host_priv *tegra_hpriv,
 	val |= (1 << T_SATA0_NVOOB_SQUELCH_FILTER_MODE_SHIFT);
 	val |= (3 << T_SATA0_NVOOB_SQUELCH_FILTER_LENGTH_SHIFT);
 	scfg_writel(val, T_SATA0_NVOOB);
+
+	val = scfg_readl(T_SATA0_FIFO_0);
+	val = (val & ~T_SATA0_FIFO_0_L2P_FIFO_DEPTH_MASK) |
+			T_SATA0_FIFO_0_L2P_FIFO_DEPTH;
+	scfg_writel(val, T_SATA0_FIFO_0);
 
 	/*
 	 * WAR: Before enabling SATA PLL shutdown, lockdet needs to be ignored.
