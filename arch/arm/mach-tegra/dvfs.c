@@ -956,7 +956,7 @@ static int dvfs_override_core_voltage(int override_mv)
 	floor = dvfs_rail_get_override_floor(rail);
 	ceiling = rail->nominal_millivolts;
 	if (override_mv && ((override_mv < floor) || (override_mv > ceiling))) {
-		pr_err("%s: override level %d outside the range [%d...%d]\n",
+		pr_info("%s: override level %d outside the range [%d...%d]\n",
 		       __func__, override_mv, floor, ceiling);
 		mutex_unlock(&rail_override_lock);
 		return -EINVAL;

@@ -107,7 +107,6 @@ config ARCH_TEGRA_12x_SOC
 	select TEGRA_ISOMGR
 	select TEGRA_ISOMGR_SYSFS
 	select PROC_DEVICETREE
-        select TEGRA_USE_SIMON
 	help
 	  Support for NVIDIA Tegra 12x family of SoCs, based upon the
 	  ARM Cortex-A15MP CPU

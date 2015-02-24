@@ -406,7 +406,7 @@ int __init ardbeg_edp_init(void)
 	else if (pmu_board_info.board_id == BOARD_PM374)
 		regulator_mA = 16000;
 	else if (pmu_board_info.board_id == BOARD_PM375)
-		regulator_mA = 10500;
+		regulator_mA = 11400;
 	else
 		regulator_mA = 12000;
 

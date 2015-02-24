@@ -48,14 +48,20 @@ static int gpu_vmin_offsets[] = { 0, -20, };
 static int vdd_core_vmin_trips_table[MAX_THERMAL_LIMITS] = { 20, };
 static int vdd_core_therm_floors_table[MAX_THERMAL_LIMITS] = { 950, };
 
+static int vdd_core_vmin_trips_table_sku80[MAX_THERMAL_LIMITS] = { 0, };
+static int vdd_core_therm_floors_table_sku80[MAX_THERMAL_LIMITS] = { 1100, };
+
+static int vdd_core_vmin_trips_table_sku80_alwayson[MAX_THERMAL_LIMITS] = { 0, };
+static int vdd_core_therm_floors_table_sku80_alwayson[MAX_THERMAL_LIMITS] = { 1000, };
+
 static int vdd_core_vmax_trips_table[MAX_THERMAL_LIMITS] = { 62,   72,   82, };
 static int vdd_core_therm_caps_table[MAX_THERMAL_LIMITS] = { 1130, 1100, 1060, };
 
-static int vdd_core_vmax_trips_table_sku80_alwayson[MAX_THERMAL_LIMITS] = { -40, 0, };
-static int vdd_core_therm_caps_table_sku80_alwayson[MAX_THERMAL_LIMITS] = { 950, 1000, };
+static int vdd_core_vmax_trips_table_sku80_alwayson[] = { -40, 0, };
+static int vdd_core_therm_caps_table_sku80_alwayson[] = { 950, 1000, };
 
-static int vdd_core_vmax_trips_table_sku80[MAX_THERMAL_LIMITS] = { -40, 0, 70};
-static int vdd_core_therm_caps_table_sku80[MAX_THERMAL_LIMITS] = { 1000, 1100, 1050 };
+static int vdd_core_vmax_trips_table_sku80[] = { -40, 0, 70};
+static int vdd_core_therm_caps_table_sku80[] = { 1050, 1100, 1050};
 
 #ifndef CONFIG_TEGRA_CPU_VOLT_CAP
 static int vdd_cpu_vmax_trips_table[MAX_THERMAL_LIMITS] = { 62,   72,   82, };
@@ -159,7 +165,7 @@ void __init tegra12x_vdd_cpu_align(int step_uv, int offset_uv)
 /* CPU DVFS tables */
 static unsigned long cpu_max_freq[] = {
 /* speedo_id	0	 1	  2	   3	    4	     5	      6		7	 8*/
-		2014500, 2320500, 2116500, 2524500, 1811000, 2218500, 1938000, 1912500, 2140000,
+		2014500, 2320500, 2116500, 2524500, 1811000, 2218500, 1912500, 1912500, 2116500,
 };
 
 static struct cpu_cvb_dvfs cpu_cvb_dvfs_table[] = {
@@ -195,9 +201,9 @@ static struct cpu_cvb_dvfs cpu_cvb_dvfs_table[] = {
 		 */
 		.clk_switch_trips = {34,}
 	},
-	/* Entry for Embedded SKU CD575MI Always On*/
+	/* Entry for Embedded SKU CD575M Always On*/
 	{
-		.speedo_id = 7,
+		.speedo_id = 6,
 		.process_id = -1,
 		.dfll_tune_data  = {
 			.tune0		= 0x005020FF,
@@ -207,30 +213,71 @@ static struct cpu_cvb_dvfs cpu_cvb_dvfs_table[] = {
 			.tune_high_min_millivolts = 900,
 			.min_millivolts = 720,
 		},
+		.max_mv = 1120,
+		.freqs_mult = KHZ,
+		.speedo_scale = 100,
+		.voltage_scale = 1000,
+		.cvb_table = {
+			/*f       dfll: c0,     c1,   c2  pll:  c0,   c1,    c2 */
+			{204000,        {1112619, -29295, 402}, {950000, 0, 0}},
+			{306000,	{1150460, -30585, 402}, {950000, 0, 0}},
+			{408000,	{1190122, -31865, 402}, {950000, 0, 0}},
+			{510000,	{1231606, -33155, 402}, {950000, 0, 0}},
+			{612000,	{1274912, -34435, 402}, {950000, 0, 0}},
+			{714000,	{1320040, -35725, 402}, {950000, 0, 0}},
+			{816000,	{1366990, -37005, 402}, {950000, 0, 0}},
+			{918000,	{1415762, -38295, 402}, {950000, 0, 0}},
+			{1020000,	{1466355, -39575, 402}, {950000, 0, 0}},
+			{1122000,	{1518771, -40865, 402}, {950000, 0, 0}},
+			{1224000,	{1573009, -42145, 402}, {970000, 0, 0}},
+			{1326000,	{1629068, -43435, 402}, {1100000, 0, 0}},
+			{1428000,	{1686950, -44715, 402}, {1100000, 0, 0}},
+			{1530000,	{1746653, -46005, 402}, {1100000, 0, 0}},
+			{1632000,	{1808179, -47285, 402}, {1200000, 0, 0}},
+			{1734000,	{1871526, -48575, 402}, {1200000, 0, 0}},
+			{1836000,	{1936696, -49855, 402}, {1200000, 0, 0}},
+			{1912500,	{2003687, -51145, 402}, {1200000, 0, 0}},
+			{      0 , 	{      0,      0,   0}, {}},
+		},
+		.vmin_trips_table = { 20, 35, 55, 75, 120 },
+		.therm_floors_table = { 900, 800, 790, 770, 750, },
+	},
+	/* Entry for Embedded SKU CD575MI Always On*/
+	{
+		.speedo_id = 7,
+		.process_id = -1,
+		.dfll_tune_data  = {
+			.tune0		= 0x005040FF,
+			.tune0_high_mv	= 0x005040FF,
+			.tune1		= 0x00000060,
+			.droop_rate_min = 1000000,
+			.tune_high_min_millivolts = 950,
+			.min_millivolts = 950,
+		},
 		.max_mv = 1100,
 		.freqs_mult = KHZ,
 		.speedo_scale = 100,
 		.voltage_scale = 1000,
 		.cvb_table = {
 			/*f       dfll: c0,     c1,   c2  pll:  c0,   c1,    c2 */
-			{204000,        {1112619, -29295, 402}, {800000, 0, 0}},
-			{306000,	{1150460, -30585, 402}, {800000, 0, 0}},
-			{408000,	{1190122, -31865, 402}, {800000, 0, 0}},
-			{510000,	{1231606, -33155, 402}, {800000, 0, 0}},
-			{612000,	{1274912, -34435, 402}, {800000, 0, 0}},
-			{714000,	{1320040, -35725, 402}, {800000, 0, 0}},
-			{816000,	{1366990, -37005, 402}, {820000, 0, 0}},
-			{918000,	{1415762, -38295, 402}, {840000, 0, 0}},
-			{1020000,	{1466355, -39575, 402}, {880000, 0, 0}},
-			{1122000,	{1518771, -40865, 402}, {900000, 0, 0}},
-			{1224000,	{1573009, -42145, 402}, {930000, 0, 0}},
-			{1326000,	{1629068, -43435, 402}, {960000, 0, 0}},
-			{1428000,	{1686950, -44715, 402}, {990000, 0, 0}},
-			{1530000,	{1746653, -46005, 402}, {1020000, 0, 0}},
-			{1632000,	{1808179, -47285, 402}, {1070000, 0, 0}},
-			{1734000,	{1871526, -48575, 402}, {1100000, 0, 0}},
-			{1836000,	{1936696, -49855, 402}, {1140000, 0, 0}},
-			{1912500,	{2003687, -51145, 402}, {1180000, 0, 0}},
+			{204000,        {1112619, -29295, 402}, {950000, 0, 0}},
+			{306000,	{1150460, -30585, 402}, {950000, 0, 0}},
+			{408000,	{1190122, -31865, 402}, {950000, 0, 0}},
+			{510000,	{1231606, -33155, 402}, {950000, 0, 0}},
+			{612000,	{1274912, -34435, 402}, {950000, 0, 0}},
+			{714000,	{1320040, -35725, 402}, {950000, 0, 0}},
+			{816000,	{1366990, -37005, 402}, {950000, 0, 0}},
+			{918000,	{1415762, -38295, 402}, {950000, 0, 0}},
+			{1020000,	{1466355, -39575, 402}, {950000, 0, 0}},
+			{1122000,	{1518771, -40865, 402}, {950000, 0, 0}},
+			{1224000,	{1573009, -42145, 402}, {970000, 0, 0}},
+			{1326000,	{1629068, -43435, 402}, {1100000, 0, 0}},
+			{1428000,	{1686950, -44715, 402}, {1100000, 0, 0}},
+			{1530000,	{1746653, -46005, 402}, {1100000, 0, 0}},
+			{1632000,	{1808179, -47285, 402}, {1200000, 0, 0}},
+			{1734000,	{1871526, -48575, 402}, {1200000, 0, 0}},
+			{1836000,	{1936696, -49855, 402}, {1200000, 0, 0}},
+			{1912500,	{2003687, -51145, 402}, {1200000, 0, 0}},
 			{      0 , 	{      0,      0,   0}, {}},
 		},
 		/*
@@ -244,12 +291,12 @@ static struct cpu_cvb_dvfs cpu_cvb_dvfs_table[] = {
 		.speedo_id = 8,
 		.process_id = -1,
 		.dfll_tune_data  = {
-			.tune0		= 0x005020FF,
+			.tune0		= 0x005040FF,
 			.tune0_high_mv	= 0x005040FF,
 			.tune1		= 0x00000060,
 			.droop_rate_min = 1000000,
-			.tune_high_min_millivolts = 900,
-			.min_millivolts = 720,
+			.tune_high_min_millivolts = 950,
+			.min_millivolts = 950,
 		},
 		.max_mv = 1210,
 		.freqs_mult = KHZ,
@@ -257,26 +304,26 @@ static struct cpu_cvb_dvfs cpu_cvb_dvfs_table[] = {
 		.voltage_scale = 1000,
 		.cvb_table = {
 			/*f       dfll: c0,     c1,   c2  pll:  c0,   c1,    c2 */
-			{204000,        {1112619, -29295, 402}, {800000, 0, 0}},
-			{306000,	{1150460, -30585, 402}, {800000, 0, 0}},
-			{408000,	{1190122, -31865, 402}, {800000, 0, 0}},
-			{510000,	{1231606, -33155, 402}, {800000, 0, 0}},
-			{612000,	{1274912, -34435, 402}, {800000, 0, 0}},
-			{714000,	{1320040, -35725, 402}, {800000, 0, 0}},
-			{816000,	{1366990, -37005, 402}, {820000, 0, 0}},
-			{918000,	{1415762, -38295, 402}, {840000, 0, 0}},
-			{1020000,	{1466355, -39575, 402}, {880000, 0, 0}},
-			{1122000,	{1518771, -40865, 402}, {900000, 0, 0}},
-			{1224000,	{1573009, -42145, 402}, {930000, 0, 0}},
-			{1326000,	{1629068, -43435, 402}, {960000, 0, 0}},
-			{1428000,	{1686950, -44715, 402}, {990000, 0, 0}},
-			{1530000,	{1746653, -46005, 402}, {1020000, 0, 0}},
-			{1632000,	{1808179, -47285, 402}, {1070000, 0, 0}},
-			{1734000,	{1871526, -48575, 402}, {1100000, 0, 0}},
-			{1836000,	{1936696, -49855, 402}, {1140000, 0, 0}},
-			{1938000,	{2003687, -51145, 402}, {1180000, 0, 0}},
-			{2014500,	{2054787, -52095, 402}, {1220000, 0, 0}},
-			{2116500,	{2124957, -53385, 402}, {1260000, 0, 0}},
+			{204000,        {1112619, -29295, 402}, {950000, 0, 0}},
+			{306000,	{1150460, -30585, 402}, {950000, 0, 0}},
+			{408000,	{1190122, -31865, 402}, {950000, 0, 0}},
+			{510000,	{1231606, -33155, 402}, {950000, 0, 0}},
+			{612000,	{1274912, -34435, 402}, {950000, 0, 0}},
+			{714000,	{1320040, -35725, 402}, {950000, 0, 0}},
+			{816000,	{1366990, -37005, 402}, {950000, 0, 0}},
+			{918000,	{1415762, -38295, 402}, {950000, 0, 0}},
+			{1020000,	{1466355, -39575, 402}, {950000, 0, 0}},
+			{1122000,	{1518771, -40865, 402}, {950000, 0, 0}},
+			{1224000,	{1573009, -42145, 402}, {970000, 0, 0}},
+			{1326000,	{1629068, -43435, 402}, {1100000, 0, 0}},
+			{1428000,	{1686950, -44715, 402}, {1100000, 0, 0}},
+			{1530000,	{1746653, -46005, 402}, {1100000, 0, 0}},
+			{1632000,	{1808179, -47285, 402}, {1130000, 0, 0}},
+			{1734000,	{1871526, -48575, 402}, {1130000, 0, 0}},
+			{1836000,	{1936696, -49855, 402}, {1210000, 0, 0}},
+			{1938000,	{2003687, -51145, 402}, {1300000, 0, 0}},
+			{2014500,	{2054787, -52095, 402}, {1300000, 0, 0}},
+			{2116500,	{2124957, -53385, 402}, {1300000, 0, 0}},
 			{      0 , 	{      0,      0,   0}, {}},
 		},
 		/*
@@ -345,7 +392,7 @@ static struct dvfs cpu_dvfs = {
 };
 
 /* Core DVFS tables */
-static const int core_millivolts[MAX_DVFS_FREQS] = {
+static int core_millivolts[MAX_DVFS_FREQS] = {
 	800, 850, 900, 950, 1000, 1050, 1100, 1110, 1150};
 
 #define CORE_DVFS(_clk_name, _speedo_id, _process_id, _auto, _mult, _freqs...) \
@@ -559,70 +606,70 @@ static struct dvfs core_dvfs_table_embedded[] = {
 	/* Core voltages (mV):		         800,    850,    900,	 950,    1000, 	 1050,	  1100	*/
 	/* Clock limits for internal blocks, PLLs */
 
-	CORE_DVFS("emc",        4, -1, 1, KHZ, 1,      1,      1,      1,	792000,	 792000, 924000),
+	CORE_DVFS("emc",        4, -1, 1, KHZ, 1,      1,      1,      1,	1,	 792000, 924000),
 
-        CORE_DVFS("cpu_lp",     4, -1, 1, KHZ,  1,      1,      1,      1,	1044000, 1044000, 1044000),
+        CORE_DVFS("cpu_lp",     4, -1, 1, KHZ,  1,      1,      1,      1,	1, 1044000, 1044000),
 
-        CORE_DVFS("sbus",       4, -1, 1, KHZ,  1,      1,      1,      1,	348000, 348000, 372000),
+        CORE_DVFS("sbus",       4, -1, 1, KHZ,  1,      1,      1,      1,	1, 348000, 372000),
 
-	CORE_DVFS("vic03",      4, -1, 1, KHZ,  1,      1,      1,      1,	660000, 660000, 708000),
+	CORE_DVFS("vic03",      4, -1, 1, KHZ,  1,      1,      1,      1,	1, 660000, 708000),
 
-	CORE_DVFS("tsec",       4, -1, 1, KHZ,  1,      1,      1,      1,	660000, 660000, 708000),
+	CORE_DVFS("tsec",       4, -1, 1, KHZ,  1,      1,      1,      1,	1, 660000, 708000),
 
-	CORE_DVFS("msenc",      4, -1, 1, KHZ,  1,      1,      1,      1,	432000, 432000, 456000),
+	CORE_DVFS("msenc",      4, -1, 1, KHZ,  1,      1,      1,      1,	1, 432000, 456000),
 
-	CORE_DVFS("se",         4, -1, 1, KHZ,  1,      1,      1,      1,	432000, 432000, 456000),
+	CORE_DVFS("se",         4, -1, 1, KHZ,  1,      1,      1,      1,	1, 432000, 456000),
 
-	CORE_DVFS("vde",        4, -1, 1, KHZ,  1,      1,      1,      1,	432000, 432000, 456000),
+	CORE_DVFS("vde",        4, -1, 1, KHZ,  1,      1,      1,      1,	1, 432000, 456000),
 
-        CORE_DVFS("host1x",     4, -1, 1, KHZ,  1,      1,      1,      1,	372000, 372000, 408000),
+        CORE_DVFS("host1x",     4, -1, 1, KHZ,  1,      1,      1,      1,	1, 372000, 408000),
 
-	CORE_DVFS("vi",         4, -1, 1, KHZ,  1,      1,      1,      1,	600000, 600000, 600000),
+	CORE_DVFS("vi",         4, -1, 1, KHZ,  1,      1,      1,      1,	1, 600000, 600000),
 
-	CORE_DVFS("isp",        4, -1, 1, KHZ,  1,      1,      1,      1,	600000, 600000, 600000),
+	CORE_DVFS("isp",        4, -1, 1, KHZ,  1,      1,      1,      1,	1, 600000, 600000),
 
 #ifdef CONFIG_TEGRA_DUAL_CBUS
-        CORE_DVFS("c2bus",      4, -1, 1, KHZ,  1,      1,      1,      1,	432000, 432000, 456000),
+        CORE_DVFS("c2bus",      4, -1, 1, KHZ,  1,      1,      1,      1,	1, 432000, 456000),
 
-        CORE_DVFS("c3bus",      4, -1, 1, KHZ,  1,      1,      1,      1,	660000, 660000, 708000),
+        CORE_DVFS("c3bus",      4, -1, 1, KHZ,  1,      1,      1,      1,	1, 660000, 708000),
 #else
-	CORE_DVFS("cbus",      4, -1, 1, KHZ,  1,      1,      1,      1,	216000, 216000, 372000),
+	CORE_DVFS("cbus",      4, -1, 1, KHZ,  1,      1,      1,      1,	1, 216000, 372000),
 #endif
 
-	CORE_DVFS("c4bus",      4, -1, 1, KHZ,  1,      1,      1,      1,	600000, 600000, 600000),
+	CORE_DVFS("c4bus",      4, -1, 1, KHZ,  1,      1,      1,      1,	1, 600000, 600000),
 
-	CORE_DVFS("pll_m",  4, -1, 1, KHZ,   1,      1,      1,      1,		1066000, 1066000, 1200000),
-	CORE_DVFS("pll_c",  4, -1, 1, KHZ,   1,      1,      1,      1,		1066000, 1066000, 1066000),
-	CORE_DVFS("pll_c2", 4, -1, 1, KHZ,   1,      1,      1,      1,		1066000, 1066000, 1066000),
-	CORE_DVFS("pll_c3", 4, -1, 1, KHZ,   1,      1,      1,      1,		1066000, 1066000, 1066000),
+	CORE_DVFS("pll_m",  4, -1, 1, KHZ,   1,      1,      1,      1,		1, 1066000, 1200000),
+	CORE_DVFS("pll_c",  4, -1, 1, KHZ,   1,      1,      1,      1,		1, 1066000, 1066000),
+	CORE_DVFS("pll_c2", 4, -1, 1, KHZ,   1,      1,      1,      1,		1, 1066000, 1066000),
+	CORE_DVFS("pll_c3", 4, -1, 1, KHZ,   1,      1,      1,      1,		1, 1066000, 1066000),
 
 	/* Core voltages (mV):		     800,    850,    900,    950,       1000 	1050	1100*/
 	/* Clock limits for I/O peripherals */
-	CORE_DVFS("dsia",   4, -1, 1, KHZ,   1,      1,      1,      1,		750000, 750000, 750000),
-	CORE_DVFS("dsib",   4, -1, 1, KHZ,   1,      1,      1,      1,		750000, 750000, 750000),
-	CORE_DVFS("dsialp", 4, -1, 1, KHZ,   1,      1,      1,      1,		156000, 156000, 156000),
-	CORE_DVFS("dsiblp", 4, -1, 1, KHZ,   1,      1,      1,      1,		156000, 156000, 156000),
-	CORE_DVFS("hdmi",   4, -1, 1, KHZ,   1,      1,      1,      1,		297000, 297000, 297000),
+	CORE_DVFS("dsia",   4, -1, 1, KHZ,   1,      1,      1,      1,		1, 750000, 750000),
+	CORE_DVFS("dsib",   4, -1, 1, KHZ,   1,      1,      1,      1,		1, 750000, 750000),
+	CORE_DVFS("dsialp", 4, -1, 1, KHZ,   1,      1,      1,      1,		1, 156000, 156000),
+	CORE_DVFS("dsiblp", 4, -1, 1, KHZ,   1,      1,      1,      1,		1, 156000, 156000),
+	CORE_DVFS("hdmi",   4, -1, 1, KHZ,   1,      1,      1,      1,		1, 297000, 297000),
 
-	CORE_DVFS("pciex",  4,  -1, 1, KHZ,   1,      1,      1,     1,		500000, 500000, 500000),
-	CORE_DVFS("mselect", 4, -1, 1, KHZ,  1,      1,      1,      1,		204000, 204000, 408000),
+	CORE_DVFS("pciex",  4,  -1, 1, KHZ,   1,      1,      1,     1,		1, 500000, 500000),
+	CORE_DVFS("mselect", 4, -1, 1, KHZ,  1,      1,      1,      1,		1, 204000, 408000),
 
 	/* Core voltages (mV):		         	800,    850,    900,	 950,    1000 	1050	1100*/
 	/* xusb clocks */
-	CORE_DVFS("xusb_falcon_src", 4, -1, 1, KHZ, 	  1,      1,      1,      1,	336000, 336000 ,  336000),
-	CORE_DVFS("xusb_host_src",   4, -1, 1, KHZ,  	  1,      1,      1,      1,	112000, 112000 ,  112000),
-	CORE_DVFS("xusb_dev_src",    4, -1, 1, KHZ,  	  1,      1,      1,      1,	112000, 112000 ,  112000),
-	CORE_DVFS("xusb_ss_src",     4, -1, 1, KHZ,  	  1,      1,      1,      1,	120000, 120000 ,  120000),
-	CORE_DVFS("xusb_fs_src",     4, -1, 1, KHZ,  	  1,      1,      1,      1,	 48000,  48000 ,   48000),
-	CORE_DVFS("xusb_hs_src",     4, -1, 1, KHZ,  	  1,      1,      1,      1,	 60000,  60000 ,   60000),
+	CORE_DVFS("xusb_falcon_src", 4, -1, 1, KHZ, 	  1,      1,      1,      1,	1, 336000 ,  336000),
+	CORE_DVFS("xusb_host_src",   4, -1, 1, KHZ,  	  1,      1,      1,      1,	1, 112000 ,  112000),
+	CORE_DVFS("xusb_dev_src",    4, -1, 1, KHZ,  	  1,      1,      1,      1,	1, 112000 ,  112000),
+	CORE_DVFS("xusb_ss_src",     4, -1, 1, KHZ,  	  1,      1,      1,      1,	1, 120000 ,  120000),
+	CORE_DVFS("xusb_fs_src",     4, -1, 1, KHZ,  	  1,      1,      1,      1,	 1,  48000 ,   48000),
+	CORE_DVFS("xusb_hs_src",     4, -1, 1, KHZ,  	  1,      1,      1,      1,	 1,  60000 ,   60000),
 
-	CORE_DVFS("hda",    	     4, -1, 1, KHZ,  	  1,      1,      1,      1,	108000, 108000 ,  108000),
-	CORE_DVFS("hda2codec_2x",    4, -1, 1, KHZ,  	  1,      1,      1,      1,	 48000,  48000 ,   48000),
+	CORE_DVFS("hda",    	     4, -1, 1, KHZ,  	  1,      1,      1,      1,	1, 108000 ,  108000),
+	CORE_DVFS("hda2codec_2x",    4, -1, 1, KHZ,  	  1,      1,      1,      1,	 1,  48000 ,   48000),
 
-	CORE_DVFS("sor0",            4, -1, 1, KHZ, 	  1,      1,      1,      1,	540000,  540000,  540000),
-	OVRRD_DVFS("sdmmc1",         4, -1, 1, KHZ,      1,      1,  	1,  	1,	136000, 136000, 136000),
-        OVRRD_DVFS("sdmmc3",         4, -1, 1, KHZ,      1,      1,  	1,  	1,	136000, 136000, 136000),
-        OVRRD_DVFS("sdmmc4",         4, -1, 1, KHZ,      1,      1,  	1,  	1,	136000, 136000, 136000),
+	CORE_DVFS("sor0",            4, -1, 1, KHZ, 	  1,      1,      1,      1,	1,  540000,  540000),
+	OVRRD_DVFS("sdmmc1",         4, -1, 1, KHZ,      1,      1,  	1,  	1,	1, 136000, 136000),
+        OVRRD_DVFS("sdmmc3",         4, -1, 1, KHZ,      1,      1,  	1,  	1,	1, 136000, 136000),
+        OVRRD_DVFS("sdmmc4",         4, -1, 1, KHZ,      1,      1,  	1,  	1,	1, 136000, 136000),
 };
 
 static struct dvfs core_dvfs_table_automotive[] = {
@@ -717,7 +764,7 @@ static int resolve_core_override(int min_override_mv)
 /* GPU DVFS tables */
 static unsigned long gpu_max_freq[] = {
 /* speedo_id	0	1	2	 3	 4	 5	 6*/
-		648000, 852000, 1008000, 600000, 804000, 756000, 924000
+		648000, 852000, 1008000, 600000, 804000, 756000, 852000
 };
 static struct gpu_cvb_dvfs gpu_cvb_dvfs_table[] = {
 	{
@@ -738,10 +785,42 @@ static struct gpu_cvb_dvfs gpu_cvb_dvfs_table[] = {
 		.vts_trips_table = { -40, 35, },
 	},
 	{
+		/* Embedded SKU CD575M Always On*/
+		.speedo_id =  4,
+		.process_id = -1,
+		.max_mv = 1090,
+		.freqs_mult = KHZ,
+		.speedo_scale = 100,
+		.thermal_scale = 10,
+		.voltage_scale = 1000,
+		.cvb_table = {
+			/*f        dfll  pll:   c0,     c1,   c2,   c3,      c4,   c5 */
+			{   72000, {  }, { 1209886, -36468,  515,   417, -13123,  203}, },
+			{  108000, {  }, { 1130804, -27659,  296,   298, -10834,  221}, },
+			{  180000, {  }, { 1162871, -27110,  247,   238, -10681,  268}, },
+			{  252000, {  }, { 1220458, -28654,  247,   179, -10376,  298}, },
+			{  324000, {  }, { 1280953, -30204,  247,   119,  -9766,  304}, },
+			{  396000, {  }, { 1344547, -31777,  247,   119,  -8545,  292}, },
+			{  468000, {  }, { 1420168, -34227,  269,    60,  -7172,  256}, },
+			{  540000, {  }, { 1490757, -35955,  274,    60,  -5188,  197}, },
+			{  612000, {  }, { 1599112, -42583,  398,     0,  -1831,  119}, },
+			{  648000, {  }, { 1366986, -16459, -274,     0,  -3204,   72}, },
+			{  684000, {  }, { 1391884, -17078, -274,   -60,  -1526,   30}, },
+			{  708000, {  }, { 1415522, -17497, -274,   -60,   -458,    0}, },
+			{  756000, {  }, { 1464061, -18331, -274,  -119,   1831,  -72}, },
+			{  804000, {  }, { 1524225, -20064, -254,  -119,   4272, -155}, },
+			{       0, {  }, { }, },
+		},
+		.cvb_vmin =  {  0, {  }, { 1180000, -18900,    0,     0,  -6110,    0}, },
+		.vmin_trips_table = { 15, },
+		.therm_floors_table = { 900, },
+		.vts_trips_table = { -10, 10, 30, 50, 70, },
+	},
+	{
 		/* Embedded SKU CD575MI Always On*/
 		.speedo_id =  5,
 		.process_id = -1,
-		.max_mv = 1090,
+		.max_mv = 1070,
 		.freqs_mult = KHZ,
 		.speedo_scale = 100,
 		.thermal_scale = 10,
@@ -760,7 +839,7 @@ static struct gpu_cvb_dvfs gpu_cvb_dvfs_table[] = {
 			{  648000, {  }, { 1366986, -16459, -274,  }, },
 			{  684000, {  }, { 1391884, -17078, -274,  }, },
 			{  708000, {  }, { 1415522, -17497, -274,  }, },
-			{  756000, {  }, { 1464061, -18331, -274,  }, },
+			{  756000, {  }, { 1494061, -18331, -274,  }, },
 			{       0, {  }, { }, },
 		},
 		.cvb_vmin =  { 0, { } , { 950000, }, },
@@ -789,11 +868,9 @@ static struct gpu_cvb_dvfs gpu_cvb_dvfs_table[] = {
 			{  648000, {  }, { 1366986, -16459, -274,  }, },
 			{  684000, {  }, { 1391884, -17078, -274,  }, },
 			{  708000, {  }, { 1415522, -17497, -274,  }, },
-			{  756000, {  }, { 1464061, -18331, -274,  }, },
+			{  756000, {  }, { 1494061, -18331, -274,  }, },
 			{  804000, {  }, { 1524225, -20064, -254,  }, },
                         {  852000, {  }, { 1608418, -21643, -269,  }, },
-			{  900000, {  }, { 1706383, -25155, -209,  }, },
-			{  924000, {  }, { 1739600, -26289, -194,  }, },
 			{       0, {  }, { }, },
 		},
 		.cvb_vmin =  { 0, { } , { 950000, }, },
@@ -1286,8 +1363,10 @@ static int __init set_gpu_dvfs_data(unsigned long max_freq,
 			/* clip to minimum, abort if above maximum */
 			mvj_offs = max(mvj, gpu_vmin[j] + simon_offs);
 			mvj = max(mvj, gpu_vmin[j]);
-			if (mvj > d->max_mv)
-				break;
+			if ((d->speedo_id != 5) || (j != 0)) {
+				if (mvj > d->max_mv)
+					break;
+			}
 
 			/* update voltage for adjacent ranges bounded by this
 			   trip-point (cvb & dvfs are transpose matrices) */
@@ -1440,6 +1519,7 @@ void __init tegra12x_init_dvfs(void)
 	int core_process_id = tegra_core_process_id();
 	int gpu_speedo_id = tegra_gpu_speedo_id();
 	int gpu_process_id = tegra_gpu_process_id();
+	int chip_personality = tegra_get_chip_personality();
 
 	int i, ret;
 	int core_nominal_mv_index;
@@ -1466,8 +1546,17 @@ void __init tegra12x_init_dvfs(void)
 	if (cpu_speedo_id == 7 || cpu_speedo_id == 8 ||
 		CONFIG_TEGRA_USE_DFLL_RANGE == TEGRA_USE_DFLL_CDEV_CNTRL)
 		tegra_override_dfll_range = TEGRA_USE_DFLL_CDEV_CNTRL;
-	if (soc_speedo_id == 3 || soc_speedo_id == 4)
+	if (soc_speedo_id == 3)
 		tegra_dvfs_core_disabled = true;
+	/* update core dvfs nominal voltage for CD575M always on profile */
+	if (soc_speedo_id == 0 && chip_personality == always_on) {
+		for (i = 0; i < MAX_DVFS_FREQS; i++) {
+			if (core_millivolts[i] == 1000) {
+				core_millivolts[i] = 1010;
+				break;
+			}
+		}
+	}
 	/*
 	 * Find nominal voltages for core (1st) and cpu rails before rail
 	 * init. Nominal voltage index in core scaling ladder can also be
@@ -1528,9 +1617,9 @@ void __init tegra12x_init_dvfs(void)
 	BUG_ON((i == ARRAY_SIZE(gpu_cvb_dvfs_table)) || ret);
 
 	/* Init core thermal profile */
-	tegra_dvfs_rail_init_vmin_thermal_profile(vdd_core_vmin_trips_table,
-		vdd_core_therm_floors_table, &tegra12_dvfs_rail_vdd_core, NULL);
 	if (soc_speedo_id == 3) {
+		tegra_dvfs_rail_init_vmin_thermal_profile(vdd_core_vmin_trips_table_sku80_alwayson,
+				vdd_core_therm_floors_table_sku80_alwayson, &tegra12_dvfs_rail_vdd_core, NULL);
 		tegra12_dvfs_rail_vdd_core.therm_mv_caps = vdd_core_therm_caps_table_sku80_alwayson;
 		tegra12_dvfs_rail_vdd_core.therm_mv_caps_num = ARRAY_SIZE(vdd_core_therm_caps_table_sku80_alwayson);
 		if (tegra12_dvfs_rail_vdd_core.vmax_cdev) {
@@ -1539,6 +1628,8 @@ void __init tegra12x_init_dvfs(void)
 			tegra12_dvfs_rail_vdd_core.vmax_cdev->trip_temperatures = vdd_core_vmax_trips_table_sku80_alwayson;
 		}
 	} else if (soc_speedo_id == 4) {
+		tegra_dvfs_rail_init_vmin_thermal_profile(vdd_core_vmin_trips_table_sku80,
+				vdd_core_therm_floors_table_sku80, &tegra12_dvfs_rail_vdd_core, NULL);
 		tegra12_dvfs_rail_vdd_core.therm_mv_caps = vdd_core_therm_caps_table_sku80;
 		tegra12_dvfs_rail_vdd_core.therm_mv_caps_num = ARRAY_SIZE(vdd_core_therm_caps_table_sku80);
 		if (tegra12_dvfs_rail_vdd_core.vmax_cdev) {
@@ -1546,9 +1637,12 @@ void __init tegra12x_init_dvfs(void)
 				ARRAY_SIZE(vdd_core_vmax_trips_table_sku80);
 			tegra12_dvfs_rail_vdd_core.vmax_cdev->trip_temperatures = vdd_core_vmax_trips_table_sku80;
 		}
-	} else
+	} else {
+		tegra_dvfs_rail_init_vmin_thermal_profile(vdd_core_vmin_trips_table,
+				vdd_core_therm_floors_table, &tegra12_dvfs_rail_vdd_core, NULL);
 		tegra_dvfs_rail_init_vmax_thermal_profile(vdd_core_vmax_trips_table,
-			vdd_core_therm_caps_table, &tegra12_dvfs_rail_vdd_core, NULL);
+				vdd_core_therm_caps_table, &tegra12_dvfs_rail_vdd_core, NULL);
+	}
 
 	/* Init rail structures and dependencies */
 	tegra_dvfs_init_rails(tegra12_dvfs_rails,

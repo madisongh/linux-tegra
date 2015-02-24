@@ -2074,7 +2074,8 @@ static int ardbeg_nct72_init(void)
 	}
 
 	/* vmin trips are bound to soctherm on norrin */
-	if (!(board_info.board_id == BOARD_PM374))
+	if (!(board_info.board_id == BOARD_PM374) &&
+		!(board_info.board_id == BOARD_PM375))
 		tegra_add_all_vmin_trips(ardbeg_nct72_pdata.sensors[EXT].trips,
 			&ardbeg_nct72_pdata.sensors[EXT].num_trips);
 
@@ -2103,8 +2104,8 @@ static int ardbeg_nct72_init(void)
 		ARRAY_SIZE(ardbeg_i2c_nct72_board_info));
 	else if (board_info.board_id == BOARD_PM375 ||
 			board_info.board_id == BOARD_PM377) {
-		ardbeg_nct72_pdata.sensors[EXT].shutdown_limit = 100;
-		ardbeg_nct72_pdata.sensors[LOC].shutdown_limit = 95;
+		ardbeg_nct72_pdata.sensors[EXT].shutdown_limit = 105;
+		ardbeg_nct72_pdata.sensors[LOC].shutdown_limit = 100;
 		i2c_register_board_info(0, ardbeg_i2c_nct72_board_info,
 					1); /* only register device[0] */
 	}
