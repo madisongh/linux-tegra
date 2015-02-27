@@ -76,7 +76,14 @@ struct nvmap_platform_carveout {
 	unsigned int usage_mask;
 	phys_addr_t base;
 	size_t size;
-	size_t buddy_size;
+	struct device *cma_dev;
+	bool resize;
+	struct device *dma_dev;
+	bool is_ivm;
+	int peer;
+	int vmid;
+	int can_alloc;
+	bool enable_static_dma_map;
 };
 
 struct nvmap_platform_data {
