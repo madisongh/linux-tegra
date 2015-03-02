@@ -119,7 +119,7 @@
 						regulator-always-on;
 						regulator-init-mode = <REGULATOR_MODE_NORMAL>;
 						regulator-boot-on;
-						ti,roof-floor = <PALMAS_EXT_CONTROL_NSLEEP>;
+						ti,roof-floor = <PALMAS_EXT_CONTROL_PIN_NSLEEP>;
 						ti,disable-active-discharge-idle;
 
 						consumers {
@@ -292,7 +292,7 @@
 						regulator-name = "avdd-pll";
 						regulator-always-on;
 						regulator-boot-on;
-						ti,roof-floor = <PALMAS_EXT_CONTROL_NSLEEP>;
+						ti,roof-floor = <PALMAS_EXT_CONTROL_PIN_NSLEEP>;
 
 						consumers {
 							c0 {

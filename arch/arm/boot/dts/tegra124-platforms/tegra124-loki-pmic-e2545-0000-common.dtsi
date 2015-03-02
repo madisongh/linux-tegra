@@ -122,7 +122,7 @@
 						regulator-min-microvolt = <700000>;
 						regulator-max-microvolt = <1250000>;
 						regulator-init-mode = <REGULATOR_MODE_NORMAL>;
-						ti,roof-floor = <PALMAS_EXT_CONTROL_NSLEEP>;
+						ti,roof-floor = <PALMAS_EXT_CONTROL_PIN_NSLEEP>;
 						regulator-ramp-delay = <5000>;
 
 						consumers {
@@ -483,7 +483,7 @@
 					palmas_regen2:regen2 {
 						regulator-name = "vdd-regen2";
 						regulator-max-microvolt = <5000000>;
-						ti,roof-floor = <PALMAS_EXT_CONTROL_NSLEEP>;
+						ti,roof-floor = <PALMAS_EXT_CONTROL_PIN_NSLEEP>;
 						regulator-boot-on;
 					};
 				};
