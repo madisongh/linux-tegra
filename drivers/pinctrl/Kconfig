@@ -251,4 +251,5 @@ config PINCTRL_TB10X
 
 endmenu
 
+trysource "../kernel-t18x/drivers/pinctrl/Kconfig"
 endif
