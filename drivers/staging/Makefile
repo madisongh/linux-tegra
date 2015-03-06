@@ -31,6 +31,7 @@ obj-$(CONFIG_MFD_NVEC)		+= nvec/
 obj-$(CONFIG_STAGING_RDMA)	+= rdma/
 obj-$(CONFIG_ANDROID)		+= android/
 obj-$(CONFIG_FIQ_DEBUGGER)      += android/fiq_debugger/
+obj-$(CONFIG_SYNC)              += android/
 obj-$(CONFIG_STAGING_BOARD)	+= board/
 obj-$(CONFIG_WIMAX_GDM72XX)	+= gdm72xx/
 obj-$(CONFIG_LTE_GDM724X)	+= gdm724x/

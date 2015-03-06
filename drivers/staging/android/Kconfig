@@ -23,7 +23,7 @@ config ANDROID_TIMED_GPIO
 	depends on GPIOLIB || COMPILE_TEST
 	depends on ANDROID_TIMED_OUTPUT
 	default n
-        ---help---
+	---help---
 	  Unlike generic gpio is to allow programs to access and manipulate gpio
 	  registers from user space, timed output/gpio is a system to allow changing
 	  a gpio pin and restore it automatically after a specified timeout.
@@ -46,6 +46,12 @@ config ANDROID_LOW_MEMORY_KILLER_AUTODETECT_OOM_ADJ_VALUES
 	  Detect oom_adj values written to
 	  /sys/module/lowmemorykiller/parameters/adj and convert them
 	  to oom_score_adj values.
+
+source "drivers/staging/android/ion/Kconfig"
+
+endif # if ANDROID
+
+source "drivers/staging/android/fiq_debugger/Kconfig"
 
 config SYNC
 	bool "Synchronization framework"
@@ -75,10 +81,5 @@ config SW_SYNC_USER
 	  *WARNING* improper use of this can result in deadlocking kernel
 	  drivers from userspace.
 
-source "drivers/staging/android/ion/Kconfig"
-
-endif # if ANDROID
-
-source "drivers/staging/android/fiq_debugger/Kconfig"
 
 endmenu
