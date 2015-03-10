@@ -160,6 +160,8 @@ static int tegra_hier_ictlr_probe(struct platform_device *pdev)
 	if (!ictlr)
 		return -ENOMEM;
 
+	dev_set_drvdata(&pdev->dev, ictlr);
+
 	ret = tegra_hier_ictlr_map_memory(pdev, ictlr);
 	if (ret)
 		return ret;
@@ -176,7 +178,6 @@ static int tegra_hier_ictlr_probe(struct platform_device *pdev)
 
 	dev_notice(&pdev->dev, "probed\n");
 
-	dev_set_drvdata(&pdev->dev, ictlr);
 	return 0;
 }
 
