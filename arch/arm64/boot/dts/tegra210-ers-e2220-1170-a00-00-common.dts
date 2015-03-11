@@ -67,6 +67,13 @@
 	chosen {
         };
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "e2220";
+		};
+	};
+
 	sdhci@700b0600 {
 		vddio_sdmmc-supply = <&max77620_sd3>;
 		vddio_sd_slot-supply = <&vdd_3v3>;

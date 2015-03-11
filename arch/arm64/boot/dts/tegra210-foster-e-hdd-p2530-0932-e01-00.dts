@@ -31,6 +31,12 @@
 		bootargs = "earlycon=uart8250,mmio32,0x70006000 androidboot.hardware=foster_e_hdd";
 	};
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "foster_e_hdd";
+		};
+	};
 	sata@70020000 {
 		status = "okay";
 		nvidia,sata-connector-type=<E_SATA_P>;

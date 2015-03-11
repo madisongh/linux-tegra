@@ -32,6 +32,13 @@
 		bootargs = "earlycon=uart8250,mmio32,0x70006000 androidboot.hardware=foster_e";
 	};
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "foster_e";
+		};
+	};
+
 	rollback-protection {
 		status = "okay";
 	};

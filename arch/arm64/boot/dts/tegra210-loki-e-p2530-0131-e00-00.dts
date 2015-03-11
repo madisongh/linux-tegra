@@ -31,6 +31,13 @@
 		bootargs = "earlycon=uart8250,mmio32,0x70006000 androidboot.hardware=loki_e_base";
 	};
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "loki_e_base";
+		};
+	};
+
 	backlight {
 		compatible = "pwm-backlight";
 		status = "okay";

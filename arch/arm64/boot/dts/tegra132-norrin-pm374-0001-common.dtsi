@@ -42,6 +42,13 @@
 		linux,initrd-end = <0x824B5300>;
 	};
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "norrin";
+		};
+	};
+
 	host1x {
 		/* tegradc.0 */
 		dc@54200000 {

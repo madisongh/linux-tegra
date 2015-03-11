@@ -55,6 +55,13 @@
 		bootargs = "earlycon=uart8250,mmio32,0x70006000 androidboot.hardware=e2190";
 	};
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "e2190";
+		};
+	};
+
 	pmc@7000e400 {
 		nvidia,invert-interrupt;
 	};

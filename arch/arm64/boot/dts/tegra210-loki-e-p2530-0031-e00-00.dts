@@ -28,6 +28,13 @@
 		bootargs = "earlycon=uart8250,mmio32,0x70006000 androidboot.hardware=loki_e_lte";
 	};
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "loki_e_lte";
+		};
+	};
+
 	modem {
 		/* pre boost regulator gpio */
 		nvidia,pre-boost-gpio = <&gpio TEGRA_GPIO(E, 5) GPIO_ACTIVE_HIGH>;
