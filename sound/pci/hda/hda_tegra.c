@@ -483,7 +483,7 @@ static int hda_tegra_probe(struct platform_device *pdev)
 	struct azx *chip;
 	struct hda_tegra *hda;
 	int err;
-	const unsigned int driver_flags = AZX_DCAPS_RIRB_DELAY;
+	const unsigned int driver_flags = 0;
 
 	hda = devm_kzalloc(&pdev->dev, sizeof(*hda), GFP_KERNEL);
 	if (!hda)
