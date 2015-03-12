@@ -287,88 +287,19 @@ static inline int pdev_bad_for_parity(struct pci_dev *dev)
 
 }
 
-/*
- * pcibios_fixup_bus - Called after each bus is probed,
- * but before its children are examined.
- */
-void pcibios_fixup_bus(struct pci_bus *bus)
+void pcibios_add_bus(struct pci_bus *bus)
 {
-	struct pci_dev *dev;
-	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
-	bool has_pcie_dev = 0;
-
-	/*
-	 * Walk the devices on this bus, working out what we can
-	 * and can't support.
-	 */
-	list_for_each_entry(dev, &bus->devices, bus_list) {
-		u16 status;
-
-		if (!has_pcie_dev)
-			has_pcie_dev = pci_is_pcie(dev);
-		pci_read_config_word(dev, PCI_STATUS, &status);
-
-		/*
-		 * If any device on this bus does not support fast back
-		 * to back transfers, then the bus as a whole is not able
-		 * to support them.  Having fast back to back transfers
-		 * on saves us one PCI cycle per transaction.
-		 */
-		if (!(status & PCI_STATUS_FAST_BACK))
-			features &= ~PCI_COMMAND_FAST_BACK;
-
-		if (pdev_bad_for_parity(dev))
-			features &= ~(PCI_COMMAND_SERR | PCI_COMMAND_PARITY);
-
-		switch (dev->class >> 8) {
-		case PCI_CLASS_BRIDGE_PCI:
-			pci_read_config_word(dev, PCI_BRIDGE_CONTROL, &status);
-			status |= PCI_BRIDGE_CTL_PARITY|PCI_BRIDGE_CTL_MASTER_ABORT;
-			status &= ~(PCI_BRIDGE_CTL_BUS_RESET|PCI_BRIDGE_CTL_FAST_BACK);
-			pci_write_config_word(dev, PCI_BRIDGE_CONTROL, status);
-			break;
-
-		case PCI_CLASS_BRIDGE_CARDBUS:
-			pci_read_config_word(dev, PCI_CB_BRIDGE_CONTROL, &status);
-			status |= PCI_CB_BRIDGE_CTL_PARITY|PCI_CB_BRIDGE_CTL_MASTER_ABORT;
-			pci_write_config_word(dev, PCI_CB_BRIDGE_CONTROL, status);
-			break;
-		}
-	}
-
-	/*
-	 * Now walk the devices again, this time setting them up.
-	 */
-	list_for_each_entry(dev, &bus->devices, bus_list) {
-		u16 cmd;
-
-		pci_read_config_word(dev, PCI_COMMAND, &cmd);
-		cmd |= features;
-		pci_write_config_word(dev, PCI_COMMAND, cmd);
-
-		pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE,
-				      L1_CACHE_BYTES >> 2);
-	}
-
-	/*
-	 * Propagate the flags to the PCI bridge.
-	 */
-	if (bus->self && bus->self->hdr_type == PCI_HEADER_TYPE_BRIDGE) {
-		if (features & PCI_COMMAND_FAST_BACK)
-			bus->bridge_ctl |= PCI_BRIDGE_CTL_FAST_BACK;
-		if (features & PCI_COMMAND_PARITY)
-			bus->bridge_ctl |= PCI_BRIDGE_CTL_PARITY;
-	}
-
-	/*
-	 * Report what we did for this bus
-	 * (only if the bus doesn't have even one PCIe device)
-	 */
-	if (!has_pcie_dev)
-		pr_info("PCI: bus%d: Fast back to back transfers %sabled\n",
-			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+	struct pci_sys_data *sys = bus->sysdata;
+	if (sys->add_bus)
+		sys->add_bus(bus);
 }
-EXPORT_SYMBOL(pcibios_fixup_bus);
+
+void pcibios_remove_bus(struct pci_bus *bus)
+{
+	struct pci_sys_data *sys = bus->sysdata;
+	if (sys->remove_bus)
+		sys->remove_bus(bus);
+}
 
 /*
  * Swizzle the device pin each time we cross a bridge.  If a platform does
@@ -565,34 +496,6 @@ char * __init pcibios_setup(char *str)
 		return NULL;
 	}
 	return str;
-}
-
-/*
- * From arch/i386/kernel/pci-i386.c:
- *
- * We need to avoid collisions with `mirrored' VGA ports
- * and other strange ISA hardware, so we always want the
- * addresses to be allocated in the 0x000-0x0ff region
- * modulo 0x400.
- *
- * Why? Because some silly external IO cards only decode
- * the low 10 bits of the IO address. The 0x00-0xff region
- * is reserved for motherboard devices that decode all 16
- * bits, so it's ok to allocate at, say, 0x2800-0x28ff,
- * but we want to try to avoid allocating at 0x2900-0x2bff
- * which might be mirrored at 0x0100-0x03ff..
- */
-resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-				resource_size_t size, resource_size_t align)
-{
-	resource_size_t start = res->start;
-
-	if (res->flags & IORESOURCE_IO && start & 0x300)
-		start = (start + 0x3ff) & ~0x3ff;
-
-	start = (start + align - 1) & ~(align - 1);
-
-	return start;
 }
 
 /**
