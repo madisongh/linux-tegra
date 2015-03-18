@@ -478,6 +478,26 @@ config TEGRA_BB_XMM_POWER2
 	  insert this LKM to initiate 2nd USB enumeration power sequence
 	  - after modem software has been downloaded to flashless device.
 
+config TEGRA_BBC_PROXY
+	bool "Enable BBC Proxy driver"
+	default n
+	help
+	  Enables driver which handles miscellaneous services required
+	  by the BB core. Handles initialization of EDP, ISO Bandwidth,
+	  and Latency Allowance settings. Additional setting adjustments
+	  can be done from user space through sysfs.
+
+config TEGRA_BBC_THERMAL
+	bool "Enable BBC Thermal reporting support"
+	depends on NVSHM
+	depends on TEGRA_BBC_PROXY
+	default y
+	help
+	  Enables the reporting of BBC-managed temperature sensors values as
+	  thermal zones.  This uses the statistics framework where the data
+	  reside, and thus depends on the NVSHM driver to provides the API to
+	  browse the BBC statistics and be notified of modem [re-]boot.
+
 config TEGRA_PLLM_RESTRICTED
 	bool "Restrict PLLM usage as module clock source"
 	depends on !ARCH_TEGRA_2x_SOC
@@ -552,6 +572,23 @@ config TEGRA_DISABLE_BBC_LATENCY_ALLOWANCE
 	  Disables BBCRW latency allowance configuration by
 	  clients. The BBCRW latency allowance would remain
 	  same as boot time configured value.
+
+config TEGRA_BASEBAND
+	bool "Enable integrated tegra baseband support"
+	default n
+	help
+	  This option enables support for integrated icera baseband
+	  This driver is used to setup shared memory space, provide
+	  functions to handle IPC mechanism and a sysfs interface for IPC
+	  notification which support polling on sysfs file.
+
+config TEGRA_BASEBAND_SIMU
+	bool "Enable integrated tegra baseband simulation"
+	select TEGRA_BASEBAND
+	help
+	  This option enables tegra baseband simulation when actual hardware
+	  is not present. IPC is simulated when writing to status file which
+	  allow high level tests in local loopback
 
 config TEGRA_MC_PTSA
 	bool "Enable MC PTSA programming"
