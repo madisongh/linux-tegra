@@ -753,4 +753,8 @@ config AID_FUSE
 	help
 	  When enabled, allows sysfs reads of the AID fuse, which contains
 	  the chip family ID and a chip-unique Tegra ID. Supported on t132+.
+
+config TEGRA_CPUQUIET
+	bool
+
 endif
