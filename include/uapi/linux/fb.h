@@ -225,6 +225,23 @@ struct fb_bitfield {
 #define FB_VMODE_YWRAP		256	/* ywrap instead of panning     */
 #define FB_VMODE_SMOOTH_XPAN	512	/* smooth xpan possible (internally used) */
 #define FB_VMODE_CONUPDATE	512	/* don't update x/yoffset	*/
+#define FB_VMODE_Y420		1024	/* YCrCb 4:2:0 also supported */
+#define FB_VMODE_Y420_ONLY	2048	/* YCrCb 4:2:0 only supported */
+
+#define FB_FLAG_RATIO_4_3	64
+#define FB_FLAG_RATIO_16_9	128
+#define FB_FLAG_RATIO_64_27	512
+#define FB_FLAG_RATIO_256_135	1024
+#define FB_FLAG_PIXEL_REPEAT	256
+
+/*
+ * Stereo modes
+ */
+#define FB_VMODE_STEREO_NONE        0x00000000  /* not stereo */
+#define FB_VMODE_STEREO_FRAME_PACK  0x01000000  /* frame packing */
+#define FB_VMODE_STEREO_TOP_BOTTOM  0x02000000  /* top-bottom */
+#define FB_VMODE_STEREO_LEFT_RIGHT  0x04000000  /* left-right */
+#define FB_VMODE_STEREO_MASK        0xFF000000
 
 /*
  * Display rotation support
