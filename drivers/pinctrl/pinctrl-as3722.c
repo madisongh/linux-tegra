@@ -1,7 +1,7 @@
 /*
  * ams AS3722 pin control and GPIO driver.
  *
- * Copyright (c) 2013, NVIDIA Corporation.
+ * Copyright (c) 2013-2014, NVIDIA CORPORATION. All rights reserved.
  *
  * Author: Laxman Dewangan <ldewangan@nvidia.com>
  *
@@ -249,6 +249,7 @@ static int as3722_pinctrl_set(struct pinctrl_dev *pctldev, unsigned function,
 		return ret;
 	}
 	as_pci->gpio_control[group].io_function = function;
+	val = val & AS3722_GPIO_IOSF_MASK;
 
 	switch (val) {
 	case AS3722_GPIO_IOSF_SD0_OUT:
