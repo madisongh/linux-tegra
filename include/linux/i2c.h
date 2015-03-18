@@ -435,6 +435,9 @@ struct i2c_adapter {
 	int retries;
 	struct device dev;		/* the adapter device */
 
+	bool cancel_xfer_on_shutdown;
+	bool atomic_xfer_only;
+
 	int nr;
 	char name[48];
 	struct completion dev_released;
@@ -474,6 +477,8 @@ int i2c_for_each_dev(void *data, int (*fn)(struct device *, void *));
 /* Adapter locking functions, exported for shared pin cases */
 void i2c_lock_adapter(struct i2c_adapter *);
 void i2c_unlock_adapter(struct i2c_adapter *);
+void i2c_shutdown_adapter(struct i2c_adapter *adapter);
+void i2c_shutdown_clear_adapter(struct i2c_adapter *adapter);
 
 /*flags for the client struct: */
 #define I2C_CLIENT_PEC	0x04		/* Use Packet Error Checking */
@@ -576,5 +581,19 @@ static inline struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node
 	return NULL;
 }
 #endif /* CONFIG_OF */
+
+/* Bus clear logic using the GPIO */
+#ifdef CONFIG_I2C_ALGO_BUSCLEAR
+int i2c_algo_busclear_gpio(struct device *dev, int scl_gpio,
+	int scl_gpio_flags, int sda_gpio, int sda_gpio_flags,
+	int max_retry_clock, int clock_speed_hz);
+#else
+static inline int i2c_algo_busclear_gpio(struct device *dev, int scl_gpio,
+	int scl_gpio_flags, int sda_gpio, int sda_gpio_flags,
+	int max_retry_clock, int clock_speed_hz)
+{
+	return -EINVAL;
+}
+#endif /* CONFIG_I2C_ALGO_BUSCLEAR */
 
 #endif /* _LINUX_I2C_H */
