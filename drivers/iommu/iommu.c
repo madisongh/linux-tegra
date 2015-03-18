@@ -750,23 +750,39 @@ static int iommu_bus_notifier(struct notifier_block *nb,
 			      unsigned long action, void *data)
 {
 	struct device *dev = data;
-	const struct iommu_ops *ops = dev->bus->iommu_ops;
+	const struct iommu_ops *ops;
 	struct iommu_group *group;
 	unsigned long group_action = 0;
+
+	if (!dev || !dev->bus|| !dev->bus->iommu_ops)
+		return 0;
+
+	ops = dev->bus->iommu_ops;
 
 	/*
 	 * ADD/DEL call into iommu driver ops if provided, which may
 	 * result in ADD/DEL notifiers to group->notifier
 	 */
-	if (action == BUS_NOTIFY_ADD_DEVICE) {
+	switch (action) {
+	case BUS_NOTIFY_ADD_DEVICE:
 		if (ops->add_device)
 			return ops->add_device(dev);
-	} else if (action == BUS_NOTIFY_DEL_DEVICE) {
+		break;
+	case BUS_NOTIFY_DEL_DEVICE:
 		if (ops->remove_device && dev->iommu_group) {
 			ops->remove_device(dev);
 			return 0;
 		}
-	}
+		break;
+	case BUS_NOTIFY_BOUND_DRIVER:
+		if (ops->bound_driver)
+			ops->bound_driver(dev);
+		break;
+	case BUS_NOTIFY_UNBIND_DRIVER:
+		if (ops->unbind_driver)
+			ops->unbind_driver(dev);
+		break;
+	};
 
 	/*
 	 * Remaining BUS_NOTIFYs get filtered and republished to the
@@ -1024,7 +1040,7 @@ static size_t iommu_pgsize(struct iommu_domain *domain,
 }
 
 int iommu_map(struct iommu_domain *domain, unsigned long iova,
-	      phys_addr_t paddr, size_t size, int prot)
+	      phys_addr_t paddr, size_t size, unsigned long prot)
 {
 	unsigned long orig_iova = iova;
 	unsigned int min_pagesz;
@@ -1075,6 +1091,31 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(iommu_map);
+
+int iommu_map_pages(struct iommu_domain *domain, unsigned long iova,
+		    struct page **pages, size_t count, unsigned long prot)
+{
+	int err;
+
+	err = domain->ops->map_pages(domain, iova, pages, count, prot);
+	if (err)
+		iommu_unmap(domain, iova, count << PAGE_SHIFT);
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(iommu_map_pages);
+
+int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
+		 struct scatterlist *sgl, int nents, unsigned long prot)
+{
+	int err;
+
+	err = domain->ops->map_sg(domain, iova, sgl, nents, prot);
+	if (err)
+		iommu_unmap(domain, iova, sgl->length);
+
+	return err;
+}
 
 size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
 {
