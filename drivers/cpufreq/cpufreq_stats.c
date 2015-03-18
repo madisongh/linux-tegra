@@ -23,7 +23,7 @@ struct cpufreq_stats {
 	unsigned long long last_time;
 	unsigned int max_state;
 	unsigned int state_num;
-	unsigned int last_index;
+	int last_index;
 	u64 *time_in_state;
 	unsigned int *freq_table;
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
@@ -46,7 +46,7 @@ static int cpufreq_stats_update(unsigned int cpu)
 	cur_time = get_jiffies_64();
 	spin_lock(&cpufreq_stats_lock);
 	stat = per_cpu(cpufreq_stats_table, cpu);
-	if (stat->time_in_state)
+	if (stat->time_in_state && stat->last_index >= 0)
 		stat->time_in_state[stat->last_index] +=
 			cur_time - stat->last_time;
 	stat->last_time = cur_time;
@@ -145,15 +145,20 @@ static struct attribute_group stats_attr_group = {
 static int freq_table_get_index(struct cpufreq_stats *stat, unsigned int freq)
 {
 	int index;
-	for (index = 0; index < stat->max_state; index++)
-		if (stat->freq_table[index] == freq)
-			return index;
-	return -1;
+	for (index = 0; index < stat->state_num; index++)
+		if (stat->freq_table[index] > freq)
+			break;
+	return index - 1; /* below lowest freq in table: return -1 */
 }
 
 static void __cpufreq_stats_free_table(struct cpufreq_policy *policy)
 {
-	struct cpufreq_stats *stat = per_cpu(cpufreq_stats_table, policy->cpu);
+	struct cpufreq_stats *stat;
+
+	spin_lock(&cpufreq_stats_lock);
+	stat = per_cpu(cpufreq_stats_table, policy->cpu);
+	per_cpu(cpufreq_stats_table, policy->cpu) = NULL;
+	spin_unlock(&cpufreq_stats_lock);
 
 	if (!stat)
 		return;
@@ -182,7 +187,7 @@ static void cpufreq_stats_free_table(unsigned int cpu)
 
 static int __cpufreq_stats_create_table(struct cpufreq_policy *policy)
 {
-	unsigned int i, count = 0, ret = 0;
+	unsigned int i, j, k, count = 0, ret = 0;
 	struct cpufreq_stats *stat;
 	unsigned int alloc_size;
 	unsigned int cpu = policy->cpu;
@@ -225,9 +230,19 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy)
 	stat->trans_table = stat->freq_table + count;
 #endif
 	i = 0;
-	cpufreq_for_each_valid_entry(pos, table)
+	cpufreq_for_each_valid_entry(pos, table) {
 		if (freq_table_get_index(stat, pos->frequency) == -1)
 			stat->freq_table[i++] = pos->frequency;
+		/* Insert in sorted stat->freq_table */
+		for (j = 0; j < i && stat->freq_table[j] < pos->frequency; j++)
+			;
+		if (stat->freq_table[j] == pos->frequency)
+			continue;
+		for (k = i; k > j; k--)
+			stat->freq_table[k] = stat->freq_table[k - 1];
+		stat->freq_table[j] = pos->frequency;
+		i++;
+	}
 	stat->state_num = i;
 	spin_lock(&cpufreq_stats_lock);
 	stat->last_time = get_jiffies_64();
@@ -301,26 +316,27 @@ static int cpufreq_stat_notifier_trans(struct notifier_block *nb,
 	if (val != CPUFREQ_POSTCHANGE)
 		return 0;
 
+	cpufreq_stats_update(freq->cpu);
+
+	spin_lock(&cpufreq_stats_lock);
 	stat = per_cpu(cpufreq_stats_table, freq->cpu);
-	if (!stat)
+	if (!stat) {
+		spin_unlock(&cpufreq_stats_lock);
 		return 0;
+	}
 
 	old_index = stat->last_index;
 	new_index = freq_table_get_index(stat, freq->new);
 
-	/* We can't do stat->time_in_state[-1]= .. */
-	if (old_index == -1 || new_index == -1)
+	if (old_index == new_index) {
+		spin_unlock(&cpufreq_stats_lock);
 		return 0;
+	}
 
-	cpufreq_stats_update(freq->cpu);
-
-	if (old_index == new_index)
-		return 0;
-
-	spin_lock(&cpufreq_stats_lock);
 	stat->last_index = new_index;
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
-	stat->trans_table[old_index * stat->max_state + new_index]++;
+	if (old_index >= 0 && new_index >= 0)
+		stat->trans_table[old_index * stat->max_state + new_index]++;
 #endif
 	stat->total_trans++;
 	spin_unlock(&cpufreq_stats_lock);
