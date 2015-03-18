@@ -156,4 +156,11 @@ config TEGRA_ACTMON
 	  certain hardware units. It can boost EMC clock or AVP clock depending
 	  on the memory trafic among various client. If unsure, say Y here.
 
+config TEGRA_IVC
+	bool "Tegra IVC protocol support"
+	default n
+	help
+	  Enable the Tegra IVC library, which implements a lockless, shared-
+	  memory queue.
+
 trysource "../kernel-t18x/drivers/platform/tegra/Kconfig"
