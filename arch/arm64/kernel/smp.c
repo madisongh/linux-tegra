@@ -66,9 +66,30 @@ enum ipi_msg_type {
 	IPI_CALL_FUNC,
 	IPI_CALL_FUNC_SINGLE,
 	IPI_CPU_STOP,
+	IPI_WAKEUP,
 	IPI_TIMER,
 	IPI_IRQ_WORK,
 };
+
+static struct smp_operations smp_ops;
+
+void __init smp_set_ops(struct smp_operations *ops)
+{
+	if (ops)
+		smp_ops = *ops;
+};
+
+static void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+{
+	if (smp_ops.smp_prepare_cpus)
+		smp_ops.smp_prepare_cpus(max_cpus);
+}
+
+static void  platform_secondary_init(unsigned int cpu)
+{
+	if (smp_ops.smp_secondary_init)
+		smp_ops.smp_secondary_init(cpu);
+}
 
 /*
  * Boot a secondary CPU, and assign it the specified idle task.
@@ -76,6 +97,9 @@ enum ipi_msg_type {
  */
 static int boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
+	if (smp_ops.smp_boot_secondary)
+		smp_ops.smp_boot_secondary(cpu, idle);
+
 	if (cpu_ops[cpu]->cpu_boot)
 		return cpu_ops[cpu]->cpu_boot(cpu);
 
@@ -125,11 +149,34 @@ static void smp_store_cpu_info(unsigned int cpuid)
 	store_cpu_topology(cpuid);
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+
+static int platform_cpu_kill(unsigned int cpu)
+{
+	if (smp_ops.cpu_kill)
+		return smp_ops.cpu_kill(cpu);
+	return 1;
+}
+
+static void platform_cpu_die(unsigned int cpu)
+{
+	if (smp_ops.cpu_die)
+		smp_ops.cpu_die(cpu);
+}
+
+static int platform_cpu_disable(unsigned int cpu)
+{
+	if (smp_ops.cpu_disable)
+		return smp_ops.cpu_disable(cpu);
+	return 0;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 /*
  * This is the secondary CPU boot entry.  We're using this CPUs
  * idle thread stack, but a set of temporary page tables.
  */
-asmlinkage void secondary_start_kernel(void)
+asmlinkage void __cpuinit secondary_start_kernel(void)
 {
 	struct mm_struct *mm = &init_mm;
 	unsigned int cpu = smp_processor_id();
@@ -143,7 +190,7 @@ asmlinkage void secondary_start_kernel(void)
 	cpumask_set_cpu(cpu, mm_cpumask(mm));
 
 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
-	printk("CPU%u: Booted secondary processor\n", cpu);
+	pr_debug("CPU%u: Booted secondary processor\n", cpu);
 
 	/*
 	 * TTBR0 is only used for the identity mapping at this stage. Make it
@@ -154,6 +201,11 @@ asmlinkage void secondary_start_kernel(void)
 
 	preempt_disable();
 	trace_hardirqs_off();
+
+	/*
+	 * Give the platform a chance to do its own initialisation.
+	 */
+	platform_secondary_init(cpu);
 
 	if (cpu_ops[cpu]->cpu_postboot)
 		cpu_ops[cpu]->cpu_postboot();
@@ -192,13 +244,6 @@ asmlinkage void secondary_start_kernel(void)
 static int op_cpu_disable(unsigned int cpu)
 {
 	/*
-	 * If we don't have a cpu_die method, abort before we reach the point
-	 * of no return. CPU0 may not have an cpu_ops, so test for it.
-	 */
-	if (!cpu_ops[cpu] || !cpu_ops[cpu]->cpu_die)
-		return -EOPNOTSUPP;
-
-	/*
 	 * We may need to abort a hot unplug for some other mechanism-specific
 	 * reason.
 	 */
@@ -215,6 +260,10 @@ int __cpu_disable(void)
 {
 	unsigned int cpu = smp_processor_id();
 	int ret;
+
+	ret = platform_cpu_disable(cpu);
+	if (ret)
+		return ret;
 
 	ret = op_cpu_disable(cpu);
 	if (ret)
@@ -264,7 +313,11 @@ void __cpu_die(unsigned int cpu)
 		pr_crit("CPU%u: cpu didn't die\n", cpu);
 		return;
 	}
-	pr_notice("CPU%u: shutdown\n", cpu);
+
+	if (!platform_cpu_kill(cpu))
+		printk("CPU%u: unable to kill\n", cpu);
+
+	pr_debug("CPU%u: shutdown\n", cpu);
 
 	/*
 	 * Now that the dying CPU is beyond the point of no return w.r.t.
@@ -284,7 +337,7 @@ void __cpu_die(unsigned int cpu)
  * of the other hotplug-cpu capable cores, so presumably coming
  * out of idle fixes this.
  */
-void cpu_die(void)
+void __ref cpu_die(void)
 {
 	unsigned int cpu = smp_processor_id();
 
@@ -300,9 +353,26 @@ void cpu_die(void)
 	 * mechanism must perform all required cache maintenance to ensure that
 	 * no dirty lines are lost in the process of shutting down the CPU.
 	 */
-	cpu_ops[cpu]->cpu_die(cpu);
+	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
+		cpu_ops[cpu]->cpu_die(cpu);
 
-	BUG();
+	/*
+	 * actual CPU shutdown procedure is at least platform (if not
+	 * CPU) specific.
+	 */
+	platform_cpu_die(cpu);
+
+	/*
+	 * Do not return to the idle loop - jump back to the secondary
+	 * cpu initialisation.  There's some initialisation which needs
+	 * to be repeated to undo the effects of taking the CPU offline.
+	 * ps. x29 is the frame pointer.
+	 */
+	__asm__("mov	sp, %0\n"
+	"	mov	x29, #0\n"
+	"	b	secondary_start_kernel"
+	:
+	: "r" (secondary_data.stack));
 }
 #endif
 
@@ -343,13 +413,13 @@ void __init smp_init_cpus(void)
 		}
 		hwid = of_read_number(cell, of_n_addr_cells(dn));
 
+		hwid &= MPIDR_HWID_BITMASK;
+
 		/*
-		 * Non affinity bits must be set to 0 in the DT
+		 * Check to see if the cpu is disabled.
 		 */
-		if (hwid & ~MPIDR_HWID_BITMASK) {
-			pr_err("%s: invalid reg property\n", dn->full_name);
+		if (!of_device_is_available(dn))
 			goto next;
-		}
 
 		/*
 		 * Duplicate MPIDRs are a recipe for disaster. Scan
@@ -390,6 +460,9 @@ void __init smp_init_cpus(void)
 			continue;
 		}
 
+		if (!bootcpu_valid)
+			continue;
+
 		if (cpu >= NR_CPUS)
 			goto next;
 
@@ -422,6 +495,9 @@ next:
 	for (i = 0; i < NR_CPUS; i++)
 		if (cpu_logical_map(i) != INVALID_HWID)
 			set_cpu_possible(i, true);
+
+	if (smp_ops.smp_init_cpus)
+		smp_ops.smp_init_cpus();
 }
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
@@ -468,6 +544,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		set_cpu_present(cpu, true);
 		max_cpus--;
 	}
+
+	platform_smp_prepare_cpus(max_cpus);
 }
 
 void (*__smp_cross_call)(const struct cpumask *, unsigned int);
@@ -483,6 +561,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
 	S(IPI_CALL_FUNC, "Function call interrupts"),
 	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
 	S(IPI_CPU_STOP, "CPU stop interrupts"),
+	S(IPI_WAKEUP, "CPU wakeup interrupts"),
 	S(IPI_TIMER, "Timer broadcast interrupts"),
 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
 };
@@ -491,6 +570,11 @@ static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
 {
 	trace_ipi_raise(target, ipi_types[ipinr]);
 	__smp_cross_call(target, ipinr);
+}
+
+void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
+{
+	smp_cross_call(mask, IPI_WAKEUP);
 }
 
 void show_ipi_list(struct seq_file *p, int prec)
@@ -593,6 +677,9 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		irq_enter();
 		ipi_cpu_stop(cpu);
 		irq_exit();
+		break;
+
+	case IPI_WAKEUP:
 		break;
 
 #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST

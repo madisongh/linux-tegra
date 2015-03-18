@@ -1,0 +1,157 @@
+/*
+ * tegra210-hawkeye-p2290-common.dtsi: Hawkeye common dtsi.
+ *
+ * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ */
+
+#include <dt-bindings/types.h>
+/dts-v1/;
+
+/memreserve/ 0x80000000 0x00020000;
+
+#include "tegra210-soc-shield.dtsi"
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/gpio/tegra-gpio.h>
+
+/* camera control gpio definitions */
+#define CAM_PWDN_FQ	TEGRA_GPIO(T, 0)
+#define CAM_PWDN_RQ	TEGRA_GPIO(S, 7)
+#define CAM_RST		TEGRA_GPIO(S, 4)
+#define CAM_PWDN_AF	TEGRA_GPIO(S, 5)
+
+#include "tegra210-platforms/tegra210-prods.dtsi"
+#include "tegra210-platforms/tegra210-hawkeye-pinmux-p2290-1100-a00.dtsi"
+#include "tegra210-platforms/tegra210-hawkeye-power-tree-p2290-1100-a00.dtsi"
+#include "tegra210-platforms/tegra210-ers-keys-e2141-1100-a00.dtsi"
+#include "panel-a-1080p-14-0.dtsi"
+#include "tegra210-platforms/tegra210-hawkeye-touch.dtsi"
+#include "tegra210-platforms/tegra210-hawkeye-sensor-p2290-1100-a00.dtsi"
+#include "tegra210-platforms/tegra210-hawkeye-camera-p2290-1100-a00.dtsi"
+#include "tegra210-platforms/tegra210-hawkeye-modem-p2290-1100-a00.dtsi"
+
+/* TODO: comm's dtsi should be included after GPIO dtsi */
+#include "tegra210-platforms/tegra210-hawkeye-comms.dtsi"
+
+/ {
+	compatible = "nvidia,hawkeye", "nvidia,tegra210";
+	nvidia,fastboot-usb-pid = <0xb420>;
+
+	nvidia,boardids = "2290:0000:A0";
+	nvidia,proc-boardid = "2290:0000:A0";
+	nvidia,pmu-boardid = "2290:0000:A0";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	chosen {
+	};
+
+	pmc@7000e400 {
+		nvidia,invert-interrupt;
+	};
+
+	gpio-keys {
+		home {
+			status = "disabled";
+		};
+	};
+
+
+	i2c@546c0000 {
+		avdd_dsi_csi-supply = <&mipi_1v2>;
+	};
+
+	camera-pcl {
+		profiles {
+			ov5693@2_0036 {
+				use_of_node = "yes";
+				dev_name = "ov5693";
+				num = <1>;
+				vana-supply = <&max77620_ldo3>;
+				vif-supply = <&en_vdd_cam>;
+				cam2-gpios = <&gpio CAM_PWDN_FQ 0>;
+				reset-gpios = <&gpio CAM_RST 0>;
+			};
+			ov5693@2_0010 {
+				use_of_node = "yes";
+				dev_name = "ov5693";
+				num = <0>;
+				vana-supply = <&max77620_ldo3>;
+				vif-supply = <&en_vdd_cam>;
+				cam2-gpios = <&gpio CAM_PWDN_RQ 0>;
+			};
+			ad5823@2_000c {
+				use_of_node = "yes";
+				vdd-supply = <&max77620_ldo3>;
+				vif-supply = <&en_vdd_cam>;
+				af-pwdn-gpios = <&gpio CAM_PWDN_AF 0>;
+			};
+		};
+
+		dpd {
+			compatible = "nvidia,csi-dpd";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			default-enable;
+			num = <6>;
+			csia {
+				reg = <0x0 0x0 0x0 0x0>;
+			};
+			csib {
+				reg = <0x0 0x1 0x0 0x0>;
+			};
+			csic {
+				reg = <0x1 0x0a 0x0 0x0>;
+			};
+			csid {
+				reg = <0x1 0x0b 0x0 0x0>;
+			};
+			csie {
+				reg = <0x1 0x0c 0x0 0x0>;
+			};
+			csif {
+				reg = <0x1 0x0d 0x0 0x0>;
+			};
+		};
+	};
+
+	extcon {
+		id_gpio_extcon: extcon@0 {
+			compatible = "extcon-gpio";
+			reg = <0x0>;
+			extcon-gpio,name = "ID";
+			gpio = <&max77620 0 0>;
+			extcon-gpio,connection-state-low;
+			extcon-gpio,cable-name = "USB-Host";
+			#extcon-cells = <1>;
+		};
+	};
+
+	udc@7d000000 {
+		nvidia,port-otg;
+		nvidia,charging-supported;
+		nvidia,enable-pmu-vbus-detection;
+		nvidia,id-detection-type = <1>;
+		extcon-cables = <&bq2419x 0>;
+		extcon-cable-names = "vbus";
+		#extcon-cells = <1>;
+		dt-override-status-odm-data = <0x01000000 0x00000000>;
+	};
+
+        otg@7d000000 {
+		nvidia,enable-pmu-vbus-detection;
+		nvidia,id-detection-type = <1>;
+		extcon-cables = <&bq2419x 0 &id_gpio_extcon 0>;
+		extcon-cable-names = "vbus", "id";
+		#extcon-cells = <1>;
+		dt-override-status-odm-data = <0x01000000 0x00000000>;
+        };
+};

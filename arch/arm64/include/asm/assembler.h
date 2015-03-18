@@ -62,11 +62,27 @@
  * Enable and disable debug exceptions.
  */
 	.macro	disable_dbg
+#ifdef CONFIG_DENVER_CPU
+	msr	daifset, #12
+#else
 	msr	daifset, #8
+#endif
 	.endm
 
 	.macro	enable_dbg
+#ifdef CONFIG_DENVER_CPU
+	msr	daifclr, #12
+#else
 	msr	daifclr, #8
+#endif
+	.endm
+
+	.macro	enable_dbg_irq
+#ifdef CONFIG_DENVER_CPU
+	msr	daifclr, #14
+#else
+	msr	daifclr, #10
+#endif
 	.endm
 
 	.macro	disable_step_tsk, flgs, tmp

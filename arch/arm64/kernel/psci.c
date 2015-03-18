@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2014, NVIDIA Corporation. All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -15,6 +17,7 @@
 
 #define pr_fmt(fmt) "psci: " fmt
 
+#include <linux/export.h>
 #include <linux/init.h>
 #include <linux/of.h>
 #include <linux/smp.h>
@@ -32,27 +35,7 @@
 #include <asm/suspend.h>
 #include <asm/system_misc.h>
 
-#define PSCI_POWER_STATE_TYPE_STANDBY		0
-#define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
-
-struct psci_power_state {
-	u16	id;
-	u8	type;
-	u8	affinity_level;
-};
-
-struct psci_operations {
-	int (*cpu_suspend)(struct psci_power_state state,
-			   unsigned long entry_point);
-	int (*cpu_off)(struct psci_power_state state);
-	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
-	int (*migrate)(unsigned long cpuid);
-	int (*affinity_info)(unsigned long target_affinity,
-			unsigned long lowest_affinity_level);
-	int (*migrate_info_type)(void);
-};
-
-static struct psci_operations psci_ops;
+struct psci_operations psci_ops;
 
 static int (*invoke_psci_fn)(u64, u64, u64, u64);
 typedef int (*psci_initcall_t)(const struct device_node *);
@@ -87,7 +70,7 @@ static int psci_to_linux_errno(int errno)
 	return -EINVAL;
 }
 
-static u32 psci_power_state_pack(struct psci_power_state state)
+u32 psci_power_state_pack(struct psci_power_state state)
 {
 	return ((state.id << PSCI_0_2_POWER_STATE_ID_SHIFT)
 			& PSCI_0_2_POWER_STATE_ID_MASK) |
@@ -108,12 +91,27 @@ static void psci_power_state_unpack(u32 power_state,
 			(power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
 			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
 }
+EXPORT_SYMBOL(psci_power_state_pack);
+
+struct psci_power_state to_psci_power_state(unsigned long arg)
+{
+	struct psci_power_state ps;
+
+	ps.id = (arg >> PSCI_0_2_POWER_STATE_ID_SHIFT)
+			& PSCI_0_2_POWER_STATE_ID_MASK;
+	ps.type = (arg >> PSCI_0_2_POWER_STATE_TYPE_SHIFT)
+			& PSCI_0_2_POWER_STATE_TYPE_MASK;
+	ps.affinity_level = (arg >> PSCI_0_2_POWER_STATE_AFFL_SHIFT)
+			& PSCI_0_2_POWER_STATE_AFFL_MASK;
+
+	return ps;
+}
 
 /*
  * The following two functions are invoked via the invoke_psci_fn pointer
  * and will not be inlined, allowing us to piggyback on the AAPCS.
  */
-static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
+static noinline notrace int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
 					 u64 arg2)
 {
 	asm volatile(
@@ -128,7 +126,7 @@ static noinline int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1,
 	return function_id;
 }
 
-static noinline int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
+static noinline notrace int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
 					 u64 arg2)
 {
 	asm volatile(

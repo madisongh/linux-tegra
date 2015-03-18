@@ -313,7 +313,8 @@ el1_undef:
 	 */
 	enable_dbg
 	mov	x0, sp
-	b	do_undefinstr
+	bl	do_undefinstr
+	kernel_exit 1
 el1_dbg:
 	/*
 	 * Debug exception handling
@@ -667,6 +668,11 @@ ENDPROC(el0_svc)
 	 * This is the really slow path.  We're going to be doing context
 	 * switches, and waiting for our parent to respond.
 	 */
+ni_sys_systrace:
+	mov     x0, sp
+	bl      do_ni_syscall
+	b       __sys_trace_return
+
 __sys_trace:
 	mov	x0, sp
 	bl	syscall_trace_enter
@@ -674,7 +680,7 @@ __sys_trace:
 	uxtw	scno, w0			// syscall number (possibly new)
 	mov	x1, sp				// pointer to regs
 	cmp	scno, sc_nr			// check upper syscall limit
-	b.hs	ni_sys
+	b.hs	ni_sys_systrace
 	ldp	x0, x1, [sp]			// restore the syscall args
 	ldp	x2, x3, [sp, #S_X2]
 	ldp	x4, x5, [sp, #S_X4]

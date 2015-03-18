@@ -55,7 +55,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
  */
 static inline void cpu_set_reserved_ttbr0(void)
 {
-	unsigned long ttbr = page_to_phys(empty_zero_page);
+	unsigned long ttbr = page_to_phys(virt_to_page(empty_zero_page));
 
 	asm(
 	"	msr	ttbr0_el1, %0			// set TTBR0\n"
@@ -78,11 +78,8 @@ static inline void switch_new_context(struct mm_struct *mm)
 static inline void check_and_switch_context(struct mm_struct *mm,
 					    struct task_struct *tsk)
 {
-	/*
-	 * Required during context switch to avoid speculative page table
-	 * walking with the wrong TTBR.
-	 */
-	cpu_set_reserved_ttbr0();
+	/* unneeded switch to ASID0 */
+	/* cpu_set_reserved_ttbr0(); */
 
 	if (!((mm->context.id ^ cpu_last_asid) >> MAX_ASID_BITS))
 		/*

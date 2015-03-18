@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 ARM Ltd.
+ * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,29 +11,19 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+ * 02111-1307, USA
  */
 
-#include <linux/linkage.h>
-#include <linux/const.h>
-#include <asm/assembler.h>
-#include <asm/page.h>
+#ifndef __MACH_TEGRA_MEMORY_H
+#define __MACH_TEGRA_MEMORY_H
 
 /*
- * Clear page @dest
- *
- * Parameters:
- *	x0 - dest
+ * Unaligned DMA causes tegra dma to place data on 4-byte boundary after
+ * expected address. Call to skb_reserve(skb, NET_IP_ALIGN) was causing skb
+ * buffers in usbnet.c and u_ether.c to become unaligned.
  */
-ENTRY(clear_page)
-	mrs	x1, dczid_el0
-	and	w1, w1, #0xf
-	mov	x2, #4
-	lsl	x1, x2, x1
+#define NET_IP_ALIGN	0
 
-1:	dc	zva, x0
-	add	x0, x0, x1
-	tst	x0, #(PAGE_SIZE - 1)
-	b.ne	1b
-	ret
-ENDPROC(clear_page)
+#endif

@@ -30,6 +30,9 @@ AS		+= -EL
 LD		+= -EL
 endif
 
+# For mach-xxx/mach/{io.h|irqs.h}
+KBUILD_CPPFLAGS += -Iarch/arm/mach-tegra/include
+
 CHECKFLAGS	+= -D__aarch64__
 
 # Default value
@@ -44,11 +47,15 @@ endif
 
 export	TEXT_OFFSET GZFLAGS
 
+subdir-ccflags-y += -Werror
 core-y		+= arch/arm64/kernel/ arch/arm64/mm/
 core-$(CONFIG_NET) += arch/arm64/net/
 core-$(CONFIG_KVM) += arch/arm64/kvm/
 core-$(CONFIG_XEN) += arch/arm64/xen/
 core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
+
+core-$(CONFIG_ARCH_TEGRA)	+= arch/arm64/mach-tegra/
+
 libs-y		:= arch/arm64/lib/ $(libs-y)
 libs-y		+= $(LIBGCC)
 libs-$(CONFIG_EFI_STUB) += drivers/firmware/efi/libstub/
@@ -57,11 +64,15 @@ libs-$(CONFIG_EFI_STUB) += drivers/firmware/efi/libstub/
 KBUILD_IMAGE	:= Image.gz
 KBUILD_DTBS	:= dtbs
 
-all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
+all:	$(KBUILD_IMAGE) $(KBUILD_DTBS) zImage
 
 boot := arch/arm64/boot
 
-Image Image.gz: vmlinux
+# FIXME: copied from arch/arm/Makefile
+archprepare:
+	$(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
+
+Image Image.gz zImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 zinstall install: vmlinux

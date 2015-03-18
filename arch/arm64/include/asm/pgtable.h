@@ -32,6 +32,13 @@
 #define PTE_PROT_NONE		(_AT(pteval_t, 1) << 58) /* only when !PTE_VALID */
 
 /*
+ * Some extra PTE bits definition.
+ */
+#define PTE_YOUNG		PTE_AF
+#define PTE_PRESENT		PTE_VALID | PTE_PROT_NONE
+#define PTE_XN			PTE_UXN
+
+/*
  * VMALLOC and SPARSEMEM_VMEMMAP ranges.
  *
  * VMEMAP_SIZE: allows the whole VA space to be covered by a struct page array
@@ -47,6 +54,14 @@
 #define vmemmap			((struct page *)(VMALLOC_END + SZ_64K))
 
 #define FIRST_USER_ADDRESS	0
+
+/*
+ * Use TASK_SIZE as the ceiling argument for free_pgtables() and
+ * free_pgd_range() to make sure all memory pages are freed when
+ * processes are torn down. Otherwise, the initial stack page is
+ * leaked since it's above TASK_SIZE(_32) in the compat mode.
+ */
+#define USER_PGTABLES_CEILING  TASK_SIZE_64
 
 #ifndef __ASSEMBLY__
 extern void __pte_error(const char *file, int line, unsigned long val);
@@ -69,6 +84,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
 #define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
 #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
 #define PROT_SECT_NORMAL_EXEC	(PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+#define PROT_SECT_NORMAL_NC	(PROT_SECT_DEFAULT | PMD_ATTRINDX(MT_NORMAL_NC))
 
 #define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
 
@@ -111,8 +127,12 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
  * ZERO_PAGE is a global shared page that is always zero: used
  * for zero-mapped memory areas etc..
  */
-extern struct page *empty_zero_page;
-#define ZERO_PAGE(vaddr)	(empty_zero_page)
+extern unsigned long empty_zero_page;
+extern unsigned long zero_page_mask;
+
+#define ZERO_PAGE(vaddr) \
+	(virt_to_page((void *)(empty_zero_page + (((unsigned long)(vaddr)) & zero_page_mask))))
+#define __HAVE_COLOR_ZERO_PAGE
 
 #define pte_ERROR(pte)		__pte_error(__FILE__, __LINE__, pte_val(pte))
 
@@ -320,6 +340,8 @@ static inline int has_transparent_hugepage(void)
 	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC) | PTE_PXN | PTE_UXN)
 #define pgprot_device(prot) \
 	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRE) | PTE_PXN | PTE_UXN)
+#define pgprot_device_writecombine(prot) \
+	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_GRE) | PTE_PXN | PTE_UXN)
 #define __HAVE_PHYS_MEM_ACCESS_PROT
 struct file;
 extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
