@@ -936,6 +936,16 @@ void iommu_domain_free(struct iommu_domain *domain)
 }
 EXPORT_SYMBOL_GPL(iommu_domain_free);
 
+int iommu_get_hwid(struct iommu_domain *domain, struct device *dev,
+		   unsigned int id)
+{
+	if (unlikely(domain->ops->get_hwid == NULL))
+		return -ENODEV;
+
+	return domain->ops->get_hwid(domain, dev, id);
+}
+EXPORT_SYMBOL_GPL(iommu_get_hwid);
+
 int iommu_attach_device(struct iommu_domain *domain, struct device *dev)
 {
 	int ret;
