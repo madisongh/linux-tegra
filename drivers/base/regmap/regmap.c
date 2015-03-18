@@ -586,6 +586,7 @@ struct regmap *regmap_init(struct device *dev,
 	map->readable_reg = config->readable_reg;
 	map->volatile_reg = config->volatile_reg;
 	map->precious_reg = config->precious_reg;
+	map->reg_volatile_set = config->reg_volatile_set;
 	map->cache_type = config->cache_type;
 	map->name = config->name;
 
@@ -1056,6 +1057,7 @@ int regmap_reinit_cache(struct regmap *map, const struct regmap_config *config)
 	map->readable_reg = config->readable_reg;
 	map->volatile_reg = config->volatile_reg;
 	map->precious_reg = config->precious_reg;
+	map->reg_volatile_set = config->reg_volatile_set;
 	map->cache_type = config->cache_type;
 
 	regmap_debugfs_init(map, config->name);
@@ -2175,7 +2177,7 @@ int regmap_raw_read(struct regmap *map, unsigned int reg, void *val,
 	size_t val_bytes = map->format.val_bytes;
 	size_t val_count = val_len / val_bytes;
 	unsigned int v;
-	int ret, i;
+	int ret = -EINVAL, i;
 
 	if (!map->bus)
 		return -EINVAL;

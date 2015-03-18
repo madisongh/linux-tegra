@@ -493,6 +493,52 @@ void regcache_cache_bypass(struct regmap *map, bool enable)
 }
 EXPORT_SYMBOL_GPL(regcache_cache_bypass);
 
+static int _regcache_volatile_set(struct regmap *map, unsigned int reg,
+				  bool is_volatile)
+{
+	int ret;
+
+	if (is_volatile == regmap_volatile(map, reg))
+		return 0;
+
+	if (!map->cache_ops || !map->cache_ops->drop)
+		return -EINVAL;
+
+	if (!map->reg_volatile_set)
+		return -ENOSYS;
+
+	ret = map->reg_volatile_set(map->dev, reg, is_volatile);
+	if (ret)
+		return ret;
+
+	return map->cache_ops->drop(map, reg, reg);
+}
+
+/**
+ * regcache_volatile_set: Set single register as volatile or cached
+ *
+ * @map: map to apply change to
+ * @reg: register to be set as volatile or cached
+ * @is_volatile: if true, register is set as volatile, otherwise as cached
+ *
+ * Set access attribute to the specified register as volatile or cached. Clear
+ * cache_present bit (i.e., invalidate cache) on successful exit.
+ *
+ * Return a negative value on failure, 0 on success.
+ */
+int regcache_volatile_set(struct regmap *map, unsigned int reg,
+			  bool is_volatile)
+{
+	int ret;
+
+	map->lock(map->lock_arg);
+	ret = _regcache_volatile_set(map, reg, is_volatile);
+	map->unlock(map->lock_arg);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(regcache_volatile_set);
+
 bool regcache_set_val(struct regmap *map, void *base, unsigned int idx,
 		      unsigned int val)
 {
@@ -583,6 +629,12 @@ int regcache_lookup_reg(struct regmap *map, unsigned int reg)
 	else
 		return -ENOENT;
 }
+
+/*static void regcache_clear_reg_present(struct regmap *map, unsigned int reg)
+{
+	if ((map->cache_present) && (reg < map->cache_present_nbits))
+		clear_bit(reg, map->cache_present);
+}*/
 
 static bool regcache_reg_present(unsigned long *cache_present, unsigned int idx)
 {

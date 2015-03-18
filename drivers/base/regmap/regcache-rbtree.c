@@ -15,6 +15,7 @@
 #include <linux/debugfs.h>
 #include <linux/rbtree.h>
 #include <linux/seq_file.h>
+#include <linux/kmemleak.h>
 
 #include "internal.h"
 
@@ -356,6 +357,8 @@ regcache_rbtree_node_alloc(struct regmap *map, unsigned int reg)
 				GFP_KERNEL);
 	if (!rbnode->block)
 		goto err_free;
+	kmemleak_not_leak(rbnode->block);
+	kmemleak_not_leak(rbnode);
 
 	rbnode->cache_present = kzalloc(BITS_TO_LONGS(rbnode->blklen) *
 		sizeof(*rbnode->cache_present), GFP_KERNEL);
