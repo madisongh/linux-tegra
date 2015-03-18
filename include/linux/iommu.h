@@ -135,6 +135,7 @@ struct iommu_dm_region {
  * struct iommu_ops - iommu ops and capabilities
  * @domain_init: init iommu domain
  * @domain_destroy: destroy iommu domain
+ * @get_hwid: retrieve the hwid (streamid/asid) associated with the domain/dev
  * @attach_dev: attach device to an iommu domain
  * @detach_dev: detach device from an iommu domain
  * @map: map a physically contiguous memory region to an iommu domain
@@ -156,6 +157,9 @@ struct iommu_ops {
 	/* Domain allocation and freeing by the iommu driver */
 	struct iommu_domain *(*domain_alloc)(unsigned iommu_domain_type);
 	void (*domain_free)(struct iommu_domain *);
+
+	int (*get_hwid)(struct iommu_domain *domain, struct device *dev,
+			unsigned int id);
 
 	int (*attach_dev)(struct iommu_domain *domain, struct device *dev);
 	void (*detach_dev)(struct iommu_domain *domain, struct device *dev);
@@ -208,6 +212,8 @@ extern bool iommu_capable(struct bus_type *bus, enum iommu_cap cap);
 extern struct iommu_domain *iommu_domain_alloc(struct bus_type *bus);
 extern struct iommu_group *iommu_group_get_by_id(int id);
 extern void iommu_domain_free(struct iommu_domain *domain);
+extern int iommu_get_hwid(struct iommu_domain *domain, struct device *dev,
+			  unsigned int id);
 extern int iommu_attach_device(struct iommu_domain *domain,
 			       struct device *dev);
 extern void iommu_detach_device(struct iommu_domain *domain,
