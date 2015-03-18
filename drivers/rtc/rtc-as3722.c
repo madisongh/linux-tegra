@@ -45,7 +45,7 @@ static void as3722_time_to_reg(u8 *rbuff, struct rtc_time *tm)
 	rbuff[1] = bin2bcd(tm->tm_min);
 	rbuff[2] = bin2bcd(tm->tm_hour);
 	rbuff[3] = bin2bcd(tm->tm_mday);
-	rbuff[4] = bin2bcd(tm->tm_mon);
+	rbuff[4] = bin2bcd(tm->tm_mon + 1);
 	rbuff[5] = bin2bcd(tm->tm_year - (AS3722_RTC_START_YEAR - 1900));
 }
 
@@ -55,7 +55,7 @@ static void as3722_reg_to_time(u8 *rbuff, struct rtc_time *tm)
 	tm->tm_min = bcd2bin(rbuff[1] & 0x7F);
 	tm->tm_hour = bcd2bin(rbuff[2] & 0x3F);
 	tm->tm_mday = bcd2bin(rbuff[3] & 0x3F);
-	tm->tm_mon = bcd2bin(rbuff[4] & 0x1F);
+	tm->tm_mon = bcd2bin(rbuff[4] & 0x1F) - 1;
 	tm->tm_year = (AS3722_RTC_START_YEAR - 1900) + bcd2bin(rbuff[5] & 0x7F);
 	return;
 }
@@ -125,6 +125,7 @@ static int as3722_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	}
 
 	as3722_reg_to_time(as_time_array, &alrm->time);
+	alrm->enabled = (as3722_rtc->irq_enable) ? 1 : 0;
 	return 0;
 }
 
@@ -226,9 +227,19 @@ static int as3722_rtc_suspend(struct device *dev)
 {
 	struct as3722_rtc *as3722_rtc = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev))
-		enable_irq_wake(as3722_rtc->alarm_irq);
+	if (device_may_wakeup(dev)) {
+		int ret;
+		struct rtc_wkalrm alm;
 
+		enable_irq_wake(as3722_rtc->alarm_irq);
+		ret = as3722_rtc_read_alarm(dev, &alm);
+		if (!ret)
+			dev_info(dev, "%s() alrm %d time %d %d %d %d %d %d\n",
+				__func__, alm.enabled,
+				alm.time.tm_year, alm.time.tm_mon,
+				alm.time.tm_mday, alm.time.tm_hour,
+				alm.time.tm_min, alm.time.tm_sec);
+	}
 	return 0;
 }
 
@@ -236,8 +247,17 @@ static int as3722_rtc_resume(struct device *dev)
 {
 	struct as3722_rtc *as3722_rtc = dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev))
+	if (device_may_wakeup(dev)) {
+		int ret;
+		struct rtc_time tm;
+
 		disable_irq_wake(as3722_rtc->alarm_irq);
+		ret = as3722_rtc_read_time(dev, &tm);
+		if (!ret)
+			dev_info(dev, "%s() %d %d %d %d %d %d\n",
+				__func__, tm.tm_year, tm.tm_mon, tm.tm_mday,
+				tm.tm_hour, tm.tm_min, tm.tm_sec);
+	}
 	return 0;
 }
 #endif
