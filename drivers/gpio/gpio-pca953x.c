@@ -3,6 +3,7 @@
  *
  *  Copyright (C) 2005 Ben Gardner <bgardner@wabtec.com>
  *  Copyright (C) 2007 Marvell International Ltd.
+ *  Copyright (C) 2014 NVIDIA CORPORATION.  All rights reserved.
  *
  *  Derived from drivers/i2c/chips/pca9539.c
  *
@@ -154,7 +155,7 @@ static int pca953x_write_regs(struct pca953x_chip *chip, int reg, u8 *val)
 		switch (chip->chip_type) {
 		case PCA953X_TYPE:
 			ret = i2c_smbus_write_word_data(chip->client,
-							reg << 1, (u16) *val);
+					reg << 1, val[0] | (val[1] << 8));
 			break;
 		case PCA957X_TYPE:
 			ret = i2c_smbus_write_byte_data(chip->client, reg << 1,
@@ -358,6 +359,10 @@ static void pca953x_setup_gpio(struct pca953x_chip *chip, int gpios)
 	gc->dev = &chip->client->dev;
 	gc->owner = THIS_MODULE;
 	gc->names = chip->names;
+#ifdef CONFIG_OF_GPIO
+	gc->of_node = chip->client->dev.of_node;
+#endif
+
 }
 
 #ifdef CONFIG_GPIO_PCA953X_IRQ
@@ -754,10 +759,47 @@ static const struct of_device_id pca953x_dt_ids[] = {
 
 MODULE_DEVICE_TABLE(of, pca953x_dt_ids);
 
+#ifdef CONFIG_PM
+static int pca953x_suspend(struct device *dev)
+{
+	/* we do know our state already, so nothing to save */
+	return 0;
+}
+
+static int pca953x_resume(struct device *dev)
+{
+	struct pca953x_chip *chip = i2c_get_clientdata(to_i2c_client(dev));
+
+	switch (chip->chip_type) {
+	case PCA953X_TYPE:
+		pca953x_write_regs(chip, PCA953X_OUTPUT, chip->reg_output);
+		pca953x_write_regs(chip, PCA953X_DIRECTION,
+				chip->reg_direction);
+		break;
+	case PCA957X_TYPE:
+		pca953x_write_regs(chip, PCA957X_OUT, chip->reg_output);
+		pca953x_write_regs(chip, PCA957X_CFG, chip->reg_direction);
+		break;
+	default:
+		/* unknown chip type? */
+		return 0;
+	}
+	return 0;
+}
+
+static const struct dev_pm_ops pca953x_pm = {
+	.suspend_late = pca953x_suspend,
+	.resume_early = pca953x_resume,
+};
+#endif
+
 static struct i2c_driver pca953x_driver = {
 	.driver = {
 		.name	= "pca953x",
 		.of_match_table = pca953x_dt_ids,
+#ifdef CONFIG_PM
+		.pm	= &pca953x_pm,
+#endif
 	},
 	.probe		= pca953x_probe,
 	.remove		= pca953x_remove,

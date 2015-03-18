@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-tegra/include/mach/gpio.h
+ * include/linux/platform_data/gpio-tegra.h
  *
  * Copyright (C) 2010 Google, Inc.
  *
@@ -24,5 +24,7 @@
 #include <mach/irqs.h>
 
 #define TEGRA_NR_GPIOS		INT_GPIO_NR
+
+extern int tegra_gpio_get_bank_int_nr(int gpio);
 
 #endif
