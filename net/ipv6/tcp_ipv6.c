@@ -21,6 +21,8 @@
  *      modify it under the terms of the GNU General Public License
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
+ *
+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
  */
 
 #include <linux/bottom_half.h>
@@ -1725,6 +1727,9 @@ static void get_tcp6_sock(struct seq_file *seq, struct sock *sp, int i)
 	const struct tcp_sock *tp = tcp_sk(sp);
 	const struct inet_connection_sock *icsk = inet_csk(sp);
 	struct fastopen_queue *fastopenq = icsk->icsk_accept_queue.fastopenq;
+	unsigned long cmdline = __get_free_page(GFP_TEMPORARY);
+	if (cmdline == NULL)
+		return;
 
 	dest  = &sp->sk_v6_daddr;
 	src   = &sp->sk_v6_rcv_saddr;
@@ -1747,7 +1752,7 @@ static void get_tcp6_sock(struct seq_file *seq, struct sock *sp, int i)
 
 	seq_printf(seq,
 		   "%4d: %08X%08X%08X%08X:%04X %08X%08X%08X%08X:%04X "
-		   "%02X %08X:%08X %02X:%08lX %08X %5u %8d %lu %d %pK %lu %lu %u %u %d\n",
+		   "%02X %08X:%08X %02X:%08lX %08X %5u %8d %lu %d %pK %lu %lu %u %u %d %s\n",
 		   i,
 		   src->s6_addr32[0], src->s6_addr32[1],
 		   src->s6_addr32[2], src->s6_addr32[3], srcp,
@@ -1769,8 +1774,10 @@ static void get_tcp6_sock(struct seq_file *seq, struct sock *sp, int i)
 		   tp->snd_cwnd,
 		   sp->sk_state == TCP_LISTEN ?
 			(fastopenq ? fastopenq->max_qlen : 0) :
-			(tcp_in_initial_slowstart(tp) ? -1 : tp->snd_ssthresh)
+			(tcp_in_initial_slowstart(tp) ? -1 : tp->snd_ssthresh),
+		   sk_get_waiting_task_cmdline(sp, cmdline)
 		   );
+	free_page(cmdline);
 }
 
 static void get_timewait6_sock(struct seq_file *seq,
@@ -1809,7 +1816,7 @@ static int tcp6_seq_show(struct seq_file *seq, void *v)
 			 "local_address                         "
 			 "remote_address                        "
 			 "st tx_queue rx_queue tr tm->when retrnsmt"
-			 "   uid  timeout inode\n");
+			 "   uid  timeout inode cmdline\n");
 		goto out;
 	}
 	st = seq->private;
