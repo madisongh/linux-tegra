@@ -3,6 +3,7 @@
  *
  * (C) Copyright 2002-2004, 2007 Greg Kroah-Hartman <greg@kroah.com>
  * (C) Copyright 2007 Novell Inc.
+ * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
  *
  * Released under the GPL v2 only.
  *
@@ -21,6 +22,8 @@
 #include <linux/suspend.h>
 #include <linux/kexec.h>
 #include "pci.h"
+
+#include <mach/tegra_smmu.h> /* FIXME */
 
 struct pci_dynid {
 	struct list_head node;
@@ -1415,6 +1418,15 @@ EXPORT_SYMBOL(pci_bus_type);
 
 static int __init pci_driver_init(void)
 {
-	return bus_register(&pci_bus_type);
+	int err;
+
+	err = bus_register(&pci_bus_type);
+	if (err)
+		return err;
+
+#ifdef CONFIG_TEGRA_IOMMU_SMMU
+	bus_register_notifier(&pci_bus_type, &tegra_smmu_device_pci_nb);
+#endif
+	return 0;
 }
 postcore_initcall(pci_driver_init);
