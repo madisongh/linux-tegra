@@ -1,6 +1,8 @@
 #
 # USB peripheral controller drivers
 #
+GCOV_PROFILE_tegra_udc.o := y
+
 obj-$(CONFIG_USB_GADGET)	+= udc-core.o
 obj-$(CONFIG_USB_DUMMY_HCD)	+= dummy_hcd.o
 obj-$(CONFIG_USB_NET2272)	+= net2272.o

@@ -5,6 +5,10 @@
 # Rewritten to use lists instead of if-statements.
 #
 
+obj-$(CONFIG_EDP_FRAMEWORK)	+= edp/
+obj-$(CONFIG_SYSEDP_FRAMEWORK)	+= edp/
+obj-$(CONFIG_CPUQUIET_FRAMEWORK) += cpuquiet/
+
 obj-y				+= irqchip/
 obj-y				+= bus/
 
@@ -19,6 +23,8 @@ obj-$(CONFIG_PARISC)		+= parisc/
 obj-$(CONFIG_RAPIDIO)		+= rapidio/
 obj-y				+= video/
 obj-y				+= idle/
+
+obj-$(CONFIG_PADCTRL)		+= padctrl/
 
 # IPMI must come before ACPI in order to provide IPMI opregion support
 obj-$(CONFIG_IPMI_HANDLER)	+= char/ipmi/
@@ -101,6 +107,7 @@ obj-y				+= i2c/ media/
 obj-$(CONFIG_PPS)		+= pps/
 obj-$(CONFIG_PTP_1588_CLOCK)	+= ptp/
 obj-$(CONFIG_W1)		+= w1/
+obj-$(CONFIG_STAGING)		+= staging/
 obj-$(CONFIG_POWER_SUPPLY)	+= power/
 obj-$(CONFIG_HWMON)		+= hwmon/
 obj-$(CONFIG_THERMAL)		+= thermal/
@@ -135,7 +142,6 @@ obj-$(CONFIG_SSB)		+= ssb/
 obj-$(CONFIG_BCMA)		+= bcma/
 obj-$(CONFIG_VHOST_RING)	+= vhost/
 obj-$(CONFIG_VLYNQ)		+= vlynq/
-obj-$(CONFIG_STAGING)		+= staging/
 obj-y				+= platform/
 #common clk code
 obj-y				+= clk/
@@ -162,3 +168,4 @@ obj-$(CONFIG_POWERCAP)		+= powercap/
 obj-$(CONFIG_MCB)		+= mcb/
 obj-$(CONFIG_RAS)		+= ras/
 obj-$(CONFIG_THUNDERBOLT)	+= thunderbolt/
+obj-$(CONFIG_MIPI_BIF)		+= mipi_bif/

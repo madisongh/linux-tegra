@@ -101,6 +101,9 @@ struct regulator_linear_range {
  * @set_bypass: Set the regulator in bypass mode.
  * @get_bypass: Get the regulator bypass mode state.
  *
+ * @set_control_mode: Set the control mode for the regulator.
+ * @get_control_mode: Get the control mode for the regulator.
+ *
  * @enable_time: Time taken for the regulator voltage output voltage to
  *               stabilise after being enabled, in microseconds.
  * @set_ramp_delay: Set the ramp delay for the regulator. The driver should
@@ -132,6 +135,8 @@ struct regulator_ops {
 			    unsigned *selector);
 	int (*map_voltage)(struct regulator_dev *, int min_uV, int max_uV);
 	int (*set_voltage_sel) (struct regulator_dev *, unsigned selector);
+	int (*set_sleep_voltage_sel) (struct regulator_dev *,
+				unsigned selector);
 	int (*get_voltage) (struct regulator_dev *);
 	int (*get_voltage_sel) (struct regulator_dev *);
 
@@ -148,6 +153,14 @@ struct regulator_ops {
 	/* get/set regulator operating mode (defined in consumer.h) */
 	int (*set_mode) (struct regulator_dev *, unsigned int mode);
 	unsigned int (*get_mode) (struct regulator_dev *);
+
+	/* get/set regulator sleep mode (defined in consumer.h) */
+	int (*set_sleep_mode) (struct regulator_dev *, unsigned int sleep_mode);
+	unsigned int (*get_sleep_mode) (struct regulator_dev *);
+
+	/* get/set regulator control mode (defined in consumer.h) */
+	int (*set_control_mode) (struct regulator_dev *, unsigned int mode);
+	unsigned int (*get_control_mode) (struct regulator_dev *);
 
 	/* Time taken to enable or set voltage on the regulator */
 	int (*enable_time) (struct regulator_dev *);
@@ -166,6 +179,9 @@ struct regulator_ops {
 	/* get most efficient regulator operating mode for load */
 	unsigned int (*get_optimum_mode) (struct regulator_dev *, int input_uV,
 					  int output_uV, int load_uA);
+
+	/* set regulator voltage selector access as volatile or cached */
+	int (*set_vsel_volatile) (struct regulator_dev *, bool is_volatile);
 
 	/* control and report on bypass mode */
 	int (*set_bypass)(struct regulator_dev *dev, bool enable);
@@ -270,6 +286,8 @@ struct regulator_desc {
 
 	unsigned int vsel_reg;
 	unsigned int vsel_mask;
+	unsigned int vsel_persist_val;
+	bool vsel_persist;
 	unsigned int apply_reg;
 	unsigned int apply_bit;
 	unsigned int enable_reg;

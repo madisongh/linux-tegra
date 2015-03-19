@@ -1454,6 +1454,10 @@ static int do_test(int m)
 		ret += tcrypt_test("crct10dif");
 		break;
 
+	case 48:
+		ret += tcrypt_test("ofb(aes)");
+		break;
+
 	case 100:
 		ret += tcrypt_test("hmac(md5)");
 		break;
@@ -1496,6 +1500,10 @@ static int do_test(int m)
 
 	case 110:
 		ret += tcrypt_test("hmac(crc32)");
+		break;
+
+	case 111:
+		ret += tcrypt_test("cmac(aes)");
 		break;
 
 	case 150:

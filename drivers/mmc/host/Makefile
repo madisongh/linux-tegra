@@ -1,6 +1,7 @@
 #
 # Makefile for MMC/SD host controller drivers
 #
+GCOV_PROFILE_sdhci-tegra.o := y
 
 obj-$(CONFIG_MMC_ARMMMCI)	+= mmci.o
 obj-$(CONFIG_MMC_QCOM_DML)	+= mmci_qcom_dml.o

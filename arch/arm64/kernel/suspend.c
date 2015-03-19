@@ -1,3 +1,21 @@
+/*
+ * Copyright (C) 2013 ARM Ltd.
+ * Copyright (c) 2014, NVIDIA Corporation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include <linux/export.h>
 #include <linux/percpu.h>
 #include <linux/slab.h>
 #include <asm/cacheflush.h>
@@ -5,6 +23,7 @@
 #include <asm/debug-monitors.h>
 #include <asm/pgtable.h>
 #include <asm/memory.h>
+#include <asm/mmu_context.h>
 #include <asm/smp_plat.h>
 #include <asm/suspend.h>
 #include <asm/tlbflush.h>
@@ -98,7 +117,18 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
 	 */
 	ret = __cpu_suspend_enter(arg, fn);
 	if (ret == 0) {
-		cpu_switch_mm(mm->pgd, mm);
+		/*
+		 * We are resuming from reset with TTBR0_EL1 set to the
+		 * idmap to enable the MMU; restore the active_mm mappings in
+		 * TTBR0_EL1 unless the active_mm == &init_mm, in which case
+		 * the thread entered __cpu_suspend with TTBR0_EL1 set to
+		 * reserved TTBR0 page tables and should be restored as such.
+		 */
+		if (mm == &init_mm)
+			cpu_set_reserved_ttbr0();
+		else
+			cpu_switch_mm(mm->pgd, mm);
+
 		flush_tlb_all();
 
 		/*
@@ -125,9 +155,10 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
 
 	return ret;
 }
+EXPORT_SYMBOL(cpu_suspend);
 
-extern struct sleep_save_sp sleep_save_sp;
-extern phys_addr_t sleep_idmap_phys;
+struct sleep_save_sp sleep_save_sp;
+phys_addr_t sleep_idmap_phys;
 
 static int __init cpu_suspend_init(void)
 {

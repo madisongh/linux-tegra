@@ -28,6 +28,7 @@
 #include <linux/of.h>
 #include <linux/pwm.h>
 #include <linux/platform_device.h>
+#include <linux/pinctrl/consumer.h>
 #include <linux/slab.h>
 
 #define PWM_ENABLE	(1 << 31)
@@ -45,6 +46,9 @@ struct tegra_pwm_chip {
 	struct clk		*clk;
 
 	void __iomem		*mmio_base;
+	struct pinctrl		*pinctrl;
+	struct pinctrl_state	*suspend_state;
+	struct pinctrl_state	*resume_state;
 };
 
 static inline struct tegra_pwm_chip *to_tegra_pwm_chip(struct pwm_chip *chip)
@@ -105,6 +109,10 @@ static int tegra_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	 */
 	if (rate >> PWM_SCALE_WIDTH)
 		return -EINVAL;
+	/* Due to the PWM divider is zero-based, we need to minus 1 to get
+	 *desired frequency*/
+	if (rate > 0)
+		 rate--;
 
 	val |= rate << PWM_SCALE_SHIFT;
 
@@ -180,14 +188,18 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
-	if (IS_ERR(pwm->mmio_base))
+	if (IS_ERR(pwm->mmio_base)) {
+		dev_err(&pdev->dev, "PWM io mapping failed\n");
 		return PTR_ERR(pwm->mmio_base);
+	}
 
 	platform_set_drvdata(pdev, pwm);
 
 	pwm->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(pwm->clk))
+	if (IS_ERR(pwm->clk)) {
+		dev_err(&pdev->dev, "PWM clock get failed\n");
 		return PTR_ERR(pwm->clk);
+	}
 
 	pwm->chip.dev = &pdev->dev;
 	pwm->chip.ops = &tegra_pwm_ops;
@@ -200,6 +212,25 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	pwm->pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (IS_ERR(pwm->pinctrl))
+		pwm->pinctrl = NULL;
+
+	if (pwm->pinctrl) {
+		pwm->suspend_state = pinctrl_lookup_state(pwm->pinctrl,
+						"suspend");
+		if (IS_ERR(pwm->suspend_state))
+			pwm->suspend_state = NULL;
+
+		pwm->resume_state = pinctrl_lookup_state(pwm->pinctrl,
+						"resume");
+		if (IS_ERR(pwm->resume_state))
+			pwm->resume_state = NULL;
+
+		if (pwm->suspend_state && pwm->resume_state)
+			dev_info(&pdev->dev,
+				"Pinconfig found for suspend/resume\n");
+	}
 	return 0;
 }
 
@@ -226,9 +257,49 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 	return pwmchip_remove(&pc->chip);
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int tegra_pwm_suspend(struct device *dev)
+{
+	struct tegra_pwm_chip *pc = dev_get_drvdata(dev);
+	int ret;
+
+	if (pc->pinctrl && pc->suspend_state) {
+		ret = pinctrl_select_state(pc->pinctrl, pc->suspend_state);
+		if (ret < 0) {
+			dev_err(dev, "setting pin suspend state failed :%d\n",
+				ret);
+			return ret;
+		}
+	}
+	return 0;
+}
+
+static int tegra_pwm_resume(struct device *dev)
+{
+	struct tegra_pwm_chip *pc = dev_get_drvdata(dev);
+	int ret;
+
+	if (pc->pinctrl && pc->resume_state) {
+		ret = pinctrl_select_state(pc->pinctrl, pc->resume_state);
+		if (ret < 0) {
+			dev_err(dev, "setting pin resume state failed :%d\n",
+				ret);
+			return ret;
+		}
+	}
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops tegra_pwm_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(tegra_pwm_suspend, tegra_pwm_resume)
+};
+
 static const struct of_device_id tegra_pwm_of_match[] = {
 	{ .compatible = "nvidia,tegra20-pwm" },
 	{ .compatible = "nvidia,tegra30-pwm" },
+	{ .compatible = "nvidia,tegra114-pwm" },
+	{ .compatible = "nvidia,tegra124-pwm" },
 	{ }
 };
 
@@ -239,12 +310,24 @@ static struct platform_driver tegra_pwm_driver = {
 		.name = "tegra-pwm",
 		.owner = THIS_MODULE,
 		.of_match_table = tegra_pwm_of_match,
+		.pm = &tegra_pwm_pm_ops,
 	},
 	.probe = tegra_pwm_probe,
 	.remove = tegra_pwm_remove,
 };
 
-module_platform_driver(tegra_pwm_driver);
+static int __init tegra_pwm_init_driver(void)
+{
+	return platform_driver_register(&tegra_pwm_driver);
+}
+
+static void __exit tegra_pwm_exit_driver(void)
+{
+	platform_driver_unregister(&tegra_pwm_driver);
+}
+
+subsys_initcall(tegra_pwm_init_driver);
+module_exit(tegra_pwm_exit_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("NVIDIA Corporation");

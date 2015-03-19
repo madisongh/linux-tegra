@@ -43,10 +43,24 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/debugfs.h>
+#include <linux/uaccess.h>
+#include <linux/dma-attrs.h>
+#include <linux/tegra-soc.h>
 
 #include <linux/amba/bus.h>
 
+#include <dt-bindings/memory/tegra-swgroup.h>
+
 #include <asm/pgalloc.h>
+#include <asm/dma-iommu.h>
+#include <asm/pgtable.h>
+
+#define CREATE_TRACE_POINTS
+#include <trace/events/arm_smmu.h>
+
+#include "of_tegra-smmu.h" /* FIXME: to parse implicitly */
+#include "tegra-smmu.h"
 
 /* Maximum number of stream IDs assigned to a single device */
 #define MAX_MASTER_STREAMIDS		MAX_PHANDLE_ARGS
@@ -346,12 +360,15 @@ struct arm_smmu_master_cfg {
 	int				num_streamids;
 	u16				streamids[MAX_MASTER_STREAMIDS];
 	struct arm_smmu_smr		*smrs;
+
+	struct dentry			*debugfs_root;
 };
 
 struct arm_smmu_master {
 	struct device_node		*of_node;
 	struct rb_node			node;
 	struct arm_smmu_master_cfg	cfg;
+	struct dentry			*debugfs_root;
 };
 
 struct arm_smmu_device {
@@ -391,6 +408,13 @@ struct arm_smmu_device {
 
 	struct list_head		list;
 	struct rb_root			masters;
+	struct dentry			*masters_root;
+
+	struct dentry			*debugfs_root;
+	struct debugfs_regset32		*regset;
+	DECLARE_BITMAP(context_filter, ARM_SMMU_MAX_CBS);
+
+	struct list_head		asprops;
 };
 
 struct arm_smmu_cfg {
@@ -412,6 +436,70 @@ struct arm_smmu_domain {
 
 static DEFINE_SPINLOCK(arm_smmu_devices_lock);
 static LIST_HEAD(arm_smmu_devices);
+
+#ifdef CONFIG_ARM_SMMU_WAR
+/*
+ * linsim hacks: Indirect register accessor
+ */
+static struct arm_smmu_device *smmu_handle; /* assmu only one smmu device */
+
+#undef readl_relaxed
+#undef writel_relaxed
+#undef writel
+#define __readl_relaxed(c)						\
+	({ u32 __v = le32_to_cpu((__force __le32)__raw_readl(c)); __v; })
+#define __writel(v,c)							\
+	({ __iowmb(); ((void)__raw_writel((__force u32)cpu_to_le32(v),(c))); })
+
+static volatile void __iomem *mc_base;
+
+#define MC_BASE				0x22c10000 /* HACK: for c-model */
+#define MC_SIZE				0x00010000
+#define ARM_SMMU_CONTROL_ADDRESS	0x24
+#define ARM_SMMU_CONTROL_DATA		0x28
+
+static inline void writel(u32 val, volatile void __iomem *virt_addr)
+{
+	u32 offset;
+	volatile void __iomem *ctl_addr;
+
+	if (!tegra_platform_is_linsim()) {
+		__writel(val, virt_addr);
+		return;
+	}
+
+	ctl_addr = mc_base + ARM_SMMU_CONTROL_ADDRESS;
+	offset = virt_addr - smmu_handle->base;
+	__writel(offset, ctl_addr);
+	pr_debug("Indirect write(ADDRESS) offset=%08x ctl_addr=%p\n",
+		 offset, ctl_addr);
+
+	ctl_addr = mc_base + ARM_SMMU_CONTROL_DATA;
+	__writel(val, ctl_addr);
+	pr_debug("Indirect write(DATA) val=%08x ctl_addr=%p\n", val, ctl_addr);
+}
+#define writel_relaxed(v,a) writel(v,a)
+
+static inline u32 readl_relaxed(const volatile void __iomem *virt_addr)
+{
+	u32 val, offset;
+	volatile void __iomem *ctl_addr;
+
+	if (!tegra_platform_is_linsim())
+		return __readl_relaxed(virt_addr);
+
+	ctl_addr = mc_base + ARM_SMMU_CONTROL_ADDRESS;
+	offset = virt_addr - smmu_handle->base;
+	__writel(offset, ctl_addr);
+	pr_debug("Indirect read(ADDRESS) offset=%08x ctl_addr=%p\n",
+		 offset, ctl_addr);
+
+	ctl_addr = mc_base + ARM_SMMU_CONTROL_DATA;
+	val = __readl_relaxed(ctl_addr);
+	pr_debug("Indirect read(DATA) val=%08x ctl_addr=%p\n", val, ctl_addr);
+	return val;
+}
+#endif
 
 struct arm_smmu_option_prop {
 	u32 opt;
@@ -930,8 +1018,10 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 	if (smmu->version == ARM_SMMU_V1) {
 		cfg->irptndx = atomic_inc_return(&smmu->irptndx);
 		cfg->irptndx %= smmu->num_context_irqs;
-	} else {
+	} else if (smmu->num_context_banks == smmu->num_context_irqs) {
 		cfg->irptndx = cfg->cbndx;
+	} else {
+		cfg->irptndx = 0;
 	}
 
 	ACCESS_ONCE(smmu_domain->smmu) = smmu;
@@ -1157,6 +1247,21 @@ static void arm_smmu_master_free_smrs(struct arm_smmu_device *smmu,
 	kfree(smrs);
 }
 
+/* HACK: c-model uses legacy swgroup interface */
+static void tegra_smmu_conf_swgroup(struct arm_smmu_device *smmu, int swgid,
+				    u8 cbndx)
+{
+	size_t offs;
+	u32 val;
+
+	offs = tegra_smmu_of_offset(swgid);
+	val = BIT(31) | swgid; /* swgid == streamID */
+	__writel(val, mc_base + offs);
+
+	pr_info("%s() ASID_0=0x%zx val=0x%08x streamID=%d cbndx=%d\n",
+		__func__, offs, val, swgid, cbndx);
+}
+
 static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
 				      struct arm_smmu_master_cfg *cfg)
 {
@@ -1176,6 +1281,11 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
 		s2cr = S2CR_TYPE_TRANS |
 		       (smmu_domain->cfg.cbndx << S2CR_CBNDX_SHIFT);
 		writel_relaxed(s2cr, gr0_base + ARM_SMMU_GR0_S2CR(idx));
+
+		if (config_enabled(CONFIG_ARM_SMMU_WAR) &&
+		    tegra_platform_is_linsim())
+			tegra_smmu_conf_swgroup(smmu, cfg->streamids[i],
+						smmu_domain->cfg.cbndx);
 	}
 
 	return 0;
@@ -1204,6 +1314,154 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
 	}
 
 	arm_smmu_master_free_smrs(smmu, cfg);
+}
+
+static int smmu_ptdump_show(struct seq_file *s, void *unused)
+{
+	struct arm_smmu_domain *smmu_domain = s->private;
+	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+	int i, j, k, l;
+	unsigned long addr = 0;
+
+	pgd = cfg->pgd;
+	for (i = 0; i < PTRS_PER_PGD; ++i, pgd++) {
+		if (pgd_none(*pgd))
+			continue;
+		pud = pud_offset(pgd, addr);
+		for (j = 0; j < PTRS_PER_PUD; ++j, pud++) {
+			if (pud_none(*pud))
+				continue;
+			pmd = pmd_offset(pud, addr);
+			for (k = 0; k < PTRS_PER_PMD; ++k, pmd++) {
+				if (pmd_none(*pmd))
+					continue;
+				pte = pmd_page_vaddr(*pmd) + pte_index(addr);
+				for (l = 0; l < PTRS_PER_PTE; ++l, pte++) {
+					phys_addr_t pa;
+
+					pa = *pte;
+					pa &= PAGE_MASK;
+					if (!pa)
+						continue;
+					seq_printf(s,
+						   "va=0x%016lx pa=%pap *pte=%pad\n",
+						   addr, &pa, &(*pte));
+					addr += PAGE_SIZE;
+				}
+				addr += PMD_SIZE;
+			}
+			addr += PUD_SIZE;
+		}
+		addr += PGDIR_SIZE;
+	}
+	return 0;
+}
+
+static int smmu_ptdump_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, smmu_ptdump_show, inode->i_private);
+}
+
+static const struct file_operations smmu_ptdump_fops = {
+	.open           = smmu_ptdump_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+#define defreg_cb(_name)			\
+	{					\
+		.name = __stringify(_name),	\
+		.offset = ARM_SMMU_CB_ ## _name,\
+	}
+
+static const struct debugfs_reg32 arm_smmu_cb_regs[] = {
+	defreg_cb(SCTLR),
+	defreg_cb(TTBCR2),
+	defreg_cb(TTBR0_LO),
+	defreg_cb(TTBR0_HI),
+	defreg_cb(TTBCR),
+	defreg_cb(S1_MAIR0),
+	defreg_cb(FSR),
+	defreg_cb(FAR_LO),
+	defreg_cb(FAR_HI),
+	defreg_cb(FSYNR0),
+};
+
+static void debugfs_create_smmu_cb(struct arm_smmu_domain *smmu_domain,
+				   struct device *dev)
+{
+	struct dentry *dent;
+	char name[] = "cb000";
+	struct debugfs_regset32	*cb;
+	u8 cbndx = smmu_domain->cfg.cbndx;
+	struct arm_smmu_device *smmu = dev->archdata.iommu;
+
+	sprintf(name, "cb%03d", cbndx);
+	dent = debugfs_create_dir(name, smmu->debugfs_root);
+	if (!dent)
+		return;
+	cb = smmu->regset + 1 + cbndx;
+	cb->regs = arm_smmu_cb_regs;
+	cb->nregs = ARRAY_SIZE(arm_smmu_cb_regs);
+	cb->base = smmu->base + (smmu->size >> 1) +
+		cbndx * (1 << smmu->pgshift);
+	debugfs_create_regset32("regdump", S_IRUGO, dent, cb);
+	debugfs_create_file("ptdump", S_IRUGO, dent, smmu_domain,
+			    &smmu_ptdump_fops);
+}
+
+static int smmu_master_show(struct seq_file *s, void *unused)
+{
+	int i;
+	struct arm_smmu_master *master = s->private;
+
+	for (i = 0; i < master->cfg.num_streamids; i++)
+		seq_printf(s, "streamids: % 3d ", master->cfg.streamids[i]);
+	seq_printf(s, "\n");
+	for (i = 0; i < master->cfg.num_streamids; i++)
+		seq_printf(s, "smrs:      % 3d ", master->cfg.smrs[i].idx);
+	seq_printf(s, "\n");
+	return 0;
+}
+
+static int smmu_master_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, smmu_master_show, inode->i_private);
+}
+
+static const struct file_operations smmu_master_fops = {
+	.open           = smmu_master_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static void add_smmu_master_debugfs(struct arm_smmu_domain *smmu_domain,
+				    struct device *dev,
+				    struct arm_smmu_master *master)
+{
+	struct dentry *dent;
+	struct arm_smmu_device *smmu = dev->archdata.iommu;
+	char name[] = "cb000";
+	char target[] = "../../cb000";
+	u8 cbndx = smmu_domain->cfg.cbndx;
+
+	dent = debugfs_create_dir(dev_name(dev), smmu->masters_root);
+	if (!dent)
+		return;
+
+	debugfs_create_file("streamids", 0444, dent, master, &smmu_master_fops);
+	debugfs_create_u8("cbndx", 0444, dent, &smmu_domain->cfg.cbndx);
+	debugfs_create_smmu_cb(smmu_domain, dev);
+	sprintf(name, "cb%03d", cbndx);
+	sprintf(target, "../../cb%03d", cbndx);
+	debugfs_create_symlink(name, dent, target);
+	master->debugfs_root = dent;
 }
 
 static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
@@ -1251,8 +1509,11 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		return -ENODEV;
 
 	ret = arm_smmu_domain_add_master(smmu_domain, cfg);
-	if (!ret)
+	if (!ret) {
 		dev->archdata.iommu = domain;
+		add_smmu_master_debugfs(smmu_domain, dev,
+					find_smmu_master(smmu, dev->of_node));
+	}
 	return ret;
 }
 
@@ -1266,6 +1527,7 @@ static void arm_smmu_detach_dev(struct iommu_domain *domain, struct device *dev)
 		return;
 
 	dev->archdata.iommu = NULL;
+	debugfs_remove_recursive(cfg->debugfs_root);
 	arm_smmu_domain_remove_master(smmu_domain, cfg);
 }
 
@@ -1449,15 +1711,21 @@ static int arm_smmu_alloc_init_pud(struct arm_smmu_device *smmu, pgd_t *pgd,
 
 static int arm_smmu_handle_mapping(struct arm_smmu_domain *smmu_domain,
 				   unsigned long iova, phys_addr_t paddr,
-				   size_t size, int prot)
+				   size_t size, unsigned long attrs)
 {
-	int ret, stage;
+	int ret, stage, prot = IOMMU_WRITE | IOMMU_READ;
 	unsigned long end;
 	phys_addr_t input_mask, output_mask;
 	struct arm_smmu_device *smmu = smmu_domain->smmu;
 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
 	pgd_t *pgd = cfg->pgd;
 	unsigned long flags;
+
+	/* FIXME: follow the upstream prot */
+	if (dma_get_attr(DMA_ATTR_READ_ONLY, (struct dma_attrs *)attrs))
+		prot &= ~IOMMU_WRITE;
+	else if (dma_get_attr(DMA_ATTR_WRITE_ONLY, (struct dma_attrs *)attrs))
+		prot &= ~IOMMU_READ;
 
 	if (cfg->cbar == CBAR_TYPE_S2_TRANS) {
 		stage = 2;
@@ -1481,6 +1749,12 @@ static int arm_smmu_handle_mapping(struct arm_smmu_domain *smmu_domain,
 	if (paddr & ~output_mask)
 		return -ERANGE;
 
+	if (test_bit(cfg->cbndx, smmu->context_filter)) {
+		trace_smmu_map(cfg->cbndx, iova, paddr, size, prot);
+		pr_debug("cbndx=%d iova=%pad paddr=%pap size=%zx prot=%x\n",
+			 cfg->cbndx, &iova, &paddr, size, prot);
+	}
+
 	spin_lock_irqsave(&smmu_domain->lock, flags);
 	pgd += pgd_index(iova);
 	end = iova + size;
@@ -1500,6 +1774,31 @@ out_unlock:
 	spin_unlock_irqrestore(&smmu_domain->lock, flags);
 
 	return ret;
+}
+
+static int arm_smmu_map_sg(struct iommu_domain *domain, unsigned long iova,
+			struct scatterlist *sgl, int npages, unsigned long prot)
+{
+	int i;
+	struct scatterlist *sg;
+	struct arm_smmu_domain *smmu_domain = domain->priv;
+
+	for (i = 0, sg = sgl; i < npages; sg = sg_next(sg)) {
+		int err;
+		phys_addr_t pa = sg_phys(sg) & PAGE_MASK;
+		unsigned int len = PAGE_ALIGN(sg->offset + sg->length);
+
+		pr_debug("%s() iova=%pad pa=%pap size=%x\n",
+			__func__, &iova, &pa, len);
+		err = arm_smmu_handle_mapping(smmu_domain, iova, pa, len, prot);
+		if (err)
+			return err;
+
+		i += len >> PAGE_SHIFT;
+		iova += len;
+	}
+
+	return 0;
 }
 
 static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
@@ -1591,6 +1890,8 @@ static int arm_smmu_add_device(struct device *dev)
 	struct iommu_group *group;
 	void (*releasefn)(void *) = NULL;
 	int ret;
+	struct dma_iommu_mapping *mapping;
+	u64 swgids = 0;
 
 	smmu = find_smmu_for_device(dev);
 	if (!smmu)
@@ -1612,6 +1913,7 @@ static int arm_smmu_add_device(struct device *dev)
 		}
 
 		cfg->num_streamids = 1;
+		swgids = TEGRA_SWGROUP_BIT(AFI);
 		/*
 		 * Assume Stream ID == Requester ID for now.
 		 * We need a way to describe the ID mappings in FDT.
@@ -1629,11 +1931,36 @@ static int arm_smmu_add_device(struct device *dev)
 		}
 
 		cfg = &master->cfg;
+
+		for (i = 0; i < cfg->num_streamids; i++)
+			swgids |= BIT(cfg->streamids[i]);
+
+		dev_info(dev, "swgids=%llx\n", swgids);
 	}
 
 	iommu_group_set_iommudata(group, cfg, releasefn);
 	ret = iommu_group_add_device(group, dev);
+	iommu_group_put(group);
+	if (ret)
+		return ret;
 
+
+	mapping = tegra_smmu_of_get_mapping(dev, swgids, &smmu->asprops);
+	if (IS_ERR(mapping)) {
+		ret = PTR_ERR(mapping);
+		goto out_put_group;
+	}
+
+	dev->archdata.iommu = smmu;
+	ret = arm_iommu_attach_device(dev, mapping);
+	if (ret)
+		goto err_attach_dev;
+
+	return 0;
+
+err_attach_dev:
+	dev->archdata.iommu = NULL;
+	arm_iommu_release_mapping(mapping);
 out_put_group:
 	iommu_group_put(group);
 	return ret;
@@ -1650,6 +1977,7 @@ static const struct iommu_ops arm_smmu_ops = {
 	.domain_destroy	= arm_smmu_domain_destroy,
 	.attach_dev	= arm_smmu_attach_dev,
 	.detach_dev	= arm_smmu_detach_dev,
+	.map_sg		= arm_smmu_map_sg,
 	.map		= arm_smmu_map,
 	.unmap		= arm_smmu_unmap,
 	.iova_to_phys	= arm_smmu_iova_to_phys,
@@ -1823,10 +2151,12 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	size = 1 <<
 		(((id >> ID1_NUMPAGENDXB_SHIFT) & ID1_NUMPAGENDXB_MASK) + 1);
 	size *= 2 << smmu->pgshift;
-	if (smmu->size != size)
-		dev_warn(smmu->dev,
+	if (smmu->size != size) {
+		dev_info(smmu->dev,
 			"SMMU address space size (0x%lx) differs from mapped region size (0x%lx)!\n",
 			size, smmu->size);
+		smmu->size = size;
+	}
 
 	smmu->num_s2_context_banks = (id >> ID1_NUMS2CB_SHIFT) &
 				      ID1_NUMS2CB_MASK;
@@ -1885,6 +2215,157 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	return 0;
 }
 
+#define defreg(_name)				\
+	{					\
+		.name = __stringify(_name),	\
+		.offset = ARM_SMMU_ ## _name,	\
+	}
+#define defreg_gr0(_name) defreg(GR0_ ## _name)
+
+static const struct debugfs_reg32 arm_smmu_gr0_regs[] = {
+	defreg_gr0(sCR0),
+	defreg_gr0(ID0),
+	defreg_gr0(ID1),
+	defreg_gr0(ID2),
+	defreg_gr0(sGFSR),
+	defreg_gr0(sGFSYNR0),
+	defreg_gr0(sGFSYNR1),
+	defreg_gr0(sTLBGSTATUS),
+	defreg_gr0(PIDR2),
+};
+
+static ssize_t smmu_context_filter_write(struct file *file,
+					 const char __user *user_buf,
+					 size_t count, loff_t *ppos)
+{
+	u8 cbndx;
+	char buf[] = __stringify(ARM_SMMU_MAX_CBS);
+	size_t bytes = min_t(size_t, sizeof(buf), count);
+	struct seq_file *seqf = file->private_data;
+	struct arm_smmu_device *smmu = seqf->private;
+	unsigned long *bitmap = smmu->context_filter;
+
+	if (kstrtou8_from_user(user_buf, bytes, 10, &cbndx)) {
+		size_t bytes;
+
+		bytes = BITS_TO_LONGS(ARM_SMMU_MAX_CBS) * sizeof(long);
+		memset(bitmap, 0, bytes);
+		dev_info(smmu->dev, "resetting context_filter\n");
+		return count;
+	}
+
+	if (cbndx > smmu->num_context_banks)
+		return -EINVAL;
+
+	set_bit(cbndx, bitmap);
+	return count;
+}
+
+static int smmu_context_filter_show(struct seq_file *s, void *unused)
+{
+	struct arm_smmu_device *smmu = s->private;
+	unsigned long *bitmap = smmu->context_filter;
+	int idx = 0;
+
+	while (1) {
+		idx = find_next_bit(bitmap, ARM_SMMU_MAX_CBS, idx);
+		if (idx >= ARM_SMMU_MAX_CBS)
+			break;
+		seq_printf(s, "%d ", idx);
+		idx++;
+	}
+	seq_putc(s, '\n');
+	return 0;
+}
+
+static int smmu_context_filter_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, smmu_context_filter_show, inode->i_private);
+}
+
+static const struct file_operations smmu_context_filter_fops = {
+	.open		= smmu_context_filter_open,
+	.read		= seq_read,
+	.write		= smmu_context_filter_write,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static void arm_smmu_debugfs_delete(struct arm_smmu_device *smmu)
+{
+	int i;
+	const struct debugfs_reg32 *regs = smmu->regset->regs;
+
+	regs += ARRAY_SIZE(arm_smmu_gr0_regs);
+	for (i = 0; i < 4 * smmu->num_context_banks; i++)
+		kfree(regs[i].name);
+
+	kfree(smmu->regset);
+	debugfs_remove_recursive(smmu->debugfs_root);
+}
+
+static void arm_smmu_debugfs_create(struct arm_smmu_device *smmu)
+{
+	int i;
+	struct debugfs_reg32 *regs;
+	size_t bytes;
+
+	smmu->debugfs_root = debugfs_create_dir(dev_name(smmu->dev), NULL);
+	if (!smmu->debugfs_root)
+		return;
+
+	smmu->masters_root = debugfs_create_dir("masters", smmu->debugfs_root);
+	if (!smmu->masters_root)
+		goto err_out;
+
+	bytes = (smmu->num_context_banks + 1) * sizeof(*smmu->regset);
+	bytes += ARRAY_SIZE(arm_smmu_gr0_regs) * sizeof(*regs);
+	bytes += 4 * smmu->num_context_banks * sizeof(*regs);
+	smmu->regset = kzalloc(bytes, GFP_KERNEL);
+	if (!smmu->regset)
+		goto err_out;
+
+	smmu->regset->base = smmu->base;
+	smmu->regset->nregs = ARRAY_SIZE(arm_smmu_gr0_regs) +
+		4 * smmu->num_context_banks;
+	smmu->regset->regs = (struct debugfs_reg32 *)(smmu->regset +
+						smmu->num_context_banks + 1);
+	regs = (struct debugfs_reg32 *)smmu->regset->regs;
+	for (i = 0; i < ARRAY_SIZE(arm_smmu_gr0_regs); i++) {
+		regs->name = arm_smmu_gr0_regs[i].name;
+		regs->offset = arm_smmu_gr0_regs[i].offset;
+		regs++;
+	}
+
+	for (i = 0; i < smmu->num_context_banks; i++) {
+		regs->name = kasprintf(GFP_KERNEL, "GR0_SMR%03d", i);
+		regs->offset = ARM_SMMU_GR0_SMR(i);
+		regs++;
+
+		regs->name = kasprintf(GFP_KERNEL, "GR0_S2CR%03d", i);
+		regs->offset = ARM_SMMU_GR0_S2CR(i);
+		regs++;
+
+		regs->name = kasprintf(GFP_KERNEL, "GR1_CBAR%03d", i);
+		regs->offset = (1 << smmu->pgshift) + ARM_SMMU_GR1_CBAR(i);
+		regs++;
+
+		regs->name = kasprintf(GFP_KERNEL, "GR1_CBA2R%03d", i);
+		regs->offset = (1 << smmu->pgshift) + ARM_SMMU_GR1_CBA2R(i);
+		regs++;
+	}
+
+	debugfs_create_regset32("regdump", S_IRUGO, smmu->debugfs_root,
+				smmu->regset);
+	debugfs_create_file("context_filter", S_IRUGO | S_IWUSR,
+			    smmu->debugfs_root, smmu,
+			    &smmu_context_filter_fops);
+	return;
+
+err_out:
+	arm_smmu_debugfs_delete(smmu);
+}
+
 static const struct of_device_id arm_smmu_of_match[] = {
 	{ .compatible = "arm,smmu-v1", .data = (void *)ARM_SMMU_V1 },
 	{ .compatible = "arm,smmu-v2", .data = (void *)ARM_SMMU_V2 },
@@ -1903,17 +2384,25 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct rb_node *node;
 	struct of_phandle_args masterspec;
-	int num_irqs, i, err;
+	int num_irqs, i, err, count;
 
 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
 	if (!smmu) {
 		dev_err(dev, "failed to allocate arm_smmu_device\n");
 		return -ENOMEM;
 	}
+	smmu_handle = smmu;
 	smmu->dev = dev;
 
 	of_id = of_match_node(arm_smmu_of_match, dev->of_node);
 	smmu->version = (enum arm_smmu_arch_version)of_id->data;
+
+	INIT_LIST_HEAD(&smmu->asprops);
+	count = tegra_smmu_of_register_asprops(smmu->dev, &smmu->asprops);
+	if (!count) {
+		dev_err(dev, "invalid domains property\n");
+		return -EINVAL;
+	}
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	smmu->base = devm_ioremap_resource(dev, res);
@@ -1981,11 +2470,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 
 	if (smmu->version > ARM_SMMU_V1 &&
 	    smmu->num_context_banks != smmu->num_context_irqs) {
-		dev_err(dev,
+		dev_info(dev,
 			"found only %d context interrupt(s) but %d required\n",
 			smmu->num_context_irqs, smmu->num_context_banks);
-		err = -ENODEV;
-		goto out_put_masters;
 	}
 
 	for (i = 0; i < smmu->num_global_irqs; ++i) {
@@ -2007,6 +2494,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 	spin_unlock(&arm_smmu_devices_lock);
 
 	arm_smmu_device_reset(smmu);
+	arm_smmu_debugfs_create(smmu);
 	return 0;
 
 out_free_irqs:
@@ -2030,6 +2518,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
 	struct arm_smmu_device *curr, *smmu = NULL;
 	struct rb_node *node;
 
+	arm_smmu_debugfs_delete(smmu);
 	spin_lock(&arm_smmu_devices_lock);
 	list_for_each_entry(curr, &arm_smmu_devices, list) {
 		if (curr->dev == dev) {
@@ -2073,6 +2562,17 @@ static struct platform_driver arm_smmu_driver = {
 static int __init arm_smmu_init(void)
 {
 	int ret;
+
+	if (config_enabled(CONFIG_ARM_SMMU_WAR) &&
+	    tegra_platform_is_linsim()) {
+		mc_base = ioremap_nocache(MC_BASE, MC_SIZE);
+		if (!mc_base)
+			return -EINVAL;
+
+		pr_info("%s(): 0x%08x is mapped to %p\n",
+			__func__, MC_BASE, mc_base);
+		__writel(SMMU_CONFIG_ENABLE, mc_base + SMMU_CONFIG);
+	}
 
 	ret = platform_driver_register(&arm_smmu_driver);
 	if (ret)

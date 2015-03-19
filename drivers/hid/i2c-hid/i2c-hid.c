@@ -137,6 +137,7 @@ struct i2c_hid {
 						   * descriptor. */
 	unsigned int		bufsize;	/* i2c buffer size */
 	char			*inbuf;		/* Input buffer */
+	char			*rawbuf;	/* Raw Input buffer */
 	char			*cmdbuf;	/* Command buffer */
 	char			*argsbuf;	/* Command arguments buffer */
 
@@ -371,6 +372,9 @@ static void i2c_hid_get_input(struct i2c_hid *ihid)
 	int ret, ret_size;
 	int size = le16_to_cpu(ihid->hdesc.wMaxInputLength);
 
+	if (size > ihid->bufsize)
+		size = ihid->bufsize;
+
 	ret = i2c_master_recv(ihid->client, ihid->inbuf, size);
 	if (ret != size) {
 		if (ret < 0)
@@ -504,9 +508,11 @@ static void i2c_hid_find_max_report(struct hid_device *hid, unsigned int type,
 static void i2c_hid_free_buffers(struct i2c_hid *ihid)
 {
 	kfree(ihid->inbuf);
+	kfree(ihid->rawbuf);
 	kfree(ihid->argsbuf);
 	kfree(ihid->cmdbuf);
 	ihid->inbuf = NULL;
+	ihid->rawbuf = NULL;
 	ihid->cmdbuf = NULL;
 	ihid->argsbuf = NULL;
 	ihid->bufsize = 0;
@@ -522,10 +528,11 @@ static int i2c_hid_alloc_buffers(struct i2c_hid *ihid, size_t report_size)
 		       report_size; /* report */
 
 	ihid->inbuf = kzalloc(report_size, GFP_KERNEL);
+	ihid->rawbuf = kzalloc(report_size, GFP_KERNEL);
 	ihid->argsbuf = kzalloc(args_len, GFP_KERNEL);
 	ihid->cmdbuf = kzalloc(sizeof(union command) + args_len, GFP_KERNEL);
 
-	if (!ihid->inbuf || !ihid->argsbuf || !ihid->cmdbuf) {
+	if (!ihid->inbuf || !ihid->rawbuf || !ihid->argsbuf || !ihid->cmdbuf) {
 		i2c_hid_free_buffers(ihid);
 		return -ENOMEM;
 	}
@@ -552,12 +559,12 @@ static int i2c_hid_get_raw_report(struct hid_device *hid,
 
 	ret = i2c_hid_get_report(client,
 			report_type == HID_FEATURE_REPORT ? 0x03 : 0x01,
-			report_number, ihid->inbuf, ask_count);
+			report_number, ihid->rawbuf, ask_count);
 
 	if (ret < 0)
 		return ret;
 
-	ret_count = ihid->inbuf[0] | (ihid->inbuf[1] << 8);
+	ret_count = ihid->rawbuf[0] | (ihid->rawbuf[1] << 8);
 
 	if (ret_count <= 2)
 		return 0;
@@ -566,7 +573,7 @@ static int i2c_hid_get_raw_report(struct hid_device *hid,
 
 	/* The query buffer contains the size, dropping it in the reply */
 	count = min(count, ret_count - 2);
-	memcpy(buf, ihid->inbuf + 2, count);
+	memcpy(buf, ihid->rawbuf + 2, count);
 
 	return count;
 }
@@ -702,12 +709,7 @@ static int i2c_hid_start(struct hid_device *hid)
 
 static void i2c_hid_stop(struct hid_device *hid)
 {
-	struct i2c_client *client = hid->driver_data;
-	struct i2c_hid *ihid = i2c_get_clientdata(client);
-
 	hid->claimed = 0;
-
-	i2c_hid_free_buffers(ihid);
 }
 
 static int i2c_hid_open(struct hid_device *hid)
@@ -1143,7 +1145,45 @@ static struct i2c_driver i2c_hid_driver = {
 	.id_table	= i2c_hid_id_table,
 };
 
-module_i2c_driver(i2c_hid_driver);
+static const struct hid_device_id hid_i2chid_table[] = {
+	{ HID_DEVICE(BUS_I2C, HID_GROUP_GENERIC, HID_ANY_ID, HID_ANY_ID) },
+	{ }
+};
+
+static struct hid_driver hid_i2chid_driver = {
+	.name = "generic-i2c",
+	.id_table = hid_i2chid_table,
+};
+
+static int __init i2chid_init(void)
+{
+	int retval;
+
+	retval = hid_register_driver(&hid_i2chid_driver);
+	if (retval)
+		goto hid_register_fail;
+
+	retval = i2c_add_driver(&i2c_hid_driver);
+	if (retval)
+		goto i2c_register_fail;
+
+	return 0;
+
+i2c_register_fail:
+	hid_unregister_driver(&hid_i2chid_driver);
+
+hid_register_fail:
+	return retval;
+}
+
+static void __exit i2chid_exit(void)
+{
+	i2c_del_driver(&i2c_hid_driver);
+	hid_unregister_driver(&hid_i2chid_driver);
+}
+
+module_init(i2chid_init);
+module_exit(i2chid_exit);
 
 MODULE_DESCRIPTION("HID over I2C core driver");
 MODULE_AUTHOR("Benjamin Tissoires <benjamin.tissoires@gmail.com>");

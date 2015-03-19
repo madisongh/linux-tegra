@@ -199,9 +199,12 @@ ENTRY(__cpu_setup)
 	tlbi	vmalle1is			// invalidate I + D TLBs
 	dsb	ish
 
+__cpu_setup_post_flush:
+
 	mov	x0, #3 << 20
 	msr	cpacr_el1, x0			// Enable FP/ASIMD
-	msr	mdscr_el1, xzr			// Reset mdscr_el1
+	mov	x0, #1 << 14			// Enable MDSCR_EL1.HDE
+	msr	mdscr_el1, x0			// only set HDE in mdscr_el1
 	/*
 	 * Memory region attributes for LPAE:
 	 *
@@ -242,6 +245,36 @@ ENTRY(__cpu_setup)
 	msr	tcr_el1, x10
 	ret					// return to head.S
 ENDPROC(__cpu_setup)
+
+ENTRY(__cortexa53_cpu_setup)
+	/*
+	 * no need to flush cache and invalidate tlb and btbs because
+	 * cortex-a53 invalidates them already during reset
+	 */
+	b	__cpu_setup_post_flush
+ENDPROC(__cortexa53_cpu_setup)
+
+ENTRY(__cortexa57_cpu_setup)
+
+	mrs	x0, s3_1_c15_c2_0
+	/* enable non-cacheable streaming enhancement */
+	orr	x0, x0, #(1<<24)
+	msr	s3_1_c15_c2_0, x0
+	mrs	x0, s3_1_c11_c0_2
+	and	x1, x0, #7
+	cmp	x1, #2
+	b.eq	__cpu_setup_post_flush
+	mov	x1, #7
+	bic	x0, x0, x1
+	orr	x0, x0, #2			// set data RAM latency to 3
+	/*
+	 * no need to flush cache and invalidate tlb and btbs because
+	 * cortex-a57 invalidates them already during reset
+	 */
+	msr	s3_1_c11_c0_2, x0
+
+	b	__cpu_setup_post_flush
+ENDPROC(__cortexa57_cpu_setup)
 
 	/*
 	 *                 n n            T

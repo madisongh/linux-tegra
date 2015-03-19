@@ -405,7 +405,7 @@ u32 arch_timer_get_rate(void)
 	return arch_timer_rate;
 }
 
-static u64 arch_counter_get_cntvct_mem(void)
+notrace static u64 arch_counter_get_cntvct_mem(void)
 {
 	u32 vct_lo, vct_hi, tmp_hi;
 
@@ -462,7 +462,10 @@ static void __init arch_counter_register(unsigned type)
 
 	/* Register the CP15 based counter if we have one */
 	if (type & ARCH_CP15_TIMER) {
-		arch_timer_read_counter = arch_counter_get_cntvct;
+		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_use_virtual)
+			arch_timer_read_counter = arch_counter_get_cntvct;
+		else
+			arch_timer_read_counter = arch_counter_get_cntpct;
 	} else {
 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
 

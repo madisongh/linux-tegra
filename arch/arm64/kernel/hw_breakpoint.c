@@ -864,18 +864,12 @@ static void hw_breakpoint_reset(void *unused)
 	for (slots = this_cpu_ptr(bp_on_reg), i = 0; i < core_num_brps; ++i) {
 		if (slots[i]) {
 			hw_breakpoint_control(slots[i], HW_BREAKPOINT_RESTORE);
-		} else {
-			write_wb_reg(AARCH64_DBG_REG_BCR, i, 0UL);
-			write_wb_reg(AARCH64_DBG_REG_BVR, i, 0UL);
 		}
 	}
 
 	for (slots = this_cpu_ptr(wp_on_reg), i = 0; i < core_num_wrps; ++i) {
 		if (slots[i]) {
 			hw_breakpoint_control(slots[i], HW_BREAKPOINT_RESTORE);
-		} else {
-			write_wb_reg(AARCH64_DBG_REG_WCR, i, 0UL);
-			write_wb_reg(AARCH64_DBG_REG_WVR, i, 0UL);
 		}
 	}
 }

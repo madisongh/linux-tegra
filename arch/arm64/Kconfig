@@ -4,6 +4,7 @@ config ARM64
 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
 	select ARCH_HAS_SG_CHAIN
 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+	select ARCH_HAVE_CUSTOM_GPIO_H
 	select ARCH_USE_CMPXCHG_LOCKREF
 	select ARCH_SUPPORTS_ATOMIC_RMW
 	select ARCH_WANT_OPTIONAL_GPIOLIB
@@ -16,7 +17,7 @@ config ARM64
 	select ARM_GIC_V3
 	select BUILDTIME_EXTABLE_SORT
 	select CLONE_BACKWARDS
-	select COMMON_CLK
+#	select COMMON_CLK
 	select CPU_PM if (SUSPEND || CPU_IDLE)
 	select DCACHE_WORD_ACCESS
 	select GENERIC_ALLOCATOR
@@ -27,6 +28,7 @@ config ARM64
 	select GENERIC_IOMAP
 	select GENERIC_IRQ_PROBE
 	select GENERIC_IRQ_SHOW
+	select GENERIC_PCI_IOMAP
 	select GENERIC_SCHED_CLOCK
 	select GENERIC_SMP_IDLE_THREAD
 	select GENERIC_STRNCPY_FROM_USER
@@ -77,6 +79,30 @@ config ARM64
 	help
 	  ARM 64-bit (AArch64) Linux support.
 
+trysource ../kernel-t18x/arch/arm64/Kconfig
+
+config ARCH_TEGRA_18x_SOC
+	bool "Tegra 18x family SOC Kconfig placeholder"
+	select ARCH_TEGRA_18x_SOC_PRIVATE
+	help
+	  Kconfig placeholder for NVIDIA Tegra18x family of SoCs
+
+config NEED_MACH_MEMORY_H
+    bool
+    help
+      Select this when mach/memory.h is required to provide special
+      definitions for this platform.  The need for mach/memory.h should
+      be avoided when possible.
+
+config ARM64_MACH_FRAMEWORK
+	def_bool y
+	depends on ARCH_TEGRA_12x_SOC || ARCH_TEGRA_21x_SOC
+	help
+	  Enable support for the ARM64 machine framework. The machine framework
+	  provides hooks for vendors to provide customized machine init
+	  routines. WARNING: This feature will be deperacted for future chips.
+	  DO NOT enable this feature for future chips.
+
 config 64BIT
 	def_bool y
 
@@ -100,6 +126,15 @@ config TRACE_IRQFLAGS_SUPPORT
 
 config RWSEM_XCHGADD_ALGORITHM
 	def_bool y
+
+config ARM64_SIMPLE_SPINLOCK
+	def_bool n
+	help
+	  The simple locks are designed to be simpler, faster, and more power
+	  efficent than the normal locks when there are not many cores
+	  contending for the lock. It does this by minimizing the time before
+	  executing wfe in the contention case while minimizing the work in the
+	  uncontended case.
 
 config GENERIC_HWEIGHT
 	def_bool y
@@ -126,10 +161,19 @@ config NEED_SG_DMA_LENGTH
 	def_bool y
 
 config SWIOTLB
-	def_bool y
+	def_bool y if !ARM_DMA_USE_IOMMU
 
 config IOMMU_HELPER
 	def_bool SWIOTLB
+
+config ARM_DMA_USE_IOMMU
+	select NEED_SG_DMA_LENGTH
+	bool
+
+config MULTI_IRQ_HANDLER
+        bool
+        help
+	  Allow each machine to specify it's own IRQ handler at run time.
 
 config KERNEL_MODE_NEON
 	def_bool y
@@ -162,6 +206,22 @@ config ARCH_XGENE
 	bool "AppliedMicro X-Gene SOC Family"
 	help
 	  This enables support for AppliedMicro X-Gene SOC Family
+
+config ARCH_TEGRA
+	bool "NVIDIA Tegra"
+	select CLKDEV_LOOKUP
+	select CLKSRC_MMIO
+	select GENERIC_CLOCKEVENTS
+	select GENERIC_GPIO
+	select HAVE_CLK
+	select HAVE_SMP
+	select NEED_MACH_MEMORY_H
+	select PCI
+	help
+	  This enables support for NVIDIA Tegra based systems (Tegra APX,
+	  Tegra 6xx and Tegra 2 series).
+
+source "arch/arm64/mach-tegra/Kconfig"
 
 endmenu
 
@@ -299,7 +359,24 @@ config HOTPLUG_CPU
 	  Say Y here to experiment with turning CPUs off and on.  CPUs
 	  can be controlled through /sys/devices/system/cpu.
 
+config HOTPLUG_CPU0
+	bool "Support for CPU0 hotplug"
+	depends on HOTPLUG_CPU
+	default n
+	help
+	  CPU0 hotplug is not supported on all arm64 platforms. Select Y to
+	  enable CPU0 hotplug. If you're unsure, leave CPU0 hotplug disabled.
+
 source kernel/Kconfig.preempt
+
+config ARCH_NR_GPIO
+	int
+	default 1024 if ARCH_TEGRA
+	default 0
+	help
+
+	  Maximum number of GPIOs in the system.
+	  If unsure, leave the default value.
 
 config HZ
 	int
@@ -561,6 +638,8 @@ source "drivers/cpuidle/Kconfig"
 
 source "drivers/cpufreq/Kconfig"
 
+source "drivers/cpuquiet/Kconfig"
+
 endmenu
 
 source "net/Kconfig"
@@ -583,3 +662,5 @@ source "arch/arm64/crypto/Kconfig"
 endif
 
 source "lib/Kconfig"
+
+source "drivers/firmware/tegra/Kconfig"

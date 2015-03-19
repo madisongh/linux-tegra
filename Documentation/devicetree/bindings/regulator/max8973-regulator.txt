@@ -2,11 +2,27 @@
 
 Required properties:
 
-- compatible:	must be "maxim,max8973"
+- compatible:	must be one of
+		"maxim,max8973",
+		"maxim,max77621"
 - reg:		the i2c slave address of the regulator. It should be 0x1b.
 
 Any standard regulator properties can be used to configure the single max8973
 DCDC.
+
+Optional properties:
+- maxim,externally-enable: Boolean property which tells whether EN pin control
+	the output enable or not.
+- maxim,dvs-gpio: DVS gpio. GPIO on which DVS pin is connected.
+- maxim,dvs-default-state: Default state of the DVS pin whether it is GPIO
+	control or tied to HIGH or LOW.
+- maxim,control-flags: Control flags. The macros are defined on
+		include/dt-bindings/regulator/max8973.h
+- maxim,external-enable-gpio: GPIO number if EN pin is connected to one of
+		system GPIO lines.
+- maxim,sleep-on-dvs: Boolean, enable sleep control through DVS pin. When
+		this property is available then property dvs-default-state
+		will tell dvs pin state for active state of the rail.
 
 Example:
 

@@ -1,6 +1,6 @@
 VERSION = 3
 PATCHLEVEL = 18
-SUBLEVEL = 0
+SUBLEVEL = 9
 EXTRAVERSION =
 NAME = Shuffling Zombie Juror
 
@@ -614,7 +614,11 @@ KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
 else
+ifdef CONFIG_LESS_GCC_OPT
+KBUILD_CFLAGS	+= -O1
+else
 KBUILD_CFLAGS	+= -O2
+endif
 endif
 
 # Tell gcc to never replace conditional load with a non-conditional one

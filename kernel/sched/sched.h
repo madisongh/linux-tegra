@@ -541,6 +541,11 @@ struct rq {
 #endif
 	int skip_clock_update;
 
+	/* time-based average load */
+	u64 nr_last_stamp;
+	u64 nr_running_integral;
+	seqcount_t ave_seqcnt;
+
 	/* capture load from *all* tasks on this cpu: */
 	struct load_weight load;
 	unsigned long nr_load_updates;
@@ -1223,11 +1228,36 @@ extern void update_idle_cpu_load(struct rq *this_rq);
 
 extern void init_task_runnable_average(struct task_struct *p);
 
+/* 27 ~= 134217728ns = 134.2ms
+ * 26 ~=  67108864ns =  67.1ms
+ * 25 ~=  33554432ns =  33.5ms
+ * 24 ~=  16777216ns =  16.8ms
+ */
+#define NR_AVE_SCALE(x)		((x) << FSHIFT)
+
+
+static inline u64 do_nr_running_integral(struct rq *rq)
+{
+	s64 nr, deltax;
+	u64 nr_running_integral = rq->nr_running_integral;
+
+	deltax = rq->clock_task - rq->nr_last_stamp;
+	nr = NR_AVE_SCALE(rq->nr_running);
+
+	nr_running_integral += nr * deltax;
+
+	return nr_running_integral;
+}
+
 static inline void add_nr_running(struct rq *rq, unsigned count)
 {
 	unsigned prev_nr = rq->nr_running;
 
+	write_seqcount_begin(&rq->ave_seqcnt);
+	rq->nr_running_integral = do_nr_running_integral(rq);
+	rq->nr_last_stamp = rq->clock_task;
 	rq->nr_running = prev_nr + count;
+	write_seqcount_end(&rq->ave_seqcnt);
 
 	if (prev_nr < 2 && rq->nr_running >= 2) {
 #ifdef CONFIG_SMP
@@ -1253,7 +1283,11 @@ static inline void add_nr_running(struct rq *rq, unsigned count)
 
 static inline void sub_nr_running(struct rq *rq, unsigned count)
 {
+	write_seqcount_begin(&rq->ave_seqcnt);
+	rq->nr_running_integral = do_nr_running_integral(rq);
+	rq->nr_last_stamp = rq->clock_task;
 	rq->nr_running -= count;
+	write_seqcount_end(&rq->ave_seqcnt);
 }
 
 static inline void rq_last_tick_reset(struct rq *rq)

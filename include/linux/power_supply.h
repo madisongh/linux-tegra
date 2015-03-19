@@ -1,6 +1,7 @@
 /*
  *  Universal power supply monitor class
  *
+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
  *  Copyright © 2007  Anton Vorontsov <cbou@mail.ru>
  *  Copyright © 2004  Szabolcs Gyurko
  *  Copyright © 2003  Ian Molton <spyro@f2s.com>
@@ -140,6 +141,7 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_TEMP_AMBIENT,
 	POWER_SUPPLY_PROP_TEMP_AMBIENT_ALERT_MIN,
 	POWER_SUPPLY_PROP_TEMP_AMBIENT_ALERT_MAX,
+	POWER_SUPPLY_PROP_TEMP_INFO,
 	POWER_SUPPLY_PROP_TIME_TO_EMPTY_NOW,
 	POWER_SUPPLY_PROP_TIME_TO_EMPTY_AVG,
 	POWER_SUPPLY_PROP_TIME_TO_FULL_NOW,
@@ -225,6 +227,7 @@ struct power_supply {
 #ifdef CONFIG_THERMAL
 	struct thermal_zone_device *tzd;
 	struct thermal_cooling_device *tcd;
+	bool thermal_zone_sensor;
 #endif
 
 #ifdef CONFIG_LEDS_TRIGGERS
@@ -263,7 +266,6 @@ struct power_supply_info {
 extern struct atomic_notifier_head power_supply_notifier;
 extern int power_supply_reg_notifier(struct notifier_block *nb);
 extern void power_supply_unreg_notifier(struct notifier_block *nb);
-extern struct power_supply *power_supply_get_by_name(const char *name);
 #ifdef CONFIG_OF
 extern struct power_supply *power_supply_get_by_phandle(struct device_node *np,
 							const char *property);
@@ -277,8 +279,11 @@ extern int power_supply_am_i_supplied(struct power_supply *psy);
 extern int power_supply_set_battery_charged(struct power_supply *psy);
 
 #ifdef CONFIG_POWER_SUPPLY
+extern struct power_supply *power_supply_get_by_name(const char *name);
 extern int power_supply_is_system_supplied(void);
 #else
+static inline struct power_supply *power_supply_get_by_name(const char *name)
+{ return NULL; }
 static inline int power_supply_is_system_supplied(void) { return -ENOSYS; }
 #endif
 

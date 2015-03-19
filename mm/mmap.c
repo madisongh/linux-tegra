@@ -41,6 +41,7 @@
 #include <linux/notifier.h>
 #include <linux/memory.h>
 #include <linux/printk.h>
+#include <linux/tegra_profiler.h>
 
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
@@ -1660,6 +1661,7 @@ munmap_back:
 	file = vma->vm_file;
 out:
 	perf_event_mmap(vma);
+	quadd_event_mmap(vma);
 
 	vm_stat_account(mm, vm_flags, file, len >> PAGE_SHIFT);
 	if (vm_flags & VM_LOCKED) {
@@ -2106,14 +2108,17 @@ static int acct_stack_growth(struct vm_area_struct *vma, unsigned long size, uns
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct rlimit *rlim = current->signal->rlim;
-	unsigned long new_start;
+	unsigned long new_start, actual_size;
 
 	/* address space limit tests */
 	if (!may_expand_vm(mm, grow))
 		return -ENOMEM;
 
 	/* Stack limit test */
-	if (size > ACCESS_ONCE(rlim[RLIMIT_STACK].rlim_cur))
+	actual_size = size;
+	if (size && (vma->vm_flags & (VM_GROWSUP | VM_GROWSDOWN)))
+		actual_size -= PAGE_SIZE;
+	if (actual_size > ACCESS_ONCE(rlim[RLIMIT_STACK].rlim_cur))
 		return -ENOMEM;
 
 	/* mlock limit tests */
@@ -2214,6 +2219,7 @@ int expand_upwards(struct vm_area_struct *vma, unsigned long address)
 				spin_unlock(&vma->vm_mm->page_table_lock);
 
 				perf_event_mmap(vma);
+				quadd_event_mmap(vma);
 			}
 		}
 	}
@@ -2283,6 +2289,7 @@ int expand_downwards(struct vm_area_struct *vma,
 				spin_unlock(&vma->vm_mm->page_table_lock);
 
 				perf_event_mmap(vma);
+				quadd_event_mmap(vma);
 			}
 		}
 	}
@@ -2721,6 +2728,8 @@ static unsigned long do_brk(unsigned long addr, unsigned long len)
 	vma_link(mm, vma, prev, rb_link, rb_parent);
 out:
 	perf_event_mmap(vma);
+	quadd_event_mmap(vma);
+
 	mm->total_vm += len >> PAGE_SHIFT;
 	if (flags & VM_LOCKED)
 		mm->locked_vm += (len >> PAGE_SHIFT);
@@ -3016,6 +3025,7 @@ static struct vm_area_struct *__install_special_mapping(
 	mm->total_vm += len >> PAGE_SHIFT;
 
 	perf_event_mmap(vma);
+	quadd_event_mmap(vma);
 
 	return vma;
 

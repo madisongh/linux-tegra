@@ -509,13 +509,18 @@ config SPI_MXS
 	  SPI driver for Freescale MXS devices.
 
 config SPI_TEGRA114
-	tristate "NVIDIA Tegra114 SPI Controller"
-	depends on (ARCH_TEGRA && TEGRA20_APB_DMA) || COMPILE_TEST
-	depends on RESET_CONTROLLER && HAS_DMA
+	tristate "Nvidia Tegra114/124 SPI Controller"
+	depends on ARCH_TEGRA && TEGRA20_APB_DMA
 	help
-	  SPI driver for NVIDIA Tegra114 SPI Controller interface. This controller
-	  is different than the older SoCs SPI controller and also register interface
-	  get changed with this controller.
+	  SPI driver for Nvidia Tegra114/124 SPI Controller interface. This controller
+	  is different than the older SoCs spi controller and register interface
+	  also get changed with this controller.
+
+config SPI_TEGRA114_SLAVE
+	tristate "Nvidia Tegra114 SPI Slave Controller"
+	depends on ARCH_TEGRA && TEGRA20_APB_DMA
+	help
+	  SPI slave driver for Nvidia Tegra114 and later soc SPI Controller interface.
 
 config SPI_TEGRA20_SFLASH
 	tristate "Nvidia Tegra20 Serial flash Controller"
@@ -532,6 +537,13 @@ config SPI_TEGRA20_SLINK
 	depends on RESET_CONTROLLER && HAS_DMA
 	help
 	  SPI driver for Nvidia Tegra20/Tegra30 SLINK Controller interface.
+
+config QSPI_TEGRA210
+	tristate "Nvidia Tegra210 QSPI Controller"
+	depends on ARCH_TEGRA && TEGRA20_APB_DMA
+	help
+	  QSPI driver for Nvidia Tegra210 QSPI Controller interface. This controller
+	  is different from the spi controller and first time introduces on Tegra210 soc.
 
 config SPI_TOPCLIFF_PCH
 	tristate "Intel EG20T PCH/LAPIS Semicon IOH(ML7213/ML7223/ML7831) SPI"

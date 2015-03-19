@@ -3730,8 +3730,8 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	sbi->s_inodes_per_block = blocksize / EXT4_INODE_SIZE(sb);
 	if (sbi->s_inodes_per_block == 0)
 		goto cantfind_ext4;
-	sbi->s_itb_per_group = sbi->s_inodes_per_group /
-					sbi->s_inodes_per_block;
+	sbi->s_itb_per_group = DIV_ROUND_UP(sbi->s_inodes_per_group,
+					sbi->s_inodes_per_block);
 	sbi->s_desc_per_block = blocksize / EXT4_DESC_SIZE(sb);
 	sbi->s_sbh = bh;
 	sbi->s_mount_state = le16_to_cpu(es->s_state);
@@ -4849,9 +4849,8 @@ static int ext4_remount(struct super_block *sb, int *flags, char *data)
 	if ((old_opts.s_mount_opt & EXT4_MOUNT_JOURNAL_CHECKSUM) ^
 	    test_opt(sb, JOURNAL_CHECKSUM)) {
 		ext4_msg(sb, KERN_ERR, "changing journal_checksum "
-			 "during remount not supported");
-		err = -EINVAL;
-		goto restore_opts;
+			 "during remount not supported; ignoring");
+		sbi->s_mount_opt ^= EXT4_MOUNT_JOURNAL_CHECKSUM;
 	}
 
 	if (test_opt(sb, DATA_FLAGS) == EXT4_MOUNT_JOURNAL_DATA) {

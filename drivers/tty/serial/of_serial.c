@@ -19,6 +19,9 @@
 #include <linux/of_platform.h>
 #include <linux/nwpserial.h>
 #include <linux/clk.h>
+#ifdef CONFIG_ARCH_TEGRA
+#include <linux/tegra-pm.h>
+#endif
 
 #include "8250/8250.h"
 
@@ -27,28 +30,6 @@ struct of_serial_info {
 	int type;
 	int line;
 };
-
-#ifdef CONFIG_ARCH_TEGRA
-void tegra_serial_handle_break(struct uart_port *p)
-{
-	unsigned int status, tmout = 10000;
-
-	do {
-		status = p->serial_in(p, UART_LSR);
-		if (status & (UART_LSR_FIFOE | UART_LSR_BRK_ERROR_BITS))
-			status = p->serial_in(p, UART_RX);
-		else
-			break;
-		if (--tmout == 0)
-			break;
-		udelay(1);
-	} while (1);
-}
-#else
-static inline void tegra_serial_handle_break(struct uart_port *port)
-{
-}
-#endif
 
 /*
  * Fill a struct uart_port for a given device node
@@ -60,7 +41,7 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
 	struct resource resource;
 	struct device_node *np = ofdev->dev.of_node;
 	u32 clk, spd, prop;
-	int ret;
+	int ret, cmp_ret;
 
 	memset(port, 0, sizeof *port);
 	if (of_property_read_u32(np, "clock-frequency", &clk)) {
@@ -88,6 +69,10 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
 
 	spin_lock_init(&port->lock);
 	port->mapbase = resource.start;
+#ifdef CONFIG_ARCH_TEGRA
+	if (of_property_read_bool(np, "console-port"))
+		debug_uart_port_base = port->mapbase;
+#endif
 
 	/* Check for shifted address mapping */
 	if (of_property_read_u32(np, "reg-offset", &prop) == 0)
@@ -129,8 +114,12 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
 
 	port->dev = &ofdev->dev;
 
-	if (type == PORT_TEGRA)
+	if (type == PORT_TEGRA) {
 		port->handle_break = tegra_serial_handle_break;
+		cmp_ret = of_device_is_compatible(np, "nvidia,tegra210-uart");
+		if (!cmp_ret)
+			port->flags |= UPF_BUGGY_UART;
+	}
 
 	return 0;
 out:
@@ -251,6 +240,7 @@ static struct of_device_id of_platform_serial_table[] = {
 	{ .compatible = "ns16750",  .data = (void *)PORT_16750, },
 	{ .compatible = "ns16850",  .data = (void *)PORT_16850, },
 	{ .compatible = "nvidia,tegra20-uart", .data = (void *)PORT_TEGRA, },
+	{ .compatible = "nvidia,tegra210-uart", .data = (void *)PORT_TEGRA, },
 	{ .compatible = "nxp,lpc3220-uart", .data = (void *)PORT_LPC3220, },
 	{ .compatible = "altr,16550-FIFO32",
 		.data = (void *)PORT_ALTR_16550_F32, },

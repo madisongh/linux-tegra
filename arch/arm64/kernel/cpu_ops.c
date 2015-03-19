@@ -18,6 +18,7 @@
 
 #include <asm/cpu_ops.h>
 #include <asm/smp_plat.h>
+#include <asm/cputype.h>
 #include <linux/errno.h>
 #include <linux/of.h>
 #include <linux/string.h>

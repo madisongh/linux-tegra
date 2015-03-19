@@ -73,6 +73,9 @@ EXPORT_SYMBOL_GPL(pm_power_off);
 
 void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
 
+void (*pm_power_reset)(void);
+EXPORT_SYMBOL(pm_power_reset);
+
 /*
  * This is our default idle handler.
  */
@@ -443,4 +446,14 @@ static unsigned long randomize_base(unsigned long base)
 unsigned long arch_randomize_brk(struct mm_struct *mm)
 {
 	return randomize_base(mm->brk);
+}
+
+void arch_cpu_idle_enter(void)
+{
+	idle_notifier_call_chain(IDLE_START);
+}
+
+void arch_cpu_idle_exit(void)
+{
+	idle_notifier_call_chain(IDLE_END);
 }

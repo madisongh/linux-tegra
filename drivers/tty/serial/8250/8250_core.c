@@ -272,7 +272,8 @@ static const struct serial8250_config uart_config[] = {
 		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_01 |
 				  UART_FCR_T_TRIG_01,
 		.rxtrig_bytes	= {1, 4, 8, 14},
-		.flags		= UART_CAP_FIFO | UART_CAP_RTOIE,
+		.flags		= UART_CAP_FIFO | UART_CAP_RTOIE |
+				  UART_CAP_HW_CTSRTS,
 	},
 	[PORT_XR17D15X] = {
 		.name		= "XR17D15X",
@@ -441,6 +442,7 @@ static void io_serial_out(struct uart_port *p, int offset, int value)
 }
 
 static int serial8250_default_handle_irq(struct uart_port *port);
+static int serial8250_tegra_handle_irq(struct uart_port *port);
 static int exar_handle_irq(struct uart_port *port);
 
 static void set_io_from_upio(struct uart_port *p)
@@ -968,6 +970,7 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 		return;
 	}
 
+#ifdef CONFIG_HAS_NS_SUPER_IO_CHIP
 	/*
 	 * Check for a National Semiconductor SuperIO chip.
 	 * Attempt to switch to bank 2, read the value of the LOOP bit
@@ -1007,6 +1010,7 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 			return;
 		}
 	}
+#endif
 
 	/*
 	 * No EFR.  Try to detect a TI16750, which only sets bit 5 of
@@ -1618,6 +1622,86 @@ static int serial8250_default_handle_irq(struct uart_port *port)
 }
 
 /*
+ * Tegra UART IIR sometimes not consistent with its IRQ signal
+ * which will generate continous spurious interrupts, inorder to
+ * recover from this, generate legal modem interrupt and
+ * handle it.
+ */
+#define NOINTR_COUNTER 1000
+static int serial8250_tegra_handle_irq(struct uart_port *port)
+{
+	struct uart_8250_port *up =
+		container_of(port, struct uart_8250_port, port);
+	static int tegra_nointr_count;
+	unsigned int iir = serial_port_in(port, UART_IIR);
+	unsigned char status;
+	unsigned long flags;
+
+	if ((iir & UART_IIR_NO_INT)) {
+		tegra_nointr_count++;
+		if (tegra_nointr_count > NOINTR_COUNTER) {
+			up->mcr = serial_port_in(port, UART_MCR)
+				| UART_MCR_LOOP;
+			serial_port_out(port, UART_MCR, up->mcr);
+			up->ier = serial_port_in(port, UART_IER)
+				| UART_IER_MSI;
+			serial_port_out(port, UART_IER, up->ier);
+			up->mcr |= UART_MCR_RTS;
+			serial_port_out(port, UART_MCR, up->mcr);
+		}
+		return 0;
+	} else {
+		tegra_nointr_count = 0;
+	}
+
+	spin_lock_irqsave(&port->lock, flags);
+
+	status = serial_port_in(port, UART_LSR);
+
+	DEBUG_INTR("status = %x...", status);
+
+	if ((iir & 0xf) == UART_IIR_MSI) {
+		if (up->mcr & UART_MCR_LOOP) {
+			serial_port_out(port, UART_TX, 0xff);
+			up->mcr &= ~UART_MCR_LOOP;
+			serial_port_out(port, UART_MCR, up->mcr);
+			up->ier &= ~UART_IER_MSI;
+			serial_port_out(port, UART_IER, up->ier);
+			up->mcr &= ~UART_MCR_RTS;
+			serial_port_out(port, UART_MCR, up->mcr);
+		}
+		serial8250_modem_status(up);
+	}
+
+	if (status & (UART_LSR_DR | UART_LSR_BI))
+		status = serial8250_rx_chars(up, status);
+
+	if (status & UART_LSR_THRE)
+		serial8250_tx_chars(up);
+
+	spin_unlock_irqrestore(&port->lock, flags);
+	return 1;
+}
+
+#ifdef CONFIG_ARCH_TEGRA
+void tegra_serial_handle_break(struct uart_port *p)
+{
+	unsigned int status, tmout = 10000;
+
+	do {
+		status = p->serial_in(p, UART_LSR);
+		if (status & (UART_LSR_FIFOE | UART_LSR_BRK_ERROR_BITS))
+			status = p->serial_in(p, UART_RX);
+		else
+			break;
+		if (--tmout == 0)
+			break;
+		udelay(1);
+	} while (1);
+}
+#endif
+
+/*
  * These Exar UARTs have an extra interrupt indicator that could
  * fire for a few unimplemented interrupts.  One of which is a
  * wakeup event when coming out of sleep.  Put this here just
@@ -1679,6 +1763,10 @@ static irqreturn_t serial8250_interrupt(int irq, void *dev_id)
 			end = NULL;
 		} else if (end == NULL)
 			end = l;
+
+		/* Tegra NO_INTR should be returned as handled */
+		if (port->type == PORT_TEGRA)
+			handled = 1;
 
 		l = l->next;
 
@@ -1910,8 +1998,13 @@ static void serial8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
 	struct uart_8250_port *up = up_to_u8250p(port);
 	unsigned char mcr = 0;
 
-	if (mctrl & TIOCM_RTS)
-		mcr |= UART_MCR_RTS;
+	if (up->port.type == PORT_TEGRA) {
+		if (mctrl & TIOCM_RTS)
+			mcr |= UART_MCR_HW_RTS;
+	} else {
+		if (mctrl & TIOCM_RTS)
+			mcr |= UART_MCR_RTS;
+	}
 	if (mctrl & TIOCM_DTR)
 		mcr |= UART_MCR_DTR;
 	if (mctrl & TIOCM_OUT1)
@@ -2529,6 +2622,19 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
 			serial_port_out(port, UART_EFR, efr);
 	}
 
+	if (up->capabilities & UART_CAP_HW_CTSRTS) {
+		unsigned char mcr = serial_port_in(port, UART_MCR);
+		/*
+		 * TEGRA UART core support the auto control of the RTS and CTS
+		 * flow control.
+		 */
+		if (termios->c_cflag & CRTSCTS)
+			mcr |= UART_MCR_HW_CTS;
+		else
+			mcr &= ~UART_MCR_HW_CTS;
+		serial_port_out(port, UART_MCR, mcr);
+	}
+
 	/* Workaround to enable 115200 baud on OMAP1510 internal ports */
 	if (is_omap1510_8250(up)) {
 		if (baud == 115200) {
@@ -2944,8 +3050,14 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 		up->bugs |= UART_BUG_NOMSR;
 
 	/* HW bugs may trigger IRQ while IIR == NO_INT */
-	if (port->type == PORT_TEGRA)
+	if (port->type == PORT_TEGRA) {
 		up->bugs |= UART_BUG_NOMSR;
+#if defined CONFIG_ARCH_TEGRA
+		port->handle_break = tegra_serial_handle_break;
+#endif
+		if (port->flags & UPF_BUGGY_UART)
+			port->handle_irq = serial8250_tegra_handle_irq;
+	}
 
 	if (port->type != PORT_UNKNOWN && flags & UART_CONFIG_IRQ)
 		autoconfig_irq(up);

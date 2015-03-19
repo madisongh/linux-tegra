@@ -278,3 +278,23 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
 }
 RESERVEDMEM_OF_DECLARE(cma, "shared-dma-pool", rmem_cma_setup);
 #endif
+
+int dma_get_contiguous_stats(struct device *dev,
+			struct dma_contiguous_stats *stats)
+{
+	struct cma *cma = NULL;
+
+	if ((!dev) || !stats)
+		return -EINVAL;
+
+	if (dev->cma_area)
+		cma = dev->cma_area;
+
+	if (!cma)
+		return -EINVAL;
+
+	stats->size = (cma->count) << PAGE_SHIFT;
+	stats->base = (cma->base_pfn) << PAGE_SHIFT;
+
+	return 0;
+}

@@ -107,11 +107,36 @@ struct gpio_chip *gpiod_to_chip(const struct gpio_desc *desc)
 EXPORT_SYMBOL_GPL(gpiod_to_chip);
 
 /* dynamic allocation of GPIOs, e.g. on a hotplugged device */
-static int gpiochip_find_base(int ngpio)
+static int gpiochip_find_base(struct gpio_chip *req_chip, int aliased_base)
 {
 	struct gpio_chip *chip;
-	int base = ARCH_NR_GPIOS - ngpio;
+	int ngpio = req_chip->ngpio;
+	int base = -1;
 
+	if (aliased_base >= 0) {
+		int start_gpio = aliased_base;
+		int end_gpio = aliased_base + req_chip->ngpio;
+
+		/* Check if aliased base is not already allocated */
+		list_for_each_entry(chip, &gpio_chips, list) {
+			if (chip->base > end_gpio)
+				continue;
+
+			if ((chip->base < start_gpio) &&
+				((chip->base + chip->ngpio) < start_gpio))
+					continue;
+			pr_err("GPIO %d to %d is already allocated\n",
+					start_gpio, end_gpio);
+			aliased_base = -1;
+			break;
+		}
+		base = aliased_base;
+	}
+
+	if (base >= 0)
+		goto found;
+
+	base = ARCH_NR_GPIOS - ngpio;
 	list_for_each_entry_reverse(chip, &gpio_chips, list) {
 		/* found a free space? */
 		if (chip->base + chip->ngpio <= base)
@@ -121,6 +146,7 @@ static int gpiochip_find_base(int ngpio)
 			base = chip->base - ngpio;
 	}
 
+found:
 	if (gpio_is_valid(base)) {
 		pr_debug("%s: found new base at %d\n", __func__, base);
 		return base;
@@ -226,6 +252,7 @@ int gpiochip_add(struct gpio_chip *chip)
 	int		status = 0;
 	unsigned	id;
 	int		base = chip->base;
+	int		aliased_base = -1;
 
 	if ((!gpio_is_valid(base) || !gpio_is_valid(base + chip->ngpio - 1))
 			&& base >= 0) {
@@ -233,10 +260,15 @@ int gpiochip_add(struct gpio_chip *chip)
 		goto fail;
 	}
 
+#ifdef CONFIG_OF
+	if (chip->of_node)
+		aliased_base = of_alias_get_id(chip->of_node, "gpio");
+#endif
+
 	spin_lock_irqsave(&gpio_lock, flags);
 
 	if (base < 0) {
-		base = gpiochip_find_base(chip->ngpio);
+		base = gpiochip_find_base(chip, aliased_base);
 		if (base < 0) {
 			status = base;
 			goto unlock;
@@ -268,6 +300,9 @@ int gpiochip_add(struct gpio_chip *chip)
 
 	spin_unlock_irqrestore(&gpio_lock, flags);
 
+	if (status)
+		goto fail;
+
 #ifdef CONFIG_PINCTRL
 	INIT_LIST_HEAD(&chip->pin_ranges);
 #endif
@@ -275,14 +310,16 @@ int gpiochip_add(struct gpio_chip *chip)
 	of_gpiochip_add(chip);
 	acpi_gpiochip_add(chip);
 
-	if (status)
-		goto fail;
+	of_gpiochip_init(chip);
 
 	status = gpiochip_export(chip);
-	if (status)
+	if (status) {
+		acpi_gpiochip_remove(chip);
+		of_gpiochip_remove(chip);
 		goto fail;
+	}
 
-	pr_debug("%s: registered GPIOs %d to %d on device: %s\n", __func__,
+	pr_info("%s: registered GPIOs %d to %d on device: %s\n", __func__,
 		chip->base, chip->base + chip->ngpio - 1,
 		chip->label ? : "generic");
 
@@ -313,14 +350,13 @@ void gpiochip_remove(struct gpio_chip *chip)
 	unsigned long	flags;
 	unsigned	id;
 
-	acpi_gpiochip_remove(chip);
-
-	spin_lock_irqsave(&gpio_lock, flags);
-
 	gpiochip_irqchip_remove(chip);
+
+	acpi_gpiochip_remove(chip);
 	gpiochip_remove_pin_ranges(chip);
 	of_gpiochip_remove(chip);
 
+	spin_lock_irqsave(&gpio_lock, flags);
 	for (id = 0; id < chip->ngpio; id++) {
 		if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
 			dev_crit(chip->dev, "REMOVING GPIOCHIP WITH GPIOS STILL REQUESTED\n");
@@ -720,7 +756,7 @@ int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
 		kfree(pin_range);
 		return ret;
 	}
-	chip_dbg(chip, "created GPIO range %d->%d ==> %s PIN %d->%d\n",
+	chip_info(chip, "created GPIO range %d->%d ==> %s PIN %d->%d\n",
 		 gpio_offset, gpio_offset + npins - 1,
 		 pinctl_name,
 		 pin_offset, pin_offset + npins - 1);

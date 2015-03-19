@@ -40,9 +40,16 @@
 #include <asm/sizes.h>
 #include <asm/tlb.h>
 
+#include <asm/mach/arch.h>
+
 #include "mm.h"
 
+/* FIXME */
+#if !defined(CONFIG_MACH_EXUMA) && !defined(CONFIG_MACH_GRENADA)
 phys_addr_t memstart_addr __read_mostly = 0;
+#else
+phys_addr_t memstart_addr __read_mostly = 0x80000000;
+#endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
 static int __init early_initrd(char *p)
@@ -127,7 +134,7 @@ static void arm64_memory_present(void)
 {
 }
 #else
-static void arm64_memory_present(void)
+static void __init arm64_memory_present(void)
 {
 	struct memblock_region *reg;
 
@@ -151,6 +158,13 @@ void __init arm64_memblock_init(void)
 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
 #endif
 
+	early_init_fdt_scan_reserved_mem();
+
+#ifdef CONFIG_ARM64_MACH_FRAMEWORK
+	/* reserve any platform specific memblock areas */
+	if (machine_desc->reserve)
+		machine_desc->reserve();
+#endif
 	early_init_fdt_scan_reserved_mem();
 
 	/* 4GB maximum for 32-bit only capable devices */
@@ -335,14 +349,8 @@ static int keep_initrd;
 
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
-	if (!keep_initrd) {
-		if (start == initrd_start)
-			start = round_down(start, PAGE_SIZE);
-		if (end == initrd_end)
-			end = round_up(end, PAGE_SIZE);
-
+	if (!keep_initrd)
 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
-	}
 }
 
 static int __init keepinitrd_setup(char *__unused)

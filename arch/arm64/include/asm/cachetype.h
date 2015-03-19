@@ -23,6 +23,9 @@
 #define CTR_CWG_SHIFT		24
 #define CTR_CWG_MASK		15
 
+#define CLIDR_LOUIS_SHIFT	21
+#define CLIDR_LOUIS_MASK	7
+
 #define ICACHE_POLICY_RESERVED	0
 #define ICACHE_POLICY_AIVIVT	1
 #define ICACHE_POLICY_VIPT	2
@@ -76,6 +79,25 @@ static inline int icache_is_aivivt(void)
 static inline u32 cache_type_cwg(void)
 {
 	return (read_cpuid_cachetype() >> CTR_CWG_SHIFT) & CTR_CWG_MASK;
+}
+
+/*
+* If the LoUIS field value is 0x0, this means that no levels of
+* cache need to cleaned or invalidated when cleaning or
+* invalidating to the point of unification for the Inner
+* Shareable shareability domain.
+*/
+static inline int need_user_flush_range(void)
+{
+	static int read, louis;
+
+	if (!read) {
+		read = 1;
+		asm volatile ("mrs %0, CLIDR_EL1" : "=r" (louis));
+		louis = (louis >> CLIDR_LOUIS_SHIFT) & CLIDR_LOUIS_MASK;
+	}
+
+	return louis;
 }
 
 #endif	/* __ASSEMBLY__ */

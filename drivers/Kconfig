@@ -64,6 +64,8 @@ source "drivers/pinctrl/Kconfig"
 
 source "drivers/gpio/Kconfig"
 
+source "drivers/padctrl/Kconfig"
+
 source "drivers/w1/Kconfig"
 
 source "drivers/power/Kconfig"
@@ -156,6 +158,8 @@ source "drivers/devfreq/Kconfig"
 
 source "drivers/extcon/Kconfig"
 
+source "drivers/mipi_bif/Kconfig"
+
 source "drivers/memory/Kconfig"
 
 source "drivers/iio/Kconfig"
@@ -183,5 +187,9 @@ source "drivers/mcb/Kconfig"
 source "drivers/ras/Kconfig"
 
 source "drivers/thunderbolt/Kconfig"
+
+source "drivers/edp/Kconfig"
+
+source "drivers/gpu/nvgpu/Kconfig"
 
 endmenu

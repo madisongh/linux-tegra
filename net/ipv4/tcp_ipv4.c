@@ -48,6 +48,8 @@
  *	YOSHIFUJI Hideaki @USAGI and:	Support IPV6_V6ONLY socket option, which
  *	Alexey Kuznetsov		allow both IPv4 and IPv6 sockets to bind
  *					a single port at the same time.
+ *
+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
  */
 
 #define pr_fmt(fmt) "TCP: " fmt
@@ -623,6 +625,7 @@ static void tcp_v4_send_reset(struct sock *sk, struct sk_buff *skb)
 	arg.iov[0].iov_base = (unsigned char *)&rep;
 	arg.iov[0].iov_len  = sizeof(rep.th);
 
+	net = sk ? sock_net(sk) : dev_net(skb_dst(skb)->dev);
 #ifdef CONFIG_TCP_MD5SIG
 	hash_location = tcp_parse_md5sig_option(th);
 	if (!sk && hash_location) {
@@ -633,7 +636,7 @@ static void tcp_v4_send_reset(struct sock *sk, struct sk_buff *skb)
 		 * Incoming packet is checked with md5 hash with finding key,
 		 * no RST generated if md5 hash doesn't match.
 		 */
-		sk1 = __inet_lookup_listener(dev_net(skb_dst(skb)->dev),
+		sk1 = __inet_lookup_listener(net,
 					     &tcp_hashinfo, ip_hdr(skb)->saddr,
 					     th->source, ip_hdr(skb)->daddr,
 					     ntohs(th->source), inet_iif(skb));
@@ -681,9 +684,9 @@ static void tcp_v4_send_reset(struct sock *sk, struct sk_buff *skb)
 	if (sk)
 		arg.bound_dev_if = sk->sk_bound_dev_if;
 
-	net = dev_net(skb_dst(skb)->dev);
 	arg.tos = ip_hdr(skb)->tos;
-	ip_send_unicast_reply(net, skb, &TCP_SKB_CB(skb)->header.h4.opt,
+	ip_send_unicast_reply(*this_cpu_ptr(net->ipv4.tcp_sk),
+			      skb, &TCP_SKB_CB(skb)->header.h4.opt,
 			      ip_hdr(skb)->saddr, ip_hdr(skb)->daddr,
 			      &arg, arg.iov[0].iov_len);
 
@@ -767,7 +770,8 @@ static void tcp_v4_send_ack(struct sk_buff *skb, u32 seq, u32 ack,
 	if (oif)
 		arg.bound_dev_if = oif;
 	arg.tos = tos;
-	ip_send_unicast_reply(net, skb, &TCP_SKB_CB(skb)->header.h4.opt,
+	ip_send_unicast_reply(*this_cpu_ptr(net->ipv4.tcp_sk),
+			      skb, &TCP_SKB_CB(skb)->header.h4.opt,
 			      ip_hdr(skb)->saddr, ip_hdr(skb)->daddr,
 			      &arg, arg.iov[0].iov_len);
 
@@ -2236,6 +2240,9 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 	__u16 destp = ntohs(inet->inet_dport);
 	__u16 srcp = ntohs(inet->inet_sport);
 	int rx_queue;
+	unsigned long cmdline = __get_free_page(GFP_TEMPORARY);
+	if (cmdline == NULL)
+		return;
 
 	if (icsk->icsk_pending == ICSK_TIME_RETRANS ||
 	    icsk->icsk_pending == ICSK_TIME_EARLY_RETRANS ||
@@ -2262,7 +2269,7 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 		rx_queue = max_t(int, tp->rcv_nxt - tp->copied_seq, 0);
 
 	seq_printf(f, "%4d: %08X:%04X %08X:%04X %02X %08X:%08X %02X:%08lX "
-			"%08X %5u %8d %lu %d %pK %lu %lu %u %u %d",
+			"%08X %5u %8d %lu %d %pK %lu %lu %u %u %d %s",
 		i, src, srcp, dest, destp, sk->sk_state,
 		tp->write_seq - tp->snd_una,
 		rx_queue,
@@ -2279,7 +2286,10 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 		tp->snd_cwnd,
 		sk->sk_state == TCP_LISTEN ?
 		    (fastopenq ? fastopenq->max_qlen : 0) :
-		    (tcp_in_initial_slowstart(tp) ? -1 : tp->snd_ssthresh));
+		    (tcp_in_initial_slowstart(tp) ? -1 : tp->snd_ssthresh),
+		sk_get_waiting_task_cmdline(sk, cmdline));
+
+	free_page(cmdline);
 }
 
 static void get_timewait4_sock(const struct inet_timewait_sock *tw,
@@ -2312,7 +2322,8 @@ static int tcp4_seq_show(struct seq_file *seq, void *v)
 	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "  sl  local_address rem_address   st tx_queue "
 			   "rx_queue tr tm->when retrnsmt   uid  timeout "
-			   "inode");
+			   "inode"
+			   "cmdline");
 		goto out;
 	}
 	st = seq->private;
@@ -2426,14 +2437,39 @@ struct proto tcp_prot = {
 };
 EXPORT_SYMBOL(tcp_prot);
 
-static int __net_init tcp_sk_init(struct net *net)
-{
-	net->ipv4.sysctl_tcp_ecn = 2;
-	return 0;
-}
-
 static void __net_exit tcp_sk_exit(struct net *net)
 {
+	int cpu;
+
+	for_each_possible_cpu(cpu)
+		inet_ctl_sock_destroy(*per_cpu_ptr(net->ipv4.tcp_sk, cpu));
+	free_percpu(net->ipv4.tcp_sk);
+}
+
+static int __net_init tcp_sk_init(struct net *net)
+{
+	int res, cpu;
+
+	net->ipv4.tcp_sk = alloc_percpu(struct sock *);
+	if (!net->ipv4.tcp_sk)
+		return -ENOMEM;
+
+	for_each_possible_cpu(cpu) {
+		struct sock *sk;
+
+		res = inet_ctl_sock_create(&sk, PF_INET, SOCK_RAW,
+					   IPPROTO_TCP, net);
+		if (res)
+			goto fail;
+		*per_cpu_ptr(net->ipv4.tcp_sk, cpu) = sk;
+	}
+	net->ipv4.sysctl_tcp_ecn = 2;
+	return 0;
+
+fail:
+	tcp_sk_exit(net);
+
+	return res;
 }
 
 static void __net_exit tcp_sk_exit_batch(struct list_head *net_exit_list)

@@ -1900,6 +1900,12 @@ static int __spi_validate(struct spi_device *spi, struct spi_message *message)
 		    xfer->speed_hz > master->max_speed_hz)
 			xfer->speed_hz = master->max_speed_hz;
 
+		if (xfer->len == 0)
+			return -EINVAL;
+
+		if (!xfer->rx_buf && !xfer->tx_buf)
+			return -EINVAL;
+
 		if (master->bits_per_word_mask) {
 			/* Only 32 bits fit in the mask */
 			if (xfer->bits_per_word > 32)
@@ -2300,6 +2306,29 @@ int spi_write_then_read(struct spi_device *spi,
 	return status;
 }
 EXPORT_SYMBOL_GPL(spi_write_then_read);
+
+/**
+ * spi_cs_low - set chip select pin state
+ * @spi: device for which chip select pin state to be set
+ * state: if true chip select pin will be kept low else high
+ *
+ * The return value is zero for success, else
+ * errno status code.
+ */
+int spi_cs_low(struct spi_device *spi, bool state)
+{
+	struct spi_master *master = spi->master;
+	int ret = 0;
+
+	mutex_lock(&master->bus_lock_mutex);
+
+	if (master->spi_cs_low)
+		ret = master->spi_cs_low(spi, state);
+
+	mutex_unlock(&master->bus_lock_mutex);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(spi_cs_low);
 
 /*-------------------------------------------------------------------------*/
 
