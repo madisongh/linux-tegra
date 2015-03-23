@@ -338,13 +338,15 @@ int __init norrin_soctherm_init(void)
 	cp_rev = tegra_fuse_calib_base_get_cp(NULL, NULL);
 	ft_rev = tegra_fuse_calib_base_get_ft(NULL, NULL);
 
-	if (cp_rev) {
+	pr_info("FUSE: cp_rev %d ft_rev %d\n", cp_rev, ft_rev);
+	if (cp_rev && board_info.board_id != BOARD_PM375) {
 		/* ATE rev is Old or Mid - use PLLx sensor only */
 		norrin_soctherm_data.therm[THERM_CPU] =
 			norrin_v1_soctherm_data.therm[THERM_CPU];
 		norrin_soctherm_data.therm[THERM_PLL] =
 			norrin_v1_soctherm_data.therm[THERM_PLL];
-		therm_cpu = THERM_PLL; /* override CPU with PLL zone */
+		therm_cpu = THERM_PLL;
+		/* override CPU with PLL zone */
 	}
 
 	/* do this only for supported CP,FT fuses */
