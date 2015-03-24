@@ -65,6 +65,8 @@
 #define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT		24
 #define SDHCI_VNDR_CLK_CTRL_SDR50_TUNING		0x20
 #define SDHCI_VNDR_CLK_CTRL_INTERNAL_CLK		0x2
+#define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK		0xFF
+#define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK		0x1F
 
 #define SDHCI_VNDR_MISC_CTRL				0x120
 #define SDHCI_VNDR_MISC_CTRL_ENABLE_SDR104_SUPPORT	0x8
@@ -99,6 +101,14 @@
 #define SDMMC_AUTO_CAL_STATUS_AUTO_CAL_ACTIVE	0x80000000
 #define SDMMC_AUTO_CAL_STATUS_PULLDOWN_OFFSET	24
 #define PULLUP_ADJUSTMENT_OFFSET	20
+
+#define SDMMC_VENDOR_ERR_INTR_STATUS_0	0x108
+
+#define SDMMC_IO_SPARE_0	0x1F0
+#define SPARE_OUT_3_OFFSET	19
+
+#define SDMMC_VENDOR_IO_TRIM_CNTRL_0	0x1AC
+#define SDMMC_VENDOR_IO_TRIM_CNTRL_0_SEL_VREG_MASK	0x4
 
 /* Erratum: Version register is invalid in HW */
 #define NVQUIRK_FORCE_SDHCI_SPEC_200		BIT(0)
@@ -147,7 +157,23 @@
 #define NVQUIRK_HIGH_FREQ_TAP_PROCEDURE		BIT(22)
 /* Disable SDMMC3 external loopback */
 #define NVQUIRK_DISABLE_EXTERNAL_LOOPBACK	BIT(23)
-#define NVQUIRK_TMP_VAR_1_5_TAP_MARGIN		BIT(24)
+/* Select fix tap hole margins */
+#define NVQUIRK_SELECT_FIXED_TAP_HOLE_MARGINS	BIT(24)
+/* Enable HS400 mode */
+#define NVQUIRK_ENABLE_HS400			BIT(26)
+/* Enable AUTO CMD23 */
+#define NVQUIRK_ENABLE_AUTO_CMD23		BIT(27)
+#define NVQUIRK_SET_SDMEMCOMP_VREF_SEL		BIT(28)
+/* Special PAD control register settings are needed for T210 */
+#define NVQUIRK_UPDATE_PAD_CNTRL_REG		BIT(29)
+#define NVQUIRK_UPDATE_PIN_CNTRL_REG		BIT(30)
+/* Use timeout clk for write crc status data timeout counter */
+#define NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT	BIT(31)
+
+/* Enable T210 specific SDMMC WAR - sd card voltage switch */
+#define NVQUIRK2_CONFIG_PWR_DET			BIT(0)
+/* Enable T210 specific SDMMC WAR - Tuning Step Size, Tuning Iterations*/
+#define NVQUIRK2_UPDATE_HW_TUNING_CONFG		BIT(1)
 
 /* Common subset of quirks for Tegra3 and later sdmmc controllers */
 #define TEGRA_SDHCI_NVQUIRKS	(NVQUIRK_ENABLE_PADPIPE_CLKEN | \
@@ -228,8 +254,10 @@ struct sdhci_tegra_soc_data {
 	unsigned int tuning_freq_list[TUNING_FREQ_COUNT];
 	u8 t2t_coeffs_count;
 	u8 tap_hole_coeffs_count;
+	u8 tap_hole_margins_count;
 	struct tuning_t2t_coeffs *t2t_coeffs;
 	struct tap_hole_coeffs *tap_hole_coeffs;
+	struct tuning_tap_hole_margins *tap_hole_margins;
 };
 
 
@@ -369,6 +397,23 @@ struct tap_hole_coeffs t12x_tap_hole_coeffs[] = {
 		255734,	1164,	178691),
 	SET_TAP_HOLE_COEFFS("sdhci-tegra.0",	81600,	2916,	331143,	2916,
 		331143,	1480,	232373),
+};
+
+struct tuning_tap_hole_margins {
+	const char *dev_id;
+	unsigned int tap_hole_margin;
+};
+
+#define SET_TUNING_TAP_HOLE_MARGIN(_device_id, _tap_hole_margin) \
+	{						\
+		.dev_id = _device_id,			\
+		.tap_hole_margin = _tap_hole_margin,	\
+	}
+
+struct tuning_tap_hole_margins t12x_automotive_tap_hole_margins[] = {
+	SET_TUNING_TAP_HOLE_MARGIN("sdhci-tegra.3", 13),
+	SET_TUNING_TAP_HOLE_MARGIN("sdhci-tegra.2", 7),
+	SET_TUNING_TAP_HOLE_MARGIN("sdhci-tegra.0", 10),
 };
 
 struct freq_tuning_constraints {
@@ -566,6 +611,8 @@ static void sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 	unsigned int trim_delay);
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	unsigned char signal_voltage);
+static int get_tuning_tap_hole_margins(struct sdhci_host *sdhci,
+		int t2t_tuning_value);
 
 static int show_error_stats_dump(struct seq_file *s, void *data)
 {
@@ -1005,7 +1052,7 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		if (plat->ddr_trim_delay != -1) {
 			trim_delay = plat->ddr_trim_delay;
 			vndr_ctrl = sdhci_readl(host, SDHCI_VNDR_CLK_CTRL);
-			vndr_ctrl &= ~(0x1F <<
+			vndr_ctrl &= ~(SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK <<
 				SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
 			vndr_ctrl |= (trim_delay <<
 				SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
@@ -1027,7 +1074,7 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		best_tap_value = tegra_host->plat->tap_delay;
 	}
 	vndr_ctrl = sdhci_readl(host, SDHCI_VNDR_CLK_CTRL);
-	vndr_ctrl &= ~(0xFF <<
+	vndr_ctrl &= ~(SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK <<
 		SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
 	vndr_ctrl |= (best_tap_value <<
 		SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
@@ -1161,13 +1208,14 @@ static void tegra_sdhci_reset_exit(struct sdhci_host *host, u8 mask)
 		} else {
 			best_tap_value = tegra_host->plat->tap_delay;
 		}
-		vendor_ctrl &= ~(0xFF << SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
+		vendor_ctrl &= ~(SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK <<
+				SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
 		vendor_ctrl |= (best_tap_value <<
 			SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
 	}
 
 	if (soc_data->nvquirks & NVQUIRK_SET_TRIM_DELAY) {
-		vendor_ctrl &= ~(0x1F <<
+		vendor_ctrl &= ~(SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK <<
 		SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
 		vendor_ctrl |= (plat->trim_delay <<
 		SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
@@ -1710,7 +1758,8 @@ static void sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 	}
 
 	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
-	vendor_ctrl &= ~(0xFF << SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
+	vendor_ctrl &= ~(SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK <<
+			SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
 	vendor_ctrl |= (tap_delay << SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
 	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 }
@@ -1721,7 +1770,8 @@ static void sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 	u32 vendor_ctrl;
 
 	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
-	vendor_ctrl &= ~(0x1F << SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
+	vendor_ctrl &= ~(SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK <<
+			SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
 	vendor_ctrl |= (trim_delay << SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
 	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 }
@@ -1866,9 +1916,7 @@ static int slide_window_start(struct sdhci_host *sdhci,
 	struct tegra_tuning_data *tuning_data,
 	int tap_value, enum tap_win_edge_attr edge_attr, int tap_hole)
 {
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
-	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+	int tap_margin = 0;
 
 	if (edge_attr == WIN_EDGE_BOUN_START) {
 		if (tap_value < 0)
@@ -1876,12 +1924,11 @@ static int slide_window_start(struct sdhci_host *sdhci,
 		else
 			tap_value += (1000 / tuning_data->calc_values.t2t_vmax);
 	} else if (edge_attr == WIN_EDGE_HOLE) {
-		if (soc_data->nvquirks & NVQUIRK_TMP_VAR_1_5_TAP_MARGIN)
-			tap_value += ((7 * tap_hole) / 100) + 2;
-		else
-			tap_value += ((7 * tap_hole) / 100) +
-			(((2 * (450 / tuning_data->calc_values.t2t_vmax))
-			+ 1) / 2);
+		if (tap_hole >= 0) {
+			tap_margin = get_tuning_tap_hole_margins(sdhci,
+					tuning_data->calc_values.t2t_vmax);
+			tap_value += ((7 * tap_hole) / 100) + tap_margin;
+		}
 	}
 
 	if (tap_value > MAX_TAP_VALUES)
@@ -1894,25 +1941,20 @@ static int slide_window_end(struct sdhci_host *sdhci,
 	struct tegra_tuning_data *tuning_data,
 	int tap_value, enum tap_win_edge_attr edge_attr, int tap_hole)
 {
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
-	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+	int tap_margin = 0;
 
 	if (edge_attr == WIN_EDGE_BOUN_END) {
 		tap_value = (tap_value * tuning_data->calc_values.t2t_vmax) /
 			tuning_data->calc_values.t2t_vmin;
 		tap_value -= (1000 / tuning_data->calc_values.t2t_vmin);
 	} else if (edge_attr == WIN_EDGE_HOLE) {
-		if (tap_hole > 0)
+		if (tap_hole >= 0) {
 			tap_value = tap_hole;
-		if (soc_data->nvquirks & NVQUIRK_TMP_VAR_1_5_TAP_MARGIN)
-			tap_value -= ((7 * tap_hole) / 100) + 2;
-		else
-			tap_value -= ((7 * tap_hole) / 100) +
-			(((2 * (450 / tuning_data->calc_values.t2t_vmin))
-			+ 1) / 2);
+			tap_margin = get_tuning_tap_hole_margins(sdhci,
+					tuning_data->calc_values.t2t_vmin);
+		}
+		tap_value -= ((7 * tap_hole) / 100) + tap_margin;
 	}
-
 	return tap_value;
 }
 
@@ -2793,6 +2835,39 @@ static u8 sdhci_tegra_get_freq_point(struct sdhci_host *sdhci)
 			return i;
 
 	return TUNING_MAX_FREQ;
+}
+
+static int get_tuning_tap_hole_margins(struct sdhci_host *sdhci,
+		int t2t_tuning_value)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+	struct tuning_tap_hole_margins *tap_hole;
+	const char *dev_id;
+	int i;
+	int tap_margin = 0;
+
+	if (soc_data->nvquirks & NVQUIRK_SELECT_FIXED_TAP_HOLE_MARGINS)  {
+		if (soc_data->tap_hole_margins) {
+			tap_hole = soc_data->tap_hole_margins;
+			dev_id = dev_name(mmc_dev(sdhci->mmc));
+			for (i = 0; i < soc_data->tap_hole_margins_count; i++) {
+				if (!strcmp(dev_id, tap_hole->dev_id))
+					return tap_hole->tap_hole_margin;
+				tap_hole++;
+			}
+		} else {
+			dev_info(mmc_dev(sdhci->mmc),
+				"Fixed tap hole margins missing\n");
+		}
+	}
+
+	/* if no margin are available calculate tap margin */
+	tap_margin = (((2 * (450 / t2t_tuning_value)) +
+			1) / 2);
+
+	return tap_margin;
 }
 
 /*
