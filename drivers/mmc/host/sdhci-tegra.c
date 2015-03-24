@@ -1927,6 +1927,9 @@ static int slide_window_start(struct sdhci_host *sdhci,
 	struct tegra_tuning_data *tuning_data,
 	int tap_value, enum tap_win_edge_attr edge_attr, int tap_hole)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	int tap_margin = 0;
 
 	if (edge_attr == WIN_EDGE_BOUN_START) {
@@ -1936,8 +1939,12 @@ static int slide_window_start(struct sdhci_host *sdhci,
 			tap_value += (1000 / tuning_data->calc_values.t2t_vmax);
 	} else if (edge_attr == WIN_EDGE_HOLE) {
 		if (tap_hole >= 0) {
-			tap_margin = get_tuning_tap_hole_margins(sdhci,
-					tuning_data->calc_values.t2t_vmax);
+			if (soc_data->nvquirks & NVQUIRK_TMP_VAR_1_5_TAP_MARGIN)
+				tap_margin = 2;
+			else
+				tap_margin = (((2 * (450 /
+					tuning_data->calc_values.t2t_vmax)) +
+					1) / 2);
 			tap_value += ((7 * tap_hole) / 100) + tap_margin;
 		}
 	}
@@ -1952,6 +1959,9 @@ static int slide_window_end(struct sdhci_host *sdhci,
 	struct tegra_tuning_data *tuning_data,
 	int tap_value, enum tap_win_edge_attr edge_attr, int tap_hole)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	int tap_margin = 0;
 
 	if (edge_attr == WIN_EDGE_BOUN_END) {
@@ -1961,8 +1971,12 @@ static int slide_window_end(struct sdhci_host *sdhci,
 	} else if (edge_attr == WIN_EDGE_HOLE) {
 		if (tap_hole >= 0) {
 			tap_value = tap_hole;
-			tap_margin = get_tuning_tap_hole_margins(sdhci,
-					tuning_data->calc_values.t2t_vmin);
+			if (soc_data->nvquirks & NVQUIRK_TMP_VAR_1_5_TAP_MARGIN)
+				tap_margin = 2;
+			else
+				tap_margin = (((2 * (450 /
+					tuning_data->calc_values.t2t_vmin)) +
+					1) / 2);
 		}
 		tap_value -= ((7 * tap_hole) / 100) + tap_margin;
 	}
@@ -1974,8 +1988,8 @@ static int adjust_window_boundaries(struct sdhci_host *sdhci,
 	struct tap_window_data *temp_tap_data)
 {
 	struct tap_window_data *tap_data;
-	int vmin_tap_hole = 0;
-	int vmax_tap_hole = 0;
+	int vmin_tap_hole = -1;
+	int vmax_tap_hole = -1;
 	u8 i = 0;
 
 	for (i = 0; i < tuning_data->num_of_valid_tap_wins; i++) {
