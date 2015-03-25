@@ -469,7 +469,7 @@ static int init_cpu_edp_limits_calculated(void)
 		     temp_idx < ARRAY_SIZE(temperatures); temp_idx++) {
 			cpu_edp_calculated_limits[temp_idx].temperature =
 				temperatures[temp_idx];
-			if (temperatures[temp_idx] >= 70 &&
+			if (temperatures[temp_idx] >= 76 &&
 					tegra_cpu_speedo_id() == 8)
 				limit = 1836000;
 			else

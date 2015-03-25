@@ -224,7 +224,7 @@ static struct soctherm_platform_data norrin_soctherm_data = {
 			.trips = {
 				{
 					.cdev_type = "tegra-shutdown",
-					.trip_temp = 101000,
+					.trip_temp = 105000,
 					.trip_type = THERMAL_TRIP_CRITICAL,
 					.upper = THERMAL_NO_LIMIT,
 					.lower = THERMAL_NO_LIMIT,
@@ -252,7 +252,7 @@ static struct soctherm_platform_data norrin_soctherm_data = {
 			.trips = {
 				{
 					.cdev_type = "tegra-shutdown",
-					.trip_temp = 101000, /* = GPU shut */
+					.trip_temp = 105000, /* = GPU shut */
 					.trip_type = THERMAL_TRIP_CRITICAL,
 					.upper = THERMAL_NO_LIMIT,
 					.lower = THERMAL_NO_LIMIT,
