@@ -200,6 +200,8 @@ static int tegra_mselect_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	dev_set_drvdata(&pdev->dev, msel);
+
 	ret = tegra_mselect_irq_init(pdev, msel);
 	if (ret)
 		return ret;
@@ -208,7 +210,6 @@ static int tegra_mselect_probe(struct platform_device *pdev)
 
 	dev_notice(&pdev->dev, "probed\n");
 
-	dev_set_drvdata(&pdev->dev, msel);
 	return 0;
 }
 
