@@ -9091,7 +9091,7 @@ static struct clk tegra_clk_hda2codec_2x = {
 	.clk_id = TEGRA210_CLK_ID_HDA2CODEC_2X,
 	.lookup = {
 		.dev_id = "tegra30-hda",
-		.con_id = "hda2codec",
+		.con_id = "hda2codec_2x",
 	},
 	.ops = &tegra_periph_clk_ops,
 	.u.periph = {
