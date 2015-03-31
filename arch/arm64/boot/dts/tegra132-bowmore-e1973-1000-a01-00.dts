@@ -25,6 +25,7 @@
 #include "tegra124-platforms/tegra124-ardbeg-power-tree-e1733-1000-a00.dtsi"
 #include "tegra132-platforms/tegra132-bowmore-sensor-e1934-1000-a00.dtsi"
 #include "tegra132-platforms/tegra132-bowmore-camera-a00.dtsi"
+#include "tegra132-platforms/tegra132-sdhci.dtsi"
 #include "panel-a-wuxga-8-0.dtsi"
 #include "panel-p-wuxga-10-1.dtsi"
 #include "tegra124-platforms/tegra124-ardbeg-hdmi-e1780-1000-a00.dtsi"
@@ -244,4 +245,17 @@
 		compatible = "pwm-backlight";
 		status = "okay";
 	};
+
+	sdhci@700b0600 {
+		status = "okay";
+	};
+
+	sdhci@700b0400 {
+		status = "okay";
+	};
+
+	sdhci@700b0000 {
+		status = "okay";
+	};
+
 };
