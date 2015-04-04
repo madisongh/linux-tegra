@@ -444,9 +444,13 @@ static int __init tegra_init_pd(struct device_node *np)
 	pm_genpd_init(gpd, &simple_qos_governor, is_off);
 	pm_genpd_set_poweroff_delay(gpd, 3000);
 	of_genpd_add_provider_simple(np, gpd);
+
+#warning genpd_pm_subdomain_attach does not work with upstream
+#if 0
 	gpd->of_node = of_node_get(np);
 
 	genpd_pm_subdomain_attach(gpd);
+#endif
 	return 0;
 }
 
@@ -469,7 +473,9 @@ void tegra_pd_add_device(struct device *dev)
 {
 	device_set_wakeup_capable(dev, 1);
 	pm_genpd_dev_need_save(dev, false);
+#if 0
 	pm_genpd_add_callbacks(dev, &tegra_pd_ops, NULL);
+#endif
 }
 EXPORT_SYMBOL(tegra_pd_add_device);
 
@@ -493,19 +499,25 @@ EXPORT_SYMBOL(tegra_pd_remove_device);
 
 void tegra_pd_add_sd(struct generic_pm_domain *sd)
 {
+#warning genpd_pm_subdomain_attach does not work with upstream
+#if 0
 	int ret;
 	ret = genpd_pm_subdomain_attach(sd);
 	if (ret)
 		pr_err("Failure to add %s domain\n", sd->name);
+#endif
 }
 EXPORT_SYMBOL(tegra_pd_add_sd);
 
 void tegra_pd_remove_sd(struct generic_pm_domain *sd)
 {
+#warning genpd_pm_subdomain_attach does not work with upstream
+#if 0
 	int ret;
 	ret = genpd_pm_subdomain_detach(sd);
 	if (ret)
 		pr_err("Failure to remove %s domain\n", sd->name);
+#endif
 }
 EXPORT_SYMBOL(tegra_pd_remove_sd);
 
