@@ -531,6 +531,13 @@ config REGULATOR_QCOM_RPM
 	  Qualcomm RPM as a module. The module will be named
 	  "qcom_rpm-regulator".
 
+config REGULATOR_PINMUX_FIXED
+	tristate "Pinmux based fixed voltage regulator support"
+	help
+	  This driver provides support for fixed voltage regulators
+	  based on pinmux state. The regulator can be controlled by
+	  changign the pimux states.
+
 config REGULATOR_PWM
 	tristate "PWM based voltage regulator support"
 	depends on PWM
@@ -687,6 +694,14 @@ config REGULATOR_TPS65090
 	help
 	  This driver provides support for the voltage regulators on the
 	  TI TPS65090 PMIC.
+
+config REGULATOR_TPS65132
+	tristate "TI TPS65132 Dual Output Power regulators"
+	depends on I2C && GPIOLIB
+	select REGMAP_I2C
+	help
+	  This driver supports TPS65132 single inductor - dual output
+	  power supply specifcally designed for display panels.
 
 config REGULATOR_TPS65217
 	tristate "TI TPS65217 Power regulators"

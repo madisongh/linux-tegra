@@ -238,12 +238,14 @@ void fence_enable_sw_signaling(struct fence *fence);
  * This function requires fence->lock to be held.
  */
 static inline bool
-fence_is_signaled_locked(struct fence *fence)
+fence_is_signaled_locked(struct fence *fence, u64 timestamp)
 {
 	if (test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags))
 		return true;
 
 	if (fence->ops->signaled && fence->ops->signaled(fence)) {
+		if (timestamp)
+			fence->timestamp = ns_to_ktime(timestamp);
 		fence_signal_locked(fence);
 		return true;
 	}

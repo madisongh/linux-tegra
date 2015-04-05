@@ -3,7 +3,7 @@
  *
  * arch/arm64/boot/dts/tegra210-ers-e2190-1100-a00-00.dts
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,16 +25,20 @@
 /memreserve/ 0x80000000 0x00020000;
 
 #include "tegra210-common.dtsi"
-#include "tegra210-platforms/tegra210-ers-extgpio-e2141-1100-a00.dtsi"
+#include "tegra210-platforms/tegra210-ers-extgpio-e2220-1170-a00.dtsi"
 #include "tegra210-platforms/tegra210-ers-power-tree-e2174-1101-a00.dtsi"
 #include "tegra210-platforms/tegra210-ers-sensor-e2160-1000-a00.dtsi"
 #include "tegra210-platforms/tegra210-ers-gpio-e2190-1100-a00.dtsi"
 #include "tegra210-platforms/tegra210-ers-pinmux-e2190-1100-a00.dtsi"
 #include "tegra210-platforms/tegra210-comms.dtsi"
 #include "tegra210-platforms/tegra210-sdhci.dtsi"
+#include "tegra210-platforms/tegra210-audio.dtsi"
 #include "panel-a-wuxga-8-0.dtsi"
 #include "tegra210-platforms/tegra210-ers-hdmi-e2190-1100-a00.dtsi"
-#include "tegra210-platforms/tegra210-ers-keys-e2141-1100-a00.dtsi"
+#include "tegra210-platforms/tegra210-ers-keys-e2220-1170-a00.dtsi"
+#include "tegra210-platforms/tegra210-edp.dtsi"
+#include "tegra210-platforms/tegra210-ers-thermal-nct72-e2220-1170-a00.dtsi"
+#include "tegra210-platforms/tegra210-thermal-Tboard-Tdiode.dtsi"
 
 / {
 	model = "e2190";
@@ -126,6 +130,8 @@
 		pinctrl-1 = <&sdmmc1_schmitt_disable_state>;
 		pinctrl-2 = <&sdmmc1_clk_schmitt_enable_state>;
 		pinctrl-3 = <&sdmmc1_clk_schmitt_disable_state>;
+		nvidia,sd-device;
+		wp-gpios = <&gpio TEGRA_GPIO_PZ3 0>;
 		status = "okay";
 	};
 
@@ -278,6 +284,12 @@
 			thermal-sensors = <&gpu_max77621_reg>;
 			status = "okay";
 		};
+		Tboard_tegra {
+			status = "okay";
+		};
+		Tdiode_tegra {
+			status = "okay";
+		};
 	};
 
         sata@70020000 {
@@ -335,6 +347,11 @@
 		vdd-gpu-rail-max77621@3 {
 			status = "okay";
 		};
+	};
+
+	cpuidle {
+		vdd-cpu-supply = <&cpu_max77621_reg>;
+		cc4-microvolt = <606250>;
 	};
 
 	spi@7000da00 {

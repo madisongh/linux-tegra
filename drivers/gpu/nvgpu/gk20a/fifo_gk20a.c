@@ -1,7 +1,7 @@
 /*
  * GK20A Graphics FIFO (gr host)
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -145,6 +145,9 @@ u32 gk20a_fifo_engine_interrupt_mask(struct gk20a *g)
 
 	for (i = 0; i < g->fifo.max_engines; i++) {
 		u32 intr_id = g->fifo.engine_info[i].intr_id;
+		if (i == ENGINE_CE2_GK20A &&
+			(!g->ops.ce2.isr_stall || !g->ops.ce2.isr_nonstall))
+			continue;
 
 		if (intr_id)
 			eng_intr_mask |= BIT(intr_id);
@@ -156,7 +159,6 @@ u32 gk20a_fifo_engine_interrupt_mask(struct gk20a *g)
 static void gk20a_remove_fifo_support(struct fifo_gk20a *f)
 {
 	struct gk20a *g = f->g;
-	struct device *d = dev_from_gk20a(g);
 	struct fifo_engine_info_gk20a *engine_info;
 	struct fifo_runlist_info_gk20a *runlist;
 	u32 runlist_id;
@@ -172,36 +174,14 @@ static void gk20a_remove_fifo_support(struct fifo_gk20a *f)
 		}
 		kfree(f->channel);
 	}
-	if (f->userd.gpu_va)
-		gk20a_gmmu_unmap(&g->mm.bar1.vm,
-				f->userd.gpu_va,
-				f->userd.size,
-				gk20a_mem_flag_none);
-
-	if (f->userd.sgt)
-		gk20a_free_sgtable(&f->userd.sgt);
-
-	if (f->userd.cpuva)
-		dma_free_coherent(d,
-				f->userd_total_size,
-				f->userd.cpuva,
-				f->userd.iova);
-	f->userd.cpuva = NULL;
-	f->userd.iova = 0;
+	gk20a_gmmu_unmap_free(&g->mm.bar1.vm, &f->userd);
 
 	engine_info = f->engine_info + ENGINE_GR_GK20A;
 	runlist_id = engine_info->runlist_id;
 	runlist = &f->runlist_info[runlist_id];
 
-	for (i = 0; i < MAX_RUNLIST_BUFFERS; i++) {
-		if (runlist->mem[i].cpuva)
-			dma_free_coherent(d,
-				runlist->mem[i].size,
-				runlist->mem[i].cpuva,
-				runlist->mem[i].iova);
-		runlist->mem[i].cpuva = NULL;
-		runlist->mem[i].iova = 0;
-	}
+	for (i = 0; i < MAX_RUNLIST_BUFFERS; i++)
+		gk20a_gmmu_free(g, &runlist->mem[i]);
 
 	kfree(runlist->active_channels);
 	kfree(runlist->active_tsgs);
@@ -324,19 +304,11 @@ static int init_runlist(struct gk20a *g, struct fifo_gk20a *f)
 
 	runlist_size  = ram_rl_entry_size_v() * f->num_channels;
 	for (i = 0; i < MAX_RUNLIST_BUFFERS; i++) {
-		dma_addr_t iova;
-
-		runlist->mem[i].cpuva =
-			dma_alloc_coherent(d,
-					runlist_size,
-					&iova,
-					GFP_KERNEL);
-		if (!runlist->mem[i].cpuva) {
+		int err = gk20a_gmmu_alloc(g, runlist_size, &runlist->mem[i]);
+		if (err) {
 			dev_err(d, "memory allocation failed\n");
 			goto clean_up_runlist;
 		}
-		runlist->mem[i].iova = iova;
-		runlist->mem[i].size = runlist_size;
 	}
 	mutex_init(&runlist->mutex);
 
@@ -348,15 +320,8 @@ static int init_runlist(struct gk20a *g, struct fifo_gk20a *f)
 	return 0;
 
 clean_up_runlist:
-	for (i = 0; i < MAX_RUNLIST_BUFFERS; i++) {
-		if (runlist->mem[i].cpuva)
-			dma_free_coherent(d,
-				runlist->mem[i].size,
-				runlist->mem[i].cpuva,
-				runlist->mem[i].iova);
-		runlist->mem[i].cpuva = NULL;
-		runlist->mem[i].iova = 0;
-	}
+	for (i = 0; i < MAX_RUNLIST_BUFFERS; i++)
+		gk20a_gmmu_free(g, &runlist->mem[i]);
 
 	kfree(runlist->active_channels);
 	runlist->active_channels = NULL;
@@ -499,7 +464,6 @@ static int gk20a_init_fifo_setup_sw(struct gk20a *g)
 	struct fifo_gk20a *f = &g->fifo;
 	struct device *d = dev_from_gk20a(g);
 	int chid, i, err = 0;
-	dma_addr_t iova;
 
 	gk20a_dbg_fn("");
 
@@ -518,42 +482,16 @@ static int gk20a_init_fifo_setup_sw(struct gk20a *g)
 	f->max_engines = ENGINE_INVAL_GK20A;
 
 	f->userd_entry_size = 1 << ram_userd_base_shift_v();
-	f->userd_total_size = f->userd_entry_size * f->num_channels;
 
-	f->userd.cpuva = dma_alloc_coherent(d,
-					f->userd_total_size,
-					&iova,
-					GFP_KERNEL);
-	if (!f->userd.cpuva) {
-		dev_err(d, "memory allocation failed\n");
-		err = -ENOMEM;
-		goto clean_up;
-	}
-
-	f->userd.iova = iova;
-	err = gk20a_get_sgtable(d, &f->userd.sgt,
-				f->userd.cpuva, f->userd.iova,
-				f->userd_total_size);
+	err = gk20a_gmmu_alloc_map(&g->mm.bar1.vm,
+				   f->userd_entry_size * f->num_channels,
+				   &f->userd);
 	if (err) {
-		dev_err(d, "failed to create sg table\n");
-		goto clean_up;
-	}
-
-	/* bar1 va */
-	f->userd.gpu_va = gk20a_gmmu_map(&g->mm.bar1.vm,
-					&f->userd.sgt,
-					f->userd_total_size,
-					0, /* flags */
-					gk20a_mem_flag_none);
-	if (!f->userd.gpu_va) {
-		dev_err(d, "gmmu mapping failed\n");
-		err = -ENOMEM;
+		dev_err(d, "memory allocation failed\n");
 		goto clean_up;
 	}
 
 	gk20a_dbg(gpu_dbg_map, "userd bar1 va = 0x%llx", f->userd.gpu_va);
-
-	f->userd.size = f->userd_total_size;
 
 	f->channel = kzalloc(f->num_channels * sizeof(*f->channel),
 				GFP_KERNEL);
@@ -579,9 +517,9 @@ static int gk20a_init_fifo_setup_sw(struct gk20a *g)
 
 	for (chid = 0; chid < f->num_channels; chid++) {
 		f->channel[chid].userd_cpu_va =
-			f->userd.cpuva + chid * f->userd_entry_size;
+			f->userd.cpu_va + chid * f->userd_entry_size;
 		f->channel[chid].userd_iova =
-			gk20a_mm_smmu_vaddr_translate(g, f->userd.iova)
+			g->ops.mm.get_iova_addr(g, f->userd.sgt->sgl, 0)
 				+ chid * f->userd_entry_size;
 		f->channel[chid].userd_gpu_va =
 			f->userd.gpu_va + chid * f->userd_entry_size;
@@ -604,22 +542,7 @@ static int gk20a_init_fifo_setup_sw(struct gk20a *g)
 
 clean_up:
 	gk20a_dbg_fn("fail");
-	if (f->userd.gpu_va)
-		gk20a_gmmu_unmap(&g->mm.bar1.vm,
-					f->userd.gpu_va,
-					f->userd.size,
-					gk20a_mem_flag_none);
-	if (f->userd.sgt)
-		gk20a_free_sgtable(&f->userd.sgt);
-	if (f->userd.cpuva)
-		dma_free_coherent(d,
-				f->userd_total_size,
-				f->userd.cpuva,
-				f->userd.iova);
-	f->userd.cpuva = NULL;
-	f->userd.iova = 0;
-
-	memset(&f->userd, 0, sizeof(struct userd_desc));
+	gk20a_gmmu_unmap_free(&g->mm.bar1.vm, &f->userd);
 
 	kfree(f->channel);
 	f->channel = NULL;
@@ -654,7 +577,7 @@ static int gk20a_init_fifo_setup_hw(struct gk20a *g)
 		u32 v, v1 = 0x33, v2 = 0x55;
 
 		u32 bar1_vaddr = f->userd.gpu_va;
-		volatile u32 *cpu_vaddr = f->userd.cpuva;
+		volatile u32 *cpu_vaddr = f->userd.cpu_va;
 
 		gk20a_dbg_info("test bar1 @ vaddr 0x%x",
 			   bar1_vaddr);
@@ -722,8 +645,8 @@ channel_from_inst_ptr(struct fifo_gk20a *f, u64 inst_ptr)
 		return NULL;
 	for (ci = 0; ci < f->num_channels; ci++) {
 		struct channel_gk20a *c = f->channel+ci;
-		if (c->inst_block.cpuva &&
-		    (inst_ptr == c->inst_block.cpu_pa))
+		if (c->inst_block.cpu_va &&
+		    (inst_ptr == gk20a_mem_phys(&c->inst_block)))
 			return f->channel+ci;
 	}
 	return NULL;
@@ -827,11 +750,14 @@ static inline void get_exception_mmu_fault_info(
 	f->inst_ptr <<= fifo_intr_mmu_fault_inst_ptr_align_shift_v();
 }
 
-static void gk20a_fifo_reset_engine(struct gk20a *g, u32 engine_id)
+void gk20a_fifo_reset_engine(struct gk20a *g, u32 engine_id)
 {
 	gk20a_dbg_fn("");
 
 	if (engine_id == top_device_info_type_enum_graphics_v()) {
+		/*HALT_PIPELINE method, halt GR engine*/
+		if (gr_gk20a_halt_pipe(g))
+			gk20a_err(dev_from_gk20a(g), "failed to HALT gr pipe");
 		/* resetting engine using mc_enable_r() is not enough,
 		 * we do full init sequence */
 		gk20a_gr_reset(g);
@@ -875,34 +801,6 @@ static bool gk20a_fifo_should_defer_engine_reset(struct gk20a *g, u32 engine_id,
 		return false;
 
 	return true;
-}
-
-void fifo_gk20a_finish_mmu_fault_handling(struct gk20a *g,
-		unsigned long fault_id) {
-	u32 engine_mmu_id;
-
-	/* reset engines */
-	for_each_set_bit(engine_mmu_id, &fault_id, 32) {
-		u32 engine_id = gk20a_mmu_id_to_engine_id(engine_mmu_id);
-		if (engine_id != ~0)
-			gk20a_fifo_reset_engine(g, engine_id);
-	}
-
-	/* clear interrupt */
-	gk20a_writel(g, fifo_intr_mmu_fault_id_r(), fault_id);
-
-	/* resume scheduler */
-	gk20a_writel(g, fifo_error_sched_disable_r(),
-		     gk20a_readl(g, fifo_error_sched_disable_r()));
-
-	/* Re-enable fifo access */
-	gk20a_writel(g, gr_gpfifo_ctl_r(),
-		     gr_gpfifo_ctl_access_enabled_f() |
-		     gr_gpfifo_ctl_semaphore_access_enabled_f());
-
-	/* It is safe to enable ELPG again. */
-	if (support_gk20a_pmu(g->dev) && g->elpg_enabled)
-		gk20a_pmu_enable_elpg(g);
 }
 
 static bool gk20a_fifo_set_ctx_mmu_error(struct gk20a *g,
@@ -1083,10 +981,12 @@ static bool gk20a_fifo_handle_mmu_fault(struct gk20a *g)
 
 			/* handled during channel free */
 			g->fifo.deferred_reset_pending = true;
-		}
+		} else if (engine_id != ~0)
+			gk20a_fifo_reset_engine(g, engine_id);
 
 		/* disable the channel/TSG from hw and increment
 		 * syncpoints */
+
 		if (tsg) {
 			struct channel_gk20a *ch = NULL;
 			if (!g->fifo.deferred_reset_pending)
@@ -1102,10 +1002,10 @@ static bool gk20a_fifo_handle_mmu_fault(struct gk20a *g)
 					gk20a_fifo_set_ctx_mmu_error_ch(g, ch);
 			gk20a_channel_abort(ch);
 		} else if (f.inst_ptr ==
-				g->mm.bar1.inst_block.cpu_pa) {
+				gk20a_mem_phys(&g->mm.bar1.inst_block)) {
 			gk20a_err(dev_from_gk20a(g), "mmu fault from bar1");
 		} else if (f.inst_ptr ==
-				g->mm.pmu.inst_block.cpu_pa) {
+				gk20a_mem_phys(&g->mm.pmu.inst_block)) {
 			gk20a_err(dev_from_gk20a(g), "mmu fault from pmu");
 		} else
 			gk20a_err(dev_from_gk20a(g), "couldn't locate channel for mmu fault");
@@ -1119,9 +1019,21 @@ static bool gk20a_fifo_handle_mmu_fault(struct gk20a *g)
 		return verbose;
 	}
 
-	/* resetting the engines and clearing the runlists is done in
-	   a separate function to allow deferred reset. */
-	fifo_gk20a_finish_mmu_fault_handling(g, fault_id);
+	/* clear interrupt */
+	gk20a_writel(g, fifo_intr_mmu_fault_id_r(), fault_id);
+
+	/* resume scheduler */
+	gk20a_writel(g, fifo_error_sched_disable_r(),
+		     gk20a_readl(g, fifo_error_sched_disable_r()));
+
+	/* Re-enable fifo access */
+	gk20a_writel(g, gr_gpfifo_ctl_r(),
+		     gr_gpfifo_ctl_access_enabled_f() |
+		     gr_gpfifo_ctl_semaphore_access_enabled_f());
+
+	/* It is safe to enable ELPG again. */
+	if (support_gk20a_pmu(g->dev) && g->elpg_enabled)
+		gk20a_pmu_enable_elpg(g);
 	return verbose;
 }
 
@@ -1151,15 +1063,6 @@ static void gk20a_fifo_trigger_mmu_fault(struct gk20a *g,
 	unsigned long delay = GR_IDLE_CHECK_DEFAULT;
 	unsigned long engine_id;
 	int ret;
-
-	/*
-	 * sched error prevents recovery, and ctxsw error will retrigger
-	 * every 100ms. Disable the sched error to allow recovery.
-	 */
-	gk20a_writel(g, fifo_intr_en_0_r(),
-		     0x7FFFFFFF & ~fifo_intr_en_0_sched_error_m());
-	gk20a_writel(g, fifo_intr_0_r(),
-			fifo_intr_0_sched_error_reset_f());
 
 	/* trigger faults for all bad engines */
 	for_each_set_bit(engine_id, &engine_ids, 32) {
@@ -1194,9 +1097,6 @@ static void gk20a_fifo_trigger_mmu_fault(struct gk20a *g,
 	/* release mmu fault trigger */
 	for_each_set_bit(engine_id, &engine_ids, 32)
 		gk20a_writel(g, fifo_trigger_mmu_fault_r(engine_id), 0);
-
-	/* Re-enable sched error */
-	gk20a_writel(g, fifo_intr_en_0_r(), 0x7FFFFFFF);
 }
 
 static u32 gk20a_fifo_engines_on_id(struct gk20a *g, u32 id, bool is_tsg)
@@ -1272,6 +1172,7 @@ void gk20a_fifo_recover(struct gk20a *g, u32 __engine_ids,
 	unsigned long engine_id, i;
 	unsigned long _engine_ids = __engine_ids;
 	unsigned long engine_ids = 0;
+	u32 val;
 
 	if (verbose)
 		gk20a_debug_dump(g->dev);
@@ -1302,7 +1203,23 @@ void gk20a_fifo_recover(struct gk20a *g, u32 __engine_ids,
 
 	}
 
+	/*
+	 * sched error prevents recovery, and ctxsw error will retrigger
+	 * every 100ms. Disable the sched error to allow recovery.
+	 */
+	val = gk20a_readl(g, fifo_intr_en_0_r());
+	val &= ~(fifo_intr_en_0_sched_error_m() | fifo_intr_en_0_mmu_fault_m());
+	gk20a_writel(g, fifo_intr_en_0_r(), val);
+	gk20a_writel(g, fifo_intr_0_r(),
+			fifo_intr_0_sched_error_reset_f());
+
 	g->ops.fifo.trigger_mmu_fault(g, engine_ids);
+	gk20a_fifo_handle_mmu_fault(g);
+
+	val = gk20a_readl(g, fifo_intr_en_0_r());
+	val |= fifo_intr_en_0_mmu_fault_f(1)
+		| fifo_intr_en_0_sched_error_f(1);
+	gk20a_writel(g, fifo_intr_en_0_r(), val);
 }
 
 int gk20a_fifo_force_reset_ch(struct channel_gk20a *ch, bool verbose)
@@ -1335,10 +1252,10 @@ static bool gk20a_fifo_handle_sched_error(struct gk20a *g)
 	u32 engine_id;
 	int id = -1;
 	bool non_chid = false;
+	bool ret = false;
 
-	/* read and reset the scheduler error register */
+	/* read the scheduler error register */
 	sched_error = gk20a_readl(g, fifo_intr_sched_error_r());
-	gk20a_writel(g, fifo_intr_0_r(), fifo_intr_0_sched_error_reset_f());
 
 	for (engine_id = 0; engine_id < g->fifo.max_engines; engine_id++) {
 		u32 status = gk20a_readl(g, fifo_engine_status_r(engine_id));
@@ -1370,8 +1287,12 @@ static bool gk20a_fifo_handle_sched_error(struct gk20a *g)
 	}
 
 	/* could not find the engine - should never happen */
-	if (unlikely(engine_id >= g->fifo.max_engines))
+	if (unlikely(engine_id >= g->fifo.max_engines)) {
+		gk20a_err(dev_from_gk20a(g), "fifo sched error : 0x%08x, failed to find engine\n",
+			sched_error);
+		ret = false;
 		goto err;
+	}
 
 	if (fifo_intr_sched_error_code_f(sched_error) ==
 			fifo_intr_sched_error_code_ctxsw_timeout_v()) {
@@ -1380,6 +1301,7 @@ static bool gk20a_fifo_handle_sched_error(struct gk20a *g)
 
 		if (non_chid) {
 			gk20a_fifo_recover(g, BIT(engine_id), true);
+			ret = true;
 			goto err;
 		}
 
@@ -1390,22 +1312,26 @@ static bool gk20a_fifo_handle_sched_error(struct gk20a *g)
 			gk20a_err(dev_from_gk20a(g),
 				"fifo sched ctxsw timeout error:"
 				"engine = %u, ch = %d", engine_id, id);
+			gk20a_gr_debug_dump(g->dev);
 			gk20a_fifo_recover(g, BIT(engine_id),
 				ch->timeout_debug_dump);
+			ret = true;
 		} else {
-			gk20a_warn(dev_from_gk20a(g),
+			gk20a_dbg_info(
 				"fifo is waiting for ctx switch for %d ms,"
 				"ch = %d\n",
 				ch->timeout_accumulated_ms,
 				id);
+			ret = false;
 		}
-		return ch->timeout_debug_dump;
+		return ret;
 	}
-err:
-	gk20a_err(dev_from_gk20a(g), "fifo sched error : 0x%08x, engine=%u, %s=%d",
-		   sched_error, engine_id, non_chid ? "non-ch" : "ch", id);
 
-	return true;
+	gk20a_err(dev_from_gk20a(g), "fifo sched error : 0x%08x, engine=%u, %s=%d",
+		sched_error, engine_id, non_chid ? "non-ch" : "ch", id);
+
+err:
+	return ret;
 }
 
 static u32 fifo_error_isr(struct gk20a *g, u32 fifo_intr)
@@ -1457,7 +1383,8 @@ static u32 fifo_error_isr(struct gk20a *g, u32 fifo_intr)
 	if (print_channel_reset_log) {
 		int engine_id;
 		gk20a_err(dev_from_gk20a(g),
-			   "channel reset initated from %s", __func__);
+			   "channel reset initiated from %s; intr=0x%08x",
+			   __func__, fifo_intr);
 		for (engine_id = 0;
 		     engine_id < g->fifo.max_engines;
 		     engine_id++) {
@@ -1895,7 +1822,6 @@ static int gk20a_fifo_update_runlist_locked(struct gk20a *g, u32 runlist_id,
 					    bool wait_for_finish)
 {
 	u32 ret = 0;
-	struct device *d = dev_from_gk20a(g);
 	struct fifo_gk20a *f = &g->fifo;
 	struct fifo_runlist_info_gk20a *runlist = NULL;
 	u32 *runlist_entry_base = NULL;
@@ -1937,15 +1863,15 @@ static int gk20a_fifo_update_runlist_locked(struct gk20a *g, u32 runlist_id,
 	new_buf = !runlist->cur_buffer;
 
 	gk20a_dbg_info("runlist_id : %d, switch to new buffer 0x%16llx",
-		runlist_id, runlist->mem[new_buf].iova);
+		runlist_id, (u64)gk20a_mem_phys(&runlist->mem[new_buf]));
 
-	runlist_pa = gk20a_get_phys_from_iova(d, runlist->mem[new_buf].iova);
+	runlist_pa = gk20a_mem_phys(&runlist->mem[new_buf]);
 	if (!runlist_pa) {
 		ret = -EINVAL;
 		goto clean_up;
 	}
 
-	runlist_entry_base = runlist->mem[new_buf].cpuva;
+	runlist_entry_base = runlist->mem[new_buf].cpu_va;
 	if (!runlist_entry_base) {
 		ret = -ENOMEM;
 		goto clean_up;
@@ -2160,6 +2086,11 @@ static u32 gk20a_fifo_get_num_fifos(struct gk20a *g)
 	return ccsr_channel__size_1_v();
 }
 
+u32 gk20a_fifo_get_pbdma_signature(struct gk20a *g)
+{
+	return pbdma_signature_hw_valid_f() | pbdma_signature_sw_zero_f();
+}
+
 void gk20a_init_fifo(struct gpu_ops *gops)
 {
 	gk20a_init_channel(gops);
@@ -2169,4 +2100,5 @@ void gk20a_init_fifo(struct gpu_ops *gops)
 	gops->fifo.apply_pb_timeout = gk20a_fifo_apply_pb_timeout;
 	gops->fifo.wait_engine_idle = gk20a_fifo_wait_engine_idle;
 	gops->fifo.get_num_fifos = gk20a_fifo_get_num_fifos;
+	gops->fifo.get_pbdma_signature = gk20a_fifo_get_pbdma_signature;
 }

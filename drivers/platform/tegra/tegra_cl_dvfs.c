@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/tegra_cl_dvfs.c
  *
- * Copyright (c) 2012-2014 NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2012-2015 NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -256,6 +256,8 @@ struct tegra_cl_dvfs {
 
 	struct hrtimer			tune_timer;
 	ktime_t				tune_delay;
+	u8				tune_out_last;
+
 	struct timer_list		calibration_timer;
 	unsigned long			calibration_delay;
 	ktime_t				last_calibration;
@@ -837,6 +839,7 @@ static void set_output_limits(struct tegra_cl_dvfs *cld, u8 out_min, u8 out_max)
 static void cl_dvfs_set_force_out_min(struct tegra_cl_dvfs *cld);
 static void set_cl_config(struct tegra_cl_dvfs *cld, struct dfll_rate_req *req)
 {
+	bool sample_tune_out_last = false;
 	u8 cap_gb = CL_DVFS_CAP_GUARD_BAND_STEPS;
 	u8 out_max, out_min;
 	u8 out_cap = get_output_cap(cld, req);
@@ -849,6 +852,7 @@ static void set_cl_config(struct tegra_cl_dvfs *cld, struct dfll_rate_req *req)
 			hrtimer_start(&cld->tune_timer, cld->tune_delay,
 				      HRTIMER_MODE_REL);
 			cl_dvfs_set_force_out_min(cld);
+			sample_tune_out_last = true;
 		}
 		break;
 
@@ -901,6 +905,13 @@ static void set_cl_config(struct tegra_cl_dvfs *cld, struct dfll_rate_req *req)
 	out_max = max(out_max, cld->force_out_min);
 
 	set_output_limits(cld, out_min, out_max);
+
+	/* Must be sampled after new out_min is set */
+	if (sample_tune_out_last && is_i2c(cld)) {
+		u32 val = cl_dvfs_readl(cld, CL_DVFS_I2C_STS);
+		cld->tune_out_last =
+			(val >> CL_DVFS_I2C_STS_I2C_LAST_SHIFT) & OUT_MASK;
+	}
 }
 
 static void set_ol_config(struct tegra_cl_dvfs *cld)
@@ -948,7 +959,23 @@ static enum hrtimer_restart tune_timer_cb(struct hrtimer *timer)
 			(val >> CL_DVFS_I2C_STS_I2C_LAST_SHIFT) & OUT_MASK :
 			out_min; /* no way to stall PWM: out_last >= out_min */
 
-		if (!(val & CL_DVFS_I2C_STS_I2C_REQ_PENDING) &&
+		/*
+		 * Update high tune settings if both last I2C value and minimum
+		 * output are above high range output threshold, provided I2C
+		 * transaction that might be in flight when minimum output was
+		 * set has been completed. The latter condition is true if no
+		 * transaction is pending or I2C last value has changed since
+		 * minimum limit was set.
+		 *
+		 * Since PWM mode never has pending indicator set, high tune
+		 * settings are updated always.
+		 */
+		if (!(val & CL_DVFS_I2C_STS_I2C_REQ_PENDING) ||
+		    (cld->tune_out_last != out_last)) {
+			cld->tune_out_last = cld->num_voltages;
+		}
+
+		if ((cld->tune_out_last == cld->num_voltages) &&
 		    (out_last >= cld->tune_high_out_min)  &&
 		    (out_min >= cld->tune_high_out_min)) {
 			udelay(CL_DVFS_OUTPUT_RAMP_DELAY);
@@ -1155,7 +1182,7 @@ static u8 find_mv_out_cap(struct tegra_cl_dvfs *cld, int mv)
 
 	for (cap = 0; cap < cld->num_voltages; cap++) {
 		uv = cld->out_map[cap]->reg_uV;
-		if (uv >= mv * 1000)
+		if (uv / 1000 >= mv)
 			return is_i2c(cld) ? cap : cld->out_map[cap]->reg_value;
 	}
 	return get_output_top(cld);	/* maximum possible output */
@@ -1168,7 +1195,7 @@ static u8 find_mv_out_floor(struct tegra_cl_dvfs *cld, int mv)
 
 	for (floor = 0; floor < cld->num_voltages; floor++) {
 		uv = cld->out_map[floor]->reg_uV;
-		if (uv > mv * 1000) {
+		if (uv / 1000 > mv) {
 			if (!floor)	/* minimum possible output */
 				return get_output_bottom(cld);
 			break;
@@ -1696,6 +1723,64 @@ static void cl_dvfs_disable_clocks(struct tegra_cl_dvfs *cld)
 	clk_disable(cld->soc_clk);
 }
 
+static int sync_tune_state(struct tegra_cl_dvfs *cld)
+{
+	u32 val = cl_dvfs_readl(cld, CL_DVFS_TUNE0);
+	if (cld->tune0_low == val)
+		set_tune_state(cld, TEGRA_CL_DVFS_TUNE_LOW);
+	else if (cld->tune0_high == val)
+		set_tune_state(cld, TEGRA_CL_DVFS_TUNE_HIGH);
+	else {
+		pr_err("\n %s: Failed to sync cl_dvfs tune state\n", __func__);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+/*
+ * When bootloader enables cl_dvfs, then this function
+ * can be used to set cl_dvfs sw sate to be in sync with
+ * cl_dvfs HW sate.
+ */
+static int cl_dvfs_sync(struct tegra_cl_dvfs *cld)
+{
+	u32 val;
+	int status;
+	unsigned long int rate;
+	unsigned long int dfll_boot_req_khz = tegra_dfll_boot_req_khz();
+
+	output_enable(cld);
+
+	val = cl_dvfs_readl(cld, CL_DVFS_FREQ_REQ) &
+		CL_DVFS_FREQ_REQ_SCALE_MASK;
+	cld->last_req.scale = val >> CL_DVFS_FREQ_REQ_SCALE_SHIFT;
+	cld->last_req.rate = dfll_boot_req_khz * 1000;
+	cld->last_req.freq = GET_REQUEST_FREQ(cld->last_req.rate,
+						cld->ref_rate);
+	val = cld->last_req.freq;
+	rate = GET_REQUEST_RATE(val, cld->ref_rate);
+	if (find_safe_output(cld, rate, &(cld->last_req.output))) {
+		pr_err("%s: Failed to find safe output for rate %lu\n",
+			__func__, rate);
+		return -EINVAL;
+	}
+	cld->last_req.cap = cld->last_req.output;
+	cld->mode = TEGRA_CL_DVFS_CLOSED_LOOP;
+	status = sync_tune_state(cld);
+	if (status)
+		return status;
+	return 0;
+}
+
+static bool is_cl_dvfs_closed_loop(struct tegra_cl_dvfs *cld)
+{
+	u32 mode;
+	mode = cl_dvfs_readl(cld, CL_DVFS_CTRL) + 1;
+	if (mode == TEGRA_CL_DVFS_CLOSED_LOOP)
+		return true;
+	return false;
+}
+
 static int cl_dvfs_init(struct tegra_cl_dvfs *cld)
 {
 	int ret, gpio, flags;
@@ -1770,9 +1855,18 @@ static int cl_dvfs_init(struct tegra_cl_dvfs *cld)
 	/* Setup PMU interface */
 	cl_dvfs_init_out_if(cld);
 
-	/* Configure control registers in disabled mode and disable clocks */
-	cl_dvfs_init_cntrl_logic(cld);
-	cl_dvfs_disable_clocks(cld);
+	if (is_cl_dvfs_closed_loop(cld)) {
+		ret = cl_dvfs_sync(cld);
+		if (ret)
+			return ret;
+	} else {
+		/*
+		 * Configure control registers in disabled mode
+		 * and disable clocks
+		 */
+		cl_dvfs_init_cntrl_logic(cld);
+		cl_dvfs_disable_clocks(cld);
+	}
 
 	/* Set target clock cl_dvfs data */
 	tegra_dfll_set_cl_dvfs_data(cld->dfll_clk, cld);
@@ -1804,8 +1898,20 @@ void tegra_cl_dvfs_resume(struct tegra_cl_dvfs *cld)
 	cld->last_req = req;
 	if (mode != TEGRA_CL_DVFS_DISABLED) {
 		set_mode(cld, TEGRA_CL_DVFS_OPEN_LOOP);
-		WARN(mode > TEGRA_CL_DVFS_OPEN_LOOP,
-		     "DFLL was left locked in suspend\n");
+		if (WARN(mode > TEGRA_CL_DVFS_OPEN_LOOP,
+			 "DFLL was left locked in suspend\n"))
+			return;
+	}
+
+	/* Re-enable bypass output if it was forced before suspend */
+	if ((cld->p_data->u.pmu_pwm.dfll_bypass_dev) &&
+	    (cld->suspended_force_out & CL_DVFS_OUTPUT_FORCE_ENABLE)) {
+		if (!cld->safe_dvfs->dfll_data.is_bypass_down ||
+		    !cld->safe_dvfs->dfll_data.is_bypass_down()) {
+			cl_dvfs_wmb(cld);
+			output_enable(cld);
+			udelay(CL_DVFS_OUTPUT_RAMP_DELAY);
+		}
 	}
 }
 
@@ -1901,6 +2007,7 @@ static struct thermal_cooling_device_ops tegra_cl_dvfs_vmin_cool_ops = {
 static void tegra_cl_dvfs_init_cdev(struct work_struct *work)
 {
 	char *type;
+	char dt_type[THERMAL_NAME_LENGTH];
 	struct device_node *dn;
 	struct tegra_cl_dvfs *cld = container_of(
 		work, struct tegra_cl_dvfs, init_cdev_work);
@@ -1908,9 +2015,10 @@ static void tegra_cl_dvfs_init_cdev(struct work_struct *work)
 	/* just report error - initialized at WC temperature, anyway */
 	if (cld->safe_dvfs->dvfs_rail->vmin_cdev) {
 		type = cld->safe_dvfs->dvfs_rail->vmin_cdev->cdev_type;
+		snprintf(dt_type, sizeof(dt_type), "%s_dfll", type);
 		dn = cld->safe_dvfs->dvfs_rail->vmin_cdev->cdev_dn;
 		cld->vmin_cdev = dn ?
-			thermal_of_cooling_device_register(dn, type,
+			thermal_of_cooling_device_register(dn, dt_type,
 				(void *)cld, &tegra_cl_dvfs_vmin_cool_ops) :
 			thermal_cooling_device_register(type,
 				(void *)cld, &tegra_cl_dvfs_vmin_cool_ops);
@@ -1927,9 +2035,10 @@ static void tegra_cl_dvfs_init_cdev(struct work_struct *work)
 
 	if (cld->safe_dvfs->dvfs_rail->vmax_cdev) {
 		type = cld->safe_dvfs->dvfs_rail->vmax_cdev->cdev_type;
+		snprintf(dt_type, sizeof(dt_type), "%s_dfll", type);
 		dn = cld->safe_dvfs->dvfs_rail->vmax_cdev->cdev_dn;
 		cld->vmax_cdev = dn ?
-			thermal_of_cooling_device_register(dn, type,
+			thermal_of_cooling_device_register(dn, dt_type,
 				(void *)cld, &tegra_cl_dvfs_vmax_cool_ops) :
 			thermal_cooling_device_register(type,
 				(void *)cld, &tegra_cl_dvfs_vmax_cool_ops);
@@ -1978,11 +2087,13 @@ static int tegra_cl_dvfs_suspend_cl(struct device *dev)
 	cld->suspended_force_out = cl_dvfs_readl(cld, CL_DVFS_OUTPUT_FORCE);
 	clk_unlock_restore(cld->dfll_clk, &flags);
 
+	pr_debug("%s: closed loop thermal control suspended\n", __func__);
+
 	return 0;
 }
 
 static const struct dev_pm_ops tegra_cl_dvfs_pm_ops = {
-	.suspend = tegra_cl_dvfs_suspend_cl,
+	.suspend_noirq = tegra_cl_dvfs_suspend_cl,
 };
 #endif
 
@@ -2030,11 +2141,22 @@ static int tegra_cl_dvfs_get_output(void *data)
 	return val;
 }
 
-static void tegra_cl_dvfs_bypass_dev_register(struct tegra_cl_dvfs *cld,
-					      struct platform_device *byp_dev)
+static void cl_dvfs_init_pwm_bypass(struct tegra_cl_dvfs *cld,
+					   struct platform_device *byp_dev)
 {
 	struct tegra_dfll_bypass_platform_data *p_data =
 		byp_dev->dev.platform_data;
+
+	int vinit = cld->p_data->u.pmu_pwm.init_uV;
+	int vmin = cld->p_data->u.pmu_pwm.min_uV;
+	int vstep = cld->p_data->u.pmu_pwm.step_uV;
+
+	/* Sync initial voltage and setup bypass callbacks */
+	if ((vinit >= vmin) && vstep) {
+		unsigned int vsel = DIV_ROUND_UP((vinit - vmin), vstep);
+		tegra_cl_dvfs_force_output(cld, vsel);
+	}
+
 	p_data->set_bypass_sel = tegra_cl_dvfs_force_output;
 	p_data->get_bypass_sel = tegra_cl_dvfs_get_output;
 	p_data->dfll_data = cld;
@@ -2277,7 +2399,7 @@ static int dt_parse_pwm_regulator(struct platform_device *pdev,
 	struct device_node *r_dn, struct tegra_cl_dvfs_platform_data *p_data)
 {
 	unsigned long val;
-	int min_uV, max_uV, step_uV;
+	int min_uV, max_uV, step_uV, init_uV;
 	struct of_phandle_args args;
 	struct platform_device *rdev = of_find_device_by_node(r_dn);
 
@@ -2301,6 +2423,7 @@ static int dt_parse_pwm_regulator(struct platform_device *pdev,
 	/* voltage boundaries and step */
 	OF_READ_U32(r_dn, regulator-min-microvolt, min_uV);
 	OF_READ_U32(r_dn, regulator-max-microvolt, max_uV);
+	OF_READ_U32(r_dn, regulator-init-microvolt, init_uV);
 
 	step_uV = (max_uV - min_uV) / (MAX_CL_DVFS_VOLTAGES - 1);
 	if (step_uV <= 0) {
@@ -2314,6 +2437,7 @@ static int dt_parse_pwm_regulator(struct platform_device *pdev,
 
 	p_data->u.pmu_pwm.min_uV = min_uV;
 	p_data->u.pmu_pwm.step_uV = step_uV;
+	p_data->u.pmu_pwm.init_uV = init_uV;
 
 	/*
 	 * For pwm regulator access from the regulator driver, without
@@ -2693,8 +2817,7 @@ static int __init tegra_cl_dvfs_probe(struct platform_device *pdev)
 	if ((p_data->pmu_if == TEGRA_CL_DVFS_PMU_PWM) &&
 	    p_data->u.pmu_pwm.dfll_bypass_dev) {
 		clk_enable(cld->soc_clk);
-		tegra_cl_dvfs_bypass_dev_register(
-			cld, p_data->u.pmu_pwm.dfll_bypass_dev);
+		cl_dvfs_init_pwm_bypass(cld, p_data->u.pmu_pwm.dfll_bypass_dev);
 	}
 
 	/* Register SiMon notifier */

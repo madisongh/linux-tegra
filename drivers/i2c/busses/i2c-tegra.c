@@ -40,6 +40,7 @@
 #include <linux/clk/tegra.h>
 #include <linux/tegra-pm.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/pinctrl/pinconf-tegra.h>
 
 #include <asm/unaligned.h>
 
@@ -105,6 +106,7 @@
 #define PACKET_HEADER0_HEADER_SIZE_SHIFT	28
 #define PACKET_HEADER0_PACKET_ID_SHIFT		16
 #define PACKET_HEADER0_CONT_ID_SHIFT		12
+#define PACKET_HEADER0_CONT_ID_MASK		0xF
 #define PACKET_HEADER0_PROTOCOL_I2C		(1<<4)
 
 #define I2C_HEADER_HIGHSPEED_MODE		(1<<22)
@@ -644,9 +646,11 @@ static inline void tegra_i2c_clock_disable(struct tegra_i2c_dev *i2c_dev)
 	}
 }
 
-static void tegra_i2c_set_clk_rate(struct tegra_i2c_dev *i2c_dev)
+static int tegra_i2c_set_clk_rate(struct tegra_i2c_dev *i2c_dev)
 {
 	u32 clk_multiplier;
+	int ret;
+
 	if (i2c_dev->is_high_speed_enable)
 		clk_multiplier = i2c_dev->chipdata->clk_multiplier_hs_mode
 			* (i2c_dev->chipdata->clk_divisor_hs_mode + 1);
@@ -654,8 +658,14 @@ static void tegra_i2c_set_clk_rate(struct tegra_i2c_dev *i2c_dev)
 		clk_multiplier = I2C_CLK_MULTIPLIER_STD_FAST_MODE
 		* (i2c_dev->clk_divisor_non_hs_mode + 1);
 
-	clk_set_rate(i2c_dev->div_clk, i2c_dev->bus_clk_rate
+	ret = clk_set_rate(i2c_dev->div_clk, i2c_dev->bus_clk_rate
 							* clk_multiplier);
+	if (ret < 0) {
+		dev_err(i2c_dev->dev, "set clock rate %lu failed: %d\n",
+			i2c_dev->bus_clk_rate * clk_multiplier, ret);
+		return ret;
+	}
+	return ret;
 }
 
 static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
@@ -685,7 +695,9 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
 	i2c_writel(i2c_dev, val, I2C_CNFG);
 	i2c_writel(i2c_dev, 0, I2C_INT_MASK);
 
-	tegra_i2c_set_clk_rate(i2c_dev);
+	err = tegra_i2c_set_clk_rate(i2c_dev);
+	if (err < 0)
+		return err;
 
 	clk_divisor |= i2c_dev->chipdata->clk_divisor_hs_mode;
 	if (i2c_dev->chipdata->has_clk_divisor_std_fast_mode)
@@ -1263,6 +1275,21 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	if (adap->atomic_xfer_only)
 		return -EBUSY;
 
+	for (i = 0; i < num; i++) {
+		if (msgs[i].len > 4096) {
+			dev_err(i2c_dev->dev, "msg len %d not supported, supports upto 4096\n",
+					msgs[i].len);
+			return -EINVAL;
+		}
+	}
+
+	if (adap->bus_clk_rate != i2c_dev->bus_clk_rate) {
+		i2c_dev->bus_clk_rate = adap->bus_clk_rate;
+		ret = tegra_i2c_set_clk_rate(i2c_dev);
+		if (ret < 0)
+			return ret;
+	}
+
 	i2c_dev->msgs = msgs;
 	i2c_dev->msgs_num = num;
 
@@ -1332,21 +1359,8 @@ static const struct i2c_algorithm tegra_i2c_algo = {
 	.functionality	= tegra_i2c_func,
 };
 
-static int __tegra_i2c_suspend_noirq(struct tegra_i2c_dev *i2c_dev);
-static int __tegra_i2c_resume_noirq(struct tegra_i2c_dev *i2c_dev);
-
 static int tegra_i2c_pm_notifier(struct notifier_block *nb,
-		unsigned long event, void *data)
-{
-	struct tegra_i2c_dev *i2c_dev = container_of(nb, struct tegra_i2c_dev, pm_nb);
-
-	if (event == TEGRA_PM_SUSPEND)
-		__tegra_i2c_suspend_noirq(i2c_dev);
-	else if (event == TEGRA_PM_RESUME)
-		__tegra_i2c_resume_noirq(i2c_dev);
-
-	return NOTIFY_OK;
-}
+	unsigned long event, void *data);
 
 static struct tegra_i2c_platform_data *parse_i2c_tegra_dt(
 	struct platform_device *pdev)
@@ -1531,6 +1545,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	int bus_num = -1;
 	struct pinctrl *pin;
 	struct pinctrl_state *s;
+	char prod_name[15];
 
 	if (pdev->dev.of_node) {
 		match = of_match_device(of_match_ptr(tegra_i2c_of_match), &pdev->dev);
@@ -1630,7 +1645,6 @@ skip_pinctrl:
 	if (i2c_dev->chipdata->has_fast_clock)
 		i2c_dev->fast_clk = fast_clk;
 	i2c_dev->irq = irq;
-	i2c_dev->cont_id = pdev->id;
 	i2c_dev->dev = &pdev->dev;
 	i2c_dev->is_clkon_always = pdata->is_clkon_always;
 	i2c_dev->bus_clk_rate = pdata->bus_clk_rate ? pdata->bus_clk_rate: 100000;
@@ -1681,6 +1695,7 @@ skip_pinctrl:
 	i2c_dev->adapter.class = I2C_CLASS_DEPRECATED;
 	strlcpy(i2c_dev->adapter.name, "Tegra I2C adapter",
 		sizeof(i2c_dev->adapter.name));
+	i2c_dev->adapter.bus_clk_rate = i2c_dev->bus_clk_rate;
 	i2c_dev->adapter.algo = &tegra_i2c_algo;
 	i2c_dev->adapter.dev.parent = &pdev->dev;
 	i2c_dev->adapter.nr = bus_num;
@@ -1698,6 +1713,14 @@ skip_pinctrl:
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to add I2C adapter\n");
 		return ret;
+	}
+	i2c_dev->cont_id = i2c_dev->adapter.nr & PACKET_HEADER0_CONT_ID_MASK;
+	if (pdata->is_high_speed_enable) {
+		sprintf(prod_name, "i2c%d_hs_prod", i2c_dev->cont_id);
+		ret = tegra_pinctrl_config_prod(&pdev->dev, prod_name);
+		if (ret < 0)
+			dev_warn(&pdev->dev, "Failed to set %s setting\n",
+					prod_name);
 	}
 
 	i2c_dev->pm_nb.notifier_call = tegra_i2c_pm_notifier;
@@ -1735,7 +1758,7 @@ static void tegra_i2c_shutdown(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM_SLEEP
-static int __tegra_i2c_suspend_noirq(struct tegra_i2c_dev *i2c_dev)
+static int __tegra_i2c_suspend_noirq_late(struct tegra_i2c_dev *i2c_dev)
 {
 	i2c_dev->is_suspended = true;
 	if (i2c_dev->is_clkon_always)
@@ -1744,22 +1767,21 @@ static int __tegra_i2c_suspend_noirq(struct tegra_i2c_dev *i2c_dev)
 	return 0;
 }
 
-static int tegra_i2c_suspend_noirq(struct device *dev)
+static int tegra_i2c_suspend_noirq_late(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
 
 	i2c_lock_adapter(&i2c_dev->adapter);
 
-	__tegra_i2c_suspend_noirq(i2c_dev);
+	__tegra_i2c_suspend_noirq_late(i2c_dev);
 
 	i2c_unlock_adapter(&i2c_dev->adapter);
 
 	return 0;
 }
 
-
-static int __tegra_i2c_resume_noirq(struct tegra_i2c_dev *i2c_dev)
+static int __tegra_i2c_resume_noirq_early(struct tegra_i2c_dev *i2c_dev)
 {
 	int ret;
 
@@ -1775,27 +1797,45 @@ static int __tegra_i2c_resume_noirq(struct tegra_i2c_dev *i2c_dev)
 	return 0;
 }
 
-static int tegra_i2c_resume_noirq(struct device *dev)
+static int tegra_i2c_resume_noirq_early(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
 
 	i2c_lock_adapter(&i2c_dev->adapter);
 
-	__tegra_i2c_resume_noirq(i2c_dev);
+	__tegra_i2c_resume_noirq_early(i2c_dev);
 
 	i2c_unlock_adapter(&i2c_dev->adapter);
 
 	return 0;
 }
 
+static int tegra_i2c_pm_notifier(struct notifier_block *nb,
+		unsigned long event, void *data)
+{
+	struct tegra_i2c_dev *i2c_dev = container_of(nb, struct tegra_i2c_dev, pm_nb);
+
+	if (event == TEGRA_PM_SUSPEND)
+		__tegra_i2c_suspend_noirq_late(i2c_dev);
+	else if (event == TEGRA_PM_RESUME)
+		__tegra_i2c_resume_noirq_early(i2c_dev);
+
+	return NOTIFY_OK;
+}
+
 static const struct dev_pm_ops tegra_i2c_pm = {
-	.suspend_noirq = tegra_i2c_suspend_noirq,
-	.resume_noirq = tegra_i2c_resume_noirq,
+	.suspend_noirq_late = tegra_i2c_suspend_noirq_late,
+	.resume_noirq_early = tegra_i2c_resume_noirq_early,
 };
 #define TEGRA_I2C_PM	(&tegra_i2c_pm)
 #else
 #define TEGRA_I2C_PM	NULL
+static int tegra_i2c_pm_notifier(struct notifier_block *nb,
+		unsigned long event, void *data)
+{
+	return NOTIFY_OK;
+}
 #endif
 
 static struct platform_driver tegra_i2c_driver = {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -130,6 +130,7 @@ enum tegra_clk_ex_param {
 	TEGRA_CLK_DFLL_LOCK,
 	TEGRA_CLK_SOR_CLK_SEL,
 	TEGRA_CLK_MIPI_CSI_OUT_ENB,
+	TEGRA_CLK_QSPI_DIV2_ENB,
 };
 
 #ifdef CONFIG_COMMON_CLK
@@ -147,6 +148,17 @@ struct clk *tegra_get_clock_by_name(const char *name);
 int tegra_is_clk_enabled(struct clk *clk);
 int tegra_dvfs_use_alt_freqs_on_clk(struct clk *c, bool use_alt_freq);
 
+/* To be implemented for COMMON CLK framework */
+/* Get max rate safe at min voltage in all t-ranges; return zero if unknown */
+static inline unsigned long tegra_dvfs_get_fmax_at_vmin_safe_t(struct clk *c)
+{
+	return 0;
+}
+static inline long tegra_emc_round_rate_updown(unsigned long rate, bool up)
+{
+	return 0;
+}
+
 #else
 void tegra_periph_reset_deassert(struct clk *c);
 void tegra_periph_reset_assert(struct clk *c);
@@ -160,10 +172,13 @@ struct notifier_block;
 int tegra_dvfs_get_freqs(struct clk *c, unsigned long **freqs, int *num_freqs);
 int tegra_dvfs_set_rate(struct clk *c, unsigned long rate);
 int tegra_dvfs_override_core_voltage(struct clk *c, int override_mv);
+
+unsigned long tegra_dvfs_predict_hz_at_mv_max_tfloor(struct clk *c, int mv);
 int tegra_dvfs_predict_mv_at_hz_no_tfloor(struct clk *c, unsigned long rate);
 int tegra_dvfs_predict_mv_at_hz_cur_tfloor(struct clk *c, unsigned long rate);
 int tegra_dvfs_predict_mv_at_hz_max_tfloor(struct clk *c, unsigned long rate);
 int tegra_dvfs_set_fmax_at_vmin(struct clk *c, unsigned long f_max, int v_min);
+
 int tegra_dvfs_get_core_override_floor(void);
 int tegra_dvfs_get_core_nominal_millivolts(void);
 int tegra_dvfs_get_core_boot_level(void);

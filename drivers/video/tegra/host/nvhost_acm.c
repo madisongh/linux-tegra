@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Automatic Clock Management
  *
- * Copyright (c) 2010-2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -91,9 +91,27 @@ static void do_unpowergate_locked(int id)
 	}
 }
 
+static void dump_clock_status(struct platform_device *dev)
+{
+	struct nvhost_device_data *pdata = platform_get_drvdata(dev);
+	int i;
+
+	pr_info("\n%s: %s status:\n", __func__, dev_name(&dev->dev));
+
+	for (i = 0; i < NVHOST_MODULE_MAX_CLOCKS; i++) {
+		if (!pdata->clocks[i].name)
+			break;
+		pr_info("%s: clock %s: enabled=%d, rate = %lu\n",
+			__func__, pdata->clocks[i].name,
+			!!tegra_is_clk_enabled(pdata->clk[i]),
+			clk_get_rate(pdata->clk[i]));
+	}
+}
+
 static void do_module_reset_locked(struct platform_device *dev)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(dev);
+	int ret;
 
 	if (pdata->reset) {
 		pdata->reset(dev);
@@ -102,12 +120,20 @@ static void do_module_reset_locked(struct platform_device *dev)
 
 	/* assert module and mc client reset */
 	if (pdata->clocks[0].reset) {
-		tegra_mc_flush(pdata->clocks[0].reset);
+		ret = tegra_mc_flush(pdata->clocks[0].reset);
+		if (ret) {
+			dump_clock_status(nvhost_get_host(dev)->dev);
+			dump_clock_status(dev);
+		}
 		tegra_periph_reset_assert(pdata->clk[0]);
 	}
 
 	if (pdata->clocks[1].reset) {
-		tegra_mc_flush(pdata->clocks[1].reset);
+		ret = tegra_mc_flush(pdata->clocks[1].reset);
+		if (ret) {
+			dump_clock_status(nvhost_get_host(dev)->dev);
+			dump_clock_status(dev);
+		}
 		tegra_periph_reset_assert(pdata->clk[1]);
 	}
 
@@ -127,7 +153,7 @@ static void do_module_reset_locked(struct platform_device *dev)
 
 static unsigned long nvhost_emc_bw_to_freq_req(unsigned long rate)
 {
-	return tegra_emc_bw_to_freq_req((unsigned long)(rate >> 10));
+	return tegra_emc_bw_to_freq_req((unsigned long)(rate));
 }
 #else
 static void do_powergate_locked(int id)
@@ -338,10 +364,16 @@ static int nvhost_module_update_rate(struct platform_device *dev, int index)
 		if (!constraint)
 			continue;
 
+		/* Note: We need to take max to avoid wrapping issues */
 		if (type == NVHOST_BW)
-			bw_constraint += constraint;
+			bw_constraint = max(bw_constraint,
+				bw_constraint + (constraint / 1000));
 		else if (type == NVHOST_PIXELRATE)
-			pixelrate += constraint;
+			pixelrate = max(pixelrate,
+				pixelrate + constraint);
+		else if (type == NVHOST_BW_KHZ)
+			bw_constraint = max(bw_constraint,
+				bw_constraint + constraint);
 		else
 			floor_rate = max(floor_rate, constraint);
 	}
@@ -355,7 +387,8 @@ static int nvhost_module_update_rate(struct platform_device *dev, int index)
 	if (!rate) {
 		unsigned long bw_freq_khz =
 			nvhost_emc_bw_to_freq_req(bw_constraint);
-		rate = max(floor_rate, bw_freq_khz << 10);
+		bw_freq_khz = min(ULONG_MAX / 1000, bw_freq_khz);
+		rate = max(floor_rate, bw_freq_khz * 1000);
 	}
 
 	/* take devfreq rate into account */
@@ -619,7 +652,7 @@ int nvhost_module_init(struct platform_device *dev)
 	pdata->num_clks = 0;
 	INIT_LIST_HEAD(&pdata->client_list);
 
-	if (pdata->virtual_dev) {
+	if (nvhost_dev_is_virtual(dev)) {
 		pm_runtime_enable(&dev->dev);
 		return err;
 	}
@@ -828,6 +861,109 @@ const struct dev_pm_ops nvhost_module_pm_ops = {
 };
 EXPORT_SYMBOL(nvhost_module_pm_ops);
 
+#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+static int _nvhost_init_domain(struct device_node *np,
+			       struct generic_pm_domain *gpd)
+{
+	bool is_off = false;
+
+	gpd->name = (char *)np->name;
+
+#warning using private generic pm domain function
+#if 0
+	if (pm_genpd_lookup_name(gpd->name))
+		return 0;
+#endif
+
+	if (of_property_read_bool(np, "is_off"))
+		is_off = true;
+
+	pm_genpd_init(gpd, NULL, is_off);
+
+	gpd->power_off = nvhost_module_power_off;
+	gpd->power_on = nvhost_module_power_on;
+	gpd->dev_ops.start = nvhost_module_enable_clk;
+	gpd->dev_ops.stop = nvhost_module_disable_clk;
+	gpd->dev_ops.save_state = nvhost_module_prepare_poweroff;
+	gpd->dev_ops.restore_state = nvhost_module_finalize_poweron;
+	if (!of_property_read_bool(np, "host1x")) {
+#warning TODO: pm domain suspend ops removed
+#if 0
+		gpd->dev_ops.suspend = nvhost_module_suspend;
+		gpd->dev_ops.resume = nvhost_module_finalize_poweron;
+#endif
+	}
+
+	of_genpd_add_provider_simple(np, gpd);
+
+#warning genpd_pm_subdomain_attach does not work with upstream
+#if 0
+	gpd->of_node = of_node_get(np);
+
+	genpd_pm_subdomain_attach(gpd);
+#endif
+	return 0;
+}
+
+int nvhost_domain_init(struct of_device_id *matches)
+{
+	struct device_node *np;
+	int ret = 0;
+	struct nvhost_device_data *dev_data;
+	struct generic_pm_domain *gpd;
+	for_each_matching_node(np, matches) {
+		const struct of_device_id *match = of_match_node(matches, np);
+		dev_data = (struct nvhost_device_data *)match->data;
+		gpd = &dev_data->pd;
+		ret = _nvhost_init_domain(np, gpd);
+		if (ret)
+			break;
+	}
+	return ret;
+
+}
+EXPORT_SYMBOL(nvhost_domain_init);
+
+void nvhost_register_client_domain(struct generic_pm_domain *domain)
+{
+}
+EXPORT_SYMBOL(nvhost_register_client_domain);
+
+void nvhost_unregister_client_domain(struct generic_pm_domain *domain)
+{
+}
+EXPORT_SYMBOL(nvhost_unregister_client_domain);
+
+int nvhost_module_add_domain(struct generic_pm_domain *domain,
+	struct platform_device *pdev)
+{
+	struct nvhost_device_data *pdata;
+	struct device_node *dn = of_node_get(pdev->dev.of_node);
+	bool wakeup_capable = false;
+	struct dev_power_governor *pm_domain_gov = NULL;
+
+	pdata = platform_get_drvdata(pdev);
+	if (!pdata)
+		return -EINVAL;
+
+	if (!pdata->can_powergate)
+		pm_domain_gov = &pm_domain_always_on_gov;
+	domain->gov = pm_domain_gov;
+
+	if (pdata->powergate_delay)
+		pm_genpd_set_poweroff_delay(domain,
+				pdata->powergate_delay);
+
+	if (of_property_read_bool(dn, "wakeup-capable"))
+		wakeup_capable = true;
+
+	device_set_wakeup_capable(&pdev->dev, wakeup_capable);
+
+	return 0;
+}
+EXPORT_SYMBOL(nvhost_module_add_domain);
+
+#else
 /*FIXME Use API to get host1x domain */
 static struct generic_pm_domain *host1x_domain;
 
@@ -904,6 +1040,7 @@ int nvhost_module_add_domain(struct generic_pm_domain *domain,
 		return _nvhost_module_add_domain(domain, pdev, 1);
 }
 EXPORT_SYMBOL(nvhost_module_add_domain);
+#endif
 
 int nvhost_module_enable_clk(struct device *dev)
 {
@@ -932,7 +1069,6 @@ int nvhost_module_enable_clk(struct device *dev)
 
 	return 0;
 }
-EXPORT_SYMBOL(nvhost_module_enable_clk);
 
 int nvhost_module_disable_clk(struct device *dev)
 {
@@ -955,7 +1091,6 @@ int nvhost_module_disable_clk(struct device *dev)
 
 	return 0;
 }
-EXPORT_SYMBOL(nvhost_module_disable_clk);
 
 static void nvhost_module_load_regs(struct platform_device *pdev, bool prod)
 {
@@ -982,8 +1117,10 @@ static int nvhost_module_suspend(struct device *dev)
 	 * device_prepare takes one ref, so expect usage count to
 	 * be 1 at this point.
 	 */
+#ifdef CONFIG_PM_RUNTIME
 	if (atomic_read(&dev->power.usage_count) > 1)
 		return -EBUSY;
+#endif
 
 	return nvhost_module_prepare_poweroff(dev);
 }

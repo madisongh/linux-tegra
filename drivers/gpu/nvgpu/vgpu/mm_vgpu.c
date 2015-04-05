@@ -1,7 +1,7 @@
 /*
  * Virtualized GPU Memory Management
  *
- * Copyright (c) 2014 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -16,6 +16,7 @@
 #include <linux/dma-mapping.h>
 #include "vgpu/vgpu.h"
 #include "gk20a/semaphore_gk20a.h"
+#include "gk20a/mm_gk20a.h"
 
 static int vgpu_init_mm_setup_sw(struct gk20a *g)
 {
@@ -39,9 +40,8 @@ static int vgpu_init_mm_setup_sw(struct gk20a *g)
 
 	/* gk20a_init_gpu_characteristics expects this to be populated */
 	vm->big_page_size = big_page_size;
-	vm->compression_page_size = big_page_size;
-	vm->pde_stride    = vm->big_page_size << 10;
-	vm->pde_stride_shift = ilog2(vm->pde_stride);
+	vm->mmu_levels = (vm->big_page_size == SZ_64K) ?
+			 gk20a_mm_levels_64k : gk20a_mm_levels_128k;
 
 	mm->sw_ready = true;
 
@@ -65,7 +65,8 @@ static u64 vgpu_locked_gmmu_map(struct vm_gk20a *vm,
 				u32 ctag_offset,
 				u32 flags,
 				int rw_flag,
-				bool clear_ctags)
+				bool clear_ctags,
+				bool sparse)
 {
 	int err = 0;
 	struct device *d = dev_from_vm(vm);
@@ -74,7 +75,7 @@ static u64 vgpu_locked_gmmu_map(struct vm_gk20a *vm,
 	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(d);
 	struct tegra_vgpu_cmd_msg msg;
 	struct tegra_vgpu_as_map_params *p = &msg.params.as_map;
-	u64 addr = gk20a_mm_iova_addr(g, sgt->sgl);
+	u64 addr = g->ops.mm.get_iova_addr(g, sgt->sgl, flags);
 	u8 prot;
 
 	gk20a_dbg_fn("");
@@ -115,7 +116,8 @@ static u64 vgpu_locked_gmmu_map(struct vm_gk20a *vm,
 	if (err || msg.ret)
 		goto fail;
 
-	vm->tlb_dirty = true;
+	/* TLB invalidate handled on server side */
+
 	return map_offset;
 fail:
 	gk20a_err(d, "%s: failed with err=%d\n", __func__, err);
@@ -127,7 +129,8 @@ static void vgpu_locked_gmmu_unmap(struct vm_gk20a *vm,
 				u64 size,
 				int pgsz_idx,
 				bool va_allocated,
-				int rw_flag)
+				int rw_flag,
+				bool sparse)
 {
 	struct gk20a *g = gk20a_from_vm(vm);
 	struct gk20a_platform *platform = gk20a_get_platform(g->dev);
@@ -155,7 +158,7 @@ static void vgpu_locked_gmmu_unmap(struct vm_gk20a *vm,
 		dev_err(dev_from_vm(vm),
 			"failed to update gmmu ptes on unmap");
 
-	vm->tlb_dirty = true;
+	/* TLB invalidate handled on server side */
 }
 
 static void vgpu_vm_remove_support(struct vm_gk20a *vm)
@@ -210,7 +213,7 @@ u64 vgpu_bar1_map(struct gk20a *g, struct sg_table **sgt, u64 size)
 	struct gk20a_platform *platform = gk20a_get_platform(g->dev);
 	struct dma_iommu_mapping *mapping =
 			to_dma_iommu_mapping(dev_from_gk20a(g));
-	u64 addr = gk20a_mm_iova_addr(g, (*sgt)->sgl);
+	u64 addr = g->ops.mm.get_iova_addr(g, (*sgt)->sgl, 0);
 	struct tegra_vgpu_cmd_msg msg;
 	struct tegra_vgpu_as_map_params *p = &msg.params.as_map;
 	int err;
@@ -240,10 +243,11 @@ static int vgpu_vm_alloc_share(struct gk20a_as_share *as_share,
 	struct tegra_vgpu_as_share_params *p = &msg.params.as_share;
 	struct mm_gk20a *mm = &g->mm;
 	struct vm_gk20a *vm;
-	u64 vma_size;
-	u32 num_pages, low_hole_pages;
+	u32 num_small_pages, num_large_pages, low_hole_pages;
+	u64 small_vma_size, large_vma_size;
 	char name[32];
 	int err, i;
+	u32 start;
 
 	/* note: keep the page sizes sorted lowest to highest here */
 	u32 gmmu_page_sizes[gmmu_nr_page_sizes] = {
@@ -268,6 +272,7 @@ static int vgpu_vm_alloc_share(struct gk20a_as_share *as_share,
 		vm->gmmu_page_sizes[i] = gmmu_page_sizes[i];
 
 	vm->big_pages = true;
+	vm->big_page_size = big_page_size;
 
 	vm->va_start  = big_page_size << 10;   /* create a one pde hole */
 	vm->va_limit  = mm->channel.size; /* note this means channel.size is
@@ -277,36 +282,47 @@ static int vgpu_vm_alloc_share(struct gk20a_as_share *as_share,
 	msg.handle = platform->virt_handle;
 	p->size = vm->va_limit;
 	err = vgpu_comm_sendrecv(&msg, sizeof(msg), sizeof(msg));
-	if (err || msg.ret)
-		return -ENOMEM;
+	if (err || msg.ret) {
+		err = -ENOMEM;
+		goto clean_up;
+	}
 
 	vm->handle = p->handle;
 
-	/* low-half: alloc small pages */
-	/* high-half: alloc big pages */
-	vma_size = mm->channel.size >> 1;
+	/* First 16GB of the address space goes towards small pages. What ever
+	 * remains is allocated to large pages. */
+	small_vma_size = (u64)16 << 30;
+	large_vma_size = vm->va_limit - small_vma_size;
 
-	snprintf(name, sizeof(name), "gk20a_as_%d-%dKB", as_share->id,
-		 gmmu_page_sizes[gmmu_page_size_small]>>10);
-	num_pages = (u32)(vma_size >>
-		    ilog2(gmmu_page_sizes[gmmu_page_size_small]));
+	num_small_pages = (u32)(small_vma_size >>
+		    ilog2(vm->gmmu_page_sizes[gmmu_page_size_small]));
 
 	/* num_pages above is without regard to the low-side hole. */
 	low_hole_pages = (vm->va_start >>
-			  ilog2(gmmu_page_sizes[gmmu_page_size_small]));
-
-	gk20a_allocator_init(&vm->vma[gmmu_page_size_small], name,
-	      low_hole_pages,             /* start */
-	      num_pages - low_hole_pages); /* length */
+			  ilog2(vm->gmmu_page_sizes[gmmu_page_size_small]));
 
 	snprintf(name, sizeof(name), "gk20a_as_%d-%dKB", as_share->id,
-		 gmmu_page_sizes[gmmu_page_size_big]>>10);
+		 gmmu_page_sizes[gmmu_page_size_small]>>10);
+	err = gk20a_allocator_init(&vm->vma[gmmu_page_size_small],
+			     name,
+			     low_hole_pages,		 /*start*/
+			     num_small_pages - low_hole_pages);/* length*/
+	if (err)
+		goto clean_up_share;
 
-	num_pages = (u32)(vma_size >>
-		    ilog2(gmmu_page_sizes[gmmu_page_size_big]));
-	gk20a_allocator_init(&vm->vma[gmmu_page_size_big], name,
-			      num_pages, /* start */
-			      num_pages); /* length */
+	start = (u32)(small_vma_size >>
+		    ilog2(vm->gmmu_page_sizes[gmmu_page_size_big]));
+	num_large_pages = (u32)(large_vma_size >>
+			    ilog2(vm->gmmu_page_sizes[gmmu_page_size_big]));
+
+	snprintf(name, sizeof(name), "gk20a_as_%d-%dKB", as_share->id,
+		gmmu_page_sizes[gmmu_page_size_big]>>10);
+	err = gk20a_allocator_init(&vm->vma[gmmu_page_size_big],
+			      name,
+			      start,			/* start */
+			      num_large_pages);		/* length */
+	if (err)
+		goto clean_up_small_allocator;
 
 	vm->mapped_buffers = RB_ROOT;
 
@@ -317,6 +333,19 @@ static int vgpu_vm_alloc_share(struct gk20a_as_share *as_share,
 	vm->enable_ctag = true;
 
 	return 0;
+
+clean_up_small_allocator:
+	gk20a_allocator_destroy(&vm->vma[gmmu_page_size_small]);
+clean_up_share:
+	msg.cmd = TEGRA_VGPU_CMD_AS_FREE_SHARE;
+	msg.handle = platform->virt_handle;
+	p->handle = vm->handle;
+	err = vgpu_comm_sendrecv(&msg, sizeof(msg), sizeof(msg));
+	WARN_ON(err || msg.ret);
+clean_up:
+	kfree(vm);
+	as_share->vm = NULL;
+	return err;
 }
 
 static int vgpu_vm_bind_channel(struct gk20a_as_share *as_share,
@@ -402,20 +431,11 @@ static void vgpu_mm_tlb_invalidate(struct vm_gk20a *vm)
 
 	gk20a_dbg_fn("");
 
-	/* No need to invalidate if tlb is clean */
-	mutex_lock(&vm->update_gmmu_lock);
-	if (!vm->tlb_dirty) {
-		mutex_unlock(&vm->update_gmmu_lock);
-		return;
-	}
-
 	msg.cmd = TEGRA_VGPU_CMD_AS_INVALIDATE;
 	msg.handle = platform->virt_handle;
 	p->handle = vm->handle;
 	err = vgpu_comm_sendrecv(&msg, sizeof(msg), sizeof(msg));
 	WARN_ON(err || msg.ret);
-	vm->tlb_dirty = false;
-	mutex_unlock(&vm->update_gmmu_lock);
 }
 
 void vgpu_init_mm_ops(struct gpu_ops *gops)
@@ -430,4 +450,5 @@ void vgpu_init_mm_ops(struct gpu_ops *gops)
 	gops->mm.l2_flush = vgpu_mm_l2_flush;
 	gops->mm.tlb_invalidate = vgpu_mm_tlb_invalidate;
 	gops->mm.get_physical_addr_bits = gk20a_mm_get_physical_addr_bits;
+	gops->mm.get_iova_addr = gk20a_mm_iova_addr;
 }

@@ -3,7 +3,7 @@
  *
  * A device driver for ADSP and APE
  *
- * Copyright (C) 2014 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2015 NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -67,6 +67,7 @@ static inline bool nvadsp_amsic_skip_reg(u32 offset)
 	}
 }
 
+#ifdef CONFIG_PM_RUNTIME
 static int nvadsp_amisc_save(struct platform_device *pdev)
 {
 	struct nvadsp_drv_data *d = platform_get_drvdata(pdev);
@@ -126,7 +127,7 @@ static int nvadsp_amisc_restore(struct platform_device *pdev)
 	}
 	return 0;
 }
-
+#endif /* CONFIG_PM_RUNTIME */
 
 #ifdef CONFIG_PM_SLEEP
 static int nvadsp_suspend(struct device *dev)
@@ -507,6 +508,7 @@ static int nvadsp_remove(struct platform_device *pdev)
 #ifdef CONFIG_OF
 static const struct of_device_id nvadsp_of_match[] = {
 	{ .compatible = "nvidia,tegra210-adsp", .data = NULL, },
+	{ .compatible = "nvidia,tegra18x-adsp", .data = NULL, },
 	{},
 };
 #endif

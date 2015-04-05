@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Init for T210 Architecture Chips
  *
- * Copyright (c) 2011-2014, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -26,6 +26,7 @@
 #include "dev.h"
 #include "nvhost_job.h"
 #include "class_ids.h"
+#include "scale3d.h"
 
 #include "t210.h"
 #include "t124/t124.h"
@@ -36,8 +37,8 @@
 #include "nvdec/nvdec.h"
 #include "tsec/tsec.h"
 #include "vi/vi.h"
-#include "vii2c/vii2c.h"
 #include "isp/isp.h"
+#include "isp/isp_isr_v1.h"
 
 #include "../../../../arch/arm/mach-tegra/iomap.h"
 
@@ -47,15 +48,19 @@
 #include "cg_regs.c"
 
 #define HOST_EMC_FLOOR 204000000
+#define HOST_NVDEC_EMC_FLOOR 102000000
 #define TSEC_POWERGATE_DELAY 500
 
 #define BIT64(nr) (1ULL << (nr))
 
 static struct host1x_device_info host1x04_info = {
 	.nb_channels	= T124_NVHOST_NUMCHANNELS,
-	.nb_pts		= NV_HOST1X_SYNCPT_NB_PTS,
+	.ch_base	= 0,
+	.ch_limit	= T124_NVHOST_NUMCHANNELS,
 	.nb_mlocks	= NV_HOST1X_NB_MLOCKS,
 	.initialize_chip_support = nvhost_init_t210_support,
+	.nb_hw_pts	= NV_HOST1X_SYNCPT_NB_PTS,
+	.nb_pts		= NV_HOST1X_SYNCPT_NB_PTS,
 	.pts_base	= 0,
 	.pts_limit	= NV_HOST1X_SYNCPT_NB_PTS,
 	.syncpt_policy	= SYNCPT_PER_CHANNEL,
@@ -91,11 +96,13 @@ struct nvhost_device_data t21_isp_info = {
 	NVHOST_DEFAULT_CLOCKGATE_DELAY,
 	.powergate_delay	= 500,
 	.can_powergate		= true,
-	.clocks			= {{ "isp", UINT_MAX, 0, TEGRA_MC_CLIENT_ISP }},
+	.clocks			= {
+		{ "isp", UINT_MAX, 0, TEGRA_MC_CLIENT_ISP },
+		{"emc", 0, NVHOST_MODULE_ID_EXTERNAL_MEMORY_CONTROLLER} },
 	.finalize_poweron	= nvhost_isp_t210_finalize_poweron,
 	.prepare_poweroff	= nvhost_isp_t124_prepare_poweroff,
+	.hw_init		= nvhost_isp_register_isr_v1,
 	.ctrl_ops		= &tegra_isp_ctrl_ops,
-	.gather_filter_enabled	= true,
 	.bond_out_id		= BOND_OUT_ISP,
 };
 
@@ -116,12 +123,13 @@ struct nvhost_device_data t21_ispb_info = {
 	NVHOST_DEFAULT_CLOCKGATE_DELAY,
 	.powergate_delay	= 500,
 	.can_powergate		= true,
-	.clocks			= {{ "isp", UINT_MAX, 0,
-					TEGRA_MC_CLIENT_ISPB } },
+	.clocks			= {
+		{ "isp", UINT_MAX, 0, TEGRA_MC_CLIENT_ISPB },
+		{"emc", 0, NVHOST_MODULE_ID_EXTERNAL_MEMORY_CONTROLLER} },
 	.finalize_poweron	= nvhost_isp_t210_finalize_poweron,
 	.prepare_poweroff	= nvhost_isp_t124_prepare_poweroff,
+	.hw_init		= nvhost_isp_register_isr_v1,
 	.ctrl_ops		= &tegra_isp_ctrl_ops,
-	.gather_filter_enabled	= true,
 	.bond_out_id		= BOND_OUT_ISP,
 };
 #endif
@@ -156,7 +164,6 @@ struct nvhost_device_data t21_vi_info = {
 	.ctrl_ops		= &tegra_vi_ctrl_ops,
 	.num_channels		= 6,
 	.slcg_notifier_enable	= true,
-	.gather_filter_enabled	= true,
 	.bond_out_id		= BOND_OUT_VI,
 	.prepare_poweroff = nvhost_vi_prepare_poweroff,
 	.finalize_poweron = nvhost_vi_finalize_poweron,
@@ -185,7 +192,6 @@ struct nvhost_device_data t21_vib_info = {
 	.moduleid		= NVHOST_MODULE_VI,
 	.ctrl_ops		= &tegra_vi_ctrl_ops,
 	.num_channels		= 1,
-	.gather_filter_enabled	= true,
 	.bond_out_id		= BOND_OUT_VI,
 };
 
@@ -221,7 +227,6 @@ struct nvhost_device_data t21_vi_info = {
 	.ctrl_ops		= &tegra_vi_ctrl_ops,
 	.slave			= &tegra_vi01b_device,
 	.num_channels		= 1,
-	.gather_filter_enabled	= true,
 	.bond_out_id		= BOND_OUT_VI,
 	.prepare_poweroff = nvhost_vi_prepare_poweroff,
 	.finalize_poweron = nvhost_vi_finalize_poweron,
@@ -229,32 +234,6 @@ struct nvhost_device_data t21_vi_info = {
 EXPORT_SYMBOL(t21_vi_info);
 #endif
 
-#endif
-
-#if defined(CONFIG_TEGRA_GRHOST_VII2C)
-struct nvhost_device_data t21_vii2c_info = {
-	.class			= NV_VIDEO_STREAMING_VII2C_CLASS_ID,
-	.exclusive		= true,
-	.keepalive		= true,
-	.finalize_poweron	= nvhost_vii2c_finalize_poweron,
-	.prepare_poweroff	= nvhost_vii2c_prepare_poweroff,
-	.reset			= nvhost_vii2c_module_reset,
-#ifdef TEGRA_POWERGATE_VE
-	.powergate_ids		= {TEGRA_POWERGATE_VE, -1},
-#else
-	NVHOST_MODULE_NO_POWERGATE_IDS,
-#endif
-	NVHOST_DEFAULT_CLOCKGATE_DELAY,
-	.gather_filter_enabled	= true,
-	.powergate_delay	= 500,
-	.can_powergate		= true,
-	.moduleid		= NVHOST_MODULE_VII2C,
-	.clocks = {
-		{"vii2c", 86400000},
-		{"i2cslow", 1000000},
-	},
-	.num_channels		= 1,
-};
 #endif
 
 struct nvhost_device_data t21_msenc_info = {
@@ -286,7 +265,6 @@ struct nvhost_device_data t21_msenc_info = {
 	.borps_addr		= 0x00001850,
 	.borps_val		= 0x2008,
 	.actmon_enabled		= true,
-	.gather_filter_enabled	= true,
 	.firmware_name		= "nvhost_nvenc050.fw",
 	.bond_out_id		= BOND_OUT_NVENC
 };
@@ -301,11 +279,12 @@ struct nvhost_device_data t21_nvdec_info = {
 #else
 	NVHOST_MODULE_NO_POWERGATE_IDS,
 #endif
-	NVHOST_DEFAULT_CLOCKGATE_DELAY,
+	.clockgate_delay	= 10,
 	.powergate_delay	= 500,
 	.can_powergate		= true,
 	.clocks			= {{"nvdec", UINT_MAX, 0, TEGRA_MC_CLIENT_NVDEC},
-				   {"emc", HOST_EMC_FLOOR} },
+				   {"emc", HOST_NVDEC_EMC_FLOOR,
+				NVHOST_MODULE_ID_EXTERNAL_MEMORY_CONTROLLER} },
 	.engine_cg_regs		= t21x_nvdec_gating_registers,
 	.engine_can_cg		= true,
 	.poweron_reset		= true,
@@ -320,7 +299,6 @@ struct nvhost_device_data t21_nvdec_info = {
 	.mamask_val		= 0x3d,
 	.borps_addr		= 0x00001650,
 	.borps_val		= 0x2008,
-	.gather_filter_enabled	= true,
 	.actmon_enabled		= true,
 	.bond_out_id		= BOND_OUT_NVDEC,
 };
@@ -354,7 +332,6 @@ struct nvhost_device_data t21_nvjpg_info = {
 	.borps_addr		= 0x00001450,
 	.borps_val		= 0x2008,
 	.actmon_enabled		= true,
-	.gather_filter_enabled	= true,
 	.bond_out_id		= BOND_OUT_NVJPG,
 	.firmware_name		= "nvhost_nvjpg010.fw",
 };
@@ -370,6 +347,8 @@ struct nvhost_device_data t21_tsec_info = {
 				   {"emc", HOST_EMC_FLOOR} },
 	NVHOST_MODULE_NO_POWERGATE_IDS,
 	NVHOST_DEFAULT_CLOCKGATE_DELAY,
+	.can_powergate		= true,
+	.powergate_delay	= TSEC_POWERGATE_DELAY,
 	.keepalive		= true,
 	.moduleid		= NVHOST_MODULE_TSEC,
 	.engine_can_cg		= true,
@@ -377,7 +356,6 @@ struct nvhost_device_data t21_tsec_info = {
 	.poweron_reset		= true,
 	.finalize_poweron	= nvhost_tsec_finalize_poweron,
 	.prepare_poweroff	= nvhost_tsec_prepare_poweroff,
-	.gather_filter_enabled	= true,
 	.bond_out_id		= BOND_OUT_TSEC,
 };
 
@@ -387,7 +365,7 @@ struct nvhost_device_data t21_tsecb_info = {
 	.devfs_name		= "tsecb",
 	.version		= NVHOST_ENCODE_TSEC_VER(1, 0),
 	.class			= NV_TSECB_CLASS_ID,
-	.exclusive		= true,
+	.exclusive		= false,
 	.clocks			= {{"tsecb", UINT_MAX, 0, TEGRA_MC_CLIENT_TSECB},
 				   {"emc", HOST_EMC_FLOOR} },
 	NVHOST_MODULE_NO_POWERGATE_IDS,
@@ -400,7 +378,6 @@ struct nvhost_device_data t21_tsecb_info = {
 	.poweron_reset		= true,
 	.finalize_poweron	= nvhost_tsec_finalize_poweron,
 	.prepare_poweroff	= nvhost_tsec_prepare_poweroff,
-	.gather_filter_enabled	= true,
 	.bond_out_id		= BOND_OUT_TSEC,
 };
 #ifdef CONFIG_ARCH_TEGRA_VIC
@@ -409,8 +386,9 @@ struct nvhost_device_data t21_vic_info = {
 	.num_channels		= 1,
 	.modulemutexes		= {NVMODMUTEX_VIC},
 	.devfs_name		= "vic",
-	.clocks			= {{"vic03", UINT_MAX, 0, TEGRA_MC_CLIENT_VIC},
-				   {"emc", UINT_MAX,
+	.clocks			= {{"vic03", 140800000, 0,
+				   TEGRA_MC_CLIENT_VIC},
+				   {"emc", HOST_EMC_FLOOR,
 				   NVHOST_MODULE_ID_EXTERNAL_MEMORY_CONTROLLER},
 				   {"vic_floor", 0,
 				   NVHOST_MODULE_ID_CBUS_FLOOR},
@@ -431,14 +409,17 @@ struct nvhost_device_data t21_vic_info = {
 	.engine_can_cg		= true,
 	.poweron_toggle_slcg	= true,
 	.finalize_poweron	= nvhost_vic_finalize_poweron,
-	.scaling_init           = nvhost_scale_init,
-	.scaling_deinit         = nvhost_scale_deinit,
+	.scaling_init           = nvhost_scale3d_init,
+	.scaling_deinit         = nvhost_scale3d_deinit,
+	.scaling_post_cb	= &nvhost_scale3d_callback,
 	.actmon_regs            = HOST1X_CHANNEL_ACTMON2_REG_BASE,
+	.linear_emc		= true,
 	.actmon_enabled         = true,
+	.actmon_irq		= 13,
+	.devfreq_governor	= "wmark_active",
 	.serialize		= true,
 	.push_work_done		= true,
 	.firmware_name		= "vic04_ucode.bin",
-	.gather_filter_enabled	= true,
 	.bond_out_id		= BOND_OUT_VIC,
 	.aggregate_constraints	= nvhost_vic_aggregate_constraints,
 	.num_ppc		= 8,

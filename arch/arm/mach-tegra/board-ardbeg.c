@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-ardbeg.c
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -42,6 +42,7 @@
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
 #include <linux/regulator/consumer.h>
+#include <linux/regulator/machine.h>
 #include <linux/smb349-charger.h>
 #include <linux/max17048_battery.h>
 #include <linux/leds.h>
@@ -226,10 +227,13 @@ static void ardbeg_i2c_init(void)
 	struct board_info board_info;
 	tegra_get_board_info(&board_info);
 
-	if (board_info.board_id == BOARD_PM374) {
-		i2c_register_board_info(0, &max98090_board_info, 1);
-	} else if (board_info.board_id != BOARD_PM359)
-		i2c_register_board_info(0, &rt5639_board_info, 1);
+	if(!of_machine_is_compatible("nvidia,green-arrow"))
+	{
+		if (board_info.board_id == BOARD_PM374) {
+			i2c_register_board_info(0, &max98090_board_info, 1);
+		} else if (board_info.board_id != BOARD_PM359)
+			i2c_register_board_info(0, &rt5639_board_info, 1);
+	}
 
 	if (board_info.board_id == BOARD_PM359 ||
 		board_info.board_id == BOARD_PM358 ||
@@ -321,7 +325,8 @@ static void ardbeg_audio_init(void)
 
 		if (board_info.board_id == BOARD_E1762 ||
 			board_info.board_id == BOARD_P1761 ||
-			board_info.board_id == BOARD_E1922) {
+			board_info.board_id == BOARD_E1922 ||
+			of_machine_is_compatible("nvidia,green-arrow")) {
 			ardbeg_audio_pdata_rt5639.gpio_hp_det =
 				TEGRA_GPIO_CDC_IRQ;
 			ardbeg_audio_pdata_rt5639.use_codec_jd_irq = true;
@@ -371,9 +376,6 @@ static struct platform_device norrin_audio_device_max98090 = {
 
 static struct platform_device *ardbeg_devices[] __initdata = {
 	&tegra_rtc_device,
-#if !defined(CONFIG_ARM64)
-	&tegra_udc_device,
-#endif
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_SE) && !defined(CONFIG_USE_OF)
 	&tegra12_se_device,
 #endif
@@ -525,6 +527,11 @@ static void ardbeg_usb_init(void)
 	struct board_info bi;
 	tegra_get_pmu_board_info(&bi);
 
+	/* ST8 is supported through DT, return */
+	if (board_info.board_id == BOARD_P1761 ||
+			of_machine_is_compatible("nvidia,green-arrow"))
+		return;
+
 #if !defined(CONFIG_ARM64)
 	if (board_info.sku == 1100 || board_info.board_id == BOARD_P1761 ||
 					board_info.board_id == BOARD_E1784)
@@ -568,8 +575,8 @@ static void ardbeg_usb_init(void)
 			tegra_udc_pdata.qc2_voltage = TEGRA_USB_QC2_9V;
 			tegra_udc_pdata.u_data.dev.qc2_current_limit_ma = 1200;
 
-			/* charger needs to be set to 2A - h/w will do 1.8A */
-			tegra_udc_pdata.u_data.dev.dcp_current_limit_ma = 2000;
+			/* charger needs to be set to 3A - h/w will do 2A */
+			tegra_udc_pdata.u_data.dev.dcp_current_limit_ma = 3000;
 		}
 
 		switch (bi.board_id) {
@@ -618,7 +625,9 @@ static void ardbeg_usb_init(void)
 
 	/* Setup the udc platform data */
 	tegra_udc_device.dev.platform_data = &tegra_udc_pdata;
+
 #if !defined(CONFIG_ARM64)
+	platform_device_register(&tegra_udc_device);
 	if (!(usb_port_owner_info & UTMI2_PORT_OWNER_XUSB)) {
 		if (!modem_id) {
 			if ((bi.board_id != BOARD_P1761) &&
@@ -761,9 +770,6 @@ static void ardbeg_modem_init(void)
 
 #ifdef CONFIG_USE_OF
 static struct of_dev_auxdata ardbeg_auxdata_lookup[] __initdata = {
-	T124_SPI_OF_DEV_AUXDATA,
-	OF_DEV_AUXDATA("nvidia,tegra124-apbdma", 0x60020000, "tegra-apbdma",
-				NULL),
 	OF_DEV_AUXDATA("nvidia,tegra124-se", 0x70012000, "tegra12-se", NULL),
 	OF_DEV_AUXDATA("nvidia,tegra132-dtv", 0x7000c300, "dtv", NULL),
 	OF_DEV_AUXDATA("nvidia,tegra124-dtv", 0x7000c300, "dtv", NULL),
@@ -777,6 +783,10 @@ static struct of_dev_auxdata ardbeg_auxdata_lookup[] __initdata = {
 	OF_DEV_AUXDATA("nvidia,tegra132-ehci", 0x7d008000, "tegra-ehci.2",
 			NULL),
 #endif
+	OF_DEV_AUXDATA("nvidia,tegra124-udc", TEGRA_USB_BASE, "tegra-udc.0",
+			NULL),
+	OF_DEV_AUXDATA("nvidia,tegra124-otg", TEGRA_USB_BASE, "tegra-otg",
+			NULL),
 	OF_DEV_AUXDATA("nvidia,tegra124-host1x", TEGRA_HOST1X_BASE, "host1x",
 		NULL),
 	OF_DEV_AUXDATA("nvidia,tegra124-gk20a", TEGRA_GK20A_BAR0_BASE,
@@ -794,7 +804,6 @@ static struct of_dev_auxdata ardbeg_auxdata_lookup[] __initdata = {
 	OF_DEV_AUXDATA("nvidia,tegra124-isp", TEGRA_ISP_BASE, "isp.0", NULL),
 	OF_DEV_AUXDATA("nvidia,tegra124-isp", TEGRA_ISPB_BASE, "isp.1", NULL),
 	OF_DEV_AUXDATA("nvidia,tegra124-tsec", TEGRA_TSEC_BASE, "tsec", NULL),
-	T124_UART_OF_DEV_AUXDATA,
 	T124_I2C_OF_DEV_AUXDATA,
 	T124_SDMMC_OF_DEV_AUXDATA,
 	OF_DEV_AUXDATA("nvidia,tegra124-xhci", 0x70090000, "tegra-xhci",
@@ -807,7 +816,6 @@ static struct of_dev_auxdata ardbeg_auxdata_lookup[] __initdata = {
 		NULL),
 	OF_DEV_AUXDATA("nvidia,tegra124-nvavp", 0x60001000, "nvavp",
 				NULL),
-	OF_DEV_AUXDATA("nvidia,tegra124-pwm", 0x7000a000, "tegra-pwm", NULL),
 	OF_DEV_AUXDATA("nvidia,tegra124-dfll", 0x70110000, "tegra_cl_dvfs",
 		NULL),
 	OF_DEV_AUXDATA("nvidia,tegra132-dfll", 0x70040084, "tegra_cl_dvfs",
@@ -824,6 +832,8 @@ static struct of_dev_auxdata ardbeg_auxdata_lookup[] __initdata = {
 #ifdef CONFIG_TEGRA_CEC_SUPPORT
 	OF_DEV_AUXDATA("nvidia,tegra124-cec", 0x70015000, "tegra_cec", NULL),
 #endif
+	OF_DEV_AUXDATA("nvidia,tegra-audio-rt5639", 0x0, "tegra-snd-rt5639",
+		NULL),
 	OF_DEV_AUXDATA("nvidia,icera-i500", 0, "tegra_usb_modem_power", NULL),
 	OF_DEV_AUXDATA("nvidia,ptm", 0x7081c000, "ptm", NULL),
 	OF_DEV_AUXDATA("nvidia,tegra30-hda", 0x70030000, "tegra30-hda", NULL),
@@ -1160,6 +1170,8 @@ static void __init tegra_ardbeg_early_init(void)
 		tegra_soc_device_init("t132loki");
 	else if (of_machine_is_compatible("nvidia,e2141"))
 		tegra_soc_device_init("e2141");
+	else if (of_machine_is_compatible("nvidia,green-arrow"))
+		tegra_soc_device_init("green-arrow");
 	else
 		tegra_soc_device_init("ardbeg");
 }
@@ -1201,12 +1213,20 @@ static void __init tegra_ardbeg_late_init(void)
 	ardbeg_xusb_init();
 #endif
 	ardbeg_i2c_init();
-	ardbeg_audio_init();
+
+	if(!of_machine_is_compatible("nvidia,green-arrow"))
+		ardbeg_audio_init();
+
 	platform_add_devices(ardbeg_devices, ARRAY_SIZE(ardbeg_devices));
-	if (board_info.board_id == BOARD_PM374)	/* Norrin ERS */
-		platform_device_register(&norrin_audio_device_max98090);
-	else if (board_info.board_id != BOARD_PM359)
-		platform_device_register(&ardbeg_audio_device_rt5639);
+
+	if(!of_machine_is_compatible("nvidia,green-arrow"))
+	{
+		if (board_info.board_id == BOARD_PM374)	/* Norrin ERS */
+			platform_device_register(&norrin_audio_device_max98090);
+		else if (board_info.board_id != BOARD_PM359)
+			platform_device_register(&ardbeg_audio_device_rt5639);
+	}
+
 	tegra_io_dpd_init();
 	if (board_info.board_id == BOARD_E2548 ||
 			board_info.board_id == BOARD_P2530)
@@ -1241,7 +1261,10 @@ static void __init tegra_ardbeg_late_init(void)
 		ardbeg_emc_init();
 
 	isomgr_init();
-	ardbeg_touch_init();
+
+	if (!of_machine_is_compatible("nvidia,green-arrow" ))
+		ardbeg_touch_init();
+
 	if (board_info.board_id == BOARD_E2548 ||
 			board_info.board_id == BOARD_P2530)
 		loki_panel_init();
@@ -1319,6 +1342,9 @@ static struct notifier_block platform_nb = {
 
 static void __init tegra_ardbeg_dt_init(void)
 {
+	if(of_machine_is_compatible("nvidia,green-arrow"))
+		regulator_has_full_constraints();
+
 	tegra_get_board_info(&board_info);
 	tegra_get_display_board_info(&display_board_info);
 
@@ -1388,6 +1414,11 @@ static const char * const tn8_dt_board_compat[] = {
 	NULL
 };
 
+static const char * const green_arrow_dt_board_compat[] = {
+	"nvidia,green-arrow",
+	NULL
+};
+
 static const char * const ardbeg_sata_dt_board_compat[] = {
 	"nvidia,ardbeg_sata",
 	NULL
@@ -1451,6 +1482,19 @@ DT_MACHINE_START(TN8, "tn8")
 	.init_time	= clocksource_of_init,
 	.init_machine	= tegra_ardbeg_dt_init,
 	.dt_compat	= tn8_dt_board_compat,
+	.init_late      = tegra_init_late
+MACHINE_END
+
+DT_MACHINE_START(GREEN_ARROW, "green-arrow")
+	.atag_offset	= 0x100,
+	.smp		= smp_ops(tegra_smp_ops),
+	.map_io		= tegra_map_common_io,
+	.reserve	= tegra_ardbeg_reserve,
+	.init_early	= tegra_ardbeg_init_early,
+	.init_irq	= irqchip_init,
+	.init_time	= clocksource_of_init,
+	.init_machine	= tegra_ardbeg_dt_init,
+	.dt_compat	= green_arrow_dt_board_compat,
 	.init_late      = tegra_init_late
 MACHINE_END
 

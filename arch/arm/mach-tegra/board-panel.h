@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-panel.h
  *
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -65,9 +65,16 @@ struct tegra_panel_ops {
 	void (*hotplug_report)(bool);
 	struct pwm_bl_data_dt_ops *pwm_bl_ops;
 };
+
+struct generic_bl_data_dt_ops {
+	int (*notify)(struct device *dev, int brightness);
+};
+
 extern struct tegra_panel_ops dsi_p_wuxga_10_1_ops;
 extern struct tegra_panel_ops dsi_lgd_wxga_7_0_ops;
 extern struct tegra_panel_ops dsi_s_wqxga_10_1_ops;
+extern struct tegra_panel_ops dsi_s_wuxga_7_0_ops;
+extern struct tegra_panel_ops dsi_s_wuxga_8_0_ops;
 extern struct tegra_panel_ops dsi_a_1200_1920_8_0_ops;
 extern struct tegra_panel_ops dsi_a_1200_800_8_0_ops;
 extern struct tegra_panel_ops edp_a_1080p_14_0_ops;
@@ -77,6 +84,7 @@ extern struct tegra_panel_ops dsi_a_1080p_14_0_ops;
 extern struct tegra_panel_ops dsi_j_1440_810_5_8_ops;
 extern struct tegra_panel_ops dsi_j_720p_5_ops;
 extern struct tegra_panel_ops dsi_l_720p_5_loki_ops;
+extern struct tegra_panel_ops edp_s_uhdtv_15_6_ops;
 
 extern struct tegra_panel_ops *fixed_primary_panel_ops;
 extern struct tegra_panel_ops *fixed_secondary_panel_ops;
@@ -100,7 +108,6 @@ extern struct tegra_panel dsi_j_1440_810_5_8;
 extern struct tegra_panel dsi_j_720p_5;
 extern struct tegra_panel dsi_a_1200_1920_8_0;
 extern struct tegra_panel dsi_a_1200_800_8_0;
-extern struct tegra_panel edp_c_1366_768_14_0;
 
 void tegra_dsi_resources_init(u8 dsi_instance,
 			struct resource *resources, int n_resources);
@@ -112,9 +119,6 @@ int tegra_panel_gpio_get_dt(const char *comp_str,
 
 int tegra_panel_reset(struct tegra_panel_of *panel, unsigned int delay_ms);
 
-int tegra_init_hdmi(struct platform_device *pdev,
-			struct platform_device *phost1x);
-
 void tegra_fb_copy_or_clear(void);
 
 int tegra_disp_defer_vcore_override(void);
@@ -125,5 +129,7 @@ void tegra_set_fixed_panel_ops(bool is_primary,
 void tegra_set_fixed_pwm_bl_ops(struct pwm_bl_data_dt_ops *p_ops);
 
 void tegra_pwm_bl_ops_register(struct device *dev);
+
+void ti_lp855x_bl_ops_register(struct device *dev);
 
 #endif /* __MACH_TEGRA_BOARD_PANEL_H */

@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Driver Entrypoint
  *
- * Copyright (c) 2010-2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -66,6 +66,8 @@ static const char *num_mutexes_name = "num_mlocks";
 static const char *gather_filter_enabled_name = "gather_filter_enabled";
 static const char *alloc_syncpts_per_apps_name = "alloc_syncpts_per_apps";
 static const char *alloc_chs_per_submits_name = "alloc_chs_per_submits";
+static const char *syncpts_pts_base_name = "pts_base";
+static const char *syncpts_pts_limit_name = "pts_limit";
 
 struct nvhost_master *nvhost;
 
@@ -128,7 +130,7 @@ static int nvhost_ctrlopen(struct inode *inode, struct file *filp)
 static int nvhost_ioctl_ctrl_syncpt_read(struct nvhost_ctrl_userctx *ctx,
 	struct nvhost_ctrl_syncpt_read_args *args)
 {
-	if (args->id >= nvhost_syncpt_nb_pts(&ctx->dev->syncpt))
+	if (!nvhost_syncpt_is_valid_hw_pt(&ctx->dev->syncpt, args->id))
 		return -EINVAL;
 	args->value = nvhost_syncpt_read(&ctx->dev->syncpt, args->id);
 	trace_nvhost_ioctl_ctrl_syncpt_read(args->id, args->value);
@@ -138,7 +140,7 @@ static int nvhost_ioctl_ctrl_syncpt_read(struct nvhost_ctrl_userctx *ctx,
 static int nvhost_ioctl_ctrl_syncpt_incr(struct nvhost_ctrl_userctx *ctx,
 	struct nvhost_ctrl_syncpt_incr_args *args)
 {
-	if (args->id >= nvhost_syncpt_nb_pts(&ctx->dev->syncpt))
+	if (!nvhost_syncpt_is_valid_pt(&ctx->dev->syncpt, args->id))
 		return -EINVAL;
 	trace_nvhost_ioctl_ctrl_syncpt_incr(args->id);
 	nvhost_syncpt_incr(&ctx->dev->syncpt, args->id);
@@ -150,7 +152,7 @@ static int nvhost_ioctl_ctrl_syncpt_waitex(struct nvhost_ctrl_userctx *ctx,
 {
 	u32 timeout;
 	int err;
-	if (args->id >= nvhost_syncpt_nb_pts(&ctx->dev->syncpt))
+	if (!nvhost_syncpt_is_valid_hw_pt(&ctx->dev->syncpt, args->id))
 		return -EINVAL;
 	if (args->timeout == NVHOST_NO_TIMEOUT)
 		/* FIXME: MAX_SCHEDULE_TIMEOUT is ulong which can be bigger
@@ -175,7 +177,7 @@ static int nvhost_ioctl_ctrl_syncpt_waitmex(struct nvhost_ctrl_userctx *ctx,
 	ulong timeout;
 	int err;
 	struct timespec ts;
-	if (args->id >= nvhost_syncpt_nb_pts(&ctx->dev->syncpt))
+	if (!nvhost_syncpt_is_valid_hw_pt(&ctx->dev->syncpt, args->id))
 		return -EINVAL;
 	if (args->timeout == NVHOST_NO_TIMEOUT)
 		timeout = MAX_SCHEDULE_TIMEOUT;
@@ -225,8 +227,8 @@ static int nvhost_ioctl_ctrl_sync_fence_create(struct nvhost_ctrl_userctx *ctx,
 	}
 
 	for (i = 0; i < args->num_pts; i++) {
-		if (pts[i].id >= nvhost_syncpt_nb_pts(&ctx->dev->syncpt) &&
-		    pts[i].id != NVSYNCPT_INVALID) {
+		if (!nvhost_syncpt_is_valid_hw_pt(&ctx->dev->syncpt,
+					pts[i].id)) {
 			err = -EINVAL;
 			goto out;
 		}
@@ -385,7 +387,7 @@ static int nvhost_ioctl_ctrl_get_version(struct nvhost_ctrl_userctx *ctx,
 static int nvhost_ioctl_ctrl_syncpt_read_max(struct nvhost_ctrl_userctx *ctx,
 	struct nvhost_ctrl_syncpt_read_args *args)
 {
-	if (args->id >= nvhost_syncpt_nb_pts(&ctx->dev->syncpt))
+	if (!nvhost_syncpt_is_valid_hw_pt(&ctx->dev->syncpt, args->id))
 		return -EINVAL;
 	args->value = nvhost_syncpt_read_max(&ctx->dev->syncpt, args->id);
 	return 0;
@@ -525,12 +527,11 @@ static int disable_irq_host(struct platform_device *dev)
 
 int nvhost_gather_filter_enabled(struct nvhost_syncpt *sp)
 {
-	enum tegra_chipid cid = tegra_get_chipid();
-
-	if (cid == TEGRA_CHIPID_TEGRA12 || cid == TEGRA_CHIPID_TEGRA13 ||
-	    cid == TEGRA_CHIPID_TEGRA21)
-		return 1;
-	return 0;
+	/*
+	 * Keep gather filter always enabled
+	 * We still need this API to inform this to user space
+	 */
+	return 1;
 }
 
 static int alloc_syncpts_per_apps(struct nvhost_syncpt *sp)
@@ -619,7 +620,7 @@ static int nvhost_user_init(struct nvhost_master *host)
 	}
 
 	host->caps_nodes = devm_kzalloc(&host->dev->dev,
-			sizeof(struct nvhost_capability_node) * 5, GFP_KERNEL);
+			sizeof(struct nvhost_capability_node) * 7, GFP_KERNEL);
 	if (!host->caps_nodes) {
 		err = -ENOMEM;
 		goto fail;
@@ -666,6 +667,18 @@ static int nvhost_user_init(struct nvhost_master *host)
 		goto fail;
 	}
 
+	if (nvhost_set_sysfs_capability_node(host, syncpts_pts_limit_name,
+		host->caps_nodes + 5, &nvhost_syncpt_pts_limit, NULL)) {
+		err = -EIO;
+		goto fail;
+	}
+
+	if (nvhost_set_sysfs_capability_node(host, syncpts_pts_base_name,
+		host->caps_nodes + 6, &nvhost_syncpt_pts_base, NULL)) {
+		err = -EIO;
+		goto fail;
+	}
+
 	return 0;
 fail:
 	return err;
@@ -690,7 +703,7 @@ static int nvhost_alloc_resources(struct nvhost_master *host)
 		return err;
 
 	host->intr.syncpt = kzalloc(sizeof(struct nvhost_intr_syncpt) *
-				    nvhost_syncpt_nb_pts(&host->syncpt),
+				    nvhost_syncpt_nb_hw_pts(&host->syncpt),
 				    GFP_KERNEL);
 
 	if (!host->intr.syncpt) {
@@ -713,6 +726,8 @@ static struct of_device_id tegra_host1x_of_match[] = {
 #ifdef CONFIG_ARCH_TEGRA_18x_SOC
 	{ .compatible = "nvidia,tegra186-host1x",
 		.data = (struct nvhost_device_data *)&t18_host1x_info },
+	{ .compatible = "nvidia,tegra186-host1x-cl34000094",
+		.data = (struct nvhost_device_data *)&t18_host1x_info },
 #endif
 	{ },
 };
@@ -731,106 +746,24 @@ static void of_nvhost_parse_platform_data(struct platform_device *dev,
 					struct nvhost_device_data *pdata)
 {
 	struct device_node *np = dev->dev.of_node;
+	struct nvhost_master *host = nvhost_get_host(dev);
 	u32 value;
 
 	if (!of_property_read_u32(np, "virtual-dev", &value)) {
 		if (value)
 			pdata->virtual_dev = true;
 	}
+
+	if (!of_property_read_u32(np, "nvidia,ch-base", &value))
+		host->info.ch_base = value;
+
+	if (!of_property_read_u32(np, "nvidia,nb-channels", &value))
+		host->info.nb_channels = value;
+
+	host->info.ch_limit = host->info.ch_base + host->info.nb_channels;
 }
 
-static inline int vhost_comm_init(struct platform_device *pdev)
-{
-	size_t queue_sizes[] = { TEGRA_VHOST_QUEUE_SIZES };
-
-	return tegra_gr_comm_init(pdev, TEGRA_GR_COMM_CTX_CLIENT, 3,
-				queue_sizes, TEGRA_VHOST_QUEUE_CMD,
-				ARRAY_SIZE(queue_sizes));
-}
-
-static inline void vhost_comm_deinit(void)
-{
-	size_t queue_sizes[] = { TEGRA_VHOST_QUEUE_SIZES };
-
-	tegra_gr_comm_deinit(TEGRA_GR_COMM_CTX_CLIENT, TEGRA_VHOST_QUEUE_CMD,
-			ARRAY_SIZE(queue_sizes));
-}
-
-static u64 vhost_virt_connect(void)
-{
-	struct tegra_vhost_cmd_msg msg;
-	struct tegra_vhost_connect_params *p = &msg.params.connect;
-	int err;
-
-	msg.cmd = TEGRA_VHOST_CMD_CONNECT;
-	p->module = TEGRA_VHOST_MODULE_HOST;
-	err = vhost_sendrecv(&msg);
-
-	return (err || msg.ret) ? 0 : p->handle;
-}
-
-int vhost_sendrecv(struct tegra_vhost_cmd_msg *msg)
-{
-	void *handle;
-	size_t size = sizeof(*msg);
-	size_t size_out = size;
-	void *data = msg;
-	int err;
-
-	err = tegra_gr_comm_sendrecv(TEGRA_GR_COMM_CTX_CLIENT,
-				tegra_gr_comm_get_server_vmid(),
-				TEGRA_VHOST_QUEUE_CMD, &handle, &data, &size);
-	if (!err) {
-		WARN_ON(size < size_out);
-		memcpy(msg, data, size_out);
-		tegra_gr_comm_release(handle);
-	}
-
-	return err;
-}
-
-static int nvhost_virt_init(struct platform_device *dev)
-{
-	struct nvhost_virt_ctx *virt_ctx =
-				kzalloc(sizeof(*virt_ctx), GFP_KERNEL);
-	int err;
-
-	if (!virt_ctx)
-		return -ENOMEM;
-
-	err = vhost_comm_init(dev);
-	if (err) {
-		dev_err(&dev->dev, "failed to init comm interface\n");
-		goto fail;
-	}
-
-	virt_ctx->handle = vhost_virt_connect();
-	if (!virt_ctx->handle) {
-		dev_err(&dev->dev,
-			"failed to connect to server node\n");
-		vhost_comm_deinit();
-		err = -ENOMEM;
-		goto fail;
-	}
-
-	nvhost_set_virt_data(dev, virt_ctx);
-	return 0;
-
-fail:
-	kfree(virt_ctx);
-	return err;
-}
-
-static void nvhost_virt_deinit(struct platform_device *dev)
-{
-	struct nvhost_virt_ctx *virt_ctx = nvhost_get_virt_data(dev);
-
-	if (virt_ctx) {
-		/* FIXME: add virt disconnect */
-		vhost_comm_deinit();
-		kfree(virt_ctx);
-	}
-}
+long linsim_cl = 0;
 
 static int nvhost_probe(struct platform_device *dev)
 {
@@ -844,8 +777,17 @@ static int nvhost_probe(struct platform_device *dev)
 		const struct of_device_id *match;
 
 		match = of_match_device(tegra_host1x_of_match, &dev->dev);
-		if (match)
+		if (match) {
+			char *substr = strstr(match->compatible, "cl");
+
 			pdata = (struct nvhost_device_data *)match->data;
+
+			if (substr) {
+				substr += 2;
+				if (kstrtol(substr, 0, &linsim_cl))
+					WARN(1, "Unable to decode linsim cl\n");
+			}
+		}
 	} else
 		pdata = (struct nvhost_device_data *)dev->dev.platform_data;
 
@@ -886,7 +828,11 @@ static int nvhost_probe(struct platform_device *dev)
 	nvhost = host;
 
 	host->dev = dev;
+	INIT_LIST_HEAD(&host->static_mappings_list);
+	INIT_LIST_HEAD(&host->vm_list);
+	mutex_init(&host->vm_mutex);
 	mutex_init(&pdata->lock);
+	mutex_init(&host->priority_lock);
 
 	/* Copy host1x parameters. The private_data gets replaced
 	 * by nvhost_master later */
@@ -894,7 +840,6 @@ static int nvhost_probe(struct platform_device *dev)
 			sizeof(struct host1x_device_info));
 
 	pdata->pdev = dev;
-	atomic_set(&host->shutdown, 0);
 
 	/* set common host1x device data */
 	platform_set_drvdata(dev, pdata);
@@ -902,17 +847,17 @@ static int nvhost_probe(struct platform_device *dev)
 	/* set private host1x device data */
 	nvhost_set_private_data(dev, host);
 
-	host->aperture = devm_ioremap_resource(&dev->dev, regs);
-	if (IS_ERR(host->aperture)) {
-		err = PTR_ERR(host->aperture);
-		goto fail;
-	}
-
 	of_nvhost_parse_platform_data(dev, pdata);
 	if (pdata->virtual_dev) {
-		err = nvhost_virt_init(dev);
+		err = nvhost_virt_init(dev, NVHOST_MODULE_NONE);
 		if (err) {
 			dev_err(&dev->dev, "failed to init virt support\n");
+			goto fail;
+		}
+	} else {
+		host->aperture = devm_ioremap_resource(&dev->dev, regs);
+		if (IS_ERR(host->aperture)) {
+			err = PTR_ERR(host->aperture);
 			goto fail;
 		}
 	}
@@ -944,7 +889,9 @@ static int nvhost_probe(struct platform_device *dev)
 		goto fail;
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS
+#ifndef CONFIG_PM_GENERIC_DOMAINS_OF
 	pdata->pd.name = "tegra-host1x";
+#endif
 	err = nvhost_module_add_domain(&pdata->pd, dev);
 #endif
 
@@ -1049,15 +996,6 @@ static int nvhost_resume(struct device *dev)
 	return 0;
 }
 
-static void nvhost_shutdown(struct platform_device *pdev)
-{
-	struct nvhost_master *host = nvhost_get_host(pdev);
-
-	dev_info(&pdev->dev, "shutting down");
-	atomic_set(&host->shutdown, 1);
-	__pm_runtime_disable(&pdev->dev, false);
-}
-
 static const struct dev_pm_ops host1x_pm_ops = {
 	.prepare = nvhost_suspend_prepare,
 	.complete = nvhost_suspend_complete,
@@ -1069,9 +1007,6 @@ static const struct dev_pm_ops host1x_pm_ops = {
 static struct platform_driver platform_driver = {
 	.probe = nvhost_probe,
 	.remove = __exit_p(nvhost_remove),
-#ifdef CONFIG_PM
-	.shutdown = nvhost_shutdown,
-#endif
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = DRIVER_NAME,
@@ -1084,8 +1019,20 @@ static struct platform_driver platform_driver = {
 	},
 };
 
+static struct of_device_id tegra21x_host1x_domain_match[] = {
+	{.compatible = "nvidia,tegra210-host1x-pd",
+	 .data = (struct nvhost_device_data *)&t21_host1x_info},
+	{},
+};
+
 static int __init nvhost_mod_init(void)
 {
+	int ret;
+
+	ret = nvhost_domain_init(tegra21x_host1x_domain_match);
+	if (ret)
+		return ret;
+
 	return platform_driver_register(&platform_driver);
 }
 

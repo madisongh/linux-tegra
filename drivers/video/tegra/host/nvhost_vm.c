@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Host Virtual Memory
  *
- * Copyright (c) 2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -21,47 +21,63 @@
 #include <linux/slab.h>
 #include <linux/dma-buf.h>
 
+#include "chip_support.h"
 #include "nvhost_vm.h"
 #include "dev.h"
-
-struct nvhost_vm {
-	struct platform_device *pdev;
-
-	struct kref kref;	/* reference to this VM */
-	struct mutex mutex;
-
-	/* rb-tree of buffers mapped into this VM */
-	struct rb_root buffer_list;
-
-	/* count of application viewed buffers mapped into this VM */
-	unsigned int num_user_mapped_buffers;
-};
-
-struct nvhost_vm_buffer {
-	struct nvhost_vm *vm;
-
-	/* buffer attachment */
-	struct dma_buf *dmabuf;
-	struct dma_buf_attachment *attach;
-	struct sg_table *sgt;
-
-	/* context specific view to the buffer */
-	dma_addr_t addr;
-	size_t size;
-
-	struct kref kref;	/* reference to this buffer */
-
-	/* bookkeeping */
-	unsigned int user_map_count;	/* application view to the buffer */
-	unsigned int submit_map_count;	/* hw view to this buffer */
-	struct rb_node node;
-};
 
 struct nvhost_vm_pin {
 	/* list of pinned buffers */
 	struct nvhost_vm_buffer **buffers;
 	unsigned int num_buffers;
 };
+
+int nvhost_vm_get_id(struct nvhost_vm *vm)
+{
+	if (!vm_op().get_id)
+		return -ENOSYS;
+
+	return vm_op().get_id(vm);
+}
+
+int nvhost_vm_map_static(struct platform_device *pdev,
+			 void *vaddr, dma_addr_t paddr,
+			 size_t size)
+{
+	struct nvhost_vm_static_buffer *sbuffer;
+	struct nvhost_master *host = nvhost_get_host(pdev);
+	struct nvhost_vm *vm;
+
+	/* if static mappings are not supported, exit */
+	if (!vm_op().pin_static_buffer)
+		return 0;
+
+	sbuffer = kzalloc(sizeof(*sbuffer), GFP_KERNEL);
+	if (!sbuffer)
+		return -ENOMEM;
+
+	sbuffer->paddr = paddr;
+	sbuffer->vaddr = vaddr;
+	sbuffer->size = size;
+	INIT_LIST_HEAD(&sbuffer->list);
+
+	/* take global vm mutex */
+	mutex_lock(&host->vm_mutex);
+
+	/* add this buffer into list of static mappings */
+	list_add_tail(&sbuffer->list, &host->static_mappings_list);
+
+	/* add the static mapping to all existing vms */
+	list_for_each_entry(vm, &host->vm_list, vm_list) {
+		int err = vm_op().pin_static_buffer(vm, sbuffer);
+		/* this is irreversible; just warn of failed mapping */
+		WARN_ON(err);
+	}
+
+	/* release the vm mutex */
+	mutex_unlock(&host->vm_mutex);
+
+	return 0;
+}
 
 static struct nvhost_vm_buffer *nvhost_vm_find_buffer(struct rb_root *root,
 						      struct dma_buf *dmabuf)
@@ -114,6 +130,9 @@ static int insert_mapped_buffer(struct rb_root *root,
 static void nvhost_vm_destroy_buffer_locked(struct nvhost_vm_buffer *buffer)
 {
 	struct nvhost_vm *vm = buffer->vm;
+
+	if (vm_op().unpin_buffer)
+		vm_op().unpin_buffer(vm, buffer);
 
 	dma_buf_unmap_attachment(buffer->attach, buffer->sgt,
 				 DMA_BIDIRECTIONAL);
@@ -222,12 +241,21 @@ int nvhost_vm_map_dmabuf(struct nvhost_vm *vm, struct dma_buf *dmabuf,
 		goto err_map_attachment;
 	}
 
-	/* get dma address */
-	buffer->addr = sg_dma_address(buffer->sgt->sgl);
+	/* if pin function is defined.. */
+	if (vm_op().pin_buffer) {
+		/* .. use it to determine the device view on this buffer */
+		err = vm_op().pin_buffer(vm, buffer);
+		if (err)
+			goto err_pin;
+	} else {
+		/* otherwise assume that dma_buf mapped it into the correct
+		 * iova. just get the dma address */
+		buffer->addr = sg_dma_address(buffer->sgt->sgl);
 
-	/* handle physical addresses */
-	if (!buffer->addr)
-		buffer->addr = sg_phys(buffer->sgt->sgl);
+		/* handle physical addresses */
+		if (!buffer->addr)
+			buffer->addr = sg_phys(buffer->sgt->sgl);
+	}
 
 	/* add buffer to the buffer list to avoid duplicate mappings */
 	err = insert_mapped_buffer(&vm->buffer_list, buffer);
@@ -245,6 +273,7 @@ int nvhost_vm_map_dmabuf(struct nvhost_vm *vm, struct dma_buf *dmabuf,
 err_insert_buffer:
 	dma_buf_unmap_attachment(buffer->attach,
 			buffer->sgt, DMA_BIDIRECTIONAL);
+err_pin:
 err_map_attachment:
 	dma_buf_detach(dmabuf, buffer->attach);
 err_attach:
@@ -341,8 +370,14 @@ err_alloc_pin:
 static void nvhost_vm_deinit(struct kref *kref)
 {
 	struct nvhost_vm *vm = container_of(kref, struct nvhost_vm, kref);
+	struct nvhost_master *host = nvhost_get_host(vm->pdev);
 	struct nvhost_vm_buffer *buffer;
 	struct rb_node *node;
+
+	/* remove this vm from the vms list */
+	mutex_lock(&host->vm_mutex);
+	list_del(&vm->vm_list);
+	mutex_unlock(&host->vm_mutex);
 
 	mutex_lock(&vm->mutex);
 
@@ -357,6 +392,9 @@ static void nvhost_vm_deinit(struct kref *kref)
 	}
 
 	mutex_unlock(&vm->mutex);
+
+	if (vm_op().deinit)
+		vm_op().deinit(vm);
 
 	kfree(vm);
 	vm = NULL;
@@ -374,6 +412,8 @@ void nvhost_vm_get(struct nvhost_vm *vm)
 
 struct nvhost_vm *nvhost_vm_allocate(struct platform_device *pdev)
 {
+	struct nvhost_vm_static_buffer *sbuffer;
+	struct nvhost_master *host = nvhost_get_host(pdev);
 	struct nvhost_vm *vm;
 
 	/* get room to keep vm */
@@ -386,8 +426,39 @@ struct nvhost_vm *nvhost_vm_allocate(struct platform_device *pdev)
 	kref_init(&vm->kref);
 	vm->pdev = pdev;
 
+	if (vm_op().init) {
+		int err = vm_op().init(vm);
+		if (err)
+			goto err_init_vm;
+	}
+
+	/* take global vm mutex */
+	mutex_lock(&host->vm_mutex);
+
+	/* add this vm into list of vms */
+	list_add_tail(&vm->vm_list, &host->vm_list);
+
+	/* map all statically mapped buffers to this vm */
+	if (vm_op().pin_static_buffer) {
+		list_for_each_entry(sbuffer,
+				    &host->static_mappings_list,
+				    list) {
+			int err = vm_op().pin_static_buffer(vm, sbuffer);
+			if (err)
+				goto err_pin_static_buffers;
+		}
+	}
+
+	/* release the vm mutex */
+	mutex_unlock(&host->vm_mutex);
+
 	return vm;
 
+err_pin_static_buffers:
+	mutex_unlock(&host->vm_mutex);
+	vm_op().deinit(vm);
+err_init_vm:
+	kfree(vm);
 err_alloc_vm:
 	return NULL;
 }

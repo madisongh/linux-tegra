@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Host Client Module
  *
- * Copyright (c) 2010-2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -53,8 +53,7 @@
 #include "nvhost_channel.h"
 #include "nvhost_job.h"
 #include "nvhost_sync.h"
-
-static DEFINE_MUTEX(channel_lock);
+#include "vhost/vhost.h"
 
 int nvhost_check_bondout(unsigned int id)
 {
@@ -183,6 +182,7 @@ struct nvhost_channel_userctx {
 	bool timeout_debug_dump;
 	struct platform_device *pdev;
 	u32 syncpts[NVHOST_MODULE_MAX_SYNCPTS];
+	u32 client_managed_syncpt;
 
 	/* error notificatiers used channel submit timeout */
 	struct dma_buf *error_notifier_ref;
@@ -203,8 +203,6 @@ static int nvhost_channelrelease(struct inode *inode, struct file *filp)
 
 	trace_nvhost_channel_release(dev_name(&priv->pdev->dev));
 
-	mutex_lock(&channel_lock);
-
 	/* remove this client from acm */
 	nvhost_module_remove_client(priv->pdev, priv);
 
@@ -215,23 +213,24 @@ static int nvhost_channelrelease(struct inode *inode, struct file *filp)
 	nvhost_vm_put(priv->vm);
 
 	/* If the device is in exclusive mode, drop the reference */
-	if (nvhost_get_channel_policy() == MAP_CHANNEL_ON_SUBMIT &&
-	    pdata->exclusive)
+	if (pdata->exclusive)
 		pdata->num_mapped_chs--;
 
-	mutex_unlock(&channel_lock);
-
 	/* drop channel reference if we took one at open time */
-	if (nvhost_get_channel_policy() == MAP_CHANNEL_ON_OPEN)
+	if (pdata->resource_policy == RESOURCE_PER_DEVICE) {
 		nvhost_putchannel(priv->ch, 1);
-
-	if (nvhost_get_syncpt_policy() == SYNCPT_PER_CHANNEL_INSTANCE) {
+	} else {
 		/* Release instance syncpoints */
 		for (i = 0; i < NVHOST_MODULE_MAX_SYNCPTS; ++i) {
 			if (priv->syncpts[i]) {
 				nvhost_free_syncpt(priv->syncpts[i]);
 				priv->syncpts[i] = 0;
 			}
+		}
+
+		if (priv->client_managed_syncpt) {
+			nvhost_free_syncpt(priv->client_managed_syncpt);
+			priv->client_managed_syncpt = 0;
 		}
 	}
 
@@ -248,7 +247,7 @@ static int __nvhost_channelopen(struct inode *inode,
 {
 	struct nvhost_channel_userctx *priv;
 	struct nvhost_device_data *pdata, *host1x_pdata;
-	struct nvhost_channel *ch = NULL;
+	struct nvhost_master *host;
 	int ret;
 
 	/* grab pdev and pdata based on inputs */
@@ -261,34 +260,22 @@ static int __nvhost_channelopen(struct inode *inode,
 	} else
 		return -EINVAL;
 
-	/* ..and host1x platform data */
+	/* ..and host1x specific data */
 	host1x_pdata = dev_get_drvdata(pdev->dev.parent);
-
-	/* get a channel if we are in map-at-open -mode */
-	if (nvhost_get_channel_policy() == MAP_CHANNEL_ON_OPEN) {
-		ret = nvhost_channel_map(pdata, &ch, NULL);
-		if (ret || !ch) {
-			pr_err("%s: failed to map channel, error: %d\n",
-			       __func__, ret);
-			return ret;
-		}
-	}
+	host = nvhost_get_host(pdev);
 
 	trace_nvhost_channel_open(dev_name(&pdev->dev));
 
-	mutex_lock(&channel_lock);
-
 	/* If the device is in exclusive mode, make channel reservation here */
-	if (nvhost_get_channel_policy() == MAP_CHANNEL_ON_SUBMIT &&
-	    pdata->exclusive) {
+	if (pdata->exclusive) {
 		if (pdata->num_mapped_chs == pdata->num_channels)
-			goto fail;
+			goto fail_mark_used;
 		pdata->num_mapped_chs++;
 	}
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
-		goto fail;
+		goto fail_allocate_priv;
 	filp->private_data = priv;
 
 	/* Register this client to acm */
@@ -306,11 +293,9 @@ static int __nvhost_channelopen(struct inode *inode,
 	nvhost_module_idle(pdev);
 
 	/* Get client id */
-	priv->clientid = atomic_add_return(1,
-			&nvhost_get_host(pdev)->clientid);
+	priv->clientid = atomic_add_return(1, &host->clientid);
 	if (!priv->clientid)
-		priv->clientid = atomic_add_return(1,
-				&nvhost_get_host(pdev)->clientid);
+		priv->clientid = atomic_add_return(1, &host->clientid);
 
 	/* Initialize private structure */
 	priv->timeout = host1x_pdata->nvhost_timeout_default;
@@ -318,26 +303,43 @@ static int __nvhost_channelopen(struct inode *inode,
 	priv->timeout_debug_dump = true;
 	mutex_init(&priv->ioctl_lock);
 	priv->pdev = pdev;
-	priv->ch = ch;
 
 	if (!tegra_platform_is_silicon())
 		priv->timeout = 0;
 
 	priv->vm = nvhost_vm_allocate(pdev);
+	if (!priv->vm)
+		goto fail_alloc_vm;
 
-	mutex_unlock(&channel_lock);
+	/* if we run in map-at-submit mode but device has override
+	 * flag set, respect the override flag */
+	if (pdata->resource_policy == RESOURCE_PER_DEVICE) {
+		if (pdata->exclusive)
+			ret = nvhost_channel_map(pdata, &priv->ch, priv);
+		else
+			ret = nvhost_channel_map(pdata, &priv->ch, pdata);
+		if (ret) {
+			pr_err("%s: failed to map channel, error: %d\n",
+			       __func__, ret);
+			goto fail_get_channel;
+		}
+	}
 
 	return 0;
 
+fail_get_channel:
+	nvhost_vm_put(priv->vm);
+fail_alloc_vm:
 fail_power_on:
+	if (pdata->keepalive)
+		nvhost_module_enable_poweroff(pdev);
+	nvhost_module_remove_client(pdev, priv);
 fail_add_client:
 	kfree(priv);
-
-fail:
-	if (ch)
-		nvhost_putchannel(ch, 1);
-	mutex_unlock(&channel_lock);
-
+fail_allocate_priv:
+	if  (pdata->exclusive)
+		pdata->num_mapped_chs--;
+fail_mark_used:
 	return -ENOMEM;
 }
 
@@ -427,13 +429,14 @@ static int nvhost_ioctl_channel_submit(struct nvhost_channel_userctx *ctx,
 				(uintptr_t)args->syncpt_incrs;
 	u32 __user *fences = (u32 __user *)(uintptr_t)args->fences;
 	u32 __user *class_ids = (u32 __user *)(uintptr_t)args->class_ids;
+	struct nvhost_device_data *pdata = platform_get_drvdata(ctx->pdev);
 
-	struct nvhost_master *host = nvhost_get_host(ctx->pdev);
+	const u32 *syncpt_array =
+		(pdata->resource_policy == RESOURCE_PER_CHANNEL_INSTANCE) ?
+		ctx->syncpts :
+		ctx->ch->syncpts;
 	u32 *local_class_ids = NULL;
 	int err, i;
-
-	if (num_syncpt_incrs > host->info.nb_pts)
-		return -EINVAL;
 
 	job = nvhost_job_alloc(ctx->ch,
 			num_cmdbufs,
@@ -449,6 +452,9 @@ static int nvhost_ioctl_channel_submit(struct nvhost_channel_userctx *ctx,
 	job->priority = ctx->priority;
 	job->clientid = ctx->clientid;
 	job->vm = ctx->vm;
+	job->client_managed_syncpt =
+		(pdata->resource_policy == RESOURCE_PER_CHANNEL_INSTANCE) ?
+		ctx->client_managed_syncpt : ctx->ch->client_managed_syncpt;
 	nvhost_vm_get(job->vm);
 
 	/* copy error notifier settings for this job */
@@ -490,6 +496,14 @@ static int nvhost_ioctl_channel_submit(struct nvhost_channel_userctx *ctx,
 		if (err)
 			cmdbuf_ext.pre_fence = -1;
 
+		/* verify that the given class id is valid for this engine */
+		if (class_id &&
+		    class_id != pdata->class &&
+		    class_id != NV_HOST1X_CLASS_ID) {
+			err = -EINVAL;
+			goto fail;
+		}
+
 		nvhost_job_add_gather(job, cmdbuf.mem, cmdbuf.words,
 				      cmdbuf.offset, class_id,
 				      cmdbuf_ext.pre_fence);
@@ -522,14 +536,30 @@ static int nvhost_ioctl_channel_submit(struct nvhost_channel_userctx *ctx,
 
 	for (i = 0; i < num_syncpt_incrs; ++i) {
 		struct nvhost_syncpt_incr sp;
+		bool found = false;
+		int j;
 
 		/* Copy */
 		err = copy_from_user(&sp, syncpt_incrs + i, sizeof(sp));
 		if (err)
 			goto fail;
 
-		/* Validate */
-		if (sp.syncpt_id >= host->info.nb_pts) {
+		/* Validate the trivial case */
+		if (sp.syncpt_id == 0) {
+			err = -EINVAL;
+			goto fail;
+		}
+
+		/* ..and then ensure that the syncpoints have been reserved
+		 * for this client */
+		for (j = 0; j < NVHOST_MODULE_MAX_SYNCPTS; j++) {
+			if (syncpt_array[j] == sp.syncpt_id) {
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
 			err = -EINVAL;
 			goto fail;
 		}
@@ -555,7 +585,10 @@ static int nvhost_ioctl_channel_submit(struct nvhost_channel_userctx *ctx,
 	if (err)
 		goto fail;
 
-	if (args->timeout)
+	/* For now, no timeout support if virtualized */
+	if (nvhost_dev_is_virtual(ctx->pdev))
+		job->timeout = 0;
+	else if (args->timeout)
 		job->timeout = min(ctx->timeout, args->timeout);
 	else
 		job->timeout = ctx->timeout;
@@ -875,9 +908,10 @@ static u32 create_mask(u32 *words, int num)
 static u32 nvhost_ioctl_channel_get_syncpt_mask(
 		struct nvhost_channel_userctx *priv)
 {
+	struct nvhost_device_data *pdata = platform_get_drvdata(priv->pdev);
 	u32 mask;
 
-	if (nvhost_get_syncpt_policy() == SYNCPT_PER_CHANNEL_INSTANCE)
+	if (pdata->resource_policy == RESOURCE_PER_CHANNEL_INSTANCE)
 		mask = create_mask(priv->syncpts, NVHOST_MODULE_MAX_SYNCPTS);
 	else
 		mask = create_mask(priv->ch->syncpts,
@@ -932,6 +966,49 @@ static u32 nvhost_ioctl_channel_get_syncpt_instance(
 	ctx->syncpts[index] = id;
 
 	return id;
+}
+
+static int nvhost_ioctl_channel_get_client_syncpt(
+		struct nvhost_channel_userctx *ctx,
+		struct nvhost_get_client_managed_syncpt_arg *args)
+{
+	struct nvhost_device_data *pdata = platform_get_drvdata(ctx->pdev);
+	const char __user *args_name =
+		(const char __user *)(uintptr_t)args->name;
+	char name[32];
+	char set_name[32];
+
+	/* prepare syncpoint name (in case it is needed) */
+	if (args_name) {
+		if (strncpy_from_user(name, args_name, sizeof(name)) < 0)
+			return -EFAULT;
+		name[sizeof(name) - 1] = '\0';
+	} else {
+		name[0] = '\0';
+	}
+
+	snprintf(set_name, sizeof(set_name),
+		"%s_%s", dev_name(&ctx->pdev->dev), name);
+
+	if (pdata->resource_policy == RESOURCE_PER_CHANNEL_INSTANCE) {
+		if (!ctx->client_managed_syncpt)
+			ctx->client_managed_syncpt =
+				nvhost_get_syncpt_client_managed(set_name);
+		args->value = ctx->client_managed_syncpt;
+	} else {
+		struct nvhost_channel *ch = ctx->ch;
+		mutex_lock(&ch->syncpts_lock);
+		if (!ch->client_managed_syncpt)
+			ch->client_managed_syncpt =
+				nvhost_get_syncpt_client_managed(set_name);
+		mutex_unlock(&ch->syncpts_lock);
+		args->value = ch->client_managed_syncpt;
+	}
+
+	if (!args->value)
+		return -EAGAIN;
+
+	return 0;
 }
 
 static long nvhost_channelctl(struct file *filp,
@@ -1019,7 +1096,7 @@ static long nvhost_channelctl(struct file *filp,
 			break;
 		}
 
-		if (nvhost_get_syncpt_policy() == SYNCPT_PER_CHANNEL_INSTANCE)
+		if (pdata->resource_policy == RESOURCE_PER_CHANNEL_INSTANCE)
 			arg->value = nvhost_ioctl_channel_get_syncpt_instance(
 						priv, pdata, arg->param);
 		else
@@ -1033,58 +1110,12 @@ static long nvhost_channelctl(struct file *filp,
 	}
 	case NVHOST_IOCTL_CHANNEL_GET_CLIENT_MANAGED_SYNCPOINT:
 	{
-		char name[32];
-		char set_name[32];
-		struct nvhost_device_data *pdata =
-			platform_get_drvdata(priv->pdev);
-		struct nvhost_get_client_managed_syncpt_arg *args =
-			(struct nvhost_get_client_managed_syncpt_arg *)buf;
-		const char __user *args_name =
-			(const char __user *)(uintptr_t)args->name;
-
-		if (args_name) {
-			if (strncpy_from_user(name, args_name,
-			    sizeof(name)) < 0) {
-				err = -EFAULT;
-				break;
-			}
-			name[sizeof(name) - 1] = '\0';
-		} else {
-			name[0] = '\0';
-		}
-		/* if we already have required syncpt then return it ... */
-		if (pdata->client_managed_syncpt) {
-			args->value = pdata->client_managed_syncpt;
-			break;
-		}
-		/* ... otherwise get a new syncpt dynamically */
-		snprintf(set_name, sizeof(set_name),
-				"%s_%s", dev_name(&pdata->pdev->dev), name);
-		args->value = nvhost_get_syncpt_client_managed(set_name);
-		if (!args->value) {
-			err = -EAGAIN;
-			break;
-		}
-		/* ... and store it for further references */
-		pdata->client_managed_syncpt = args->value;
+		err = nvhost_ioctl_channel_get_client_syncpt(priv,
+			(struct nvhost_get_client_managed_syncpt_arg *)buf);
 		break;
 	}
 	case NVHOST_IOCTL_CHANNEL_FREE_CLIENT_MANAGED_SYNCPOINT:
-	{
-		struct nvhost_free_client_managed_syncpt_arg *args =
-			(struct nvhost_free_client_managed_syncpt_arg *)buf;
-		struct nvhost_device_data *pdata =
-			platform_get_drvdata(priv->pdev);
-		if (!args->value)
-			break;
-		if (args->value != pdata->client_managed_syncpt) {
-			err = -EINVAL;
-			break;
-		}
-		nvhost_free_syncpt(args->value);
-		pdata->client_managed_syncpt = 0;
 		break;
-	}
 	case NVHOST_IOCTL_CHANNEL_GET_WAITBASES:
 	{
 		((struct nvhost_get_param_args *)buf)->value = 0;
@@ -1180,6 +1211,13 @@ static long nvhost_channelctl(struct file *filp,
 			platform_get_drvdata(priv->pdev);
 		struct nvhost32_submit_args *args32 = (void *)buf;
 		struct nvhost_submit_args args;
+		void *identifier;
+
+		if (pdata->resource_policy == RESOURCE_PER_DEVICE &&
+		    !pdata->exclusive)
+			identifier = (void *)pdata;
+		else
+			identifier = (void *)priv;
 
 		memset(&args, 0, sizeof(args));
 		args.submit_version = args32->submit_version;
@@ -1198,15 +1236,37 @@ static long nvhost_channelctl(struct file *filp,
 		args.class_ids = args32->class_ids;
 		args.fences = args32->fences;
 
-		if (nvhost_get_channel_policy() == MAP_CHANNEL_ON_SUBMIT) {
-			err = nvhost_channel_map(pdata, &priv->ch, priv);
-			if (err)
-				break;
-			err = nvhost_ioctl_channel_submit(priv, &args);
-			nvhost_putchannel(priv->ch, 1);
-		} else {
-			err = nvhost_ioctl_channel_submit(priv, &args);
+		/* first, get a channel */
+		err = nvhost_channel_map(pdata, &priv->ch, identifier);
+		if (err)
+			break;
+
+		/* ..then, synchronize syncpoint information.
+		 *
+		 * This information is updated only in this ioctl and
+		 * channel destruction. We already hold channel
+		 * reference and this ioctl is serialized => no-one is
+		 * modifying the syncpoint field concurrently.
+		 *
+		 * Synchronization is not destructing anything
+		 * in the structure; We can only allocate new
+		 * syncpoints, and hence old ones cannot be released
+		 * by following operation. If some syncpoint is stored
+		 * into the channel structure, it remains there. */
+
+		if (pdata->resource_policy == RESOURCE_PER_CHANNEL_INSTANCE) {
+			memcpy(priv->ch->syncpts, priv->syncpts,
+			       sizeof(priv->syncpts));
+			priv->ch->client_managed_syncpt =
+				priv->client_managed_syncpt;
 		}
+
+		/* submit work */
+		err = nvhost_ioctl_channel_submit(priv, &args);
+
+		/* ..and drop the local reference */
+		nvhost_putchannel(priv->ch, 1);
+
 		args32->fence = args.fence;
 
 		break;
@@ -1215,16 +1275,44 @@ static long nvhost_channelctl(struct file *filp,
 	{
 		struct nvhost_device_data *pdata =
 			platform_get_drvdata(priv->pdev);
+		void *identifier;
 
-		if (nvhost_get_channel_policy() == MAP_CHANNEL_ON_SUBMIT) {
-			err = nvhost_channel_map(pdata, &priv->ch, priv);
-			if (err)
-				break;
-			err = nvhost_ioctl_channel_submit(priv, (void *)buf);
-			nvhost_putchannel(priv->ch, 1);
-		} else {
-			err = nvhost_ioctl_channel_submit(priv, (void *)buf);
+		if (pdata->resource_policy == RESOURCE_PER_DEVICE &&
+		    !pdata->exclusive)
+			identifier = (void *)pdata;
+		else
+			identifier = (void *)priv;
+
+		/* first, get a channel */
+		err = nvhost_channel_map(pdata, &priv->ch, identifier);
+		if (err)
+			break;
+
+		/* ..then, synchronize syncpoint information.
+		 *
+		 * This information is updated only in this ioctl and
+		 * channel destruction. We already hold channel
+		 * reference and this ioctl is serialized => no-one is
+		 * modifying the syncpoint field concurrently.
+		 *
+		 * Synchronization is not destructing anything
+		 * in the structure; We can only allocate new
+		 * syncpoints, and hence old ones cannot be released
+		 * by following operation. If some syncpoint is stored
+		 * into the channel structure, it remains there. */
+
+		if (pdata->resource_policy == RESOURCE_PER_CHANNEL_INSTANCE) {
+			memcpy(priv->ch->syncpts, priv->syncpts,
+			       sizeof(priv->syncpts));
+			priv->ch->client_managed_syncpt =
+				priv->client_managed_syncpt;
 		}
+
+		/* submit work */
+		err = nvhost_ioctl_channel_submit(priv, (void *)buf);
+
+		/* ..and drop the local reference */
+		nvhost_putchannel(priv->ch, 1);
 
 		break;
 	}
@@ -1395,10 +1483,6 @@ int nvhost_client_device_init(struct platform_device *dev)
 	struct nvhost_master *nvhost_master = nvhost_get_host(dev);
 	struct nvhost_device_data *pdata = platform_get_drvdata(dev);
 
-	pdata->channels = kzalloc(pdata->num_channels *
-					sizeof(struct nvhost_channel *),
-					GFP_KERNEL);
-
 	/* Create debugfs directory for the device */
 	nvhost_device_debug_init(dev);
 
@@ -1435,6 +1519,9 @@ int nvhost_client_device_init(struct platform_device *dev)
 		pdata->slave_initialized = 1;
 	}
 
+	if (pdata->hw_init)
+		return pdata->hw_init(dev);
+
 	return 0;
 
 fail_busy:
@@ -1451,8 +1538,6 @@ EXPORT_SYMBOL(nvhost_client_device_init);
 
 int nvhost_client_device_release(struct platform_device *dev)
 {
-	struct nvhost_device_data *pdata = platform_get_drvdata(dev);
-
 	/* Release nvhost module resources */
 	nvhost_module_deinit(dev);
 
@@ -1464,9 +1549,6 @@ int nvhost_client_device_release(struct platform_device *dev)
 
 	/* Remove debugFS */
 	nvhost_device_debug_deinit(dev);
-
-	/* Release all nvhost channel of dev*/
-	nvhost_channel_release(pdata);
 
 	return 0;
 }

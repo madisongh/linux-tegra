@@ -104,6 +104,8 @@ struct uart_8250_port {
 	void			(*dl_write)(struct uart_8250_port *, int);
 	int			(*rs485_config)(struct uart_8250_port *,
 						struct serial_rs485 *rs485);
+	struct timer_list	rx_poll_timer;
+	int			rx_poll_timeout_jiffies;
 };
 
 static inline struct uart_8250_port *up_to_u8250p(struct uart_port *up)

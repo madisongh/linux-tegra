@@ -1,0 +1,83 @@
+/*
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ */
+
+/ {
+	xusb@70090000 {
+		prod-settings {
+			#prod-cells = <4>;
+			prod {
+			    prod = <
+				3 0x000000b8 0xffffffe3 0x0000001c
+			    >;
+			};
+			prod_c_utmi0 {
+			    prod = <
+				3 0x000000a0 0xffff003f 0x0000c380
+			    >;
+			};
+			prod_c_utmi1 {
+			    prod = <
+				3 0x000000a4 0xffff003f 0x00000380
+			    >;
+			};
+			prod_c_utmi2 {
+			    prod = <
+				3 0x000000a8 0xffff003f 0x00000380
+			    >;
+			};
+			prod_c_ss0 {
+			    prod = <
+				3 0x00000058 0x0000000f 0x26f070f0
+				3 0x00000068 0x00000000 0x002008EE
+				3 0x00000078 0xcfffffff 0x10000000
+				3 0x00000090 0xfffffeff 0x00000100
+			    >;
+			};
+			prod_c_ss1 {
+			    prod = <
+				3 0x0000005c 0x0000000f 0x26f070f0
+				3 0x0000006c 0x00000000 0x002008EE
+				3 0x0000007c 0xcfffffff 0x10000000
+				3 0x00000094 0xfffffeff 0x00000100
+			    >;
+			};
+			prod_c_sata0 {
+			    prod = <
+				3 0x0000014c 0xcfffffff 0x10000000
+				3 0x00000158 0xfffffeff 0x00000100
+			    >;
+			};
+			prod_c_hsic0 {
+			    prod = <
+				3 0x000000d0 0xffffff00 0x00000011
+				3 0x000000c0 0xffff0000 0x0000008a
+				3 0x000000c8 0xfffffffe 0x00000001
+				3 0x000000e0 0xffffffc0 0x00000022
+			    >;
+			};
+			prod_c_hsic1 {
+			    prod = <
+				3 0x000000d4 0xffffff00 0x00000011
+				3 0x000000c4 0xffff0000 0x0000008a
+				3 0x000000cc 0xfffffffe 0x00000001
+				3 0x000000e0 0xffffffc0 0x00000022
+			    >;
+			};
+		};
+	};
+};

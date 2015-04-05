@@ -1,7 +1,7 @@
 /*
  * drivers/video/tegra/dc/hdmi2.0.c
  *
- * Copyright (c) 2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION, All rights reserved.
  * Author: Animesh Kishore <ankishore@nvidia.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -53,6 +53,22 @@
 
 #define TMDS_NODE	"/host1x/sor1"
 
+/* Possibly should be moved to hdmi_common.h */
+static struct fb_videomode tegra_dc_vga_mode = {
+	.refresh = 60,
+	.xres = 640,
+	.yres = 480,
+	.pixclock = KHZ2PICOS(25200),
+	.hsync_len = 96,	/* h_sync_width */
+	.vsync_len = 2,		/* v_sync_width */
+	.left_margin = 48,	/* h_back_porch */
+	.upper_margin = 33,	/* v_back_porch */
+	.right_margin = 16,	/* h_front_porch */
+	.lower_margin = 10,	/* v_front_porch */
+	.vmode = 0,
+	.sync = 0,
+};
+
 static ssize_t hdmi_ddc_power_toggle(struct kobject *kobj,
 	struct kobj_attribute *attr, const char *buf, size_t count);
 
@@ -78,6 +94,10 @@ static struct tmds_prod_pair tmds_config_modes[] = {
 	.clk = 75000000,
 	.name = "prod_c_75M"
 	},
+	{ /* 150 MHz */
+	.clk = 150000000,
+	.name = "prod_c_150M"
+	},
 	{ /* 300 MHz */
 	.clk = 300000000,
 	.name = "prod_c_300M"
@@ -89,15 +109,6 @@ static struct tmds_prod_pair tmds_config_modes[] = {
 };
 
 static struct tegra_hdmi *dc_hdmi;
-
-static void tegra_clk_writel(u32 val, u32 mask, u32 offset)
-{
-	u32 temp = readl(IO_ADDRESS(0x60006000 + offset));
-
-	temp &= ~(mask);
-	temp |= val;
-	writel(temp, IO_ADDRESS(0x60006000 + offset));
-}
 
 static int tegra_hdmi_controller_enable(struct tegra_hdmi *hdmi);
 static void tegra_hdmi_config_clk(struct tegra_hdmi *hdmi, u32 clk_type);
@@ -457,14 +468,20 @@ static bool tegra_hdmi_check_dc_constraint(const struct fb_videomode *mode)
 		(mode->xres >= 16) && (mode->yres >= 16);
 }
 
-__maybe_unused
 static bool tegra_hdmi_fb_mode_filter(const struct tegra_dc *dc,
 					struct fb_videomode *mode)
 {
+	struct tegra_hdmi *hdmi = dc->out_data;
+
 	if (!mode->pixclock)
 		return false;
 
 	if (mode->xres > 4096)
+		return false;
+
+	if (!tegra_edid_is_hfvsdb_present(hdmi->edid) &&
+		KHZ2PICOS(340000) >= mode->pixclock &&
+		!(mode->vmode & FB_VMODE_Y420_ONLY))
 		return false;
 
 	if (mode->pixclock && tegra_dc_get_out_max_pixclock(dc) &&
@@ -608,9 +625,11 @@ static void tegra_hdmi_hotplug_notify(struct tegra_hdmi *hdmi,
 	if (dc->adf)
 		tegra_adf_process_hotplug_connected(hdmi->dc->adf, mon_spec);
 #else
-	if (dc->fb)
+	if (dc->fb) {
 		tegra_fb_update_monspecs(hdmi->dc->fb, mon_spec,
 					tegra_hdmi_fb_mode_filter);
+		tegra_fb_update_fix(hdmi->dc->fb, mon_spec);
+	}
 #endif
 
 	dc->connected = is_asserted;
@@ -627,8 +646,6 @@ static int tegra_hdmi_edid_eld_setup(struct tegra_hdmi *hdmi)
 
 	tegra_dc_unpowergate_locked(hdmi->dc);
 
-	_tegra_hdmi_ddc_enable(hdmi);
-
 	err = tegra_hdmi_edid_read(hdmi);
 	if (err < 0)
 		goto fail;
@@ -636,8 +653,6 @@ static int tegra_hdmi_edid_eld_setup(struct tegra_hdmi *hdmi)
 	err = tegra_hdmi_eld_read(hdmi);
 	if (err < 0)
 		goto fail;
-
-	_tegra_hdmi_ddc_disable(hdmi);
 
 	tegra_dc_powergate_locked(hdmi->dc);
 
@@ -964,6 +979,24 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 
 	tegra_dc_set_outdata(dc, hdmi);
 
+	/* NOTE: Below code is applicable to L4T or embedded systems and is
+	 * protected accordingly. This section early enables DC with first mode
+	 * from the monitor specs.
+	 * In case there is no hotplug we are falling back
+	 * to default VGA mode.
+	 */
+	if ((config_enabled(CONFIG_FRAMEBUFFER_CONSOLE) ||
+			((dc->pdata->flags & TEGRA_DC_FLAG_ENABLED) &&
+			 (dc->pdata->flags & TEGRA_DC_FLAG_SET_EARLY_MODE))) &&
+			dc->out && (dc->out->type == TEGRA_DC_OUT_HDMI)) {
+		struct fb_monspecs specs;
+		if (tegra_dc_hpd(dc) && (!dc->initialized)) {
+			if (!tegra_edid_get_monspecs(hdmi->edid, &specs, NULL))
+				tegra_dc_set_fb_mode(dc, specs.modedb, false);
+		} else
+			tegra_dc_set_fb_mode(dc, &tegra_dc_vga_mode, false);
+	}
+
 #ifdef CONFIG_SWITCH
 	hdmi->hpd_switch.name = "hdmi";
 	err = switch_dev_register(&hdmi->hpd_switch);
@@ -1024,6 +1057,7 @@ static void tegra_hdmi_config(struct tegra_hdmi *hdmi)
 #ifndef CONFIG_TEGRA_NVDISPLAY
 	struct tegra_dc *dc = hdmi->dc;
 	u32 h_pulse_start, h_pulse_end;
+	unsigned long val = 0;
 #endif
 	u32 dispclk_div_8_2;
 
@@ -1033,7 +1067,7 @@ static void tegra_hdmi_config(struct tegra_hdmi *hdmi)
 	tegra_sor_write_field(sor, NV_SOR_INPUT_CONTROL,
 			NV_SOR_INPUT_CONTROL_ARM_VIDEO_RANGE_LIMITED |
 			NV_SOR_INPUT_CONTROL_HDMI_SRC_SELECT_DISPLAYB,
-			NV_SOR_INPUT_CONTROL_ARM_VIDEO_RANGE_LIMITED |
+			NV_SOR_INPUT_CONTROL_ARM_VIDEO_RANGE_FULL |
 			NV_SOR_INPUT_CONTROL_HDMI_SRC_SELECT_DISPLAYB);
 
 	dispclk_div_8_2 = clk_get_rate(hdmi->sor->sor_clk) / 1000000 * 4;
@@ -1053,7 +1087,10 @@ static void tegra_hdmi_config(struct tegra_hdmi *hdmi)
 	h_pulse_end = h_pulse_start + 8;
 	tegra_dc_writel(dc, PULSE_START(h_pulse_start) | PULSE_END(h_pulse_end),
 		  DC_DISP_H_PULSE2_POSITION_A);
-	tegra_dc_writel(dc, 0x1000, DC_DISP_DISP_SIGNAL_OPTIONS0);
+
+	val = tegra_dc_readl(dc, DC_DISP_DISP_SIGNAL_OPTIONS0);
+	val |= H_PULSE_2_ENABLE;
+	tegra_dc_writel(dc, val, DC_DISP_DISP_SIGNAL_OPTIONS0);
 #endif
 }
 
@@ -1097,7 +1134,8 @@ static int tegra_hdmi_find_cea_vic(struct tegra_hdmi *hdmi)
 
 	tegra_dc_to_fb_videomode(&m, mode);
 
-	m.vmode &= ~FB_VMODE_STEREO_MASK; /* stereo modes have the same VICs */
+	/* only interlaced required for VIC identification */
+	m.vmode &= FB_VMODE_INTERLACED;
 
 	for (i = 1; i < modedb_size; i++) {
 		const struct fb_videomode *curr = &cea_modes[i];
@@ -1108,10 +1146,16 @@ static int tegra_hdmi_find_cea_vic(struct tegra_hdmi *hdmi)
 		if (!best)
 			best = i;
 		/* if either flag is set, then match is required */
-		if (curr->flag & (FB_FLAG_RATIO_4_3 | FB_FLAG_RATIO_16_9)) {
+		if (curr->flag &
+			(FB_FLAG_RATIO_4_3 | FB_FLAG_RATIO_16_9 |
+			FB_FLAG_RATIO_64_27 | FB_FLAG_RATIO_256_135)) {
 			if (m.flag & curr->flag & FB_FLAG_RATIO_4_3)
 				best = i;
 			else if (m.flag & curr->flag & FB_FLAG_RATIO_16_9)
+				best = i;
+			else if (m.flag & curr->flag & FB_FLAG_RATIO_64_27)
+				best = i;
+			else if (m.flag & curr->flag & FB_FLAG_RATIO_256_135)
 				best = i;
 		} else {
 			best = i;
@@ -1125,17 +1169,55 @@ static u32 tegra_hdmi_get_aspect_ratio(struct tegra_hdmi *hdmi)
 	u32 aspect_ratio;
 
 	switch (hdmi->dc->mode.avi_m) {
-	case HDMI_AVI_ASPECT_RATIO_4_3:
+	case TEGRA_DC_MODE_AVI_M_4_3:
 		aspect_ratio = HDMI_AVI_ASPECT_RATIO_4_3;
 		break;
-	case HDMI_AVI_ASPECT_RATIO_16_9:
+	case TEGRA_DC_MODE_AVI_M_16_9:
 		aspect_ratio = HDMI_AVI_ASPECT_RATIO_16_9;
 		break;
+	/*
+	 * no avi_m field for picture aspect ratio 64:27 and 256:135.
+	 * sink detects via VIC, avi_m is 0.
+	 */
+	case TEGRA_DC_MODE_AVI_M_64_27: /* fall through */
+	case TEGRA_DC_MODE_AVI_M_256_135: /* fall through */
 	default:
 		aspect_ratio = HDMI_AVI_ASPECT_RATIO_NO_DATA;
 	}
 
+	/* For seamless HDMI, read aspect ratio parameters from bootloader
+	 * set AVI Infoframe parameters
+	 */
+	if ((aspect_ratio == HDMI_AVI_ASPECT_RATIO_NO_DATA) &&
+		tegra_is_bl_display_initialized(hdmi->dc->ndev->id)) {
+		u32 temp = 0;
+		temp = tegra_sor_readl(hdmi->sor,
+			NV_SOR_HDMI_AVI_INFOFRAME_SUBPACK0_LOW);
+		temp = (temp >> 20) & 0x3;
+		switch (temp) {
+		case 1:
+		aspect_ratio = HDMI_AVI_ASPECT_RATIO_4_3;
+		break;
+		case 2:
+		aspect_ratio = HDMI_AVI_ASPECT_RATIO_16_9;
+		break;
+		default:
+		aspect_ratio = HDMI_AVI_ASPECT_RATIO_NO_DATA;
+		}
+	}
 	return aspect_ratio;
+}
+
+static u32 tegra_hdmi_get_rgb_ycc(struct tegra_hdmi *hdmi)
+{
+	int yuv_flag = hdmi->dc->mode.vmode & FB_VMODE_SET_YUV_MASK;
+
+	if (yuv_flag & FB_VMODE_Y420)
+		return HDMI_AVI_YCC_420;
+	else if (yuv_flag & FB_VMODE_Y422)
+		return HDMI_AVI_YCC_422;
+
+	return HDMI_AVI_RGB;
 }
 
 static void tegra_hdmi_avi_infoframe_update(struct tegra_hdmi *hdmi)
@@ -1150,10 +1232,7 @@ static void tegra_hdmi_avi_infoframe_update(struct tegra_hdmi *hdmi)
 	avi->scan = HDMI_AVI_UNDERSCAN;
 	avi->bar_valid = HDMI_AVI_BAR_INVALID;
 	avi->act_fmt_valid = HDMI_AVI_ACTIVE_FORMAT_VALID;
-	if (hdmi->dc->yuv_bypass)
-		avi->rgb_ycc = HDMI_AVI_YCC_420;
-	else
-		avi->rgb_ycc = HDMI_AVI_RGB;
+	avi->rgb_ycc = tegra_hdmi_get_rgb_ycc(hdmi);
 
 	avi->act_format = HDMI_AVI_ACTIVE_FORMAT_SAME;
 	avi->aspect_ratio = tegra_hdmi_get_aspect_ratio(hdmi);
@@ -1368,6 +1447,9 @@ static void tegra_hdmi_audio_config(struct tegra_hdmi *hdmi,
 	struct tegra_dc_sor_data *sor = hdmi->sor;
 	u32 val;
 
+	if (hdmi->dvi)
+		return;
+
 	/* hda is the only audio source */
 	val = NV_SOR_AUDIO_CTRL_AFIFO_FLUSH |
 		NV_SOR_AUDIO_CTRL_SRC_HDA;
@@ -1538,10 +1620,15 @@ static int _tegra_hdmi_v2_x_config(struct tegra_hdmi *hdmi)
 {
 #define SCDC_STABILIZATION_DELAY_MS (20)
 
-	/* reset hdmi2.x config on host and monitor */
-	tegra_hdmi_v2_x_mon_config(hdmi, false);
-	tegra_hdmi_v2_x_host_config(hdmi, false);
+	/* disable hdmi2.x config on host and monitor only
+	 * if bootloader didn't initialize hdmi
+	 */
+	if (!tegra_is_bl_display_initialized(hdmi->dc->ndev->id)) {
+		tegra_hdmi_v2_x_mon_config(hdmi, false);
+		tegra_hdmi_v2_x_host_config(hdmi, false);
+	}
 
+	/* enable hdmi2.x config on host and monitor */
 	tegra_hdmi_v2_x_mon_config(hdmi, true);
 	msleep(SCDC_STABILIZATION_DELAY_MS);
 
@@ -1574,7 +1661,7 @@ static void tegra_hdmi_scdc_worker(struct work_struct *work)
 	mutex_lock(&hdmi->ddc_lock);
 
 	tegra_hdmi_scdc_read(hdmi, rd_tmds_config, ARRAY_SIZE(rd_tmds_config));
-	if (!rd_tmds_config[0][1])
+	if (!rd_tmds_config[0][1] && hdmi->dc->mode.pclk > 340000000)
 		_tegra_hdmi_v2_x_config(hdmi);
 
 	mutex_unlock(&hdmi->ddc_lock);
@@ -1625,10 +1712,12 @@ static void tegra_hdmi_put(struct tegra_dc *dc)
 /* TODO: add support for other deep colors */
 static inline u32 tegra_hdmi_get_bpp(struct tegra_hdmi *hdmi)
 {
-	if (hdmi->dc->yuv_bypass)
+	int yuv_flag = hdmi->dc->mode.vmode & FB_VMODE_SET_YUV_MASK;
+
+	if (yuv_flag == (FB_VMODE_Y420 | FB_VMODE_Y30))
 		return 30;
-	else
-		return 24;
+
+	return 24;
 }
 
 static u32 tegra_hdmi_gcp_color_depth(struct tegra_hdmi *hdmi)
@@ -1660,9 +1749,29 @@ static u32 tegra_hdmi_gcp_color_depth(struct tegra_hdmi *hdmi)
 /* return packing phase of last pixel in preceding video data period */
 static u32 tegra_hdmi_gcp_packing_phase(struct tegra_hdmi *hdmi)
 {
-	return tegra_sor_readl(hdmi->sor, NV_SOR_HDMI_GCP_STATUS) >>
-		NV_SOR_HDMI_GCP_STATUS_ACTIVE_END_PP_SHIFT &
-		NV_SOR_HDMI_GCP_STATUS_ACTIVE_END_PP_MASK;
+	int yuv_flag = hdmi->dc->mode.vmode & FB_VMODE_SET_YUV_MASK;
+
+	if (!tegra_hdmi_gcp_color_depth(hdmi))
+		return 0;
+
+	/* 10P4 for yuv420 10bpc */
+	if (yuv_flag == (FB_VMODE_Y420 | FB_VMODE_Y30))
+		return 0;
+
+	 return 0;
+}
+
+static bool tegra_hdmi_gcp_default_phase_en(struct tegra_hdmi *hdmi)
+{
+	int yuv_flag = hdmi->dc->mode.vmode & FB_VMODE_SET_YUV_MASK;
+
+	if (!tegra_hdmi_gcp_color_depth(hdmi))
+		return false;
+
+	if (yuv_flag == (FB_VMODE_Y420 | FB_VMODE_Y30))
+		return true;
+
+	return false;
 }
 
 /* general control packet */
@@ -1671,15 +1780,17 @@ static void tegra_hdmi_gcp(struct tegra_hdmi *hdmi)
 #define GCP_SB1_PP_SHIFT 4
 
 	struct tegra_dc_sor_data *sor = hdmi->sor;
-	u8 sb1;
+	u8 sb1, sb2;
 
 	/* disable gcp before configuring */
 	tegra_sor_writel(sor, NV_SOR_HDMI_GCP_CTRL, 0);
 
 	sb1 = tegra_hdmi_gcp_packing_phase(hdmi) << GCP_SB1_PP_SHIFT |
 		tegra_hdmi_gcp_color_depth(hdmi);
+	sb2 = !!tegra_hdmi_gcp_default_phase_en(hdmi);
 	tegra_sor_writel(sor, NV_SOR_HDMI_GCP_SUBPACK(0),
-			sb1 << NV_SOR_HDMI_GCP_SUBPACK_SB1_SHIFT);
+			sb1 << NV_SOR_HDMI_GCP_SUBPACK_SB1_SHIFT |
+			sb2 << NV_SOR_HDMI_GCP_SUBPACK_SB2_SHIFT);
 
 	/* Send gcp every frame */
 	tegra_sor_writel(sor, NV_SOR_HDMI_GCP_CTRL,
@@ -1710,9 +1821,15 @@ static int tegra_hdmi_controller_enable(struct tegra_hdmi *hdmi)
 	tegra_hdmi_vendor_infoframe(hdmi);
 	tegra_hdmi_audio_config(hdmi, AUDIO_FREQ_32K, HDA);
 
+	tegra_sor_pad_cal_power(sor, true);
+	tegra_hdmi_config_tmds(hdmi);
+	tegra_sor_pad_cal_power(sor, false);
+
 	tegra_hdmi_config_clk(hdmi, TEGRA_HDMI_BRICK_CLK);
 	tegra_dc_sor_attach(sor);
-	tegra_nvhdcp_set_plug(hdmi->nvhdcp, tegra_dc_hpd(dc));
+	if (!hdmi->dvi)
+		tegra_nvhdcp_set_plug(hdmi->nvhdcp, true);
+
 
 	tegra_dc_setup_clk(dc, dc->clk);
 	tegra_dc_hdmi_setup_clk(dc, hdmi->sor->sor_clk);
@@ -1722,18 +1839,15 @@ static int tegra_hdmi_controller_enable(struct tegra_hdmi *hdmi)
 
 	/* TODO: Confirm sequence with HW */
 	tegra_sor_writel(sor,  NV_SOR_SEQ_INST(0), 0x8080);
-	tegra_sor_writel(sor,  NV_SOR_PWR, 0x80000000);
 	tegra_sor_writel(sor,  NV_SOR_PWR, 0x80000001);
-
-	tegra_sor_pad_cal_power(sor, true);
-	tegra_hdmi_config_tmds(hdmi);
-	tegra_sor_pad_cal_power(sor, false);
 
 	if (hdmi->dc->mode.pclk > 340000000) {
 		tegra_hdmi_v2_x_config(hdmi);
 		schedule_delayed_work(&hdmi->scdc_work,
 			msecs_to_jiffies(HDMI_SCDC_MONITOR_TIMEOUT_MS));
 	}
+
+	tegra_hdmi_gcp(hdmi);
 
 	tegra_dc_put(dc);
 	return 0;
@@ -1750,17 +1864,19 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 
 	hdmi->enabled = true;
 #ifdef CONFIG_SWITCH
-	switch_set_state(&hdmi->audio_switch, 1);
+	if (!hdmi->dvi)
+		switch_set_state(&hdmi->audio_switch, 1);
 #endif
 }
 
 static inline u32 tegra_hdmi_get_shift_clk_div(struct tegra_hdmi *hdmi)
 {
-	u32 n = tegra_hdmi_get_bpp(hdmi);
-	u32 d = 24;
+	/*
+	 * HW does not support deep color yet
+	 * always return 0
+	 */
 
-	/* real shift clk div is n/d. Reg value is ((n/d - 1) * 2) */
-	return ((n - d) * 2) / d;
+	return 0;
 }
 
 static void tegra_hdmi_config_clk(struct tegra_hdmi *hdmi, u32 clk_type)
@@ -1773,12 +1889,17 @@ static void tegra_hdmi_config_clk(struct tegra_hdmi *hdmi, u32 clk_type)
 
 	if (clk_type == TEGRA_HDMI_BRICK_CLK) {
 		u32 val;
+		struct tegra_dc_sor_data *sor = hdmi->sor;
+		int div = hdmi->dc->mode.pclk < 340000000 ? 1 : 2;
+		unsigned long rate = clk_get_rate(sor->src_switch_clk);
+		unsigned long parent_rate =
+			clk_get_rate(clk_get_parent(sor->src_switch_clk));
 
-		/* TODO: Set sor divider */
-		if (hdmi->dc->mode.pclk < 340000000)
-			tegra_clk_writel(0, 0xff, 0x410);
-		else
-			tegra_clk_writel(2, 0xff, 0x410);
+		/* Set sor divider */
+		if (rate != parent_rate / div) {
+			rate = parent_rate / div;
+			clk_set_rate(sor->src_switch_clk, rate);
+		}
 
 		/* Select brick muxes */
 		val = (hdmi->dc->mode.pclk < 340000000) ?
@@ -1789,8 +1910,24 @@ static void tegra_hdmi_config_clk(struct tegra_hdmi *hdmi, u32 clk_type)
 		tegra_sor_writel(hdmi->sor, NV_SOR_CLK_CNTRL, val);
 		usleep_range(250, 300); /* sor brick pll stabilization delay */
 
-		/* TODO: Select sor clock muxes */
-		tegra_clk_writel((3 << 14), (0x3 << 14), 0x410);
+		/*
+		 * Report brick configuration and rate, so that SOR clock tree
+		 * is properly updated. No h/w changes by clock api calls below,
+		 * just sync s/w state with brick h/w.
+		 */
+		rate = rate/NV_SOR_HDMI_BRICK_DIV*NV_SOR_HDMI_BRICK_MUL(val);
+		if (clk_get_parent(sor->brick_clk) != sor->src_switch_clk)
+			clk_set_parent(sor->brick_clk, sor->src_switch_clk);
+		clk_set_rate(sor->brick_clk, rate);
+
+		/*
+		 * Select primary -- HDMI -- DVFS table for SOR clock (if SOR
+		 * clock has single DVFS table for all modes, nothing changes).
+		 */
+		tegra_dvfs_use_alt_freqs_on_clk(sor->sor_clk, false);
+
+		/* Select sor clock muxes */
+		tegra_clk_cfg_ex(sor->sor_clk, TEGRA_CLK_SOR_CLK_SEL, 3);
 
 		tegra_dc_writel(hdmi->dc, PIXEL_CLK_DIVIDER_PCD1 |
 			SHIFT_CLK_DIVIDER(tegra_hdmi_get_shift_clk_div(hdmi)),
@@ -1798,10 +1935,12 @@ static void tegra_hdmi_config_clk(struct tegra_hdmi *hdmi, u32 clk_type)
 
 		hdmi->clk_type = TEGRA_HDMI_BRICK_CLK;
 	} else if (clk_type == TEGRA_HDMI_SAFE_CLK) {
-		/* Select sor clock muxes */
-		tegra_clk_cfg_ex(hdmi->sor->sor_clk, TEGRA_CLK_SOR_CLK_SEL, 0);
-
-		hdmi->clk_type = TEGRA_HDMI_SAFE_CLK;
+		if (!hdmi->dc->initialized) {
+			/* Select sor clock muxes */
+			tegra_clk_cfg_ex(hdmi->sor->sor_clk,
+				TEGRA_CLK_SOR_CLK_SEL, 0);
+			hdmi->clk_type = TEGRA_HDMI_SAFE_CLK;
+		}
 	} else {
 		dev_err(&hdmi->dc->ndev->dev, "hdmi: incorrect clk type configured\n");
 	}
@@ -1811,24 +1950,21 @@ static void tegra_hdmi_config_clk(struct tegra_hdmi *hdmi, u32 clk_type)
 static long tegra_hdmi_get_pclk(struct tegra_dc_mode *mode)
 {
 	long h_total, v_total;
-
+	long refresh;
 	h_total = mode->h_active + mode->h_front_porch + mode->h_back_porch +
 		mode->h_sync_width;
 	v_total = mode->v_active + mode->v_front_porch + mode->v_back_porch +
 		mode->v_sync_width;
-
-	return h_total * v_total * (tegra_dc_calc_refresh(mode) / 1000);
+	refresh = tegra_dc_calc_refresh(mode);
+	refresh = DIV_ROUND_CLOSEST(refresh, 1000);
+	return h_total * v_total * refresh;
 }
 
 static long tegra_dc_hdmi_setup_clk(struct tegra_dc *dc, struct clk *clk)
 {
-#ifndef CONFIG_TEGRA_NVDISPLAY
-	struct clk *parent_clk = clk_get_sys(NULL,
-				dc->out->parent_clk ? : "pll_d2");
-#else
 	struct clk *parent_clk = clk_get(NULL,
 				dc->out->parent_clk ? : "pll_d2");
-#endif
+
 	dc->mode.pclk = tegra_hdmi_get_pclk(&dc->mode);
 
 	if (IS_ERR_OR_NULL(parent_clk)) {
@@ -1836,22 +1972,54 @@ static long tegra_dc_hdmi_setup_clk(struct tegra_dc *dc, struct clk *clk)
 		return 0;
 	}
 
+#ifdef CONFIG_TEGRA_NVDISPLAY
 	if (clk_get_parent(clk) != parent_clk)
 		clk_set_parent(clk, parent_clk);
+#else
+	if (clk == dc->clk) {
+		if (clk_get_parent(clk) != parent_clk) {
+			if (clk_set_parent(clk, parent_clk)) {
+				dev_err(&dc->ndev->dev,
+					"hdmi: set dc parent failed\n");
+				return 0;
+			}
+		}
+	} else {
+		struct tegra_hdmi *hdmi = tegra_dc_get_outdata(dc);
+		struct tegra_dc_sor_data *sor = hdmi->sor;
 
-#ifndef CONFIG_TEGRA_NVDISPLAY
-	/* TODO: Set parent manually */
-	if (clk == dc->clk)
-		tegra_clk_writel(5 << 29, (0x7 << 29), 0x13c);
-	else
-		tegra_clk_writel((5 << 29), (0x7 << 29), 0x410);
+		if (clk_get_parent(sor->src_switch_clk) != parent_clk) {
+			if (clk_set_parent(sor->src_switch_clk, parent_clk)) {
+				dev_err(&dc->ndev->dev,
+					"hdmi: set src switch parent failed\n");
+				return 0;
+			}
+		}
+	}
 #endif
-
+	if (dc->initialized)
+		goto skip_setup;
 	if (clk_get_rate(parent_clk) != dc->mode.pclk)
 		clk_set_rate(parent_clk, dc->mode.pclk);
-
-	tegra_dvfs_set_rate(parent_clk, dc->mode.pclk);
-	tegra_dvfs_set_rate(clk, dc->mode.pclk);
+skip_setup:
+	/*
+	 * DC clock divider is controlled by DC driver transparently to clock
+	 * framework -- hence, direct call to DVFS with target mode rate. SOR
+	 * clock rate in clock tree is properly updated, and can be used for
+	 * DVFS update.
+	 *
+	 * TODO: tegra_hdmi_controller_enable() procedure 1st configures SOR
+	 * clock via tegra_hdmi_config_clk(), and then calls this function
+	 * that may re-lock parent PLL. That needs to be double-checked:
+	 * in general re-locking PLL while the downstream module is already
+	 * sourced from it is not recommended. If/when the order of enabling
+	 * HDMI controller is changed, we can remove direct DVFS call for SOR
+	 * (but for DC it should be kept, anyway).
+	 */
+	if (clk == dc->clk)
+		tegra_dvfs_set_rate(clk, dc->mode.pclk);
+	else
+		tegra_dvfs_set_rate(clk, clk_get_rate(clk));
 
 	return tegra_dc_pclk_round_rate(dc, dc->mode.pclk);
 }
@@ -1917,7 +2085,16 @@ static void tegra_dc_hdmi_modeset_notifier(struct tegra_dc *dc)
 	tegra_hdmi_get(dc);
 	tegra_dc_io_start(dc);
 
-	tegra_hdmi_gcp(hdmi);
+	/* disable hdmi2.x config on host and monitor */
+	if (dc->mode.pclk > 340000000) {
+		if (tegra_edid_is_scdc_present(dc->edid))
+			tegra_hdmi_v2_x_mon_config(hdmi, true);
+		tegra_hdmi_v2_x_host_config(hdmi, true);
+	} else {
+		if (tegra_edid_is_scdc_present(dc->edid))
+			tegra_hdmi_v2_x_mon_config(hdmi, false);
+		tegra_hdmi_v2_x_host_config(hdmi, false);
+	}
 
 	tegra_dc_io_end(dc);
 	tegra_hdmi_put(dc);
@@ -2049,4 +2226,5 @@ struct tegra_dc_out_ops tegra_dc_hdmi2_0_ops = {
 	.ddc_enable = tegra_dc_hdmi_ddc_enable,
 	.ddc_disable = tegra_dc_hdmi_ddc_disable,
 	.modeset_notifier = tegra_dc_hdmi_modeset_notifier,
+	.mode_filter = tegra_hdmi_fb_mode_filter,
 };

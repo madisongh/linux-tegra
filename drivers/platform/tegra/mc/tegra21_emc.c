@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/tegra21_emc.c
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -25,11 +25,14 @@
 #include <linux/hrtimer.h>
 #include <linux/pasr.h>
 #include <linux/slab.h>
+#include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
 #include <linux/tegra-soc.h>
 #include <linux/platform_data/tegra_emc_pdata.h>
+#include <soc/tegra/tegra_bpmp.h>
 
 #include <asm/cputime.h>
+#include <asm/uaccess.h>
 
 #include <tegra/tegra21_emc.h>
 #include <tegra/mc-regs-t21x.h>
@@ -82,7 +85,7 @@ static struct supported_sequence supported_seqs[] = {
 		0x6,
 		emc_set_clock_r21015,
 		__do_periodic_emc_compensation_r21015,
-		"21015"
+		"21018"
 	},
 
 	/* NULL terminate. */
@@ -154,6 +157,10 @@ static struct emc_iso_usage tegra21_emc_iso_usage[] = {
 		80, get_iso_bw_os_idle
 	},
 	{
+		BIT(EMC_USER_DC2),
+		80, get_iso_bw_os_idle
+	},
+	{
 		BIT(EMC_USER_DC1) | BIT(EMC_USER_DC2),
 		50, get_iso_bw_general
 	},
@@ -212,14 +219,15 @@ static struct emc_sel tegra_emc_clk_sel[TEGRA_EMC_TABLE_MAX_SIZE];
 static struct emc_sel tegra_emc_clk_sel_b[TEGRA_EMC_TABLE_MAX_SIZE];
 static struct tegra21_emc_table start_timing;
 static struct tegra21_emc_table *emc_timing;
-static unsigned long dram_over_temp_state = DRAM_OVER_TEMP_NONE;
+unsigned long dram_over_temp_state = DRAM_OVER_TEMP_NONE;
 
 static ktime_t clkchange_time;
 static int clkchange_delay = 100;
 
-static struct tegra21_emc_table *tegra_emc_table;
-static struct tegra21_emc_table *tegra_emc_table_derated;
-static int tegra_emc_table_size;
+struct tegra21_emc_table *tegra_emc_table;
+struct tegra21_emc_table *tegra_emc_table_derated;
+int tegra_emc_table_size;
+static u32 current_clksrc;
 
 static u32 dram_dev_num;
 static u32 dram_type = -1;
@@ -378,8 +386,8 @@ void emc_timing_update(int dual_chan)
 	}
 }
 
-static inline void set_over_temp_timing(
-	struct tegra21_emc_table *next_timing, unsigned long state)
+void set_over_temp_timing(struct tegra21_emc_table *next_timing,
+			  unsigned long state)
 {
 #define REFRESH_X2      1
 #define REFRESH_X4      2
@@ -402,10 +410,12 @@ static inline void set_over_temp_timing(
 		REFRESH_SPEEDUP(dsr_cntrl, REFRESH_X2);
 		break;
 	case DRAM_OVER_TEMP_REFRESH_X4:
-	case DRAM_OVER_TEMP_THROTTLE:
 		REFRESH_SPEEDUP(ref, REFRESH_X4);
 		REFRESH_SPEEDUP(pre_ref, REFRESH_X4);
 		REFRESH_SPEEDUP(dsr_cntrl, REFRESH_X4);
+		break;
+	case DRAM_OVER_TEMP_THROTTLE:
+		/* Handled in derated tables for T210. */
 		break;
 	default:
 	WARN(1, "%s: Failed to set dram over temp state %lu\n",
@@ -481,7 +491,6 @@ void ccfifo_writel(u32 val, unsigned long addr, u32 delay)
 {
 	/* Index into CCFIFO - for keeping track of how many writes we
 	 * generate. */
-
 	emc_cc_dbg(CCFIFO, "[%d] (%u) 0x%08x => 0x%03lx\n",
 		   ccfifo_index, delay, val, addr);
 	ccfifo_index++;
@@ -514,7 +523,15 @@ static void emc_set_clock(struct tegra21_emc_table *next_timing,
 			  struct tegra21_emc_table *last_timing,
 			  int training, u32 clksrc)
 {
+	current_clksrc = clksrc;
 	seq->set_clock(next_timing, last_timing, training, clksrc);
+
+	if (next_timing->periodic_training)
+		tegra_emc_timer_training_start();
+	else
+		tegra_emc_timer_training_stop();
+
+	/* EMC freq dependent MR4 polling. */
 }
 
 static inline void emc_get_timing(struct tegra21_emc_table *timing)
@@ -596,8 +613,7 @@ default_val:
 	return 2000;
 }
 
-static struct tegra21_emc_table *emc_get_table(
-	unsigned long over_temp_state)
+struct tegra21_emc_table *emc_get_table(unsigned long over_temp_state)
 {
 	if ((over_temp_state == DRAM_OVER_TEMP_THROTTLE) &&
 	    (tegra_emc_table_derated != NULL))
@@ -680,7 +696,7 @@ int tegra_emc_set_rate_on_parent(unsigned long rate, struct clk *p)
 
 long tegra_emc_round_rate_updown(unsigned long rate, bool up)
 {
-	int i;
+	int i, last_i;
 	unsigned long table_rate;
 
 	if (!tegra_emc_table)
@@ -691,24 +707,31 @@ long tegra_emc_round_rate_updown(unsigned long rate, bool up)
 
 	pr_debug("%s: %lu\n", __func__, rate);
 
+	/* clamp incoming rate to max */
+	if (rate > clk_get_max_rate(emc))
+		rate = clk_get_max_rate(emc);
+
 	/* Table entries specify rate in kHz */
 	rate = rate / 1000;
 
 	i = get_start_idx(rate);
+	last_i = -1;
+	table_rate = 0;
 	for (; i < tegra_emc_table_size; i++) {
 		if (tegra_emc_clk_sel[i].input == NULL)
 			continue;	/* invalid entry */
 
 		table_rate = tegra_emc_table[i].rate;
 		if (table_rate >= rate) {
-			if (!up && i && (table_rate > rate)) {
-				i--;
+			if (!up && (last_i != -1) && (table_rate > rate)) {
+				i = last_i;
 				table_rate = tegra_emc_table[i].rate;
 			}
 			pr_debug("%s: using %lu\n", __func__, table_rate);
 			last_round_idx = i;
 			return table_rate * 1000;
 		}
+		last_i = i;
 	}
 
 	return -EINVAL;
@@ -785,6 +808,67 @@ static inline const struct clk_mux_sel *get_emc_input(u32 val)
 			break;
 	}
 	return sel;
+}
+
+/*
+ * Copy training params and registers from source to destination tables. This
+ * treats each table pointer as one table as opposed to an array of tables.
+ *
+ * For comparison emc_copy_table_params() instead treats src and dst as arrays.
+ */
+void __emc_copy_table_params(struct tegra21_emc_table *src,
+			     struct tegra21_emc_table *dst, int flags)
+{
+	int j;
+
+#define COPY_PARAM(field)				\
+	do {						\
+		dst->field = src->field;		\
+	} while (0)
+
+	if (flags & EMC_COPY_TABLE_PARAM_PERIODIC_FIELDS) {
+		/* The periodic_training state params. */
+		COPY_PARAM(trained_dram_clktree_c0d0u0);
+		COPY_PARAM(trained_dram_clktree_c0d0u1);
+		COPY_PARAM(trained_dram_clktree_c0d1u0);
+		COPY_PARAM(trained_dram_clktree_c0d1u1);
+		COPY_PARAM(trained_dram_clktree_c1d0u0);
+		COPY_PARAM(trained_dram_clktree_c1d0u1);
+		COPY_PARAM(trained_dram_clktree_c1d1u0);
+		COPY_PARAM(trained_dram_clktree_c1d1u1);
+		COPY_PARAM(current_dram_clktree_c0d0u0);
+		COPY_PARAM(current_dram_clktree_c0d0u1);
+		COPY_PARAM(current_dram_clktree_c0d1u0);
+		COPY_PARAM(current_dram_clktree_c0d1u1);
+		COPY_PARAM(current_dram_clktree_c1d0u0);
+		COPY_PARAM(current_dram_clktree_c1d0u1);
+		COPY_PARAM(current_dram_clktree_c1d1u0);
+		COPY_PARAM(current_dram_clktree_c1d1u1);
+	}
+
+	if (flags & EMC_COPY_TABLE_PARAM_TRIM_REGS) {
+		/* Trim register values of which some are trained. */
+		for (j = 0; j < src->trim_regs_per_ch_num; j++)
+			dst->trim_regs_per_ch[j] =
+				src->trim_regs_per_ch[j];
+
+		for (j = 0; j < src->trim_regs_num; j++)
+			dst->trim_regs[j] = src->trim_regs[j];
+
+		for (j = 0; j < src->burst_regs_per_ch_num; j++)
+			dst->burst_regs_per_ch[j] =
+				src->burst_regs_per_ch[j];
+	}
+}
+
+static void emc_copy_table_params(struct tegra21_emc_table *src,
+			   struct tegra21_emc_table *dst,
+			   int table_size, int flags)
+{
+	int i;
+
+	for (i = 0; i < table_size; i++)
+		__emc_copy_table_params(&src[i], &dst[i], flags);
 }
 
 static int find_matching_input(struct tegra21_emc_table *table,
@@ -988,6 +1072,17 @@ static int init_emc_table(struct tegra21_emc_table *table,
 				return -EINVAL;
 			}
 		}
+
+		/* Copy trained trimmers from the normal table to the derated
+		 * table for LP4. This saves training time in the BL since.
+		 * Trimmers are the same for derated and non-derated tables.
+		 */
+		if (tegra_emc_get_dram_type() == DRAM_TYPE_LPDDR4)
+			emc_copy_table_params(table, table_der,
+					tegra_emc_table_size,
+					EMC_COPY_TABLE_PARAM_PERIODIC_FIELDS |
+					EMC_COPY_TABLE_PARAM_TRIM_REGS);
+
 		pr_info("tegra: emc: Derated table is valid.\n");
 	}
 
@@ -1069,9 +1164,25 @@ static int init_emc_table(struct tegra21_emc_table *table,
 }
 
 #ifdef CONFIG_PASR
-static bool tegra21_is_lpddr3(void)
+struct pasr_mask {
+	u32 device0_mask;
+	u32 device1_mask;
+};
+
+static struct pasr_mask *pasr_mask_virt;
+static struct pasr_mask *pasr_mask_phys;
+
+static bool is_pasr_supported(void)
 {
-	return (dram_type == DRAM_TYPE_LPDDR2);
+	return (dram_type == DRAM_TYPE_LPDDR2 ||
+		dram_type == DRAM_TYPE_LPDDR4);
+}
+
+void tegra_bpmp_pasr_mask(uint32_t phys)
+{
+	int mb[] = { phys };
+	int r = tegra_bpmp_send(MRQ_PASR_MASK, &mb, sizeof(mb));
+	WARN_ON(r);
 }
 
 static void tegra21_pasr_apply_mask(u16 *mem_reg, void *cookie)
@@ -1082,7 +1193,11 @@ static void tegra21_pasr_apply_mask(u16 *mem_reg, void *cookie)
 	val = TEGRA_EMC_MODE_REG_17 | *mem_reg;
 	val |= device << TEGRA_EMC_MRW_DEV_SHIFT;
 
-	emc_writel(val, EMC_MRW);
+	if (device == TEGRA_EMC_MRW_DEV1)
+		pasr_mask_virt->device0_mask = val;
+
+	if (device == TEGRA_EMC_MRW_DEV2)
+		pasr_mask_virt->device1_mask = val;
 
 	pr_debug("%s: cookie = %d mem_reg = 0x%04x val = 0x%08x\n", __func__,
 			(int)(uintptr_t)cookie, *mem_reg, val);
@@ -1108,12 +1223,29 @@ static int tegra21_pasr_enable(const char *arg, const struct kernel_param *kp)
 	unsigned int old_pasr_enable;
 	void *cookie;
 	int num_devices;
+	u32 regval;
 	u64 device_size;
-	u64 size_mul;
+	u64 subp_addr_mode;
+	u64 dram_width;
+	u64 num_channels;
 	int ret = 0;
 
-	if (!tegra21_is_lpddr3())
+	if (!is_pasr_supported() || !pasr_mask_virt)
 		return -ENOSYS;
+
+	regval = emc_readl(EMC_FBIO_CFG7);
+	subp_addr_mode = (regval & (0x1 << 13)) == 0 ? 32 : 16;
+	num_channels = (regval & (0x1 << 2)) == 0 ? 1 : 2;
+
+	regval = emc_readl(EMC_FBIO_CFG5);
+	dram_width = (regval & (0x1 << 4)) == 0 ? 32 : 64;
+
+	device_size = 1 << ((mc_readl(MC_EMEM_ADR_CFG_DEV0) >>
+				MC_EMEM_DEV_SIZE_SHIFT) &
+				MC_EMEM_DEV_SIZE_MASK);
+
+	device_size = device_size * (dram_width/subp_addr_mode);
+	device_size = device_size * num_channels;
 
 	old_pasr_enable = pasr_enable;
 	param_set_int(arg, kp);
@@ -1122,7 +1254,6 @@ static int tegra21_pasr_enable(const char *arg, const struct kernel_param *kp)
 		return ret;
 
 	num_devices = 1 << (mc_readl(MC_EMEM_ADR_CFG) & BIT(0));
-	size_mul = 1 << ((emc_readl(EMC_FBIO_CFG5) >> 4) & BIT(0));
 
 	/* Cookie represents the device number to write to MRW register.
 	 * 0x2 to for only dev0, 0x1 for dev1.
@@ -1138,11 +1269,6 @@ static int tegra21_pasr_enable(const char *arg, const struct kernel_param *kp)
 		cookie = (void *)(int)TEGRA_EMC_MRW_DEV2;
 		/* Next device is located after first device, so read DEV0 size
 		 * to decide base address for DEV1 */
-		device_size = 1 << ((mc_readl(MC_EMEM_ADR_CFG_DEV0) >>
-					MC_EMEM_DEV_SIZE_SHIFT) &
-					MC_EMEM_DEV_SIZE_MASK);
-		device_size = device_size * size_mul * SZ_4M;
-
 		tegra21_pasr_remove_mask(TEGRA_DRAM_BASE + device_size, cookie);
 	} else {
 		cookie = (void *)(int)TEGRA_EMC_MRW_DEV1;
@@ -1156,11 +1282,6 @@ static int tegra21_pasr_enable(const char *arg, const struct kernel_param *kp)
 
 		/* Next device is located after first device, so read DEV0 size
 		 * to decide base address for DEV1 */
-		device_size = 1 << ((mc_readl(MC_EMEM_ADR_CFG_DEV0) >>
-					MC_EMEM_DEV_SIZE_SHIFT) &
-					MC_EMEM_DEV_SIZE_MASK);
-		device_size = device_size * size_mul * SZ_4M;
-
 		ret = tegra21_pasr_set_mask(TEGRA_DRAM_BASE + device_size, cookie);
 	}
 
@@ -1173,6 +1294,31 @@ static struct kernel_param_ops tegra21_pasr_enable_ops = {
 	.get = param_get_int,
 };
 module_param_cb(pasr_enable, &tegra21_pasr_enable_ops, &pasr_enable, 0644);
+
+static int tegra21_pasr_init(struct device *dev)
+{
+	dma_addr_t phys;
+	void *shared_virt;
+
+	shared_virt = dma_alloc_coherent(dev,
+				sizeof(struct pasr_mask), &phys, GFP_KERNEL);
+	if (!shared_virt)
+		return -ENOMEM;
+
+	pasr_mask_virt = (struct pasr_mask *)shared_virt;
+	pasr_mask_phys = (struct pasr_mask *)phys;
+
+	pasr_mask_virt->device0_mask = TEGRA_EMC_MODE_REG_17 |
+			(TEGRA_EMC_MRW_DEV1 << TEGRA_EMC_MRW_DEV_SHIFT);
+	pasr_mask_virt->device1_mask = TEGRA_EMC_MODE_REG_17 |
+			(TEGRA_EMC_MRW_DEV2 << TEGRA_EMC_MRW_DEV_SHIFT);
+
+	tegra_bpmp_pasr_mask((uint32_t)phys);
+
+	return 0;
+}
+#else
+static inline int tegra21_pasr_init(struct device *dev) { return 0; };
 #endif
 
 /* FIXME: add to clock resume */
@@ -1219,7 +1365,8 @@ static int emc_read_mrr(int dev, int addr)
 	int ret;
 	u32 val, emc_cfg;
 
-	if (dram_type != DRAM_TYPE_LPDDR2)
+	if (dram_type != DRAM_TYPE_LPDDR2 &&
+	    dram_type != DRAM_TYPE_LPDDR4)
 		return -ENODEV;
 
 	ret = wait_for_update(EMC_EMC_STATUS,
@@ -1276,7 +1423,8 @@ int tegra_emc_set_over_temp_state(unsigned long state)
 	struct tegra21_emc_table *current_table;
 	struct tegra21_emc_table *new_table;
 
-	if (dram_type != DRAM_TYPE_LPDDR2 || !emc_timing)
+	if ((dram_type != DRAM_TYPE_LPDDR2 &&
+	     dram_type != DRAM_TYPE_LPDDR4) || !emc_timing)
 		return -ENODEV;
 
 	if (state > DRAM_OVER_TEMP_THROTTLE)
@@ -1301,8 +1449,7 @@ int tegra_emc_set_over_temp_state(unsigned long state)
 	if (current_table != new_table) {
 		offset = emc_timing - current_table;
 		emc_set_clock(&new_table[offset], emc_timing, 0,
-			new_table[offset].src_sel_reg |
-			EMC_CLK_FORCE_CC_TRIGGER);
+			      current_clksrc | EMC_CLK_FORCE_CC_TRIGGER);
 		emc_timing = &new_table[offset];
 		tegra_mc_divider_update(emc);
 	} else {
@@ -1479,6 +1626,204 @@ static u8 get_iso_bw_general(unsigned long iso_bw)
 
 static struct dentry *emc_debugfs_root;
 
+struct emc_table_array {
+	u32 *array;
+	u32  length;
+};
+
+static ssize_t emc_table_entry_array_write(struct file *filp,
+					   const char __user *buff,
+					   size_t len, loff_t *off)
+{
+	char kbuff[64];
+	u32 offs, value, buff_size;
+	int ret;
+	struct emc_table_array *arr =
+		((struct seq_file *)filp->private_data)->private;
+
+	buff_size = min_t(size_t, 64, len);
+
+	if (copy_from_user(kbuff, buff, buff_size))
+		return -EFAULT;
+
+	ret = sscanf(kbuff, "%u %x", &offs, &value);
+	if (ret != 2)
+		return -EINVAL;
+
+	if (offs < 0 || offs >= arr->length)
+		return -EINVAL;
+
+	pr_info("Setting reg_list: offs=%d, value = 0x%08x\n", offs, value);
+	arr->array[offs] = value;
+
+	return len;
+}
+
+static int emc_table_entry_array_show(struct seq_file *s, void *data)
+{
+	struct emc_table_array *arr = s->private;
+	int i;
+
+	for (i = 0; i < arr->length; i++)
+		seq_printf(s, "%-4d - 0x%08x\n", i, arr->array[i]);
+
+	return 0;
+}
+
+static int emc_table_entry_array_open(struct inode *inode, struct file *filp)
+{
+	return single_open(filp, emc_table_entry_array_show, inode->i_private);
+}
+
+static const struct file_operations emc_table_entry_array_fops = {
+	.open		= emc_table_entry_array_open,
+	.write		= emc_table_entry_array_write,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int emc_table_entry_create(struct dentry *parent,
+				  struct tegra21_emc_table *table)
+{
+#define RW 0664
+#define RO 0444
+#define __T_FIELD(dentry, table, field, mode, size, ux)			\
+	debugfs_create_ ## ux ## size(__stringify(field),		\
+				      mode, dentry,			\
+				      &(table->field));			\
+
+#define __T_ARRAY(dentry, table, __array, __size)			\
+	do {								\
+		static struct emc_table_array array_data_ ## __array;	\
+									\
+		array_data_ ## __array.array = table->__array;		\
+		array_data_ ## __array.length = table->__size;		\
+		debugfs_create_file(__stringify(__array), RW, dentry,	\
+				    &array_data_ ## __array,		\
+				    &emc_table_entry_array_fops);	\
+	} while (0)
+
+	char name[16];
+	struct dentry *table_dir, *array_dir;
+
+	snprintf(name, 16, "%lu", table->rate);
+
+	table_dir = debugfs_create_dir(name, parent);
+	if (!table_dir)
+		return -ENODEV;
+
+	/*
+	 * Not all table params can be modified... So some are read only, others
+	 * are read write.
+	 */
+	__T_FIELD(table_dir, table, rev,                             RO, 8,  x);
+	__T_FIELD(table_dir, table, needs_training,                  RO, 32, x);
+	__T_FIELD(table_dir, table, training_pattern,                RO, 32, x);
+	__T_FIELD(table_dir, table, trained,                         RO, 32, x);
+	__T_FIELD(table_dir, table, periodic_training,               RO, 32, x);
+	__T_FIELD(table_dir, table, trained_dram_clktree_c0d0u0,     RO, 32, x);
+	__T_FIELD(table_dir, table, trained_dram_clktree_c0d0u1,     RO, 32, x);
+	__T_FIELD(table_dir, table, trained_dram_clktree_c0d1u0,     RO, 32, x);
+	__T_FIELD(table_dir, table, trained_dram_clktree_c0d1u1,     RO, 32, x);
+	__T_FIELD(table_dir, table, trained_dram_clktree_c1d0u0,     RO, 32, x);
+	__T_FIELD(table_dir, table, trained_dram_clktree_c1d0u1,     RO, 32, x);
+	__T_FIELD(table_dir, table, trained_dram_clktree_c1d1u0,     RO, 32, x);
+	__T_FIELD(table_dir, table, trained_dram_clktree_c1d1u1,     RO, 32, x);
+	__T_FIELD(table_dir, table, current_dram_clktree_c0d0u0,     RO, 32, x);
+	__T_FIELD(table_dir, table, current_dram_clktree_c0d0u1,     RO, 32, x);
+	__T_FIELD(table_dir, table, current_dram_clktree_c0d1u0,     RO, 32, x);
+	__T_FIELD(table_dir, table, current_dram_clktree_c0d1u1,     RO, 32, x);
+	__T_FIELD(table_dir, table, current_dram_clktree_c1d0u0,     RO, 32, x);
+	__T_FIELD(table_dir, table, current_dram_clktree_c1d0u1,     RO, 32, x);
+	__T_FIELD(table_dir, table, current_dram_clktree_c1d1u0,     RO, 32, x);
+	__T_FIELD(table_dir, table, current_dram_clktree_c1d1u1,     RO, 32, x);
+	__T_FIELD(table_dir, table, run_clocks,                      RO, 32, u);
+	__T_FIELD(table_dir, table, tree_margin,                     RO, 32, x);
+	__T_FIELD(table_dir, table, burst_regs_num,                  RO, 32, u);
+	__T_FIELD(table_dir, table, burst_regs_per_ch_num,           RO, 32, u);
+	__T_FIELD(table_dir, table, trim_regs_num,                   RO, 32, u);
+	__T_FIELD(table_dir, table, burst_mc_regs_num,               RO, 32, u);
+	__T_FIELD(table_dir, table, la_scale_regs_num,               RO, 32, u);
+	__T_FIELD(table_dir, table, vref_regs_num,                   RO, 32, u);
+	__T_FIELD(table_dir, table, training_mod_regs_num,           RO, 32, u);
+	__T_FIELD(table_dir, table, dram_timing_regs_num,            RO, 32, u);
+	__T_FIELD(table_dir, table, min_mrs_wait,                    RW, 32, x);
+	__T_FIELD(table_dir, table, emc_mrw,                         RW, 32, x);
+	__T_FIELD(table_dir, table, emc_mrw2,                        RW, 32, x);
+	__T_FIELD(table_dir, table, emc_mrw3,                        RW, 32, x);
+	__T_FIELD(table_dir, table, emc_mrw4,                        RW, 32, x);
+	__T_FIELD(table_dir, table, emc_mrw9,                        RW, 32, x);
+	__T_FIELD(table_dir, table, emc_mrs,                         RW, 32, x);
+	__T_FIELD(table_dir, table, emc_emrs,                        RW, 32, x);
+	__T_FIELD(table_dir, table, emc_emrs2,                       RW, 32, x);
+	__T_FIELD(table_dir, table, emc_auto_cal_config,             RW, 32, x);
+	__T_FIELD(table_dir, table, emc_auto_cal_config2,            RW, 32, x);
+	__T_FIELD(table_dir, table, emc_auto_cal_config3,            RW, 32, x);
+	__T_FIELD(table_dir, table, emc_auto_cal_config4,            RW, 32, x);
+	__T_FIELD(table_dir, table, emc_auto_cal_config5,            RW, 32, x);
+	__T_FIELD(table_dir, table, emc_auto_cal_config6,            RW, 32, x);
+	__T_FIELD(table_dir, table, emc_auto_cal_config7,            RW, 32, x);
+	__T_FIELD(table_dir, table, emc_auto_cal_config8,            RW, 32, x);
+	__T_FIELD(table_dir, table, emc_cfg_2,                       RW, 32, x);
+	__T_FIELD(table_dir, table, emc_sel_dpd_ctrl,                RW, 32, x);
+	__T_FIELD(table_dir, table, emc_fdpd_ctrl_cmd_no_ramp,       RW, 32, x);
+	__T_FIELD(table_dir, table, dll_clk_src,                     RO, 32, x);
+	__T_FIELD(table_dir, table, clk_out_enb_x_0_clk_enb_emc_dll, RO, 32, x);
+	__T_FIELD(table_dir, table, clock_change_latency,            RO, 32, x);
+
+	/*
+	 * Now for the arrays.
+	 */
+	array_dir = debugfs_create_dir("reg_lists", table_dir);
+	if (!array_dir)
+		return 0;
+
+	__T_ARRAY(array_dir, table, burst_regs, burst_regs_num);
+	__T_ARRAY(array_dir, table, burst_regs_per_ch, burst_regs_per_ch_num);
+	__T_ARRAY(array_dir, table, shadow_regs_ca_train, burst_regs_num);
+	__T_ARRAY(array_dir, table, shadow_regs_quse_train, burst_regs_num);
+	__T_ARRAY(array_dir, table, shadow_regs_rdwr_train, burst_regs_num);
+	__T_ARRAY(array_dir, table, trim_regs, trim_regs_num);
+	__T_ARRAY(array_dir, table, trim_regs_per_ch, trim_regs_per_ch_num);
+	__T_ARRAY(array_dir, table, vref_regs, vref_regs_num);
+	__T_ARRAY(array_dir, table, dram_timing_regs, dram_timing_regs_num);
+	__T_ARRAY(array_dir, table, training_mod_regs, training_mod_regs_num);
+	__T_ARRAY(array_dir, table, burst_mc_regs, burst_mc_regs_num);
+	__T_ARRAY(array_dir, table, la_scale_regs, la_scale_regs_num);
+
+	return 0;
+}
+
+static int emc_init_table_debug(struct dentry *emc_root,
+				struct tegra21_emc_table *regular_tbl,
+				struct tegra21_emc_table *derated_tbl)
+{
+	struct dentry *tables_dir, *regular, *derated = NULL;
+	int i;
+
+	tables_dir = debugfs_create_dir("tables", emc_root);
+	if (!tables_dir)
+		return -ENODEV;
+
+	regular = debugfs_create_dir("regular", tables_dir);
+	if (!regular)
+		return -ENODEV;
+	if (derated_tbl) {
+		derated = debugfs_create_dir("derated", tables_dir);
+		if (!regular)
+			return -ENODEV;
+	}
+
+	for (i = 0; i < tegra_emc_table_size; i++) {
+		emc_table_entry_create(regular, &regular_tbl[i]);
+		if (derated)
+			emc_table_entry_create(derated, &derated_tbl[i]);
+	}
+
+	return 0;
+}
+
 static int emc_stats_show(struct seq_file *s, void *data)
 {
 	int i;
@@ -1619,6 +1964,9 @@ static int tegra_emc_debug_init(void)
 				 emc_debugfs_root, NULL, &emc_table_info_fops))
 		goto err_out;
 
+	emc_init_table_debug(emc_debugfs_root,
+			     tegra_emc_table, tegra_emc_table_derated);
+
 	return 0;
 
 err_out:
@@ -1675,6 +2023,9 @@ out:
 		if (!IS_ERR_VALUE(rate))
 			tegra_clk_preset_emc_monitor(rate);
 	}
+
+	if (tegra21_pasr_init(&pdev->dev))
+		dev_err(&pdev->dev, "PASR init failed\n");
 
 	return err;
 }

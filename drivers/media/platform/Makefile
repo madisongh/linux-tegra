@@ -50,7 +50,7 @@ obj-$(CONFIG_SOC_CAMERA)		+= soc_camera/
 obj-$(CONFIG_VIDEO_RENESAS_VSP1)	+= vsp1/
 
 obj-y	+= omap/
-obj-$(CONFIG_ARCH_TEGRA) += tegra/
+obj-$(CONFIG_PLATFORM_TEGRA) += tegra/
 
 ccflags-y += -I$(srctree)/drivers/media/i2c
 ccflags-y += -I$(srctree)/drivers/video/tegra/host

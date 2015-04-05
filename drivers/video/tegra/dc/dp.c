@@ -1,7 +1,7 @@
 /*
  * drivers/video/tegra/dc/dp.c
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -456,7 +456,7 @@ static int tegra_dc_dpaux_read_chunk_locked(struct tegra_dc_dp_data *dp,
 		*aux_stat = tegra_dpaux_readl(dp, DPAUX_DP_AUXSTAT);
 
 		/* Ignore I2C errors on fpga */
-		if (tegra_platform_is_fpga())
+		if (!tegra_platform_is_silicon())
 			*aux_stat &= ~DPAUX_DP_AUXSTAT_REPLYTYPE_I2CNACK;
 
 		if ((*aux_stat & DPAUX_DP_AUXSTAT_TIMEOUT_ERROR_PENDING) ||
@@ -770,7 +770,7 @@ static int lane_count_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
-static ssize_t lane_count_set(struct file *file, const char  *buf,
+static ssize_t lane_count_set(struct file *file, const char __user *buf,
 						size_t count, loff_t *off)
 {
 	struct seq_file *s = file->private_data;
@@ -836,7 +836,7 @@ static int link_speed_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
-static ssize_t link_speed_set(struct file *file, const char  *buf,
+static ssize_t link_speed_set(struct file *file, const char __user *buf,
 						size_t count, loff_t *off)
 {
 	struct seq_file *s = file->private_data;
@@ -1620,6 +1620,8 @@ static int tegra_dc_dp_init(struct tegra_dc *dc)
 	struct device_node *np_dp =
 		(dc->ndev->id) ? of_find_node_by_path(DPAUX1_NODE)
 		: of_find_node_by_path(DPAUX_NODE);
+	struct device_node *np_panel = NULL;
+	bool virtual_edid = false;
 
 	dp = devm_kzalloc(&dc->ndev->dev, sizeof(*dp), GFP_KERNEL);
 	if (!dp) {
@@ -1637,6 +1639,11 @@ static int tegra_dc_dp_init(struct tegra_dc *dc)
 			}
 			of_address_to_resource(np_dp, 0, &of_dp_res);
 			res = &of_dp_res;
+			np_panel = tegra_get_panel_node_out_type_check(dc,
+				TEGRA_DC_OUT_DP);
+			if (np_panel && of_device_is_available(np_panel))
+				virtual_edid = of_property_read_bool(np_panel,
+					"nvidia,edid");
 		} else {
 			err = -EINVAL;
 			goto err_free_dp;
@@ -1721,6 +1728,8 @@ static int tegra_dc_dp_init(struct tegra_dc *dc)
 	dp->irq = irq;
 	dp->pdata = dc->pdata->default_out->dp_out;
 
+	tegra_set_dpaux_addr(dp->aux_base, dc->ndev->id);
+
 	if (IS_ERR_OR_NULL(dp->sor)) {
 		err = PTR_ERR(dp->sor);
 		dp->sor = NULL;
@@ -1728,7 +1737,12 @@ static int tegra_dc_dp_init(struct tegra_dc *dc)
 	}
 
 	if (dp->dc->out->type != TEGRA_DC_OUT_FAKE_DP) {
-		dp->dp_edid = tegra_edid_create(dc, tegra_dc_dp_i2c_xfer);
+		if (virtual_edid)
+			dp->dp_edid = tegra_edid_create(dc,
+							tegra_dc_edid_blob);
+		else
+			dp->dp_edid = tegra_edid_create(dc,
+							tegra_dc_dp_i2c_xfer);
 		if (IS_ERR_OR_NULL(dp->dp_edid)) {
 			dev_err(&dc->ndev->dev,
 				"dp: failed to create edid obj\n");
@@ -1799,7 +1813,7 @@ static int tegra_dp_hpd_plug(struct tegra_dc_dp_data *dp)
 
 	might_sleep();
 
-	if (tegra_platform_is_fpga()) {
+	if (!tegra_platform_is_silicon()) {
 		msleep(TEGRA_DP_HPD_PLUG_TIMEOUT_MS);
 		return 0;
 	}
@@ -1859,6 +1873,9 @@ static void tegra_dp_lt_config(struct tegra_dc_dp_data *dp,
 	u32 cnt;
 	u32 val;
 
+	/* support for 1 lane */
+	u32 loopcnt = (n_lanes == 1) ? 1 : n_lanes >> 1;
+
 	for (cnt = 0; cnt < n_lanes; cnt++) {
 		u32 mask = 0;
 		u32 pe_reg, vs_reg, pc_reg;
@@ -1868,7 +1885,7 @@ static void tegra_dp_lt_config(struct tegra_dc_dp_data *dp,
 			mask = NV_SOR_PR_LANE2_DP_LANE0_MASK;
 			shift = NV_SOR_PR_LANE2_DP_LANE0_SHIFT;
 			/* TODO: Fix lane config */
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC)  || defined(CONFIG_TEGRA_NVDISPLAY)
 			mask = NV_SOR_PR_LANE0_DP_LANE2_MASK;
 			shift = NV_SOR_PR_LANE0_DP_LANE2_SHIFT;
 #endif
@@ -1881,7 +1898,7 @@ static void tegra_dp_lt_config(struct tegra_dc_dp_data *dp,
 			mask = NV_SOR_PR_LANE0_DP_LANE2_MASK;
 			shift = NV_SOR_PR_LANE0_DP_LANE2_SHIFT;
 			/* TODO: Fix lane config */
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC)  || defined(CONFIG_TEGRA_NVDISPLAY)
 			mask = NV_SOR_PR_LANE2_DP_LANE0_MASK;
 			shift = NV_SOR_PR_LANE2_DP_LANE0_SHIFT;
 #endif
@@ -1926,7 +1943,7 @@ static void tegra_dp_lt_config(struct tegra_dc_dp_data *dp,
 			(NV_DPCD_TRAINING_LANE0_SET + cnt), val);
 	}
 	if (pc_supported) {
-		for (cnt = 0; cnt < n_lanes / 2; cnt++) {
+		for (cnt = 0; cnt < loopcnt; cnt++) {
 			u32 max_pc_flag0 = tegra_dp_is_max_pc(pc[cnt]);
 			u32 max_pc_flag1 = tegra_dp_is_max_pc(pc[cnt + 1]);
 			val = (pc[cnt] << NV_DPCD_LANEX_SET2_PC2_SHIFT) |
@@ -1950,7 +1967,10 @@ static bool tegra_dp_clock_recovery_status(struct tegra_dc_dp_data *dp)
 	u32 n_lanes = dp->link_cfg.lane_count;
 	u8 data_ptr;
 
-	for (cnt = 0; cnt < n_lanes / 2; cnt++) {
+	/* support for 1 lane */
+	u32 loopcnt = (n_lanes == 1) ? 1 : n_lanes >> 1;
+
+	for (cnt = 0; cnt < loopcnt; cnt++) {
 		tegra_dc_dp_dpcd_read(dp,
 			(NV_DPCD_LANE0_1_STATUS + cnt), &data_ptr);
 
@@ -1969,11 +1989,14 @@ static void tegra_dp_lt_adjust(struct tegra_dc_dp_data *dp,
 				u32 pe[4], u32 vs[4], u32 pc[4],
 				bool pc_supported)
 {
-	size_t cnt;
+	u32 cnt;
 	u8 data_ptr;
 	u32 n_lanes = dp->link_cfg.lane_count;
 
-	for (cnt = 0; cnt < n_lanes / 2; cnt++) {
+	/* support for 1 lane */
+	u32 loopcnt = (n_lanes == 1) ? 1 : n_lanes >> 1;
+
+	for (cnt = 0; cnt < loopcnt; cnt++) {
 		tegra_dc_dp_dpcd_read(dp,
 			(NV_DPCD_LANE0_1_ADJUST_REQ + cnt), &data_ptr);
 		pe[2 * cnt] = (data_ptr & NV_DPCD_ADJUST_REQ_LANEX_PE_MASK) >>
@@ -2049,7 +2072,10 @@ static bool tegra_dp_channel_eq_status(struct tegra_dc_dp_data *dp)
 	u8 data_ptr;
 	bool ce_done = true;
 
-	for (cnt = 0; cnt < n_lanes / 2; cnt++) {
+	/* support for 1 lane */
+	u32 loopcnt = (n_lanes == 1) ? 1 : n_lanes >> 1;
+
+	for (cnt = 0; cnt < loopcnt; cnt++) {
 		tegra_dc_dp_dpcd_read(dp,
 			(NV_DPCD_LANE0_1_STATUS + cnt), &data_ptr);
 
@@ -2393,6 +2419,7 @@ static void tegra_dc_dp_enable(struct tegra_dc *dc)
 		if (tegra_dp_hpd_plug(dp) < 0) {
 			dev_info(&dc->ndev->dev,
 				"dp: no panel/monitor plugged\n");
+			dc->connected = false; /* unplugged during suspend */
 			goto error_enable;
 		}
 	}
@@ -2405,7 +2432,8 @@ static void tegra_dc_dp_enable(struct tegra_dc *dc)
 	}
 
 	if (dp->dp_edid && !dp->dp_edid->data &&
-		(dp->dc->out->type != TEGRA_DC_OUT_FAKE_DP))
+		(dp->dc->out->type != TEGRA_DC_OUT_FAKE_DP) &&
+		!tegra_platform_is_linsim())
 		tegra_dp_edid(dp);
 
 	tegra_dp_dpcd_init(dp);
@@ -2468,17 +2496,18 @@ static void tegra_dc_dp_disable(struct tegra_dc *dc)
 {
 	struct tegra_dc_dp_data *dp = tegra_dc_get_outdata(dc);
 
-	if (!dp->enabled)
-		return;
-
-	cancel_work_sync(&dp->lt_work);
-
 	tegra_dc_io_start(dc);
 
 	tegra_dp_default_int(dp, false);
+	cancel_work_sync(&dp->lt_work);
 
 	if (dp->dc->out->type != TEGRA_DC_OUT_FAKE_DP)
 		tegra_dp_disable_irq(dp->irq);
+
+	if (!dp->enabled) {
+		tegra_dc_io_end(dc);
+		return;
+	}
 
 	tegra_dpaux_pad_power(dp->dc,
 	dp->dc->ndev->id == 0 ? TEGRA_DPAUX_INSTANCE_0 : TEGRA_DPAUX_INSTANCE_1
@@ -2515,7 +2544,7 @@ static long tegra_dc_dp_setup_clk(struct tegra_dc *dc, struct clk *clk)
 	struct tegra_dc_dp_data *dp = tegra_dc_get_outdata(dc);
 	struct clk *dc_parent_clk;
 
-	if (tegra_platform_is_fpga())
+	if (!tegra_platform_is_silicon())
 		return tegra_dc_pclk_round_rate(dc, dc->mode.pclk);
 
 	if (clk == dc->clk) {
@@ -2538,7 +2567,8 @@ static bool tegra_dc_dp_detect(struct tegra_dc *dc)
 	struct tegra_dc_dp_data *dp = tegra_dc_get_outdata(dc);
 	u32 rd;
 
-	if (dp->dc->out->type == TEGRA_DC_OUT_FAKE_DP)
+	if (dp->dc->out->type == TEGRA_DC_OUT_FAKE_DP ||
+		tegra_platform_is_linsim())
 		return  true;
 
 	tegra_dc_io_start(dc);
@@ -2563,7 +2593,8 @@ static void tegra_dc_dp_modeset_notifier(struct tegra_dc *dc)
 	tegra_dc_sor_modeset_notifier(dp->sor, false);
 	/* Pixel clock may be changed in new mode,
 	 * recalculate link config */
-	tegra_dc_dp_calc_config(dp, dp->mode, &dp->link_cfg);
+	if (!tegra_platform_is_linsim())
+		tegra_dc_dp_calc_config(dp, dp->mode, &dp->link_cfg);
 
 
 	tegra_dpaux_clk_disable(dp);

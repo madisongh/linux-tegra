@@ -468,4 +468,5 @@ config QCOM_BAM_DMA
 	  Enable support for the QCOM BAM DMA controller.  This controller
 	  provides DMA capabilities for a variety of on-chip devices.
 
+trysource "../kernel-t18x/drivers/dma/Kconfig"
 endif

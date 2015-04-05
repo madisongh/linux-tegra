@@ -1,7 +1,7 @@
 /*
  * GM20B ACR
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -380,9 +380,10 @@ struct acr_gm20b {
 	struct acr_fw_header *fw_hdr;
 	u32 pmu_args;
 	const struct firmware *acr_fw;
-	struct pmu_mem_desc acr_ucode;
+	struct flcn_acr_desc *acr_dmem_desc;
+	struct mem_desc acr_ucode;
 	const struct firmware *hsbl_fw;
-	struct pmu_mem_desc hsbl_ucode;
+	struct mem_desc hsbl_ucode;
 	struct flcn_bl_dmem_desc bl_dmem_desc;
 	const struct firmware *pmu_fw;
 	const struct firmware *pmu_desc;

@@ -1,7 +1,7 @@
 /*
  * GM20B Graphics
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -18,6 +18,7 @@
 #include "gk20a/gk20a.h"
 
 #include "ltc_gm20b.h"
+#include "ce2_gm20b.h"
 #include "gr_gm20b.h"
 #include "ltc_gm20b.h"
 #include "fb_gm20b.h"
@@ -30,6 +31,7 @@
 #include "mc_gm20b.h"
 #include <linux/tegra-fuse.h>
 #include "regops_gm20b.h"
+#include "debug_gm20b.h"
 
 #define FUSE_OPT_PRIV_SEC_DIS_0 0x264
 #define PRIV_SECURITY_DISABLE 0x01
@@ -80,7 +82,7 @@ static struct gpu_ops gm20b_ops = {
 			gm20b_blcg_pmu_load_gating_prod,
 		.pg_gr_load_gating_prod =
 			gr_gm20b_pg_gr_load_gating_prod,
-	}
+	},
 };
 
 int gm20b_init_hal(struct gk20a *g)
@@ -123,11 +125,13 @@ int gm20b_init_hal(struct gk20a *g)
 	gm20b_init_ltc(gops);
 	gm20b_init_fb(gops);
 	gm20b_init_fifo(gops);
+	gm20b_init_ce2(gops);
 	gm20b_init_gr_ctx(gops);
 	gm20b_init_mm(gops);
 	gm20b_init_pmu_ops(gops);
 	gm20b_init_clk_ops(gops);
 	gm20b_init_regops(gops);
+	gm20b_init_debug_ops(gops);
 	gops->name = "gm20b";
 
 	c->twod_class = FERMI_TWOD_A;

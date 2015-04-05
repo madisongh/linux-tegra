@@ -1,7 +1,7 @@
 /*
  * imx214.c - imx214 sensor driver
  *
- * Copyright (c) 2014, NVIDIA CORPORATION, All Rights Reserved.
+ * Copyright (c) 2015, NVIDIA CORPORATION, All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -191,7 +191,9 @@ static int imx214_set_mode(struct imx214_info *info, struct imx214_mode *mode)
 			 mode->coarse_time, mode->gain, mode->hdr_en);
 
 	if (mode->hdr_en == true) {
-		if (mode->xres == 4096 && mode->yres == 3072) {
+		if (mode->xres == 4096 && mode->yres == 2304) {
+			sensor_mode = IMX214_MODE_4096X2304_HDR;
+		} else if (mode->xres == 4096 && mode->yres == 3072) {
 			sensor_mode = IMX214_MODE_4096X3072_HDR;
 		} else if (mode->xres == 3840 && mode->yres == 2160) {
 			sensor_mode = IMX214_MODE_3840X2160_HDR;
@@ -205,10 +207,16 @@ static int imx214_set_mode(struct imx214_info *info, struct imx214_mode *mode)
 			return -EINVAL;
 		}
 	} else {
-		if (mode->xres == 4096 && mode->yres == 3072) {
+		if (mode->xres == 4096 && mode->yres == 2304) {
+			sensor_mode = IMX214_MODE_4096X2304;
+		} else if (mode->xres == 4096 && mode->yres == 3072) {
 			sensor_mode = IMX214_MODE_4096X3072;
 		} else if (mode->xres == 3840 && mode->yres == 2160) {
 			sensor_mode = IMX214_MODE_3840X2160;
+		} else if (mode->xres == 2048 && mode->yres == 1536) {
+			sensor_mode = IMX214_MODE_2048X1536;
+		} else if (mode->xres == 2048 && mode->yres == 1152) {
+			sensor_mode = IMX214_MODE_2048X1152;
 		} else if (mode->xres == 1920 && mode->yres == 1080) {
 			sensor_mode = IMX214_MODE_1920X1080;
 		} else if (mode->xres == 1280 && mode->yres == 720) {

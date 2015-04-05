@@ -115,6 +115,22 @@ static int lc709203f_write_word(struct i2c_client *client, u8 reg, u16 value)
 	return ret;
 }
 
+static int lc709203f_get_battery_soc(struct battery_gauge_dev *bg_dev)
+{
+	struct lc709203f_chip *chip = battery_gauge_get_drvdata(bg_dev);
+	int val;
+
+	val = lc709203f_read_word(chip->client, LC709203F_RSOC);
+	if (val < 0)
+		dev_err(&chip->client->dev, "%s: err %d\n", __func__, val);
+	else
+		val =  battery_gauge_get_adjusted_soc(chip->bg_dev,
+				chip->pdata->threshold_soc,
+				chip->pdata->maximum_soc, val * 100);
+
+	return val;
+}
+
 static int lc709203f_update_soc_voltage(struct lc709203f_chip *chip)
 {
 	int val;
@@ -133,11 +149,8 @@ static int lc709203f_update_soc_voltage(struct lc709203f_chip *chip)
 				chip->pdata->threshold_soc,
 				chip->pdata->maximum_soc, val * 100);
 
-	if (chip->soc >= LC709203F_BATTERY_FULL && chip->charge_complete != 1)
-		chip->soc = LC709203F_BATTERY_FULL - 1;
-
-	if (chip->status == POWER_SUPPLY_STATUS_FULL && chip->charge_complete) {
-		chip->soc = LC709203F_BATTERY_FULL;
+	if (chip->soc == LC709203F_BATTERY_FULL && chip->charge_complete) {
+		chip->status = POWER_SUPPLY_STATUS_FULL;
 		chip->capacity_level = POWER_SUPPLY_CAPACITY_LEVEL_FULL;
 		chip->health = POWER_SUPPLY_HEALTH_GOOD;
 	} else if (chip->soc < LC709203F_BATTERY_LOW) {
@@ -145,10 +158,12 @@ static int lc709203f_update_soc_voltage(struct lc709203f_chip *chip)
 		chip->health = POWER_SUPPLY_HEALTH_DEAD;
 		chip->capacity_level = POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL;
 	} else {
+		chip->charge_complete = 0;
 		chip->status = chip->lasttime_status;
 		chip->health = POWER_SUPPLY_HEALTH_GOOD;
 		chip->capacity_level = POWER_SUPPLY_CAPACITY_LEVEL_NORMAL;
 	}
+
 	return 0;
 }
 
@@ -187,6 +202,7 @@ static void lc709203f_work(struct work_struct *work)
 	}
 
 	mutex_unlock(&chip->mutex);
+	battery_gauge_report_battery_soc(chip->bg_dev, chip->soc);
 	schedule_delayed_work(&chip->work, LC709203F_DELAY);
 }
 
@@ -301,6 +317,7 @@ static int lc709203f_update_battery_status(struct battery_gauge_dev *bg_dev,
 		enum battery_charger_status status)
 {
 	struct lc709203f_chip *chip = battery_gauge_get_drvdata(bg_dev);
+	int val;
 
 	mutex_lock(&chip->mutex);
 	if (chip->shutdown_complete) {
@@ -308,13 +325,25 @@ static int lc709203f_update_battery_status(struct battery_gauge_dev *bg_dev,
 		return 0;
 	}
 
+	val = lc709203f_read_word(chip->client, LC709203F_RSOC);
+	if (val < 0)
+		dev_err(&chip->client->dev, "%s: err %d\n",
+			__func__, val);
+	else
+		chip->soc = battery_gauge_get_adjusted_soc(chip->bg_dev,
+				chip->pdata->threshold_soc,
+				chip->pdata->maximum_soc, val * 100);
+
 	if (status == BATTERY_CHARGING) {
 		chip->charge_complete = 0;
 		chip->status = POWER_SUPPLY_STATUS_CHARGING;
 	} else if (status == BATTERY_CHARGING_DONE) {
-		chip->charge_complete = 1;
-		chip->soc = LC709203F_BATTERY_FULL;
-		chip->status = POWER_SUPPLY_STATUS_FULL;
+		if (chip->soc == LC709203F_BATTERY_FULL) {
+			chip->charge_complete = 1;
+			chip->status = POWER_SUPPLY_STATUS_FULL;
+			chip->capacity_level =
+				POWER_SUPPLY_CAPACITY_LEVEL_FULL;
+		}
 		goto done;
 	} else {
 		chip->status = POWER_SUPPLY_STATUS_DISCHARGING;
@@ -325,11 +354,16 @@ static int lc709203f_update_battery_status(struct battery_gauge_dev *bg_dev,
 done:
 	mutex_unlock(&chip->mutex);
 	power_supply_changed(&chip->battery);
+	dev_info(&chip->client->dev,
+		"%s() Battery status: %d and SoC: %d%% UI status: %d\n",
+		__func__, status, chip->soc, chip->status);
+
 	return 0;
 }
 
 static struct battery_gauge_ops lc709203f_bg_ops = {
 	.update_battery_status = lc709203f_update_battery_status,
+	.get_battery_soc = lc709203f_get_battery_soc,
 };
 
 static struct battery_gauge_info lc709203f_bgi = {
@@ -660,6 +694,8 @@ static void lc709203f_shutdown(struct i2c_client *client)
 	mutex_unlock(&chip->mutex);
 
 	cancel_delayed_work_sync(&chip->work);
+	dev_info(&chip->client->dev, "At shutdown Voltage %dmV and SoC %d%%\n",
+			chip->vcell, chip->soc);
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -688,6 +724,7 @@ static int lc709203f_resume(struct device *dev)
 	lc709203f_update_soc_voltage(chip);
 	power_supply_changed(&chip->battery);
 	mutex_unlock(&chip->mutex);
+	battery_gauge_report_battery_soc(chip->bg_dev, chip->soc);
 
 	dev_info(&chip->client->dev, "At resume Voltage %dmV and SoC %d%%\n",
 			chip->vcell, chip->soc);

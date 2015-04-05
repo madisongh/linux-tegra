@@ -204,17 +204,15 @@
 			gpio-open-drain;
 		};
 	};
-	i2c@7000c000 {
-		icm20628@68 {
-			vlogic-supply = <&max77620_ldo3>;
-			vdd-supply = <&vdd_3v3>;
-		};
-	};
 
 	i2c@7000c500 {
 		battery-charger@6b {
 			status = "disabled";
 		};
+	};
+
+	i2c@546c0000 {
+		bus-pullup-supply = <&battery_reg>;
 	};
 
 	efuse@7000f800 {

@@ -1,7 +1,7 @@
 /*
  * linux/platform/tegra/cpu-tegra.h
  *
- * Copyright (c) 2011-2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,10 +29,6 @@ int tegra_update_cpu_speed(unsigned long rate);
 int tegra_cpu_set_speed_cap(unsigned int *speed_cap);
 int tegra_cpu_set_speed_cap_locked(unsigned int *speed_cap);
 void tegra_cpu_set_volt_cap(unsigned int cap);
-unsigned int tegra_count_slow_cpus(unsigned long speed_limit);
-unsigned int tegra_get_slowest_cpu_n(void);
-unsigned long tegra_cpu_lowest_speed(void);
-unsigned long tegra_cpu_highest_speed(void);
 
 #if defined(CONFIG_TEGRA_CPUQUIET) && defined(CONFIG_TEGRA_CLUSTER_CONTROL)
 int tegra_auto_hotplug_init(struct mutex *cpulock);
@@ -74,9 +70,12 @@ static inline struct tegra_cooling_device *tegra_vc_get_cdev(void)
 
 #ifdef CONFIG_TEGRA_HMP_CLUSTER_CONTROL
 unsigned long lp_to_virtual_gfreq(unsigned long lp_freq);
+int tegra_cpu_volt_cap_apply(int *cap_idx, int new_idx, int level);
 #else
 static inline unsigned long lp_to_virtual_gfreq(unsigned long freq)
 { return freq; }
+static inline int tegra_cpu_volt_cap_apply(int *cap_idx, int new_idx, int level)
+{ return -ENOSYS; }
 #endif
 
 #endif /* __MACH_TEGRA_CPU_TEGRA_H */

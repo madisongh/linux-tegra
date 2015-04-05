@@ -475,11 +475,11 @@ static int tegra12x_gpu_unpowergate(int id,
 			goto err_power;
 		}
 		first = true;
-	} else {
-		ret = tegra_dvfs_rail_power_up(gpu_rail);
-		if (ret)
-			goto err_power;
 	}
+
+	ret = tegra_dvfs_rail_power_up(gpu_rail);
+	if (ret)
+		goto err_power;
 
 	/* If first clk_ptr is null, fill clk info for the partition */
 	if (!pg_info->clk_info[0].clk_ptr)
@@ -827,7 +827,9 @@ static int tegra12x_powergate_init_refcount(void)
 {
 	bool disa_powered = tegra_powergate_is_powered(TEGRA_POWERGATE_DISA);
 	bool venc_powered = tegra_powergate_is_powered(TEGRA_POWERGATE_VENC);
+#ifdef CONFIG_ARCH_TEGRA_HAS_PCIE
 	bool pcie_powered = tegra_powergate_is_powered(TEGRA_POWERGATE_PCIE);
+#endif
 
 	WARN_ON(venc_powered && !disa_powered);
 

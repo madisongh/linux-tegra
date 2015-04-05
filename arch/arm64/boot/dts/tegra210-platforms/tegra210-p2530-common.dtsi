@@ -1,7 +1,7 @@
 /*
  * arch/arm64/boot/dts/tegra210-platforms/tegra210-p2530-common.dtsi
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014 - 2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,6 +17,9 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
+
+#include "tegra210-platforms/tegra210-thermal-nct72-p2530.dtsi"
+#include "tegra210-platforms/tegra210-thermal-Tboard-Tdiode.dtsi"
 
 / {
 	nvidia,boardids = "2530:0032:E0";
@@ -37,7 +40,6 @@
 		uhs-mask = <0x0>;
 		built-in;
 		power-off-rail;
-		disable-clock-gate;
 		nvidia,enable-hs533-mode;
 		pll_source = "pll_p", "pll_c4_out1";
 		status = "okay";
@@ -48,13 +50,14 @@
 		default-drv-type = <1>;
 		uhs-mask = <0x1c>;
 		power-off-rail;
-		disable-clock-gate;
 		nvidia,update-pinctrl-settings;
-		pinctrl-names = "sdmmc_schmitt_enable", "sdmmc_schmitt_disable", "sdmmc_clk_schmitt_enable", "sdmmc_clk_schmitt_disable";
+		pinctrl-names = "sdmmc_schmitt_enable", "sdmmc_schmitt_disable", "sdmmc_clk_schmitt_enable", "sdmmc_clk_schmitt_disable", "sdmmc_drv_code", "sdmmc_default_drv_code";
 		pinctrl-0 = <&sdmmc3_schmitt_enable_state>;
 		pinctrl-1 = <&sdmmc3_schmitt_disable_state>;
 		pinctrl-2 = <&sdmmc3_clk_schmitt_enable_state>;
 		pinctrl-3 = <&sdmmc3_clk_schmitt_disable_state>;
+		pinctrl-4 = <&sdmmc3_drv_code_1_8V>;
+		pinctrl-5 = <&sdmmc3_default_drv_code_3_3V>;
 		status = "disabled";
 	};
 
@@ -63,20 +66,21 @@
 		nvidia,ddr-tap-delay = <0>;
 		uhs-mask = <0x8>;
 		power-off-rail;
-		disable-clock-gate;
 		status = "okay";
 	};
 
 	sdhci@700b0000 {
 		uhs-mask = <0xc>;
 		power-off-rail;
-		disable-clock-gate;
 		nvidia,update-pinctrl-settings;
-		pinctrl-names = "sdmmc_schmitt_enable", "sdmmc_schmitt_disable", "sdmmc_clk_schmitt_enable", "sdmmc_clk_schmitt_disable";
+		pinctrl-names = "sdmmc_schmitt_enable", "sdmmc_schmitt_disable", "sdmmc_clk_schmitt_enable", "sdmmc_clk_schmitt_disable", "sdmmc_drv_code", "sdmmc_default_drv_code";
 		pinctrl-0 = <&sdmmc1_schmitt_enable_state>;
 		pinctrl-1 = <&sdmmc1_schmitt_disable_state>;
 		pinctrl-2 = <&sdmmc1_clk_schmitt_enable_state>;
 		pinctrl-3 = <&sdmmc1_clk_schmitt_disable_state>;
+		pinctrl-4 = <&sdmmc1_drv_code_1_8V>;
+		pinctrl-5 = <&sdmmc1_default_drv_code_3_3V>;
+		nvidia,sd-device;
 		status = "okay";
 	};
 
@@ -118,6 +122,10 @@
 			regulator-supplies = "vddio-dmic";
 			vddio-dmic-supply = <&max77620_sd3>;
 		};
+	};
+
+	wifi-antenna-tuning {
+		status = "disabled";
 	};
 
 	soctherm@0x700E2000 {
@@ -269,46 +277,6 @@
 				up_compensation = <20>;
 				down_compensation = <20>;
 			};
-			trips {
-				lcpu_critical {
-					temperature = <103000>; /* must be same as GPU's critical temp */
-					hysteresis = <0>;
-					type = "critical";
-					writable;
-				};
-				lcpu_heavy {
-					temperature = <101500>;
-					hysteresis = <0>;
-					type = "hot";
-					writable;
-				};
-				lcpu_throttle {
-					temperature = <92000>;
-					hysteresis = <0>;
-					type = "passive";
-					writable;
-				};
-			};
-			cooling-maps {
-				map0 {
-					trip = <&{/thermal-zones/LCPU-therm/trips/lcpu_critical}>;
-					cdev-type = "tegra-shutdown";
-					cooling-device = <&{/soctherm@0x700E2000/throttle@critical}
-						THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-				map1 {
-					trip = <&{/thermal-zones/LCPU-therm/trips/lcpu_heavy}>;
-					cdev-type = "tegra-heavy";
-					cooling-device = <&{/soctherm@0x700E2000/throttle@heavy}
-						THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-				map2 {
-					trip = <&{/thermal-zones/LCPU-therm/trips/lcpu_throttle}>;
-					cdev-type = "cpu-balanced";
-					cooling-device = <&{/bthrot_cdev/cpu_balanced}
-						THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-			};
 		};
 		PLL-therm {
 			thermal-zone-params {
@@ -323,6 +291,13 @@
 		};
 
 		Charger-Die {
+			status = "okay";
+		};
+
+		Tboard_tegra {
+			status = "okay";
+		};
+		Tdiode_tegra {
 			status = "okay";
 		};
 	};

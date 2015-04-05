@@ -124,6 +124,14 @@ F:	drivers/misc/tegra-cec/tegra_cec.c
 F:	drivers/video/tegra/fb.c
 F:	drivers/video/tegra/dc/
 
+HDCP
+M:	Sharath Sarangpur <ssarangpur@nvidia.com>
+L:	sw-mobile-security@exchange.nvidia.com
+S:	Supported
+F:	drivers/video/tegra/dc/hdmihdcp.c
+F:	drivers/video/tegra/dc/nvhdcp.c
+F:	drivers/video/tegra/dc/nvhdcp_hdcp22_methods.c
+
 GPU
 M:	Terje Bergstrom <tbergstrom@nvidia.com>
 L:	sw-mobile-host1x@exchange.nvidia.com
@@ -216,6 +224,7 @@ F:	arch/arm/mach-tegra/cpuquiet.c
 F:	arch/arm/mach-tegra/sysfs-cluster.c
 F:	drivers/cpufreq/
 F:	drivers/cpuidle/
+X:	drivers/cpuidle/coupled.c
 F:	drivers/cpuquiet/
 F:	drivers/input/input-cfboost.c
 F:	drivers/platform/tegra/cpu-tegra.c

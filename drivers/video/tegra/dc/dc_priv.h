@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -495,6 +495,9 @@ int tegra_dc_config_frame_end_intr(struct tegra_dc *dc, bool enable);
 int _tegra_dc_wait_for_frame_end(struct tegra_dc *dc,
 	u32 timeout_ms);
 
+/* defined in dc.c, used in mode.c */
+void tegra_dc_setup_vrr(struct tegra_dc *dc);
+
 /* defined in bandwidth.c, used in dc.c */
 void tegra_dc_clear_bandwidth(struct tegra_dc *dc);
 void tegra_dc_program_bandwidth(struct tegra_dc *dc, bool use_new);
@@ -510,7 +513,11 @@ long tegra_dc_calc_min_bandwidth(struct tegra_dc *dc);
 /* defined in mode.c, used in dc.c and window.c */
 int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode);
 int tegra_dc_calc_refresh(const struct tegra_dc_mode *m);
+int tegra_dc_calc_fb_refresh(const struct fb_videomode *fbmode);
 int tegra_dc_update_mode(struct tegra_dc *dc);
+
+/* defined in mode.c, used in nvsr.c */
+int _tegra_dc_set_mode(struct tegra_dc *dc, const struct tegra_dc_mode *mode);
 
 /* defined in clock.c, used in dc.c, rgb.c, dsi.c and hdmi.c */
 void tegra_dc_setup_clk(struct tegra_dc *dc, struct clk *clk);
@@ -542,8 +549,12 @@ struct device_node *tegra_get_panel_node_out_type_check
 struct tegra_dc_platform_data
 	*of_dc_parse_platform_data(struct platform_device *ndev);
 
+/* defined in dc.c, used in dc.c and dev.c */
+void tegra_dc_set_act_vfp(struct tegra_dc *dc, int vfp);
+
 /* defined in dc.c, used in dc.c and window.c */
 bool tegra_dc_windows_are_dirty(struct tegra_dc *dc, u32 win_act_req_mask);
+int tegra_dc_get_v_count(struct tegra_dc *dc);
 
 /* defined in cursor.c, used in dc.c and ext/cursor.c */
 int tegra_dc_cursor_image(struct tegra_dc *dc,
@@ -565,10 +576,14 @@ int tegra_nvdisp_update_windows(struct tegra_dc *dc,
 	struct tegra_dc_win *windows[], int n,
 	u16 *dirty_rect, bool wait_for_vblank);
 int tegra_nvdisp_head_enable(struct tegra_dc *dc);
+int tegra_nvdisp_head_disable(struct tegra_dc *dc);
 int tegra_nvdisp_get_linestride(struct tegra_dc *dc, int win);
 void tegra_nvdisp_enable_crc(struct tegra_dc *dc);
 void tegra_nvdisp_disable_crc(struct tegra_dc *dc);
 u32 tegra_nvdisp_read_rg_crc(struct tegra_dc *dc);
+int tegra_nvdisp_program_mode(struct tegra_dc *dc,
+			struct tegra_dc_mode *mode);
+void tegra_nvdisp_underflow_handler(struct tegra_dc *dc);
 
 struct tegra_fb_info *tegra_nvdisp_fb_register(struct platform_device *ndev,
 	struct tegra_dc *dc, struct tegra_fb_data *fb_data,
@@ -576,6 +591,10 @@ struct tegra_fb_info *tegra_nvdisp_fb_register(struct platform_device *ndev,
 
 void nvdisp_dc_feature_register(struct tegra_dc *dc);
 int nvdisp_set_cursor_position(struct tegra_dc *dc, s16 x, s16 y);
+int tegra_nvdisp_set_output_lut(struct tegra_dc *dc,
+					struct tegra_dc_lut *lut);
+int tegra_nvdisp_update_cmu(struct tegra_dc *dc, struct tegra_dc_lut *lut);
+void tegra_dc_cache_cmu(struct tegra_dc *dc, struct tegra_dc_cmu *src_cmu);
 #endif
 
 #endif

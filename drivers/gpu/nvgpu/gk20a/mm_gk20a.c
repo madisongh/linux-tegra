@@ -1,7 +1,7 @@
 /*
  * GK20A memory management
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -27,6 +27,7 @@
 #include <linux/vmalloc.h>
 #include <linux/dma-buf.h>
 #include <uapi/linux/nvgpu.h>
+#include <trace/events/gk20a.h>
 
 #include "gk20a.h"
 #include "mm_gk20a.h"
@@ -97,9 +98,12 @@ static int update_gmmu_ptes_locked(struct vm_gk20a *vm,
 				   struct sg_table *sgt, u64 buffer_offset,
 				   u64 first_vaddr, u64 last_vaddr,
 				   u8 kind_v, u32 ctag_offset, bool cacheable,
-				   int rw_flag);
+				   bool umapped_pte, int rw_flag,
+				   bool sparse,
+				   u32 flags);
 static int __must_check gk20a_init_system_vm(struct mm_gk20a *mm);
 static int __must_check gk20a_init_bar1_vm(struct mm_gk20a *mm);
+static int __must_check gk20a_init_hwpm(struct mm_gk20a *mm);
 
 
 struct gk20a_dmabuf_priv {
@@ -265,19 +269,13 @@ static int gk20a_init_mm_reset_enable_hw(struct gk20a *g)
 	return 0;
 }
 
-static void gk20a_remove_vm(struct vm_gk20a *vm, struct inst_desc *inst_block)
+static void gk20a_remove_vm(struct vm_gk20a *vm, struct mem_desc *inst_block)
 {
 	struct gk20a *g = vm->mm->g;
-	struct device *d = dev_from_gk20a(g);
 
 	gk20a_dbg_fn("");
 
-	if (inst_block->cpuva)
-		dma_free_coherent(d, inst_block->size,
-			inst_block->cpuva, inst_block->iova);
-	inst_block->cpuva = NULL;
-	inst_block->iova = 0;
-
+	gk20a_free_inst_block(g, inst_block);
 	gk20a_vm_remove_support_nofree(vm);
 }
 
@@ -285,6 +283,7 @@ static void gk20a_remove_mm_support(struct mm_gk20a *mm)
 {
 	gk20a_remove_vm(&mm->bar1.vm, &mm->bar1.inst_block);
 	gk20a_remove_vm(&mm->pmu.vm, &mm->pmu.inst_block);
+	gk20a_free_inst_block(gk20a_from_mm(mm), &mm->hwpm.inst_block);
 }
 
 int gk20a_init_mm_setup_sw(struct gk20a *g)
@@ -311,7 +310,16 @@ int gk20a_init_mm_setup_sw(struct gk20a *g)
 	if (err)
 		return err;
 
+	if (g->ops.mm.init_bar2_vm) {
+		err = g->ops.mm.init_bar2_vm(g);
+		if (err)
+			return err;
+	}
 	err = gk20a_init_system_vm(mm);
+	if (err)
+		return err;
+
+	err = gk20a_init_hwpm(mm);
 	if (err)
 		return err;
 
@@ -325,11 +333,12 @@ int gk20a_init_mm_setup_sw(struct gk20a *g)
 }
 
 /* make sure gk20a_init_mm_support is called before */
-static int gk20a_init_mm_setup_hw(struct gk20a *g)
+int gk20a_init_mm_setup_hw(struct gk20a *g)
 {
 	struct mm_gk20a *mm = &g->mm;
-	struct inst_desc *inst_block = &mm->bar1.inst_block;
-	phys_addr_t inst_pa = inst_block->cpu_pa;
+	struct mem_desc *inst_block = &mm->bar1.inst_block;
+	phys_addr_t inst_pa = gk20a_mem_phys(inst_block);
+	int err;
 
 	gk20a_dbg_fn("");
 
@@ -342,6 +351,13 @@ static int gk20a_init_mm_setup_hw(struct gk20a *g)
 		     bus_bar1_block_target_vid_mem_f() |
 		     bus_bar1_block_mode_virtual_f() |
 		     bus_bar1_block_ptr_f(inst_pa));
+
+	if (g->ops.mm.init_bar2_mm_hw_setup) {
+		err = g->ops.mm.init_bar2_mm_hw_setup(g);
+		if (err)
+			return err;
+	}
+
 	if (gk20a_mm_fb_flush(g) || gk20a_mm_fb_flush(g))
 		return -EBUSY;
 
@@ -361,17 +377,14 @@ int gk20a_init_mm_support(struct gk20a *g)
 	if (err)
 		return err;
 
-	err = gk20a_init_mm_setup_hw(g);
-	if (err)
-		return err;
+	if (g->ops.mm.init_mm_setup_hw)
+		err = g->ops.mm.init_mm_setup_hw(g);
 
 	return err;
 }
 
 static int alloc_gmmu_phys_pages(struct vm_gk20a *vm, u32 order,
-			    void **handle,
-			    struct sg_table **sgt,
-			    size_t *size)
+				 struct gk20a_mm_entry *entry)
 {
 	u32 num_pages = 1 << order;
 	u32 len = num_pages * PAGE_SIZE;
@@ -385,76 +398,81 @@ static int alloc_gmmu_phys_pages(struct vm_gk20a *vm, u32 order,
 		gk20a_dbg(gpu_dbg_pte, "alloc_pages failed\n");
 		goto err_out;
 	}
-	*sgt = kzalloc(sizeof(*sgt), GFP_KERNEL);
-	if (!sgt) {
+	entry->sgt = kzalloc(sizeof(*entry->sgt), GFP_KERNEL);
+	if (!entry->sgt) {
 		gk20a_dbg(gpu_dbg_pte, "cannot allocate sg table");
 		goto err_alloced;
 	}
-	err = sg_alloc_table(*sgt, 1, GFP_KERNEL);
+	err = sg_alloc_table(entry->sgt, 1, GFP_KERNEL);
 	if (err) {
 		gk20a_dbg(gpu_dbg_pte, "sg_alloc_table failed\n");
 		goto err_sg_table;
 	}
-	sg_set_page((*sgt)->sgl, pages, len, 0);
-	*handle = page_address(pages);
-	memset(*handle, 0, len);
-	*size = len;
-	FLUSH_CPU_DCACHE(*handle, sg_phys((*sgt)->sgl), len);
+	sg_set_page(entry->sgt->sgl, pages, len, 0);
+	entry->cpu_va = page_address(pages);
+	memset(entry->cpu_va, 0, len);
+	entry->size = len;
+	FLUSH_CPU_DCACHE(entry->cpu_va, sg_phys(entry->sgt->sgl), len);
 
 	return 0;
 
 err_sg_table:
-	kfree(*sgt);
+	kfree(entry->sgt);
 err_alloced:
 	__free_pages(pages, order);
 err_out:
 	return -ENOMEM;
 }
 
-static void free_gmmu_phys_pages(struct vm_gk20a *vm, void *handle,
-			    struct sg_table *sgt, u32 order,
-			    size_t size)
+static void free_gmmu_phys_pages(struct vm_gk20a *vm,
+			    struct gk20a_mm_entry *entry)
 {
 	gk20a_dbg_fn("");
-	free_pages((unsigned long)handle, order);
-	sg_free_table(sgt);
-	kfree(sgt);
+	free_pages((unsigned long)entry->cpu_va, get_order(entry->size));
+	entry->cpu_va = NULL;
+
+	sg_free_table(entry->sgt);
+	kfree(entry->sgt);
+	entry->sgt = NULL;
 }
 
-static int map_gmmu_phys_pages(void *handle, struct sg_table *sgt,
-			  void **va, size_t size)
+static int map_gmmu_phys_pages(struct gk20a_mm_entry *entry)
 {
-	FLUSH_CPU_DCACHE(handle, sg_phys(sgt->sgl), sgt->sgl->length);
-	*va = handle;
+	FLUSH_CPU_DCACHE(entry->cpu_va,
+			 sg_phys(entry->sgt->sgl),
+			 entry->sgt->sgl->length);
 	return 0;
 }
 
-static void unmap_gmmu_phys_pages(void *handle, struct sg_table *sgt, void *va)
+static void unmap_gmmu_phys_pages(struct gk20a_mm_entry *entry)
 {
-	FLUSH_CPU_DCACHE(handle, sg_phys(sgt->sgl), sgt->sgl->length);
+	FLUSH_CPU_DCACHE(entry->cpu_va,
+			 sg_phys(entry->sgt->sgl),
+			 entry->sgt->sgl->length);
 }
 
 static int alloc_gmmu_pages(struct vm_gk20a *vm, u32 order,
-			    void **handle,
-			    struct sg_table **sgt,
-			    size_t *size)
+			    struct gk20a_mm_entry *entry)
 {
 	struct device *d = dev_from_vm(vm);
 	u32 num_pages = 1 << order;
 	u32 len = num_pages * PAGE_SIZE;
 	dma_addr_t iova;
 	DEFINE_DMA_ATTRS(attrs);
-	struct page **pages;
 	void *cpuva;
 	int err = 0;
 
 	gk20a_dbg_fn("");
 
 	if (tegra_platform_is_linsim())
-		return alloc_gmmu_phys_pages(vm, order,	handle, sgt, size);
+		return alloc_gmmu_phys_pages(vm, order, entry);
 
-	*size = len;
+	entry->size = len;
 
+	/*
+	 * On arm32 we're limited by vmalloc space, so we do not map pages by
+	 * default.
+	 */
 	if (IS_ENABLED(CONFIG_ARM64)) {
 		cpuva = dma_zalloc_coherent(d, len, &iova, GFP_KERNEL);
 		if (!cpuva) {
@@ -462,14 +480,16 @@ static int alloc_gmmu_pages(struct vm_gk20a *vm, u32 order,
 			goto err_out;
 		}
 
-		err = gk20a_get_sgtable(d, sgt, cpuva, iova, len);
+		err = gk20a_get_sgtable(d, &entry->sgt, cpuva, iova, len);
 		if (err) {
 			gk20a_err(d, "sgt allocation failed\n");
 			goto err_free;
 		}
 
-		*handle = cpuva;
+		entry->cpu_va = cpuva;
 	} else {
+		struct page **pages;
+
 		dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &attrs);
 		pages = dma_alloc_attrs(d, len, &iova, GFP_KERNEL, &attrs);
 		if (!pages) {
@@ -477,99 +497,106 @@ static int alloc_gmmu_pages(struct vm_gk20a *vm, u32 order,
 			goto err_out;
 		}
 
-		err = gk20a_get_sgtable_from_pages(d, sgt, pages,
+		err = gk20a_get_sgtable_from_pages(d, &entry->sgt, pages,
 					iova, len);
 		if (err) {
 			gk20a_err(d, "sgt allocation failed\n");
 			goto err_free;
 		}
 
-		*handle = (void *)pages;
+		entry->pages = pages;
 	}
 
 	return 0;
 
 err_free:
 	if (IS_ENABLED(CONFIG_ARM64)) {
-		dma_free_coherent(d, len, handle, iova);
+		dma_free_coherent(d, len, entry->cpu_va, iova);
 		cpuva = NULL;
 	} else {
-		dma_free_attrs(d, len, pages, iova, &attrs);
-		pages = NULL;
+		dma_free_attrs(d, len, entry->pages, iova, &attrs);
+		entry->pages = NULL;
 	}
 	iova = 0;
 err_out:
 	return -ENOMEM;
 }
 
-void free_gmmu_pages(struct vm_gk20a *vm, void *handle,
-			    struct sg_table *sgt, u32 order,
-			    size_t size)
+void free_gmmu_pages(struct vm_gk20a *vm,
+		     struct gk20a_mm_entry *entry)
 {
 	struct device *d = dev_from_vm(vm);
 	u64 iova;
 	DEFINE_DMA_ATTRS(attrs);
-	struct page **pages;
 
 	gk20a_dbg_fn("");
-	BUG_ON(sgt == NULL);
+	BUG_ON(entry->sgt == NULL);
 
 	if (tegra_platform_is_linsim()) {
-		free_gmmu_phys_pages(vm, handle, sgt, order, size);
+		free_gmmu_phys_pages(vm, entry);
 		return;
 	}
 
-	iova = sg_dma_address(sgt->sgl);
+	iova = sg_dma_address(entry->sgt->sgl);
 
-	gk20a_free_sgtable(&sgt);
+	gk20a_free_sgtable(&entry->sgt);
 
+	/*
+	 * On arm32 we're limited by vmalloc space, so we do not map pages by
+	 * default.
+	 */
 	if (IS_ENABLED(CONFIG_ARM64)) {
-		dma_free_coherent(d, size, handle, iova);
+		dma_free_coherent(d, entry->size, entry->cpu_va, iova);
+		entry->cpu_va = NULL;
 	} else {
-		pages = (struct page **)handle;
 		dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &attrs);
-		dma_free_attrs(d, size, pages, iova, &attrs);
-		pages = NULL;
+		dma_free_attrs(d, entry->size, entry->pages, iova, &attrs);
+		entry->pages = NULL;
 	}
-
-	handle = NULL;
-	iova = 0;
+	entry->size = 0;
 }
 
-int map_gmmu_pages(void *handle, struct sg_table *sgt,
-			  void **kva, size_t size)
+int map_gmmu_pages(struct gk20a_mm_entry *entry)
 {
-	int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	int count = PAGE_ALIGN(entry->size) >> PAGE_SHIFT;
 	struct page **pages;
 	gk20a_dbg_fn("");
 
 	if (tegra_platform_is_linsim())
-		return map_gmmu_phys_pages(handle, sgt, kva, size);
+		return map_gmmu_phys_pages(entry);
 
 	if (IS_ENABLED(CONFIG_ARM64)) {
-		*kva = handle;
+		FLUSH_CPU_DCACHE(entry->cpu_va,
+				 sg_phys(entry->sgt->sgl),
+				 entry->size);
 	} else {
-		pages = (struct page **)handle;
-		*kva = vmap(pages, count, 0, pgprot_writecombine(PAGE_KERNEL));
-		if (!(*kva))
+		pages = entry->pages;
+		entry->cpu_va = vmap(pages, count, 0,
+				     pgprot_writecombine(PAGE_KERNEL));
+		if (!entry->cpu_va)
 			return -ENOMEM;
 	}
 
 	return 0;
 }
 
-void unmap_gmmu_pages(void *handle, struct sg_table *sgt, void *va)
+void unmap_gmmu_pages(struct gk20a_mm_entry *entry)
 {
 	gk20a_dbg_fn("");
 
 	if (tegra_platform_is_linsim()) {
-		unmap_gmmu_phys_pages(handle, sgt, va);
+		unmap_gmmu_phys_pages(entry);
 		return;
 	}
 
-	if (!IS_ENABLED(CONFIG_ARM64))
-		vunmap(va);
-	va = NULL;
+	if (IS_ENABLED(CONFIG_ARM64)) {
+		FLUSH_CPU_DCACHE(entry->cpu_va,
+				 sg_phys(entry->sgt->sgl),
+				 entry->size);
+	} else {
+		vunmap(entry->cpu_va);
+		entry->cpu_va = NULL;
+	}
 }
 
 /* allocate a phys contig region big enough for a full
@@ -577,33 +604,37 @@ void unmap_gmmu_pages(void *handle, struct sg_table *sgt, void *va)
  * the whole range is zeroed so it's "invalid"/will fault
  */
 
-int zalloc_gmmu_page_table_gk20a(struct vm_gk20a *vm,
-					enum gmmu_pgsz_gk20a gmmu_pgsz_idx,
-					struct page_table_gk20a *pte)
+static int gk20a_zalloc_gmmu_page_table(struct vm_gk20a *vm,
+				 enum gmmu_pgsz_gk20a pgsz_idx,
+				 const struct gk20a_mmu_level *l,
+				 struct gk20a_mm_entry *entry)
 {
 	int err;
-	u32 pte_order;
-	void *handle = NULL;
-	struct sg_table *sgt;
-	size_t size;
+	int order;
+	struct gk20a *g = gk20a_from_vm(vm);
 
 	gk20a_dbg_fn("");
 
 	/* allocate enough pages for the table */
-	pte_order = vm->page_table_sizing[gmmu_pgsz_idx].order;
+	order = l->hi_bit[pgsz_idx] - l->lo_bit[pgsz_idx] + 1;
+	order += ilog2(l->entry_size);
+	order -= PAGE_SHIFT;
+	order = max(0, order);
 
-	err = alloc_gmmu_pages(vm, pte_order, &handle, &sgt, &size);
+	err = alloc_gmmu_pages(vm, order, entry);
+	gk20a_dbg(gpu_dbg_pte, "entry = 0x%p, addr=%08llx, size %d",
+		  entry, g->ops.mm.get_iova_addr(g, entry->sgt->sgl, 0),
+		  order);
 	if (err)
 		return err;
+	entry->pgsz = pgsz_idx;
 
-	gk20a_dbg(gpu_dbg_pte, "pte = 0x%p, addr=%08llx, size %d",
-		  pte, gk20a_mm_iova_addr(vm->mm->g, sgt->sgl), pte_order);
+	return err;
+}
 
-	pte->ref = handle;
-	pte->sgt = sgt;
-	pte->size = size;
-
-	return 0;
+int gk20a_mm_pde_coverage_bit_count(struct vm_gk20a *vm)
+{
+	return vm->mmu_levels[0].lo_bit[0];
 }
 
 /* given address range (inclusive) determine the pdes crossed */
@@ -611,17 +642,19 @@ void pde_range_from_vaddr_range(struct vm_gk20a *vm,
 					      u64 addr_lo, u64 addr_hi,
 					      u32 *pde_lo, u32 *pde_hi)
 {
-	*pde_lo = (u32)(addr_lo >> vm->pde_stride_shift);
-	*pde_hi = (u32)(addr_hi >> vm->pde_stride_shift);
+	int pde_shift = gk20a_mm_pde_coverage_bit_count(vm);
+
+	*pde_lo = (u32)(addr_lo >> pde_shift);
+	*pde_hi = (u32)(addr_hi >> pde_shift);
 	gk20a_dbg(gpu_dbg_pte, "addr_lo=0x%llx addr_hi=0x%llx pde_ss=%d",
-		   addr_lo, addr_hi, vm->pde_stride_shift);
+		   addr_lo, addr_hi, pde_shift);
 	gk20a_dbg(gpu_dbg_pte, "pde_lo=%d pde_hi=%d",
 		   *pde_lo, *pde_hi);
 }
 
 u32 *pde_from_index(struct vm_gk20a *vm, u32 i)
 {
-	return (u32 *) (((u8 *)vm->pdes.kv) + i*gmmu_pde__size_v());
+	return (u32 *) (((u8 *)vm->pdb.cpu_va) + i*gmmu_pde__size_v());
 }
 
 u32 pte_index_from_vaddr(struct vm_gk20a *vm,
@@ -629,7 +662,7 @@ u32 pte_index_from_vaddr(struct vm_gk20a *vm,
 {
 	u32 ret;
 	/* mask off pde part */
-	addr = addr & ((((u64)1) << vm->pde_stride_shift) - ((u64)1));
+	addr = addr & ((1ULL << gk20a_mm_pde_coverage_bit_count(vm)) - 1ULL);
 
 	/* shift over to get pte index. note assumption that pte index
 	 * doesn't leak over into the high 32b */
@@ -637,52 +670,6 @@ u32 pte_index_from_vaddr(struct vm_gk20a *vm,
 
 	gk20a_dbg(gpu_dbg_pte, "addr=0x%llx pte_i=0x%x", addr, ret);
 	return ret;
-}
-
-static inline void pte_space_page_offset_from_index(u32 i, u32 *pte_page,
-						    u32 *pte_offset)
-{
-	/* ptes are 8B regardless of pagesize */
-	/* pte space pages are 4KB. so 512 ptes per 4KB page*/
-	*pte_page = i >> 9;
-
-	/* this offset is a pte offset, not a byte offset */
-	*pte_offset = i & ((1<<9)-1);
-
-	gk20a_dbg(gpu_dbg_pte, "i=0x%x pte_page=0x%x pte_offset=0x%x",
-		   i, *pte_page, *pte_offset);
-}
-
-
-/*
- * given a pde index/page table number make sure it has
- * backing store and if not go ahead allocate it and
- * record it in the appropriate pde
- */
-int validate_gmmu_page_table_gk20a_locked(struct vm_gk20a *vm,
-				u32 i, enum gmmu_pgsz_gk20a gmmu_pgsz_idx)
-{
-	int err;
-	struct page_table_gk20a *pte =
-		vm->pdes.ptes[gmmu_pgsz_idx] + i;
-
-	gk20a_dbg_fn("");
-
-	/* if it's already in place it's valid */
-	if (pte->ref)
-		return 0;
-
-	gk20a_dbg(gpu_dbg_pte, "alloc %dKB ptes for pde %d",
-		   vm->gmmu_page_sizes[gmmu_pgsz_idx]/1024, i);
-
-	err = zalloc_gmmu_page_table_gk20a(vm, gmmu_pgsz_idx, pte);
-	if (err)
-		return err;
-
-	/* rewrite pde */
-	update_gmmu_pde_locked(vm, i);
-
-	return 0;
 }
 
 static struct vm_reserved_va_node *addr_to_reservation(struct vm_gk20a *vm,
@@ -988,7 +975,9 @@ static int setup_buffer_kind_and_compression(struct vm_gk20a *vm,
 					     enum gmmu_pgsz_gk20a pgsz_idx)
 {
 	bool kind_compressible;
-	struct device *d = dev_from_gk20a(vm->mm->g);
+	struct gk20a *g = gk20a_from_vm(vm);
+	struct device *d = dev_from_gk20a(g);
+	int ctag_granularity = g->ops.fb.compression_page_size(g);
 
 	if (unlikely(bfr->kind_v == gmmu_pte_kind_invalid_v()))
 		bfr->kind_v = gmmu_pte_kind_pitch_v();
@@ -1012,8 +1001,8 @@ static int setup_buffer_kind_and_compression(struct vm_gk20a *vm,
 		}
 	}
 	/* comptags only supported for suitable kinds, 128KB pagesize */
-	if (unlikely(kind_compressible &&
-		     (vm->gmmu_page_sizes[pgsz_idx] != vm->big_page_size))) {
+	if (kind_compressible &&
+	    vm->gmmu_page_sizes[pgsz_idx] < g->ops.fb.compressible_page_size(g)) {
 		/*
 		gk20a_warn(d, "comptags specified"
 		" but pagesize being used doesn't support it");*/
@@ -1023,8 +1012,7 @@ static int setup_buffer_kind_and_compression(struct vm_gk20a *vm,
 		kind_compressible = false;
 	}
 	if (kind_compressible)
-		bfr->ctag_lines = ALIGN(bfr->size, COMP_TAG_LINE_SIZE) >>
-			COMP_TAG_LINE_SIZE_SHIFT;
+		bfr->ctag_lines = DIV_ROUND_UP_ULL(bfr->size, ctag_granularity);
 	else
 		bfr->ctag_lines = 0;
 
@@ -1093,17 +1081,17 @@ u64 gk20a_locked_gmmu_map(struct vm_gk20a *vm,
 			u32 ctag_offset,
 			u32 flags,
 			int rw_flag,
-			bool clear_ctags)
+			bool clear_ctags,
+			bool sparse)
 {
-	int err = 0, i = 0;
+	int err = 0;
 	bool allocated = false;
-	u32 pde_lo, pde_hi;
 	struct device *d = dev_from_vm(vm);
 	struct gk20a *g = gk20a_from_vm(vm);
+	int ctag_granularity = g->ops.fb.compression_page_size(g);
 
 	if (clear_ctags && ctag_offset) {
-		u32 ctag_lines = ALIGN(size, COMP_TAG_LINE_SIZE) >>
-					COMP_TAG_LINE_SIZE_SHIFT;
+		u32 ctag_lines = DIV_ROUND_UP_ULL(size, ctag_granularity);
 
 		/* init/clear the ctag buffer */
 		g->ops.ltc.cbc_ctrl(g, gk20a_cbc_op_clear,
@@ -1122,35 +1110,25 @@ u64 gk20a_locked_gmmu_map(struct vm_gk20a *vm,
 		allocated = true;
 	}
 
-	pde_range_from_vaddr_range(vm,
-				   map_offset,
-				   map_offset + size - 1,
-				   &pde_lo, &pde_hi);
-
-	/* mark the addr range valid (but with 0 phys addr, which will fault) */
-	for (i = pde_lo; i <= pde_hi; i++) {
-		err = validate_gmmu_page_table_gk20a_locked(vm, i,
-							    pgsz_idx);
-		if (err) {
-			gk20a_err(d, "failed to validate page table %d: %d",
-							   i, err);
-			goto fail_validate;
-		}
-	}
-
 	err = update_gmmu_ptes_locked(vm, pgsz_idx,
 				      sgt,
 				      buffer_offset,
-				      map_offset, map_offset + size - 1,
+				      map_offset, map_offset + size,
 				      kind_v,
 				      ctag_offset,
 				      flags &
 				      NVGPU_MAP_BUFFER_FLAGS_CACHEABLE_TRUE,
-				      rw_flag);
+				      flags &
+				      NVGPU_GPU_FLAGS_SUPPORT_UNMAPPED_PTE,
+				      rw_flag,
+				      sparse,
+				      flags);
 	if (err) {
 		gk20a_err(d, "failed to update ptes on map");
 		goto fail_validate;
 	}
+
+	g->ops.mm.tlb_invalidate(vm);
 
 	return map_offset;
 fail_validate:
@@ -1166,7 +1144,8 @@ void gk20a_locked_gmmu_unmap(struct vm_gk20a *vm,
 			u64 size,
 			int pgsz_idx,
 			bool va_allocated,
-			int rw_flag)
+			int rw_flag,
+			bool sparse)
 {
 	int err = 0;
 	struct gk20a *g = gk20a_from_vm(vm);
@@ -1186,14 +1165,13 @@ void gk20a_locked_gmmu_unmap(struct vm_gk20a *vm,
 				NULL, /* n/a for unmap */
 				0,
 				vaddr,
-				vaddr + size - 1,
+				vaddr + size,
 				0, 0, false /* n/a for unmap */,
-				rw_flag);
+				false, rw_flag,
+				sparse, 0);
 	if (err)
 		dev_err(dev_from_vm(vm),
 			"failed to update gmmu ptes on unmap");
-
-	/* detect which if any pdes/ptes can now be released */
 
 	/* flush l2 so any dirty lines are written out *now*.
 	 *  also as we could potentially be switching this buffer
@@ -1204,6 +1182,8 @@ void gk20a_locked_gmmu_unmap(struct vm_gk20a *vm,
 	 * unmapping (below). */
 
 	gk20a_mm_l2_flush(g, true);
+
+	g->ops.mm.tlb_invalidate(vm);
 }
 
 static u64 gk20a_vm_map_duplicate_locked(struct vm_gk20a *vm,
@@ -1289,7 +1269,7 @@ u64 gk20a_vm_map(struct vm_gk20a *vm,
 	u32 gmmu_page_size = 0;
 	u64 map_offset = 0;
 	int err = 0;
-	struct buffer_attrs bfr = {0};
+	struct buffer_attrs bfr = {NULL};
 	struct gk20a_comptags comptags;
 	u64 buf_addr;
 	bool clear_ctags = false;
@@ -1332,16 +1312,25 @@ u64 gk20a_vm_map(struct vm_gk20a *vm,
 	bfr.pgsz_idx = -1;
 	mapping_size = mapping_size ? mapping_size : bfr.size;
 
-	/* If FIX_OFFSET is set, pgsz is determined. Otherwise, select
-	 * page size according to memory alignment */
+	if (vm->big_pages)
+		gmmu_select_page_size(vm, &bfr);
+	else
+		bfr.pgsz_idx = gmmu_page_size_small;
+
+	/* If FIX_OFFSET is set, pgsz is determined at address allocation
+	 * time. The alignment at address alloc time must be the same as
+	 * the alignment determined by gmmu_select_page_size().
+	 */
 	if (flags & NVGPU_AS_MAP_BUFFER_FLAGS_FIXED_OFFSET) {
-		bfr.pgsz_idx = NV_GMMU_VA_IS_UPPER(offset_align) ?
+		int pgsz_idx = NV_GMMU_VA_IS_UPPER(offset_align) ?
 				gmmu_page_size_big : gmmu_page_size_small;
-	} else {
-		if (vm->big_pages)
-			gmmu_select_page_size(vm, &bfr);
-		else
-			bfr.pgsz_idx = gmmu_page_size_small;
+		if (pgsz_idx > bfr.pgsz_idx) {
+			gk20a_err(d, "%llx buffer pgsz %d, VA pgsz %d",
+				  offset_align, bfr.pgsz_idx, pgsz_idx);
+			err = -EINVAL;
+			goto clean_up;
+		}
+		bfr.pgsz_idx = min(bfr.pgsz_idx, pgsz_idx);
 	}
 
 	/* validate/adjust bfr attributes */
@@ -1413,7 +1402,8 @@ u64 gk20a_vm_map(struct vm_gk20a *vm,
 					bfr.kind_v,
 					bfr.ctag_offset,
 					flags, rw_flag,
-					clear_ctags);
+					clear_ctags,
+					false);
 	if (!map_offset)
 		goto clean_up;
 
@@ -1493,10 +1483,6 @@ u64 gk20a_vm_map(struct vm_gk20a *vm,
 
 	mutex_unlock(&vm->update_gmmu_lock);
 
-	/* Invalidate kernel mappings immediately */
-	if (vm_aspace_id(vm) == -1)
-		gk20a_mm_tlb_invalidate(vm);
-
 	return map_offset;
 
 clean_up:
@@ -1533,78 +1519,152 @@ u64 gk20a_gmmu_map(struct vm_gk20a *vm,
 				0, /* page size index = 0 i.e. SZ_4K */
 				0, /* kind */
 				0, /* ctag_offset */
-				flags, rw_flag, false);
+				flags, rw_flag, false, false);
 	mutex_unlock(&vm->update_gmmu_lock);
 	if (!vaddr) {
 		gk20a_err(dev_from_vm(vm), "failed to allocate va space");
 		return 0;
 	}
 
-	/* Invalidate kernel mappings immediately */
-	g->ops.mm.tlb_invalidate(vm);
-
 	return vaddr;
 }
 
-int gk20a_gmmu_alloc_map(struct vm_gk20a *vm,
-			 size_t size, struct mem_desc *mem)
+int gk20a_gmmu_alloc(struct gk20a *g, size_t size, struct mem_desc *mem)
 {
-	struct gk20a *g = vm->mm->g;
+	return gk20a_gmmu_alloc_attr(g, 0, size, mem);
+}
+
+int gk20a_gmmu_alloc_attr(struct gk20a *g, enum dma_attr attr, size_t size, struct mem_desc *mem)
+{
 	struct device *d = dev_from_gk20a(g);
 	int err;
-	struct sg_table *sgt;
+	dma_addr_t iova;
 
-	mem->cpu_va = dma_alloc_coherent(d, size, &mem->iova, GFP_KERNEL);
-	if (!mem->cpu_va)
-		return -ENOMEM;
+	gk20a_dbg_fn("");
 
-	err = gk20a_get_sgtable(d, &sgt, mem->cpu_va, mem->iova, size);
+	if (attr) {
+		DEFINE_DMA_ATTRS(attrs);
+		dma_set_attr(attr, &attrs);
+		if (attr == DMA_ATTR_NO_KERNEL_MAPPING) {
+			mem->pages = dma_alloc_attrs(d,
+					size, &iova, GFP_KERNEL, &attrs);
+			if (!mem->pages)
+				return -ENOMEM;
+		} else {
+			mem->cpu_va = dma_alloc_attrs(d,
+					size, &iova, GFP_KERNEL, &attrs);
+			if (!mem->cpu_va)
+				return -ENOMEM;
+		}
+	} else {
+		mem->cpu_va = dma_alloc_coherent(d, size, &iova, GFP_KERNEL);
+		if (!mem->cpu_va)
+			return -ENOMEM;
+	}
+
+	if (attr == DMA_ATTR_NO_KERNEL_MAPPING)
+		err = gk20a_get_sgtable_from_pages(d, &mem->sgt, mem->pages,
+						   iova, size);
+	else {
+		err = gk20a_get_sgtable(d, &mem->sgt, mem->cpu_va, iova, size);
+		memset(mem->cpu_va, 0, size);
+	}
 	if (err)
 		goto fail_free;
 
-	mem->gpu_va = gk20a_gmmu_map(vm, &sgt, size, 0, gk20a_mem_flag_none);
-	gk20a_free_sgtable(&sgt);
+	mem->size = size;
+
+	gk20a_dbg_fn("done");
+
+	return 0;
+
+fail_free:
+	dma_free_coherent(d, size, mem->cpu_va, iova);
+	mem->cpu_va = NULL;
+	mem->sgt = NULL;
+	return err;
+}
+
+void gk20a_gmmu_free_attr(struct gk20a *g, enum dma_attr attr,
+			  struct mem_desc *mem)
+{
+	struct device *d = dev_from_gk20a(g);
+
+	if (mem->cpu_va || mem->pages) {
+		if (attr) {
+			DEFINE_DMA_ATTRS(attrs);
+			dma_set_attr(attr, &attrs);
+			if (attr == DMA_ATTR_NO_KERNEL_MAPPING)
+				dma_free_attrs(d, mem->size, mem->pages,
+					       sg_dma_address(mem->sgt->sgl),
+					       &attrs);
+			else
+				dma_free_attrs(d, mem->size, mem->cpu_va,
+					       sg_dma_address(mem->sgt->sgl),
+					       &attrs);
+		} else {
+			dma_free_coherent(d, mem->size, mem->cpu_va,
+				  sg_dma_address(mem->sgt->sgl));
+		}
+
+		mem->cpu_va = NULL;
+	}
+
+	if (mem->sgt)
+		gk20a_free_sgtable(&mem->sgt);
+}
+
+void gk20a_gmmu_free(struct gk20a *g, struct mem_desc *mem)
+{
+	return gk20a_gmmu_free_attr(g, 0, mem);
+}
+
+int gk20a_gmmu_alloc_map(struct vm_gk20a *vm, size_t size, struct mem_desc *mem)
+{
+	return gk20a_gmmu_alloc_map_attr(vm, 0, size, mem);
+}
+
+int gk20a_gmmu_alloc_map_attr(struct vm_gk20a *vm,
+			 enum dma_attr attr, size_t size, struct mem_desc *mem)
+{
+	int err = gk20a_gmmu_alloc_attr(vm->mm->g, attr, size, mem);
+
+	if (err)
+		return err;
+
+	mem->gpu_va = gk20a_gmmu_map(vm, &mem->sgt, size, 0, gk20a_mem_flag_none);
 	if (!mem->gpu_va) {
 		err = -ENOMEM;
 		goto fail_free;
 	}
 
-	mem->size = size;
-
 	return 0;
 
 fail_free:
-	dma_free_coherent(d, size, mem->cpu_va, mem->iova);
-	mem->cpu_va = NULL;
-	mem->iova = 0;
-
+	gk20a_gmmu_free(vm->mm->g, mem);
 	return err;
 }
 
 void gk20a_gmmu_unmap_free(struct vm_gk20a *vm, struct mem_desc *mem)
 {
-	struct gk20a *g = vm->mm->g;
-	struct device *d = dev_from_gk20a(g);
-
 	if (mem->gpu_va)
 		gk20a_gmmu_unmap(vm, mem->gpu_va, mem->size, gk20a_mem_flag_none);
 	mem->gpu_va = 0;
 
-	if (mem->cpu_va)
-		dma_free_coherent(d, mem->size, mem->cpu_va, mem->iova);
-	mem->cpu_va = NULL;
-	mem->iova = 0;
+	gk20a_gmmu_free(vm->mm->g, mem);
 }
 
 dma_addr_t gk20a_mm_gpuva_to_iova_base(struct vm_gk20a *vm, u64 gpu_vaddr)
 {
 	struct mapped_buffer_node *buffer;
 	dma_addr_t addr = 0;
+	struct gk20a *g = gk20a_from_vm(vm);
 
 	mutex_lock(&vm->update_gmmu_lock);
 	buffer = find_mapped_buffer_locked(&vm->mapped_buffers, gpu_vaddr);
 	if (buffer)
-		addr = gk20a_mm_iova_addr(vm->mm->g, buffer->sgt->sgl);
+		addr = g->ops.mm.get_iova_addr(g, buffer->sgt->sgl,
+				buffer->flags);
 	mutex_unlock(&vm->update_gmmu_lock);
 
 	return addr;
@@ -1623,7 +1683,8 @@ void gk20a_gmmu_unmap(struct vm_gk20a *vm,
 			size,
 			0, /* page size 4K */
 			true, /*va_allocated */
-			rw_flag);
+			rw_flag,
+			false);
 	mutex_unlock(&vm->update_gmmu_lock);
 }
 
@@ -1683,12 +1744,12 @@ int gk20a_get_sgtable_from_pages(struct device *d, struct sg_table **sgt,
 		err = -ENOMEM;
 		goto fail;
 	}
-	err = sg_alloc_table(*sgt, 1, GFP_KERNEL);
+	err = sg_alloc_table_from_pages(*sgt, pages,
+			DIV_ROUND_UP(size, 4096), 0, size, GFP_KERNEL);
 	if (err) {
 		dev_err(d, "failed to allocate sg_table\n");
 		goto fail;
 	}
-	sg_set_page((*sgt)->sgl, *pages, size, 0);
 	sg_dma_address((*sgt)->sgl) = iova;
 
 	return 0;
@@ -1709,10 +1770,14 @@ void gk20a_free_sgtable(struct sg_table **sgt)
 
 u64 gk20a_mm_smmu_vaddr_translate(struct gk20a *g, dma_addr_t iova)
 {
-	return iova | 1ULL << g->ops.mm.get_physical_addr_bits(g);
+	if (!device_is_iommuable(dev_from_gk20a(g)))
+		return iova;
+	else
+		return iova | 1ULL << g->ops.mm.get_physical_addr_bits(g);
 }
 
-u64 gk20a_mm_iova_addr(struct gk20a *g, struct scatterlist *sgl)
+u64 gk20a_mm_iova_addr(struct gk20a *g, struct scatterlist *sgl,
+		u32 flags)
 {
 	if (!device_is_iommuable(dev_from_gk20a(g)))
 		return sg_phys(sgl);
@@ -1726,161 +1791,6 @@ u64 gk20a_mm_iova_addr(struct gk20a *g, struct scatterlist *sgl)
 	return gk20a_mm_smmu_vaddr_translate(g, sg_dma_address(sgl));
 }
 
-static int update_gmmu_ptes_locked(struct vm_gk20a *vm,
-				   enum gmmu_pgsz_gk20a pgsz_idx,
-				   struct sg_table *sgt,
-				   u64 buffer_offset,
-				   u64 first_vaddr, u64 last_vaddr,
-				   u8 kind_v, u32 ctag_offset,
-				   bool cacheable,
-				   int rw_flag)
-{
-	int err;
-	u32 pde_lo, pde_hi, pde_i;
-	struct scatterlist *cur_chunk;
-	unsigned int cur_offset;
-	u32 pte_w[2] = {0, 0}; /* invalid pte */
-	u32 ctag = ctag_offset * SZ_128K;
-	u32 ctag_incr;
-	u32 page_size  = vm->gmmu_page_sizes[pgsz_idx];
-	u64 addr = 0;
-	u64 space_to_skip = buffer_offset;
-
-	pde_range_from_vaddr_range(vm, first_vaddr, last_vaddr,
-				   &pde_lo, &pde_hi);
-
-	gk20a_dbg(gpu_dbg_pte, "size_idx=%d, pde_lo=%d, pde_hi=%d",
-		   pgsz_idx, pde_lo, pde_hi);
-
-	/* If ctag_offset !=0 add 1 else add 0.  The idea is to avoid a branch
-	 * below (per-pte). Note: this doesn't work unless page size (when
-	 * comptags are active) is 128KB. We have checks elsewhere for that. */
-	ctag_incr = ctag_offset ? page_size : 0;
-
-	cur_offset = 0;
-	if (sgt) {
-		cur_chunk = sgt->sgl;
-		/* space_to_skip must be page aligned */
-		BUG_ON(space_to_skip & (page_size - 1));
-
-		while (space_to_skip > 0 && cur_chunk) {
-			u64 new_addr = gk20a_mm_iova_addr(vm->mm->g, cur_chunk);
-			if (new_addr) {
-				addr = new_addr;
-				addr += cur_offset;
-			}
-			cur_offset += page_size;
-			addr += page_size;
-			while (cur_chunk &&
-				cur_offset >= cur_chunk->length) {
-				cur_offset -= cur_chunk->length;
-				cur_chunk = sg_next(cur_chunk);
-			}
-			space_to_skip -= page_size;
-		}
-	}
-	else
-		cur_chunk = NULL;
-
-	for (pde_i = pde_lo; pde_i <= pde_hi; pde_i++) {
-		u32 pte_lo, pte_hi;
-		u32 pte_cur;
-		void *pte_kv_cur;
-
-		struct page_table_gk20a *pte = vm->pdes.ptes[pgsz_idx] + pde_i;
-
-		if (pde_i == pde_lo)
-			pte_lo = pte_index_from_vaddr(vm, first_vaddr,
-						      pgsz_idx);
-		else
-			pte_lo = 0;
-
-		if ((pde_i != pde_hi) && (pde_hi != pde_lo))
-			pte_hi = vm->page_table_sizing[pgsz_idx].num_ptes-1;
-		else
-			pte_hi = pte_index_from_vaddr(vm, last_vaddr,
-						      pgsz_idx);
-
-		/* get cpu access to the ptes */
-		err = map_gmmu_pages(pte->ref, pte->sgt, &pte_kv_cur,
-				     pte->size);
-		if (err) {
-			gk20a_err(dev_from_vm(vm),
-				   "couldn't map ptes for update as=%d",
-				   vm_aspace_id(vm));
-			goto clean_up;
-		}
-
-		gk20a_dbg(gpu_dbg_pte, "pte_lo=%d, pte_hi=%d", pte_lo, pte_hi);
-		for (pte_cur = pte_lo; pte_cur <= pte_hi; pte_cur++) {
-			if (likely(sgt)) {
-				u64 new_addr = gk20a_mm_iova_addr(vm->mm->g,
-								  cur_chunk);
-				if (new_addr) {
-					addr = new_addr;
-					addr += cur_offset;
-				}
-				pte_w[0] = gmmu_pte_valid_true_f() |
-					gmmu_pte_address_sys_f(addr
-						>> gmmu_pte_address_shift_v());
-				pte_w[1] = gmmu_pte_aperture_video_memory_f() |
-					gmmu_pte_kind_f(kind_v) |
-					gmmu_pte_comptagline_f(ctag / SZ_128K);
-
-				if (rw_flag == gk20a_mem_flag_read_only) {
-					pte_w[0] |= gmmu_pte_read_only_true_f();
-					pte_w[1] |=
-						gmmu_pte_write_disable_true_f();
-				} else if (rw_flag ==
-					   gk20a_mem_flag_write_only) {
-					pte_w[1] |=
-						gmmu_pte_read_disable_true_f();
-				}
-				if (!cacheable)
-					pte_w[1] |= gmmu_pte_vol_true_f();
-
-				gk20a_dbg(gpu_dbg_pte, "pte_cur=%d addr=0x%x,%08x kind=%d"
-					   " ctag=%d vol=%d"
-					   " [0x%08x,0x%08x]",
-					   pte_cur, hi32(addr), lo32(addr),
-					   kind_v, ctag, !cacheable,
-					   pte_w[1], pte_w[0]);
-				ctag += ctag_incr;
-				cur_offset += page_size;
-				addr += page_size;
-				while (cur_chunk &&
-					cur_offset >= cur_chunk->length) {
-					cur_offset -= cur_chunk->length;
-					cur_chunk = sg_next(cur_chunk);
-				}
-
-			} else {
-				gk20a_dbg(gpu_dbg_pte,
-					   "pte_cur=%d [0x0,0x0]",
-					   pte_cur);
-			}
-
-			gk20a_mem_wr32(pte_kv_cur + pte_cur*8, 0, pte_w[0]);
-			gk20a_mem_wr32(pte_kv_cur + pte_cur*8, 1, pte_w[1]);
-		}
-
-		unmap_gmmu_pages(pte->ref, pte->sgt, pte_kv_cur);
-	}
-
-	smp_mb();
-	vm->tlb_dirty = true;
-	gk20a_dbg_fn("set tlb dirty");
-
-	return 0;
-
-clean_up:
-	/*TBD: potentially rewrite above to pre-map everything it needs to
-	 * as that's the only way it can fail */
-	return err;
-
-}
-
-
 /* for gk20a the "video memory" apertures here are misnomers. */
 static inline u32 big_valid_pde0_bits(u64 pte_addr)
 {
@@ -1890,6 +1800,7 @@ static inline u32 big_valid_pde0_bits(u64 pte_addr)
 			   (u32)(pte_addr >> gmmu_pde_address_shift_v()));
 	return  pde0_bits;
 }
+
 static inline u32 small_valid_pde1_bits(u64 pte_addr)
 {
 	u32 pde1_bits =
@@ -1906,60 +1817,269 @@ static inline u32 small_valid_pde1_bits(u64 pte_addr)
    made.  So, superfluous updates will cause unnecessary
    pde invalidations.
 */
-void update_gmmu_pde_locked(struct vm_gk20a *vm, u32 i)
+static int update_gmmu_pde_locked(struct vm_gk20a *vm,
+			   struct gk20a_mm_entry *pte,
+			   u32 i, u32 gmmu_pgsz_idx,
+			   u64 iova,
+			   u32 kind_v, u32 *ctag,
+			   bool cacheable, bool unammped_pte,
+			   int rw_flag, bool sparse, u32 flags)
 {
+	struct gk20a *g = gk20a_from_vm(vm);
 	bool small_valid, big_valid;
-	u64 pte_addr[2] = {0, 0};
-	struct page_table_gk20a *small_pte =
-		vm->pdes.ptes[gmmu_page_size_small] + i;
-	struct page_table_gk20a *big_pte =
-		vm->pdes.ptes[gmmu_page_size_big] + i;
+	u64 pte_addr_small = 0, pte_addr_big = 0;
+	struct gk20a_mm_entry *entry = vm->pdb.entries + i;
 	u32 pde_v[2] = {0, 0};
 	u32 *pde;
 
-	small_valid = small_pte && small_pte->ref;
-	big_valid   = big_pte && big_pte->ref;
+	gk20a_dbg_fn("");
+
+	small_valid = entry->size && entry->pgsz == gmmu_page_size_small;
+	big_valid   = entry->size && entry->pgsz == gmmu_page_size_big;
 
 	if (small_valid)
-		pte_addr[gmmu_page_size_small] =
-			gk20a_mm_iova_addr(vm->mm->g, small_pte->sgt->sgl);
+		pte_addr_small = g->ops.mm.get_iova_addr(g, entry->sgt->sgl, 0);
 
 	if (big_valid)
-		pte_addr[gmmu_page_size_big] =
-			gk20a_mm_iova_addr(vm->mm->g, big_pte->sgt->sgl);
+		pte_addr_big = g->ops.mm.get_iova_addr(g, entry->sgt->sgl, 0);
 
 	pde_v[0] = gmmu_pde_size_full_f();
-	pde_v[0] |= big_valid ?
-		big_valid_pde0_bits(pte_addr[gmmu_page_size_big])
-		:
+	pde_v[0] |= big_valid ? big_valid_pde0_bits(pte_addr_big) :
 		(gmmu_pde_aperture_big_invalid_f());
 
 	pde_v[1] |= (small_valid ?
-		     small_valid_pde1_bits(pte_addr[gmmu_page_size_small])
-		     :
+		     small_valid_pde1_bits(pte_addr_small) :
 		     (gmmu_pde_aperture_small_invalid_f() |
-		      gmmu_pde_vol_small_false_f())
-		     )
-		|
-		(big_valid ? (gmmu_pde_vol_big_true_f()) :
-		 gmmu_pde_vol_big_false_f());
+		      gmmu_pde_vol_small_false_f()))
+		    |
+		    (big_valid ? (gmmu_pde_vol_big_true_f()) :
+		     gmmu_pde_vol_big_false_f());
 
 	pde = pde_from_index(vm, i);
 
 	gk20a_mem_wr32(pde, 0, pde_v[0]);
 	gk20a_mem_wr32(pde, 1, pde_v[1]);
 
+	gk20a_dbg(gpu_dbg_pte, "pde:%d,sz=%d = 0x%x,0x%08x",
+		  i, gmmu_pgsz_idx, pde_v[1], pde_v[0]);
+	return 0;
+}
+
+static int update_gmmu_pte_locked(struct vm_gk20a *vm,
+			   struct gk20a_mm_entry *pte,
+			   u32 i, u32 gmmu_pgsz_idx,
+			   u64 iova,
+			   u32 kind_v, u32 *ctag,
+			   bool cacheable, bool unmapped_pte,
+			   int rw_flag, bool sparse, u32 flags)
+{
+	struct gk20a *g = gk20a_from_vm(vm);
+	u32 ctag_granularity = g->ops.fb.compression_page_size(g);
+	u32 page_size  = vm->gmmu_page_sizes[gmmu_pgsz_idx];
+	u32 pte_w[2] = {0, 0}; /* invalid pte */
+
+	if (iova) {
+		if (unmapped_pte)
+			pte_w[0] = gmmu_pte_valid_false_f() |
+				gmmu_pte_address_sys_f(iova
+				>> gmmu_pte_address_shift_v());
+		else
+			pte_w[0] = gmmu_pte_valid_true_f() |
+				gmmu_pte_address_sys_f(iova
+				>> gmmu_pte_address_shift_v());
+
+		pte_w[1] = gmmu_pte_aperture_video_memory_f() |
+			gmmu_pte_kind_f(kind_v) |
+			gmmu_pte_comptagline_f(*ctag / ctag_granularity);
+
+		if (rw_flag == gk20a_mem_flag_read_only) {
+			pte_w[0] |= gmmu_pte_read_only_true_f();
+			pte_w[1] |=
+				gmmu_pte_write_disable_true_f();
+		} else if (rw_flag ==
+			   gk20a_mem_flag_write_only) {
+			pte_w[1] |=
+				gmmu_pte_read_disable_true_f();
+		}
+		if (!unmapped_pte) {
+			if (!cacheable)
+				pte_w[1] |=
+					gmmu_pte_vol_true_f();
+			else {
+			/* Store cachable value behind
+			 * gmmu_pte_write_disable_true_f */
+				if (!cacheable)
+					pte_w[1] |=
+					gmmu_pte_write_disable_true_f();
+			}
+		}
+
+		gk20a_dbg(gpu_dbg_pte,
+			"pte=%d iova=0x%llx kind=%d ctag=%d vol=%d [0x%08x, 0x%08x]",
+			   i, iova,
+			   kind_v, *ctag / ctag_granularity, !cacheable,
+			   pte_w[1], pte_w[0]);
+
+		if (*ctag)
+			*ctag += page_size;
+	} else if (sparse) {
+		pte_w[0] = gmmu_pte_valid_false_f();
+		pte_w[1] |= gmmu_pte_vol_true_f();
+	} else {
+		gk20a_dbg(gpu_dbg_pte, "pte_cur=%d [0x0,0x0]", i);
+	}
+
+	gk20a_mem_wr32(pte->cpu_va + i*8, 0, pte_w[0]);
+	gk20a_mem_wr32(pte->cpu_va + i*8, 1, pte_w[1]);
+
+	return 0;
+}
+
+static int update_gmmu_level_locked(struct vm_gk20a *vm,
+				    struct gk20a_mm_entry *pte,
+				    enum gmmu_pgsz_gk20a pgsz_idx,
+				    u64 iova,
+				    u64 gpu_va, u64 gpu_end,
+				    u8 kind_v, u32 *ctag,
+				    bool cacheable, bool unmapped_pte,
+				    int rw_flag,
+				    bool sparse,
+				    int lvl,
+				    u32 flags)
+{
+	const struct gk20a_mmu_level *l = &vm->mmu_levels[lvl];
+	const struct gk20a_mmu_level *next_l = &vm->mmu_levels[lvl+1];
+	int err = 0;
+	u32 pde_i;
+	u64 pde_size = 1ULL << (u64)l->lo_bit[pgsz_idx];
+
+	gk20a_dbg_fn("");
+
+	pde_i = (gpu_va & ((1ULL << ((u64)l->hi_bit[pgsz_idx]+1)) - 1ULL))
+		>> (u64)l->lo_bit[pgsz_idx];
+
+	gk20a_dbg(gpu_dbg_pte, "size_idx=%d, l: %d, [%llx,%llx], iova=%llx",
+		  pgsz_idx, lvl, gpu_va, gpu_end-1, iova);
+
+	while (gpu_va < gpu_end) {
+		struct gk20a_mm_entry *next_pte = NULL;
+		u64 next = min((gpu_va + pde_size) & ~(pde_size-1), gpu_end);
+
+		/* Allocate next level */
+		if (next_l->update_entry) {
+			if (!pte->entries) {
+				int num_entries =
+					1 <<
+					 (l->hi_bit[pgsz_idx]
+					  - l->lo_bit[pgsz_idx]);
+				pte->entries =
+					kzalloc(sizeof(struct gk20a_mm_entry) *
+						num_entries, GFP_KERNEL);
+				pte->pgsz = pgsz_idx;
+				if (!pte->entries)
+					return -ENOMEM;
+			}
+			next_pte = pte->entries + pde_i;
+
+			if (!next_pte->size) {
+				err = gk20a_zalloc_gmmu_page_table(vm,
+					pgsz_idx, next_l, next_pte);
+				if (err)
+					return err;
+			}
+		}
+
+		err = l->update_entry(vm, pte, pde_i, pgsz_idx,
+				iova, kind_v, ctag, cacheable, unmapped_pte,
+				rw_flag, sparse, flags);
+		if (err)
+			return err;
+
+		if (next_l->update_entry) {
+			/* get cpu access to the ptes */
+			err = map_gmmu_pages(next_pte);
+			if (err) {
+				gk20a_err(dev_from_vm(vm),
+					   "couldn't map ptes for update as=%d",
+					   vm_aspace_id(vm));
+				return err;
+			}
+			err = update_gmmu_level_locked(vm, next_pte,
+				pgsz_idx,
+				iova,
+				gpu_va,
+				next,
+				kind_v, ctag, cacheable, unmapped_pte,
+				rw_flag, sparse, lvl+1, flags);
+			unmap_gmmu_pages(next_pte);
+
+			if (err)
+				return err;
+		}
+
+		if (iova)
+			iova += next - gpu_va;
+		pde_i++;
+		gpu_va = next;
+	}
+
+	gk20a_dbg_fn("done");
+
+	return 0;
+}
+
+static int update_gmmu_ptes_locked(struct vm_gk20a *vm,
+				   enum gmmu_pgsz_gk20a pgsz_idx,
+				   struct sg_table *sgt,
+				   u64 buffer_offset,
+				   u64 gpu_va, u64 gpu_end,
+				   u8 kind_v, u32 ctag_offset,
+				   bool cacheable, bool unmapped_pte,
+				   int rw_flag,
+				   bool sparse,
+				   u32 flags)
+{
+	struct gk20a *g = gk20a_from_vm(vm);
+	int ctag_granularity = g->ops.fb.compression_page_size(g);
+	u32 ctag = ctag_offset * ctag_granularity;
+	u64 iova = 0;
+	u64 space_to_skip = buffer_offset;
+	u32 page_size  = vm->gmmu_page_sizes[pgsz_idx];
+	int err;
+
+	gk20a_dbg(gpu_dbg_pte, "size_idx=%d, iova=%llx",
+		   pgsz_idx,
+		   sgt ? g->ops.mm.get_iova_addr(vm->mm->g, sgt->sgl, flags)
+		       : 0ULL);
+
+	if (space_to_skip & (page_size - 1))
+		return -EINVAL;
+
+	if (sgt)
+		iova = g->ops.mm.get_iova_addr(vm->mm->g, sgt->sgl, flags)
+				+ space_to_skip;
+
+	gk20a_dbg(gpu_dbg_map, "size_idx=%d, gpu_va=[%llx,%llx], iova=%llx",
+			pgsz_idx, gpu_va, gpu_end-1, iova);
+	err = map_gmmu_pages(&vm->pdb);
+	if (err) {
+		gk20a_err(dev_from_vm(vm),
+			   "couldn't map ptes for update as=%d",
+			   vm_aspace_id(vm));
+		return err;
+	}
+	err = update_gmmu_level_locked(vm, &vm->pdb, pgsz_idx,
+			iova,
+			gpu_va, gpu_end,
+			kind_v, &ctag,
+			cacheable, unmapped_pte, rw_flag, sparse, 0, flags);
+	unmap_gmmu_pages(&vm->pdb);
+
 	smp_mb();
 
-	FLUSH_CPU_DCACHE(pde,
-			 sg_phys(vm->pdes.sgt->sgl) + (i*gmmu_pde__size_v()),
-			 sizeof(u32)*2);
+	gk20a_dbg_fn("done");
 
-	gk20a_mm_l2_invalidate(vm->mm->g);
-
-	gk20a_dbg(gpu_dbg_pte, "pde:%d = 0x%x,0x%08x\n", i, pde_v[1], pde_v[0]);
-
-	vm->tlb_dirty  = true;
+	return err;
 }
 
 /* NOTE! mapped_buffers lock must be held */
@@ -1968,29 +2088,14 @@ void gk20a_vm_unmap_locked(struct mapped_buffer_node *mapped_buffer)
 	struct vm_gk20a *vm = mapped_buffer->vm;
 	struct gk20a *g = vm->mm->g;
 
-	if (mapped_buffer->va_node &&
-	    mapped_buffer->va_node->sparse) {
-		u64 vaddr = mapped_buffer->addr;
-		u32 pgsz_idx = mapped_buffer->pgsz_idx;
-		u32 num_pages = mapped_buffer->size >>
-			ilog2(vm->gmmu_page_sizes[pgsz_idx]);
-
-		/* there is little we can do if this fails... */
-		g->ops.mm.gmmu_unmap(vm,
-			mapped_buffer->addr,
-			mapped_buffer->size,
-			mapped_buffer->pgsz_idx,
-			mapped_buffer->va_allocated,
-			gk20a_mem_flag_none);
-		g->ops.mm.set_sparse(vm, vaddr,
-				num_pages, pgsz_idx, false);
-	} else
-		g->ops.mm.gmmu_unmap(vm,
-				mapped_buffer->addr,
-				mapped_buffer->size,
-				mapped_buffer->pgsz_idx,
-				mapped_buffer->va_allocated,
-				gk20a_mem_flag_none);
+	g->ops.mm.gmmu_unmap(vm,
+		mapped_buffer->addr,
+		mapped_buffer->size,
+		mapped_buffer->pgsz_idx,
+		mapped_buffer->va_allocated,
+		gk20a_mem_flag_none,
+		mapped_buffer->va_node ?
+		  mapped_buffer->va_node->sparse : false);
 
 	gk20a_dbg(gpu_dbg_map, "as=%d pgsz=%d gv=0x%x,%08x own_mem_ref=%d",
 		   vm_aspace_id(vm),
@@ -2041,6 +2146,7 @@ static void gk20a_vm_remove_support_nofree(struct vm_gk20a *vm)
 	struct vm_reserved_va_node *va_node, *va_node_tmp;
 	struct rb_node *node;
 	int i;
+	u32 pde_lo = 0, pde_hi = 0;
 
 	gk20a_dbg_fn("");
 	mutex_lock(&vm->update_gmmu_lock);
@@ -2065,32 +2171,16 @@ static void gk20a_vm_remove_support_nofree(struct vm_gk20a *vm)
 
 	/* unmapping all buffers above may not actually free
 	 * all vm ptes.  jettison them here for certain... */
-	for (i = 0; i < vm->pdes.num_pdes; i++) {
-		struct page_table_gk20a *pte =
-			&vm->pdes.ptes[gmmu_page_size_small][i];
-		if (pte->ref) {
-			free_gmmu_pages(vm, pte->ref, pte->sgt,
-				vm->page_table_sizing[gmmu_page_size_small].order,
-				pte->size);
-			pte->ref = NULL;
-		}
-		pte = &vm->pdes.ptes[gmmu_page_size_big][i];
-		if (pte->ref) {
-			free_gmmu_pages(vm, pte->ref, pte->sgt,
-				vm->page_table_sizing[gmmu_page_size_big].order,
-				pte->size);
-			pte->ref = NULL;
-		}
+	pde_range_from_vaddr_range(vm,
+				   0, vm->va_limit-1,
+				   &pde_lo, &pde_hi);
+	for (i = 0; i < pde_hi + 1; i++) {
+		struct gk20a_mm_entry *entry = &vm->pdb.entries[i];
+		if (entry->size)
+			free_gmmu_pages(vm, entry);
 	}
 
-	unmap_gmmu_pages(vm->pdes.ref, vm->pdes.sgt, vm->pdes.kv);
-	free_gmmu_pages(vm, vm->pdes.ref, vm->pdes.sgt, 0, vm->pdes.size);
-
-	kfree(vm->pdes.ptes[gmmu_page_size_small]);
-	kfree(vm->pdes.ptes[gmmu_page_size_big]);
-	gk20a_allocator_destroy(&vm->vma[gmmu_page_size_small]);
-	if (vm->big_pages)
-		gk20a_allocator_destroy(&vm->vma[gmmu_page_size_big]);
+	gk20a_deinit_vm(vm);
 
 	mutex_unlock(&vm->update_gmmu_lock);
 }
@@ -2119,7 +2209,31 @@ void gk20a_vm_put(struct vm_gk20a *vm)
 	kref_put(&vm->ref, gk20a_vm_remove_support_kref);
 }
 
-static int gk20a_init_vm(struct mm_gk20a *mm,
+const struct gk20a_mmu_level gk20a_mm_levels_64k[] = {
+	{.hi_bit = {NV_GMMU_VA_RANGE-1, NV_GMMU_VA_RANGE-1},
+	 .lo_bit = {26, 26},
+	 .update_entry = update_gmmu_pde_locked,
+	 .entry_size = 8},
+	{.hi_bit = {25, 25},
+	 .lo_bit = {12, 16},
+	 .update_entry = update_gmmu_pte_locked,
+	 .entry_size = 8},
+	{.update_entry = NULL}
+};
+
+const struct gk20a_mmu_level gk20a_mm_levels_128k[] = {
+	{.hi_bit = {NV_GMMU_VA_RANGE-1, NV_GMMU_VA_RANGE-1},
+	 .lo_bit = {27, 27},
+	 .update_entry = update_gmmu_pde_locked,
+	 .entry_size = 8},
+	{.hi_bit = {26, 26},
+	 .lo_bit = {12, 17},
+	 .update_entry = update_gmmu_pte_locked,
+	 .entry_size = 8},
+	{.update_entry = NULL}
+};
+
+int gk20a_init_vm(struct mm_gk20a *mm,
 		struct vm_gk20a *vm,
 		u32 big_page_size,
 		u64 low_hole,
@@ -2128,9 +2242,10 @@ static int gk20a_init_vm(struct mm_gk20a *mm,
 		char *name)
 {
 	int err, i;
-	u32 num_pages, low_hole_pages;
+	u32 num_small_pages, num_large_pages, low_hole_pages;
 	char alloc_name[32];
-	u64 vma_size;
+	u64 small_vma_size, large_vma_size;
+	u32 pde_lo, pde_hi;
 
 	/* note: keep the page sizes sorted lowest to highest here */
 	u32 gmmu_page_sizes[gmmu_nr_page_sizes] = { SZ_4K, big_page_size };
@@ -2142,91 +2257,45 @@ static int gk20a_init_vm(struct mm_gk20a *mm,
 	vm->big_pages = big_pages;
 
 	vm->big_page_size = gmmu_page_sizes[gmmu_page_size_big];
-	vm->compression_page_size = gmmu_page_sizes[gmmu_page_size_big];
-	vm->pde_stride    = vm->big_page_size << 10;
-	vm->pde_stride_shift = ilog2(vm->pde_stride);
 
-	for (i = 0; i < gmmu_nr_page_sizes; i++) {
-		u32 num_ptes, pte_space, num_pages;
+	vm->mmu_levels = vm->mm->g->ops.mm.get_mmu_levels(vm->mm->g,
+			vm->big_page_size);
 
+	for (i = 0; i < gmmu_nr_page_sizes; i++)
 		vm->gmmu_page_sizes[i] = gmmu_page_sizes[i];
 
-		/* assuming "full" page tables */
-		num_ptes = vm->pde_stride / gmmu_page_sizes[i];
+	gk20a_dbg_info("small page-size (%dKB)",
+			vm->gmmu_page_sizes[gmmu_page_size_small] >> 10);
 
-		pte_space = num_ptes * gmmu_pte__size_v();
-		/* allocate whole pages */
-		pte_space = roundup(pte_space, PAGE_SIZE);
+	gk20a_dbg_info("big page-size (%dKB)",
+			vm->gmmu_page_sizes[gmmu_page_size_big] >> 10);
 
-		num_pages = pte_space / PAGE_SIZE;
-		/* make sure "order" is viable */
-		BUG_ON(!is_power_of_2(num_pages));
+	pde_range_from_vaddr_range(vm,
+				   0, vm->va_limit-1,
+				   &pde_lo, &pde_hi);
+	vm->pdb.entries = kzalloc(sizeof(struct gk20a_mm_entry) *
+			(pde_hi + 1), GFP_KERNEL);
 
-		vm->page_table_sizing[i].num_ptes = num_ptes;
-		vm->page_table_sizing[i].order = ilog2(num_pages);
-	}
-
-	gk20a_dbg_info("small page-size (%dKB) pte array: %dKB",
-			vm->gmmu_page_sizes[gmmu_page_size_small] >> 10,
-			(vm->page_table_sizing[gmmu_page_size_small].num_ptes *
-			 gmmu_pte__size_v()) >> 10);
-
-	gk20a_dbg_info("big page-size (%dKB) pte array: %dKB",
-			vm->gmmu_page_sizes[gmmu_page_size_big] >> 10,
-			(vm->page_table_sizing[gmmu_page_size_big].num_ptes *
-			 gmmu_pte__size_v()) >> 10);
-
-	{
-		u32 pde_lo, pde_hi;
-		pde_range_from_vaddr_range(vm,
-					   0, vm->va_limit-1,
-					   &pde_lo, &pde_hi);
-		vm->pdes.num_pdes = pde_hi + 1;
-	}
-
-	vm->pdes.ptes[gmmu_page_size_small] =
-		kzalloc(sizeof(struct page_table_gk20a) *
-			vm->pdes.num_pdes, GFP_KERNEL);
-
-	if (!vm->pdes.ptes[gmmu_page_size_small]) {
-		err = -ENOMEM;
-		goto clean_up_pdes;
-	}
-
-	vm->pdes.ptes[gmmu_page_size_big] =
-		kzalloc(sizeof(struct page_table_gk20a) *
-			vm->pdes.num_pdes, GFP_KERNEL);
-
-	if (!vm->pdes.ptes[gmmu_page_size_big]) {
-		err = -ENOMEM;
-		goto clean_up_pdes;
-	}
+	if (!vm->pdb.entries)
+		return -ENOMEM;
 
 	gk20a_dbg_info("init space for %s va_limit=0x%llx num_pdes=%d",
-		   name, vm->va_limit, vm->pdes.num_pdes);
+		   name, vm->va_limit, pde_hi + 1);
 
 	/* allocate the page table directory */
-	err = alloc_gmmu_pages(vm, 0, &vm->pdes.ref,
-			       &vm->pdes.sgt, &vm->pdes.size);
+	err = gk20a_zalloc_gmmu_page_table(vm, 0, &vm->mmu_levels[0], &vm->pdb);
 	if (err)
 		goto clean_up_pdes;
 
-	err = map_gmmu_pages(vm->pdes.ref, vm->pdes.sgt, &vm->pdes.kv,
-			     vm->pdes.size);
-	if (err) {
-		goto clean_up_ptes;
+	/* First 16GB of the address space goes towards small pages. What ever
+	 * remains is allocated to large pages. */
+	small_vma_size = vm->va_limit;
+	if (big_pages) {
+		small_vma_size = (u64)16 << 30;
+		large_vma_size = vm->va_limit - small_vma_size;
 	}
-	gk20a_dbg(gpu_dbg_pte, "bar 1 pdes.kv = 0x%p, pdes.phys = 0x%llx",
-		  vm->pdes.kv, gk20a_mm_iova_addr(vm->mm->g, vm->pdes.sgt->sgl));
-	/* we could release vm->pdes.kv but it's only one page... */
 
-	/* low-half: alloc small pages */
-	/* high-half: alloc big pages */
-	vma_size = vm->va_limit;
-	if (big_pages)
-		vma_size /= 2;
-
-	num_pages = (u32)(vma_size >>
+	num_small_pages = (u32)(small_vma_size >>
 		    ilog2(vm->gmmu_page_sizes[gmmu_page_size_small]));
 
 	/* num_pages above is without regard to the low-side hole. */
@@ -2238,20 +2307,22 @@ static int gk20a_init_vm(struct mm_gk20a *mm,
 	err = gk20a_allocator_init(&vm->vma[gmmu_page_size_small],
 			     alloc_name,
 			     low_hole_pages,		 /*start*/
-			     num_pages - low_hole_pages);/* length*/
+			     num_small_pages - low_hole_pages);/* length*/
 	if (err)
-		goto clean_up_map_pde;
+		goto clean_up_ptes;
 
 	if (big_pages) {
-		num_pages = (u32)((vm->va_limit / 2) >>
+		u32 start = (u32)(small_vma_size >>
+			    ilog2(vm->gmmu_page_sizes[gmmu_page_size_big]));
+		num_large_pages = (u32)(large_vma_size >>
 			    ilog2(vm->gmmu_page_sizes[gmmu_page_size_big]));
 
 		snprintf(alloc_name, sizeof(alloc_name), "gk20a_%s-%dKB",
 			 name, vm->gmmu_page_sizes[gmmu_page_size_big]>>10);
 		err = gk20a_allocator_init(&vm->vma[gmmu_page_size_big],
 				      alloc_name,
-				      num_pages,		/* start */
-				      num_pages);		/* length */
+				      start,			/* start */
+				      num_large_pages);		/* length */
 		if (err)
 			goto clean_up_small_allocator;
 	}
@@ -2266,14 +2337,10 @@ static int gk20a_init_vm(struct mm_gk20a *mm,
 
 clean_up_small_allocator:
 	gk20a_allocator_destroy(&vm->vma[gmmu_page_size_small]);
-clean_up_map_pde:
-	unmap_gmmu_pages(vm->pdes.ref, vm->pdes.sgt, vm->pdes.kv);
 clean_up_ptes:
-	free_gmmu_pages(vm, vm->pdes.ref, vm->pdes.sgt, 0,
-			vm->pdes.size);
+	free_gmmu_pages(vm, &vm->pdb);
 clean_up_pdes:
-	kfree(vm->pdes.ptes[gmmu_page_size_small]);
-	kfree(vm->pdes.ptes[gmmu_page_size_big]);
+	kfree(vm->pdb.entries);
 	return err;
 }
 
@@ -2367,13 +2434,6 @@ int gk20a_vm_alloc_space(struct gk20a_as_share *as_share,
 		goto clean_up;
 	}
 
-	if (args->flags & NVGPU_AS_ALLOC_SPACE_FLAGS_SPARSE &&
-	    pgsz_idx != gmmu_page_size_big) {
-		err = -ENOSYS;
-		kfree(va_node);
-		goto clean_up;
-	}
-
 	start_page_nr = 0;
 	if (args->flags & NVGPU_AS_ALLOC_SPACE_FLAGS_FIXED_OFFSET)
 		start_page_nr = (u32)(args->o_a.offset >>
@@ -2399,9 +2459,18 @@ int gk20a_vm_alloc_space(struct gk20a_as_share *as_share,
 
 	/* mark that we need to use sparse mappings here */
 	if (args->flags & NVGPU_AS_ALLOC_SPACE_FLAGS_SPARSE) {
-		err = g->ops.mm.set_sparse(vm, vaddr_start, args->pages,
-					 pgsz_idx, true);
-		if (err) {
+		u64 map_offset = g->ops.mm.gmmu_map(vm, vaddr_start,
+					 NULL,
+					 0,
+					 va_node->size,
+					 pgsz_idx,
+					 0,
+					 0,
+					 args->flags,
+					 gk20a_mem_flag_none,
+					 false,
+					 true);
+		if (!map_offset) {
 			mutex_unlock(&vm->update_gmmu_lock);
 			vma->free(vma, start_page_nr, args->pages, 1);
 			kfree(va_node);
@@ -2435,17 +2504,8 @@ int gk20a_vm_free_space(struct gk20a_as_share *as_share,
 			args->pages, args->offset);
 
 	/* determine pagesz idx */
-	for (pgsz_idx = gmmu_page_size_small;
-	     pgsz_idx < gmmu_nr_page_sizes;
-	     pgsz_idx++) {
-		if (vm->gmmu_page_sizes[pgsz_idx] == args->page_size)
-			break;
-	}
-
-	if (pgsz_idx >= gmmu_nr_page_sizes) {
-		err = -EINVAL;
-		goto clean_up;
-	}
+	pgsz_idx = NV_GMMU_VA_IS_UPPER(args->offset) ?
+			gmmu_page_size_big : gmmu_page_size_small;
 
 	start_page_nr = (u32)(args->offset >>
 			ilog2(vm->gmmu_page_sizes[pgsz_idx]));
@@ -2461,12 +2521,13 @@ int gk20a_vm_free_space(struct gk20a_as_share *as_share,
 	if (va_node) {
 		struct mapped_buffer_node *buffer, *n;
 
-		/* there is no need to unallocate the buffers in va. Just
-		 * convert them into normal buffers */
-
+		/* Decrement the ref count on all buffers in this va_node. This
+		 * allows userspace to let the kernel free mappings that are
+		 * only used by this va_node. */
 		list_for_each_entry_safe(buffer, n,
 			&va_node->va_buffers_list, va_buffers_list) {
 			list_del_init(&buffer->va_buffers_list);
+			kref_put(&buffer->ref, gk20a_vm_unmap_locked_kref);
 		}
 
 		list_del(&va_node->reserved_va_list);
@@ -2478,7 +2539,8 @@ int gk20a_vm_free_space(struct gk20a_as_share *as_share,
 					va_node->size,
 					va_node->pgsz_idx,
 					true,
-					gk20a_mem_flag_none);
+					gk20a_mem_flag_none,
+					true);
 		kfree(va_node);
 	}
 	mutex_unlock(&vm->update_gmmu_lock);
@@ -2566,7 +2628,7 @@ int gk20a_dmabuf_get_state(struct dma_buf *dmabuf, struct device *dev,
 	s->offset = offset;
 	INIT_LIST_HEAD(&s->list);
 	mutex_init(&s->lock);
-	list_add_tail(&priv->states, &s->list);
+	list_add_tail(&s->list, &priv->states);
 
 out:
 	mutex_unlock(&priv->lock);
@@ -2591,7 +2653,7 @@ static int gk20a_dmabuf_get_kind(struct dma_buf *dmabuf)
 	return kind;
 }
 
-int gk20a_vm_map_buffer(struct gk20a_as_share *as_share,
+int gk20a_vm_map_buffer(struct vm_gk20a *vm,
 			int dmabuf_fd,
 			u64 *offset_align,
 			u32 flags, /*NVGPU_AS_MAP_BUFFER_FLAGS_*/
@@ -2600,7 +2662,6 @@ int gk20a_vm_map_buffer(struct gk20a_as_share *as_share,
 			u64 mapping_size)
 {
 	int err = 0;
-	struct vm_gk20a *vm = as_share->vm;
 	struct dma_buf *dmabuf;
 	u64 ret_va;
 
@@ -2635,40 +2696,50 @@ int gk20a_vm_map_buffer(struct gk20a_as_share *as_share,
 	return err;
 }
 
-int gk20a_vm_unmap_buffer(struct gk20a_as_share *as_share, u64 offset)
+int gk20a_vm_unmap_buffer(struct vm_gk20a *vm, u64 offset)
 {
-	struct vm_gk20a *vm = as_share->vm;
-
 	gk20a_dbg_fn("");
 
 	gk20a_vm_unmap_user(vm, offset);
 	return 0;
 }
 
-static void gk20a_deinit_vm(struct vm_gk20a *vm)
+void gk20a_deinit_vm(struct vm_gk20a *vm)
 {
 	gk20a_allocator_destroy(&vm->vma[gmmu_page_size_big]);
 	gk20a_allocator_destroy(&vm->vma[gmmu_page_size_small]);
-	unmap_gmmu_pages(vm->pdes.ref, vm->pdes.sgt, vm->pdes.kv);
-	free_gmmu_pages(vm, vm->pdes.ref, vm->pdes.sgt, 0,
-			vm->pdes.size);
-	kfree(vm->pdes.ptes[gmmu_page_size_small]);
-	kfree(vm->pdes.ptes[gmmu_page_size_big]);
+
+	unmap_gmmu_pages(&vm->pdb);
+	free_gmmu_pages(vm, &vm->pdb);
+	kfree(vm->pdb.entries);
+}
+
+int gk20a_alloc_inst_block(struct gk20a *g, struct mem_desc *inst_block)
+{
+	struct device *dev = dev_from_gk20a(g);
+	int err;
+
+	err = gk20a_gmmu_alloc(g, ram_in_alloc_size_v(), inst_block);
+	if (err) {
+		gk20a_err(dev, "%s: memory allocation failed\n", __func__);
+		return err;
+	}
+
+	return 0;
+}
+
+void gk20a_free_inst_block(struct gk20a *g, struct mem_desc *inst_block)
+{
+	if (inst_block->cpu_va)
+		gk20a_gmmu_free(g, inst_block);
 }
 
 static int gk20a_init_bar1_vm(struct mm_gk20a *mm)
 {
 	int err;
-	phys_addr_t inst_pa;
-	void *inst_ptr;
 	struct vm_gk20a *vm = &mm->bar1.vm;
 	struct gk20a *g = gk20a_from_mm(mm);
-	u64 pde_addr;
-	u32 pde_addr_lo;
-	u32 pde_addr_hi;
-	struct device *d = dev_from_gk20a(g);
-	struct inst_desc *inst_block = &mm->bar1.inst_block;
-	dma_addr_t iova;
+	struct mem_desc *inst_block = &mm->bar1.inst_block;
 	u32 big_page_size = gk20a_get_platform(g->dev)->default_big_page_size;
 
 	mm->bar1.aperture_size = bar1_aperture_size_mb_gk20a() << 20;
@@ -2676,65 +2747,13 @@ static int gk20a_init_bar1_vm(struct mm_gk20a *mm)
 	gk20a_init_vm(mm, vm, big_page_size, SZ_4K,
 		      mm->bar1.aperture_size, false, "bar1");
 
-	gk20a_dbg_info("pde pa=0x%llx",
-		       (u64)gk20a_mm_iova_addr(g, vm->pdes.sgt->sgl));
-
-	pde_addr = gk20a_mm_iova_addr(g, vm->pdes.sgt->sgl);
-	pde_addr_lo = u64_lo32(pde_addr >> ram_in_base_shift_v());
-	pde_addr_hi = u64_hi32(pde_addr);
-
-	/* allocate instance mem for bar1 */
-	inst_block->size = ram_in_alloc_size_v();
-	inst_block->cpuva = dma_alloc_coherent(d, inst_block->size,
-				&iova, GFP_KERNEL);
-	if (!inst_block->cpuva) {
-		gk20a_err(d, "%s: memory allocation failed\n", __func__);
-		err = -ENOMEM;
+	err = gk20a_alloc_inst_block(g, inst_block);
+	if (err)
 		goto clean_up_va;
-	}
+	gk20a_init_inst_block(inst_block, vm, big_page_size);
 
-	inst_block->iova = iova;
-	inst_block->cpu_pa = gk20a_get_phys_from_iova(d, inst_block->iova);
-	if (!inst_block->cpu_pa) {
-		gk20a_err(d, "%s: failed to get phys address\n", __func__);
-		err = -ENOMEM;
-		goto clean_up_inst_block;
-	}
-
-	inst_pa = inst_block->cpu_pa;
-	inst_ptr = inst_block->cpuva;
-
-	gk20a_dbg_info("bar1 inst block physical phys = 0x%llx, kv = 0x%p",
-		(u64)inst_pa, inst_ptr);
-
-	memset(inst_ptr, 0, inst_block->size);
-
-	gk20a_mem_wr32(inst_ptr, ram_in_page_dir_base_lo_w(),
-		ram_in_page_dir_base_target_vid_mem_f() |
-		ram_in_page_dir_base_vol_true_f() |
-		ram_in_page_dir_base_lo_f(pde_addr_lo));
-
-	gk20a_mem_wr32(inst_ptr, ram_in_page_dir_base_hi_w(),
-		ram_in_page_dir_base_hi_f(pde_addr_hi));
-
-	gk20a_mem_wr32(inst_ptr, ram_in_adr_limit_lo_w(),
-		 u64_lo32(vm->va_limit) | 0xFFF);
-
-	gk20a_mem_wr32(inst_ptr, ram_in_adr_limit_hi_w(),
-		ram_in_adr_limit_hi_f(u64_hi32(vm->va_limit)));
-
-	if (g->ops.mm.set_big_page_size)
-		g->ops.mm.set_big_page_size(g, inst_ptr, big_page_size);
-
-	gk20a_dbg_info("bar1 inst block ptr: %08llx",  (u64)inst_pa);
 	return 0;
 
-clean_up_inst_block:
-	if (inst_block->cpuva)
-		dma_free_coherent(d, inst_block->size,
-			inst_block->cpuva, inst_block->iova);
-	inst_block->cpuva = NULL;
-	inst_block->iova = 0;
 clean_up_va:
 	gk20a_deinit_vm(vm);
 	return err;
@@ -2744,16 +2763,9 @@ clean_up_va:
 static int gk20a_init_system_vm(struct mm_gk20a *mm)
 {
 	int err;
-	phys_addr_t inst_pa;
-	void *inst_ptr;
 	struct vm_gk20a *vm = &mm->pmu.vm;
 	struct gk20a *g = gk20a_from_mm(mm);
-	u64 pde_addr;
-	u32 pde_addr_lo;
-	u32 pde_addr_hi;
-	struct device *d = dev_from_gk20a(g);
-	struct inst_desc *inst_block = &mm->pmu.inst_block;
-	dma_addr_t iova;
+	struct mem_desc *inst_block = &mm->pmu.inst_block;
 	u32 big_page_size = gk20a_get_platform(g->dev)->default_big_page_size;
 
 	mm->pmu.aperture_size = GK20A_PMU_VA_SIZE;
@@ -2762,45 +2774,61 @@ static int gk20a_init_system_vm(struct mm_gk20a *mm)
 	gk20a_init_vm(mm, vm, big_page_size,
 		      SZ_128K << 10, GK20A_PMU_VA_SIZE, false, "system");
 
-	gk20a_dbg_info("pde pa=0x%llx",
-		       (u64)gk20a_mm_iova_addr(g, vm->pdes.sgt->sgl));
-
-	pde_addr = gk20a_mm_iova_addr(g, vm->pdes.sgt->sgl);
-	pde_addr_lo = u64_lo32(pde_addr >> ram_in_base_shift_v());
-	pde_addr_hi = u64_hi32(pde_addr);
-
-	/* allocate instance mem for pmu */
-	inst_block->size = ram_in_alloc_size_v();
-	inst_block->cpuva = dma_alloc_coherent(d, inst_block->size,
-				&iova, GFP_KERNEL);
-	if (!inst_block->cpuva) {
-		gk20a_err(d, "%s: memory allocation failed\n", __func__);
-		err = -ENOMEM;
+	err = gk20a_alloc_inst_block(g, inst_block);
+	if (err)
 		goto clean_up_va;
-	}
+	gk20a_init_inst_block(inst_block, vm, big_page_size);
 
-	inst_block->iova = iova;
-	inst_block->cpu_pa = gk20a_get_phys_from_iova(d, inst_block->iova);
-	if (!inst_block->cpu_pa) {
-		gk20a_err(d, "%s: failed to get phys address\n", __func__);
-		err = -ENOMEM;
-		goto clean_up_inst_block;
-	}
+	return 0;
 
-	inst_pa = inst_block->cpu_pa;
-	inst_ptr = inst_block->cpuva;
+clean_up_va:
+	gk20a_deinit_vm(vm);
+	return err;
+}
 
-	gk20a_dbg_info("pmu inst block physical addr: 0x%llx", (u64)inst_pa);
+static int gk20a_init_hwpm(struct mm_gk20a *mm)
+{
+	int err;
+	struct vm_gk20a *vm = &mm->pmu.vm;
+	struct gk20a *g = gk20a_from_mm(mm);
+	struct mem_desc *inst_block = &mm->hwpm.inst_block;
 
-	memset(inst_ptr, 0, inst_block->size);
+	err = gk20a_alloc_inst_block(g, inst_block);
+	if (err)
+		return err;
+	gk20a_init_inst_block(inst_block, vm, 0);
+
+	return 0;
+}
+
+void gk20a_mm_init_pdb(struct gk20a *g, void *inst_ptr, u64 pdb_addr)
+{
+	u32 pdb_addr_lo = u64_lo32(pdb_addr >> ram_in_base_shift_v());
+	u32 pdb_addr_hi = u64_hi32(pdb_addr);
 
 	gk20a_mem_wr32(inst_ptr, ram_in_page_dir_base_lo_w(),
 		ram_in_page_dir_base_target_vid_mem_f() |
 		ram_in_page_dir_base_vol_true_f() |
-		ram_in_page_dir_base_lo_f(pde_addr_lo));
+		ram_in_page_dir_base_lo_f(pdb_addr_lo));
 
 	gk20a_mem_wr32(inst_ptr, ram_in_page_dir_base_hi_w(),
-		ram_in_page_dir_base_hi_f(pde_addr_hi));
+		ram_in_page_dir_base_hi_f(pdb_addr_hi));
+}
+
+void gk20a_init_inst_block(struct mem_desc *inst_block, struct vm_gk20a *vm,
+		u32 big_page_size)
+{
+	struct gk20a *g = gk20a_from_vm(vm);
+	u64 pde_addr = g->ops.mm.get_iova_addr(g, vm->pdb.sgt->sgl, 0);
+	phys_addr_t inst_pa = gk20a_mem_phys(inst_block);
+	void *inst_ptr = inst_block->cpu_va;
+
+	gk20a_dbg_info("inst block phys = 0x%llx, kv = 0x%p",
+		(u64)inst_pa, inst_ptr);
+
+	gk20a_dbg_info("pde pa=0x%llx", (u64)pde_addr);
+
+	g->ops.mm.init_pdb(g, inst_ptr, pde_addr);
 
 	gk20a_mem_wr32(inst_ptr, ram_in_adr_limit_lo_w(),
 		 u64_lo32(vm->va_limit) | 0xFFF);
@@ -2808,20 +2836,8 @@ static int gk20a_init_system_vm(struct mm_gk20a *mm)
 	gk20a_mem_wr32(inst_ptr, ram_in_adr_limit_hi_w(),
 		ram_in_adr_limit_hi_f(u64_hi32(vm->va_limit)));
 
-	if (g->ops.mm.set_big_page_size)
+	if (big_page_size && g->ops.mm.set_big_page_size)
 		g->ops.mm.set_big_page_size(g, inst_ptr, big_page_size);
-
-	return 0;
-
-clean_up_inst_block:
-	if (inst_block->cpuva)
-		dma_free_coherent(d, inst_block->size,
-			inst_block->cpuva, inst_block->iova);
-	inst_block->cpuva = NULL;
-	inst_block->iova = 0;
-clean_up_va:
-	gk20a_deinit_vm(vm);
-	return err;
 }
 
 int gk20a_mm_fb_flush(struct gk20a *g)
@@ -2838,6 +2854,9 @@ int gk20a_mm_fb_flush(struct gk20a *g)
 	/* Make sure all previous writes are committed to the L2. There's no
 	   guarantee that writes are to DRAM. This will be a sysmembar internal
 	   to the L2. */
+
+	trace_gk20a_mm_fb_flush(g->dev->name);
+
 	gk20a_writel(g, flush_fb_flush_r(),
 		flush_fb_flush_pending_busy_f());
 
@@ -2850,16 +2869,20 @@ int gk20a_mm_fb_flush(struct gk20a *g)
 			flush_fb_flush_pending_busy_v()) {
 				gk20a_dbg_info("fb_flush 0x%x", data);
 				retry--;
-				usleep_range(20, 40);
+				udelay(5);
 		} else
 			break;
 	} while (retry >= 0 || !tegra_platform_is_silicon());
 
-	if (retry < 0) {
+	if (tegra_platform_is_silicon() && retry < 0) {
 		gk20a_warn(dev_from_gk20a(g),
 			"fb_flush too many retries");
+		if (g->ops.fb.dump_vpr_wpr_info)
+			g->ops.fb.dump_vpr_wpr_info(g);
 		ret = -EBUSY;
 	}
+
+	trace_gk20a_mm_fb_flush_done(g->dev->name);
 
 	mutex_unlock(&mm->l2_op_lock);
 
@@ -2870,6 +2893,8 @@ static void gk20a_mm_l2_invalidate_locked(struct gk20a *g)
 {
 	u32 data;
 	s32 retry = 200;
+
+	trace_gk20a_mm_l2_invalidate(g->dev->name);
 
 	/* Invalidate any clean lines from the L2 so subsequent reads go to
 	   DRAM. Dirty lines are not affected by this operation. */
@@ -2886,14 +2911,16 @@ static void gk20a_mm_l2_invalidate_locked(struct gk20a *g)
 				gk20a_dbg_info("l2_system_invalidate 0x%x",
 						data);
 				retry--;
-				usleep_range(20, 40);
+				udelay(5);
 		} else
 			break;
 	} while (retry >= 0 || !tegra_platform_is_silicon());
 
-	if (retry < 0)
+	if (tegra_platform_is_silicon() && retry < 0)
 		gk20a_warn(dev_from_gk20a(g),
 			"l2_system_invalidate too many retries");
+
+	trace_gk20a_mm_l2_invalidate_done(g->dev->name);
 }
 
 void gk20a_mm_l2_invalidate(struct gk20a *g)
@@ -2922,6 +2949,8 @@ void gk20a_mm_l2_flush(struct gk20a *g, bool invalidate)
 
 	mutex_lock(&mm->l2_op_lock);
 
+	trace_gk20a_mm_l2_flush(g->dev->name);
+
 	/* Flush all dirty lines from the L2 to DRAM. Lines are left in the L2
 	   as clean, so subsequent reads might hit in the L2. */
 	gk20a_writel(g, flush_l2_flush_dirty_r(),
@@ -2936,14 +2965,16 @@ void gk20a_mm_l2_flush(struct gk20a *g, bool invalidate)
 			flush_l2_flush_dirty_pending_busy_v()) {
 				gk20a_dbg_info("l2_flush_dirty 0x%x", data);
 				retry--;
-				usleep_range(20, 40);
+				udelay(5);
 		} else
 			break;
 	} while (retry >= 0 || !tegra_platform_is_silicon());
 
-	if (retry < 0)
+	if (tegra_platform_is_silicon() && retry < 0)
 		gk20a_warn(dev_from_gk20a(g),
 			"l2_flush_dirty too many retries");
+
+	trace_gk20a_mm_l2_flush_done(g->dev->name);
 
 	if (invalidate)
 		gk20a_mm_l2_invalidate_locked(g);
@@ -2983,10 +3014,10 @@ int gk20a_vm_find_buffer(struct vm_gk20a *vm, u64 gpu_va,
 void gk20a_mm_tlb_invalidate(struct vm_gk20a *vm)
 {
 	struct gk20a *g = gk20a_from_vm(vm);
-	u32 addr_lo = u64_lo32(gk20a_mm_iova_addr(vm->mm->g,
-						  vm->pdes.sgt->sgl) >> 12);
+	u32 addr_lo = u64_lo32(g->ops.mm.get_iova_addr(vm->mm->g,
+						  vm->pdb.sgt->sgl, 0) >> 12);
 	u32 data;
-	s32 retry = 200;
+	s32 retry = 2000;
 	static DEFINE_MUTEX(tlb_lock);
 
 	gk20a_dbg_fn("");
@@ -3000,23 +3031,19 @@ void gk20a_mm_tlb_invalidate(struct vm_gk20a *vm)
 	if (!g->power_on)
 		return;
 
-	/* No need to invalidate if tlb is clean */
-	mutex_lock(&vm->update_gmmu_lock);
-	if (!vm->tlb_dirty) {
-		mutex_unlock(&vm->update_gmmu_lock);
-		return;
-	}
-
 	mutex_lock(&tlb_lock);
+
+	trace_gk20a_mm_tlb_invalidate(g->dev->name);
+
 	do {
 		data = gk20a_readl(g, fb_mmu_ctrl_r());
 		if (fb_mmu_ctrl_pri_fifo_space_v(data) != 0)
 			break;
-		usleep_range(20, 40);
+		udelay(2);
 		retry--;
 	} while (retry >= 0 || !tegra_platform_is_silicon());
 
-	if (retry < 0) {
+	if (tegra_platform_is_silicon() && retry < 0) {
 		gk20a_warn(dev_from_gk20a(g),
 			"wait mmu fifo space too many retries");
 		goto out;
@@ -3036,17 +3063,17 @@ void gk20a_mm_tlb_invalidate(struct vm_gk20a *vm)
 			fb_mmu_ctrl_pri_fifo_empty_false_f())
 			break;
 		retry--;
-		usleep_range(20, 40);
+		udelay(2);
 	} while (retry >= 0 || !tegra_platform_is_silicon());
 
-	if (retry < 0)
+	if (tegra_platform_is_silicon() && retry < 0)
 		gk20a_warn(dev_from_gk20a(g),
 			"mmu invalidate too many retries");
 
+	trace_gk20a_mm_tlb_invalidate_done(g->dev->name);
+
 out:
 	mutex_unlock(&tlb_lock);
-	vm->tlb_dirty = false;
-	mutex_unlock(&vm->update_gmmu_lock);
 }
 
 int gk20a_mm_suspend(struct gk20a *g)
@@ -3071,6 +3098,13 @@ u32 gk20a_mm_get_physical_addr_bits(struct gk20a *g)
 	return 34;
 }
 
+const struct gk20a_mmu_level *gk20a_mm_get_mmu_levels(struct gk20a *g,
+						      u32 big_page_size)
+{
+	return (big_page_size == SZ_64K) ?
+		 gk20a_mm_levels_64k : gk20a_mm_levels_128k;
+}
+
 void gk20a_init_mm(struct gpu_ops *gops)
 {
 	gops->mm.is_debug_mode_enabled = gk20a_mm_mmu_debug_mode_enabled;
@@ -3083,6 +3117,10 @@ void gk20a_init_mm(struct gpu_ops *gops)
 	gops->mm.l2_invalidate = gk20a_mm_l2_invalidate;
 	gops->mm.l2_flush = gk20a_mm_l2_flush;
 	gops->mm.tlb_invalidate = gk20a_mm_tlb_invalidate;
+	gops->mm.get_iova_addr = gk20a_mm_iova_addr;
 	gops->mm.get_physical_addr_bits = gk20a_mm_get_physical_addr_bits;
+	gops->mm.get_mmu_levels = gk20a_mm_get_mmu_levels;
+	gops->mm.init_pdb = gk20a_mm_init_pdb;
+	gops->mm.init_mm_setup_hw = gk20a_init_mm_setup_hw;
 }
 

@@ -864,6 +864,18 @@ config HID_SENSOR_HUB
 	  for events and handle data streams. Each sensor driver can format
 	  data and present to user mode using input or IIO interface.
 
+config HID_ANDROIDTV_REMOTE
+	tristate "AndroidTV remote control support"
+	depends on USB_HID
+	---help---
+	Support for AndroidTV remote control.
+
+config HID_SHIELD_REMOTE
+	tristate "SHIELD remote control support"
+	depends on USB_HID
+	---help---
+	Support for NVIDIA SHIELD remote control.
+
 endmenu
 
 endif # HID

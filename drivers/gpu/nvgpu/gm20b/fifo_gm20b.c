@@ -1,7 +1,7 @@
 /*
  * GM20B Fifo
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -24,7 +24,7 @@ static void channel_gm20b_bind(struct channel_gk20a *ch_gk20a)
 {
 	struct gk20a *g = ch_gk20a->g;
 
-	u32 inst_ptr = ch_gk20a->inst_block.cpu_pa
+	u32 inst_ptr = gk20a_mem_phys(&ch_gk20a->inst_block)
 		>> ram_in_base_shift_v();
 
 	gk20a_dbg_info("bind channel %d inst ptr 0x%08x",
@@ -118,4 +118,5 @@ void gm20b_init_fifo(struct gpu_ops *gops)
 	gops->fifo.trigger_mmu_fault = gm20b_fifo_trigger_mmu_fault;
 	gops->fifo.wait_engine_idle = gk20a_fifo_wait_engine_idle;
 	gops->fifo.get_num_fifos = gm20b_fifo_get_num_fifos;
+	gops->fifo.get_pbdma_signature = gk20a_fifo_get_pbdma_signature;
 }

@@ -47,6 +47,8 @@
 #define PMC_IO_DPD_REQ		0x1B8
 #define PMC_IO_DPD2_REQ		0x1C0
 
+#define PMC_TSC_MULT		0x2b4
+
 #define PMC_CNTRL2		0x440
 #define PMC_WAKE_DET_EN		BIT(9)
 
@@ -87,6 +89,8 @@
 #define PMC_PWR_DET_ENABLE			0x48
 #define PMC_PWR_DET_VAL				0xE4
 
+/* Scratch 250: Bootrom i2c command base */
+#define PMC_BR_COMMAND_BASE		0x908
 
 static u8 tegra_cpu_domains[] = {
 	0xFF,			/* not available for CPU0 */
@@ -101,11 +105,6 @@ void __iomem *tegra_pmc_base;
 static bool tegra_pmc_invert_interrupt;
 #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
 static struct clk *tegra_pclk;
-#endif
-
-#ifndef CONFIG_TEGRA_DYNAMIC_PWRDET
-void pwr_detect_bit_write(u32 pwrdet_bit, bool enable) { }
-EXPORT_SYMBOL(pwr_detect_bit_write);
 #endif
 
 #ifdef CONFIG_OF
@@ -285,19 +284,6 @@ void tegra_pmc_remove_dpd_req(void)
 }
 EXPORT_SYMBOL(tegra_pmc_remove_dpd_req);
 
-void tegra_pmc_pmu_interrupt_polarity(bool active_low)
-{
-	u32 pmc_ctrl;
-
-	pmc_ctrl = tegra_pmc_readl(PMC_CTRL);
-	if (active_low)
-		pmc_ctrl |= PMC_CTRL_INTR_LOW;
-	else
-		pmc_ctrl &= ~PMC_CTRL_INTR_LOW;
-	tegra_pmc_writel(pmc_ctrl, PMC_CTRL);
-}
-EXPORT_SYMBOL(tegra_pmc_pmu_interrupt_polarity);
-
 static void _tegra_pmc_register_update(int offset,
 		unsigned long mask, unsigned long val)
 {
@@ -318,6 +304,12 @@ void tegra_pmc_register_update(int offset,
 	spin_unlock_irqrestore(&tegra_pmc_access_lock, flags);
 }
 EXPORT_SYMBOL(tegra_pmc_register_update);
+
+void tegra_pmc_write_bootrom_command(u32 command_offset, unsigned long val)
+{
+	tegra_pmc_writel(val, command_offset + PMC_BR_COMMAND_BASE);
+}
+EXPORT_SYMBOL(tegra_pmc_write_bootrom_command);
 
 void tegra_pmc_pwr_detect_update(unsigned long mask, unsigned long val)
 {
@@ -550,9 +542,13 @@ static int __init tegra_pmc_init(void)
 {
 	struct device_node *np;
 	u32 val;
+	unsigned long tsc_rate;
 	int ret;
 
 	tegra_pmc_parse_dt();
+
+	pr_err("PMC: Setting PMIC interrupt active-%s\n",
+		(tegra_pmc_invert_interrupt) ? "low" : "high");
 
 	val = tegra_pmc_readl(PMC_CTRL);
 	if (tegra_pmc_invert_interrupt)
@@ -560,6 +556,12 @@ static int __init tegra_pmc_init(void)
 	else
 		val &= ~PMC_CTRL_INTR_LOW;
 	tegra_pmc_writel(val, PMC_CTRL);
+
+	val = tegra_pmc_readl(PMC_TSC_MULT);
+	val &= ~0xffff;
+	tsc_rate = clk_get_rate(clk_get_sys("timer", NULL));
+	val |= (tsc_rate >> 11);
+	tegra_pmc_writel(val, PMC_TSC_MULT);
 
 	np = of_find_matching_node(NULL, matches);
 	if (np) {
@@ -603,6 +605,11 @@ static int __init tegra_pmc_init(void)
 			pr_err("ERROR: Pad control driver init failed: %d\n",
 				ret);
 		}
+
+		ret = tegra_boorom_pmc_init(&tegra_pmc_dev);
+		if (ret < 0)
+			pr_err("ERROR: Bootrom PMC config failed: %d\n", ret);
+	
 	}
 
 	return 0;

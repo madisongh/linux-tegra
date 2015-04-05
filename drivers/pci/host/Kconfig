@@ -31,11 +31,15 @@ config PCI_IMX6
 	select PCIE_DW
 
 config PCI_TEGRA
-        tristate "NVIDIA Tegra PCIe controller"
-        select TEGRA_USB_SHARED_PAD
-        depends on ARCH_TEGRA_HAS_PCIE
-        help
-          Adds PCIe Host controller driver for tegra based systems
+	tristate "NVIDIA Tegra PCIe controller"
+	select TEGRA_USB_SHARED_PAD
+	select ARCH_TEGRA_HAS_PCIE
+	depends on PLATFORM_TEGRA
+	help
+	  Adds PCIe Host controller driver for tegra based systems
+
+config ARCH_TEGRA_HAS_PCIE
+	bool
 
 config PCI_RCAR_GEN2
 	bool "Renesas R-Car Gen2 Internal PCI controller"

@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Driver Entrypoint
  *
- * Copyright (c) 2010-2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -35,6 +35,8 @@ struct nvhost_chip_support;
 struct nvhost_channel;
 struct mem_mgr;
 
+extern long linsim_cl;
+
 /*
  * Policy determines how do we store the syncpts,
  * i.e. either per channel (in struct nvhost_channel)
@@ -56,15 +58,24 @@ enum nvhost_channel_policy {
 };
 
 struct host1x_device_info {
+	/* Channel info */
 	int		nb_channels;	/* host1x: num channels supported */
-	int		nb_pts; 	/* host1x: num syncpoints supported */
-	int		nb_mlocks;	/* host1x: number of mlocks */
-	int		(*initialize_chip_support)(struct nvhost_master *,
-						struct nvhost_chip_support *);
+	int		ch_base;	/* host1x: channel base */
+	int		ch_limit;	/* host1x: channel limit */
+	enum nvhost_channel_policy channel_policy; /* host1x: channel policy */
+
+	/* Syncpoint info */
+	int		nb_hw_pts;	/* host1x: num syncpoints supported
+					   in h/w */
+	int		nb_pts;		/* host1x: num syncpoints supported
+					   in s/w where nb_pts <= nb_hw_pts */
 	int		pts_base;	/* host1x: syncpoint base */
 	int		pts_limit;	/* host1x: syncpoint limit */
 	enum nvhost_syncpt_policy syncpt_policy; /* host1x: syncpoint policy */
-	enum nvhost_channel_policy channel_policy; /* host1x: channel policy */
+
+	int		nb_mlocks;	/* host1x: number of mlocks */
+	int		(*initialize_chip_support)(struct nvhost_master *,
+						struct nvhost_chip_support *);
 };
 
 struct nvhost_master {
@@ -84,9 +95,13 @@ struct nvhost_master {
 
 	struct nvhost_channel **chlist;	/* channel list */
 	struct mutex chlist_mutex;	/* mutex for channel list */
-	unsigned long allocated_channels;
-	unsigned long next_free_ch;
-	atomic_t shutdown;
+	unsigned long allocated_channels[2];
+	struct mutex priority_lock;	/* mutex for priority update */
+
+	/* nvhost vm specific structures */
+	struct list_head static_mappings_list;
+	struct list_head vm_list;
+	struct mutex vm_mutex;
 };
 
 extern struct nvhost_master *nvhost;
@@ -102,20 +117,6 @@ int nvhost_host1x_prepare_poweroff(struct platform_device *dev);
 void nvhost_set_chanops(struct nvhost_channel *ch);
 
 int nvhost_gather_filter_enabled(struct nvhost_syncpt *sp);
-
-extern pid_t nvhost_debug_null_kickoff_pid;
-
-static inline enum nvhost_syncpt_policy nvhost_get_syncpt_policy(void)
-{
-	struct nvhost_master *host = nvhost;
-	return host->info.syncpt_policy;
-}
-
-static inline enum nvhost_channel_policy nvhost_get_channel_policy(void)
-{
-	struct nvhost_master *host = nvhost;
-	return host->info.channel_policy;
-}
 
 static inline void *nvhost_get_private_data(struct platform_device *_dev)
 {

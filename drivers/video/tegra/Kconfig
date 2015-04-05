@@ -75,7 +75,17 @@ config TEGRA_DC_CMU
 	  Say Y here to enable Tegra color management unit.
 	  Enabled by default to support color correction for panels.
 	  It is used to make the representation of color match
-	  accross displays.
+	  across displays.
+
+config TEGRA_DC_CMU_V2
+	bool "Tegra Color Management Unit(Version 2)"
+	depends on TEGRA_DC && TEGRA_NVDISPLAY
+	default y
+	help
+	  Say Y here to enable Tegra color management unit.
+	  Enabled by default to support color correction for panels.
+	  It is used to make the representation of color match
+	  across displays.
 
 config TEGRA_NVDISPLAY
         bool "Tegra NvDisplay Architecture Support"
@@ -117,7 +127,7 @@ config TEGRA_MIPI_CAL
 
 config TEGRA_DC_SCAN_COLUMN
 	bool
-	depends on TEGRA_DC && (ARCH_TEGRA_11x_SOC || ARCH_TEGRA_12x_SOC || ARCH_TEGRA_21x_SOC)
+	depends on TEGRA_DC && (ARCH_TEGRA_11x_SOC || ARCH_TEGRA_12x_SOC || ARCH_TEGRA_21x_SOC || TEGRA_NVDISPLAY)
 	default y
 	help
 	  Enables access to scan column mode for providing 90 and 270 rotation.
@@ -152,7 +162,7 @@ config TEGRA_DC_BLOCK_LINEAR
 
 config TEGRA_DC_INTERLACE
 	bool
-	depends on TEGRA_DC && (ARCH_TEGRA_12x_SOC || ARCH_TEGRA_21x_SOC)
+	depends on TEGRA_DC && (ARCH_TEGRA_12x_SOC || ARCH_TEGRA_21x_SOC || TEGRA_NVDISPLAY)
 	default y
 	help
 	  Support output in interlaced formats on chips that support it.
@@ -177,6 +187,42 @@ config TEGRA_DC_CLOCK_GEN2
 	default y if ARCH_TEGRA_12x_SOC
 	help
 	  T12x redefined pll usages for pll_d and pll_d2.
+
+config TEGRA_CSC
+	bool "Tegra Color Space Converter (version 1)"
+	depends on TEGRA_DC && !TEGRA_NVDISPLAY
+	default y
+	help
+	  Color Space converter support for Tegra display controller.
+	  This will only be enabled for chips that support 3X3 CSC matrices.
+
+config TEGRA_CSC_V2
+	bool "Tegra Color Space Converter (version 2)"
+	depends on TEGRA_DC && TEGRA_NVDISPLAY
+	default y
+	help
+	  Color Space converter support for Tegra display controller.
+	  This will only be enabled for chips that support 4X3 CSC matrices.
+
+config TEGRA_LUT
+	bool "Tegra Look Up Table (version 1)"
+	depends on TEGRA_DC && !TEGRA_NVDISPLAY
+	default y
+	help
+	  LUT support for Tegra display controller.
+	  This will only be enabled for chips which support
+	  8bits per color and have separate hardware registers
+	  to write those palette values.
+
+config TEGRA_LUT_V2
+	bool "Tegra Look Up Table (version 2)"
+	depends on TEGRA_DC && TEGRA_NVDISPLAY
+	default y
+	help
+	  LUT support for Tegra display controller.
+	  This will only be enabled for chips which can support
+	  16bits per color. Hardware has only register to
+	  program the base address for entire palette array.
 
 config TEGRA_NVSD
 	bool "Tegra SmartDimmer"
@@ -249,7 +295,7 @@ config TEGRA_DSI2EDP_SN65DSI86
 
 config TEGRA_DP
 	bool "Enable eDP panel."
-	default  n
+	default  y
 	help
 	  Say Y here to enable eDP panel.
 
@@ -302,13 +348,27 @@ config TEGRA_NVSR
 	help
 	   Say Y here to enable NVSR support.
 
+config TEGRA_VRR
+	bool "Enable VRR Support"
+	default  n
+	help
+	  Say Y here to support VRR.
+
 config NVMAP_CONVERT_CARVEOUT_TO_IOVMM
 	bool "Convert carveout to IOVMM"
-	depends on TEGRA_NVMAP && IOMMU_API
+	depends on TEGRA_NVMAP && IOMMU_API && !NVMAP_CONVERT_IOVMM_TO_CARVEOUT
 	default y
 	help
 	  Say Y here to force to convert carveout memory requests to
 	  I/O virtual memory requests.
+
+config NVMAP_CONVERT_IOVMM_TO_CARVEOUT
+	bool "Convert IOVMM to carveout"
+	depends on TEGRA_NVMAP && IOMMU_API && ARCH_TEGRA_18x_SOC
+	default y
+	help
+	  Say Y here to force to convert I/O virtual memory requests to
+	  carveout memory requests.
 
 config TEGRA_NVHDCP
 	bool "Support NVHDCP content protection on HDMI"
@@ -368,13 +428,14 @@ config VI_ONE_DEVICE
 config TEGRA_DC_FAKE_PANEL_SUPPORT
 	bool "Enables fake panel and NULL OR support"
 	depends on TEGRA_DC
-	default n
+	default y
 	help
 	  Select Y to enable support for the
 	  Display Controller to output to
 	  fake panel or NULL Output Resource.
 	  Used for silicon characterization and
-	  should not be enabled for production.
+	  automated testing. should not be enabled
+	  for production.
 
 config NVHOST_BONDOUT_CHECK
 	bool "Check device presence through bondout registers"
@@ -384,3 +445,11 @@ config NVHOST_BONDOUT_CHECK
 	  Say Y here if you want to check nvhost client unit presence
 	  in pre-silicon systems.
 	  If unsure, say N
+
+config NVDEC_BOOTLOADER
+	bool "Enable use of nvdec bootloader"
+	default n
+	help
+	  Say Y here if you want to enable nvdec bootloader
+	  If unsure, say N
+

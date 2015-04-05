@@ -6,7 +6,7 @@
  * Author:
  *	Colin Cross <ccross@google.com>
  *
- * Copyright (c) 2010-2014, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA Corporation.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -253,6 +253,7 @@ struct clk {
 	bool			cansleep;
 	bool			set_disabled_div;
 	u32			flags;
+	u32			clk_id;
 	const char		*name;
 
 	u32			refcnt;
@@ -319,6 +320,7 @@ struct clk {
 		} pll;
 		struct {
 			void				*cl_dvfs;
+			struct clk			*consumer;
 		} dfll;
 		struct {
 			unsigned long			default_rate;
@@ -508,6 +510,14 @@ struct clk *tegra_get_clock_by_name(const char *name);
 
 void tegra_clk_init_from_table(struct tegra_clk_init_table *table);
 
+/**
+  * Returns dfll requested booting frequency, which
+  * is configured by bootloader as cpu clock source.
+  * If booting with different cpu clock source then,
+  * returns 0.
+  */
+unsigned long int tegra_dfll_boot_req_khz(void);
+
 #ifndef CONFIG_COMMON_CLK
 void tegra_shared_bus_stats_allocate(struct clk *c, struct bus_stats *stats);
 int tegra_shared_bus_stats_copy_to_buffer(
@@ -602,11 +612,20 @@ static inline void clk_lock_init(struct clk *c)
 #ifdef CONFIG_CPU_FREQ
 struct cpufreq_frequency_table;
 
+/**
+  * freq_table: List of frequencies allowed for cpu.
+  * throttle_lowest_index: Lowest throttling frequency index.
+  * throttle_highest_index: Highest throttling frequency index.
+  * suspend_index: Suspend frequency index.
+  * preserve_across_suspend: Preserve cpu frequency even after suspend
+  *			     for restoring during resume.
+  */
 struct tegra_cpufreq_table_data {
 	struct cpufreq_frequency_table *freq_table;
 	int throttle_lowest_index;
 	int throttle_highest_index;
 	int suspend_index;
+	bool preserve_across_suspend;
 };
 struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void);
 unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate);

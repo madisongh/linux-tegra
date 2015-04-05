@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/tegra_ptm.c
  *
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -30,12 +30,15 @@
 #include <linux/kallsyms.h>
 #include <linux/clk.h>
 #include <asm/sections.h>
+#include <asm/cacheflush.h>
 #include <linux/cpu.h>
 #include "pm.h"
 #include <linux/tegra_ptm.h>
 #include <linux/of.h>
+#include <linux/of_reserved_mem.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
+#include <linux/cpu_pm.h>
 
 /*
 _________________________________________________________
@@ -58,8 +61,19 @@ _________________________________________________________
 
 */
 
-#define CSITE_CLK_HIGH 408000000	/* basically undivided pll_p */
-#define CSITE_CLK_LOW  9600000
+#define ETR_SIZE (16 << 20) /* ETR size: 16MB */
+
+#define TRACE_STATUS_PMSTABLE 2
+#define TRACE_STATUS_IDLE     1
+
+#define ADDR_REG_PAIRS 4
+#define ADDR_REGS 8
+
+#define AFREADY_LOOP_MAX 100
+#define AFREADY_LOOP_MS 4
+
+#define CPU_DUMP_BUFF_SZ 64    /* size of dump buffer in bytes
+				  (word size * reg num) */
 
 /* PTM tracer state */
 struct tracectx {
@@ -74,11 +88,17 @@ struct tracectx {
 	void __iomem	*ape_regs;
 	void __iomem	*ptm_regs[CONFIG_NR_CPUS];
 	void __iomem	*funnel_bccplex_regs;
-	uintptr_t	*etr_address;
+	void __iomem	*tpiu_regs;
+	u8		*etr_address;
+	uintptr_t	etr_ll;
 	int		*trc_buf;
+	u8		*etr_buf;
 	int		buf_size;
-	uintptr_t	start_address;
-	uintptr_t	stop_address;
+	uintptr_t	start_address[ADDR_REG_PAIRS];
+	uintptr_t	stop_address[ADDR_REG_PAIRS];
+	u8		start_stop_mask;
+
+	u32		reg_ctx[CONFIG_NR_CPUS][100];
 
 	unsigned long	enable;
 	unsigned long	userspace;
@@ -90,29 +110,30 @@ struct tracectx {
 	unsigned long	ape;
 
 	int		trigger;
-	uintptr_t	trigger_address;
-	unsigned int	percent_after_trigger;
+	uintptr_t	trigger_address[ADDR_REGS];
+	u8		trigger_mask;
 	unsigned int	cycle_count;
-	int		dram_carveout_kb;
+	char		cpu_dump_buffer[CPU_DUMP_BUFF_SZ];
 };
 
 /* initialising some values of the structure */
 static struct tracectx tracer = {
-	.start_address			=	0,
-	.stop_address			=	0xFFFFFFC100000000,
+	.start_address			=	{ 0 },
+	.stop_address			=	{ 0xFFFFFFC100000000 },
 	.enable				=	0,
 	.userspace			=	0,
 	.branch_broadcast		=	1,
 	.return_stack			=	0,
 	.trigger			=	0,
-	.percent_after_trigger		=	25,
 	.formatter			=	1,
 	.timestamp			=	0,
 	.cycle_count			=	0,
-	.trigger_address		=	0,
+	.trigger_address		=	{ 0 },
 	.etr			=	0,
 	.ape				=	0,
-	.dram_carveout_kb		=	DRAM_CARVEOUT_MB * 1024,
+	.start_stop_mask		=	0x3,
+	.trigger_mask			=	0,
+	.cpu_dump_buffer		=	{ 0 }
 };
 
 static struct clk *csite_clk;
@@ -149,171 +170,317 @@ static void ape_init(struct tracectx *t)
 	dev_dbg(t->dev, "APE is initialized.\n");
 }
 
-/* Initialise the PTM registers */
-static void ptm_init(struct tracectx *t, int id)
+static inline void ptm_check_trace_stable(struct tracectx *t, int id, int bit)
 {
-	int trcstat_idle, trccfg;
+	int trcstat_idle;
+
+	trcstat_idle = 0x0;
+	while (trcstat_idle == 0x0) {
+		trcstat_idle = ptm_readl(t, id, TRCSTAT);
+		trcstat_idle = trcstat_idle & bit;
+	}
+}
+
+#define PTM_REG_SAVE_RESTORE_LIST \
+	do { \
+		/* main cfg and control registers */ \
+		SAVE_RESTORE_PTM(TRCPRGCTLR); \
+		SAVE_RESTORE_PTM(TRCPROCSELR); \
+		SAVE_RESTORE_PTM(TRCCONFIGR); \
+		SAVE_RESTORE_PTM(TRCEVENTCTL0R); \
+		SAVE_RESTORE_PTM(TRCEVENTCTL1R); \
+		SAVE_RESTORE_PTM(TRCQCTLR); \
+		SAVE_RESTORE_PTM(TRCTRACEIDR); \
+		SAVE_RESTORE_PTM(TRCSTALLCTLR); \
+		SAVE_RESTORE_PTM(TRCTSCTLR); \
+		SAVE_RESTORE_PTM(TRCSYNCPR); \
+		SAVE_RESTORE_PTM(TRCCCCTLR); \
+		SAVE_RESTORE_PTM(TRCBBCTLR); \
+\
+		/* filtering control registers */ \
+		SAVE_RESTORE_PTM(TRCVICTLR); \
+		SAVE_RESTORE_PTM(TRCVIIECTLR); \
+		SAVE_RESTORE_PTM(TRCVISSCTLR); \
+		SAVE_RESTORE_PTM(TRCVIPCSSCTLR); \
+\
+		/* derived resources registers */ \
+		SAVE_RESTORE_PTM(TRCSEQEVR0); \
+		SAVE_RESTORE_PTM(TRCSEQEVR1); \
+		SAVE_RESTORE_PTM(TRCSEQEVR1); \
+		SAVE_RESTORE_PTM(TRCSEQRSTEVR); \
+		SAVE_RESTORE_PTM(TRCSEQSTR); \
+		SAVE_RESTORE_PTM(TRCCNTRLDVR0); \
+		SAVE_RESTORE_PTM(TRCCNTRLDVR1); \
+		SAVE_RESTORE_PTM(TRCCNTVR0); \
+		SAVE_RESTORE_PTM(TRCCNTVR1); \
+		SAVE_RESTORE_PTM(TRCCNTCTLR0); \
+		SAVE_RESTORE_PTM(TRCCNTCTLR1); \
+		SAVE_RESTORE_PTM(TRCEXTINSELR); \
+\
+		/* resource selection registers */ \
+		SAVE_RESTORE_PTM(TRCRSCTLR2); \
+		SAVE_RESTORE_PTM(TRCRSCTLR3); \
+		SAVE_RESTORE_PTM(TRCRSCTLR4); \
+		SAVE_RESTORE_PTM(TRCRSCTLR5); \
+		SAVE_RESTORE_PTM(TRCRSCTLR6); \
+		SAVE_RESTORE_PTM(TRCRSCTLR7); \
+		SAVE_RESTORE_PTM(TRCRSCTLR8); \
+		SAVE_RESTORE_PTM(TRCRSCTLR9); \
+		SAVE_RESTORE_PTM(TRCRSCTLR10); \
+		SAVE_RESTORE_PTM(TRCRSCTLR11); \
+		SAVE_RESTORE_PTM(TRCRSCTLR12); \
+		SAVE_RESTORE_PTM(TRCRSCTLR13); \
+		SAVE_RESTORE_PTM(TRCRSCTLR14); \
+		SAVE_RESTORE_PTM(TRCRSCTLR15); \
+\
+		/* comparator registers */ \
+		SAVE_RESTORE_PTM(TRCACVR0); \
+		SAVE_RESTORE_PTM(TRCACVR0+4); \
+		SAVE_RESTORE_PTM(TRCACVR1); \
+		SAVE_RESTORE_PTM(TRCACVR1+4); \
+		SAVE_RESTORE_PTM(TRCACVR2); \
+		SAVE_RESTORE_PTM(TRCACVR2+4); \
+		SAVE_RESTORE_PTM(TRCACVR3); \
+		SAVE_RESTORE_PTM(TRCACVR3+4); \
+		SAVE_RESTORE_PTM(TRCACVR4); \
+		SAVE_RESTORE_PTM(TRCACVR4+4); \
+		SAVE_RESTORE_PTM(TRCACVR5); \
+		SAVE_RESTORE_PTM(TRCACVR5+4); \
+		SAVE_RESTORE_PTM(TRCACVR6); \
+		SAVE_RESTORE_PTM(TRCACVR6+4); \
+		SAVE_RESTORE_PTM(TRCACVR7); \
+		SAVE_RESTORE_PTM(TRCACVR7+4); \
+\
+		SAVE_RESTORE_PTM(TRCACATR0); \
+		SAVE_RESTORE_PTM(TRCACATR1); \
+		SAVE_RESTORE_PTM(TRCACATR2); \
+		SAVE_RESTORE_PTM(TRCACATR3); \
+		SAVE_RESTORE_PTM(TRCACATR4); \
+		SAVE_RESTORE_PTM(TRCACATR5); \
+		SAVE_RESTORE_PTM(TRCACATR6); \
+		SAVE_RESTORE_PTM(TRCACATR7); \
+\
+		SAVE_RESTORE_PTM(TRCCIDCVR0); \
+		SAVE_RESTORE_PTM(TRCCIDCCTLR0); \
+		SAVE_RESTORE_PTM(TRCVMIDCVR0); \
+\
+		/* single-shot comparator registers */ \
+		SAVE_RESTORE_PTM(TRCSSCCR0); \
+		SAVE_RESTORE_PTM(TRCSSCSR0); \
+\
+		/* claim tag registers */ \
+		SAVE_RESTORE_PTM(TRCCLAIMCLR); \
+	} while (0);
+
+#define SAVE_RESTORE_PTM(reg) \
+	(addr[cnt++] = readl_relaxed(reg_base + reg))
+
+static void ptm_save(struct tracectx *t)
+{
+	u32 *addr;
+	int cnt = 0;
+	int id = raw_smp_processor_id();
+	void __iomem *reg_base;
+
+	dsb(sy);
+	isb();
+
+	addr = t->reg_ctx[id];
+	reg_base = t->ptm_regs[id];
+
+	ptm_regs_unlock(t, id);
+
+	PTM_REG_SAVE_RESTORE_LIST;
+	rmb();
+}
+
+#undef SAVE_RESTORE_PTM
+#define SAVE_RESTORE_PTM(reg) ptm_writel(t, id, addr[cnt++], reg)
+
+static void ptm_restore(struct tracectx *t)
+{
+	u32 *addr;
+	int cnt = 0;
+	int id = raw_smp_processor_id();
+
+	addr = t->reg_ctx[id];
+
+	ptm_regs_unlock(t, id);
+	ptm_os_lock(t, id);
+
+	PTM_REG_SAVE_RESTORE_LIST;
+
+	ptm_os_unlock(t, id);
+}
+
+/* Initialise the PTM registers */
+static void ptm_init(void *p_info)
+{
+	u32 id, level_val, addr_mask;
+	int trccfg, i;
+	struct tracectx *t;
+
+	t = (struct tracectx *)p_info;
+	id = raw_smp_processor_id();
 
 	/* Power up the CPU PTM */
-	ptm_writel(t, id, 8, CORESIGHT_BCCPLEX_CPU_TRACE_TRCPDCR_0);
+	ptm_writel(t, id, 8, TRCPDCR);
 
-	/* Unlock the COU PTM */
+	/* Unlock the CPU PTM */
 	ptm_regs_unlock(t, id);
 
 	/* clear OS lock */
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCOSLAR_0);
+	ptm_writel(t, id, 0, TRCOSLAR);
 
 	/* clear main enable bit to enable register programming */
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCPRGCTLR_0);
+	ptm_writel(t, id, 0, TRCPRGCTLR);
 
-	trcstat_idle = 0x0;
-	while (trcstat_idle == 0x0) { /* wait till IDLE bit is set */
-		/*Read the IDLE bit in CORESIGHT_BCCPLEX_CPU0_TRACE_TRC_0 */
-		trcstat_idle = ptm_readl(t, id,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCSTAT_0);
-		trcstat_idle = trcstat_idle & 0x1;
-	}
+	ptm_check_trace_stable(t, id, TRACE_STATUS_IDLE);
 
 	/* Clear uninitialised flopes , else we get event packets */
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCEVENTCTL1R_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCEVENTCTL0R_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCTSCTLR_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCCCCTLR_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCVISSCTLR_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCSEQEVR0_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCSEQEVR1_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCSEQEVR2_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCSEQRSTEVR_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCSEQSTR_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCEXTINSELR_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCCNTRLDVR0_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCCNTRLDVR1_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCCNTCTLR0_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCCNTCTLR1_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCCNTVR0_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCCNTVR1_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR2_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR3_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR4_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR5_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR6_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR7_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR8_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR9_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR10_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR11_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR12_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR13_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR14_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR15_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCSSCSR0_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACVR0_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACVR1_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACVR2_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACVR3_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACVR4_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACVR5_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACVR6_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACVR7_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACATR0_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACATR1_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACATR2_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACATR3_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACATR4_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACATR5_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACATR6_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCACATR7_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCCIDCVR0_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCVMIDCVR0_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCCIDCCTLR0_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCVIIECTLR_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCBBCTLR_0);
-	ptm_writel(t, id, 0, CORESIGHT_BCCPLEX_CPU_TRACE_TRCSTALLCTLR_0);
+	ptm_writel(t, id, 0, TRCEVENTCTL1R);
+	ptm_writel(t, id, 0, TRCEVENTCTL0R);
+	ptm_writel(t, id, 0, TRCTSCTLR);
+	ptm_writel(t, id, 0, TRCCCCTLR);
+	ptm_writel(t, id, 0, TRCVISSCTLR);
+	ptm_writel(t, id, 0, TRCSEQEVR0);
+	ptm_writel(t, id, 0, TRCSEQEVR1);
+	ptm_writel(t, id, 0, TRCSEQEVR2);
+	ptm_writel(t, id, 0, TRCSEQRSTEVR);
+	ptm_writel(t, id, 0, TRCSEQSTR);
+	ptm_writel(t, id, 0, TRCEXTINSELR);
+	ptm_writel(t, id, 0, TRCCNTRLDVR0);
+	ptm_writel(t, id, 0, TRCCNTRLDVR1);
+	ptm_writel(t, id, 0, TRCCNTCTLR0);
+	ptm_writel(t, id, 0, TRCCNTCTLR1);
+	ptm_writel(t, id, 0, TRCCNTVR0);
+	ptm_writel(t, id, 0, TRCCNTVR1);
+	ptm_writel(t, id, 0, TRCRSCTLR2);
+	ptm_writel(t, id, 0, TRCRSCTLR3);
+	ptm_writel(t, id, 0, TRCRSCTLR4);
+	ptm_writel(t, id, 0, TRCRSCTLR5);
+	ptm_writel(t, id, 0, TRCRSCTLR6);
+	ptm_writel(t, id, 0, TRCRSCTLR7);
+	ptm_writel(t, id, 0, TRCRSCTLR8);
+	ptm_writel(t, id, 0, TRCRSCTLR9);
+	ptm_writel(t, id, 0, TRCRSCTLR10);
+	ptm_writel(t, id, 0, TRCRSCTLR11);
+	ptm_writel(t, id, 0, TRCRSCTLR12);
+	ptm_writel(t, id, 0, TRCRSCTLR13);
+	ptm_writel(t, id, 0, TRCRSCTLR14);
+	ptm_writel(t, id, 0, TRCRSCTLR15);
+	ptm_writel(t, id, 0, TRCSSCSR0);
+	ptm_writel(t, id, 0, TRCACVR0);
+	ptm_writel(t, id, 0, TRCACVR1);
+	ptm_writel(t, id, 0, TRCACVR2);
+	ptm_writel(t, id, 0, TRCACVR3);
+	ptm_writel(t, id, 0, TRCACVR4);
+	ptm_writel(t, id, 0, TRCACVR5);
+	ptm_writel(t, id, 0, TRCACVR6);
+	ptm_writel(t, id, 0, TRCACVR7);
+	ptm_writel(t, id, 0, TRCACATR0);
+	ptm_writel(t, id, 0, TRCACATR1);
+	ptm_writel(t, id, 0, TRCACATR2);
+	ptm_writel(t, id, 0, TRCACATR3);
+	ptm_writel(t, id, 0, TRCACATR4);
+	ptm_writel(t, id, 0, TRCACATR5);
+	ptm_writel(t, id, 0, TRCACATR6);
+	ptm_writel(t, id, 0, TRCACATR7);
+	ptm_writel(t, id, 0, TRCCIDCVR0);
+	ptm_writel(t, id, 0, TRCVMIDCVR0);
+	ptm_writel(t, id, 0, TRCCIDCCTLR0);
+	ptm_writel(t, id, 0, TRCVIIECTLR);
+	ptm_writel(t, id, 0, TRCBBCTLR);
+	ptm_writel(t, id, 0, TRCSTALLCTLR);
 
 	/* Configure basic controls RS, BB, TS, VMID, Context tracing */
-	trccfg = ptm_readl(t, id,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCCONFIGR_0);
+	trccfg = ptm_readl(t, id, TRCCONFIGR);
 
+	/* enable BB for address range in TRCACVR0/TRCACVR1 pair */
 	if (t->branch_broadcast) {
-		ptm_writel(t, id, 0x101,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCBBCTLR_0);
+		ptm_writel(t, id, 0x101, TRCBBCTLR);
 	}
 
 	trccfg = trccfg | (t->branch_broadcast << 3) | (t->return_stack << 12) |
 			(t->timestamp<<11);
 
+	/* set cycle count threshold */
 	if (t->cycle_count) {
 		trccfg = trccfg | (1<<4);
-		ptm_writel(t, id, t->cycle_count,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCCCCTLR_0);
+		i = ptm_readl(t, id, TRCIDR3) & 0xFFF;
+		if (t->cycle_count < i)
+			t->cycle_count = i;
+		ptm_writel(t, id, t->cycle_count, TRCCCCTLR);
 	}
-	ptm_writel(t, id, trccfg,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCCONFIGR_0);
+	ptm_writel(t, id, trccfg, TRCCONFIGR);
 
 	/* Enable Periodic Synchronisation after 1024 bytes */
-	ptm_writel(t, id, 0xa, CORESIGHT_BCCPLEX_CPU_TRACE_TRCSYNCPR_0);
+	ptm_writel(t, id, 0xa, TRCSYNCPR);
 
 	/* Program Trace ID register */
 	ptm_writel(t, id, (!(is_lp_cluster()) ?
 			BCCPLEX_BASE_ID : LCCPLEX_BASE_ID) + id,
-			CORESIGHT_BCCPLEX_CPU_TRACE_TRCTRACEIDR_0);
+			TRCTRACEIDR);
 
-	/* Program Address range comparator. Use 0 and 1 */
-	ptm_writeq(t, id, t->start_address,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCACVR0_0);
-	ptm_writeq(t, id, t->stop_address,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCACVR1_0);
+	/* Program Address range comparators */
+	for (i = 0; i < ADDR_REG_PAIRS; i++) {
+		if ((t->start_stop_mask >> (i*2)) & 0x3) {
+			ptm_writeq(t, id, t->start_address[i],
+					TRCACVR0 + 8 * i * 2);
+			ptm_writeq(t, id, t->stop_address[i],
+					TRCACVR0 + 8 * (i * 2 + 1));
+		}
+	}
 
-	/* control user space tracing */
-	ptm_writel(t, id, (t->userspace ? 0x0 : 0x1100),
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCACATR0_0);
-	ptm_writel(t, id, (t->userspace ? 0x0 : 0x1100),
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCACATR1_0);
+	for (i = 0; i < ADDR_REGS; i++)
+		if ((t->trigger_mask >> i) & 0x1)
+			ptm_writeq(t, id, t->trigger_address[i],
+					TRCACVR0 + 8 * i);
 
-	/* Select Resource 2 to include ARC0 */
-	ptm_writel(t, id, 0x50001,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR2_0);
+	/* control user space tracing for each address range */
+	level_val = (t->userspace ? 0x0 : 0x1100);
+	for (i = 0; i < ADDR_REGS; i++)
+		ptm_writel(t, id, level_val, TRCACATR0 + 8 * i);
 
-	/* Enable ViewInst and Include logic for ARC0. Disable the SSC */
-	ptm_writel(t, id, 1, CORESIGHT_BCCPLEX_CPU_TRACE_TRCVIIECTLR_0);
+	/* Select Resource 2 to include all ARC */
+	addr_mask = 0x50000;
+	for (i = 0; i < ADDR_REG_PAIRS; i++)
+		if ((t->start_stop_mask >> (i * 2)) & 0x3)
+			addr_mask += (0x1 << i);
+
+	ptm_writel(t, id, addr_mask, TRCRSCTLR2);
+
+	/* Enable ViewInst and Include logic for ARC. Disable the SSC */
+	/* this is unecessary in addition to start/stop programming */
+	/*ptm_writel(t, id, 0xf, TRCVIIECTLR);*/
 
 	/* Select Start/Stop as Started. And select Resource 2 as the Event */
 	if (t->userspace)
-		ptm_writel(t, id, 0xE02,
-			CORESIGHT_BCCPLEX_CPU_TRACE_TRCVICTLR_0);
+		ptm_writel(t, id, 0xE02, TRCVICTLR);
 	else
-		ptm_writel(t, id, 0x110E02,
-			CORESIGHT_BCCPLEX_CPU_TRACE_TRCVICTLR_0);
+		ptm_writel(t, id, 0x110E02, TRCVICTLR);
 
 	/* Trace everything till Address match packet hits. Use Single Shot
 	comparator and generate Event Packet */
 	if (t->trigger) {
-		/* SAC2 for Address Match on which to trigger */
-		ptm_writeq(t, id, t->trigger_address,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCACVR2_0);
-		ptm_writel(t, id, t->userspace ? 0x0 : 0x1100,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCACATR2_0);
 		/* Select SAC2 for SSC0 and enable SSC to re-fire on match */
-		ptm_writel(t, id, 0x4,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCSSCCR0_0);
+		ptm_writel(t, id, t->trigger_mask, TRCSSCCR0);
 		/* Clear SSC Status bit 31 */
-		ptm_writel(t, id, 0x0,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCSSCSR0_0);
+		ptm_writel(t, id, 0x0, TRCSSCSR0);
 		/* Select Resource 3 to include SSC0 */
-		ptm_writel(t, id, 0x30001,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCRSCTLR3_0);
+		ptm_writel(t, id, 0x30001, TRCRSCTLR3);
 		/* Select Resource3 as part of Event0 */
 		ptm_writel(t, id, 0x3,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCEVENTCTL0R_0);
+				TRCEVENTCTL0R);
 		/* Insert ATB packet with ATID=0x7D and Payload=Master ATID.
 		ETF can use this to Stop and flush based on this */
-		ptm_writel(t, id, 0x800,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCEVENTCTL1R_0);
+		ptm_writel(t, id, 0x800, TRCEVENTCTL1R);
 		if (t->timestamp)
 			/* insert global timestamp if enabled */
-			ptm_writel(t, id, 0x3,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCTSCTLR_0);
+			ptm_writel(t, id, 0x3, TRCTSCTLR);
 	}
+	ptm_writel(t, id, 1, TRCPRGCTLR);
+
 	dev_dbg(t->dev, "PTM%d initialized.\n", id);
 }
 
@@ -327,7 +494,7 @@ static void funnel_bccplex_init(struct tracectx *t)
 	funnel_bccplex_writel(t, 0x30F,
 		CORESIGHT_ATBFUNNEL_BCCPLEX_CXATBFUNNEL_REGS_CTRL_REG_0);
 
-	dev_info(t->dev, "Funnel bccplex initialized.\n");
+	dev_dbg(t->dev, "Funnel bccplex initialized.\n");
 }
 
 /* Initialise the funnel major registers */
@@ -340,7 +507,7 @@ static void funnel_major_init(struct tracectx *t)
 	funnel_major_writel(t, 0x305,
 		CORESIGHT_ATBFUNNEL_HUGO_MAJOR_CXATBFUNNEL_REGS_CTRL_REG_0);
 
-	dev_info(t->dev, "Funnel Major initialized.\n");
+	dev_dbg(t->dev, "Funnel Major initialized.\n");
 }
 
 /* Initialise the funnel minor registers */
@@ -365,36 +532,29 @@ static void etf_init(struct tracectx *t)
 	etf_regs_unlock(t);
 
 	/* Reset RWP and RRP when disabled */
-	etf_writel(t, 0, CORESIGHT_ETF_HUGO_CXTMC_REGS_RWP_0);
-	etf_writel(t, 0, CORESIGHT_ETF_HUGO_CXTMC_REGS_RRP_0);
+	etf_writel(t, 0, CXTMC_REGS_RWP_0);
+	etf_writel(t, 0, CXTMC_REGS_RRP_0);
 
 	/* Enabling capturing of trace data and Circular mode */
-
-	if (t->etr) {
-		etf_writel(t, 2, CORESIGHT_ETF_HUGO_CXTMC_REGS_MODE_0);
-		etf_writel(t, 1, CORESIGHT_ETF_HUGO_CXTMC_REGS_FFCR_0);
-	} else {
-		etf_writel(t, 0, CORESIGHT_ETF_HUGO_CXTMC_REGS_MODE_0);
-		if (t->trigger) {
-			/* Capture data for specified cycles after TRIGIN */
-			words_after_trigger = (t->percent_after_trigger
-					* MAX_ETF_SIZE) / 100;
-			etf_writel(t, words_after_trigger,
-					CORESIGHT_ETF_HUGO_CXTMC_REGS_TRG_0);
-			/* Flush on Trigin, insert trigger and stop on
-							Flush Complete */
-			etf_writel(t, 0x1120,
-					CORESIGHT_ETF_HUGO_CXTMC_REGS_FFCR_0);
-		}
-
-		ffcr = etf_readl(t, CORESIGHT_ETF_HUGO_CXTMC_REGS_FFCR_0);
-		ffcr &= ~1;
-		ffcr |= t->formatter;
-		etf_writel(t, ffcr, CORESIGHT_ETF_HUGO_CXTMC_REGS_FFCR_0);
+	etf_writel(t, 0, CXTMC_REGS_MODE_0);
+	if (t->trigger) {
+		/* Capture data for specified cycles after TRIGIN */
+		words_after_trigger = (t->trigger
+				* MAX_ETF_SIZE) / 100;
+		etf_writel(t, words_after_trigger, CXTMC_REGS_TRG_0);
+		/* Flush on Trigin, insert trigger and stop on
+						Flush Complete */
+		etf_writel(t, 0x1120, CXTMC_REGS_FFCR_0);
 	}
+
+	ffcr = etf_readl(t, CXTMC_REGS_FFCR_0);
+	ffcr &= ~1;
+	ffcr |= t->formatter;
+	etf_writel(t, ffcr, CXTMC_REGS_FFCR_0);
+
 	/* Enable ETF */
-	etf_writel(t, 1, CORESIGHT_ETF_HUGO_CXTMC_REGS_CTL_0);
-	dev_info(t->dev, "ETF initialized.\n");
+	etf_writel(t, 1, CXTMC_REGS_CTL_0);
+	dev_dbg(t->dev, "ETF initialized.\n");
 }
 
 /* Initialise the replicator registers*/
@@ -410,64 +570,65 @@ static void replicator_init(struct tracectx *t)
 	dev_dbg(t->dev, "Replicator initialized.\n");
 }
 
+static void tpiu_init(struct tracectx *t)
+{
+	tpiu_regs_unlock(t);
+	tpiu_writel(t, 0x1040, TPIU_FF_CTRL);
+	tpiu_regs_lock(t);
+}
+
 /* Initialise the ETR registers */
 static void etr_init(struct tracectx *t)
 {
-	int size_dwords, words_after_trigger, ffcr;
-	dma_addr_t dma_handle;
+	int words_after_trigger, ffcr;
+
+	__flush_dcache_area(t->etr_address, ETR_SIZE);
+
+	/* trace data is passing through ETF to ETR */
+	etf_regs_unlock(t);
+
+	/* to use ETR, ETF must be configured as HW FiFo first */
+	etf_writel(t, 0x2, CXTMC_REGS_MODE_0);
+	/* enable formatter, required in HW FiFo mode */
+	etf_writel(t, 0x1, CXTMC_REGS_FFCR_0);
+	/* enable ETF capture */
+	etf_writel(t, 1, CXTMC_REGS_CTL_0);
+
+	etf_regs_lock(t);
 
 	etr_regs_unlock(t);
 
-	size_dwords = (t->dram_carveout_kb * 1024)/4;
+	etr_writel(t, (ETR_SIZE >> 2), CXTMC_REGS_RSZ_0);
+	etr_writel(t, 0, CXTMC_REGS_MODE_0); /* circular mode */
 
-	etr_writel(t, size_dwords, CORESIGHT_ETR_HUGO_CXTMC_REGS_RSZ_0);
-	etr_writel(t, 0, CORESIGHT_ETR_HUGO_CXTMC_REGS_MODE_0);
-	etr_writel(t, 0x300, CORESIGHT_ETR_HUGO_CXTMC_REGS_AXICTL_0);
-
-	if (!t->etr_address)
-		t->etr_address = dma_zalloc_coherent(t->dev,
-				t->dram_carveout_kb, &dma_handle, GFP_KERNEL);
+	/* non-secure, SG mode, WrBurstLen 0x3 */
+	etr_writel(t, 0x380, CXTMC_REGS_AXICTL_0);
 
 	/*allocate space for ETR */
-	etr_writel(t, (uintptr_t)t->etr_address,
-					CORESIGHT_ETR_HUGO_CXTMC_REGS_DBALO_0);
-	etr_writel(t, (uintptr_t)t->etr_address + t->dram_carveout_kb * 1024,
-					CORESIGHT_ETR_HUGO_CXTMC_REGS_DBAHI_0);
+	etr_writeq(t, virt_to_phys((void *)t->etr_ll), CXTMC_REGS_DBALO_0);
 
 	if (t->trigger) {
 		/* Capture data for specified cycles after seeing the TRIGIN */
-		words_after_trigger = t->percent_after_trigger *
-						size_dwords / 100 ;
-		etf_writel(t, words_after_trigger,
-					CORESIGHT_ETF_HUGO_CXTMC_REGS_TRG_0);
+		words_after_trigger = t->trigger * (ETR_SIZE >> 2) / 100;
+		etr_writel(t, words_after_trigger,
+					CXTMC_REGS_TRG_0);
 		/* Flush on Trigin, insert trigger and Stop on Flush Complete */
-		etf_writel(t, 0x1120, CORESIGHT_ETR_HUGO_CXTMC_REGS_FFCR_0);
+		etr_writel(t, 0x1120, CXTMC_REGS_FFCR_0);
 	}
-	if ((!t->formatter)) {
-		ffcr = etr_readl(t, CORESIGHT_ETR_HUGO_CXTMC_REGS_FFCR_0);
-		ffcr &= ~1;
-		etr_writel(t, ffcr, CORESIGHT_ETR_HUGO_CXTMC_REGS_FFCR_0);
-	} else {
-		ffcr = etr_readl(t, CORESIGHT_ETR_HUGO_CXTMC_REGS_FFCR_0);
-		ffcr |= 1;
-		etr_writel(t, ffcr, CORESIGHT_ETR_HUGO_CXTMC_REGS_FFCR_0);
-	}
+	ffcr = etr_readl(t, CXTMC_REGS_FFCR_0);
+	ffcr &= ~1;
+	ffcr |= t->formatter;
+	etr_writel(t, ffcr, CXTMC_REGS_FFCR_0);
 
 	/* Enable ETF */
-	etr_writel(t, 1, CORESIGHT_ETR_HUGO_CXTMC_REGS_CTL_0);
+	etr_writel(t, 1, CXTMC_REGS_CTL_0);
 	dev_dbg(t->dev, "ETR initialized.\n");
 }
 
 /* This function enables PTM traces */
 static int trace_t210_start(struct tracectx *t)
 {
-	int id;
-
 	clk_enable(csite_clk);
-
-	/* Programming PTM */
-	for_each_online_cpu(id)
-		ptm_init(t, id);
 
 	if (t->ape) {
 		/* Programming APE */
@@ -483,21 +644,21 @@ static int trace_t210_start(struct tracectx *t)
 		/* Programming major funnel */
 		funnel_major_init(t);
 
-		/* programming the ETF */
-		etf_init(t);
-
 		if (t->etr)
 			/* Program the ETR */
 			etr_init(t);
+		else
+			/* programming the ETF */
+			etf_init(t);
 
 		/* programming the replicator */
 		replicator_init(t);
 
+		/* disable tpiu */
+		tpiu_init(t);
+
 		/* Enabling the ETM */
-		for_each_online_cpu(id) {
-			ptm_writel(t, id, 1,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCPRGCTLR_0);
-		}
+		on_each_cpu(ptm_init, t, false);
 		dsb(sy);
 		isb();
 	}
@@ -505,16 +666,20 @@ static int trace_t210_start(struct tracectx *t)
 	return 0;
 }
 
+static void ptm_disable(void *p_info)
+{
+	struct tracectx *t = (struct tracectx *)p_info;
+	u32 id = raw_smp_processor_id();
+
+	ptm_writel(t, id, 0, TRCPRGCTLR);
+}
+
 /* Disable the traces */
 static int trace_t210_stop(struct tracectx *t)
 {
-	int id;
-
 	if (!t->ape)
 		/* Disabling the ETM */
-		for_each_online_cpu(id)
-			ptm_writel(t, id, 0,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCPRGCTLR_0);
+		on_each_cpu(ptm_disable, &tracer, true);
 	else
 		/* Disable APE traces */
 		ape_writel(t, 0x500, CORESIGHT_APE_CPU0_ETM_ETMCR_0);
@@ -524,20 +689,83 @@ static int trace_t210_stop(struct tracectx *t)
 	return 0;
 }
 
+static void trc_read_regs(struct tracectx *p_info)
+{
+	struct tracectx *t = (struct tracectx *)p_info;
+	int reg_num = 16;
+	u32 id = raw_smp_processor_id();
+	u32 *cpu_data = (u32 *) &t->cpu_dump_buffer[id * reg_num * sizeof(u32)];
+	int i = 0;
+
+	cpu_data[i++] = ptm_readl(t, id, TRCTRACEIDR);
+	cpu_data[i++] = ptm_readl(t, id, TRCCONFIGR);
+	cpu_data[i++] = ptm_readl(t, id, TRCACVR0);
+	cpu_data[i++] = ptm_readl(t, id, TRCACVR0 + 0x4);
+	cpu_data[i++] = ptm_readl(t, id, TRCACVR1);
+	cpu_data[i++] = ptm_readl(t, id, TRCACVR1 + 0x4);
+	cpu_data[i++] = ptm_readl(t, id, TRCACVR2);
+	cpu_data[i++] = ptm_readl(t, id, TRCACVR2 + 0x4);
+	/* reserved for future use */
+	cpu_data[i++] = 0x00000000;
+	cpu_data[i++] = 0x00000000;
+	cpu_data[i++] = 0x00000000;
+	cpu_data[i++] = 0x00000000;
+	cpu_data[i++] = 0x00000000;
+	cpu_data[i++] = 0x00000000;
+	cpu_data[i++] = 0x00000000;
+	cpu_data[i++] = 0x00000000;
+}
+
 /* This function transfers the traces from kernel space to user space */
 static ssize_t trc_read(struct file *file, char __user *data,
 	size_t len, loff_t *ppos)
 {
 	struct tracectx *t = file->private_data;
+	u8 *start = t->etr_buf;
 	loff_t pos = *ppos;
+	loff_t dump_len = 0;
 
-	if ((pos + len) >= t->buf_size)
-		len = t->buf_size - pos;
+	if ((pos + len) >= t->buf_size + CPU_DUMP_BUFF_SZ)
+		len = t->buf_size + CPU_DUMP_BUFF_SZ - pos;
 
-	if ((len > 0) && copy_to_user(data, (u8 *) t->trc_buf+pos, len))
-		return -EFAULT;
-	else {
-		*ppos = pos + len;
+	/* add register config to beginning of returned data if we are reading
+	 * from beginning */
+	if (*ppos < CPU_DUMP_BUFF_SZ) {
+		if (len <= CPU_DUMP_BUFF_SZ - pos) {
+			if (copy_to_user(data, t->cpu_dump_buffer + pos, len))
+				return -EFAULT;
+			return len;
+		} else {
+			if (copy_to_user(data, t->cpu_dump_buffer + pos,
+				CPU_DUMP_BUFF_SZ - pos))
+				return -EFAULT;
+			dump_len = CPU_DUMP_BUFF_SZ - pos;
+			len -= dump_len;
+			pos += dump_len;
+		}
+	}
+	if (len > 0) {
+		if (t->etr) {
+			if (start + pos + len > t->etr_address + ETR_SIZE)
+				len = t->etr_address + ETR_SIZE - start -
+					pos;
+			if (copy_to_user(data + dump_len, t->etr_buf+pos, len))
+				return -EFAULT;
+			if (start + pos + len == t->etr_address + ETR_SIZE)
+				t->etr_buf = t->etr_address;
+		} else {
+			if (copy_to_user(data + dump_len,
+				(u8 *)t->trc_buf+pos, len))
+				return -EFAULT;
+		}
+	}
+
+
+	if (*ppos < CPU_DUMP_BUFF_SZ) {
+		*ppos += (len + dump_len);
+		return len + dump_len;
+	} else {
+		*ppos += len;
 		return len;
 	}
 }
@@ -545,8 +773,10 @@ static ssize_t trc_read(struct file *file, char __user *data,
 /* this function copies traces from the ETF to an array */
 static ssize_t trc_fill_buf(struct tracectx *t)
 {
-	int rwp, max, count, serial, overflow;
-	int trig_stat, tmcready, top_of_buffer;
+	int rwp, count = 0, overflow;
+	int trig_stat, tmcready;
+	u64 rwp64;
+	u32 pfn;
 
 	if (!t->etf_regs)
 		return -EINVAL;
@@ -559,126 +789,134 @@ static ssize_t trc_fill_buf(struct tracectx *t)
 	etf_regs_unlock(t);
 	etr_regs_unlock(t);
 
-	if (t->trigger_address) {
-		if (t->etr == 1) {
+	if (t->trigger) {
+		if (t->etr) {
 			trig_stat = 0;
 			while (trig_stat == 0) {
-				trig_stat = etr_readl(t,
-					CORESIGHT_ETR_HUGO_CXTMC_REGS_STS_0);
+				trig_stat = etr_readl(t, CXTMC_REGS_STS_0);
 				trig_stat = (trig_stat >> 1) & 0x1;
 			}
-			tmcready = 0;
-			while (tmcready == 0) {
-				trig_stat = etr_readl(t,
-					CORESIGHT_ETR_HUGO_CXTMC_REGS_STS_0);
+			do {
+				trig_stat = etr_readl(t, CXTMC_REGS_STS_0);
 				tmcready = (trig_stat >> 2) & 0x1;
-			}
+				if (++count > AFREADY_LOOP_MAX)
+					break;
+				if (!tmcready)
+					mdelay(AFREADY_LOOP_MS);
+			} while (!tmcready);
 		} else {
 			trig_stat = 0;
 			while (trig_stat == 0) {
-				trig_stat = etf_readl(t,
-					CORESIGHT_ETF_HUGO_CXTMC_REGS_STS_0);
+				trig_stat = etf_readl(t, CXTMC_REGS_STS_0);
 				trig_stat = (trig_stat >> 1) & 0x1;
 			}
-			tmcready = 0;
-			while (tmcready == 0) {
-				trig_stat = etf_readl(t,
-					CORESIGHT_ETF_HUGO_CXTMC_REGS_STS_0);
+			do {
+				trig_stat = etf_readl(t, CXTMC_REGS_STS_0);
 				tmcready = (trig_stat >> 2) & 0x1;
-			}
+				if (++count > AFREADY_LOOP_MAX)
+					break;
+				if (!tmcready)
+					mdelay(AFREADY_LOOP_MS);
+			} while (!tmcready);
 		}
 	} else {
 		if (t->etr == 1) {
 			/* Manual flush and stop */
-			etr_writel(t, 0x1001,
-					CORESIGHT_ETR_HUGO_CXTMC_REGS_FFCR_0);
-			etr_writel(t, 0x1041,
-					CORESIGHT_ETR_HUGO_CXTMC_REGS_FFCR_0);
-			tmcready = 0;
-			while (tmcready == 0) {
-				tmcready = etr_readl(t,
-					CORESIGHT_ETR_HUGO_CXTMC_REGS_STS_0);
+			etr_writel(t, 0x1001, CXTMC_REGS_FFCR_0);
+			dsb(sy);
+			isb();
+			etr_writel(t, 0x1041, CXTMC_REGS_FFCR_0);
+			dsb(sy);
+			isb();
+			do {
+				tmcready = etr_readl(t, CXTMC_REGS_STS_0);
 				tmcready = (tmcready >> 2) & 0x1;
-			}
+				if (++count > AFREADY_LOOP_MAX)
+					break;
+				if (!tmcready)
+					mdelay(AFREADY_LOOP_MS);
+			} while (!tmcready);
 		} else {
 			/* Manual flush and stop */
-			etf_writel(t, 0x1001,
-					CORESIGHT_ETF_HUGO_CXTMC_REGS_FFCR_0);
+			etf_writel(t, 0x1001, CXTMC_REGS_FFCR_0);
 			dsb(sy);
 			isb();
-			etf_writel(t, 0x1041,
-					CORESIGHT_ETF_HUGO_CXTMC_REGS_FFCR_0);
+			etf_writel(t, 0x1041, CXTMC_REGS_FFCR_0);
 			dsb(sy);
 			isb();
-			tmcready = 0;
-			while (tmcready == 0) {
-				tmcready = etf_readl(t,
-					CORESIGHT_ETF_HUGO_CXTMC_REGS_STS_0);
+			do {
+				tmcready = etf_readl(t, CXTMC_REGS_STS_0);
 				tmcready = (tmcready >> 2) & 0x1;
-			}
+				if (++count > AFREADY_LOOP_MAX)
+					break;
+				if (!tmcready)
+					mdelay(AFREADY_LOOP_MS);
+			} while (!tmcready);
 		}
 	}
 
-	/* Disable ETF */
-	etf_writel(t, 0, CORESIGHT_ETF_HUGO_CXTMC_REGS_CTL_0);
-
 	if (t->etr == 1) {
-		etr_writel(t, 0, CORESIGHT_ETR_HUGO_CXTMC_REGS_CTL_0);
+		/* Disable ETR */
+		etr_writel(t, 0, CXTMC_REGS_CTL_0);
 
-		rwp = etr_readl(t, CORESIGHT_ETR_HUGO_CXTMC_REGS_RWP_0);
-		 /* Get etf data and Check for overflow */
-		overflow = etr_readl(t, CORESIGHT_ETR_HUGO_CXTMC_REGS_STS_0);
+		/* save write pointer */
+		rwp = etr_readl(t, CXTMC_REGS_RWP_0);
+		rwp64 = etr_readl(t, CXTMC_REGS_RWPHI_0);
+		rwp64 = (rwp64 << 32) | rwp;
+
+		pfn = rwp64 >> PAGE_SHIFT;
+		for (count = 0; count < PAGE_SIZE; count++) {
+			/* pfn in scatter gather table is b[31..4] */
+			if (pfn == (*(u32 *)(t->etr_ll + (count << 2)) >> 4))
+				break;
+		}
+		count %= PAGE_SIZE;
+		t->etr_buf = t->etr_address + (count << PAGE_SHIFT);
+		t->etr_buf += (rwp64 & (PAGE_SIZE-1));
+
+		 /* Get etr data and Check for overflow */
+		overflow = etr_readl(t, CXTMC_REGS_STS_0);
 		overflow &= 0x01;
-		max = rwp;
-		top_of_buffer = (uintptr_t)t->etr_address;
-		serial = 0;
 
 		/* Disabling the ETM */
-		for_each_online_cpu(count)
-			ptm_writel(t, count, 0,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCPRGCTLR_0);
-
-		ape_writel(t, 0x500, CORESIGHT_APE_CPU0_ETM_ETMCR_0);
-
-		t->buf_size = max - (uintptr_t)t->etr_address;
-		if (overflow) {
-			t->buf_size = top_of_buffer - rwp;
-			for (count = rwp; count < top_of_buffer; count += 4) {
-				t->trc_buf[count] = etf_readl(t,
-				CORESIGHT_ETR_HUGO_CXTMC_REGS_RWP_0);
-			serial += 1;
-			}
+		if (t->enable) {
+			on_each_cpu(ptm_disable, t, true);
+			ape_writel(t, 0x500, CORESIGHT_APE_CPU0_ETM_ETMCR_0);
+			t->enable = 0;
 		}
-		for (count = (uintptr_t)t->etr_address;
-						count < max; count += 4) {
-			t->trc_buf[count] = etf_readl(t,
-				CORESIGHT_ETR_HUGO_CXTMC_REGS_RWP_0);
-			serial += 1;
+		t->buf_size = t->etr_buf - t->etr_address;
+		t->etr_buf = t->etr_address;
+		if (overflow) {
+			t->etr_buf += t->buf_size;
+			t->buf_size = ETR_SIZE;
 		}
 	} else {
+		/* Disable ETF */
+		etf_writel(t, 0, CXTMC_REGS_CTL_0);
+
 		/* save write pointer */
-		rwp = etf_readl(t, CORESIGHT_ETF_HUGO_CXTMC_REGS_RWP_0);
+		rwp = etf_readl(t, CXTMC_REGS_RWP_0);
 
 		/* check current status for overflow */
-		overflow = etf_readl(t, CORESIGHT_ETF_HUGO_CXTMC_REGS_STS_0);
+		overflow = etf_readl(t, CXTMC_REGS_STS_0);
 		overflow &= 0x1;
 
 		/* Disabling the ETM */
-		for_each_online_cpu(count)
-			ptm_writel(t, count, 0,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCPRGCTLR_0);
-
-		ape_writel(t, 0x500, CORESIGHT_APE_CPU0_ETM_ETMCR_0);
+		if (t->enable) {
+			on_each_cpu(ptm_disable, t, true);
+			ape_writel(t, 0x500, CORESIGHT_APE_CPU0_ETM_ETMCR_0);
+			t->enable = 0;
+		}
 
 		/* by default, start reading from 0 */
 		t->buf_size = rwp;
-		etf_writel(t, 0, CORESIGHT_ETF_HUGO_CXTMC_REGS_RRP_0);
+		etf_writel(t, 0, CXTMC_REGS_RRP_0);
 
 		if (overflow) {
 			/* in case of overflow, the size is max ETF size */
 			t->buf_size = MAX_ETF_SIZE * 4;
 			/* start from RWP for read */
-			etf_writel(t, rwp, CORESIGHT_ETF_HUGO_CXTMC_REGS_RRP_0);
+			etf_writel(t, rwp, CXTMC_REGS_RRP_0);
 			rwp = MAX_ETF_SIZE;
 		} else
 			rwp >>= 2;
@@ -687,8 +925,7 @@ static ssize_t trc_fill_buf(struct tracectx *t)
 		 * no overflow. take advantage of RRP rollover
 		 */
 		for (count = 0; count < rwp-1; count++) {
-			t->trc_buf[count] = etf_readl(t,
-					CORESIGHT_ETF_HUGO_CXTMC_REGS_RRD_0);
+			t->trc_buf[count] = etf_readl(t, CXTMC_REGS_RRD_0);
 		}
 	}
 	etf_regs_lock(t);
@@ -714,6 +951,9 @@ static int trc_open(struct inode *inode, struct file *file)
 
 	trc_fill_buf(t);
 
+	/* all cores have the same configuration */
+	trc_read_regs(t);
+
 	return nonseekable_open(inode, file);
 }
 
@@ -723,17 +963,40 @@ static int trc_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+#ifdef CONFIG_CPU_PM
+static int ptm_cpu_pm_notifier(struct notifier_block *self,
+	unsigned long action, void *not_used)
+{
+	int ret = NOTIFY_OK;
+
+	switch (action) {
+	case CPU_PM_ENTER:
+		if (tracer.enable)
+			ptm_save(&tracer);
+		break;
+	case CPU_PM_EXIT:
+		if (tracer.enable)
+			ptm_restore(&tracer);
+		break;
+	default:
+		ret = NOTIFY_DONE;
+	}
+	return ret;
+}
+
+static struct notifier_block ptm_cpu_pm_notifier_block = {
+	.notifier_call = ptm_cpu_pm_notifier,
+};
+#endif
+
 #ifdef CONFIG_HOTPLUG_CPU
 static int ptm_cpu_hotplug_notifier(struct notifier_block *self,
 	unsigned long action, void *hcpu)
 {
-	long cpu = (long)hcpu;
 	switch (action) {
 	case CPU_STARTING:
 		if (tracer.enable) {
-			ptm_init(&tracer, cpu);
-			ptm_writel(&tracer, cpu, 1,
-				CORESIGHT_BCCPLEX_CPU_TRACE_TRCPRGCTLR_0);
+			ptm_init(&tracer);
 		}
 		break;
 	default:
@@ -754,8 +1017,38 @@ static ssize_t trace_range_address_show(struct kobject *kobj,
 	struct kobj_attribute *attr,
 	char *buf)
 {
-	return sprintf(buf, "start address : %16lx\n stop address : %16lx\n",
-			tracer.start_address, tracer.stop_address);
+	int i;
+
+	/* clear buffer */
+	if (tracer.trigger_mask & 0x3)
+		sprintf(buf + strlen(buf),
+			"start address 0 : TRIG\nstop address 0  : TRIG\n");
+	else if (tracer.start_stop_mask & 0x3)
+		sprintf(buf + strlen(buf),
+			"start address 0 : %16lx\nstop address 0  : %16lx\n",
+			tracer.start_address[0], tracer.stop_address[0]);
+	else
+		sprintf(buf + strlen(buf),
+			"start address 0 : free\nstop address 0  : free\n");
+
+	for (i = 1; i < ADDR_REG_PAIRS; i++) {
+		if ((tracer.trigger_mask >> (i * 2)) & 0x3)
+			sprintf(buf + strlen(buf),
+				"start address %d : TRIG\nstop address %d  : TRIG\n",
+				i, i);
+		else if ((tracer.start_stop_mask >> (i*2)) & 0x3)
+			sprintf(buf + strlen(buf),
+				"start address %d : %16lx\nstop address %d  : %16lx\n",
+				i, tracer.start_address[i],
+				i, tracer.stop_address[i]);
+		else
+			sprintf(buf + strlen(buf),
+				"start address %d : free\nstop address %d  : free\n",
+				i, i);
+
+	}
+
+	return strlen(buf);
 }
 
 /* use a sysfs file "trace_address_trigger" to allow user to
@@ -764,9 +1057,17 @@ static ssize_t trace_trigger_show(struct kobject *kobj,
 	struct kobj_attribute *attr,
 	char *buf)
 {
-	if (tracer.trigger)
-		return sprintf(buf, "Address match is enabled\n"
-			"Address trigger at %16lx\n", tracer.trigger_address);
+	int i;
+	if (tracer.trigger) {
+		sprintf(buf, "Address match is enabled\n");
+		for (i = 0; i < ADDR_REG_PAIRS * 2; i++) {
+			if ((tracer.trigger_mask >> i) & 0x1)
+				sprintf(buf + strlen(buf),
+					"Address trigger at %16lx\n",
+					tracer.trigger_address[i]);
+		}
+		return strlen(buf);
+	}
 	else
 		return sprintf(buf, "Address match is disabled\n");
 }
@@ -785,7 +1086,7 @@ static ssize_t trace_enable_store(struct kobject *kobj,
 	const char *buf, size_t n)
 {
 	unsigned int value;
-	int ret;
+	int ret = -EAGAIN;
 
 	if (sscanf(buf, "%u", &value) != 1)
 		return -EINVAL;
@@ -796,36 +1097,66 @@ static ssize_t trace_enable_store(struct kobject *kobj,
 	mutex_lock(&tracer.mutex);
 
 	if (value) {
-		ret = trace_t210_start(&tracer);
+		if (!tracer.enable)
+			ret = trace_t210_start(&tracer);
 		tracer.enable = 1;
 	} else {
-		ret = trace_t210_stop(&tracer);
-		tracer.enable = 0;
+		if (tracer.enable) {
+			tracer.enable = 0;
+			ret = trace_t210_stop(&tracer);
+		}
 	}
 
 	mutex_unlock(&tracer.mutex);
 
-	return ret ? : n;
+	return ret ? ret : n;
 }
 
 static ssize_t trace_range_address_store(struct kobject *kobj,
 	struct kobj_attribute *attr,
 	char const *buf, size_t n)
 {
-	uintptr_t start_address, stop_address;
+	uintptr_t start_address[ADDR_REG_PAIRS], stop_address[ADDR_REG_PAIRS];
+	int cnt, i;
+	int addr_pair = 0;
 
-	if (sscanf(buf, "%lx %lx", &start_address, &stop_address) != 2)
-		return -EINVAL;
-
-	if (start_address >= stop_address)
+	cnt = sscanf(buf, "%lx %lx %lx %lx %lx %lx %lx %lx",
+		&start_address[0], &stop_address[0],
+		&start_address[1], &stop_address[1],
+		&start_address[2], &stop_address[2],
+		&start_address[3], &stop_address[3]);
+	if (cnt % 2)
 		return -EINVAL;
 
 	mutex_lock(&tracer.mutex);
 
-	tracer.start_address= start_address;
-	tracer.stop_address = stop_address;
+	tracer.start_stop_mask = 0;
+
+	for (i = 0; i < ADDR_REG_PAIRS; i++) {
+		if (start_address[addr_pair] >= stop_address[addr_pair]) {
+			mutex_unlock(&tracer.mutex);
+			return -EINVAL;
+		}
+
+		if ((tracer.trigger_mask >> (i * 2)) & 0x3)
+			continue;
+
+		tracer.start_address[i] = start_address[addr_pair];
+		tracer.stop_address[i] = stop_address[addr_pair];
+		tracer.start_stop_mask += (0x3 << (i*2));
+		addr_pair++;
+		if (addr_pair == cnt/2) {
+			i++;
+			break;
+		}
+	}
 
 	mutex_unlock(&tracer.mutex);
+
+	if (addr_pair < cnt/2) {
+		pr_info("Tegra PTM: Not enough address registers for request\n");
+		return -EINVAL;
+	}
 
 	return n;
 }
@@ -834,27 +1165,52 @@ static ssize_t trace_trigger_store(struct kobject *kobj,
 	struct kobj_attribute *attr,
 	const char *buf, size_t n)
 {
-	unsigned int trigger, percent_after_trigger;
-	uintptr_t trigger_address;
+	unsigned int trigger = 0;
+	uintptr_t trigger_address[ADDR_REG_PAIRS * 2];
+	int cnt, i;
+	int trig_pos = 0;
 
-	if (sscanf(buf, "%u %lx %u", &trigger, &trigger_address,
-				&percent_after_trigger) != 3)
+	cnt = sscanf(buf, "%u %lx %lx %lx %lx %lx %lx %lx %lx",
+		&trigger,
+		&trigger_address[0], &trigger_address[1],
+		&trigger_address[2], &trigger_address[3],
+		&trigger_address[4], &trigger_address[5],
+		&trigger_address[6], &trigger_address[7]);
+	if (cnt-- < 1)
 		return -EINVAL;
 
 	/* max 99% to leave room for preventing buffer overwrite */
-	if (percent_after_trigger >= 100)
-		percent_after_trigger = 99;
+	if (trigger >= 100)
+		trigger = 99;
 
 	mutex_lock(&tracer.mutex);
+	tracer.trigger_mask = 0;
 
-	if (trigger) {
-		tracer.trigger = 1;
-		tracer.trigger_address = trigger_address;
-		tracer.percent_after_trigger = percent_after_trigger;
-	} else
+	if (!trigger || !cnt) {
 		tracer.trigger = 0;
+		mutex_unlock(&tracer.mutex);
+		return n;
+	}
+
+	tracer.trigger = trigger;
+	for (i = 0; i < ADDR_REG_PAIRS * 2; i++) {
+		if ((tracer.start_stop_mask >> i) & 0x1)
+			continue;
+
+		tracer.trigger_address[i] = trigger_address[trig_pos];
+		tracer.trigger_mask += (1 << i);
+		trig_pos++;
+		if (trig_pos == cnt)
+			break;
+
+	}
 
 	mutex_unlock(&tracer.mutex);
+
+	if (trig_pos != cnt) {
+		pr_info("Tegra PTM: Not enough address registers for request\n");
+		return -EINVAL;
+	}
 
 	return n;
 }
@@ -874,6 +1230,60 @@ static ssize_t trace_cycle_count_store(struct kobject *kobj,
 
 	mutex_unlock(&tracer.mutex);
 
+	return n;
+}
+
+static void tmc_build_sg_table(void)
+{
+	unsigned long pfn;
+	void *virt;
+	u32 index;
+	u32 *sg_ptr;
+
+	virt = tracer.etr_address;
+	sg_ptr = (u32 *)tracer.etr_ll;
+	for (index = 0; index < PAGE_SIZE; index++) {/* 4k entries in total */
+		pfn = vmalloc_to_pfn(virt);
+		virt += PAGE_SIZE;
+		*sg_ptr++ = (pfn << 4) | 0x2;
+	}
+	*(--sg_ptr) = (pfn << 4) | 0x1;
+	__flush_dcache_area((void *)tracer.etr_ll, PAGE_SIZE << 2);
+}
+
+static ssize_t trace_etr_store(struct kobject *kobj,
+	struct kobj_attribute *attr,
+	const char *buf, size_t n)
+{
+	unsigned int etr_enable;
+
+	if (sscanf(buf, "%u", &etr_enable) != 1)
+		return -EINVAL;
+	tracer.etr = etr_enable ? 1 : 0;
+	if (tracer.etr_address && !tracer.etr) {
+		vfree(tracer.etr_address);
+		tracer.etr_address = NULL;
+		free_pages(tracer.etr_ll, 2);
+		tracer.etr_ll = 0;
+	} else if (tracer.etr_address) {
+		BUG_ON(!tracer.etr);
+		return n; /* enabling, but already enabled */
+	} else if (tracer.etr) {
+		tracer.etr_address = vmalloc(ETR_SIZE);
+		if (tracer.etr_address) {
+			/*
+			 * each page holds entries for 1K pages, i.e. 4MB data
+			 * so 16MB needs 4 pages, hence order 2
+			 */
+			tracer.etr_ll = __get_free_pages(GFP_KERNEL, 2);
+			if (!tracer.etr_ll) {
+				vfree(tracer.etr_address);
+				tracer.etr = 0;
+			} else
+				tmc_build_sg_table();
+		} else
+			tracer.etr = 0;
+	}
 	return n;
 }
 
@@ -913,7 +1323,6 @@ define_store_state_func(branch_broadcast)
 define_store_state_func(return_stack)
 define_store_state_func(timestamp)
 define_store_state_func(formatter)
-define_store_state_func(etr)
 define_store_state_func(ape)
 
 #define A(a, b, c, d)   __ATTR(trace_##a, b, \
@@ -966,12 +1375,12 @@ static void trc_nodes(struct tracectx *t)
 	if (ret)
 		dev_err(t->dev, "failes to register /dev/last_trc\n");
 
-	dev_info(t->dev, "Trace nodes are initialized.\n");
+	dev_dbg(t->dev, "Trace nodes are initialized.\n");
 }
 
 static int ptm_probe(struct platform_device  *dev)
 {
-	int i, dbg_cnt = 0, ptm_cnt = 0, ret = 0;
+	int i, ptm_cnt = 0, ret = 0;
 
 	struct tracectx *t = &tracer;
 
@@ -1005,19 +1414,22 @@ static int ptm_probe(struct platform_device  *dev)
 			t->etr_regs = addr;
 			break;
 		case 4:
-			t->funnel_bccplex_regs = addr;
+			t->tpiu_regs = addr;
 			break;
 		case 5:
+			t->funnel_bccplex_regs = addr;
+			break;
 		case 6:
 		case 7:
 		case 8:
+		case 9:
 			if (ptm_cnt < CONFIG_NR_CPUS)
 				t->ptm_regs[ptm_cnt++] = addr;
 			break;
-		case 9:
+		case 10:
 			t->funnel_minor_regs = addr;
 			break;
-		case 10:
+		case 11:
 			t->ape_regs = addr;
 			break;
 		default:
@@ -1028,7 +1440,6 @@ static int ptm_probe(struct platform_device  *dev)
 	}
 
 	WARN_ON(ptm_cnt < num_possible_cpus());
-	WARN_ON(dbg_cnt < num_possible_cpus());
 
 	/* Configure Coresight Clocks */
 	csite_clk = clk_get_sys("csite", NULL);
@@ -1050,11 +1461,14 @@ static int ptm_probe(struct platform_device  *dev)
 				trace_attr[i].attr.name);
 	}
 
+#ifdef CONFIG_CPU_PM
+	cpu_pm_register_notifier(&ptm_cpu_pm_notifier_block);
+#endif
 #ifdef CONFIG_HOTPLUG_CPU
 	register_cpu_notifier(&ptm_cpu_hotplug_notifier_block);
 #endif
 
-	dev_info(&dev->dev, "PTM driver initialized.\n");
+	dev_dbg(&dev->dev, "PTM driver initialized.\n");
 
 out:
 	if (ret)
@@ -1067,6 +1481,9 @@ static int ptm_remove(struct platform_device *dev)
 	struct tracectx *t = &tracer;
 	int i;
 
+#ifdef CONFIG_CPU_PM
+	cpu_pm_unregister_notifier(&ptm_cpu_pm_notifier_block);
+#endif
 #ifdef CONFIG_HOTPLUG_CPU
 	unregister_cpu_notifier(&ptm_cpu_hotplug_notifier_block);
 #endif
@@ -1082,6 +1499,7 @@ static int ptm_remove(struct platform_device *dev)
 	devm_iounmap(&dev->dev, t->funnel_minor_regs);
 	devm_iounmap(&dev->dev, t->ape_regs);
 	devm_iounmap(&dev->dev, t->etr_regs);
+	devm_iounmap(&dev->dev, t->tpiu_regs);
 	devm_iounmap(&dev->dev, t->funnel_bccplex_regs);
 	devm_iounmap(&dev->dev, t->replicator_regs);
 	t->etf_regs = NULL;
@@ -1122,4 +1540,3 @@ static int __init tegra_ptm_driver_init(void)
 	return 0;
 }
 device_initcall(tegra_ptm_driver_init);
-

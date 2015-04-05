@@ -1,7 +1,7 @@
 /*
  * drivers/media/video/tegra/nvavp/nvavp_dev.c
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This file is licensed under the terms of the GNU General Public License
  * version 2. This program is licensed "as is" without any warranty of any
@@ -57,6 +57,10 @@
 #include <linux/of_platform.h>
 #include <linux/of_address.h>
 #include <linux/tegra-timer.h>
+
+#ifdef CONFIG_TRUSTED_LITTLE_KERNEL
+#include <linux/ote_protocol.h>
+#endif
 
 #if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU)
 #include "../avp/headavp.h"
@@ -1042,7 +1046,7 @@ static int nvavp_load_ucode(struct nvavp_info *nvavp)
 		ptr = (void *)nvavp_ucode_fw->data;
 
 		if (strncmp((const char *)ptr, "NVAVPAPP", 8)) {
-			dev_info(&nvavp->nvhost_dev->dev,
+			dev_dbg(&nvavp->nvhost_dev->dev,
 				"ucode hdr string mismatch\n");
 			ret = -EINVAL;
 			goto err_req_ucode;
@@ -1115,7 +1119,7 @@ static int nvavp_load_os(struct nvavp_info *nvavp, char *fw_os_file)
 		ptr = (void *)nvavp_os_fw->data;
 
 		if (strncmp((const char *)ptr, "NVAVP-OS", 8)) {
-			dev_info(&nvavp->nvhost_dev->dev,
+			dev_dbg(&nvavp->nvhost_dev->dev,
 				"os hdr string mismatch\n");
 			ret = -EINVAL;
 			goto err_os_bin;
@@ -1144,7 +1148,7 @@ static int nvavp_load_os(struct nvavp_info *nvavp, char *fw_os_file)
 		memcpy(os_info->os_bin, ptr, os_info->size);
 		memset(os_info->data + os_info->size, 0, SZ_1M - os_info->size);
 
-		dev_info(&nvavp->nvhost_dev->dev,
+		dev_dbg(&nvavp->nvhost_dev->dev,
 			"entry=%08x control=%08x debug=%08x size=%d\n",
 			os_info->entry_offset, os_info->control_offset,
 			os_info->debug_offset, os_info->size);
@@ -1154,7 +1158,7 @@ static int nvavp_load_os(struct nvavp_info *nvavp, char *fw_os_file)
 	memcpy(os_info->data, os_info->os_bin, os_info->size);
 	os_info->reset_addr = os_info->phys + os_info->entry_offset;
 
-	dev_info(&nvavp->nvhost_dev->dev,
+	dev_dbg(&nvavp->nvhost_dev->dev,
 		"AVP os at vaddr=%p paddr=%llx reset_addr=%llx\n",
 		os_info->data, (u64)(os_info->phys), (u64)os_info->reset_addr);
 	return 0;
@@ -1190,14 +1194,14 @@ static int nvavp_os_init(struct nvavp_info *nvavp)
 #if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU) /* Tegra2 with AVP MMU */
 	/* paddr is phys address */
 	/* vaddr is AVP_KERNEL_VIRT_BASE */
-	dev_info(&nvavp->nvhost_dev->dev,
+	dev_dbg(&nvavp->nvhost_dev->dev,
 		"using AVP MMU to relocate AVP os\n");
 	sprintf(fw_os_file, "nvavp_os.bin");
 	nvavp->os_info.reset_addr = AVP_KERNEL_VIRT_BASE;
 #elif defined(CONFIG_TEGRA_AVP_KERNEL_ON_SMMU) /* Tegra3 with SMMU */
 	/* paddr is any address behind SMMU */
 	/* vaddr is TEGRA_SMMU_BASE */
-	dev_info(&nvavp->nvhost_dev->dev,
+	dev_dbg(&nvavp->nvhost_dev->dev,
 		"using SMMU at %lx to load AVP kernel\n",
 		(unsigned long)nvavp->os_info.phys);
 	BUG_ON(nvavp->os_info.phys != 0xeff00000
@@ -1207,7 +1211,7 @@ static int nvavp_os_init(struct nvavp_info *nvavp)
 		(unsigned long)nvavp->os_info.phys);
 	nvavp->os_info.reset_addr = nvavp->os_info.phys;
 #else /* nvmem= carveout */
-	dev_info(&nvavp->nvhost_dev->dev,
+	dev_dbg(&nvavp->nvhost_dev->dev,
 		"using nvmem= carveout at %llx to load AVP os\n",
 		(u64)nvavp->os_info.phys);
 	sprintf(fw_os_file, "nvavp_os_%08llx.bin", (u64)nvavp->os_info.phys);
@@ -1236,7 +1240,10 @@ err_exit:
 static int nvavp_init(struct nvavp_info *nvavp, int channel_id)
 {
 	int ret = 0;
-	int video_initialized = 0, audio_initialized = 0;
+	int video_initialized = 0;
+#if defined(CONFIG_TEGRA_NVAVP_AUDIO)
+	int audio_initialized = 0;
+#endif
 
 	nvavp->init_task = current;
 
@@ -1848,7 +1855,7 @@ int nvavp_enable_audio_clocks(nvavp_clientctx_t client, u32 clk_id)
 }
 EXPORT_SYMBOL_GPL(nvavp_enable_audio_clocks);
 
-int nvavp_disable_audio_clocks(nvavp_clientctx_t client, u32_clk_id)
+int nvavp_disable_audio_clocks(nvavp_clientctx_t client, u32 clk_id)
 {
 	return 0;
 }
@@ -1904,12 +1911,19 @@ static int tegra_nvavp_open(struct nvavp_info *nvavp,
 		nvavp->refcount++;
 		if (IS_VIDEO_CHANNEL_ID(channel_id))
 			nvavp->video_refcnt++;
+#if defined(CONFIG_TEGRA_NVAVP_AUDIO)
 		if (IS_AUDIO_CHANNEL_ID(channel_id))
 			nvavp->audio_refcnt++;
+#endif
 	}
 
+#if defined(CONFIG_TEGRA_NVAVP_AUDIO)
 	trace_tegra_nvavp_open(channel_id, nvavp->refcount,
 				nvavp->video_refcnt, nvavp->audio_refcnt);
+#else
+	trace_tegra_nvavp_open(channel_id, nvavp->refcount,
+				nvavp->video_refcnt, 0);
+#endif
 
 	clientctx->nvavp = nvavp;
 	clientctx->iova_handles = RB_ROOT;
@@ -1998,11 +2012,18 @@ static int tegra_nvavp_release(struct nvavp_clientctx *clientctx,
 
 	if (IS_VIDEO_CHANNEL_ID(channel_id))
 		nvavp->video_refcnt--;
+#if defined(CONFIG_TEGRA_NVAVP_AUDIO)
 	if (IS_AUDIO_CHANNEL_ID(channel_id))
 		nvavp->audio_refcnt--;
+#endif
 
+#if defined(CONFIG_TEGRA_NVAVP_AUDIO)
 	trace_tegra_nvavp_release(channel_id, nvavp->refcount,
 				nvavp->video_refcnt, nvavp->audio_refcnt);
+#else
+	trace_tegra_nvavp_release(channel_id, nvavp->refcount,
+				nvavp->video_refcnt, 0);
+#endif
 
 out:
 	nvavp_remove_iova_mapping(clientctx);
@@ -2106,6 +2127,7 @@ nvavp_channel_open(struct file *filp, struct nvavp_channel_open_args *arg)
 	return err;
 }
 
+extern struct device tegra_vpr_dev;
 static long tegra_nvavp_ioctl(struct file *filp, unsigned int cmd,
 			    unsigned long arg)
 {
@@ -2113,6 +2135,7 @@ static long tegra_nvavp_ioctl(struct file *filp, unsigned int cmd,
 	struct nvavp_clock_args config;
 	int ret = 0;
 	u8 buf[NVAVP_IOCTL_CHANNEL_MAX_ARG_SIZE];
+	u32 floor_size;
 
 	if (_IOC_TYPE(cmd) != NVAVP_IOCTL_MAGIC ||
 	    _IOC_NR(cmd) < NVAVP_IOCTL_MIN_NR ||
@@ -2170,6 +2193,15 @@ static long tegra_nvavp_ioctl(struct file *filp, unsigned int cmd,
 		if (ret == 0)
 			ret = copy_to_user((void __user *)arg, buf,
 			_IOC_SIZE(cmd));
+		break;
+	case NVAVP_IOCTL_VPR_FLOOR_SIZE:
+		if (copy_from_user(&floor_size, (void __user *)arg,
+			sizeof(floor_size))) {
+			ret = -EFAULT;
+			break;
+		}
+		ret = dma_set_resizable_heap_floor_size(&tegra_vpr_dev,
+				floor_size);
 		break;
 	default:
 		ret = -EINVAL;
@@ -2606,8 +2638,13 @@ static int tegra_nvavp_runtime_suspend(struct device *dev)
 		}
 	}
 
+#if defined(CONFIG_TEGRA_NVAVP_AUDIO)
 	trace_tegra_nvavp_runtime_suspend(nvavp->refcount, nvavp->video_refcnt,
 				nvavp->audio_refcnt);
+#else
+	trace_tegra_nvavp_runtime_suspend(nvavp->refcount,
+			nvavp->video_refcnt, 0);
+#endif
 
 	mutex_unlock(&nvavp->open_lock);
 
@@ -2628,8 +2665,13 @@ static int tegra_nvavp_runtime_resume(struct device *dev)
 		nvavp_init(nvavp, NVAVP_AUDIO_CHANNEL);
 #endif
 
+#if defined(CONFIG_TEGRA_NVAVP_AUDIO)
 	trace_tegra_nvavp_runtime_resume(nvavp->refcount, nvavp->video_refcnt,
 				nvavp->audio_refcnt);
+#else
+	trace_tegra_nvavp_runtime_resume(nvavp->refcount,
+			nvavp->video_refcnt, 0);
+#endif
 
 	mutex_unlock(&nvavp->open_lock);
 
@@ -2646,6 +2688,12 @@ static int tegra_nvavp_resume(struct device *dev)
 
 	nvavp_halt_avp(nvavp);
 	tegra_nvavp_runtime_resume(dev);
+
+#ifdef CONFIG_TRUSTED_LITTLE_KERNEL
+	nvavp_clks_enable(nvavp);
+	te_restore_keyslots();
+	nvavp_clks_disable(nvavp);
+#endif
 
 	return 0;
 }

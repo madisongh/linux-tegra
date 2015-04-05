@@ -32,7 +32,7 @@ struct fifo_runlist_info_gk20a {
 	unsigned long *active_channels;
 	unsigned long *active_tsgs;
 	/* Each engine has its own SW and HW runlist buffer.*/
-	struct runlist_mem_desc mem[MAX_RUNLIST_BUFFERS];
+	struct mem_desc mem[MAX_RUNLIST_BUFFERS];
 	u32  cur_buffer;
 	u32  total_entries;
 	bool stopped;
@@ -102,9 +102,8 @@ struct fifo_gk20a {
 	struct fifo_runlist_info_gk20a *runlist_info;
 	u32 max_runlists;
 
-	struct userd_desc userd;
+	struct mem_desc userd;
 	u32 userd_entry_size;
-	u32 userd_total_size;
 
 	struct channel_gk20a *channel;
 	struct mutex ch_inuse_mutex; /* protect unused chid look up */
@@ -162,6 +161,7 @@ void gk20a_fifo_recover(struct gk20a *g, u32 engine_ids, bool verbose);
 void gk20a_fifo_recover_ch(struct gk20a *g, u32 hw_chid, bool verbose);
 void gk20a_fifo_recover_tsg(struct gk20a *g, u32 tsgid, bool verbose);
 int gk20a_fifo_force_reset_ch(struct channel_gk20a *ch, bool verbose);
+void gk20a_fifo_reset_engine(struct gk20a *g, u32 engine_id);
 int gk20a_init_fifo_reset_enable_hw(struct gk20a *g);
 void gk20a_init_fifo(struct gpu_ops *gops);
 
@@ -169,4 +169,6 @@ void fifo_gk20a_finish_mmu_fault_handling(struct gk20a *g,
 		unsigned long fault_id);
 int gk20a_fifo_wait_engine_idle(struct gk20a *g);
 u32 gk20a_fifo_engine_interrupt_mask(struct gk20a *g);
+u32 gk20a_fifo_get_pbdma_signature(struct gk20a *g);
+
 #endif /*__GR_GK20A_H__*/

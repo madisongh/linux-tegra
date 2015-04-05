@@ -241,13 +241,10 @@ static int pca954x_probe(struct i2c_client *client,
 	if (!IS_ERR(gpio))
 		gpiod_direction_output(gpio, 0);
 
-	ret = of_get_property(client->dev.of_node,
-		"skip_mux_detect", NULL);
-	if (ret > 0) {
-		dev_info(&client->dev, "%s: device detect skipped.\n",
-			__func__);
-		fskip = true;
-	}
+	fskip = of_property_read_bool(client->dev.of_node,
+			"skip_mux_detect");
+	if (fskip)
+		dev_info(&client->dev, "device detect skipped.\n");
 
 	if (of_get_property(client->dev.of_node,
 		"skip_mux_detect", NULL) != NULL) {

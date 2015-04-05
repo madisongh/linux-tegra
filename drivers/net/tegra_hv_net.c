@@ -3,7 +3,7 @@
  *
  * Very loosely based on virtio_net.c
  *
- * Copyright (C) 2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2014-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This file is licensed under the terms of the GNU General Public License
  * version 2.  This program is licensed "as is" without any warranty of any
@@ -72,6 +72,7 @@
 
 #define DEFAULT_HIGH_WATERMARK_MULT	50
 #define DEFAULT_LOW_WATERMARK_MULT	25
+#define DEFAULT_MAX_TX_DELAY_MSECS	10
 
 enum drop_kind {
 	dk_none,
@@ -129,6 +130,7 @@ struct tegra_hv_net {
 
 	unsigned int high_watermark;	/* mult * framesize */
 	unsigned int low_watermark;
+	unsigned int max_tx_delay;
 };
 
 static int tegra_hv_net_open(struct net_device *ndev)
@@ -138,6 +140,13 @@ static int tegra_hv_net_open(struct net_device *ndev)
 	napi_enable(&hvn->napi);
 	netif_start_queue(ndev);
 
+	/*
+	 * check if there are already packets in our queue,
+	 * and if so, we need to schedule a call to handle them
+	 */
+	if (tegra_hv_ivc_can_read(hvn->ivck))
+		napi_schedule(&hvn->napi);
+
 	return 0;
 }
 
@@ -145,6 +154,10 @@ static irqreturn_t tegra_hv_net_interrupt(int irq, void *data)
 {
 	struct net_device *ndev = data;
 	struct tegra_hv_net *hvn = netdev_priv(ndev);
+
+	/* until this function returns 0, the channel is unusable */
+	if (tegra_hv_ivc_channel_notified(hvn->ivck) != 0)
+		return IRQ_HANDLED;
 
 	if (tegra_hv_ivc_can_write(hvn->ivck))
 		wake_up_interruptible_all(&hvn->wq);
@@ -155,6 +168,32 @@ static irqreturn_t tegra_hv_net_interrupt(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static void *tegra_hv_net_xmit_get_buffer(struct tegra_hv_net *hvn)
+{
+	void *p;
+	int ret;
+
+	/*
+	 * grabbing a frame can fail for the following reasons:
+	 * 1. the channel is full / peer is uncooperative
+	 * 2. the channel is under reset / peer has restarted
+	 */
+	p = tegra_hv_ivc_write_get_next_frame(hvn->ivck);
+	if (IS_ERR(p)) {
+		ret = wait_event_interruptible_timeout(hvn->wq,
+			!IS_ERR(p = tegra_hv_ivc_write_get_next_frame(
+				hvn->ivck)),
+			msecs_to_jiffies(hvn->max_tx_delay));
+		if (ret <= 0) {
+			net_warn_ratelimited(
+				"%s: timed out after %u ms\n",
+				hvn->ndev->name,
+				hvn->max_tx_delay);
+		}
+	}
+
+	return p;
+}
 
 static void tegra_hv_net_xmit_work(struct work_struct *work)
 {
@@ -198,22 +237,12 @@ static void tegra_hv_net_xmit_work(struct work_struct *work)
 			if (count > max_frame)
 				count = max_frame;
 
-			/* wait until we have space to write */
-			if (!tegra_hv_ivc_can_write(hvn->ivck)) {
-				ret = wait_event_interruptible(hvn->wq,
-					tegra_hv_ivc_can_write(hvn->ivck));
-				if (ret) {
-					netdev_err(hvn->ndev,
-						"%s: wait error=%d\n",
-						__func__, ret);
-					dk = dk_wq;
-					goto drop;
-				}
+			/* wait up to the maximum send timeout */
+			p = tegra_hv_net_xmit_get_buffer(hvn);
+			if (IS_ERR(p)) {
+				dk = dk_wq;
+				goto drop;
 			}
-
-			/* after we check write no failure is expected */
-			p = tegra_hv_ivc_write_get_next_frame(hvn->ivck);
-			BUG_ON(IS_ERR(p));
 
 			last = skb->len == count;
 
@@ -236,7 +265,7 @@ static void tegra_hv_net_xmit_work(struct work_struct *work)
 			skb_copy_from_linear_data(skb, &p[2], count);
 
 			/* advance the tx queue */
-			tegra_hv_ivc_write_advance(hvn->ivck);
+			(void)tegra_hv_ivc_write_advance(hvn->ivck);
 			skb_pull(skb, count);
 		}
 		/* all OK */
@@ -424,11 +453,15 @@ static int tegra_hv_net_rx(struct tegra_hv_net *hvn, int limit)
 
 	nr = 0;
 	dk = dk_none;
-	while (nr < limit && tegra_hv_ivc_can_read(hvn->ivck)) {
-
-		/* we checked, so this is expected to be successful */
+	while (nr < limit) {
+		/*
+		 * grabbing a frame can fail for the following reasons:
+		 * 1. the channel is empty / peer is uncooperative
+		 * 2. the channel is under reset / peer has restarted
+		 */
 		p = tegra_hv_ivc_read_get_next_frame(hvn->ivck);
-		BUG_ON(IS_ERR(p));
+		if (IS_ERR(p))
+			break;
 
 		nr++;
 
@@ -497,7 +530,7 @@ static int tegra_hv_net_rx(struct tegra_hv_net *hvn, int limit)
 		}
 		dk = dk_none;
 drop:
-		tegra_hv_ivc_read_advance(hvn->ivck);
+		(void)tegra_hv_ivc_read_advance(hvn->ivck);
 
 		u64_stats_update_begin(&stats->rx_syncp);
 		if (dk == dk_none) {
@@ -544,8 +577,16 @@ static int tegra_hv_net_poll(struct napi_struct *napi, int budget)
 
 	work_done = tegra_hv_net_rx(hvn, budget);
 
-	if (work_done < budget)
+	if (work_done < budget) {
 		napi_complete(napi);
+
+		/*
+		 * if an interrupt occurs after tegra_hv_net_rx() but before
+		 * napi_complete(), we lose the call to napi_schedule().
+		 */
+		if (tegra_hv_ivc_can_read(hvn->ivck))
+			napi_reschedule(napi);
+	}
 
 	return work_done;
 }
@@ -558,7 +599,7 @@ static int tegra_hv_net_probe(struct platform_device *pdev)
 	struct tegra_hv_net *hvn = NULL;
 	int ret;
 	u32 id;
-	u32 highmark, lowmark;
+	u32 highmark, lowmark, txdelay;
 
 	if (!is_tegra_hypervisor_mode()) {
 		dev_info(dev, "Hypervisor is not present\n");
@@ -587,7 +628,7 @@ static int tegra_hv_net_probe(struct platform_device *pdev)
 	if (ret != 0)
 		highmark = DEFAULT_HIGH_WATERMARK_MULT;
 
-	ret = of_property_read_u32(dn, "high-watermark-mult", &lowmark);
+	ret = of_property_read_u32(dn, "low-watermark-mult", &lowmark);
 	if (ret != 0)
 		lowmark = DEFAULT_LOW_WATERMARK_MULT;
 
@@ -596,6 +637,10 @@ static int tegra_hv_net_probe(struct platform_device *pdev)
 				highmark, lowmark);
 		goto out_of_put;
 	}
+
+	ret = of_property_read_u32(dn, "max-tx-delay-msecs", &txdelay);
+	if (ret != 0)
+		txdelay = DEFAULT_MAX_TX_DELAY_MSECS;
 
 	ndev = alloc_etherdev(sizeof(*hvn));
 	if (ndev == NULL) {
@@ -617,15 +662,16 @@ static int tegra_hv_net_probe(struct platform_device *pdev)
 	of_node_put(hv_dn);
 	hv_dn = NULL;
 
-	hvn->high_watermark = highmark * hvn->ivck->nframes;
-	hvn->low_watermark = lowmark * hvn->ivck->nframes;
-
 	if (IS_ERR_OR_NULL(hvn->ivck)) {
 		dev_err(dev, "Failed to reserve IVC channel %d\n", id);
 		ret = PTR_ERR(hvn->ivck);
 		hvn->ivck = NULL;
 		goto out_free_stats;
 	}
+
+	hvn->high_watermark = highmark * hvn->ivck->nframes;
+	hvn->low_watermark = lowmark * hvn->ivck->nframes;
+	hvn->max_tx_delay = txdelay;
 
 	/* make sure the frame size is sufficient */
 	if (hvn->ivck->frame_size <= HDR_SIZE + 4) {
@@ -678,6 +724,13 @@ static int tegra_hv_net_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to register netdev\n");
 		goto out_free_wq;
 	}
+
+	/*
+	 * start the channel reset process asynchronously. until the reset
+	 * process completes, any attempt to use the ivc channel will return
+	 * an error (e.g., all transmits will fail).
+	 */
+	tegra_hv_ivc_channel_reset(hvn->ivck);
 
 	/* the interrupt request must be the last action */
 	ret = devm_request_irq(dev, ndev->irq, tegra_hv_net_interrupt, 0,

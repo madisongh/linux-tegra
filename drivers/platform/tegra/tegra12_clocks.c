@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/tegra12_clocks.c
  *
- * Copyright (C) 2011-2014 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2011-2015 NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -419,6 +419,8 @@
 	((PLLSS_SDM_SSC_MAX << 16) | (PLLSS_SDM_SSC_MIN << 0))
 #define PLLSS_CTRL2_DEFAULT_VALUE \
 	((PLLSS_SDM_SSC_STEP << 16) | (PLLSS_SDM_DIN << 0))
+
+#define PLLSS_CFG_EN_SSC		(0x1 << 30)
 
 /* PLLSS configuration */
 #define PLLSS_MISC_KVCO			0
@@ -1060,11 +1062,6 @@ static void tegra12_super_clk_init(struct clk *c)
 	}
 	BUG_ON(sel->input == NULL);
 	c->parent = sel->input;
-
-	/* Update parent in case when LP CPU PLLX DIV2 bypassed */
-	if ((c->flags & DIV_2) && (c->parent->flags & PLLX) &&
-	    (val & SUPER_LP_DIV2_BYPASS))
-		c->parent = c->parent->parent;
 
 	/* Update parent in case when LP CPU PLLX DIV2 bypassed */
 	if ((c->flags & DIV_2) && (c->parent->flags & PLLX) &&
@@ -3754,15 +3751,30 @@ static void tegra12_pllss_clk_init(struct clk *c)
 static int tegra12_pllss_clk_enable(struct clk *c)
 {
 	u32 val;
+	bool ssc_enabled = false;
 	pr_debug("%s on clock %s\n", __func__, c->name);
 
 	pll_do_iddq(c, PLL_BASE, PLLSS_BASE_IDDQ, false);
+
+	val = clk_readl(c->reg + PLLSS_CFG(c));
+	if (val & PLLSS_CFG_EN_SSC) {
+		val &= ~PLLSS_CFG_EN_SSC;
+		clk_writel(val, c->reg + PLLSS_CFG(c));
+		ssc_enabled = true;
+	}
 
 	val = clk_readl(c->reg + PLL_BASE);
 	val |= PLL_BASE_ENABLE;
 	clk_writel(val, c->reg + PLL_BASE);
 
 	tegra12_pll_clk_wait_for_lock(c, c->reg + PLL_BASE, PLLSS_BASE_LOCK);
+
+	if (ssc_enabled) {
+		val = clk_readl(c->reg + PLLSS_CFG(c));
+		val |= PLLSS_CFG_EN_SSC;
+		pll_writel_delay(val, c->reg + PLLSS_CFG(c));
+	}
+
 	return 0;
 }
 
@@ -4308,28 +4320,17 @@ static void tune_cpu_trimmers(bool trim_high)
 }
 #endif
 
-static unsigned long int dfll_boot_khz;
-static int __init dfll_freq_cmd_line(char *line)
-{
-	int status = kstrtoul(line, 0, &dfll_boot_khz);
-	if(status) {
-		pr_err("\n%s:Error in parsing dfll_boot_khz:%d\n",
-			__func__, status);
-		dfll_boot_khz = 0;
-	}
-	return status;
-}
-early_param("dfll_boot_khz", dfll_freq_cmd_line);
-
 static void __init tegra12_dfll_clk_init(struct clk *c)
 {
+	unsigned long int dfll_boot_req_khz = tegra_dfll_boot_req_khz();
 	c->ops->init = tegra12_dfll_cpu_late_init;
 
-	/** If boot loader has set dfll clock, then dfll freq is
-	 *  passed in kernel command line from bootloader
+	/*
+	 * If boot loader has set dfll clock, then dfll freq is
+	 * passed in kernel command line from bootloader
 	 */
-	if(dfll_boot_khz)
-		c->rate = dfll_boot_khz * 1000;
+	if (dfll_boot_req_khz)
+		c->rate = dfll_boot_req_khz * 1000;
 }
 
 static int tegra12_dfll_clk_enable(struct clk *c)
@@ -4375,7 +4376,7 @@ static void tegra12_dfll_clk_reset(struct clk *c, bool assert)
 static int
 tegra12_dfll_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 {
-	if(c->state != UNINITIALIZED) {
+	if ((c->state != UNINITIALIZED) && (c->u.dfll.cl_dvfs)) {
 		if ((p == TEGRA_CLK_DFLL_LOCK) && (c->u.dfll.cl_dvfs))
 			return setting ? tegra_cl_dvfs_lock(c->u.dfll.cl_dvfs) :
 					tegra_cl_dvfs_unlock(c->u.dfll.cl_dvfs);
@@ -4411,7 +4412,7 @@ static int tegra12_use_dfll_cb(const char *arg, const struct kernel_param *kp)
 {
 	int ret = 0;
 	unsigned int old_use_dfll;
-	if (CONFIG_TEGRA_USE_DFLL_RANGE != TEGRA_USE_DFLL_CDEV_CNTRL) {
+	if (tegra_override_dfll_range != TEGRA_USE_DFLL_CDEV_CNTRL) {
 		old_use_dfll = use_dfll;
 		param_set_int(arg, kp);
 		ret =  tegra_clk_dfll_range_control(use_dfll);
@@ -8262,7 +8263,7 @@ static DEFINE_MUTEX(sbus_cross_mutex);
 }
 
 struct clk tegra_list_clks[] = {
-	PERIPH_CLK("apbdma",	"tegra-apbdma",		NULL,	34,	0,	26000000,  mux_clk_m,			0),
+	PERIPH_CLK("apbdma",	"60020000.dma",		NULL,	34,	0,	26000000,  mux_clk_m,			0),
 	PERIPH_CLK("rtc",	"rtc-tegra",		NULL,	4,	0,	32768,     mux_clk_32k,			PERIPH_NO_RESET | PERIPH_ON_APB),
 	PERIPH_CLK("kbc",	"tegra-kbc",		NULL,	36,	0,	32768,	   mux_clk_32k, 		PERIPH_NO_RESET | PERIPH_ON_APB),
 	PERIPH_CLK("timer",	"timer",		NULL,	5,	0,	26000000,  mux_clk_m,			0),
@@ -8277,7 +8278,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("i2s4",	"tegra30-i2s.4",	NULL,	102,	0x3c0,	24576000,  mux_pllaout0_audio4_2x_pllp_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("spdif_out",	"tegra30-spdif",	"spdif_out",	10,	0x108,	 24576000, mux_pllaout0_audio_2x_pllp_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("spdif_in",	"tegra30-spdif",	"spdif_in",	10,	0x10c,	100000000, mux_pllp_pllc_pllm,		MUX | DIV_U71 | PERIPH_ON_APB),
-	PERIPH_CLK("pwm",	"tegra-pwm",		NULL,	17,	0x110,	48000000, mux_pllp_pllc_clk32_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+	PERIPH_CLK("pwm",	"7000a000.pwm",		NULL,	17,	0x110,	48000000, mux_pllp_pllc_clk32_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	D_AUDIO_CLK("d_audio",	"tegra30-ahub",		"d_audio",	106,	0x3d0,	48000000,  mux_d_audio_clk,	MUX | DIV_U71 | PERIPH_ON_APB),
 	D_AUDIO_CLK("dam0",	"tegra30-dam.0",	NULL,	108,	0x3d8,	40000000,  mux_d_audio_clk,	MUX | DIV_U71 | PERIPH_ON_APB),
 	D_AUDIO_CLK("dam1",	"tegra30-dam.1",	NULL,	109,	0x3dc,	40000000,  mux_d_audio_clk,	MUX | DIV_U71 | PERIPH_ON_APB),
@@ -8295,12 +8296,12 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("hda",	"tegra30-hda",		"hda",   125,	0x428,	108000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("hda2codec_2x",	"tegra30-hda",	"hda2codec",   111,	0x3e4,	48000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("hda2hdmi",	"tegra30-hda",		"hda2hdmi",	128,	0,	48000000,  mux_clk_m,			PERIPH_ON_APB),
-	PERIPH_CLK("sbc1",	"spi-tegra114.0",	NULL,	41,	0x134, 33000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
-	PERIPH_CLK("sbc2",	"spi-tegra114.1",	NULL,	44,	0x118, 33000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
-	PERIPH_CLK("sbc3",	"spi-tegra114.2",	NULL,	46,	0x11c, 33000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
-	PERIPH_CLK("sbc4",	"spi-tegra114.3",	NULL,	68,	0x1b4, 33000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
-	PERIPH_CLK("sbc5",	"spi-tegra114.4",	NULL,	104,	0x3c8, 33000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
-	PERIPH_CLK("sbc6",	"spi-tegra114.5",	NULL,	105,	0x3cc, 33000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+	PERIPH_CLK("sbc1",	"7000d400.spi",		NULL,	41,	0x134, 51000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+	PERIPH_CLK("sbc2",	"7000d600.spi",		NULL,	44,	0x118, 51000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+	PERIPH_CLK("sbc3",	"7000d800.spi",		NULL,	46,	0x11c, 51000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+	PERIPH_CLK("sbc4",	"7000da00.spi",		NULL,	68,	0x1b4, 51000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+	PERIPH_CLK("sbc5",	"7000dc00.spi",		NULL,	104,	0x3c8, 51000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+	PERIPH_CLK("sbc6",	"7000de00.spi",		NULL,	105,	0x3cc, 51000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("sata_oob",	"tegra_sata_oob",	NULL,	123,	0x420,	216000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("sata",	"tegra_sata",		NULL,	124,	0x424,	216000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("sata_cold",	"tegra_sata_cold",	NULL,	129,	0,	48000000,  mux_clk_m,			PERIPH_ON_APB),
@@ -8331,10 +8332,10 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("i2c6",	"tegra12-i2c.5",	"div-clk",	166,	0x65c,	58300000,  mux_pllp_clkm,	MUX | DIV_U16 | PERIPH_ON_APB),
 	PERIPH_CLK("mipi-cal",	"mipi-cal",		NULL,	56,	0,	60000000,  mux_clk_m,			PERIPH_ON_APB),
 	PERIPH_CLK("mipi-cal-fixed", "mipi-cal-fixed",	NULL,	0,	0,	108000000, mux_pllp_out3,	PERIPH_NO_ENB),
-	PERIPH_CLK("uarta",	"serial-tegra.0",		NULL,	6,	0x178,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB),
-	PERIPH_CLK("uartb",	"serial-tegra.1",		NULL,	7,	0x17c,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB),
-	PERIPH_CLK("uartc",	"serial-tegra.2",		NULL,	55,	0x1a0,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB),
-	PERIPH_CLK("uartd",	"serial-tegra.3",		NULL,	65,	0x1c0,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB),
+	PERIPH_CLK("uarta",	"70006000.serial",		NULL,	6,	0x178,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB),
+	PERIPH_CLK("uartb",	"70006040.serial",		NULL,	7,	0x17c,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB),
+	PERIPH_CLK("uartc",	"70006200.serial",		NULL,	55,	0x1a0,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB),
+	PERIPH_CLK("uartd",	"70006300.serial",		NULL,	65,	0x1c0,	800000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB),
 	PERIPH_CLK("vic03",	"vic03",		NULL,	178,	0x678,	900000000, mux_pllm_pllc_pllp_plla_pllc2_c3_clkm,	MUX | DIV_U71),
 	PERIPH_CLK_EX("vi",	"vi",			"vi",	20,	0x148,	700000000, mux_pllm_pllc_pllp_plla_pllc4,	MUX | DIV_U71 | DIV_U71_INT, &tegra_vi_clk_ops),
 	PERIPH_CLK("vi_sensor",	 NULL,			"vi_sensor",	164,	0x1a8,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_NO_RESET),
@@ -8345,7 +8346,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("hdmi",	"hdmi",			NULL,	51,	0x18c,	594000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("disp1",	"tegradc.0",		NULL,	27,	0x138,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX),
 	PERIPH_CLK("disp2",	"tegradc.1",		NULL,	26,	0x13c,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX),
-	PERIPH_CLK_EX("sor0",	"sor0",			NULL,	182,	0x414,	540000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX | DIV_U71, &tegra_sor_clk_ops),
+	PERIPH_CLK_EX("sor0",	NULL,			"sor0",	182,	0x414,	540000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX | DIV_U71, &tegra_sor_clk_ops),
 	PERIPH_CLK("dpaux",	"dpaux",		NULL,	181,	0,	24000000, mux_clk_m,			0),
 	PERIPH_CLK("usbd",	"tegra-udc.0",		NULL,	22,	0,	480000000, mux_clk_m,			0),
 	PERIPH_CLK("usb2",	"tegra-ehci.1",		NULL,	58,	0,	480000000, mux_clk_m,			0),
@@ -8409,12 +8410,12 @@ struct clk tegra_list_clks[] = {
 	SHARED_SCLK("cap.throttle.sclk", "cap_throttle", NULL,	&tegra_clk_sbus_cmplx, NULL, 0, SHARED_CEILING),
 	SHARED_SCLK("floor.sclk", "floor_sclk",		NULL,	&tegra_clk_sbus_cmplx, NULL, 0, 0),
 	SHARED_SCLK("override.sclk", "override_sclk",	NULL,	&tegra_clk_sbus_cmplx, NULL, 0, SHARED_OVERRIDE),
-	SHARED_SCLK("sbc1.sclk", "tegra12-spi.0",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
-	SHARED_SCLK("sbc2.sclk", "tegra12-spi.1",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
-	SHARED_SCLK("sbc3.sclk", "tegra12-spi.2",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
-	SHARED_SCLK("sbc4.sclk", "tegra12-spi.3",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
-	SHARED_SCLK("sbc5.sclk", "tegra12-spi.4",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
-	SHARED_SCLK("sbc6.sclk", "tegra12-spi.5",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
+	SHARED_SCLK("sbc1.sclk", "7000d400.spi",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
+	SHARED_SCLK("sbc2.sclk", "7000d600.spi",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
+	SHARED_SCLK("sbc3.sclk", "7000d800.spi",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
+	SHARED_SCLK("sbc4.sclk", "7000da00.spi",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
+	SHARED_SCLK("sbc5.sclk", "7000dc00.spi",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
+	SHARED_SCLK("sbc6.sclk", "7000de00.spi",	"sclk", &tegra_clk_apb,        NULL, 0, 0),
 
 	SHARED_EMC_CLK("avp.emc",	"nvavp",	"emc",	&tegra_clk_emc, NULL, 0, 0, 0),
 	SHARED_EMC_CLK("mon_cpu.emc",	"tegra_mon", "cpu_emc",	&tegra_clk_emc, NULL, 0, 0, 0),
@@ -8452,6 +8453,7 @@ struct clk tegra_list_clks[] = {
 	SHARED_EMC_CLK("vic.emc",	"tegra_vic03.0",	"emc",  &tegra_clk_emc, NULL, 0, 0, 0),
 	SHARED_EMC_CLK("vic_shared.emc",	"tegra_vic03.0",	"emc_shared",  &tegra_clk_emc, NULL, 0, SHARED_BW, 0),
 	SHARED_EMC_CLK("battery.emc",	"battery_edp",	"emc",	&tegra_clk_emc, NULL, 0, SHARED_CEILING, 0),
+	SHARED_EMC_CLK("pcie.emc",      "tegra_pcie",           "emc",  &tegra_clk_emc, NULL, 0, 0, 0),
 	SHARED_LIMIT("floor.emc",	"floor.emc",	NULL,	&tegra_clk_emc, NULL,  0, 0),
 	SHARED_LIMIT("floor.profile.emc", "profile.emc", "floor", &tegra_clk_emc, NULL,  0, 0),
 
@@ -8677,18 +8679,18 @@ struct clk_duplicate tegra_clk_duplicates[] = {
 	CLK_DUPLICATE("sbc4", "spi-tegra114-slave.3", NULL),
 	CLK_DUPLICATE("sbc5", "spi-tegra114-slave.4", NULL),
 	CLK_DUPLICATE("sbc6", "spi-tegra114-slave.5", NULL),
-	CLK_DUPLICATE("pll_p", "spi-tegra114.0", "pll_p"),
-	CLK_DUPLICATE("pll_p", "spi-tegra114.1", "pll_p"),
-	CLK_DUPLICATE("pll_p", "spi-tegra114.2", "pll_p"),
-	CLK_DUPLICATE("pll_p", "spi-tegra114.3", "pll_p"),
-	CLK_DUPLICATE("pll_p", "spi-tegra114.4", "pll_p"),
-	CLK_DUPLICATE("pll_p", "spi-tegra114.5", "pll_p"),
-	CLK_DUPLICATE("clk_m", "spi-tegra114.0", "clk_m"),
-	CLK_DUPLICATE("clk_m", "spi-tegra114.1", "clk_m"),
-	CLK_DUPLICATE("clk_m", "spi-tegra114.2", "clk_m"),
-	CLK_DUPLICATE("clk_m", "spi-tegra114.3", "clk_m"),
-	CLK_DUPLICATE("clk_m", "spi-tegra114.4", "clk_m"),
-	CLK_DUPLICATE("clk_m", "spi-tegra114.5", "clk_m"),
+	CLK_DUPLICATE("pll_p", "7000d400.spi", "pll_p"),
+	CLK_DUPLICATE("pll_p", "7000d600.spi", "pll_p"),
+	CLK_DUPLICATE("pll_p", "7000d800.spi", "pll_p"),
+	CLK_DUPLICATE("pll_p", "7000da00.spi", "pll_p"),
+	CLK_DUPLICATE("pll_p", "7000dc00.spi", "pll_p"),
+	CLK_DUPLICATE("pll_p", "7000de00.spi", "pll_p"),
+	CLK_DUPLICATE("clk_m", "7000d400.spi", "clk_m"),
+	CLK_DUPLICATE("clk_m", "7000d600.spi", "clk_m"),
+	CLK_DUPLICATE("clk_m", "7000d800.spi", "clk_m"),
+	CLK_DUPLICATE("clk_m", "7000da00.spi", "clk_m"),
+	CLK_DUPLICATE("clk_m", "7000dc00.spi", "clk_m"),
+	CLK_DUPLICATE("clk_m", "7000de00.spi", "clk_m"),
 	CLK_DUPLICATE("i2c5", "tegra_cl_dvfs", "i2c"),
 	CLK_DUPLICATE("cpu_g", "tegra_cl_dvfs", "safe_dvfs"),
 	CLK_DUPLICATE("actmon", "tegra_host1x", "actmon"),
@@ -8963,6 +8965,7 @@ static void __init tegra12_dfll_cpu_late_init(struct clk *c)
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 	int ret;
 	struct clk *cpu = &tegra_clk_virtual_cpu_g;
+	unsigned long int dfll_boot_req_khz = tegra_dfll_boot_req_khz();
 
 	if (!cpu || !cpu->dvfs) {
 		pr_err("%s: CPU dvfs is not present\n", __func__);
@@ -8970,14 +8973,33 @@ static void __init tegra12_dfll_cpu_late_init(struct clk *c)
 	}
 	tegra_dvfs_set_dfll_tune_trimmers(cpu->dvfs, tune_cpu_trimmers);
 
-	/* release dfll clock source reset, init cl_dvfs control logic, and
-	   move dfll to initialized state, so it can be used as CPU source */
+	/* release dfll clock source reset */
 	tegra_periph_reset_deassert(c);
+
+	/*
+	 * Init cl_dvfs control logic, and move dfll to
+	 * initialized state, so it can be used as CPU source
+	 */
 	ret = tegra_init_cl_dvfs();
+
+	/* If cpu clock source is already dfll */
+	if (dfll_boot_req_khz) {
+		use_dfll = DFLL_RANGE_ALL_RATES;
+		c->state = ON;
+		tegra_dvfs_set_dfll_range(cpu->dvfs, use_dfll);
+		/* Set regulator acces mode as volatile */
+		tegra_dvfs_rail_set_reg_volatile(tegra_cpu_rail, true);
+		if (!ret)
+			tegra_cl_dvfs_debug_init(c);
+		pr_info("Tegra CPU DFLL from Boot loader with use_dfll = %d\n",
+			use_dfll);
+		return;
+	}
+
 	if (!ret) {
 		c->state = OFF;
 		if (tegra_platform_is_silicon()) {
-			if (CONFIG_TEGRA_USE_DFLL_RANGE !=
+			if (tegra_override_dfll_range !=
 					TEGRA_USE_DFLL_CDEV_CNTRL)
 				use_dfll = CONFIG_TEGRA_USE_DFLL_RANGE;
 #ifdef CONFIG_ARCH_TEGRA_13x_SOC
@@ -9223,6 +9245,9 @@ struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 	if (freq_table_data.freq_table)
 		return &freq_table_data;
 
+	if (tegra_is_soc_automotive_speedo())
+		freq_table_data.preserve_across_suspend = true;
+
 	/* Clean table */
 	for (i = 0; i < CPU_FREQ_TABLE_MAX_SIZE; i++) {
 		freq_table[i].driver_data = i;
@@ -9281,7 +9306,10 @@ struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 			if (freq > g_vmin_freq)
 				freq_table[i++].frequency = g_vmin_freq;
 		}
-		freq_table[i++].frequency = freq;
+
+		/* Skip duplicated frequency (may happen on LP CPU only) */
+		if (freq_table[i-1].frequency != freq)
+			freq_table[i++].frequency = freq;
 
 		if (freq == max_freq)
 			break;

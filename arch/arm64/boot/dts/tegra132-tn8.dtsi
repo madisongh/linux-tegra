@@ -38,6 +38,10 @@
 		spi-max-frequency = <25000000>;
 	};
 
+	pmc@7000e400 {
+		nvidia,invert-interrupt;
+	};
+
 	xusb@70090000 {
 		/* nvidia,uses_external_pmic;
 		nvidia,gpio_controls_muxed_ss_lanes; */
@@ -117,7 +121,6 @@
 		nvidia,mdm-power-report-gpio = <&gpio TEGRA_GPIO(K, 0) GPIO_ACTIVE_LOW>;
 		nvidia,reset-gpio = <&gpio TEGRA_GPIO(S, 3) GPIO_ACTIVE_LOW>;
 		nvidia,mdm-en-gpio = <&gpio TEGRA_GPIO(S, 4) GPIO_ACTIVE_HIGH>;
-		nvidia,mdm-sar0-gpio = <&gpio TEGRA_GPIO(G, 2) GPIO_ACTIVE_LOW>;
 		status = "disabled";
 	};
 

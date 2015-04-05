@@ -1,7 +1,7 @@
 /*
  * arch/arm64/boot/dts/tegra210-loki-e-p2530-0031-e00-00.dts
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,50 +18,26 @@
  *
  */
 
-#include "tegra210-loki-e-p2530-common.dtsi"
-#include "panel-j-1440-810-5-8.dtsi"
-#include "tegra210-platforms/tegra210-loki-e-emc-a00.dtsi"
-#include "tegra210-platforms/tegra210-loki-e-touch-p2530-00xx.dtsi"
+#include "tegra210-loki-e-p2530-0030-e00-00.dts"
 
 / {
 	model = "loki_e_lte";
 	nvidia,dtsfilename = __FILE__;
 
-	backlight {
-		compatible = "pwm-backlight";
-		status = "okay";
-		panel-j-1440-810-5-8-bl {
-			pwms = <&tegra_pwm 0 29334>;
-		};
+	modem {
+		/* pre boost regulator gpio */
+		nvidia,pre-boost-gpio = <&gpio TEGRA_GPIO(E, 5) GPIO_ACTIVE_HIGH>;
+		/* using XHCI UTMI */
+		nvidia,phy-type = <2>;
 	};
 
-	host1x {
-		/* tegradc.0 */
-		dc@54200000 {
-			status = "okay";
-			nvidia,dc-flags = <TEGRA_DC_FLAG_ENABLED>;
-			nvidia,emc-clk-rate = <204000000>;
-			nvidia,cmu-enable = <1>;
-			nvidia,fb-bpp = <32>; /* bits per pixel */
-			nvidia,fb-flags = <TEGRA_FB_FLIP_ON_PROBE>;
-		};
-		/* tegradc.1 */
-		dc@54240000 {
-			status = "okay";
-			nvidia,dc-flags = <TEGRA_DC_FLAG_ENABLED>;
-			nvidia,emc-clk-rate = <300000000>;
-			nvidia,fb-bpp = <32>; /* bits per pixel */
-			nvidia,fb-flags = <TEGRA_FB_FLIP_ON_PROBE>;
-		};
-		dsi {
-			nvidia,dsi-controller-vs = <DSI_VS_1>;
-			status = "okay";
-			panel-j-1440-810-5-8 {
-				nvidia,dsi-dpd-pads = <DSIC_DPD_EN DSID_DPD_EN>;
-				nvidia,panel-rst-gpio = <&gpio TEGRA_GPIO(V, 2) 0>; /* PV2 */
-				nvidia,panel-bl-pwm-gpio = <&gpio TEGRA_GPIO(V, 0) 0>; /* PV0 */
-				nvidia,panel-en-gpio = <&gpio TEGRA_GPIO(V, 1) 0>; /* PV1 */
-			};
-		};
+	xusb@70090000 {
+		/* enable UTMI pad 1 */
+		nvidia,portmap = <0x600>;
+		usb_vbus1-supply = <&battery_reg>;
+	};
+
+	touch-leds-pwm-rework {
+		status = "disabled";
 	};
 };

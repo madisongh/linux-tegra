@@ -1,7 +1,7 @@
 /*
  * arch/arm/boot/dts/tegra124-vcm30_t124.dtsi
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +22,8 @@
 #include <tegra124-platforms/tegra124-vcm30t124-fixed-reg.dtsi>
 
 / {
+	nvidia,dtbbuildtime = __DATE__, __TIME__;
+
 	#address-cells = <2>;
 	#size-cells = <2>;
 
@@ -67,6 +69,7 @@
 
 	spi@7000d400 {
 		status = "disabled";
+		nvidia,clk-parents = "pll_p";
 		spi@0 {
 			compatible = "spidev";
 			reg = <0>;
@@ -80,6 +83,7 @@
 
 	spi@7000d600 {
 		status = "disabled";
+		nvidia,clk-parents = "pll_p";
 		spi@1 {
 			compatible = "spidev";
 			reg = <1>;
@@ -89,6 +93,7 @@
 
 	spi@7000d800 {
 		status = "disabled";
+		nvidia,clk-parents = "pll_p";
 		spi@1 {
 			compatible = "spidev";
 			reg = <1>;
@@ -98,6 +103,7 @@
 
 	spi@7000dc00 {
 		status = "disabled";
+		nvidia,clk-parents = "pll_p";
 		spi@0 {
 			compatible = "spidev";
 			reg = <0>;
@@ -127,6 +133,33 @@
 		 */
 		nvidia,lane_owner = <0x2>; /* PCIE-0, SSP1 and SATA */
 		nvidia,ulpicap = <0>; /* No ulpi support */
+		nvidia,firmware_file = "tegra_xusb_firmware";
+
+		/*Characterization settings*/
+                prod-settings {
+                        #prod-cells = <4>;
+                        prod_c_ss0 {
+                            prod = <
+                                3 0x00000058 0x00000000 0x26ec75f0
+                                3 0x00000068 0x00000000 0x007e08EE
+                                3 0x00000078 0x04ffc000 0x10000000
+                                3 0x00000090 0xfffc0e44 0x00000100
+                            >;
+                        };
+                        prod_c_ss1 {
+                            prod = <
+                                3 0x0000005c 0x00000000 0x26f070f0
+                                3 0x0000006c 0x00000000 0x002008ee
+                                3 0x0000007c 0x04ffc000 0x10000000
+                                3 0x00000094 0xfffc0e44 0x00000100
+                            >;
+                        };
+		};
+	};
+
+	pmc@7000e400 {
+		status = "okay";
+		nvidia,invert-interrupt;
 	};
 
 	pcie-controller {
@@ -146,14 +179,15 @@
 
 	sata@70020000 {
 		nvidia,enable-sata-port;
+		nvidia,l2p_fifo_depth = /bits/8 <0x7>;
 		status = "disabled";
 	};
 
 	sdhci@700b0000 {
-		tap-delay = <0x3B>;
+		tap-delay = <0x10>;
 		trim-delay = <0x2>;
 		nvidia,is-ddr-trim-delay;
-		ddr-trim-delay = <0x4>;
+		ddr-trim-delay = <0x2>;
 		mmc-ocr-mask = <0>;
 		uhs-mask = <0x40>;
 		bus-width = <4>;
@@ -164,8 +198,10 @@
 		vmmc-supply = <&vmmc_dummy>;
 		disable-clock-gate;
 		nvidia,disable-auto-cal;
-		status = "disabled";
 		nvidia,update-pinctrl-settings;
+		/* clock freq based on mode */
+		fixed-clock-freq = <25500000 24000000 24000000 47000000 24000000 47000000 94000000 204000000 0 0 0>;
+		status = "disabled";
 	};
 
 	sdhci@700b0600 {
@@ -183,6 +219,8 @@
 		calib-3v3-offsets = <0x615F>;
 		calib-1v8-offsets = <0x615F>;
 		auto-cal-step = <0x7>;
+		/* clock freq based on mode */
+		fixed-clock-freq = <25500000 25500000 51000000 0 0 0 0 0 51000000 188000000 0>;
 		status = "disabled";
 	};
 
@@ -198,13 +236,15 @@
 		pll_source = "pll_c", "pll_p";
 		vmmc-supply = <&vmmc_dummy>;
 		nvidia,disable-auto-cal;
+		/* clock freq based on mode */
+		fixed-clock-freq = <25500000 25500000 51000000 0 0 0 0 0 40800000 80500000 0>;
 		status = "disabled";
 	};
 
 	sdhci@700b0400 {
 		cd-gpios = <&gpio 133 0>;
 		wp-gpios = <&gpio 132 0>;
-		tap-delay = <0x39>;
+		tap-delay = <0x5>;
 		trim-delay = <0x3>;
 		mmc-ocr-mask = <3>;
 		uhs-mask = <0x28>;
@@ -212,10 +252,16 @@
 		max-clk-limit = <204000000>;
 		pll_source = "pll_c", "pll_p";
 		vmmc-supply = <&vmmc_dummy>;
-		nvidia,disable-auto-cal;
+		cd_wakeup_incapable = <1>;
+		calib-3v3-offsets = <0x710A>;
+		calib-1v8-offsets = <0x710A>;
+		auto-cal-step = <0x7>;
 		status = "disabled";
 		nvidia,update-pinctrl-settings;
+		/* clock freq based on mode */
+		fixed-clock-freq = <25500000 24000000 24000000 47000000 24000000 47000000 94000000 204000000 0 0 0>;
 		nvidia,enable-ext-loopback;
+		nvidia,auto-cal-slew-override;
 	};
 
 	snor {
@@ -238,6 +284,70 @@
 			nvidia,phy_addr = <0x0 0x48000000>;
 			nvidia,phy_size = <0x04000000>;
 		};
+	};
+
+	udc@7d000000 {
+		nvidia,port-otg;
+		/*xcvr-setup-offset is in 2s complement for negative values*/
+		nvidia,xcvr-setup-offset = /bits/8 <16>;
+		status = "okay";
+	};
+
+	otg@7d000000 {
+		nvidia,id-detection-type = <2>;
+		status = "okay";
+	};
+
+	ehci@7d000000 {
+		nvidia,port-otg;
+		nvidia,has-hostpc;
+		nvidia,turn_off_vbus_on_lp0;
+		nvidia,id-detection-type = <2>;
+		nvidia,hssync-start-delay = <0>;
+		nvidia,idle-wait-delay = <17>;
+		nvidia,elastic-limit = <16>;
+		nvidia,term-range-adj = <6>;
+		nvidia,xcvr-setup = <15>;
+		nvidia,xcvr-lsfslew = <2>;
+		nvidia,xcvr-lsrslew = <2>;
+		nvidia,xcvr-use-fuses;
+		nvidia,vbus-oc-map = <4>;
+		nvidia,xcvr-setup-offset = <0>;
+		status = "disabled";
+	};
+
+	ehci@7d004000 {
+		nvidia,has-hostpc;
+		nvidia,turn_off_vbus_on_lp0;
+		nvidia,hot_plug;
+		nvidia,hssync-start-delay = <0>;
+		nvidia,idle-wait-delay = <17>;
+		nvidia,elastic-limit = <16>;
+		nvidia,term-range-adj = <6>;
+		nvidia,xcvr-setup = <8>;
+		nvidia,xcvr-lsfslew = <2>;
+		nvidia,xcvr-lsrslew = <2>;
+		nvidia,xcvr-use-fuses;
+		nvidia,vbus-oc-map = <5>;
+		nvidia,xcvr-setup-offset = <1>;
+		status = "okay";
+	};
+
+	ehci@7d008000 {
+		nvidia,has-hostpc;
+		nvidia,turn_off_vbus_on_lp0;
+		nvidia,hot_plug;
+		nvidia,hssync-start-delay = <0>;
+		nvidia,idle-wait-delay = <17>;
+		nvidia,elastic-limit = <16>;
+		nvidia,term-range-adj = <6>;
+		nvidia,xcvr-setup = <8>;
+		nvidia,xcvr-lsfslew = <2>;
+		nvidia,xcvr-lsrslew = <2>;
+		nvidia,xcvr-use-fuses;
+		nvidia,vbus-oc-map = <5>;
+		nvidia,xcvr-setup-offset = <2>;
+		status = "okay";
 	};
 
 	dfll@70110000 {
@@ -281,5 +391,39 @@
 				status = "disabled";
 			};
 		};
+	};
+
+	bthrot_cdev {
+		status = "disabled";
+	};
+
+	/*Re-setting the clock frequencies for visibility*/
+	i2c@7000c000 {
+		clock-frequency = <400000>;
+	};
+
+	i2c@7000c400 {
+		clock-frequency = <100000>;
+	};
+
+	i2c@7000c500 {
+		clock-frequency = <400000>;
+	};
+
+	i2c@7000c700 {
+		clock-frequency = <100000>;
+	};
+
+	i2c@7000d000 {
+		clock-frequency = <400000>;
+	};
+
+	i2c@7000d100 {
+		clock-frequency = <400000>;
+	};
+
+	soctherm@0x700E2000 {
+		soctherm-clock-frequency = <51000000>;
+		tsensor-clock-frequency  = <400000>;
 	};
 };

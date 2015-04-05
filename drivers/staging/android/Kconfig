@@ -102,6 +102,12 @@ config ANDROID_INTF_ALARM_DEV
 	  elapsed realtime, and a non-wakeup alarm on the monotonic clock.
 	  Also exports the alarm interface to user-space.
 
+source "drivers/staging/android/ion/Kconfig"
+
+endif # if ANDROID
+
+source "drivers/staging/android/fiq_debugger/Kconfig"
+
 config SYNC
 	bool "Synchronization framework"
 	default n
@@ -129,11 +135,5 @@ config SW_SYNC_USER
 	  Provides a user space API to the sw sync object.
 	  *WARNING* improper use of this can result in deadlocking kernel
 	  drivers from userspace.
-
-source "drivers/staging/android/ion/Kconfig"
-
-source "drivers/staging/android/fiq_debugger/Kconfig"
-
-endif # if ANDROID
 
 endmenu

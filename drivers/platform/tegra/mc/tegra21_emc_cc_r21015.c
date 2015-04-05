@@ -30,6 +30,34 @@
 #define DVFS_CLOCK_CHANGE_VERSION	21018
 #define EMC_PRELOCK_VERSION		2101
 
+/*
+ * When derating is enabled periodic training needs to update both sets of
+ * tables. This function copys the necessary periodic training settings from
+ * the current timing into it's alternate timing derated/normal timing.
+ */
+static void __update_emc_alt_timing(struct tegra21_emc_table *current_timing)
+{
+	struct tegra21_emc_table *current_table, *alt_timing;
+	int i;
+
+	/* Only have alternate timings when there are derated tables present. */
+	if (!tegra_emc_table_derated)
+		return;
+
+	current_table = emc_get_table(dram_over_temp_state);
+	i = current_timing - current_table;
+
+	BUG_ON(i < 0 || i > tegra_emc_table_size);
+
+	if (dram_over_temp_state == DRAM_OVER_TEMP_THROTTLE)
+		alt_timing = &tegra_emc_table[i];
+	else
+		alt_timing = &tegra_emc_table_derated[i];
+
+	__emc_copy_table_params(current_timing, alt_timing,
+				EMC_COPY_TABLE_PARAM_PERIODIC_FIELDS);
+}
+
 static inline u32 actual_osc_clocks(u32 in)
 {
 	if (in < 0x40)
@@ -65,7 +93,7 @@ static u32 update_clock_tree_delay(struct tegra21_emc_table *last_timing,
 	     "Timed out waiting for MRR 19 (ch=0)\n");
 	if (channel_mode == DUAL_CHANNEL)
 		WARN(wait_for_update(EMC_EMC_STATUS,
-				     EMC_EMC_STATUS_MRR_DIVLD, 1, 0),
+				     EMC_EMC_STATUS_MRR_DIVLD, 1, 1),
 		     "Timed out waiting for MRR 19 (ch=1)\n");
 
 	mrr_data = (emc_readl(EMC_MRR) & EMC_MRR_DATA_MASK) <<
@@ -92,7 +120,7 @@ static u32 update_clock_tree_delay(struct tegra21_emc_table *last_timing,
 	     "Timed out waiting for MRR 18 (ch=0)\n");
 	if (channel_mode == DUAL_CHANNEL)
 		WARN(wait_for_update(EMC_EMC_STATUS,
-				     EMC_EMC_STATUS_MRR_DIVLD, 1, 0),
+				     EMC_EMC_STATUS_MRR_DIVLD, 1, 1),
 		     "Timed out waiting for MRR 18 (ch=1)\n");
 
 	mrr_data = (emc_readl(EMC_MRR) & EMC_MRR_DATA_MASK) <<
@@ -172,7 +200,7 @@ static u32 update_clock_tree_delay(struct tegra21_emc_table *last_timing,
 	     "Timed out waiting for MRR 19 (ch=0)\n");
 	if (channel_mode == DUAL_CHANNEL)
 		WARN(wait_for_update(EMC_EMC_STATUS,
-				     EMC_EMC_STATUS_MRR_DIVLD, 1, 0),
+				     EMC_EMC_STATUS_MRR_DIVLD, 1, 1),
 		     "Timed out waiting for MRR 19 (ch=1)\n");
 
 	mrr_data = (emc_readl(EMC_MRR) & EMC_MRR_DATA_MASK) <<
@@ -199,7 +227,7 @@ static u32 update_clock_tree_delay(struct tegra21_emc_table *last_timing,
 	     "Timed out waiting for MRR 18 (ch=0)\n");
 	if (channel_mode == DUAL_CHANNEL)
 		WARN(wait_for_update(EMC_EMC_STATUS,
-				     EMC_EMC_STATUS_MRR_DIVLD, 1, 0),
+				     EMC_EMC_STATUS_MRR_DIVLD, 1, 1),
 		     "Timed out waiting for MRR 18 (ch=1)\n");
 
 	mrr_data = (emc_readl(EMC_MRR) & EMC_MRR_DATA_MASK) <<
@@ -615,6 +643,12 @@ u32 __do_periodic_emc_compensation_r21015(
 		 * 6. Timing update actally applies the new trimmers.
 		 */
 		emc_timing_update(channel_mode);
+
+		/*
+		 * 7. Copy over the periodic training registers that we updated
+		 *    here to the corresponding derated/non-derated table.
+		 */
+		__update_emc_alt_timing(current_timing);
 	}
 
 	return 0;
@@ -1714,6 +1748,9 @@ void emc_set_clock_r21015(struct tegra21_emc_table *next_timing,
 		__raw_writel(wval, (void __iomem *)var);
 	}
 
+	/* SW addition: do EMC refresh adjustment here. */
+	set_over_temp_timing(next_timing, dram_over_temp_state);
+
 	if (dram_type == DRAM_TYPE_LPDDR4) {
 		mrw_req = (23 << EMC_MRW_MRW_MA_SHIFT) |
 			(next_timing->run_clocks & EMC_MRW_MRW_OP_MASK);
@@ -2026,14 +2063,15 @@ void emc_set_clock_r21015(struct tegra21_emc_table *next_timing,
 	 */
 	emc_cc_dbg(STEPS, "Step 15\n");
 
-	if (source_clock_period <= zqcal_before_cc_cutoff)
-		zq_latch_dvfs_wait_time =
-			(tZQCAL_lpddr4_fc_adj - (ramp_up_wait + ramp_down_wait))
-			/ destination_clock_period;
-	else
+	if (source_clock_period <= zqcal_before_cc_cutoff) {
+		s32 t = (s32)(ramp_up_wait + ramp_down_wait) /
+			(s32)destination_clock_period;
+		zq_latch_dvfs_wait_time = (s32)tZQCAL_lpddr4_fc_adj - t;
+	} else {
 		zq_latch_dvfs_wait_time = tZQCAL_lpddr4_fc_adj -
 			div_o3(1000 * next_timing->dram_timing_regs[T_PDEX],
 			       destination_clock_period);
+	}
 
 	emc_cc_dbg(INFO, "tZQCAL_lpddr4_fc_adj = %u\n", tZQCAL_lpddr4_fc_adj);
 	emc_cc_dbg(INFO, "destination_clock_period = %u\n",
@@ -2369,6 +2407,14 @@ void emc_set_clock_r21015(struct tegra21_emc_table *next_timing,
 	 *   Restore FSP to account for switch back. Only needed in training.
 	 */
 	emc_cc_dbg(STEPS, "Step 31\n");
+
+	/* Step 32:
+	 *   [SW] Update the alternative timing (derated vs normal) table with
+	 * the periodic training values computed during the clock change
+	 * pre-amble.
+	 */
+	emc_cc_dbg(STEPS, "Step 32: Update alt timing\n");
+	__update_emc_alt_timing(next_timing);
 
 	/* Done! Yay. */
 }

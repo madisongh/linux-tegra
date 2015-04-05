@@ -84,6 +84,8 @@ struct battery_gauge_dev {
 	int				battery_capacity;
 	const char			*bat_curr_channel_name;
 	struct iio_channel		*bat_current_iio_channel;
+	const char			*input_power_channel_name;
+	struct iio_channel		*input_power_iio_channel;
 };
 
 struct battery_gauge_dev *bg_temp;
@@ -287,6 +289,52 @@ static struct attribute *battery_sysfs_attributes[] = {
 static const struct attribute_group battery_sysfs_attr_group = {
 	.attrs = battery_sysfs_attributes,
 };
+
+int battery_gauge_get_battery_soc(struct battery_charger_dev *bc_dev)
+{
+	struct battery_gauge_dev *bg_dev;
+	int ret = 0;
+
+	if (!bc_dev)
+		return -EINVAL;
+
+	mutex_lock(&charger_gauge_list_mutex);
+
+	list_for_each_entry(bg_dev, &gauge_list, list) {
+		if (bg_dev->cell_id != bc_dev->cell_id)
+			continue;
+		if (bg_dev->ops && bg_dev->ops->get_battery_soc)
+			ret = bg_dev->ops->get_battery_soc(bg_dev);
+	}
+
+	mutex_unlock(&charger_gauge_list_mutex);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(battery_gauge_get_battery_soc);
+
+int battery_gauge_report_battery_soc(struct battery_gauge_dev *bg_dev,
+					int battery_soc)
+{
+	struct battery_charger_dev *node;
+	int ret = 0;
+
+	if (!bg_dev)
+		return -EINVAL;
+
+	mutex_lock(&charger_gauge_list_mutex);
+
+	list_for_each_entry(node, &charger_list, list) {
+		if (node->cell_id != bg_dev->cell_id)
+			continue;
+		if (node->ops && node->ops->input_voltage_configure)
+			ret = node->ops->input_voltage_configure(node,
+				battery_soc);
+	}
+
+	mutex_unlock(&charger_gauge_list_mutex);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(battery_gauge_report_battery_soc);
 
 int battery_gauge_get_scaled_soc(struct battery_gauge_dev *bg_dev,
 	int actual_soc_semi, int thresod_soc)
@@ -528,6 +576,60 @@ int battery_gauge_get_battery_current(struct battery_gauge_dev *bg_dev,
 }
 EXPORT_SYMBOL_GPL(battery_gauge_get_battery_current);
 
+int battery_gauge_get_input_power(struct battery_gauge_dev *bg_dev,
+	int *power_mw)
+{
+	int ret;
+
+	if (!bg_dev || !bg_dev->input_power_channel_name)
+		return -EINVAL;
+
+	if (!bg_dev->input_power_iio_channel)
+		bg_dev->input_power_iio_channel =
+			iio_channel_get(bg_dev->parent_dev,
+					bg_dev->input_power_channel_name);
+	if (!bg_dev->input_power_iio_channel ||
+				IS_ERR(bg_dev->input_power_iio_channel)) {
+		dev_info(bg_dev->parent_dev,
+			"Battery IIO power channel %s not registered yet\n",
+			bg_dev->input_power_channel_name);
+		bg_dev->input_power_iio_channel = NULL;
+		return -ENODEV;
+	}
+
+	ret = iio_read_channel_processed(bg_dev->input_power_iio_channel,
+			power_mw);
+	if (ret < 0) {
+		dev_err(bg_dev->parent_dev,
+			"power channel read failed: %d\n", ret);
+		return ret;
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(battery_gauge_get_input_power);
+
+int battery_gauge_get_input_current_limit(struct battery_gauge_dev *bg_dev)
+{
+	struct battery_charger_dev *node;
+	int ret = 0;
+
+	if (!bg_dev)
+		return -EINVAL;
+
+	mutex_lock(&charger_gauge_list_mutex);
+
+	list_for_each_entry(node, &charger_list, list) {
+		if (node->cell_id != bg_dev->cell_id)
+			continue;
+		if (node->ops && node->ops->get_input_current_limit)
+			ret = node->ops->get_input_current_limit(node);
+	}
+
+	mutex_unlock(&charger_gauge_list_mutex);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(battery_gauge_get_input_current_limit);
+
 int battery_gauge_fc_state(struct battery_gauge_dev *bg_dev,
 					int fullcharge_state)
 {
@@ -586,6 +688,10 @@ struct battery_gauge_dev *battery_gauge_register(struct device *dev,
 
 	if (bgi->current_channel_name)
 		bg_dev->bat_curr_channel_name = bgi->current_channel_name;
+	if (bgi->input_power_channel_name)
+		bg_dev->input_power_channel_name =
+					bgi->input_power_channel_name;
+
 
 #ifdef CONFIG_THERMAL
 	if (bgi->tz_name) {

@@ -96,9 +96,13 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 			 + nvmap_page_pool_get_unused_pages()
 #endif
 			 ;
-	int other_file = global_page_state(NR_FILE_PAGES) -
-						global_page_state(NR_SHMEM) -
-						total_swapcache_pages();
+	int other_file = global_page_state(NR_FILE_PAGES)
+			 - global_page_state(NR_FILE_MAPPED)
+			 - global_page_state(NR_SHMEM)
+			 - total_swapcache_pages();
+
+	if (other_file < 0)
+		other_file = 0;
 
 	if (lowmem_adj_size < array_size)
 		array_size = lowmem_adj_size;

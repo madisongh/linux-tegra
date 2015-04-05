@@ -1,7 +1,7 @@
 /*
  * mods_mem.c - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -31,7 +31,7 @@ static int mods_post_alloc(struct MODS_PHYS_CHUNK *pt,
 static void mods_pre_free(struct MODS_PHYS_CHUNK *pt,
 			  struct MODS_MEM_INFO	 *p_mem_info);
 
-#if !defined(CONFIG_ARCH_TEGRA) || defined(CONFIG_CPA) ||\
+#if !defined(MODS_TEGRA) || defined(CONFIG_CPA) ||\
 	defined(CONFIG_ARCH_TEGRA_3x_SOC)
 static int mods_set_mem_type(u64 virt_addr, u64 pages, u32 type)
 {
@@ -78,8 +78,10 @@ static void mods_free_pages(struct MODS_MEM_INFO *p_mem_info)
 			continue;
 
 #if defined(CONFIG_PPC64)
+	if (p_mem_info->dev != NULL) {
 		pci_unmap_page(p_mem_info->dev, pt->map_addr,
 			       (1U<<pt->order)*PAGE_SIZE, DMA_BIDIRECTIONAL);
+	}
 #endif
 
 #ifdef CONFIG_BIGPHYS_AREA
@@ -458,8 +460,8 @@ static struct MODS_PHYS_CHUNK *mods_find_phys_chunk(
  * ESCAPE CALL FUNCTONS *
  ************************/
 
-int esc_mods_device_alloc_pages_new(struct file	*fp,
-				    struct MODS_DEVICE_ALLOC_PAGES_NEW *p)
+int esc_mods_device_alloc_pages_2(struct file	*fp,
+				  struct MODS_DEVICE_ALLOC_PAGES_2 *p)
 {
 	struct MODS_MEM_INFO *p_mem_info;
 	u32    num_pages;
@@ -478,8 +480,10 @@ int esc_mods_device_alloc_pages_new(struct file	*fp,
 
 	switch (p->attrib) {
 	case MODS_MEMORY_CACHED:
+#if !defined(CONFIG_PPC64)
 	case MODS_MEMORY_UNCACHED:
 	case MODS_MEMORY_WRITECOMBINE:
+#endif
 		break;
 
 	default:
@@ -577,7 +581,7 @@ int esc_mods_device_alloc_pages(struct file                    *fp,
 				struct MODS_DEVICE_ALLOC_PAGES *p)
 {
 	int retval;
-	struct MODS_DEVICE_ALLOC_PAGES_NEW dev_alloc_pages = {0};
+	struct MODS_DEVICE_ALLOC_PAGES_2 dev_alloc_pages = {0};
 	LOG_ENT();
 
 	dev_alloc_pages.num_bytes		= p->num_bytes;
@@ -589,7 +593,7 @@ int esc_mods_device_alloc_pages(struct file                    *fp,
 	dev_alloc_pages.pci_device.device	= p->pci_device.device;
 	dev_alloc_pages.pci_device.function	= p->pci_device.function;
 
-	retval = esc_mods_device_alloc_pages_new(fp, &dev_alloc_pages);
+	retval = esc_mods_device_alloc_pages_2(fp, &dev_alloc_pages);
 	if (!retval)
 		p->memory_handle = dev_alloc_pages.memory_handle;
 
@@ -600,7 +604,7 @@ int esc_mods_device_alloc_pages(struct file                    *fp,
 int esc_mods_alloc_pages(struct file *fp, struct MODS_ALLOC_PAGES *p)
 {
 	int retval;
-	struct MODS_DEVICE_ALLOC_PAGES_NEW dev_alloc_pages;
+	struct MODS_DEVICE_ALLOC_PAGES_2 dev_alloc_pages;
 	LOG_ENT();
 
 	dev_alloc_pages.num_bytes	    = p->num_bytes;
@@ -612,7 +616,7 @@ int esc_mods_alloc_pages(struct file *fp, struct MODS_ALLOC_PAGES *p)
 	dev_alloc_pages.pci_device.device   = 0;
 	dev_alloc_pages.pci_device.function = 0;
 
-	retval = esc_mods_device_alloc_pages_new(fp, &dev_alloc_pages);
+	retval = esc_mods_device_alloc_pages_2(fp, &dev_alloc_pages);
 	if (!retval)
 		p->memory_handle = dev_alloc_pages.memory_handle;
 
@@ -893,7 +897,7 @@ int esc_mods_memory_barrier(struct file *fp)
 	return OK;
 }
 
-#ifdef CONFIG_ARCH_TEGRA
+#ifdef MODS_TEGRA
 
 static void clear_contiguous_cache
 (
@@ -1064,7 +1068,7 @@ static int mods_post_alloc(struct MODS_PHYS_CHUNK *pt,
 			mods_error_printk("kmap failed\n");
 			return -EINVAL;
 		}
-#if defined(CONFIG_ARCH_TEGRA) && !defined(CONFIG_CPA) &&\
+#if defined(MODS_TEGRA) && !defined(CONFIG_CPA) &&\
 	!defined(CONFIG_ARCH_TEGRA_3x_SOC)
 		clear_contiguous_cache(ptr,
 				ptr + PAGE_SIZE,

@@ -1,7 +1,7 @@
 /*
  * extcon-cable-xlate: Cable translator based on different cable states.
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Laxman Dewangan <ldewangan@nvidia.com>
  *
@@ -209,6 +209,7 @@ static void ecx_cable_state_update_work(struct work_struct *work)
 		dev_info(ecx->dev, "Extcon Init success\n");
 		ecx->extcon_init_done = true;
 		schedule_delayed_work(&ecx->work, msecs_to_jiffies(1000));
+		return;
 	}
 	ecx_attach_cable(ecx);
 }
@@ -296,7 +297,7 @@ static struct ecx_platform_data *ecx_get_pdata_from_dt(
 	pdata->n_io_states = of_property_count_u32(np, "cable-states");
 	if ((pdata->n_io_states < 3) || (pdata->n_io_states % 3 != 0)) {
 		dev_err(&pdev->dev, "not found proper cable state\n");
-		return ERR_PTR(-EINVAL);
+		goto cable_new_states;
 	}
 	pdata->n_io_states /= 3;
 	pdata->io_states = devm_kzalloc(&pdev->dev, (pdata->n_io_states) *
@@ -318,9 +319,9 @@ static struct ecx_platform_data *ecx_get_pdata_from_dt(
 				count * 3 + 2, &pval);
 		if (!ret)
 			pdata->io_states[count].out_states = pval;
-
 	}
 
+cable_new_states:
 	pdata->n_io_new_states = of_property_count_u32(np, "cable-new-states");
 	if ((pdata->n_io_new_states < 5) || (pdata->n_io_new_states % 5 != 0)) {
 		dev_dbg(&pdev->dev, "not found proper cable-new-states\n");
@@ -358,6 +359,8 @@ static struct ecx_platform_data *ecx_get_pdata_from_dt(
 			pdata->io_new_states[count].reschedule_wq = pval;
 	}
 exit:
+	if ((pdata->n_io_states < 3) && (pdata->n_io_new_states < 5))
+		return ERR_PTR(-EINVAL);
 	return pdata;
 }
 static int ecx_probe(struct platform_device *pdev)

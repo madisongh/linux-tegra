@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -81,6 +81,7 @@ enum tegra_platform {
 	TEGRA_PLATFORM_QT,
 	TEGRA_PLATFORM_LINSIM,
 	TEGRA_PLATFORM_FPGA,
+	TEGRA_PLATFORM_UNIT_FPGA,
 	TEGRA_PLATFORM_MAX,
 };
 
@@ -204,18 +205,8 @@ int tegra_get_lane_owner_info(void);
 
 int tegra_split_mem_active(void);
 
-#ifdef CONFIG_OF
-static inline bool is_tegra_hypervisor_mode(void)
-{
-	return of_property_read_bool(of_chosen,
-			"nvidia,tegra-hypervisor-mode");
-}
-#else
-static inline bool is_tegra_hypervisor_mode(void)
-{
-	return false;
-}
-#endif
+/* check if in hypervisor mode */
+bool is_tegra_hypervisor_mode(void);
 
 void tegra_get_netlist_revision(u32 *netlist, u32* patchid);
 bool tegra_cpu_is_asim(void);
@@ -231,14 +222,24 @@ static inline bool tegra_platform_is_qt(void)
 }
 static inline bool tegra_platform_is_linsim(void)
 {
-	return tegra_get_platform() == TEGRA_PLATFORM_LINSIM;
+	int plat = tegra_get_platform();
+	return plat == TEGRA_PLATFORM_LINSIM ||
+			plat == TEGRA_PLATFORM_UNIT_FPGA;
 }
 static inline bool tegra_platform_is_fpga(void)
 {
 	return tegra_get_platform() == TEGRA_PLATFORM_FPGA;
 }
+static inline bool tegra_platform_is_unit_fpga(void)
+{
+	return tegra_get_platform() == TEGRA_PLATFORM_UNIT_FPGA;
+}
 
 bool tegra_bonded_out_dev(enum tegra_bondout_dev);
+
+extern void tegra_set_tegraid(u32 chipid, u32 major, u32 minor,
+	u32 nlist, u32 patch, const char *priv);
+extern void tegra_get_tegraid_from_hw(void);
 
 #endif /* __ASSEMBLY__ */
 

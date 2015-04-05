@@ -53,6 +53,7 @@ struct cma {
 static struct cma cma_areas[MAX_CMA_AREAS];
 static unsigned cma_area_count;
 static DEFINE_MUTEX(cma_mutex);
+static unsigned long cma_total_pages;
 
 phys_addr_t cma_get_base(struct cma *cma)
 {
@@ -195,8 +196,14 @@ int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
 	cma->order_per_bit = order_per_bit;
 	*res_cma = cma;
 	cma_area_count++;
+	cma_total_pages += ((unsigned long)size / PAGE_SIZE);
 
 	return 0;
+}
+
+unsigned long cma_get_total_pages(void)
+{
+	return cma_total_pages;
 }
 
 /**
@@ -387,7 +394,8 @@ static void __dma_clear_buffer(struct page *page, size_t size)
 }
 
 struct page *cma_alloc_at(struct cma *cma, int count,
-				unsigned int align, phys_addr_t at_addr)
+				unsigned int align, phys_addr_t at_addr,
+				bool map_non_cached)
 {
 	unsigned long mask, pfn, start = 0;
 	unsigned long bitmap_maxno, bitmap_no, bitmap_count;
@@ -468,6 +476,9 @@ retry:
 		__dma_remap(page, count << PAGE_SHIFT,
 			pgprot_writecombine(PAGE_KERNEL));
 		__dma_clear_buffer(page, count << PAGE_SHIFT);
+		if(map_non_cached)
+			__dma_remap(page, count << PAGE_SHIFT,
+				pgprot_noncached(PAGE_KERNEL));
 	}
 	return page;
 }
@@ -483,7 +494,7 @@ retry:
  */
 struct page *cma_alloc(struct cma *cma, int count, unsigned int align)
 {
-	return cma_alloc_at(cma, count, align, 0);
+	return cma_alloc_at(cma, count, align, 0, false);
 }
 
 /**

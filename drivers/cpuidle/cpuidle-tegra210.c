@@ -1,7 +1,7 @@
 /*
  * drivers/cpuidle/cpuidle-t210.c
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -21,7 +21,7 @@
 #include <linux/module.h>
 #include <linux/cpuidle.h>
 #include <linux/of_platform.h>
-#include <linux/platform_data/tegra_bpmp.h>
+#include <soc/tegra/tegra_bpmp.h>
 #include <linux/tegra-soc.h>
 #include <linux/cpu_pm.h>
 #include <linux/io.h>
@@ -38,6 +38,7 @@
 #include <linux/tick.h>
 #include <linux/irq.h>
 #include <linux/tegra_cluster_control.h>
+#include <linux/regulator/consumer.h>
 #include "../../kernel/irq/internals.h"
 
 #include <asm/suspend.h>
@@ -65,6 +66,30 @@ struct t210_idle_state {
 			int index);
 };
 
+static int tegra_bpmp_do_idle(int cpu, int ccxtl, int scxtl)
+{
+	int32_t tl;
+	int32_t data[3];
+
+	data[0] = cpu_to_le32(cpu);
+	data[1] = cpu_to_le32(ccxtl);
+	data[2] = cpu_to_le32(scxtl);
+
+	return tegra_bpmp_send_receive_atomic(MRQ_DO_IDLE, data, sizeof(data),
+			&tl, sizeof(tl)) ?: tl;
+}
+
+static int tegra_bpmp_tolerate_idle(int cpu, int ccxtl, int scxtl)
+{
+	int32_t data[3];
+
+	data[0] = cpu_to_le32(cpu);
+	data[1] = cpu_to_le32(ccxtl);
+	data[2] = cpu_to_le32(scxtl);
+
+	return tegra_bpmp_send(MRQ_TOLERATE_IDLE, data, sizeof(data));
+}
+
 static int csite_dbg_nopwrdown(void)
 {
 	u64 csite_dbg;
@@ -79,11 +104,7 @@ static int tegra210_enter_hvc(struct cpuidle_device *dev,
 {
 	/* TODO: fix the counter */
 	flowctrl_write_cc4_ctrl(dev->cpu, 0xfffffffd);
-	cpu_retention_enable(7);
-
 	cpu_do_idle();
-
-	cpu_retention_enable(0);
 	flowctrl_write_cc4_ctrl(dev->cpu, 0);
 
 	return index;
@@ -94,11 +115,7 @@ static int tegra210_enter_retention(struct cpuidle_device *dev,
 {
 	/* TODO: fix the counter */
 	flowctrl_write_cc4_ctrl(dev->cpu, 0xffffffff);
-	cpu_retention_enable(7);
-
 	cpu_do_idle();
-
-	cpu_retention_enable(0);
 	flowctrl_write_cc4_ctrl(dev->cpu, 0);
 
 	return index;
@@ -123,15 +140,17 @@ static void __tegra210_enter_c7(int cpu)
 	struct psci_power_state ps = {
 		.id = TEGRA210_CPUIDLE_C7,
 		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-		.affinity_level = 0,
+		.affinity_level = 1,
 	};
 	unsigned long arg = psci_power_state_pack(ps);
 
 	cpu_pm_enter();
-	flowctrl_write_cc4_ctrl(cpu, 0xffffffff);
-	cpu_retention_enable(7);
+
+	if (!is_lp_cluster()) {
+		flowctrl_write_cc4_ctrl(cpu, 0xffffffff);
+	}
+
 	cpu_suspend(arg);
-	cpu_retention_enable(0);
 	flowctrl_write_cc4_ctrl(cpu, 0);
 	cpu_pm_exit();
 }
@@ -492,7 +511,7 @@ static int tegra210_enter_state(struct cpuidle_device *dev,
 	return t210_idle_states[i].enter(dev, drv, i);
 }
 
-static int __init tegra210_cpuidle_register(int cpu)
+static int tegra210_cpuidle_register(int cpu)
 {
 	int ret;
 	struct cpuidle_driver *drv;
@@ -804,7 +823,7 @@ static int idle_write(void *data, u64 val)
 
 DEFINE_SIMPLE_ATTRIBUTE(duration_us_fops, NULL, idle_write, "%llu\n");
 
-static int __init debugfs_init(void)
+static int debugfs_init(void)
 {
 	struct dentry *dfs_file;
 
@@ -842,21 +861,51 @@ err_out:
 	debugfs_remove_recursive(cpuidle_debugfs_root);
 	return -ENOMEM;
 }
+#else
+static inline int debugfs_init(void) { return 0; }
 #endif
 
-/*
- * t210_idle_init
- *
- */
-static int __init tegra210_idle_init(void)
+static int tegra210_cc4_volt_init(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct regulator *reg;
+	uint32_t uv;
+	int r;
+
+	/* If cc4-microvolt is not found, assume not max77621 */
+	if (of_property_read_u32(dev->of_node, "cc4-microvolt", &uv))
+		return 0;
+
+	reg = regulator_get(dev, "vdd-cpu");
+	if (IS_ERR(reg)) {
+		dev_err(dev, "vdd-cpu regulator get failed\n");
+		return PTR_ERR(reg);
+	}
+
+	r = regulator_set_sleep_voltage(reg, uv - 100000, uv + 100000);
+	if (r) {
+		dev_err(dev, "failed to set retention voltage: %d\n", r);
+		goto err_out;
+	}
+
+	dev_info(dev, "retention voltage is %u uv\n", uv);
+	return 0;
+
+err_out:
+	WARN_ON(0);
+	return 0;
+}
+
+static int tegra210_cpuidle_probe(struct platform_device *pdev)
 {
 	int ret;
 	unsigned int cpu;
 
 	pr_info("Tegra210 cpuidle driver\n");
-	if (!of_machine_is_compatible("nvidia,tegra210")) {
-		pr_err("%s: not on T210\n", __func__);
-		return -ENODEV;
+	ret = tegra210_cc4_volt_init(pdev);
+	if (ret == -EPROBE_DEFER) {
+		pr_info("Tegra210 cpuidle driver triggering delayed probe\n");
+		return ret;
 	}
 
 	do_cc4_init();
@@ -868,9 +917,26 @@ static int __init tegra210_idle_init(void)
 			return ret;
 	}
 
-#ifdef CONFIG_DEBUG_FS
 	debugfs_init();
-#endif
 	return register_cpu_notifier(&tegra210_cpu_nb);
 }
-device_initcall(tegra210_idle_init);
+
+static const struct of_device_id tegra210_cpuidle_of[] = {
+	{ .compatible = "nvidia,tegra210-cpuidle" },
+	{}
+};
+
+static struct platform_driver tegra210_cpuidle_driver = {
+	.probe = tegra210_cpuidle_probe,
+	.driver = {
+		.owner = THIS_MODULE,
+		.name = "cpuidle",
+		.of_match_table = of_match_ptr(tegra210_cpuidle_of)
+	}
+};
+
+static __init int tegra210_cpuidle_init(void)
+{
+	return platform_driver_register(&tegra210_cpuidle_driver);
+}
+device_initcall(tegra210_cpuidle_init);

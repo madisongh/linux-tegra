@@ -40,7 +40,16 @@
 #include <tegra/mc.h>
 #include <tegra/mcerr.h>
 
+#define mcerr_pr(fmt, ...)					\
+	do {							\
+		if (!mcerr_silenced) {				\
+			trace_printk(fmt, ##__VA_ARGS__);	\
+			pr_err(fmt, ##__VA_ARGS__);		\
+		}						\
+	} while (0)
+
 static bool mcerr_throttle_enabled = true;
+static u32  mcerr_silenced;
 
 static int arb_intr_mma_set(const char *arg, const struct kernel_param *kp);
 static int arb_intr_mma_get(char *buff, const struct kernel_param *kp);
@@ -232,12 +241,12 @@ static irqreturn_t tegra_mc_error_thread(int irq, void *data)
 	count = atomic_inc_return(&error_count);
 
 	fault = chip_specific.mcerr_info(intr & mc_int_mask);
-	if (WARN(!fault, "[mcerr] Unknown error! intr sig: 0x%08x\n",
+	if (WARN(!fault, "Unknown error! intr sig: 0x%08x\n",
 		 intr & mc_int_mask))
 		goto out;
 
 	if (fault->flags & E_NO_STATUS) {
-		pr_err("[mcerr] MC fault - no status: %s\n", fault->msg);
+		mcerr_pr("MC fault - no status: %s\n", fault->msg);
 		goto out;
 	}
 
@@ -267,19 +276,9 @@ static irqreturn_t tegra_mc_error_thread(int irq, void *data)
 	if (mcerr_throttle_enabled && count >= MAX_PRINTS) {
 		schedule_delayed_work(&unthrottle_prints_work, HZ/2);
 		if (count == MAX_PRINTS)
-			pr_debug("Too many MC errors; throttling prints\n");
+			mcerr_pr("Too many MC errors; throttling prints\n");
 		goto out;
 	}
-
-	/*
-	 * if SWGRP is mpcorer or mpcorelpr and  violated the VPR requirements
-	 * skip the err print. This is usually result of speculative fetches on
-	 * VPR memory.
-	 */
-	if ((client_id == 0x27 || client_id == 0x26) &&
-		((intr & mc_int_mask) == MC_INT_DECERR_VPR) &&
-		!smmu_info)
-		goto out;
 
 	chip_specific.mcerr_print(fault, client, status, addr, secure, write,
 				  smmu_info);
@@ -326,6 +325,8 @@ static irqreturn_t tegra_mc_error_hard_irq(int irq, void *data)
 		return IRQ_NONE;
 	}
 
+	trace_printk("MCERR detected.\n");
+
 	/*
 	 * We have an interrupt; disable the rest until this one is handled.
 	 * This means we will potentially miss interrupts. We can live with
@@ -364,6 +365,10 @@ static void mcerr_default_info_update(struct mc_client *c, u32 stat)
 		c->intr_counts[3]++;
 }
 
+void __weak smmu_dump_pagetable(int swgid, dma_addr_t addr)
+{
+}
+
 /*
  * This will print at least 8 hex digits for address. If the address is bigger
  * then more digits will be printed but the full 16 hex digits for a 64 bit
@@ -374,22 +379,15 @@ static void mcerr_default_print(const struct mc_error *err,
 				u32 status, phys_addr_t addr,
 				int secure, int rw, const char *smmu_info)
 {
-	static char str[SZ_512];
-	int idx = 0;
+	if (smmu_info)
+		smmu_dump_pagetable(client->swgid, addr);
 
-	idx += snprintf(str + idx, sizeof(str) - idx,
-			"[mcerr] (%s) %s: %s\n",
-			client->swgid, client->name, err->msg);
-	idx += snprintf(str + idx, sizeof(str) - idx,
-			"[mcerr]   status = 0x%08x; addr = 0x%08llx\n",
-			status,	(long long unsigned int)addr);
-	idx += snprintf(str + idx, sizeof(str) - idx,
-			"[mcerr]   secure: %s, access-type: %s, SMMU fault: %s\n",
-			secure ? "yes" : "no", rw ? "write" : "read",
-			smmu_info ? smmu_info : "none");
-
-	trace_printk(str);
-	pr_err("%s", str);
+	mcerr_pr("(%d) %s: %s\n", client->swgid, client->name, err->msg);
+	mcerr_pr("  status = 0x%08x; addr = 0x%08llx\n", status,
+		 (long long unsigned int)addr);
+	mcerr_pr("  secure: %s, access-type: %s, SMMU fault: %s\n",
+		 secure ? "yes" : "no", rw ? "write" : "read",
+		 smmu_info ? smmu_info : "none");
 }
 
 /*
@@ -400,7 +398,7 @@ static int mcerr_default_debugfs_show(struct seq_file *s, void *v)
 	int i, j;
 	int do_print;
 
-	seq_printf(s, "%-24s %-24s %-9s %-9s %-9s %-9s\n", "swgid", "client",
+	seq_printf(s, "%-24s %-24s %-9s %-9s %-9s %-9s\n", "swgroup", "client",
 		   "decerr", "secerr", "smmuerr", "unknown");
 	for (i = 0; i < chip_specific.nr_clients; i++) {
 		do_print = 0;
@@ -416,7 +414,7 @@ static int mcerr_default_debugfs_show(struct seq_file *s, void *v)
 		if (do_print)
 			seq_printf(s, "%-24s %-24s %-9u %-9u %-9u %-9u\n",
 				   mc_clients[i].name,
-				   mc_clients[i].swgid,
+				   mc_clients[i].swgroup,
 				   mc_clients[i].intr_counts[0],
 				   mc_clients[i].intr_counts[1],
 				   mc_clients[i].intr_counts[2],
@@ -505,6 +503,9 @@ int tegra_mcerr_init(struct dentry *mc_parent, struct platform_device *pdev)
 		goto done;
 	}
 
+	if (!mc_parent)
+		goto done;
+
 	mcerr_debugfs_dir = debugfs_create_dir("err", mc_parent);
 	if (mcerr_debugfs_dir == NULL) {
 		pr_err("Failed to make debugfs node: %ld\n",
@@ -516,6 +517,7 @@ int tegra_mcerr_init(struct dentry *mc_parent, struct platform_device *pdev)
 	debugfs_create_file("mcerr_throttle", S_IRUGO | S_IWUSR,
 			    mcerr_debugfs_dir, NULL,
 			    &mcerr_throttle_debugfs_fops);
+	debugfs_create_u32("quiet", 0644, mcerr_debugfs_dir, &mcerr_silenced);
 
 done:
 	return 0;

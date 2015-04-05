@@ -35,6 +35,7 @@
 #include <linux/tegra_prod.h>
 
 #include <linux/pinctrl/pinconf-tegra.h>
+#include <linux/platform_data/gpio-tegra.h>
 
 #include "core.h"
 #include "pinctrl-tegra.h"
@@ -494,6 +495,10 @@ static int tegra_pinctrl_gpio_set_direction (struct pinctrl_dev *pctldev,
 	else
 		ret = tegra_pinconfig_group_set(pctldev, group,
 					TEGRA_PINCONF_PARAM_TRISTATE, 0);
+
+	if (pmx->soc->is_gpio_reg_support)
+		ret = tegra_pinconfig_group_set(pctldev, group,
+					TEGRA_PINCONF_PARAM_GPIO_MODE, 0);
 	return ret;
 }
 
@@ -510,7 +515,7 @@ static int tegra_pinconf_reg(struct tegra_pmx *pmx,
 			     const struct tegra_pingroup *g,
 			     enum tegra_pinconf_param param,
 			     bool report_err,
-			     s8 *bank, s16 *reg, s8 *bit, s8 *width)
+			     s8 *bank, s32 *reg, s8 *bit, s8 *width)
 {
 	switch (param) {
 	case TEGRA_PINCONF_PARAM_PULL:
@@ -619,6 +624,12 @@ static int tegra_pinconf_reg(struct tegra_pmx *pmx,
 		*bit = g->drvtype_bit;
 		*width = g->drvtype_width;
 		break;
+	case TEGRA_PINCONF_PARAM_GPIO_MODE:
+		*bank = g->gpio_bank;
+		*reg = g->gpio_reg;
+		*bit = g->gpio_bit;
+		*width = 1;
+		break;
 	default:
 		dev_err(pmx->dev, "Invalid config param %04x\n", param);
 		return -ENOTSUPP;
@@ -659,7 +670,7 @@ static int tegra_pinconf_group_get(struct pinctrl_dev *pctldev,
 	const struct tegra_pingroup *g;
 	int ret;
 	s8 bank, bit, width;
-	s16 reg;
+	s32 reg;
 	u32 val, mask;
 	unsigned long flags;
 
@@ -694,7 +705,7 @@ static int tegra_pinconf_group_set(struct pinctrl_dev *pctldev,
 	const struct tegra_pingroup *g;
 	int ret = 0, i;
 	s8 bank, bit, width;
-	s16 reg;
+	s32 reg;
 	u32 val, mask;
 	unsigned long flags;
 
@@ -781,10 +792,34 @@ static void tegra_pinconf_group_dbg_show(struct pinctrl_dev *pctldev,
 	const struct tegra_pingroup *g;
 	int i, ret;
 	s8 bank, bit, width;
-	s16 reg;
+	s32 reg;
 	u32 val;
+	int function;
+	const char *name;
+	int is_gpio = 0, dir = 0, gpio;
 
 	g = &pmx->soc->groups[group];
+	if (g->mux_reg >= 0) {
+		gpio = g->pins[0];
+
+		ret = tegra_gpio_is_enabled(gpio, &is_gpio, &dir);
+		if (ret < 0) {
+			dev_err(pctldev->dev,
+				"group %s pin gpio enquery failed: %d\n",
+					g->name, ret);
+			return;
+		}
+		if (!is_gpio) {
+			val = pmx_readl(pmx, g->mux_bank, g->mux_reg);
+			i = val & (0x3 << g->mux_bit);
+			function = g->funcs[i];
+			name = tegra_pinctrl_get_func_name(pctldev, function);
+			seq_printf(s, "\n\tfunction=%s", name);
+		} else {
+			seq_printf(s, "\n\tfunction= gpio-%s",
+					(dir) ? "input" : "output");
+		}
+	}
 
 	for (i = 0; i < ARRAY_SIZE(cfg_params); i++) {
 		ret = tegra_pinconf_reg(pmx, g, cfg_params[i].param, false,
@@ -976,27 +1011,24 @@ int tegra_pinctrl_probe(struct platform_device *pdev,
 #endif
 
 	for (i = 0; i < pmx->nbanks; i++) {
+		void __iomem *base;
+
 		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
 		if (!res) {
 			dev_err(&pdev->dev, "Missing MEM resource\n");
 			return -ENODEV;
 		}
 
-		if (!devm_request_mem_region(&pdev->dev, res->start,
-					    resource_size(res),
-					    dev_name(&pdev->dev))) {
+		base = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(base)) {
+			ret = PTR_ERR(base);
 			dev_err(&pdev->dev,
-				"Couldn't request MEM resource %d\n", i);
-			return -ENODEV;
+				"memregion/iomap address request failed: %d\n",
+				ret);
+			return ret;
 		}
-
 		pmx->reg_base[i] = res->start;
-		pmx->regs[i] = devm_ioremap(&pdev->dev, res->start,
-					    resource_size(res));
-		if (!pmx->regs[i]) {
-			dev_err(&pdev->dev, "Couldn't ioremap regs %d\n", i);
-			return -ENODEV;
-		}
+		pmx->regs[i] = base;
 
 #ifdef CONFIG_PM_SLEEP
 		pmx->regs_size[i] = resource_size(res);
@@ -1058,6 +1090,25 @@ void tegra_pinctrl_writel(u32 val, u32 bank, u32 reg)
 	writel(val, pmx->regs[bank] + reg);
 }
 EXPORT_SYMBOL_GPL(tegra_pinctrl_writel);
+
+int tegra_pinctrl_config_prod(struct device *dev, const char *prod_name)
+{
+	int ret;
+
+	if (!pmx) {
+		dev_err(dev, "Pincontrol driver is not initialised yet\n");
+		return -EIO;
+	}
+
+	ret = tegra_prod_set_by_name(pmx->regs, prod_name, pmx->prod_list);
+	if (ret < 0) {
+		dev_err(pmx->dev, "Prod config %s for device %s failed: %d\n",
+			prod_name, dev_name(dev), ret);
+		return ret;
+	}
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tegra_pinctrl_config_prod);
 
 #ifdef	CONFIG_DEBUG_FS
 

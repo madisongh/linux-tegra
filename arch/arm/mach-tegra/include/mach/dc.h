@@ -6,7 +6,7 @@
  * Author:
  *	Erik Gilling <konkers@google.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -106,6 +106,7 @@ enum {
 enum {
 	TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT = 1,
 	TEGRA_DSI_GANGED_SYMMETRIC_EVEN_ODD = 2,
+	TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT_OVERLAP = 3,
 };
 
 enum {
@@ -354,6 +355,9 @@ struct tegra_dsi_out {
 	u8		video_clock_mode;
 	u8		video_burst_mode;
 	u8		ganged_type;
+	u16		ganged_overlap;
+	bool		ganged_swap_links;
+	bool		ganged_write_to_all_links;
 
 	u8		suspend_aggr;
 
@@ -434,9 +438,11 @@ struct tegra_dc_mode {
 #define TEGRA_DC_MODE_FLAG_NEG_H_SYNC	(1 << 1)
 #define TEGRA_DC_MODE_FLAG_NEG_DE		(1 << 2)
 
-/* aspect ratio. 0 means unspecified or default. */
-#define TEGRA_DC_MODE_AVI_M_4_3		0x1
+#define TEGRA_DC_MODE_AVI_M_NO_DATA	0x0
+#define TEGRA_DC_MODE_AVI_M_4_3	0x1
 #define TEGRA_DC_MODE_AVI_M_16_9	0x2
+#define TEGRA_DC_MODE_AVI_M_64_27	0x3	/* dummy, no avi m support */
+#define TEGRA_DC_MODE_AVI_M_256_135	0x4	/* dummy, no avi m support */
 
 enum {
 	TEGRA_DC_OUT_RGB,
@@ -476,6 +482,7 @@ enum {
 	TEGRA_DC_ORDERED_DITHER,
 	TEGRA_DC_ERRDIFF_DITHER,
 	TEGRA_DC_TEMPORAL_DITHER,
+	TEGRA_DC_ERRACC_DITHER,
 };
 
 typedef u8 tegra_dc_bl_output[256];
@@ -584,6 +591,54 @@ enum {
 /* this is the old name. provided for compatibility with old board files. */
 #define dcc_bus ddc_bus
 
+struct tegra_vrr {
+	s32	capability;
+	s32	enable;
+	s32	lastenable;
+	s32	flip;
+	s32	pclk;
+	s32	vrr_min_fps;
+	s32	vrr_max_fps;
+	s32	v_front_porch_max;
+	s32	v_front_porch_min;
+	s32	vfp_extend;
+	s32	vfp_shrink;
+	s32	v_front_porch;
+	s32	v_back_porch;
+
+	s64	curr_flip_us;
+	s64	last_flip_us;
+	s32	flip_count;
+	s32	flip_interval_us;
+	s32	frame_len_max;
+	s32	frame_len_min;
+	s32	frame_len_fluct;
+	s32	line_width;
+	s32	lines_per_frame_common;
+
+	s32	frame_type;
+	s32	frame_count;
+	s32	v_count;
+	s32	last_v_cnt;
+	s32	curr_v_cnt;
+	s64     last_frame_us;
+	s64     curr_frame_us;
+	s64     fe_time_us;
+	s32	frame_delta_us;
+	s32	frame_interval_us;
+	s32	even_frame_us;
+	s32	odd_frame_us;
+
+	s32	max_adj_pct;
+	s32	max_flip_pct;
+	s32	max_dc_balance;
+	s32	max_inc_pct;
+
+	s32	dc_balance;
+	s32	frame_avg_pct;
+	s32	fluct_avg_pct;
+};
+
 struct tegra_dc_out {
 	int				type;
 	unsigned			flags;
@@ -611,6 +666,7 @@ struct tegra_dc_out {
 	struct tegra_hdmi_out		*hdmi_out;
 	struct tegra_dp_out		*dp_out;
 	struct tegra_stereo_out		*stereo;
+	struct tegra_vrr		*vrr;
 
 	unsigned			height; /* mm */
 	unsigned			width; /* mm */
@@ -650,6 +706,7 @@ struct tegra_dc_out {
 #define TEGRA_DC_OUT_INITIALIZED_MODE		(1 << 6)
 /* Makes hotplug GPIO a LP0 wakeup source */
 #define TEGRA_DC_OUT_HOTPLUG_WAKE_LP0		(1 << 7)
+#define TEGRA_DC_OUT_NVSR_MODE			(1 << 8)
 
 #define TEGRA_DC_ALIGN_MSB		0
 #define TEGRA_DC_ALIGN_LSB		1
@@ -668,6 +725,23 @@ struct tegra_dc_out {
 struct tegra_dc;
 struct nvmap_handle_ref;
 
+#if defined(CONFIG_TEGRA_CSC_V2)
+struct tegra_dc_csc_v2 {
+	u32 r2r;
+	u32 g2r;
+	u32 b2r;
+	u32 const2r;
+	u32 r2g;
+	u32 g2g;
+	u32 b2g;
+	u32 const2g;
+	u32 r2b;
+	u32 g2b;
+	u32 b2b;
+	u32 const2b;
+};
+#endif
+
 struct tegra_dc_csc {
 	unsigned short yof;
 	unsigned short kyrgb;
@@ -679,12 +753,23 @@ struct tegra_dc_csc {
 	unsigned short kvb;
 };
 
+#if defined(CONFIG_TEGRA_LUT)
 /* palette lookup table */
 struct tegra_dc_lut {
 	u8 r[256];
 	u8 g[256];
 	u8 b[256];
 };
+#endif
+
+#if defined(CONFIG_TEGRA_LUT_V2)
+/* palette lookup table */
+struct tegra_dc_lut {
+	u64 *rgb;
+	dma_addr_t phy_addr;
+	size_t size;
+};
+#endif
 
 struct tegra_dc_cmu_csc {
 	u16 krr;
@@ -698,11 +783,17 @@ struct tegra_dc_cmu_csc {
 	u16 kbb;
 };
 
+#if defined(CONFIG_TEGRA_DC_CMU_V2)
+struct tegra_dc_cmu {
+	u64 rgb[1025];
+};
+#else
 struct tegra_dc_cmu {
 	u16 lut1[256];
 	struct tegra_dc_cmu_csc csc;
 	u8 lut2[960];
 };
+#endif
 
 struct tegra_dc_win {
 	u8			idx;
@@ -733,7 +824,11 @@ struct tegra_dc_win {
 	unsigned		out_h;
 	unsigned		z;
 
+#if defined(CONFIG_TEGRA_CSC_V2)
+	struct tegra_dc_csc_v2	csc;
+#else
 	struct tegra_dc_csc	csc;
+#endif
 	bool			csc_dirty;
 
 	int			dirty;
@@ -862,7 +957,7 @@ struct tegra_dc_platform_data {
 	struct tegra_fb_data	*fb;
 	unsigned long		low_v_win;
 
-#ifdef CONFIG_TEGRA_DC_CMU
+#if defined(CONFIG_TEGRA_DC_CMU) || defined(CONFIG_TEGRA_DC_CMU_V2)
 	bool			cmu_enable;
 	struct tegra_dc_cmu	*cmu;
 #endif
@@ -877,6 +972,7 @@ struct tegra_dc_bw_data {
 };
 
 #define TEGRA_DC_FLAG_ENABLED		(1 << 0)
+#define TEGRA_DC_FLAG_SET_EARLY_MODE		(1 << 1)
 
 struct drm_mode_modeinfo;
 
@@ -948,7 +1044,11 @@ void tegra_dc_config_pwm(struct tegra_dc *dc, struct tegra_dc_pwm_params *cfg);
 
 int tegra_dsi_send_panel_short_cmd(struct tegra_dc *dc, u8 *pdata, u8 data_len);
 
+#if defined(CONFIG_TEGRA_CSC_V2)
+int tegra_nvdisp_update_csc(struct tegra_dc *dc, int win_index);
+#else
 int tegra_dc_update_csc(struct tegra_dc *dc, int win_index);
+#endif
 
 int tegra_dc_update_lut(struct tegra_dc *dc, int win_index, int fboveride);
 
@@ -977,7 +1077,7 @@ struct device_node *tegra_primary_panel_get_dt_node(
 				struct tegra_dc_platform_data *pdata);
 struct device_node *tegra_secondary_panel_get_dt_node(
 				struct tegra_dc_platform_data *pdata);
-bool tegra_is_hdmi_initialised(void);
+bool tegra_is_bl_display_initialized(int instance);
 
 void find_dc_node(struct device_node **dc1_node,
 				struct device_node **dc2_node);

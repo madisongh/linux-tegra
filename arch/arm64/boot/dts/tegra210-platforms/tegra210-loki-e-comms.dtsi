@@ -7,11 +7,9 @@
 		wlan_default: wlan-default {
 			gpio-input = <
 				TEGRA_GPIO(H, 2)
-				TEGRA_GPIO(I, 1)
 				>;
 			gpio-output-high = <
 				TEGRA_GPIO(H, 0)
-				TEGRA_GPIO(I, 0)
 				>;
 		};
 	};
@@ -42,6 +40,6 @@
 /*
 		wlan-rst-gpio = <&gpio TEGRA_GPIO(I, xxx) 0>;
 */
-		status = "okay";
+		status = "disabled";
 	};
 };

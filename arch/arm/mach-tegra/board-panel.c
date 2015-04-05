@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -32,6 +32,10 @@
 #include "board.h"
 #include "iomap.h"
 #include <linux/platform/tegra/dvfs.h>
+#include <linux/platform_data/lp855x.h>
+
+#define PRISM_THRESHOLD		50
+#define HYST_VAL		25
 
 atomic_t sd_brightness = ATOMIC_INIT(255);
 EXPORT_SYMBOL(sd_brightness);
@@ -104,12 +108,66 @@ int tegra_panel_reset(struct tegra_panel_of *panel, unsigned int delay_ms)
 	return 0;
 }
 
+
+static int tegra_bl_notify(struct device *dev, int brightness)
+{
+	int cur_sd_brightness;
+
+	struct lp855x *lp = NULL;
+	struct platform_device *pdev = NULL;
+	struct device *dc_dev;
+
+	pdev = to_platform_device(bus_find_device_by_name(
+		&platform_bus_type, NULL, "tegradc.0"));
+	dc_dev = &pdev->dev;
+
+	if (dc_dev) {
+		if (brightness <= PRISM_THRESHOLD)
+			nvsd_enbl_dsbl_prism(dc_dev, false);
+		else if (brightness > PRISM_THRESHOLD + HYST_VAL)
+			nvsd_enbl_dsbl_prism(dc_dev, true);
+	}
+
+	cur_sd_brightness = atomic_read(&sd_brightness);
+	/* SD brightness is a percentage */
+	brightness = (brightness * cur_sd_brightness) / 255;
+
+	/* Apply any backlight response curve */
+	if (brightness > 255)
+		pr_info("Error: Brightness > 255!\n");
+	else if (of_device_is_compatible(dev->of_node,
+				"ti,lp8550") ||
+		of_device_is_compatible(dev->of_node,
+				"ti,lp8551") ||
+		of_device_is_compatible(dev->of_node,
+				"ti,lp8552") ||
+		of_device_is_compatible(dev->of_node,
+				"ti,lp8553") ||
+		of_device_is_compatible(dev->of_node,
+				"ti,lp8554") ||
+		of_device_is_compatible(dev->of_node,
+				"ti,lp8555") ||
+		of_device_is_compatible(dev->of_node,
+				"ti,lp8556") ||
+		of_device_is_compatible(dev->of_node,
+				"ti,lp8557")) {
+		lp = (struct lp855x *)dev_get_drvdata(dev);
+		if (lp->pdata->bl_measured)
+			brightness = lp->pdata->bl_measured[brightness];
+	}
+
+	return brightness;
+}
+
+static struct generic_bl_data_dt_ops generic_bl_ops = {
+	.notify = tegra_bl_notify,
+};
+
 int tegra_panel_gpio_get_dt(const char *comp_str,
 				struct tegra_panel_of *panel)
 {
 	int cnt = 0;
 	char *label = NULL;
-	const char *node_status;
 	int err = 0;
 	struct device_node *node =
 		of_find_compatible_node(NULL, NULL, comp_str);
@@ -122,13 +180,6 @@ int tegra_panel_gpio_get_dt(const char *comp_str,
 
 	if (!node) {
 		pr_info("%s panel dt support not available\n", comp_str);
-		err = -ENOENT;
-		goto fail;
-	}
-
-	of_property_read_string(node, "status", &node_status);
-	if (strcmp(node_status, "okay")) {
-		pr_info("%s panel dt support disabled\n", comp_str);
 		err = -ENOENT;
 		goto fail;
 	}
@@ -216,7 +267,74 @@ void tegra_set_fixed_pwm_bl_ops(struct pwm_bl_data_dt_ops *p_ops)
 	fixed_pwm_bl_ops = p_ops;
 }
 
-void tegra_pwm_bl_ops_register(struct device *dev)
+static bool tegra_available_pwm_bl_ops_register(struct device *dev)
+{
+	struct device_node *np_bl = NULL;
+	struct device_node *np_parent = NULL;
+	const char *pn_compat = NULL;
+	bool ret = false;
+
+	np_parent = of_find_node_by_path("/backlight");
+	if (np_parent) {
+		for_each_available_child_of_node(np_parent, np_bl) {
+			if (np_bl)
+				break;
+		}
+	}
+
+	if (!np_bl) {
+		pr_info("no avaiable target backlight node\n");
+		goto end;
+	}
+
+	pn_compat = of_get_property(np_bl, "compatible", NULL);
+	if (!pn_compat) {
+		WARN(1, "No compatible prop in backlight node\n");
+		goto end;
+	}
+
+	if (of_device_is_compatible(np_bl, "p,wuxga-10-1-bl")) {
+		dev_set_drvdata(dev, dsi_p_wuxga_10_1_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "lg,wxga-7-bl")) {
+		dev_set_drvdata(dev, dsi_lgd_wxga_7_0_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "s,wqxga-10-1-bl")) {
+		dev_set_drvdata(dev, dsi_s_wqxga_10_1_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "c,wxga-14-0-bl")) {
+		dev_set_drvdata(dev, lvds_c_1366_14_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "a,1080p-14-0-bl")) {
+		dev_set_drvdata(dev, dsi_a_1080p_14_0_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "j,1440-810-5-8-bl")) {
+		dev_set_drvdata(dev, dsi_j_1440_810_5_8_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "s,wuxga-7-0-bl")) {
+		dev_set_drvdata(dev, dsi_s_wuxga_7_0_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "s,wuxga-8-0-bl")) {
+		dev_set_drvdata(dev, dsi_s_wuxga_8_0_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "a,wuxga-8-0-bl")) {
+		dev_set_drvdata(dev, dsi_a_1200_1920_8_0_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "a,wxga-8-0-bl")) {
+		dev_set_drvdata(dev, dsi_a_1200_800_8_0_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "i-edp,1080p-11-6-bl")) {
+		dev_set_drvdata(dev, edp_i_1080p_11_6_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "a-edp,1080p-14-0-bl")) {
+		dev_set_drvdata(dev, edp_a_1080p_14_0_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "j,720p-5-0-bl")) {
+		dev_set_drvdata(dev, dsi_j_720p_5_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "l,720p-5-0-bl")) {
+		dev_set_drvdata(dev, dsi_l_720p_5_loki_ops.pwm_bl_ops);
+	} else if (of_device_is_compatible(np_bl, "s-edp,uhdtv-15-6-bl")) {
+		dev_set_drvdata(dev, edp_s_uhdtv_15_6_ops.pwm_bl_ops);
+	} else {
+		pr_info("invalid compatible for backlight node\n");
+		goto end;
+	}
+
+	ret = true;
+end:
+	of_node_put(np_parent);
+	of_node_put(np_bl);
+	return ret;
+}
+static void tegra_pwm_bl_ops_reg_based_on_disp_board_id(struct device *dev)
 {
 	struct board_info display_board;
 
@@ -301,6 +419,19 @@ void tegra_pwm_bl_ops_register(struct device *dev)
 		dev_set_drvdata(dev, edp_a_1080p_14_0_ops.pwm_bl_ops);
 }
 
+void tegra_pwm_bl_ops_register(struct device *dev)
+{
+	bool ret = 0;
+	ret = tegra_available_pwm_bl_ops_register(dev);
+	if (!ret)
+		tegra_pwm_bl_ops_reg_based_on_disp_board_id(dev);
+}
+
+void ti_lp855x_bl_ops_register(struct device *dev)
+{
+	dev_set_drvdata(dev, &generic_bl_ops);
+}
+
 static void tegra_panel_register_ops(struct tegra_dc_out *dc_out,
 				struct tegra_panel_ops *p_ops)
 {
@@ -318,15 +449,127 @@ static void tegra_panel_register_ops(struct tegra_dc_out *dc_out,
 	dc_out->postsuspend = p_ops->postsuspend;
 	dc_out->hotplug_report = p_ops->hotplug_report;
 }
-
-struct device_node *tegra_primary_panel_get_dt_node(
+static struct device_node *available_internal_panel_select(
 			struct tegra_dc_platform_data *pdata)
+{
+	struct device_node *np_panel = NULL;
+	struct device_node *np_dsi = NULL, *np_sor = NULL;
+	struct tegra_dc_out *dc_out = NULL;
+	const char *pn_compat = NULL;
+
+	/*
+	 * for internal panel node, search
+	 * child node from DSI_NODE at first.
+	 * If child node is not found, search
+	 * child node from SOR_NODE.
+	 */
+
+	np_dsi = of_find_node_by_path(DSI_NODE);
+	if (np_dsi) {
+		for_each_available_child_of_node(np_dsi, np_panel) {
+			if (np_panel)
+				break;
+		}
+	}
+
+	if (!np_panel) {
+		np_sor = of_find_node_by_path(SOR_NODE);
+		if (np_sor) {
+			for_each_available_child_of_node(np_sor, np_panel) {
+				if (np_panel)
+					break;
+			}
+		}
+	}
+
+	if (!np_panel) {
+		pr_info("panel_select fail by _node_status\n");
+		goto end;
+	}
+
+	if (!pdata)
+		goto end;
+
+	dc_out = pdata->default_out;
+	if (!dc_out) {
+		WARN(1, "dc_out is not valid\n");
+		of_node_put(np_panel);
+		np_panel = NULL;
+		goto end;
+	}
+
+	pn_compat = of_get_property(np_panel, "compatible", NULL);
+	if (!pn_compat) {
+		WARN(1, "panel node do not have compatible prop\n");
+		of_node_put(np_panel);
+		np_panel = NULL;
+		goto end;
+	}
+
+	if (of_device_is_compatible(np_panel, "p,wuxga-10-1")) {
+		tegra_panel_register_ops(dc_out,
+			&dsi_p_wuxga_10_1_ops);
+	} else if (of_device_is_compatible(np_panel, "lg,wxga-7")) {
+		tegra_panel_register_ops(dc_out,
+			&dsi_lgd_wxga_7_0_ops);
+	} else if (of_device_is_compatible(np_panel, "s,wqxga-10-1")) {
+		tegra_panel_register_ops(dc_out,
+			&dsi_s_wqxga_10_1_ops);
+	} else if (of_device_is_compatible(np_panel, "c,wxga-14-0")) {
+		tegra_panel_register_ops(dc_out,
+			&lvds_c_1366_14_ops);
+	} else if (of_device_is_compatible(np_panel, "a,1080p-14-0")) {
+		tegra_panel_register_ops(dc_out,
+			&dsi_a_1080p_14_0_ops);
+	} else if (of_device_is_compatible(np_panel, "j,1440-810-5-8")) {
+		tegra_panel_register_ops(dc_out,
+			&dsi_j_1440_810_5_8_ops);
+	} else if (of_device_is_compatible(np_panel, "s,wuxga-7-0")) {
+		tegra_panel_register_ops(dc_out,
+			&dsi_s_wuxga_7_0_ops);
+	} else if (of_device_is_compatible(np_panel, "s,wuxga-8-0")) {
+		tegra_panel_register_ops(dc_out,
+			&dsi_s_wuxga_8_0_ops);
+	} else if (of_device_is_compatible(np_panel, "a,wuxga-8-0")) {
+		tegra_panel_register_ops(dc_out,
+			&dsi_a_1200_1920_8_0_ops);
+	} else if (of_device_is_compatible(np_panel, "a,wxga-8-0")) {
+		tegra_panel_register_ops(dc_out,
+			&dsi_a_1200_800_8_0_ops);
+	} else if (of_device_is_compatible(np_panel, "i-edp,1080p-11-6")) {
+		tegra_panel_register_ops(dc_out,
+			&edp_i_1080p_11_6_ops);
+	} else if (of_device_is_compatible(np_panel, "a-edp,1080p-14-0")) {
+		tegra_panel_register_ops(dc_out,
+			&edp_a_1080p_14_0_ops);
+	} else if (of_device_is_compatible(np_panel, "j,720p-5-0")) {
+		tegra_panel_register_ops(dc_out,
+			&dsi_j_720p_5_ops);
+	} else if (of_device_is_compatible(np_panel, "l,720p-5-0")) {
+		tegra_panel_register_ops(dc_out,
+			&dsi_l_720p_5_loki_ops);
+	} else if (of_device_is_compatible(np_panel, "s-edp,uhdtv-15-6")) {
+		tegra_panel_register_ops(dc_out,
+			&edp_s_uhdtv_15_6_ops);
+	} else {
+		pr_info("invalid panel compatible\n");
+		of_node_put(np_panel);
+		np_panel = NULL;
+	}
+
+end:
+	of_node_put(np_dsi);
+	of_node_put(np_sor);
+	return np_panel;
+}
+
+static struct device_node
+	*internal_panel_select_by_disp_board_id(
+		struct tegra_dc_platform_data *pdata)
 {
 	struct device_node *np_panel = NULL;
 	struct tegra_dc_out *dc_out = NULL;
 	struct board_info display_board;
-	struct device_node *np_hdmi =
-		of_find_node_by_path(HDMI_NODE);
 
 	bool is_dsi_a_1200_1920_8_0 = false;
 	bool is_dsi_a_1200_800_8_0 = false;
@@ -465,17 +708,52 @@ struct device_node *tegra_primary_panel_get_dt_node(
 			tegra_panel_register_ops(dc_out,
 				&edp_a_1080p_14_0_ops);
 	}
-	if (np_panel && of_device_is_available(np_panel)) {
+	if (np_panel)
+		return np_panel;
+	else
+		return NULL;
+}
+
+struct device_node *tegra_primary_panel_get_dt_node(
+			struct tegra_dc_platform_data *pdata)
+{
+	struct device_node *np_panel = NULL;
+	struct tegra_dc_out *dc_out = NULL;
+	struct device_node *np_hdmi =
+		of_find_node_by_path(HDMI_NODE);
+
+	if (pdata)
+		dc_out = pdata->default_out;
+
+	np_panel =
+		available_internal_panel_select(pdata);
+	if (np_panel) {
+		/*
+		 * search internal panel node by
+		 * status property.
+		 */
 		of_node_put(np_hdmi);
 		return np_panel;
-	} else {
+	};
+
+	np_panel =
+		internal_panel_select_by_disp_board_id(pdata);
+
+	if (np_panel) {
 		/*
-		 * Check hdmi primary, if there's neither
-		 * valid internal panel nor fixed panel.
+		 * legacy method to select internal panel
+		 * based on disp board id.
 		 */
-		np_panel =
-			of_get_child_by_name(np_hdmi, "hdmi-display");
-	}
+		of_node_put(np_hdmi);
+		return np_panel;
+	};
+
+	/*
+	 * Check hdmi primary, if there's neither
+	 * valid internal panel nor fixed panel.
+	 */
+	np_panel =
+		of_get_child_by_name(np_hdmi, "hdmi-display");
 
 	of_node_put(np_hdmi);
 	return of_device_is_available(np_panel) ? np_panel : NULL;
@@ -520,49 +798,6 @@ struct device_node *tegra_secondary_panel_get_dt_node(
 
 	return of_device_is_available(np_panel) ? np_panel : NULL;
 }
-
-#ifdef CONFIG_TEGRA_DC
-/**
- * tegra_init_hdmi - initialize and add HDMI device if not disabled by DT
- */
-int tegra_init_hdmi(struct platform_device *pdev,
-		     struct platform_device *phost1x)
-{
-	struct resource __maybe_unused *res;
-	bool enabled = true;
-	int err;
-#ifdef CONFIG_OF
-	struct device_node *hdmi_node = NULL;
-
-	hdmi_node = of_find_node_by_path(HDMI_NODE);
-	/* disable HDMI if explicitly set that way in the device tree */
-	enabled = !hdmi_node || of_device_is_available(hdmi_node);
-#endif
-
-	if (enabled) {
-#ifndef CONFIG_TEGRA_HDMI_PRIMARY
-		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-						   "fbmem");
-		res->start = tegra_fb2_start;
-		res->end = tegra_fb2_start + tegra_fb2_size - 1;
-#endif
-		pdev->dev.parent = &phost1x->dev;
-		err = platform_device_register(pdev);
-		if (err) {
-			dev_err(&pdev->dev, "device registration failed\n");
-			return err;
-		}
-	}
-
-	return 0;
-}
-#else
-int tegra_init_hdmi(struct platform_device *pdev,
-		     struct platform_device *phost1x)
-{
-	return 0;
-}
-#endif
 
 void tegra_fb_copy_or_clear(void)
 {

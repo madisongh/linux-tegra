@@ -160,6 +160,8 @@ struct sysedp_consumer *sysedp_create_consumer(const char *specname,
 	struct sysedp_consumer *consumer;
 	struct sysedp_consumer_data *match;
 
+	if (!pdata || !pdata->consumer_data)
+		return NULL;
 	match = sysedp_find_consumer_data(specname);
 	if (!match) {
 		pr_info("sysedp_create_consumer: unable to create %s, no consumer_data for %s found",
@@ -370,6 +372,7 @@ static int sysedp_probe(struct platform_device *pdev)
 
 static const struct of_device_id sysedp_of_match[] = {
 	{ .compatible = "nvidia,tegra124-sysedp", },
+	{ },
 };
 MODULE_DEVICE_TABLE(of, sysedp_of_match);
 

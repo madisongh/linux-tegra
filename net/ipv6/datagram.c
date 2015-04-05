@@ -906,9 +906,7 @@ void ip6_dgram_sock_seq_show(struct seq_file *seq, struct sock *sp,
 			     __u16 srcp, __u16 destp, int bucket)
 {
 	const struct in6_addr *dest, *src;
-	unsigned long cmdline = __get_free_page(GFP_TEMPORARY);
-	if (cmdline == NULL)
-		return;
+	char cmdline[128] = {'\0'};
 
 	dest  = &sp->sk_v6_daddr;
 	src   = &sp->sk_v6_rcv_saddr;
@@ -930,5 +928,4 @@ void ip6_dgram_sock_seq_show(struct seq_file *seq, struct sock *sp,
 		   atomic_read(&sp->sk_refcnt), sp,
 		   atomic_read(&sp->sk_drops),
 		   sk_get_waiting_task_cmdline(sp, cmdline));
-	free_page(cmdline);
 }

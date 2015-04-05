@@ -1,7 +1,7 @@
 /*
  * drivers/video/tegra/dc/of_dc.c
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -25,6 +25,7 @@
 #include <linux/io.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/dma-mapping.h>
 #include <linux/workqueue.h>
 #include <linux/ktime.h>
 #include <linux/debugfs.h>
@@ -42,6 +43,9 @@
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/pinctrl/pinconf-tegra.h>
+#ifdef CONFIG_TRUSTED_LITTLE_KERNEL
+#include <linux/ote_protocol.h>
+#endif
 
 #include <mach/clk.h>
 #include <mach/dc.h>
@@ -129,7 +133,7 @@ static int out_type_from_pn(struct device_node *panel_node)
 	struct device_node *default_out_np = NULL;
 	u32 temp;
 
-	if (panel_node && of_device_is_available(panel_node))
+	if (panel_node)
 		default_out_np = of_get_child_by_name(panel_node,
 			"disp-default-out");
 	if (default_out_np && !of_property_read_u32(default_out_np,
@@ -249,6 +253,7 @@ static bool is_dc_default_out_flag(u32 flag)
 		(flag == TEGRA_DC_OUT_NVHDCP_POLICY_ON_DEMAND) |
 		(flag == TEGRA_DC_OUT_CONTINUOUS_MODE) |
 		(flag == TEGRA_DC_OUT_ONE_SHOT_MODE) |
+		(flag == TEGRA_DC_OUT_NVSR_MODE) |
 		(flag == TEGRA_DC_OUT_N_SHOT_MODE) |
 		(flag == TEGRA_DC_OUT_ONE_SHOT_LP_MODE) |
 		(flag == TEGRA_DC_OUT_INITIALIZED_MODE) |
@@ -479,6 +484,32 @@ parse_disp_defout_fail:
 	of_node_put(np_sor);
 
 	return err;
+}
+
+static int parse_vrr_settings(struct platform_device *ndev,
+		struct device_node *np,
+		struct tegra_vrr *vrr)
+{
+	u32 temp;
+
+	if (!of_property_read_u32(np, "nvidia,vrr_min_fps", &temp)) {
+		vrr->vrr_min_fps = (unsigned) temp;
+		OF_DC_LOG("vrr_min_fps %d\n", vrr_min_fps);
+	}
+
+	if (!of_property_read_u32(np, "nvidia,vrr_max_fps", &temp)) {
+		vrr->vrr_max_fps = (unsigned) temp;
+		OF_DC_LOG("vrr_max_fps %d\n", vrr_max_fps);
+	}
+
+	/*
+	 * VRR capability is set when we have vrr_settings section in DT
+	 * vrr_settings, vrr_min_fps, and vrr_max_fps should always be
+	 * set at the same time in DT.
+	 */
+	vrr->capability = 1;
+
+	return 0;
 }
 
 static int parse_tmds_config(struct platform_device *ndev,
@@ -832,7 +863,7 @@ parse_modes_fail:
 	return -EINVAL;
 }
 
-#ifdef CONFIG_TEGRA_DC_CMU
+#if defined(CONFIG_TEGRA_DC_CMU)
 static int parse_cmu_data(struct device_node *np,
 	struct tegra_dc_cmu *cmu)
 {
@@ -877,6 +908,31 @@ static int parse_cmu_data(struct device_node *np,
 			*(addr_cmu_lut2++) = (u8)u;
 		}
 	}
+	return 0;
+}
+#elif defined(CONFIG_TEGRA_DC_CMU_V2)
+static int parse_cmu_data(struct device_node *np,
+	struct tegra_dc_cmu *cmu)
+{
+#if 0
+	u8 *addr_cmu_lut;
+	addr_cmu_lut = &(cmu->lut[0]);
+	memcpy(cmu, &default_cmu, sizeof(struct tegra_dc_cmu));
+	of_property_for_each_u32(np, "nvidia,cmu-lut", prop, p, u)
+		lut_count++;
+
+	if (lut_count >
+		(sizeof(cmu->lut) / sizeof(cmu->lut[0]))) {
+		pr_err("cmu lut overflow\n");
+		return -EINVAL;
+	} else {
+		of_property_for_each_u32(np, "nvidia,cmu-lut",
+			prop, p, u) {
+			/* OF_DC_LOG("cmu lut2 0x%x\n", u); */
+			*(addr_cmu_lut++) = (u8)u;
+		}
+	}
+#endif
 	return 0;
 }
 #endif
@@ -1166,6 +1222,32 @@ static struct device_node *parse_dsi_settings(struct platform_device *ndev,
 		"nvidia,dsi-ganged-type", &temp)) {
 		dsi->ganged_type = (u8)temp;
 		OF_DC_LOG("dsi ganged_type %d\n", dsi->ganged_type);
+	}
+
+	if (!of_property_read_u32(np_dsi_panel,
+		"nvidia,dsi-ganged-overlap", &temp)) {
+		dsi->ganged_overlap = (u16)temp;
+		OF_DC_LOG("dsi ganged overlap %d\n", dsi->ganged_overlap);
+		if (!dsi->ganged_type)
+			pr_warn("specified ganged overlap, but no ganged type\n");
+	}
+
+	if (!of_property_read_u32(np_dsi_panel,
+		"nvidia,dsi-ganged-swap-links", &temp)) {
+		dsi->ganged_swap_links = (bool)temp;
+		OF_DC_LOG("dsi ganged swapped links %d\n",
+			dsi->ganged_swap_links);
+		if (!dsi->ganged_type)
+			pr_warn("specified ganged swapped links, but no ganged type\n");
+	}
+
+	if (!of_property_read_u32(np_dsi_panel,
+		"nvidia,dsi-ganged-write-to-all-links", &temp)) {
+		dsi->ganged_write_to_all_links = (bool)temp;
+		OF_DC_LOG("dsi ganged write to both links %d\n",
+			dsi->ganged_write_to_all_links);
+		if (!dsi->ganged_type)
+			pr_warn("specified ganged write to all links, but no ganged type\n");
 	}
 
 	if (!of_property_read_u32(np_dsi_panel,
@@ -1804,6 +1886,16 @@ struct device_node *tegra_get_panel_node_out_type_check
 	}
 }
 
+static bool is_dc_default_flag(u32 flag)
+{
+	if ((flag == 0) ||
+		(flag & TEGRA_DC_FLAG_ENABLED) ||
+		(flag & TEGRA_DC_FLAG_SET_EARLY_MODE))
+		return true;
+	else
+		return false;
+}
+
 struct tegra_dc_platform_data
 		*of_dc_parse_platform_data(struct platform_device *ndev)
 {
@@ -1815,13 +1907,16 @@ struct tegra_dc_platform_data
 	struct device_node *np_hdmi = NULL;
 	struct device_node *np_dp_panel = NULL;
 	struct device_node *timings_np = NULL;
+	struct device_node *vrr_np = NULL;
 	struct device_node *np_target_disp = NULL;
 	struct device_node *sd_np = NULL;
 	struct device_node *default_out_np = NULL;
 	struct device_node *entry = NULL;
-#ifdef CONFIG_TEGRA_DC_CMU
+#if defined(CONFIG_TEGRA_DC_CMU) || defined(CONFIG_TEGRA_DC_CMU_V2)
 	struct device_node *cmu_np = NULL;
 #endif
+	struct property *prop;
+	const __be32 *p;
 	int err;
 	u32 temp;
 
@@ -2019,9 +2114,37 @@ struct tegra_dc_platform_data
 			goto fail_parse;
 	}
 
+	vrr_np = of_get_child_by_name(np_target_disp, "vrr-settings");
+	if (!vrr_np) {
+		pr_info("%s: could not find vrr-settings node\n", __func__);
+	} else {
+		dma_addr_t dma_addr;
+		struct tegra_vrr *vrr;
 
-	timings_np = of_get_child_by_name(np_target_disp,
-		"display-timings");
+		pdata->default_out->vrr = dma_alloc_coherent(NULL, PAGE_SIZE,
+						&dma_addr, GFP_KERNEL);
+		vrr = pdata->default_out->vrr;
+		if (vrr) {
+#ifdef CONFIG_TRUSTED_LITTLE_KERNEL
+			int retval;
+
+			retval = te_vrr_set_buf(virt_to_phys(vrr));
+			if (retval) {
+				dev_err(&ndev->dev, "failed to set buffer\n");
+				goto fail_parse;
+			}
+#endif // CONFIG_TRUSTED_LITTLE_KERNEL
+		} else {
+			dev_err(&ndev->dev, "not enough memory\n");
+			goto fail_parse;
+		}
+
+		err = parse_vrr_settings(ndev, vrr_np, vrr);
+		if (err)
+			goto fail_parse;
+	}
+
+	timings_np = of_get_child_by_name(np_target_disp, "display-timings");
 	if (!timings_np) {
 		if (pdata->default_out->type == TEGRA_DC_OUT_DSI) {
 			pr_err("%s: could not find display-timings node\n",
@@ -2030,7 +2153,7 @@ struct tegra_dc_platform_data
 		}
 	} else if (pdata->default_out->type == TEGRA_DC_OUT_DSI ||
 		   pdata->default_out->type == TEGRA_DC_OUT_FAKE_DP ||
-			pdata->default_out->type == TEGRA_DC_OUT_LVDS) {
+		   pdata->default_out->type == TEGRA_DC_OUT_LVDS) {
 		/* pdata->default_out->type == TEGRA_DC_OUT_DSI or
 		 * pdata->default_out->type == TEGRA_DC_OUT_LVDS
 		 */
@@ -2089,7 +2212,7 @@ struct tegra_dc_platform_data
 		}
 	}
 
-#ifdef CONFIG_TEGRA_DC_CMU
+#if defined(CONFIG_TEGRA_DC_CMU) || defined(CONFIG_TEGRA_DC_CMU_V2)
 	cmu_np = of_get_child_by_name(np_target_disp,
 		"cmu");
 
@@ -2126,7 +2249,7 @@ struct tegra_dc_platform_data
 		}
 	}
 
-#ifdef CONFIG_TEGRA_DC_CMU
+#if defined(CONFIG_TEGRA_DC_CMU) || defined(CONFIG_TEGRA_DC_CMU_V2)
 	if (pdata->cmu != NULL) {
 		err = parse_cmu_data(cmu_np, pdata->cmu);
 		if (err)
@@ -2134,16 +2257,14 @@ struct tegra_dc_platform_data
 	}
 #endif
 
-	if (!of_property_read_u32(np, "nvidia,dc-flags", &temp)) {
-		if ((temp != TEGRA_DC_FLAG_ENABLED) &&
-			(temp != 0)) {
-			pr_err("%s: invalid dc platform data flag\n",
-				__func__);
+	of_property_for_each_u32(np, "nvidia,dc-flags", prop, p, temp) {
+		if (!is_dc_default_flag(temp)) {
+			pr_err("invalid dc-flags\n");
 			goto fail_parse;
 		}
-		pdata->flags = (unsigned long)temp;
-		OF_DC_LOG("dc flag %lu\n", pdata->flags);
+		pdata->flags |= (unsigned long)temp;
 	}
+	OF_DC_LOG("dc flag %lu\n", pdata->flags);
 
 	if (!of_property_read_u32(np, "nvidia,dc-ctrlnum", &temp)) {
 		pdata->ctrl_num = (unsigned long)temp;
@@ -2164,7 +2285,7 @@ struct tegra_dc_platform_data
 		pdata->win_mask = (u32)temp;
 		OF_DC_LOG("win mask 0x%x\n", temp);
 	}
-#ifdef CONFIG_TEGRA_DC_CMU
+#if defined(CONFIG_TEGRA_DC_CMU) || defined(CONFIG_TEGRA_DC_CMU_V2)
 	if (!of_property_read_u32(np, "nvidia,cmu-enable", &temp)) {
 		pdata->cmu_enable = (bool)temp;
 		OF_DC_LOG("cmu enable %d\n", pdata->cmu_enable);
@@ -2177,7 +2298,7 @@ struct tegra_dc_platform_data
 	of_node_put(default_out_np);
 	of_node_put(timings_np);
 	of_node_put(sd_np);
-#ifdef CONFIG_TEGRA_DC_CMU
+#if defined(CONFIG_TEGRA_DC_CMU) || defined(CONFIG_TEGRA_DC_CMU_V2)
 	of_node_put(cmu_np);
 #endif
 	of_node_put(np_target_disp);
@@ -2188,7 +2309,7 @@ struct tegra_dc_platform_data
 
 fail_parse:
 	of_node_put(sd_np);
-#ifdef CONFIG_TEGRA_DC_CMU
+#if defined(CONFIG_TEGRA_DC_CMU) || defined(CONFIG_TEGRA_DC_CMU_V2)
 	of_node_put(cmu_np);
 #endif
 	of_node_put(np_dsi);

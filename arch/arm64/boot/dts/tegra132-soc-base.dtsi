@@ -1,7 +1,7 @@
 /*
  * tegra132-soc-base.dtsi: SOC specific DTSI file with all node disabled.
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -17,6 +17,7 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/memory/tegra-swgroup.h>
+#include "tegra132-platforms/tegra132-prods.dtsi"
 
 #include "denver.dtsi"
 
@@ -55,7 +56,8 @@
 	pinmux: pinmux@70000868 {
 		compatible = "nvidia,tegra124-pinmux";
 		reg = <0x0 0x70000868 0x0 0x164		/* Pad control registers */
-		       0x0 0x70003000 0x0 0x434>;	/* Mux registers */
+		       0x0 0x70003000 0x0 0x434		/* Mux registers */
+		       0x0 0x70000820 0x0 0x8>;		/* MIPI pad control */
 		#gpio-range-cells = <3>;
 		status = "disabled";
 	};
@@ -98,7 +100,7 @@
 		swgid-mask = <0x1 0xfffecdcf>;
 		#num-translation-enable = <4>;
 		#num-asid-security = <8>;
-		ptc-cache-size = <0x00008000>; /* 32 KB */
+
 		domains = <
 			&ppcs_as TEGRA_SWGROUP_CELLS3(PPCS, PPCS1, PPCS2)
 			&gpu_as TEGRA_SWGROUP_CELLS(GPUB)
@@ -852,8 +854,8 @@
 
 	sata@70020000 {
 		compatible = "nvidia,tegra124-ahci-sata";
-		reg = <0x0 0x70027000 0x0 0x00002000>,
-			<0x0 0x70021000 0x0 0x00001000>;
+		reg = <0x0 0x70021000 0x0 0x00001000>,
+			<0x0 0x70027000 0x0 0x00002000>;
 		interrupts = <0 23 0x04>;
 		status = "disabled";
 	};
@@ -959,8 +961,7 @@
 			device_type = "cpu";
 			compatible = "nvidia,denver", "arm,armv8";
 			reg = <0x0 0x0>;
-			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x8000fff8>;
+			enable-method = "psci";
 			power-states = <&power_states>;
 			status = "disabled";
 		};
@@ -969,11 +970,15 @@
 			device_type = "cpu";
 			compatible = "nvidia,denver", "arm,armv8";
 			reg = <0x0 0x1>;
-			enable-method = "spin-table";
-			cpu-release-addr = <0x0 0x8000fff8>;
+			enable-method = "psci";
 			power-states = <&power_states>;
 			status = "disabled";
 		};
+	};
+
+	psci {
+		compatible = "arm,psci-0.2";
+		method = "smc";
 	};
 
 	cpu_edp {

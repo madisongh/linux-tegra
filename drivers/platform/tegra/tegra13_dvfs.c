@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/tegra13_dvfs.c
  *
- * Copyright (c) 2012-2014 NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2012-2015 NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -703,7 +703,7 @@ static void __init set_cpu_dfll_vmin_data(
 
 	/* First install fixed Vmin profile */
 	tegra_dvfs_rail_init_vmin_thermal_profile(d->vmin_trips_table,
-		d->therm_floors_table, rail, &cpu_dvfs->dfll_data);
+		d->therm_floors_table, rail, &d->dfll_tune_data);
 
 	if (!rail->therm_mv_floors || !rail->therm_mv_floors_num ||
 	    !d->cvb_vmin.cvb_dfll_param.c0)
@@ -744,7 +744,7 @@ static void __init set_cpu_dfll_vmin_data(
 	 * table)
 	 */
 	tegra_dvfs_rail_init_vmin_thermal_profile(d->vmin_trips_table,
-		cpu_vmin, rail, &cpu_dvfs->dfll_data);
+		cpu_vmin, rail, &d->dfll_tune_data);
 }
 
 
@@ -859,7 +859,7 @@ static int __init set_cpu_dvfs_data(unsigned long max_freq,
 #ifndef CONFIG_TEGRA_CPU_VOLT_CAP
 	tegra_dvfs_rail_init_vmax_thermal_profile(
 		vdd_cpu_vmax_trips_table, vdd_cpu_therm_caps_table,
-		rail, &cpu_dvfs->dfll_data);
+		rail, &d->dfll_tune_data);
 
 #endif
 	if (cpu_dvfs->speedo_id == 0)
@@ -1255,6 +1255,7 @@ int tegra_dvfs_rail_post_enable(struct dvfs_rail *rail)
 	return 0;
 }
 
+#ifdef CONFIG_TEGRA_CORE_VOLT_CAP
 /* Core voltage and bus cap object and tables */
 static struct kobject *cap_kobj;
 static struct kobject *gpu_kobj;
@@ -1330,6 +1331,8 @@ static int __init tegra13_dvfs_init_core_cap(void)
 	}
 
 	/* core cap must be initialized for vmax cdev operations */
+	tegra13_dvfs_rail_vdd_core.apply_vmax_cap =
+		tegra_dvfs_therm_vmax_core_cap_apply;
 	tegra_dvfs_rail_register_vmax_cdev(&tegra13_dvfs_rail_vdd_core);
 
 	tegra_core_cap_debug_init();
@@ -1387,3 +1390,4 @@ static int __init tegra13_dvfs_init_core_cap(void)
 	return 0;
 }
 late_initcall(tegra13_dvfs_init_core_cap);
+#endif

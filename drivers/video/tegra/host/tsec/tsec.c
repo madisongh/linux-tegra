@@ -1,7 +1,7 @@
 /*
  * Tegra TSEC Module Support
  *
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -49,6 +49,7 @@
 #include "class_ids.h"
 #include "tsec_methods.h"
 #include "tsec_drv.h"
+#include "nvhost_vm.h"
 
 #ifdef CONFIG_ARCH_TEGRA_18x_SOC
 #include "t186/t186.h"
@@ -295,124 +296,52 @@ exit:
 
 static void tsec_execute_method(dma_addr_t dma_handle,
 	u32 *cpuvaddr,
-	u32 opcode_len)
+	u32 opcode_len,
+	u32 syncpt_id,
+	u32 syncpt_incrs)
 {
 	struct nvhost_channel *channel = NULL;
 	struct nvhost_job *job = NULL;
-	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
 	int err = 0;
-	u32 syncpt_incrs = 1;
-	u32 syncval = 0;
-	void *completed_waiter = NULL;
-	void *wakeup_waiter = NULL;
-	u32 id = 0;
-	void *ref;
 	struct nvhost_device_data *pdata = platform_get_drvdata(tsec);
-	channel = pdata->channels[0];
-	if (!channel) {
-		err = nvhost_channel_map(pdata, &channel, pdata);
-		if (err)
-			nvhost_err(&tsec->dev, "Channel map failed\n");
-		}
-	completed_waiter = nvhost_intr_alloc_waiter();
-	wakeup_waiter = nvhost_intr_alloc_waiter();
-	if (!completed_waiter || !wakeup_waiter) {
-		err = -ENOMEM;
-		goto exit;
-	}
 
-	job = nvhost_job_alloc(channel, 0, 0, 0, syncpt_incrs);
-	if (!job) {
-		err = -ENOMEM;
-		goto exit;
-	}
-
-	/* keep module powered */
-	nvhost_module_busy(tsec);
-
-	/* get submit lock */
-	err = mutex_lock_interruptible(&channel->submitlock);
+	err = nvhost_channel_map(pdata, &channel, pdata);
 	if (err) {
-		nvhost_module_idle(tsec);
-		goto exit;
+		nvhost_err(&tsec->dev, "Channel map failed\n");
+		return;
 	}
-	id = nvhost_get_syncpt_host_managed_by_name("tsec_hdcp");
-	if (!id) {
-		nvhost_module_idle(tsec);
-		goto exit;
+
+	job = nvhost_job_alloc(channel, 1, 0, 0, 1);
+	if (!job) {
+		nvhost_err(&tsec->dev, "failed to allocate job\n");
+		return;
 	}
-	job->sp->id = id;
-	syncval = nvhost_syncpt_incr_max(&nvhost_get_host(tsec)->syncpt,
-		id, syncpt_incrs);
+
+	job->sp->id = syncpt_id;
 	job->sp->incrs = syncpt_incrs;
-	job->sp->fence = syncval;
-	job->num_syncpts = syncpt_incrs;
+	job->num_syncpts = 1;
 
-	/* begin a CDMA submit */
-	nvhost_cdma_begin(&channel->cdma, job);
+	err = nvhost_job_add_client_gather_address(job, opcode_len,
+				NV_TSEC_CLASS_ID, dma_handle);
+	if (err) {
+		nvhost_err(&tsec->dev, "failed to add gather\n");
+		goto exit;
+	}
 
-	if (nvhost_get_channel_policy() == MAP_CHANNEL_ON_SUBMIT)
-		nvhost_cdma_push(&channel->cdma,
-			nvhost_opcode_acquire_mlock(pdata->modulemutexes[0]),
-			NVHOST_OPCODE_NOOP);
+	err = nvhost_channel_submit(job);
+	if (err) {
+		nvhost_err(&tsec->dev, "submit failed\n");
+		goto exit;
+	}
 
-	/* Wait for idle first */
-	nvhost_cdma_push(&channel->cdma,
-		nvhost_opcode_setclass(NV_HOST1X_CLASS_ID,
-		host1x_uclass_wait_syncpt_r(), 1),
-		nvhost_class_host_wait_syncpt(id,
-		syncval - syncpt_incrs));
-	nvhost_cdma_push(&channel->cdma,
-		nvhost_opcode_setclass(NV_TSEC_CLASS_ID, 0, 0),
-		NVHOST_OPCODE_NOOP);
-	nvhost_cdma_push_gather(&channel->cdma,
-		cpuvaddr,
-		dma_handle,
-		0,
-		nvhost_opcode_gather(opcode_len),
-		dma_handle);
+	/* submit takes a reference on the job structure; we can drop the
+	 * local reference now */
+	nvhost_putchannel(channel, 1);
 
-	nvhost_cdma_push(&channel->cdma,
-		nvhost_opcode_imm_incr_syncpt(
-		host1x_uclass_incr_syncpt_cond_op_done_v(), id),
-		NVHOST_OPCODE_NOOP);
-
-	if (nvhost_get_channel_policy() == MAP_CHANNEL_ON_SUBMIT)
-		nvhost_cdma_push(&channel->cdma,
-			nvhost_opcode_release_mlock(pdata->modulemutexes[0]),
-			NVHOST_OPCODE_NOOP);
-
-	nvhost_cdma_end(&channel->cdma, job);
-
-	/* Schedule a submit complete interrupt */
-	err = nvhost_intr_add_action(&nvhost_get_host(tsec)->intr,
-		id, syncval,
-		NVHOST_INTR_ACTION_SUBMIT_COMPLETE, channel,
-		completed_waiter, NULL);
-
-	completed_waiter = NULL;
-	if (err)
-		nvhost_err(&tsec->dev, "Failed to set submit complete intr\n");
-	err = nvhost_intr_add_action(&nvhost_get_host(tsec)->intr,
-			id, syncval,
-			NVHOST_INTR_ACTION_WAKEUP, &wq,
-			wakeup_waiter,
-			&ref);
-	wakeup_waiter = NULL;
-	if (err)
-		nvhost_err(&tsec->dev, "Failed to set wakeup intr\n");
-
-	mutex_unlock(&channel->submitlock);
-
-	/* Wait for read to be ready */
-
-	wait_event(wq,
-	nvhost_syncpt_is_expired(&nvhost_get_host(tsec)->syncpt,
-		id, syncval));
-
-	nvhost_intr_put_ref(&nvhost_get_host(tsec)->intr, id, ref);
-
-	nvhost_free_syncpt(id);
+	nvhost_syncpt_wait_timeout_ext(tsec, job->sp->id,
+			job->sp->fence,
+			(u32)MAX_SCHEDULE_TIMEOUT,
+			NULL, NULL);
 
 exit:
 	nvhost_job_put(job);
@@ -430,13 +359,28 @@ static void tsec_write_mthd(u32 *buf, u32 mid, u32 data, u32 *offset)
 	*offset = *offset + 4;
 }
 
+static void write_mthd(u32 *buf, u32 op1, u32 op2, u32 *offset)
+{
+	int i = 0;
+	buf[i++] = op1;
+	buf[i++] = op2;
+	*offset = *offset + 2;
+}
+
 void tsec_send_method(struct hdcp_context_t *hdcp_context,
 	u32 method, u32 flags)
 {
 	u32 opcode_len = 0;
 	u32 *cpuvaddr = NULL;
+	u32 id = 0;
 	dma_addr_t dma_handle = 0;
 	DEFINE_DMA_ATTRS(attrs);
+
+	id = nvhost_get_syncpt_host_managed_by_name("tsec_hdcp");
+	if (!id) {
+		nvhost_err(&tsec->dev, "failed to get sync point\n");
+		return;
+	}
 
 	cpuvaddr = dma_alloc_attrs(&tsec->dev, HDCP_MTHD_BUF_SIZE,
 			&dma_handle, GFP_KERNEL,
@@ -493,7 +437,14 @@ void tsec_send_method(struct hdcp_context_t *hdcp_context,
 			EXECUTE,
 			0x100,
 			&opcode_len);
-	tsec_execute_method(dma_handle, cpuvaddr, opcode_len);
+	write_mthd(&cpuvaddr[opcode_len],
+		nvhost_opcode_imm_incr_syncpt(
+			host1x_uclass_incr_syncpt_cond_op_done_v(), id),
+		NVHOST_OPCODE_NOOP,
+		&opcode_len);
+	tsec_execute_method(dma_handle, cpuvaddr, opcode_len, id, 1);
+
+	nvhost_free_syncpt(id);
 
 	dma_free_attrs(&tsec->dev,
 		HDCP_MTHD_BUF_SIZE, cpuvaddr,
@@ -848,6 +799,8 @@ static int tsec_read_ucode(struct platform_device *dev, const char *fw_name)
 
 	m->valid = true;
 
+	nvhost_vm_map_static(dev, m->mapped, m->dma_addr, m->size);
+
 	release_firmware(ucode_fw);
 
 	return 0;
@@ -1007,7 +960,9 @@ static int tsec_probe(struct platform_device *dev)
 	nvhost_module_init(dev);
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS
+#ifndef CONFIG_PM_GENERIC_DOMAINS_OF
 	pdata->pd.name = "tsec";
+#endif
 	err = nvhost_module_add_domain(&pdata->pd, dev);
 	if (err)
 		return err;
@@ -1020,13 +975,7 @@ static int tsec_probe(struct platform_device *dev)
 
 static int __exit tsec_remove(struct platform_device *dev)
 {
-#ifdef CONFIG_PM_RUNTIME
-	pm_runtime_put(&dev->dev);
-	pm_runtime_disable(&dev->dev);
-#else
-	nvhost_module_disable_clk(&dev->dev);
-#endif
-
+	nvhost_client_device_release(dev);
 	return 0;
 }
 
@@ -1069,8 +1018,20 @@ static int __init tsec_key_setup(char *line)
 }
 __setup("otf_key=", tsec_key_setup);
 
+static struct of_device_id tegra21x_tsec_domain_match[] = {
+	{.compatible = "nvidia,tegra210-tsec-pd",
+	 .data = (struct nvhost_device_data *)&t21_tsec_info},
+	{},
+};
+
 static int __init tsec_init(void)
 {
+	int ret;
+
+	ret = nvhost_domain_init(tegra21x_tsec_domain_match);
+	if (ret)
+		return ret;
+
 	return platform_driver_register(&tsec_driver);
 }
 

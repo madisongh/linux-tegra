@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Channel
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -31,6 +31,8 @@
 #include "class_ids.h"
 #include "debug.h"
 
+#define NVHOST_CHANNEL_LOW_PRIO_MAX_WAIT 50
+
 static void submit_work_done_increment(struct nvhost_job *job)
 {
 	struct nvhost_channel *ch = job->ch;
@@ -56,7 +58,7 @@ static void lock_device(struct nvhost_job *job, bool lock)
 		nvhost_opcode_release_mlock(pdata->modulemutexes[0]);
 
 	/* No need to do anything if we have a channel/engine */
-	if (nvhost_get_channel_policy() == MAP_CHANNEL_ON_OPEN)
+	if (pdata->resource_policy == RESOURCE_PER_DEVICE)
 		return;
 
 	/* If we have a hardware mlock, use it. */
@@ -128,7 +130,7 @@ static void add_sync_waits(struct nvhost_channel *ch, int fd)
 		u32 id;
 		pt = sync_pt_from_fence(fence->cbs[i].sync_pt);
 		id = nvhost_sync_pt_id(pt);
-		if (!id || id >= nvhost_syncpt_nb_pts(sp)) {
+		if (!id || !nvhost_syncpt_is_valid_hw_pt(sp, id)) {
 			sync_fence_put(fence);
 			return;
 		}
@@ -164,44 +166,38 @@ static void add_sync_waits(struct nvhost_channel *ch, int fd)
 
 static void push_waits(struct nvhost_job *job)
 {
+	struct nvhost_device_data *pdata = platform_get_drvdata(job->ch->dev);
+	struct nvhost_syncpt *sp = &nvhost_get_host(job->ch->dev)->syncpt;
 	struct nvhost_channel *ch = job->ch;
 	int i;
 
-	if (nvhost_get_channel_policy() == MAP_CHANNEL_ON_OPEN)
+	for (i = 0; i < job->num_waitchk; i++) {
+		struct nvhost_waitchk *wait = &job->waitchk[i];
+
+		/* skip pushing waits if we allow them (map-at-open mode)
+		 * and userspace wants to push a wait to some explicit
+		 * position */
+		if (pdata->resource_policy == RESOURCE_PER_DEVICE && wait->mem)
+			continue;
+
+		/* Skip pushing wait if it has already been expired */
+		if (nvhost_syncpt_is_expired(sp, wait->syncpt_id,
+					     wait->thresh))
+			continue;
+
+		nvhost_cdma_push(&ch->cdma,
+			nvhost_opcode_setclass(NV_HOST1X_CLASS_ID,
+				host1x_uclass_wait_syncpt_r(), 1),
+			nvhost_class_host_wait_syncpt(
+				wait->syncpt_id, wait->thresh));
+	}
+
+	if (pdata->resource_policy == RESOURCE_PER_DEVICE)
 		return;
 
 	for (i = 0; i < job->num_gathers; i++) {
 		struct nvhost_job_gather *g = &job->gathers[i];
 		add_sync_waits(job->ch, g->pre_fence);
-	}
-
-	for (i = 0; i < job->num_waitchk; i++)
-		nvhost_cdma_push(&ch->cdma,
-			nvhost_opcode_setclass(NV_HOST1X_CLASS_ID,
-				host1x_uclass_wait_syncpt_r(), 1),
-			nvhost_class_host_wait_syncpt(
-				job->waitchk[i].syncpt_id,
-				job->waitchk[i].thresh));
-}
-
-static void submit_nullkickoff(struct nvhost_job *job, u32 user_syncpt_incrs)
-{
-	struct nvhost_channel *ch = job->ch;
-	int incr, i;
-	u32 op_incr;
-
-	/* push increments that correspond to nulled out commands */
-	for (i = 0; i < job->num_syncpts; ++i) {
-		u32 incrs = (i == job->hwctx_syncpt_idx) ?
-			user_syncpt_incrs : job->sp[i].incrs;
-		op_incr = nvhost_opcode_imm_incr_syncpt(
-			host1x_uclass_incr_syncpt_cond_op_done_v(),
-			job->sp[i].id);
-		for (incr = 0; incr < (incrs >> 1); incr++)
-			nvhost_cdma_push(&ch->cdma, op_incr, op_incr);
-		if (incrs & 1)
-			nvhost_cdma_push(&ch->cdma, op_incr,
-				NVHOST_OPCODE_NOOP);
 	}
 }
 
@@ -222,11 +218,9 @@ static inline u32 gather_count(u32 word)
 
 static void submit_gathers(struct nvhost_job *job)
 {
-	int i;
+	struct nvhost_device_data *pdata = platform_get_drvdata(job->ch->dev);
 	void *cpuva = NULL;
-	struct nvhost_master *master = nvhost;
-	bool gather_filter_enabled =
-		nvhost_gather_filter_enabled(&master->syncpt);
+	int i;
 
 	/* push user gathers */
 	for (i = 0 ; i < job->num_gathers; i++) {
@@ -234,10 +228,10 @@ static void submit_gathers(struct nvhost_job *job)
 		u32 op1;
 		u32 op2;
 
-		if (nvhost_get_channel_policy() == MAP_CHANNEL_ON_OPEN)
+		if (pdata->resource_policy == RESOURCE_PER_DEVICE)
 			add_sync_waits(job->ch, g->pre_fence);
 
-		if (gather_filter_enabled && g->class_id)
+		if (g->class_id)
 			nvhost_cdma_push(&job->ch->cdma,
 				nvhost_opcode_setclass(g->class_id, 0, 0),
 				NVHOST_OPCODE_NOOP);
@@ -266,6 +260,34 @@ static void submit_gathers(struct nvhost_job *job)
 	}
 }
 
+static int host1x_channel_prio_check(struct nvhost_job *job)
+{
+	/*
+	 * Check if queue has higher priority jobs running. If so, wait until
+	 * queue is empty. Ignores result from nvhost_cdma_flush, as we submit
+	 * either when push buffer is empty or when we reach the timeout.
+	 */
+	int higher_count = 0;
+
+	switch (job->priority) {
+	case NVHOST_PRIORITY_HIGH:
+		higher_count = 0;
+		break;
+	case NVHOST_PRIORITY_MEDIUM:
+		higher_count = job->ch->cdma.high_prio_count;
+		break;
+	case NVHOST_PRIORITY_LOW:
+		higher_count = job->ch->cdma.high_prio_count
+			+ job->ch->cdma.med_prio_count;
+		break;
+	}
+	if (higher_count > 0)
+		(void)nvhost_cdma_flush(&job->ch->cdma,
+			NVHOST_CHANNEL_LOW_PRIO_MAX_WAIT);
+
+	return 0;
+}
+
 static int host1x_channel_submit(struct nvhost_job *job)
 {
 	struct nvhost_channel *ch = job->ch;
@@ -275,6 +297,8 @@ static int host1x_channel_submit(struct nvhost_job *job)
 	int err, i;
 	void *completed_waiters[job->num_syncpts];
 	struct nvhost_job_syncpt *hwctx_sp = job->sp + job->hwctx_syncpt_idx;
+
+	host1x_channel_prio_check(job);
 
 	memset(completed_waiters, 0, sizeof(void *) * job->num_syncpts);
 
@@ -351,13 +375,17 @@ static int host1x_channel_submit(struct nvhost_job *job)
 
 		job->sp[i].fence =
 			nvhost_syncpt_incr_max(sp, job->sp[i].id, incrs);
+
+		/* mark syncpoint used by this channel */
+		nvhost_syncpt_mark_used(sp, ch->chid, job->sp[i].id);
 	}
 
-	if (job->null_kickoff)
-		submit_nullkickoff(job, user_syncpt_incrs);
-	else
-		submit_gathers(job);
+	/* mark also client managed syncpoint used by this channel */
+	if (job->client_managed_syncpt)
+		nvhost_syncpt_mark_used(sp, ch->chid,
+					job->client_managed_syncpt);
 
+	submit_gathers(job);
 	serialize(job);
 	lock_device(job, false);
 	submit_work_done_increment(job);

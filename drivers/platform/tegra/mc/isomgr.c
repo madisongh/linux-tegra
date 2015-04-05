@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/isomgr.c
  *
- * Copyright (c) 2012-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -37,7 +37,9 @@
 #include <linux/tegra-soc.h>
 #include <asm/processor.h>
 #include <asm/current.h>
+
 #include <linux/platform/tegra/isomgr.h>
+#include <linux/platform/tegra/clock.h>
 
 #include <tegra/mc.h>
 
@@ -59,8 +61,8 @@
 			t += isomgr_clients[idx].margin_bw; \
 	} \
 	if (t + isomgr.avail_bw != isomgr.max_iso_bw) { \
-		pr_err("bw mismatch, line=%d", __LINE__); \
-		pr_err("t+isomgr.avail_bw=%d, isomgr.max_iso_bw=%d", \
+		pr_err("bw mismatch, line=%d\n", __LINE__); \
+		pr_err("t+isomgr.avail_bw=%d, isomgr.max_iso_bw=%d\n", \
 			t + isomgr.avail_bw, isomgr.max_iso_bw); \
 		BUG(); \
 	} \
@@ -73,7 +75,7 @@
 do { \
 	if (unlikely(!cp || !is_client_valid(client) || \
 		     cp->magic != ISOMGR_MAGIC)) { \
-		pr_err("bad handle %p", handle); \
+		pr_err("bad handle %p\n", handle); \
 		goto validation_fail; \
 	} \
 } while (0)
@@ -81,7 +83,7 @@ do { \
 #define VALIDATE_CLIENT() \
 do { \
 	if (unlikely(!is_client_valid(client))) { \
-		pr_err("invalid client %d", client); \
+		pr_err("invalid client %d\n", client); \
 		goto validation_fail; \
 	} \
 } while (0)
@@ -108,6 +110,7 @@ struct isoclient_info {
 };
 
 static struct isoclient_info *isoclient_info;
+static int                    isoclients;
 static bool client_valid[TEGRA_ISO_CLIENT_COUNT];
 static int iso_bw_percentage = 100;
 
@@ -285,34 +288,45 @@ static struct isoclient_info tegra21x_isoclients[] = {
 
 static void isomgr_scatter(int client);
 
-static struct isoclient_info *get_iso_client_info(void)
+static struct isoclient_info *get_iso_client_info(int *length)
 {
 	enum tegra_chipid cid;
 	struct isoclient_info *cinfo;
+	int len;
 
 	cid = tegra_get_chipid();
 	switch (cid) {
 	case TEGRA_CHIPID_TEGRA11:
 		cinfo = tegra11x_isoclients;
+		len = ARRAY_SIZE(tegra11x_isoclients);
 		iso_bw_percentage = 50;
 		break;
 	case TEGRA_CHIPID_TEGRA14:
 		cinfo = tegra14x_isoclients;
+		len = ARRAY_SIZE(tegra14x_isoclients);
 		iso_bw_percentage = 50;
 		break;
 	case TEGRA_CHIPID_TEGRA12:
 	case TEGRA_CHIPID_TEGRA13:
 		cinfo = tegra12x_isoclients;
+		len = ARRAY_SIZE(tegra12x_isoclients);
 		iso_bw_percentage = 50;
 		break;
 	case TEGRA_CHIPID_TEGRA21:
 		cinfo = tegra21x_isoclients;
-		iso_bw_percentage = 50;
+		iso_bw_percentage = 45; /* Hack: Should be determined based on
+					   DRAM type. */
+		len = ARRAY_SIZE(tegra21x_isoclients);
 		break;
 	default:
 		cinfo = tegra_null_isoclients;
+		len = 0;
 		break;
 	}
+
+	if (length)
+		*length = len;
+
 	return cinfo;
 }
 
@@ -423,9 +437,14 @@ static void update_mc_clock(void)
 	}
 
 	for (i = 0; i < TEGRA_ISO_CLIENT_COUNT; i++) {
-		if (isomgr_clients[i].real_mf != isomgr_clients[i].real_mf_rq &&
-		    !clk_set_rate(isomgr_clients[i].emc_clk,
-			isomgr_clients[i].real_mf * 1000)) {
+		if (isomgr_clients[i].real_mf != isomgr_clients[i].real_mf_rq) {
+			/* Ignore clocks for clients that are non-existent. */
+			if (!isomgr_clients[i].emc_clk)
+				continue;
+
+			if (clk_set_rate(isomgr_clients[i].emc_clk,
+					 isomgr_clients[i].real_mf * 1000))
+				continue;
 
 			if (isomgr_clients[i].real_mf_rq == 0)
 				clk_enable(isomgr_clients[i].emc_clk);
@@ -529,8 +548,10 @@ static void isomgr_scavenge(enum tegra_iso_client client)
 
 static bool is_client_valid(enum tegra_iso_client client)
 {
-	if (unlikely(client < 0 || client >= TEGRA_ISO_CLIENT_COUNT ||
-		     !client_valid[client]))
+	if (unlikely(client < 0 ||
+		     client >= TEGRA_ISO_CLIENT_COUNT ||
+		     !client_valid[client] ||
+		     !isomgr_clients[client].emc_clk))
 		return false;
 	return true;
 }
@@ -563,16 +584,16 @@ static tegra_isomgr_handle __tegra_isomgr_register(
 		isomgr.avail_bw += dedi_bw + isomgr.dedi_bw -
 				   isomgr.max_iso_bw;
 		isomgr.max_iso_bw = dedi_bw + isomgr.dedi_bw;
-		pr_info("ISO BW usage:");
+		pr_info("ISO BW usage:\n");
 		for (i = 0; i < TEGRA_ISO_CLIENT_COUNT; i++) {
 			if (!client_valid[i])
 				continue;
-			pr_info("client=%s, iso dedi bw=%dKB",
+			pr_info("client=%s, iso dedi bw=%dKB\n",
 				cname[i],
 				(client == i) ? dedi_bw :
 				isomgr_clients[i].dedi_bw);
 		}
-		pr_info("revisit BW usage of iso clients");
+		pr_info("revisit BW usage of iso clients\n");
 #else
 		pr_err("iso bandwidth %uKB is not available, client %s\n",
 			dedi_bw, cname[client]);
@@ -1107,12 +1128,12 @@ static void isomgr_create_client(int client, const char *name)
 	BUG_ON(cp->client_kobj);
 	cp->client_kobj = kobject_create_and_add(name, isomgr.kobj);
 	if (!cp->client_kobj) {
-		pr_err("failed to create sysfs client dir");
+		pr_err("failed to create sysfs client dir\n");
 		return;
 	}
 	cp->client_attrs = client_attrs;
 	if (sysfs_create_files(cp->client_kobj, &client_attr_list[client][0])) {
-		pr_err("failed to create sysfs client files");
+		pr_err("failed to create sysfs client files\n");
 		kobject_del(cp->client_kobj);
 		return;
 	}
@@ -1125,18 +1146,18 @@ static void isomgr_create_sysfs(void)
 	BUG_ON(isomgr.kobj);
 	isomgr.kobj = kobject_create_and_add("isomgr", kernel_kobj);
 	if (!isomgr.kobj) {
-		pr_err("failed to create kobject");
+		pr_err("failed to create kobject\n");
 		return;
 	}
 	if (sysfs_create_files(isomgr.kobj, isomgr_attrs)) {
-		pr_err("failed to create sysfs files");
+		pr_err("failed to create sysfs files\n");
 		kobject_del(isomgr.kobj);
 		isomgr.kobj = NULL;
 		return;
 	}
 
-	for (i = 0; i < TEGRA_ISO_CLIENT_COUNT; i++) {
-		if (client_valid[i])
+	for (i = 0; i < isoclients; i++) {
+		if (isoclient_info[i].name)
 			isomgr_create_client(isoclient_info[i].client,
 					     isoclient_info[i].name);
 	}
@@ -1152,7 +1173,7 @@ int __init isomgr_init(void)
 	unsigned int max_emc_bw;
 
 	mutex_init(&isomgr.lock);
-	isoclient_info = get_iso_client_info();
+	isoclient_info = get_iso_client_info(&isoclients);
 
 	for (i = 0; ; i++) {
 		if (isoclient_info[i].name)
@@ -1163,7 +1184,7 @@ int __init isomgr_init(void)
 
 	isomgr.emc_clk = clk_get_sys("iso", "emc");
 	if (IS_ERR_OR_NULL(isomgr.emc_clk)) {
-		pr_err("couldn't find iso emc clock. disabling isomgr.");
+		pr_err("couldn't find iso emc clock. disabling isomgr.\n");
 		test_mode = 1;
 		return 0;
 	}
@@ -1172,27 +1193,31 @@ int __init isomgr_init(void)
 		/* With DVFS disabled, bus children cannot get real max emc freq supported
 		 * Only the root parent EMC node is set to max possible rate*/
 		max_emc_clk = clk_round_rate(clk_get_parent(isomgr.emc_clk), ULONG_MAX) / 1000;
-		pr_info("iso emc max clk=%dKHz", max_emc_clk);
+		pr_info("iso emc max clk=%dKHz\n", max_emc_clk);
 		max_emc_bw = tegra_emc_freq_req_to_bw(max_emc_clk);
 		/* ISO clients can use iso_bw_percentage of max emc bw. */
 		isomgr.max_iso_bw = max_emc_bw * iso_bw_percentage / 100;
-		pr_info("max_iso_bw=%dKB", isomgr.max_iso_bw);
+		pr_info("max_iso_bw=%dKB\n", isomgr.max_iso_bw);
 		isomgr.avail_bw = isomgr.max_iso_bw;
 	}
 
-	for (i = 0; i < TEGRA_ISO_CLIENT_COUNT; i++) {
-		atomic_set(&isomgr_clients[i].kref.refcount, 0);
-		init_completion(&isomgr_clients[i].cmpl);
-		if (client_valid[i]) {
-			isomgr_clients[i].emc_clk = clk_get_sys(
+	for (i = 0; i < isoclients; i++) {
+		if (isoclient_info[i].name) {
+			enum tegra_iso_client c = isoclient_info[i].client;
+
+			atomic_set(&isomgr_clients[c].kref.refcount, 0);
+			init_completion(&isomgr_clients[c].cmpl);
+
+			isomgr_clients[c].emc_clk = clk_get_sys(
 					isoclient_info[i].dev_name,
 					isoclient_info[i].emc_clk_name);
-			if (IS_ERR_OR_NULL(isomgr_clients[i].emc_clk)) {
+
+			if (IS_ERR_OR_NULL(isomgr_clients[c].emc_clk)) {
 				pr_err("couldn't find %s %s clock",
 					isoclient_info[i].dev_name,
 					isoclient_info[i].emc_clk_name);
-				pr_err("disabling iso mgr");
-				test_mode = 1;
+
+				isomgr_clients[c].emc_clk = NULL;
 				return 0;
 			}
 		}
@@ -1219,7 +1244,6 @@ retry:
 		if (atomic_read(&cp->kref.refcount))
 			goto retry;
 	}
-	pr_info("done");
 	return 0;
 }
 EXPORT_SYMBOL(tegra_isomgr_enable_test_mode);

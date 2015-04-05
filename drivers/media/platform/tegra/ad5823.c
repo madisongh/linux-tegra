@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -40,8 +40,11 @@
 #define AD5823_FOCUS_INFINITY	(146)
 
 #define SETTLETIME_MS	(15)
-#define FOCAL_LENGTH	(4.507f)
-#define FNUMBER		(2.8f)
+/* define FOCAL_LENGTH/MAX_APERTURE/FNUMBER as integer with granularity of 10000
+   instead of previous float type -- bug 1519258 */
+#define FOCAL_LENGTH	(29500)
+#define MAX_APERTURE	(25261)	/* in APEX unit = 2 * log2(fnumber) */
+#define FNUMBER		(24000)
 #define	AD5823_MOVE_TIME_VALUE	(0x43)
 
 #define AD5823_MAX_RETRIES (3)
@@ -54,6 +57,8 @@ struct ad5823_info {
 	struct miscdevice miscdev;
 	struct regmap *regmap;
 	struct camera_sync_dev *csync_dev;
+	u32 active_features;
+	u32 supported_features;
 };
 
 static int ad5823_set_position(struct ad5823_info *info, u32 position)
@@ -72,29 +77,31 @@ static int ad5823_set_position(struct ad5823_info *info, u32 position)
 			position = info->config.pos_actual_high;
 	}
 
+	if (info->active_features|CAMDEV_USE_MFI) {
 #ifdef TEGRA_12X_OR_HIGHER_CONFIG
-	ret = camera_dev_sync_clear(info->csync_dev);
-	ret |= camera_dev_sync_wr_add(info->csync_dev,
-			AD5823_VCM_MOVE_TIME,
-			AD5823_MOVE_TIME_VALUE);
-	ret |= camera_dev_sync_wr_add(info->csync_dev,
-			AD5823_MODE,
-			0);
-	ret |= camera_dev_sync_wr_add(info->csync_dev,
-			AD5823_VCM_CODE_MSB,
-			((position >> 8) & 0x3) | (1 << 2));
-	ret |= camera_dev_sync_wr_add(info->csync_dev,
-			AD5823_VCM_CODE_LSB,
-			position & 0xFF);
-#else
-	ret |= regmap_write(info->regmap, AD5823_VCM_MOVE_TIME,
+		ret = camera_dev_sync_clear(info->csync_dev);
+		ret |= camera_dev_sync_wr_add(info->csync_dev,
+				AD5823_VCM_MOVE_TIME,
 				AD5823_MOVE_TIME_VALUE);
-	ret |= regmap_write(info->regmap, AD5823_MODE, 0);
-	ret |= regmap_write(info->regmap, AD5823_VCM_CODE_MSB,
-		((position >> 8) & 0x3) | (1 << 2));
-	ret |= regmap_write(info->regmap, AD5823_VCM_CODE_LSB,
-		position & 0xFF);
+		ret |= camera_dev_sync_wr_add(info->csync_dev,
+				AD5823_MODE,
+				0);
+		ret |= camera_dev_sync_wr_add(info->csync_dev,
+				AD5823_VCM_CODE_MSB,
+				((position >> 8) & 0x3) | (1 << 2));
+		ret |= camera_dev_sync_wr_add(info->csync_dev,
+				AD5823_VCM_CODE_LSB,
+				position & 0xFF);
 #endif
+	} else {
+		ret |= regmap_write(info->regmap, AD5823_VCM_MOVE_TIME,
+					AD5823_MOVE_TIME_VALUE);
+		ret |= regmap_write(info->regmap, AD5823_MODE, 0);
+		ret |= regmap_write(info->regmap, AD5823_VCM_CODE_MSB,
+			((position >> 8) & 0x3) | (1 << 2));
+		ret |= regmap_write(info->regmap, AD5823_VCM_CODE_LSB,
+			position & 0xFF);
+	}
 
 	return ret;
 }
@@ -119,6 +126,21 @@ static long ad5823_ioctl(struct file *file,
 
 		break;
 	}
+	case _IOC_NR(AD5823_IOCTL_SET_FEATURES):
+		info->active_features = arg;
+		break;
+
+	case _IOC_NR(AD5823_IOCTL_GET_FEATURES):
+		if (copy_to_user((void __user *) arg,
+				 &info->supported_features,
+				 sizeof(info->supported_features))) {
+			dev_err(&info->i2c_client->dev, "%s: 0x%x\n",
+				__func__, __LINE__);
+			return -EFAULT;
+		}
+
+		break;
+
 	case _IOC_NR(AD5823_IOCTL_SET_POSITION):
 		if (info->pdata->pwr_dev == AD5823_PWR_DEV_OFF
 				&& info->pdata->power_on) {
@@ -259,6 +281,7 @@ static struct ad5823_platform_data *ad5823_parse_dt(struct i2c_client *client)
 		dev_err(&client->dev, "Invalid af-pwdn-gpios\n");
 		return ERR_PTR(-EINVAL);
 	}
+	pdata->support_mfi = of_property_read_bool(np, "support_mfi");
 	pdata->power_on = ad5823_power_on;
 	pdata->power_off = ad5823_power_off;
 
@@ -346,7 +369,7 @@ static int ad5823_probe(struct i2c_client *client,
 
 	info->config.focal_length = FOCAL_LENGTH;
 	info->config.fnumber = FNUMBER;
-	info->config.max_aperture = FNUMBER;
+	info->config.max_aperture = MAX_APERTURE;
 	info->config.range_ends_reversed = 0;
 
 	info->config.pos_working_low = AD5823_FOCUS_INFINITY;
@@ -361,6 +384,11 @@ static int ad5823_probe(struct i2c_client *client,
 	info->config.focuser_set[0].settle_time = SETTLETIME_MS;
 
 	info->miscdev   = ad5823_device;
+
+	info->active_features = 0;
+	info->supported_features = 0;
+	info->supported_features |=
+		(info->pdata->support_mfi) ? CAMDEV_USE_MFI : 0;
 
 	i2c_set_clientdata(client, info);
 

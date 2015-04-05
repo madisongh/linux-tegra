@@ -1,7 +1,7 @@
 /*
  * arch/arm64/boot/dts/tegra210-grenada.dtsi
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,6 +32,8 @@
 / {
 	model = "grenada";
 	compatible = "nvidia,grenada", "nvidia,tegra210";
+	nvidia,dtsfilename = __FILE__;
+	nvidia,dtbbuildtime = __DATE__, __TIME__;
 
 	chosen {
 		bootargs ="mem=1024M@2048M earlycon=uart8250,mmio32,0x70006000";
@@ -291,7 +293,7 @@
 
 			uart2_cts_pg3 {
 				nvidia,pins = "uart2_cts_pg3";
-				nvidia,function = "ub3";
+				nvidia,function = "uartb";
 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
 				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
@@ -299,7 +301,7 @@
 
 			uart2_rts_pg2 {
 				nvidia,pins = "uart2_rts_pg2";
-				nvidia,function = "ub3";
+				nvidia,function = "uartb";
 				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
 				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
@@ -307,7 +309,7 @@
 
 			uart2_rx_pg1 {
 				nvidia,pins = "uart2_rx_pg1";
-				nvidia,function = "ub3";
+				nvidia,function = "uartb";
 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
 				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
@@ -315,7 +317,7 @@
 
 			uart2_tx_pg0 {
 				nvidia,pins = "uart2_tx_pg0";
-				nvidia,function = "ub3";
+				nvidia,function = "uartb";
 				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
 				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
@@ -1113,14 +1115,14 @@
 	};
 
 	pcie-controller {
-		status = "okay";
+		status = "disabled";
 
 		pci@1,0 {
-			status = "okay";
+			status = "disabled";
 		};
 
 		pci@2,0 {
-			status = "okay";
+			status = "disabled";
 		};
 	};
 
@@ -1222,4 +1224,12 @@
 		reg = < 0x0 0x538f0000 0x0 0x1000 >;
 	};
 
+	ethernet@0x4e000000 {
+		compatible = "smsc,lan9115";
+		reg = < 0x0 0x4e000000 0x0 0x00010000 >;
+		interrupts = < 0  48 0x4 >;
+		reg-io-width = <4>;
+		smsc,irq-active-high;
+		smsc,irq-push-pull;
+	};
 };

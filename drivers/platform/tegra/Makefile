@@ -26,6 +26,7 @@ endif
 obj-y += nvdumper/
 obj-$(CONFIG_PM_SLEEP) += pm-irq.o
 obj-$(CONFIG_TEGRA_PMC) += pmc.o
+obj-$(CONFIG_TEGRA210_BOOTROM_PMC) += tegra-bootrom-pmc-config.o
 obj-y += pm.o
 
 obj-$(CONFIG_TEGRA_MC_DOMAINS) += pm_domains.o
@@ -111,7 +112,6 @@ obj-$(CONFIG_COMMON_CLK) += common_clock.o
 
 
 obj-$(CONFIG_TEGRA3_PM) += pm-t3.o
-obj-$(CONFIG_TEGRA_CORE_VOLT_CAP) += tegra_core_volt_cap.o
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += wakeups-t21x.o
 
 
@@ -152,10 +152,6 @@ obj-$(CONFIG_TEGRA_BOARD_COMMON) += board-panel.o
 obj-$(CONFIG_TEGRA_HMP_CLUSTER_CONTROL)      += cluster-control.o
 
 obj-$(CONFIG_TEGRA_USE_NCT)             += nct.o nct_sysfs.o
-
-else # --- CONFIG_ARM64 --- #
-
-obj-y += dummy.o # generate a built-in.o
 
 endif
 

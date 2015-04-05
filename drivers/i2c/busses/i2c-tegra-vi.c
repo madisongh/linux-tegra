@@ -1,7 +1,7 @@
 /*
  * drivers/i2c/busses/vii2c-tegra.c
  *
- * Copyright (C) 2014 NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2014-2015 NVIDIA Corporation.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -227,6 +227,7 @@ struct tegra_vi_i2c_dev {
 	bool bit_banging_xfer_after_shutdown;
 	bool is_shutdown;
 	struct notifier_block pm_nb;
+	struct regulator *pull_up_supply;
 };
 
 static void i2c_writel(struct tegra_vi_i2c_dev *i2c_dev, u32 val,
@@ -553,12 +554,20 @@ static int tegra_vi_i2c_clock_enable(struct tegra_vi_i2c_dev *i2c_dev)
 			"Enabling slow clk failed, err %d\n", ret);
 		goto slow_clk_err;
 	}
+
+	ret = clk_set_rate(i2c_dev->host1x_clk, 0);
+	if (ret < 0) {
+		dev_err(i2c_dev->dev,
+			"Set host1x clk failed, err %d\n", ret);
+		goto host1x_clk_err;
+	}
 	ret = clk_prepare_enable(i2c_dev->host1x_clk);
 	if (ret < 0) {
 		dev_err(i2c_dev->dev,
 			"Enabling host1x clk failed, err %d\n", ret);
 		goto host1x_clk_err;
 	}
+
 	return 0;
 
 host1x_clk_err:
@@ -1166,18 +1175,23 @@ static int tegra_vi_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	int num)
 {
 	struct tegra_vi_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
-	int i;
+	int i = 0;
 	int ret = 0;
 	BUG_ON(!rt_mutex_is_locked(&(adap->bus_lock)));
 	if (i2c_dev->is_suspended)
 		return -EBUSY;
 
 	if ((i2c_dev->is_shutdown || adap->atomic_xfer_only)
-		&& i2c_dev->bit_banging_xfer_after_shutdown)
-		return tegra_vi_i2c_gpio_xfer(adap, msgs, num);
+		&& i2c_dev->bit_banging_xfer_after_shutdown) {
+		ret = tegra_vi_i2c_gpio_xfer(adap, msgs, num);
+		i = num;
+		goto end;
+	}
 
-	if (adap->atomic_xfer_only)
-		return -EBUSY;
+	if (adap->atomic_xfer_only) {
+		ret = -EBUSY;
+		goto end;
+	}
 
 	i2c_dev->msgs = msgs;
 	i2c_dev->msgs_num = num;
@@ -1244,6 +1258,7 @@ i2c_xfer_pwr_fail:
 	i2c_dev->msgs = NULL;
 	i2c_dev->msgs_num = 0;
 
+end:
 	return ret ?: i;
 }
 
@@ -1453,6 +1468,25 @@ static int tegra_vi_i2c_probe(struct platform_device *pdev)
 
 skip_pinctrl:
 
+	i2c_dev->pull_up_supply = devm_regulator_get(&pdev->dev, "bus-pullup");
+	if (IS_ERR(i2c_dev->pull_up_supply)) {
+		ret = PTR_ERR(i2c_dev->pull_up_supply);
+		if (ret  == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+		dev_err(&pdev->dev, "bus-pullup regulator not found: %d\n",
+			ret);
+		i2c_dev->pull_up_supply = NULL;
+	}
+
+	if (i2c_dev->pull_up_supply) {
+		ret = regulator_enable(i2c_dev->pull_up_supply);
+		if (ret < 0) {
+			dev_err(i2c_dev->dev, "Pull up regulator supply failed: %d\n",
+				ret);
+			return ret;
+		}
+	}
+
 	i2c_dev->base = base;
 	i2c_dev->div_clk = div_clk;
 	i2c_dev->slow_clk = slow_clk;
@@ -1585,14 +1619,8 @@ static int tegra_vi_i2c_suspend_noirq(struct device *dev)
 
 static int __tegra_vi_i2c_resume_noirq(struct tegra_vi_i2c_dev *i2c_dev)
 {
-	int ret;
-
 	if (i2c_dev->is_clkon_always)
 		tegra_vi_i2c_clock_enable(i2c_dev);
-
-	ret = tegra_vi_i2c_init(i2c_dev);
-	if (ret && ret != -ENODEV)
-		return ret;
 
 	i2c_dev->is_suspended = false;
 
@@ -1635,18 +1663,7 @@ static struct platform_driver tegra_vii2c_driver = {
 	},
 };
 
-static int __init tegra_vii2c_init_driver(void)
-{
-	return platform_driver_register(&tegra_vii2c_driver);
-}
-
-static void __exit tegra_vii2c_exit_driver(void)
-{
-	platform_driver_unregister(&tegra_vii2c_driver);
-}
-
-subsys_initcall(tegra_vii2c_init_driver);
-module_exit(tegra_vii2c_exit_driver);
+module_platform_driver(tegra_vii2c_driver);
 
 MODULE_DESCRIPTION("nVidia Tegra VI-I2C Bus Controller driver");
 MODULE_LICENSE("GPL v2");

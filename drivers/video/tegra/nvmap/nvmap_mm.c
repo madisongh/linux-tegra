@@ -24,12 +24,28 @@
 
 #include "nvmap_priv.h"
 
+inline static void nvmap_flush_dcache_all(void *dummy)
+{
+#if defined(CONFIG_DENVER_CPU)
+	u64 id_afr0;
+	asm volatile ("mrs %0, ID_AFR0_EL1" : "=r"(id_afr0));
+	if (likely((id_afr0 & 0xf00) == 0x100)) {
+		asm volatile ("msr s3_0_c15_c13_0, %0" : : "r" (0));
+		asm volatile ("dsb sy");
+	} else {
+		__flush_dcache_all(NULL);
+	}
+#else
+	__flush_dcache_all(NULL);
+#endif
+}
+
 void inner_flush_cache_all(void)
 {
 #if defined(CONFIG_ARM64) && defined(CONFIG_NVMAP_CACHE_MAINT_BY_SET_WAYS_ON_ONE_CPU)
-	__flush_dcache_all(NULL);
+	nvmap_flush_dcache_all(NULL);
 #elif defined(CONFIG_ARM64)
-	on_each_cpu(__flush_dcache_all, NULL, 1);
+	on_each_cpu(nvmap_flush_dcache_all, NULL, 1);
 #elif defined(CONFIG_NVMAP_CACHE_MAINT_BY_SET_WAYS_ON_ONE_CPU)
 	v7_flush_kern_cache_all();
 #else
@@ -57,7 +73,7 @@ void inner_clean_cache_all(void)
  *   __clean_dcache_page() is only available on ARM64 (well, we haven't
  *   implemented it on ARMv7).
  */
-#ifdef ARM64
+#if defined(CONFIG_ARM64)
 void nvmap_clean_cache(struct page **pages, int numpages)
 {
 	int i;
@@ -73,6 +89,15 @@ void nvmap_clean_cache(struct page **pages, int numpages)
 		__clean_dcache_page(pages[i]);
 }
 #endif
+
+void nvmap_clean_cache_page(struct page *page)
+{
+#if defined(CONFIG_ARM64)
+	__clean_dcache_page(page);
+#else
+	__flush_dcache_page(page_mapping(page), page);
+#endif
+}
 
 void nvmap_flush_cache(struct page **pages, int numpages)
 {

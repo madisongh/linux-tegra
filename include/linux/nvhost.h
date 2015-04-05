@@ -3,7 +3,7 @@
  *
  * Tegra graphics host driver
  *
- * Copyright (c) 2009-2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2009-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,6 +33,7 @@
 #include <linux/time.h>
 #include <linux/fence.h>
 
+struct nvhost_channel;
 struct nvhost_master;
 struct nvhost_hwctx;
 struct nvhost_device_power_attr;
@@ -133,13 +134,17 @@ enum nvhost_module_identifier {
 	NVHOST_MODULE_ID_MAX
 };
 
+enum nvhost_resource_policy {
+	RESOURCE_PER_DEVICE = 0,
+	RESOURCE_PER_CHANNEL_INSTANCE,
+};
+
 struct nvhost_device_data {
 	int		version;	/* ip version number of device */
 	int		id;		/* Separates clients of same hw */
 	void __iomem	*aperture[NVHOST_MODULE_MAX_IORESOURCE_MEM];
 	struct device_dma_parameters dma_parms;
 
-	u32		client_managed_syncpt;
 	u32		modulemutexes[NVHOST_MODULE_MAX_MODMUTEXES];
 	u32		moduleid;	/* Module id for user space API */
 
@@ -188,9 +193,6 @@ struct nvhost_device_data {
 	int		num_mapped_chs;	/* Num of channel mapped to device */
 	int		num_ppc;	/* Number of pixels per clock cycle */
 
-	/* Channel(s) assigned for the module */
-	struct nvhost_channel **channels;
-
 	/* device node for channel operations */
 	dev_t cdev_region;
 	struct device *node;
@@ -235,9 +237,6 @@ struct nvhost_device_data {
 	void *private_data;		/* private platform data */
 	struct platform_device *pdev;	/* owner platform_device */
 	void *virt_priv;		/* private data for virtualized dev */
-
-	/* flag to enable gather filter for device */
-	bool gather_filter_enabled;
 
 	struct mutex no_poweroff_req_mutex;
 	struct dev_pm_qos_request no_poweroff_req;
@@ -284,6 +283,11 @@ struct nvhost_device_data {
 				     unsigned long pixel_rate,
 				     unsigned long bw_rate);
 
+	/* Called after successful client device init. This can
+	 * be used in cases where the hardware specifics differ
+	 * between hardware revisions */
+	int (*hw_init)(struct platform_device *dev);
+
 	/* Allocates a context handler for the device */
 	struct nvhost_hwctx_handler *(*alloc_hwctx_handler)(u32 syncpt,
 			struct nvhost_channel *ch);
@@ -304,6 +308,9 @@ struct nvhost_device_data {
 
 	/* Is the device already forced on? */
 	bool forced_on;
+
+	/* Should we map channel at submit time? */
+	bool resource_policy;
 };
 
 
@@ -311,6 +318,13 @@ static inline
 struct nvhost_device_data *nvhost_get_devdata(struct platform_device *pdev)
 {
 	return (struct nvhost_device_data *)platform_get_drvdata(pdev);
+}
+
+static inline bool nvhost_dev_is_virtual(struct platform_device *pdev)
+{
+	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
+
+	return pdata->virtual_dev;
 }
 
 struct nvhost_device_power_attr {
@@ -330,6 +344,37 @@ void nvhost_module_idle_ext(struct platform_device *dev);
 void nvhost_register_client_domain(struct generic_pm_domain *domain);
 void nvhost_unregister_client_domain(struct generic_pm_domain *domain);
 
+/* public APIs required to submit in-kernel work */
+int nvhost_channel_map(struct nvhost_device_data *pdata,
+			struct nvhost_channel **ch,
+			void *identifier);
+void nvhost_putchannel(struct nvhost_channel *ch, int cnt);
+/* Allocate memory for a job. Just enough memory will be allocated to
+ * accomodate the submit announced in submit header.
+ */
+struct nvhost_job *nvhost_job_alloc(struct nvhost_channel *ch,
+		int num_cmdbufs, int num_relocs, int num_waitchks,
+		int num_syncpts);
+/* Decrement reference job, free if goes to zero. */
+void nvhost_job_put(struct nvhost_job *job);
+
+/* Add a gather with IOVA address to job */
+int nvhost_job_add_client_gather_address(struct nvhost_job *job,
+		u32 num_words, u32 class_id, dma_addr_t gather_address);
+int nvhost_channel_submit(struct nvhost_job *job);
+
+/* common device management APIs */
+int nvhost_client_device_get_resources(struct platform_device *dev);
+int nvhost_client_device_release(struct platform_device *dev);
+int nvhost_client_device_init(struct platform_device *dev);
+int nvhost_check_bondout(unsigned int id);
+
+/* common runtime pm and power domain APIs */
+int nvhost_module_init(struct platform_device *ndev);
+int nvhost_module_add_domain(struct generic_pm_domain *domain,
+	struct platform_device *pdev);
+extern const struct dev_pm_ops nvhost_module_pm_ops;
+
 /* public host1x sync-point management APIs */
 u32 nvhost_get_syncpt_client_managed(const char *syncpt_name);
 u32 nvhost_get_syncpt_host_managed(struct platform_device *pdev,
@@ -348,6 +393,7 @@ int nvhost_syncpt_is_expired_ext(struct platform_device *dev,
 	u32 id, u32 thresh);
 void nvhost_syncpt_set_min_eq_max_ext(struct platform_device *dev, u32 id);
 int nvhost_syncpt_nb_pts_ext(struct platform_device *dev);
+bool nvhost_syncpt_is_valid_pt_ext(struct platform_device *dev, u32 id);
 
 /* public host1x interrupt management APIs */
 int nvhost_intr_register_notifier(struct platform_device *pdev,

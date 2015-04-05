@@ -1,9 +1,7 @@
 /*
- * drivers/video/tegra/host/isp/isp.c
- *
  * Tegra Graphics ISP
  *
- * Copyright (c) 2012-2014, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -258,36 +256,9 @@ static void isp_isr_work(struct work_struct *isp_work)
 	return;
 }
 
-static irqreturn_t isp_isr(int irq, void *dev_id)
+void nvhost_isp_queue_isr_work(struct isp *tegra_isp)
 {
-	struct isp *dev = dev_id;
-	unsigned long flags;
-	u32 reg, enable_reg;
-
-	spin_lock_irqsave(&dev->lock, flags);
-
-	reg = tegra_isp_read(dev, 0xf8);
-
-	if (reg & (1 << 5)) {
-		/* Disable */
-		enable_reg = tegra_isp_read(dev, 0x14c);
-		enable_reg &= ~1;
-		tegra_isp_write(dev, 0x14c, enable_reg);
-
-		/* Clear */
-		reg &= (1 << 5);
-		tegra_isp_write(dev, 0xf8, reg);
-
-		/* put work into queue */
-		queue_work(dev->isp_workqueue,
-			(struct work_struct *)dev->my_isr_work);
-
-	} else {
-		pr_err("Unkown interrupt - ISR status %x\n", reg);
-	}
-
-	spin_unlock_irqrestore(&dev->lock, flags);
-	return IRQ_HANDLED;
+	queue_work(tegra_isp->isp_workqueue, &tegra_isp->my_isr_work->work);
 }
 
 static int isp_probe(struct platform_device *dev)
@@ -368,23 +339,6 @@ static int isp_probe(struct platform_device *dev)
 		err = -ENOMEM;
 	}
 
-	tegra_isp->irq = platform_get_irq(dev, 0);
-	if (tegra_isp->irq <= 0) {
-		dev_err(&dev->dev, "no irq\n");
-		err = -ENOENT;
-		goto camera_isp_unregister;
-	}
-
-	err = request_irq(tegra_isp->irq,
-		isp_isr, 0, "tegra-isp-isr", tegra_isp);
-	if (err) {
-		pr_err("%s: request_irq(%d) failed(%d)\n", __func__,
-		tegra_isp->irq, err);
-		goto camera_isp_unregister;
-	}
-
-	spin_lock_init(&tegra_isp->lock);
-
 	/* creating workqueue */
 	if (dev_id == 0)
 		tegra_isp->isp_workqueue = alloc_workqueue("ispa_workqueue",
@@ -408,18 +362,18 @@ static int isp_probe(struct platform_device *dev)
 
 	INIT_WORK((struct work_struct *)tegra_isp->my_isr_work, isp_isr_work);
 
-	disable_irq(tegra_isp->irq);
-
 	nvhost_module_init(dev);
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS
 
 	/* In T210 power ISPB is placed to a separate power partition */
+#ifndef CONFIG_PM_GENERIC_DOMAINS_OF
 	if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA21 &&
 	    dev_id == ISPB_DEV_ID)
 		pdata->pd.name = "ve2";
 	else
 		pdata->pd.name = "ve";
+#endif
 
 	/* add module power domain and also add its domain
 	 * as sub-domain of MC domain */
@@ -449,12 +403,6 @@ static int __exit isp_remove(struct platform_device *dev)
 #if defined(CONFIG_TEGRA_ISOMGR)
 	if (tegra_isp->isomgr_handle)
 		isp_isomgr_unregister(tegra_isp);
-#endif
-#ifdef CONFIG_PM_RUNTIME
-	pm_runtime_put(&dev->dev);
-	pm_runtime_disable(&dev->dev);
-#else
-	nvhost_module_disable_clk(&dev->dev);
 #endif
 	nvhost_client_device_release(dev);
 	disable_irq(tegra_isp->irq);
@@ -531,12 +479,10 @@ static int isp_set_la(struct isp *tegra_isp, uint isp_bw, uint la_client)
 static long isp_ioctl(struct file *file,
 		unsigned int cmd, unsigned long arg)
 {
-	struct isp *tegra_isp;
+	struct isp *tegra_isp = file->private_data;
 
 	if (_IOC_TYPE(cmd) != NVHOST_ISP_IOCTL_MAGIC)
 		return -EFAULT;
-
-	tegra_isp = file->private_data;
 
 	switch (cmd) {
 	case NVHOST_ISP_IOCTL_SET_EMC: {
@@ -607,6 +553,19 @@ static long isp_ioctl(struct file *file,
 #endif
 		return ret;
 	}
+	case NVHOST_ISP_IOCTL_SET_ISP_CLK: {
+		long isp_clk_rate = 0;
+
+		if (copy_from_user(&isp_clk_rate,
+			(const void __user *)arg, sizeof(long))) {
+			dev_err(&tegra_isp->ndev->dev,
+				"%s: Failed to copy arg from user\n", __func__);
+			return -EFAULT;
+		}
+
+		return nvhost_module_set_rate(tegra_isp->ndev,
+				tegra_isp, isp_clk_rate, 0, NVHOST_CLOCK);
+	}
 	default:
 		dev_err(&tegra_isp->ndev->dev,
 			"%s: Unknown ISP ioctl.\n", __func__);
@@ -632,14 +591,24 @@ static int isp_open(struct inode *inode, struct file *file)
 
 	file->private_data = tegra_isp;
 
+	/* add isp client to acm */
+	if (nvhost_module_add_client(tegra_isp->ndev, tegra_isp)) {
+		dev_err(&tegra_isp->ndev->dev,
+			"%s: failed add isp client\n",
+			__func__);
+		return -ENOMEM;
+	}
+
 	return 0;
 }
 
 static int isp_release(struct inode *inode, struct file *file)
 {
-#if defined(CONFIG_TEGRA_ISOMGR)
 	int ret = 0;
+
 	struct isp *tegra_isp = file->private_data;
+
+#if defined(CONFIG_TEGRA_ISOMGR)
 
 	/* nullify isomgr request */
 	if (tegra_isp->isomgr_handle) {
@@ -652,7 +621,11 @@ static int isp_release(struct inode *inode, struct file *file)
 		}
 	}
 #endif
-	return 0;
+
+	/* remove isp client from acm */
+	nvhost_module_remove_client(tegra_isp->ndev, tegra_isp);
+
+	return ret;
 }
 
 const struct file_operations tegra_isp_ctrl_ops = {
@@ -665,9 +638,22 @@ const struct file_operations tegra_isp_ctrl_ops = {
 	.release = isp_release,
 };
 
+static struct of_device_id tegra21x_isp_domain_match[] = {
+	{.compatible = "nvidia,tegra210-ve-pd",
+	 .data = (struct nvhost_device_data *)&t21_isp_info},
+	{.compatible = "nvidia,tegra210-ve2-pd",
+	 .data = (struct nvhost_device_data *)&t21_ispb_info},
+	{},
+};
 
 static int __init isp_init(void)
 {
+	int ret;
+
+	ret = nvhost_domain_init(tegra21x_isp_domain_match);
+	if (ret)
+		return ret;
+
 	return platform_driver_register(&isp_driver);
 }
 

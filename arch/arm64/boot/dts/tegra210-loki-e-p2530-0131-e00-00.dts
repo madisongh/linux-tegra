@@ -30,6 +30,7 @@
 	backlight {
 		compatible = "pwm-backlight";
 		status = "okay";
+		disable-on-kernel-charging;
 		panel-j-720p-5-0-bl {
 			pwms = <&tegra_pwm 0 29334>;
 		};
@@ -51,6 +52,7 @@
 			status = "okay";
 			nvidia,dc-flags = <TEGRA_DC_FLAG_ENABLED>;
 			nvidia,emc-clk-rate = <300000000>;
+			nvidia,cmu-enable = <1>;
 			nvidia,fb-bpp = <32>; /* bits per pixel */
 			nvidia,fb-flags = <TEGRA_FB_FLIP_ON_PROBE>;
 		};

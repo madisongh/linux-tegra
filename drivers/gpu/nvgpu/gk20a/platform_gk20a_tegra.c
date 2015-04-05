@@ -3,7 +3,7 @@
  *
  * GK20A Tegra Platform Interface
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -25,6 +25,10 @@
 #include <linux/nvmap.h>
 #include <linux/tegra_pm_domains.h>
 #include <linux/platform/tegra/clock.h>
+#include <linux/platform/tegra/dvfs.h>
+#include <linux/platform/tegra/common.h>
+#include <linux/clk/tegra.h>
+#include <mach/tegra_emc.h>
 
 #include "gk20a.h"
 #include "hal_gk20a.h"
@@ -41,6 +45,7 @@ static struct gk20a_platform t132_gk20a_tegra_platform;
 
 struct gk20a_emc_params {
 	long bw_ratio;
+	long freq_last_set;
 };
 
 #define MHZ_TO_HZ(x) ((x) * 1000000)
@@ -75,13 +80,19 @@ static int gk20a_tegra_secure_page_alloc(struct platform_device *pdev)
 	return 0;
 }
 
-static void gk20a_tegra_secure_destroy(struct platform_device *pdev,
+static void gk20a_tegra_secure_destroy(struct gk20a *g,
 				       struct gr_ctx_buffer_desc *desc)
 {
-	gk20a_free_sgtable(&desc->sgt);
-	dma_free_attrs(&tegra_vpr_dev, desc->size,
-			(void *)(uintptr_t)desc->iova,
-			desc->iova, &desc->attrs);
+	DEFINE_DMA_ATTRS(attrs);
+
+	if (desc->mem.sgt) {
+		phys_addr_t pa = sg_phys(desc->mem.sgt->sgl);
+		dma_free_attrs(&tegra_vpr_dev, desc->mem.size,
+			(void *)(uintptr_t)pa,
+			pa, &attrs);
+		gk20a_free_sgtable(&desc->mem.sgt);
+		desc->mem.sgt = NULL;
+	}
 }
 
 static int gk20a_tegra_secure_alloc(struct platform_device *pdev,
@@ -104,9 +115,7 @@ static int gk20a_tegra_secure_alloc(struct platform_device *pdev,
 	if (dma_mapping_error(&tegra_vpr_dev, iova))
 		return -ENOMEM;
 
-	desc->iova = iova;
-	desc->size = size;
-	desc->attrs = attrs;
+	desc->mem.size = size;
 	desc->destroy = gk20a_tegra_secure_destroy;
 
 	sgt = kzalloc(sizeof(*sgt), GFP_KERNEL);
@@ -121,18 +130,18 @@ static int gk20a_tegra_secure_alloc(struct platform_device *pdev,
 	}
 	page = phys_to_page(iova);
 	sg_set_page(sgt->sgl, page, size, 0);
-	sg_dma_address(sgt->sgl) = iova;
+	/* This bypasses SMMU for VPR during gmmu_map. */
+	sg_dma_address(sgt->sgl) = 0;
 
-	desc->sgt = sgt;
+	desc->mem.sgt = sgt;
 
 	return err;
 
 fail_sgt:
 	kfree(sgt);
 fail:
-	dma_free_attrs(&tegra_vpr_dev, desc->size,
-			(void *)(uintptr_t)&desc->iova,
-			desc->iova, &desc->attrs);
+	dma_free_attrs(&tegra_vpr_dev, desc->mem.size,
+			(void *)(uintptr_t)iova, iova, &attrs);
 	return err;
 }
 
@@ -142,19 +151,26 @@ fail:
  * This function returns the minimum emc clock based on gpu frequency
  */
 
-static long gk20a_tegra_get_emc_rate(struct gk20a *g,
-			      struct gk20a_emc_params *emc_params, long freq)
+static unsigned long gk20a_tegra_get_emc_rate(struct gk20a *g,
+				struct gk20a_emc_params *emc_params)
 {
-	long hz;
+	unsigned long gpu_freq, gpu_fmax_at_vmin;
+	unsigned long emc_rate, emc_scale;
 
-	freq = HZ_TO_MHZ(freq);
+	gpu_freq = clk_get_rate(g->clk.tegra_clk);
+	gpu_fmax_at_vmin = tegra_dvfs_get_fmax_at_vmin_safe_t(
+		clk_get_parent(g->clk.tegra_clk));
 
-	hz = (freq * emc_params->bw_ratio);
-	hz = (hz * min(g->pmu.load_avg, g->emc3d_ratio)) / 1000;
+	/* When scaling emc, only account for the gpu load below fmax@vmin */
+	if (gpu_freq < gpu_fmax_at_vmin)
+		emc_scale = min(g->pmu.load_avg, g->emc3d_ratio);
+	else
+		emc_scale = g->emc3d_ratio;
 
-	hz = MHZ_TO_HZ(hz);
+	emc_rate =
+		(HZ_TO_MHZ(gpu_freq) * emc_params->bw_ratio * emc_scale) / 1000;
 
-	return hz;
+	return MHZ_TO_HZ(emc_rate);
 }
 
 /*
@@ -170,11 +186,50 @@ static void gk20a_tegra_postscale(struct platform_device *pdev,
 	struct gk20a_scale_profile *profile = platform->g->scale_profile;
 	struct gk20a_emc_params *emc_params = profile->private_data;
 	struct gk20a *g = get_gk20a(pdev);
+	struct clk *emc_clk = platform->clk[2];
+	enum tegra_chipid chip_id = tegra_get_chip_id();
+	unsigned long emc_target;
+	long emc_freq_lower, emc_freq_upper, emc_freq_rounded;
 
-	long after = clk_get_rate(g->clk.tegra_clk);
-	long emc_target = gk20a_tegra_get_emc_rate(g, emc_params, after);
+	emc_target = gk20a_tegra_get_emc_rate(g, emc_params);
 
-	clk_set_rate(platform->clk[2], emc_target);
+	switch (chip_id) {
+	case TEGRA_CHIPID_TEGRA12:
+	case TEGRA_CHIPID_TEGRA13:
+		/* T124 and T132 don't apply any rounding. The resulting
+		 * emc frequency gets implicitly rounded up after issuing
+		 * the clock_set_request.
+		 * So explicitly round up the emc target here to achieve
+		 * the same outcome. */
+		emc_freq_rounded =
+			tegra_emc_round_rate_updown(emc_target, true);
+		break;
+
+	case TEGRA_CHIPID_TEGRA21:
+		emc_freq_lower = tegra_emc_round_rate_updown(emc_target, false);
+		emc_freq_upper = tegra_emc_round_rate_updown(emc_target, true);
+
+		/* round to the nearest frequency step */
+		if (emc_target < (emc_freq_lower + emc_freq_upper) / 2)
+			emc_freq_rounded = emc_freq_lower;
+		else
+			emc_freq_rounded = emc_freq_upper;
+		break;
+
+	case TEGRA_CHIPID_UNKNOWN:
+	default:
+		/* a proper rounding function needs to be implemented
+		 * for emc in t18x */
+		emc_freq_rounded = clk_round_rate(emc_clk, emc_target);
+		break;
+	}
+
+	/* only change the emc clock if new rounded frequency is different
+	 * from previously set emc rate */
+	if (emc_freq_rounded != emc_params->freq_last_set) {
+		clk_set_rate(emc_clk, emc_freq_rounded);
+		emc_params->freq_last_set = emc_freq_rounded;
+	}
 }
 
 /*
@@ -376,6 +431,7 @@ static void gk20a_tegra_scale_init(struct platform_device *pdev)
 	if (!emc_params)
 		return;
 
+	emc_params->freq_last_set = -1;
 	gk20a_tegra_calibrate_emc(pdev, emc_params);
 
 	profile->private_data = emc_params;
@@ -464,10 +520,8 @@ static int gk20a_tegra_probe(struct platform_device *dev)
 
 static int gk20a_tegra_late_probe(struct platform_device *dev)
 {
-	struct gk20a_platform *platform = gk20a_get_platform(dev);
-
 	/* Make gk20a power domain a subdomain of host1x */
-	nvhost_register_client_domain(&platform->g->pd);
+	nvhost_register_client_domain(dev_to_genpd(&dev->dev));
 
 	/* Initialise tegra specific scaling quirks */
 	gk20a_tegra_scale_init(dev);
@@ -477,10 +531,8 @@ static int gk20a_tegra_late_probe(struct platform_device *dev)
 
 static int gk20a_tegra_remove(struct platform_device *dev)
 {
-	struct gk20a_platform *platform = gk20a_get_platform(dev);
-
 	/* remove gk20a power subdomain from host1x */
-	nvhost_unregister_client_domain(&platform->g->pd);
+	nvhost_unregister_client_domain(dev_to_genpd(&dev->dev));
 
 	/* deinitialise tegra specific scaling quirks */
 	gk20a_tegra_scale_exit(dev);
@@ -596,7 +648,7 @@ struct gk20a_platform gm20b_tegra_platform = {
 	.enable_elpg            = true,
 	.enable_aelpg           = true,
 
-	.force_reset_in_do_idle = true,
+	.force_reset_in_do_idle = false,
 
 	.default_big_page_size	= SZ_128K,
 

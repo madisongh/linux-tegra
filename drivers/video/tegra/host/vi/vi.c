@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host VI
  *
- * Copyright (c) 2012-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -26,6 +26,7 @@
 #include <linux/of_device.h>
 #include <linux/of_platform.h>
 #include <linux/clk/tegra.h>
+#include <linux/tegra-soc.h>
 #include <linux/tegra_pm_domains.h>
 
 #include <media/tegra_v4l2_camera.h>
@@ -264,7 +265,8 @@ static int vi_probe(struct platform_device *dev)
 			dev_err(&tegra_vi->ndev->dev,
 				"%s: couldn't get regulator\n", __func__);
 		tegra_vi->reg = NULL;
-		goto camera_i2c_unregister;
+		if (tegra_platform_is_silicon())
+			goto camera_i2c_unregister;
 	}
 
 #ifdef CONFIG_TEGRA_CAMERA
@@ -288,7 +290,9 @@ static int vi_probe(struct platform_device *dev)
 	nvhost_module_init(dev);
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS
+#ifndef CONFIG_PM_GENERIC_DOMAINS_OF
 	pdata->pd.name = "ve";
+#endif
 
 	/* add module power domain and also add its domain
 	 * as sub-domain of MC domain */
@@ -382,8 +386,20 @@ static struct platform_driver vi_driver = {
 	}
 };
 
+static struct of_device_id tegra21x_vi_domain_match[] = {
+	{.compatible = "nvidia,tegra210-ve-pd",
+	.data = (struct nvhost_device_data *)&t21_vi_info},
+	{},
+};
+
 static int __init vi_init(void)
 {
+	int ret;
+
+	ret = nvhost_domain_init(tegra21x_vi_domain_match);
+	if (ret)
+		return ret;
+
 	return platform_driver_register(&vi_driver);
 }
 

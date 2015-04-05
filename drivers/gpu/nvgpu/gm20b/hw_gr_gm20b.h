@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -166,6 +166,14 @@ static inline u32 gr_exception_gpc_m(void)
 {
 	return 0x1 << 24;
 }
+static inline u32 gr_exception_memfmt_m(void)
+{
+	return 0x1 << 1;
+}
+static inline u32 gr_exception_ds_m(void)
+{
+	return 0x1 << 4;
+}
 static inline u32 gr_exception1_r(void)
 {
 	return 0x00400118;
@@ -222,6 +230,10 @@ static inline u32 gr_gpfifo_ctl_semaphore_access_enabled_f(void)
 {
 	return 0x10000;
 }
+static inline u32 gr_gpfifo_status_r(void)
+{
+	return 0x00400504;
+}
 static inline u32 gr_trapped_addr_r(void)
 {
 	return 0x00400704;
@@ -266,6 +278,14 @@ static inline u32 gr_status_mask_r(void)
 {
 	return 0x00400610;
 }
+static inline u32 gr_status_1_r(void)
+{
+	return 0x00400604;
+}
+static inline u32 gr_status_2_r(void)
+{
+	return 0x00400608;
+}
 static inline u32 gr_engine_status_r(void)
 {
 	return 0x0040060c;
@@ -273,6 +293,186 @@ static inline u32 gr_engine_status_r(void)
 static inline u32 gr_engine_status_value_busy_f(void)
 {
 	return 0x1;
+}
+static inline u32 gr_pri_be0_becs_be_exception_r(void)
+{
+	return 0x00410204;
+}
+static inline u32 gr_pri_be0_becs_be_exception_en_r(void)
+{
+	return 0x00410208;
+}
+static inline u32 gr_pri_gpc0_gpccs_gpc_exception_r(void)
+{
+	return 0x00502c90;
+}
+static inline u32 gr_pri_gpc0_gpccs_gpc_exception_en_r(void)
+{
+	return 0x00502c94;
+}
+static inline u32 gr_pri_gpc0_tpc0_tpccs_tpc_exception_r(void)
+{
+	return 0x00504508;
+}
+static inline u32 gr_pri_gpc0_tpc0_tpccs_tpc_exception_en_r(void)
+{
+	return 0x0050450c;
+}
+static inline u32 gr_activity_0_r(void)
+{
+	return 0x00400380;
+}
+static inline u32 gr_activity_1_r(void)
+{
+	return 0x00400384;
+}
+static inline u32 gr_activity_2_r(void)
+{
+	return 0x00400388;
+}
+static inline u32 gr_activity_4_r(void)
+{
+	return 0x00400390;
+}
+static inline u32 gr_pri_gpc0_gcc_dbg_r(void)
+{
+	return 0x00501000;
+}
+static inline u32 gr_pri_gpcs_gcc_dbg_r(void)
+{
+	return 0x00419000;
+}
+static inline u32 gr_pri_gpcs_gcc_dbg_invalidate_m(void)
+{
+	return 0x1 << 1;
+}
+static inline u32 gr_pri_gpc0_tpc0_sm_cache_control_r(void)
+{
+	return 0x005046a4;
+}
+static inline u32 gr_pri_gpcs_tpcs_sm_cache_control_r(void)
+{
+	return 0x00419ea4;
+}
+static inline u32 gr_pri_gpcs_tpcs_sm_cache_control_invalidate_cache_m(void)
+{
+	return 0x1 << 0;
+}
+static inline u32 gr_pri_sked_activity_r(void)
+{
+	return 0x00407054;
+}
+static inline u32 gr_pri_gpc0_gpccs_gpc_activity0_r(void)
+{
+	return 0x00502c80;
+}
+static inline u32 gr_pri_gpc0_gpccs_gpc_activity1_r(void)
+{
+	return 0x00502c84;
+}
+static inline u32 gr_pri_gpc0_gpccs_gpc_activity2_r(void)
+{
+	return 0x00502c88;
+}
+static inline u32 gr_pri_gpc0_gpccs_gpc_activity3_r(void)
+{
+	return 0x00502c8c;
+}
+static inline u32 gr_pri_gpc0_tpc0_tpccs_tpc_activity_0_r(void)
+{
+	return 0x00504500;
+}
+static inline u32 gr_pri_gpc0_tpc1_tpccs_tpc_activity_0_r(void)
+{
+	return 0x00504d00;
+}
+static inline u32 gr_pri_gpc0_tpcs_tpccs_tpc_activity_0_r(void)
+{
+	return 0x00501d00;
+}
+static inline u32 gr_pri_gpcs_gpccs_gpc_activity_0_r(void)
+{
+	return 0x0041ac80;
+}
+static inline u32 gr_pri_gpcs_gpccs_gpc_activity_1_r(void)
+{
+	return 0x0041ac84;
+}
+static inline u32 gr_pri_gpcs_gpccs_gpc_activity_2_r(void)
+{
+	return 0x0041ac88;
+}
+static inline u32 gr_pri_gpcs_gpccs_gpc_activity_3_r(void)
+{
+	return 0x0041ac8c;
+}
+static inline u32 gr_pri_gpcs_tpc0_tpccs_tpc_activity_0_r(void)
+{
+	return 0x0041c500;
+}
+static inline u32 gr_pri_gpcs_tpc1_tpccs_tpc_activity_0_r(void)
+{
+	return 0x0041cd00;
+}
+static inline u32 gr_pri_gpcs_tpcs_tpccs_tpc_activity_0_r(void)
+{
+	return 0x00419d00;
+}
+static inline u32 gr_pri_be0_becs_be_activity0_r(void)
+{
+	return 0x00410200;
+}
+static inline u32 gr_pri_be1_becs_be_activity0_r(void)
+{
+	return 0x00410600;
+}
+static inline u32 gr_pri_bes_becs_be_activity0_r(void)
+{
+	return 0x00408a00;
+}
+static inline u32 gr_pri_ds_mpipe_status_r(void)
+{
+	return 0x00405858;
+}
+static inline u32 gr_pri_fe_go_idle_on_status_r(void)
+{
+	return 0x00404150;
+}
+static inline u32 gr_pri_fe_go_idle_check_r(void)
+{
+	return 0x00404158;
+}
+static inline u32 gr_pri_fe_go_idle_info_r(void)
+{
+	return 0x00404194;
+}
+static inline u32 gr_pri_gpc0_tpc0_tex_m_tex_subunits_status_r(void)
+{
+	return 0x00504238;
+}
+static inline u32 gr_pri_be0_crop_status1_r(void)
+{
+	return 0x00410134;
+}
+static inline u32 gr_pri_bes_crop_status1_r(void)
+{
+	return 0x00408934;
+}
+static inline u32 gr_pri_be0_zrop_status_r(void)
+{
+	return 0x00410048;
+}
+static inline u32 gr_pri_be0_zrop_status2_r(void)
+{
+	return 0x0041004c;
+}
+static inline u32 gr_pri_bes_zrop_status_r(void)
+{
+	return 0x00408848;
+}
+static inline u32 gr_pri_bes_zrop_status2_r(void)
+{
+	return 0x0040884c;
 }
 static inline u32 gr_pipe_bundle_address_r(void)
 {
@@ -718,6 +918,10 @@ static inline u32 gr_fecs_method_push_adr_set_watchdog_timeout_f(void)
 {
 	return 0x21;
 }
+static inline u32 gr_fecs_method_push_adr_halt_pipeline_v(void)
+{
+	return 0x00000004;
+}
 static inline u32 gr_fecs_host_int_status_r(void)
 {
 	return 0x00409c18;
@@ -1058,6 +1262,26 @@ static inline u32 gr_fecs_arb_ctx_cmd_cmd_v(u32 r)
 {
 	return (r >> 0) & 0x1f;
 }
+static inline u32 gr_fecs_ctxsw_status_fe_0_r(void)
+{
+	return 0x00409c00;
+}
+static inline u32 gr_gpc0_gpccs_ctxsw_status_gpc_0_r(void)
+{
+	return 0x00502c04;
+}
+static inline u32 gr_gpc0_gpccs_ctxsw_status_1_r(void)
+{
+	return 0x00502400;
+}
+static inline u32 gr_fecs_ctxsw_idlestate_r(void)
+{
+	return 0x00409420;
+}
+static inline u32 gr_gpc0_gpccs_ctxsw_idlestate_r(void)
+{
+	return 0x00502420;
+}
 static inline u32 gr_rstr2d_gpc_map0_r(void)
 {
 	return 0x0040780c;
@@ -1301,6 +1525,10 @@ static inline u32 gr_ds_zbc_color_fmt_val_unorm_one_v(void)
 static inline u32 gr_ds_zbc_color_fmt_val_rf32_gf32_bf32_af32_v(void)
 {
 	return 0x00000004;
+}
+static inline u32 gr_ds_zbc_color_fmt_val_a8_b8_g8_r8_v(void)
+{
+	return 0x00000028;
 }
 static inline u32 gr_ds_zbc_z_r(void)
 {
@@ -2798,6 +3026,10 @@ static inline u32 gr_gpc0_tpc0_tpccs_tpc_exception_en_sm_enabled_f(void)
 {
 	return 0x2;
 }
+static inline u32 gr_gpc0_tpc0_tpccs_tpc_exception_en_sm_v(u32 r)
+{
+	return (r >> 1) & 0x1;
+}
 static inline u32 gr_gpcs_gpccs_gpc_exception_en_r(void)
 {
 	return 0x0041ac94;
@@ -2854,9 +3086,49 @@ static inline u32 gr_gpc0_tpc0_sm_dbgr_control0_run_trigger_task_f(void)
 {
 	return 0x40000000;
 }
+static inline u32 gr_gpc0_tpc0_sm_dbgr_control0_stop_on_any_warp_v(u32 r)
+{
+	return (r >> 1) & 0x1;
+}
+static inline u32 gr_gpc0_tpc0_sm_dbgr_control0_stop_on_any_warp_disable_f(void)
+{
+	return 0x0;
+}
+static inline u32 gr_gpc0_tpc0_sm_dbgr_control0_stop_on_any_sm_v(u32 r)
+{
+	return (r >> 2) & 0x1;
+}
+static inline u32 gr_gpc0_tpc0_sm_dbgr_control0_stop_on_any_sm_disable_f(void)
+{
+	return 0x0;
+}
+static inline u32 gr_gpc0_tpc0_sm_warp_valid_mask_r(void)
+{
+	return 0x00504614;
+}
+static inline u32 gr_gpc0_tpc0_sm_dbgr_bpt_pause_mask_r(void)
+{
+	return 0x00504624;
+}
+static inline u32 gr_gpc0_tpc0_sm_dbgr_bpt_trap_mask_r(void)
+{
+	return 0x00504634;
+}
+static inline u32 gr_gpc0_tpc0_sm_dbgr_bpt_trap_mask_stop_on_any_warp_disable_v(void)
+{
+	return 0x00000000;
+}
+static inline u32 gr_gpc0_tpc0_sm_dbgr_bpt_trap_mask_stop_on_any_sm_disable_v(void)
+{
+	return 0x00000000;
+}
 static inline u32 gr_gpc0_tpc0_sm_dbgr_status0_r(void)
 {
 	return 0x0050460c;
+}
+static inline u32 gr_gpc0_tpc0_sm_dbgr_status0_sm_in_trap_mode_v(u32 r)
+{
+	return (r >> 0) & 0x1;
 }
 static inline u32 gr_gpc0_tpc0_sm_dbgr_status0_locked_down_v(u32 r)
 {

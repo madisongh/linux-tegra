@@ -3,7 +3,7 @@
  *
  * Handle allocation and freeing routines for nvmap
  *
- * Copyright (c) 2009-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,9 +41,11 @@
 #include "nvmap_ioctl.h"
 
 #ifdef CONFIG_NVMAP_FORCE_ZEROED_USER_PAGES
-bool zero_memory = 1;
+bool zero_memory = true;
+#define ZERO_MEMORY_PERMS 0444
 #else
 bool zero_memory;
+#define ZERO_MEMORY_PERMS 0644
 #endif
 
 static int zero_memory_set(const char *arg, const struct kernel_param *kp)
@@ -64,7 +66,7 @@ static struct kernel_param_ops zero_memory_ops = {
 	.set = zero_memory_set,
 };
 
-module_param_cb(zero_memory, &zero_memory_ops, &zero_memory, 0644);
+module_param_cb(zero_memory, &zero_memory_ops, &zero_memory, ZERO_MEMORY_PERMS);
 
 u32 nvmap_max_handle_count;
 
@@ -96,7 +98,6 @@ void nvmap_altfree(void *ptr, size_t len)
 void _nvmap_handle_free(struct nvmap_handle *h)
 {
 	unsigned int i, nr_page, page_index = 0;
-	struct nvmap_page_pool *pool;
 
 	if (h->nvhost_priv)
 		h->nvhost_priv_delete(h->nvhost_priv);
@@ -129,14 +130,10 @@ void _nvmap_handle_free(struct nvmap_handle *h)
 	for (i = 0; i < nr_page; i++)
 		h->pgalloc.pages[i] = nvmap_to_page(h->pgalloc.pages[i]);
 
-	if (!zero_memory) {
-		pool = &nvmap_dev->pool;
-
-		nvmap_page_pool_lock(pool);
-		page_index = __nvmap_page_pool_fill_lots_locked(pool,
-						h->pgalloc.pages, nr_page);
-		nvmap_page_pool_unlock(pool);
-	}
+#ifdef CONFIG_NVMAP_PAGE_POOLS
+	page_index = nvmap_page_pool_fill_lots(&nvmap_dev->pool,
+				h->pgalloc.pages, nr_page);
+#endif
 
 	for (i = page_index; i < nr_page; i++)
 		__free_page(h->pgalloc.pages[i]);
@@ -175,9 +172,6 @@ static int handle_page_alloc(struct nvmap_client *client,
 	pgprot_t prot;
 	unsigned int i = 0, page_index = 0;
 	struct page **pages;
-#ifdef CONFIG_NVMAP_PAGE_POOLS
-	struct nvmap_page_pool *pool = NULL;
-#endif
 	gfp_t gfp = GFP_NVMAP;
 
 	if (zero_memory)
@@ -200,15 +194,11 @@ static int handle_page_alloc(struct nvmap_client *client,
 
 	} else {
 #ifdef CONFIG_NVMAP_PAGE_POOLS
-		pool = &nvmap_dev->pool;
-
 		/*
 		 * Get as many pages from the pools as possible.
 		 */
-		nvmap_page_pool_lock(pool);
-		page_index = __nvmap_page_pool_alloc_lots_locked(pool, pages,
+		page_index = nvmap_page_pool_alloc_lots(&nvmap_dev->pool, pages,
 								 nr_page);
-		nvmap_page_pool_unlock(pool);
 #endif
 		for (i = page_index; i < nr_page; i++) {
 			pages[i] = nvmap_alloc_pages_exact(gfp,	PAGE_SIZE);
@@ -255,16 +245,21 @@ static void alloc_handle(struct nvmap_client *client,
 
 	BUG_ON(type & (type - 1));
 
+	BUILD_BUG_ON(config_enabled(CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM) &&
+		     config_enabled(CONFIG_NVMAP_CONVERT_IOVMM_TO_CARVEOUT));
+
 #ifdef CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM
-	/* Convert generic carveout requests to iovmm requests. */
 	carveout_mask &= ~NVMAP_HEAP_CARVEOUT_GENERIC;
 	iovmm_mask |= NVMAP_HEAP_CARVEOUT_GENERIC;
+#elif defined(CONFIG_NVMAP_CONVERT_IOVMM_TO_CARVEOUT)
+	type &= ~NVMAP_HEAP_IOVMM;
+	type |= NVMAP_HEAP_CARVEOUT_GENERIC;
 #endif
 
 	if (type & carveout_mask) {
 		struct nvmap_heap_block *b;
 
-		b = nvmap_carveout_alloc(client, h, type);
+		b = nvmap_carveout_alloc(client, h, type, NULL);
 		if (b) {
 			h->heap_type = type;
 			h->heap_pgalloc = false;
@@ -296,6 +291,7 @@ static void alloc_handle(struct nvmap_client *client,
 static const unsigned int heap_policy_small[] = {
 	NVMAP_HEAP_CARVEOUT_VPR,
 	NVMAP_HEAP_CARVEOUT_IRAM,
+	NVMAP_HEAP_CARVEOUT_IVM,
 	NVMAP_HEAP_CARVEOUT_MASK,
 	NVMAP_HEAP_IOVMM,
 	0,
@@ -305,6 +301,7 @@ static const unsigned int heap_policy_large[] = {
 	NVMAP_HEAP_CARVEOUT_VPR,
 	NVMAP_HEAP_CARVEOUT_IRAM,
 	NVMAP_HEAP_IOVMM,
+	NVMAP_HEAP_CARVEOUT_IVM,
 	NVMAP_HEAP_CARVEOUT_MASK,
 	0,
 };
@@ -313,7 +310,8 @@ int nvmap_alloc_handle(struct nvmap_client *client,
 		       struct nvmap_handle *h, unsigned int heap_mask,
 		       size_t align,
 		       u8 kind,
-		       unsigned int flags)
+		       unsigned int flags,
+		       int peer)
 {
 	const unsigned int *alloc_policy;
 	int nr_page;
@@ -340,12 +338,24 @@ int nvmap_alloc_handle(struct nvmap_client *client,
 	h->flags = (flags & NVMAP_HANDLE_CACHE_FLAG);
 	h->align = max_t(size_t, align, L1_CACHE_BYTES);
 	h->kind = kind;
+	h->peer = peer;
 
 	/* convert iovmm requests to generic carveout. */
 	if (heap_mask & NVMAP_HEAP_IOVMM) {
 		heap_mask = (heap_mask & ~NVMAP_HEAP_IOVMM) |
 			    NVMAP_HEAP_CARVEOUT_GENERIC;
 	}
+
+	/* If user specifies IVM carveout, allocation from no other heap should
+	 * be allowed.
+	 */
+	if (heap_mask & NVMAP_HEAP_CARVEOUT_IVM)
+		if (heap_mask & ~(NVMAP_HEAP_CARVEOUT_IVM)) {
+			pr_err("%s alloc mixes IVM and other heaps\n",
+			       current->group_leader->comm);
+			err = -EINVAL;
+			goto out;
+		}
 
 	if (!heap_mask) {
 		err = -EINVAL;
@@ -505,6 +515,7 @@ struct nvmap_handle_ref *nvmap_create_handle(struct nvmap_client *client,
 	BUG_ON(!h->owner);
 	h->size = h->orig_size = size;
 	h->flags = NVMAP_HANDLE_WRITE_COMBINE;
+	h->peer = NVMAP_IVM_INVALID_PEER;
 	mutex_init(&h->lock);
 	INIT_LIST_HEAD(&h->vmas);
 	INIT_LIST_HEAD(&h->lru);

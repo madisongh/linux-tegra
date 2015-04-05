@@ -5,7 +5,7 @@
  * Author:
  *	Colin Cross <ccross@google.com>
  *
- * Copyright (c) 2010-2014 NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2015 NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -129,6 +129,9 @@ struct dvfs_rail {
 	/* Trips for clock source switch cooling device */
 	struct tegra_cooling_device *clk_switch_cdev;
 
+	/* Vmax capping method */
+	int (*apply_vmax_cap)(int *cap_idx, int new_idx, int cap_mv);
+
 	struct rail_alignment alignment;
 	struct rail_stats stats;
 	const char *version;
@@ -149,6 +152,8 @@ enum dfll_range {
 
 /* DFLL usage is under thermal cooling device control */
 #define TEGRA_USE_DFLL_CDEV_CNTRL 3
+
+extern int tegra_override_dfll_range;
 
 /* DVFS settings specific for DFLL clock source */
 struct dvfs_dfll_data {
@@ -191,6 +196,7 @@ struct dvfs {
 	bool auto_dvfs;
 	bool can_override;
 	bool defer_override;
+	bool boost_table;
 
 	/* Filled in by tegra_dvfs_init */
 	int max_millivolts;
@@ -320,7 +326,6 @@ void tegra13x_init_dvfs(void);
 void tegra21x_init_dvfs(void);
 void tegra12x_vdd_cpu_align(int step_uv, int offset_uv);
 void tegra13x_vdd_cpu_align(int step_uv, int offset_uv);
-void tegra21x_vdd_cpu_align(int step_uv, int offset_uv);
 void tegra_init_dvfs_one(struct dvfs *d, int max_freq_index);
 int dvfs_debugfs_init(struct dentry *clk_debugfs_root);
 int tegra_dvfs_rail_connect_regulators(void);
@@ -349,7 +354,8 @@ int tegra_dvfs_override_core_cap_apply(int level);
 int tegra_dvfs_therm_vmax_core_cap_apply(int *cap_idx, int new_idx, int level);
 
 int tegra_dvfs_alt_freqs_install(struct dvfs *d, unsigned long *alt_freqs);
-int tegra_dvfs_alt_freqs_set(struct dvfs *d, unsigned long *alt_freqs);
+void tegra_dvfs_alt_freqs_install_always(
+	struct dvfs *d, unsigned long *alt_freqs);
 int tegra_dvfs_replace_voltage_table(struct dvfs *d, const int *new_millivolts);
 
 int tegra_dvfs_butterfly_throttle(struct clk *c1, unsigned long *rate1,
@@ -359,6 +365,10 @@ int tegra_dvfs_dfll_mode_set(struct dvfs *d, unsigned long rate);
 int tegra_dvfs_dfll_mode_clear(struct dvfs *d, unsigned long rate);
 int tegra_clk_dfll_range_control(enum dfll_range use_dfll);
 bool tegra_dvfs_is_dfll_scale(struct dvfs *d, unsigned long rate);
+bool tegra_dvfs_is_dfll_range(struct dvfs *d, unsigned long rate);
+int tegra_dvfs_swap_dfll_range(struct dvfs *d, int range, int *old_range);
+int tegra_dvfs_set_dfll_range(struct dvfs *d, int range);
+int tegra_dvfs_rail_set_reg_volatile(struct dvfs_rail *rail, bool set);
 
 struct tegra_cooling_device *tegra_dvfs_get_cpu_vmax_cdev(void);
 struct tegra_cooling_device *tegra_dvfs_get_cpu_vmin_cdev(void);
@@ -384,7 +394,10 @@ void tegra_dvfs_rail_init_vmax_thermal_profile(
 int tegra_dvfs_rail_of_init_vmin_thermal_profile(
 	int *therm_trips_table, int *therm_floors_table,
 	struct dvfs_rail *rail, struct dvfs_dfll_data *d);
-int __init tegra_dvfs_rail_init_clk_switch_thermal_profile(
+int tegra_dvfs_rail_of_init_vmax_thermal_profile(
+	int *therm_trips_table, int *therm_caps_table,
+	struct dvfs_rail *rail, struct dvfs_dfll_data *d);
+int tegra_dvfs_rail_init_clk_switch_thermal_profile(
 	int *clk_switch_trips, struct dvfs_rail *rail);
 int tegra_dvfs_rail_init_thermal_dvfs_trips(
 	int *therm_trips_table, struct dvfs_rail *rail);
@@ -420,32 +433,6 @@ bool tegra_dvfs_is_dfll_bypass(void);
 static inline bool tegra_dvfs_rail_is_dfll_mode(struct dvfs_rail *rail)
 {
 	return rail ? rail->dfll_mode : false;
-}
-
-static inline bool tegra_dvfs_is_dfll_range(struct dvfs *d, unsigned long rate)
-{
-	return (d->dfll_data.range == DFLL_RANGE_ALL_RATES) ||
-		((d->dfll_data.range == DFLL_RANGE_HIGH_RATES) &&
-		(rate >= d->dfll_data.use_dfll_rate_min));
-}
-
-static inline int tegra_dvfs_get_dfll_range(struct dvfs *d)
-{
-	if (d)
-		return d->dfll_data.range;
-	return -ENOENT;
-}
-
-static inline int tegra_dvfs_set_dfll_range(struct dvfs *d, int range)
-{
-	if (!d->dfll_millivolts)
-		return -ENOSYS;
-
-	if ((range < DFLL_RANGE_NONE) || (range > DFLL_RANGE_HIGH_RATES))
-		return -EINVAL;
-
-	d->dfll_data.range = range;
-	return 0;
 }
 
 static inline void tegra_dvfs_rail_mode_updating(struct dvfs_rail *rail,

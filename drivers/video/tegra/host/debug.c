@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (C) 2011-2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2011-2015, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -30,7 +30,6 @@
 #include "nvhost_channel.h"
 #include "chip_support.h"
 
-pid_t nvhost_debug_null_kickoff_pid;
 unsigned int nvhost_debug_trace_cmdbuf;
 unsigned int nvhost_debug_trace_actmon;
 
@@ -70,7 +69,7 @@ static int show_channels(struct platform_device *pdev, void *data,
 		return 0;
 	}
 
-	for (index = 0; index < m->info.nb_channels; index++) {
+	for (index = 0;	index < nvhost_channel_nb_channels(m); index++) {
 		ch = m->chlist[index];
 		if (!ch || ch->dev != pdev)
 			continue;
@@ -113,9 +112,11 @@ static int show_channels_no_fifo(struct platform_device *pdev, void *data,
 static void show_syncpts(struct nvhost_master *m, struct output *o)
 {
 	int i;
+
 	nvhost_debug_output(o, "---- syncpts ----\n");
 	mutex_lock(&m->syncpt.syncpt_mutex);
-	for (i = 0; i < nvhost_syncpt_nb_pts(&m->syncpt); i++) {
+	for (i = nvhost_syncpt_pts_base(&m->syncpt);
+			i < nvhost_syncpt_pts_limit(&m->syncpt); i++) {
 		u32 max = nvhost_syncpt_read_max(&m->syncpt, i);
 		u32 min = nvhost_syncpt_update_min(&m->syncpt, i);
 		if (!min && !max)
@@ -248,8 +249,6 @@ void nvhost_debug_init(struct nvhost_master *master)
 	debugfs_create_file("status_all", S_IRUGO, de,
 			master, &nvhost_debug_all_fops);
 
-	debugfs_create_u32("null_kickoff_pid", S_IRUGO|S_IWUSR, de,
-			&nvhost_debug_null_kickoff_pid);
 	debugfs_create_u32("trace_cmdbuf", S_IRUGO|S_IWUSR, de,
 			&nvhost_debug_trace_cmdbuf);
 

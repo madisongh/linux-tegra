@@ -1,7 +1,7 @@
 /*
  * GK20A memory interface
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -14,6 +14,7 @@
  */
 
 #include <linux/types.h>
+#include <trace/events/gk20a.h>
 
 #include "gk20a.h"
 #include "mc_gk20a.h"
@@ -22,6 +23,8 @@
 irqreturn_t mc_gk20a_isr_stall(struct gk20a *g)
 {
 	u32 mc_intr_0;
+
+	trace_mc_gk20a_intr_stall(g->dev->name);
 
 	if (!g->power_on)
 		return IRQ_NONE;
@@ -36,6 +39,8 @@ irqreturn_t mc_gk20a_isr_stall(struct gk20a *g)
 
 	/* flush previous write */
 	gk20a_readl(g, mc_intr_en_0_r());
+
+	trace_mc_gk20a_intr_stall_done(g->dev->name);
 
 	return IRQ_WAKE_THREAD;
 }
@@ -67,12 +72,17 @@ irqreturn_t mc_gk20a_intr_thread_stall(struct gk20a *g)
 
 	gk20a_dbg(gpu_dbg_intr, "interrupt thread launched");
 
+	trace_mc_gk20a_intr_thread_stall(g->dev->name);
+
 	mc_intr_0 = gk20a_readl(g, mc_intr_0_r());
 
 	gk20a_dbg(gpu_dbg_intr, "stall intr %08x\n", mc_intr_0);
 
 	if (mc_intr_0 & BIT(g->fifo.engine_info[ENGINE_GR_GK20A].intr_id))
 		gr_gk20a_elpg_protected_call(g, gk20a_gr_isr(g));
+	if (mc_intr_0 & BIT(g->fifo.engine_info[ENGINE_CE2_GK20A].intr_id)
+		&& g->ops.ce2.isr_stall)
+		g->ops.ce2.isr_stall(g);
 	if (mc_intr_0 & mc_intr_0_pfifo_pending_f())
 		gk20a_fifo_isr(g);
 	if (mc_intr_0 & mc_intr_0_pmu_pending_f())
@@ -90,6 +100,8 @@ irqreturn_t mc_gk20a_intr_thread_stall(struct gk20a *g)
 	/* flush previous write */
 	gk20a_readl(g, mc_intr_en_0_r());
 
+	trace_mc_gk20a_intr_thread_stall_done(g->dev->name);
+
 	return IRQ_HANDLED;
 }
 
@@ -105,8 +117,13 @@ irqreturn_t mc_gk20a_intr_thread_nonstall(struct gk20a *g)
 
 	if (mc_intr_1 & mc_intr_0_pfifo_pending_f())
 		gk20a_fifo_nonstall_isr(g);
+	if (mc_intr_1 & mc_intr_0_priv_ring_pending_f())
+		gk20a_priv_ring_isr(g);
 	if (mc_intr_1 & BIT(g->fifo.engine_info[ENGINE_GR_GK20A].intr_id))
 		gk20a_gr_nonstall_isr(g);
+	if (mc_intr_1 & BIT(g->fifo.engine_info[ENGINE_CE2_GK20A].intr_id)
+		&& g->ops.ce2.isr_nonstall)
+		g->ops.ce2.isr_nonstall(g);
 
 	gk20a_writel(g, mc_intr_en_1_r(),
 		mc_intr_en_1_inta_hardware_f());
