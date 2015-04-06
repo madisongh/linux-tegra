@@ -1842,7 +1842,7 @@ static int arm_smmu_map_sg(struct iommu_domain *domain, unsigned long iova,
 }
 
 static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
-			phys_addr_t paddr, size_t size, int prot)
+			phys_addr_t paddr, size_t size, unsigned long prot)
 {
 	struct arm_smmu_domain *smmu_domain = domain->priv;
 
@@ -1981,6 +1981,7 @@ static int arm_smmu_add_device(struct device *dev)
 				       &cfg->streamids[0]);
 		releasefn = __arm_smmu_release_pci_iommudata;
 	} else {
+		int i;
 		struct arm_smmu_master *master;
 
 		master = find_smmu_master(smmu, dev->of_node);
