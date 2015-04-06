@@ -19,6 +19,7 @@
 
 #include <linux/types.h>
 #include <linux/bug.h>
+#include <linux/clk.h>
 
 /*
  * Tegra CPU clock and reset control ops
@@ -130,6 +131,9 @@ enum tegra_clk_ex_param {
 	TEGRA_CLK_PLLD_MIPI_MUX_SEL,
 };
 
+void tegra_periph_reset_deassert(struct clk *c);
+void tegra_periph_reset_assert(struct clk *c);
+
 #ifdef CONFIG_COMMON_CLK
 void tegra_clocks_apply_init_table(void);
 
@@ -142,8 +146,6 @@ int tegra_is_clk_enabled(struct clk *clk);
 int tegra_dvfs_use_alt_freqs_on_clk(struct clk *c, bool use_alt_freq);
 
 #else
-void tegra_periph_reset_deassert(struct clk *c);
-void tegra_periph_reset_assert(struct clk *c);
 
 static inline void tegra_clocks_apply_init_table(void)
 {}
