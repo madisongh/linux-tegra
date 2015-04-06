@@ -133,6 +133,9 @@ enum tegra_clk_ex_param {
 	TEGRA_CLK_QSPI_DIV2_ENB,
 };
 
+void tegra_periph_reset_deassert(struct clk *c);
+void tegra_periph_reset_assert(struct clk *c);
+
 #ifdef CONFIG_COMMON_CLK
 void tegra_clocks_apply_init_table(void);
 
@@ -160,8 +163,6 @@ static inline long tegra_emc_round_rate_updown(unsigned long rate, bool up)
 }
 
 #else
-void tegra_periph_reset_deassert(struct clk *c);
-void tegra_periph_reset_assert(struct clk *c);
 
 static inline void tegra_clocks_apply_init_table(void)
 {}
