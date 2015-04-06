@@ -4,6 +4,8 @@
 GCOV_PROFILE := y
 
 subdir-ccflags-y += -Werror
+CFLAGS_helpers.o := -Wno-error=unused-function
+CFLAGS_devres.o := -Wno-error=unused-function
 obj-$(CONFIG_REGULATOR) += core.o dummy.o fixed-helper.o helpers.o devres.o
 obj-$(CONFIG_OF) += of_regulator.o
 obj-$(CONFIG_REGULATOR_FIXED_VOLTAGE) += fixed.o
