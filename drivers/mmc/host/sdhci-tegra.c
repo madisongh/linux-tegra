@@ -2347,6 +2347,12 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	if (rc != 0)
 		goto err_clk_put;
 	pltfm_host->clk = clk;
+
+	/* Reset the sdhci controller to clear all previous status.*/
+	tegra_periph_reset_assert(pltfm_host->clk);
+	udelay(2);
+	tegra_periph_reset_deassert(pltfm_host->clk);
+
 	pltfm_host->priv = tegra_host;
 	tegra_host->clk_enabled = true;
 	mutex_init(&tegra_host->set_clock_mutex);
