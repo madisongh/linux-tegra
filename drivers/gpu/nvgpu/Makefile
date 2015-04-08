@@ -19,6 +19,7 @@ nvgpu-y := \
 	gk20a/gk20a.o \
 	gk20a/as_gk20a.o \
 	gk20a/ctrl_gk20a.o \
+	gk20a/ce2_gk20a.o \
 	gk20a/fifo_gk20a.o \
 	gk20a/channel_gk20a.o \
 	gk20a/channel_sync_gk20a.o \
@@ -48,6 +49,7 @@ nvgpu-y := \
 	gk20a/mc_gk20a.o \
 	gm20b/hal_gm20b.o \
 	gm20b/ltc_gm20b.o \
+	gm20b/ce2_gm20b.o \
 	gm20b/gr_gm20b.o \
 	gm20b/gr_gm20b.o \
 	gm20b/fb_gm20b.o \
@@ -58,7 +60,8 @@ nvgpu-y := \
 	gm20b/pmu_gm20b.o \
 	gm20b/mm_gm20b.o \
 	gm20b/regops_gm20b.o \
-	gm20b/mc_gm20b.o
+	gm20b/mc_gm20b.o \
+	gm20b/debug_gm20b.o
 
 nvgpu-$(CONFIG_TEGRA_GK20A) += gk20a/platform_gk20a_tegra.o
 nvgpu-$(CONFIG_SYNC) += gk20a/sync_gk20a.o
@@ -69,6 +72,7 @@ nvgpu-$(CONFIG_TEGRA_GR_VIRTUALIZATION) += \
 	vgpu/gr_vgpu.o \
 	vgpu/fifo_vgpu.o \
 	vgpu/mm_vgpu.o \
+	vgpu/debug_vgpu.o \
 	vgpu/vgpu.o
 
 nvgpu-$(CONFIG_TEGRA_CLK_FRAMEWORK) += \

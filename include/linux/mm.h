@@ -629,6 +629,10 @@ void do_set_pte(struct vm_area_struct *vma, unsigned long address,
 		struct page *page, pte_t *pte, bool write, bool anon);
 #endif
 
+#ifdef CONFIG_CMA
+unsigned int cma_threshold_get(void);
+#endif
+
 /*
  * Multiple processes may "see" the same page. E.g. for untouched
  * mappings of /dev/null, all processes see the same page full of

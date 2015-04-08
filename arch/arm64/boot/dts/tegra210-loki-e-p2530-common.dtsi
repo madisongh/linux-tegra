@@ -1,7 +1,7 @@
 /*
  * arch/arm64/boot/dts/tegra210-loki-e-p2530-common.dtsi
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,13 +23,14 @@
 /memreserve/ 0x80000000 0x00020000;
 
 #include "tegra210-common.dtsi"
+#include "tegra210-platforms/tegra210-sdhci.dtsi"
 #include "tegra210-platforms/tegra210-p2530-common.dtsi"
+#include "tegra210-platforms/tegra210-loki-e-prods.dtsi"
 #include "tegra210-platforms/tegra210-loki-power-tree-p2530-0999-e00.dtsi"
 #include "tegra210-platforms/tegra210-loki-e-gpio-p2530-0032-e00.dtsi"
 #include "tegra210-platforms/tegra210-loki-e-pinmux-p2530-0032-e00.dtsi"
 #include "tegra210-platforms/tegra210-loki-e-comms.dtsi"
 #include "tegra210-platforms/tegra210-loki-e-pwm-fan.dtsi"
-#include "tegra210-platforms/tegra210-sdhci.dtsi"
 #include "tegra210-platforms/tegra210-ers-hdmi-e2190-1100-a00.dtsi"
 #include "tegra210-platforms/tegra210-ers-touch-e1937-1000-a00.dtsi"
 #include "tegra210-platforms/tegra210-loki-e-sensor-p2530-0032-e00.dtsi"
@@ -40,6 +41,9 @@
 #include "tegra210-platforms/tegra210-loki-e-powermon.dtsi"
 #include "tegra210-platforms/tegra210-edp.dtsi"
 #include "tegra210-platforms/tegra210-sysedp.dtsi"
+#include "tegra210-platforms/tegra210-audio.dtsi"
+#include "tegra210-platforms/tegra210-loki-e-gamepad-reset.dtsi"
+#include "tegra210-platforms/tegra210-loki-e-c2port.dtsi"
 
 / {
 	compatible = "nvidia,loki-e", "nvidia,tegra210";
@@ -129,14 +133,17 @@
 		compatible = "nvidia,tegra-audio-t210ref-mobile-es755";
 		nvidia,model = "tegra-snd-t210ref-mobile-es755";
 		nvidia,hp-det-gpios = <&gpio TEGRA_GPIO(E, 6) GPIO_ACTIVE_HIGH>;
-		nvidia,num-codec-link = <2>;
+		nvidia,num-codec-link = <3>;
 		edp-consumer-name = "codec+speaker";
 
 		nvidia,audio-routing =
 			"Int Spk",	"SPKRL",
 			"Int Spk",	"SPKRR",
 			"y Headphone", 	"y OUT",
-			"y IN",		"y Mic";
+			"y IN",		"y Mic",
+			"z Headphone", 	"z OUT",
+			"z IN",		"z Mic",
+			"z IN",		"z OUT";
 
 		nvidia,xbar = <&tegra_axbar>;
 
@@ -173,6 +180,48 @@
 			srate = <8000>;
 			num-channel = <1>;
 			name-prefix = "y";
+		};
+		nvidia,dai-link-3 {
+			link-name = "spdif-dit-2";
+			cpu-dai = <&tegra_i2s3>;
+			codec-dai = <&spdif_dit2>;
+			cpu-dai-name = "I2S3";
+			codec-dai-name = "dit-hifi";
+			format = "i2s";
+			bitclock-slave;
+			frame-slave;
+			bitclock-noninversion;
+			frame-noninversion;
+			bit-format = "s16_le";
+			bclk_ratio = <0>;
+			srate = <48000>;
+			num-channel = <2>;
+			name-prefix = "z";
+		};
+	};
+
+	adsp_audio {
+		compr-ops = <1>;
+		num-plugin = <4>;
+		plugin-info-1 {
+			plugin-name = "mp3-dec1";
+			firmware-name = "nvmp3dec.elf";
+			widget-name = "MP3-DEC1";
+		};
+		plugin-info-2 {
+			plugin-name = "mp3-dec2";
+			firmware-name = "nvmp3dec.elf";
+			widget-name = "MP3-DEC2";
+		};
+		plugin-info-3 {
+			plugin-name = "spkprot";
+			firmware-name = "nvspkprot.elf";
+			widget-name = "SPKPROT-SW";
+		};
+		plugin-info-4 {
+			plugin-name = "src";
+			firmware-name = "nvsrc.elf";
+			widget-name = "SRC";
 		};
 	};
 
@@ -235,6 +284,10 @@
 		#extcon-cells = <1>;
 		status = "disabled";
 		dt-override-status-odm-data = <0x01000000 0x00000000>;
+	};
+
+	usb_cd@7009f000 {
+		nvidia,dcp-current-limit-ma = <2000>;
 	};
 
 	otg@7d000000 {
@@ -377,6 +430,10 @@
 				nvidia,consumer_name = "sdhci-tegra.0";
 				nvidia,states = <0 1785>;
 			};
+			consumer10 {
+				nvidia,consumer_name = "shieldled";
+				nvidia,states = <0 40 79 119 159 198 238 278 317 357 397>;
+			};
 		};
 	};
 
@@ -440,5 +497,155 @@
 		compatible = "nvidia,tegra124-sysedp-dynamic-capping";
 		nvidia,throttle_depth = <75>;
 		nvidia,cap_method = <3>;
+	};
+
+	bcmdhd_wlan {
+		country_code_map {
+			CC1 {
+				iso_abbrev = "XV";
+				custom_locale = "XV";
+				custom_locale_rev = <998>;
+			};
+			CC2 {
+				iso_abbrev = "US";
+				custom_locale = "Q2";
+				custom_locale_rev = <113>;
+			};
+			CC3 {
+				iso_abbrev = "CA";
+				custom_locale = "Q2";
+				custom_locale_rev = <113>;
+			};
+			CC4 {
+				iso_abbrev = "AT";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC5 {
+				iso_abbrev = "BE";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC6 {
+				iso_abbrev = "BG";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC7 {
+				iso_abbrev = "HR";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC8 {
+				iso_abbrev = "CZ";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC9 {
+				iso_abbrev = "DK";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC10 {
+				iso_abbrev = "FR";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC11 {
+				iso_abbrev = "DE";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC12 {
+				iso_abbrev = "GR";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC13 {
+				iso_abbrev = "HU";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC14 {
+				iso_abbrev = "IT";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC15 {
+				iso_abbrev = "NL";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC16 {
+				iso_abbrev = "NO";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC17 {
+				iso_abbrev = "PL";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC18 {
+				iso_abbrev = "PT";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC19 {
+				iso_abbrev = "RO";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC20 {
+				iso_abbrev = "SK";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC21 {
+				iso_abbrev = "ES";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC22 {
+				iso_abbrev = "SE";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC23 {
+				iso_abbrev = "CH";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC24 {
+				iso_abbrev = "GB";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC25 {
+				iso_abbrev = "EU";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC26 {
+				iso_abbrev = "E0";
+				custom_locale = "E0";
+				custom_locale_rev = <53>;
+			};
+			CC27 {
+				iso_abbrev = "IN";
+				custom_locale = "Q2";
+				custom_locale_rev = <113>;
+			};
+		};
+	};
+
+	rollback-protection {
+		status = "okay";
+	};
+
+	usb_nvshield_led {
+		status = "okay";
+		edp-consumer-name = "shieldled";
+		disable-on-kernel-charging;
 	};
 };

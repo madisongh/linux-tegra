@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Interrupt Management
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -92,6 +92,7 @@ struct nvhost_job {
 	dma_addr_t *reloc_addr_phys;
 
 	/* Sync point id, number of increments and end related to the submit */
+	u32 client_managed_syncpt;
 	struct nvhost_job_syncpt *sp;
 	int num_syncpts;
 
@@ -106,9 +107,6 @@ struct nvhost_job {
 
 	/* Do debug dump after timeout */
 	bool timeout_debug_dump;
-
-	/* Null kickoff prevents submit from being sent to hardware */
-	bool null_kickoff;
 
 	/* Index and number of slots used in the push buffer */
 	int first_get;
@@ -129,14 +127,6 @@ struct nvhost_job {
 };
 
 /*
- * Allocate memory for a job. Just enough memory will be allocated to
- * accomodate the submit announced in submit header.
- */
-struct nvhost_job *nvhost_job_alloc(struct nvhost_channel *ch,
-		int num_cmdbufs, int num_relocs, int num_waitchks,
-		int num_syncpts);
-
-/*
  * Add a gather to a job.
  */
 void nvhost_job_add_gather(struct nvhost_job *job,
@@ -146,11 +136,6 @@ void nvhost_job_add_gather(struct nvhost_job *job,
  * Increment reference going to nvhost_job.
  */
 void nvhost_job_get(struct nvhost_job *job);
-
-/*
- * Decrement reference job, free if goes to zero.
- */
-void nvhost_job_put(struct nvhost_job *job);
 
 /*
  * Pin memory related to job. This handles relocation of addresses to the

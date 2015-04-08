@@ -1,7 +1,7 @@
 /*
  * tegra210-soc-base.dtsi: SOC specific DTSI file with all node disabled.
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 #include "tegra210-platforms/tegra210-thermal.dtsi"
 #include <dt-bindings/gpio/tegra-gpio.h>
 #include <dt-bindings/padctrl/tegra210-pads.h>
+#include <dt-bindings/ata/ahci-tegra.h>
 
 / {
 	compatible = "nvidia,tegra210";
@@ -34,6 +35,7 @@
 			compatible = "arm,cortex-a57-64bit", "arm,armv8";
 			reg = <0x0 0x0>;
 			enable-method = "psci";
+			errata_hwcaps = <0x7>;
 			status = "disabled";
 		};
 
@@ -42,6 +44,7 @@
 			compatible = "arm,cortex-a57-64bit", "arm,armv8";
 			reg = <0x0 0x1>;
 			enable-method = "psci";
+			errata_hwcaps = <0x7>;
 			status = "disabled";
 		};
 
@@ -50,6 +53,7 @@
 			compatible = "arm,cortex-a57-64bit", "arm,armv8";
 			reg = <0x0 0x2>;
 			enable-method = "psci";
+			errata_hwcaps = <0x7>;
 			status = "disabled";
 		};
 
@@ -58,17 +62,90 @@
 			compatible = "arm,cortex-a57-64bit", "arm,armv8";
 			reg = <0x0 0x3>;
 			enable-method = "psci";
+			errata_hwcaps = <0x7>;
 			status = "disabled";
 		};
 	};
 
+	mc_clk_pd: mc-clk-pd {
+		compatible = "nvidia,tegra210-mc-clk-pd";
+		#power-domain-cells = <0>;
+	};
+
+	ape_pd: ape-pd {
+		compatible = "nvidia,tegra210-ape-pd";
+		#power-domain-cells = <0>;
+		power-domains = <&mc_clk_pd>;
+	};
+
+	host1x_pd: host1x-pd {
+		compatible = "nvidia,tegra210-host1x-pd";
+		is_off;
+		host1x;
+		#power-domain-cells = <0>;
+		power-domains = <&mc_clk_pd>;
+	};
+
+	tsec_pd: tsec-pd {
+		compatible = "nvidia,tegra210-tsec-pd";
+		is_off;
+		#power-domain-cells = <0>;
+		power-domains = <&host1x_pd>;
+	};
+
+	nvdec_pd: nvdec-pd {
+		compatible = "nvidia,tegra210-nvdec-pd";
+		is_off;
+		#power-domain-cells = <0>;
+		power-domains = <&host1x_pd>;
+	};
+
+	ve_pd: ve-pd {
+		compatible = "nvidia,tegra210-ve-pd";
+		is_off;
+		#power-domain-cells = <0>;
+		power-domains = <&host1x_pd>;
+	};
+
+	ve2_pd: ve2-pd {
+                compatible = "nvidia,tegra210-ve2-pd";
+		is_off;
+                #power-domain-cells = <0>;
+                power-domains = <&host1x_pd>;
+        };
+
+	vic03_pd: vic03-pd {
+		compatible = "nvidia,tegra210-vic03-pd";
+		is_off;
+		#power-domain-cells = <0>;
+		power-domains = <&host1x_pd>;
+	};
+
+	msenc_pd: msenc-pd {
+		compatible = "nvidia,tegra210-msenc-pd";
+		is_off;
+		#power-domain-cells = <0>;
+                power-domains = <&host1x_pd>;
+	};
+
+	nvjpg_pd: nvjpg-pd {
+		compatible = "nvidia,tegra210-nvjpg-pd";
+		is_off;
+		#power-domain-cells = <0>;
+                power-domains = <&host1x_pd>;
+	};
+
+	gpu_pd: gpu-pd {
+		compatible = "nvidia,tegra210-gpu-pd";
+		is_off;
+		#power-domain-cells = <0>;
+                power-domains = <&host1x_pd>;
+	};
+
 	psci {
-		compatible = "arm,psci";
+		compatible = "arm,psci-0.2";
 		status = "disabled";
 		method = "smc";
-		cpu_off = <0x84000002>;
-		cpu_on = <0xC4000003>;
-		cpu_suspend = <0xC4000001>;
 	};
 
 	tlk {
@@ -104,7 +181,6 @@
 		swgid-mask = <0x00000fff 0xfffccdcf>;
 		#num-translation-enable = <5>;
 		#num-asid-security = <8>;
-		ptc-cache-size = <0x00008000>; /* 32 KB */
 
 		domains = <&ppcs_as TEGRA_SWGROUP_CELLS5(PPCS, PPCS1, PPCS2, SE, SE1)
 			   &gpu_as TEGRA_SWGROUP_CELLS(GPUB)
@@ -271,6 +347,7 @@
 
 	apbdma: dma@60020000 {
 		compatible = "nvidia,tegra124-apbdma";
+		power-domains = <&mc_clk_pd>;
 		reg = <0x0 0x60020000 0x0 0x1400>;
 		interrupts = <0 104 0x04
 			      0 105 0x04
@@ -344,6 +421,7 @@
 
 	xusb@70090000 {
 		compatible = "nvidia,tegra210-xhci";
+		power-domains = <&mc_clk_pd>;
 		reg = <0x0 0x70090000 0x0 0x8000
 		       0x0 0x70098000 0x0 0x1000
 		       0x0 0x70099000 0x0 0x1000
@@ -492,6 +570,8 @@
 
 	host1x: host1x {
 		compatible = "nvidia,tegra210-host1x", "simple-bus";
+		power-domains = <&host1x_pd>;
+		wakeup-capable;
 		reg = <0x0 0x50000000 0x0 0x00034000>;
 		interrupts = <0 65 0x04   /* mpcore syncpt */
 			      0 67 0x04>; /* mpcore general */
@@ -503,8 +583,12 @@
 
 		ranges;
 
+		nvidia,ch-base = <0>;
+		nvidia,nb-channels = <12>;
+
 		vi {
 			compatible = "nvidia,tegra210-vi";
+			power-domains = <&ve_pd>;
 			reg = <0x0 0x54080000 0x0 0x00040000>;
 			interrupts = <0 69 0x04>;
 			iommus = <&smmu TEGRA_SWGROUP_VI>;
@@ -513,6 +597,7 @@
 
 		isp@54600000 {
 			compatible = "nvidia,tegra210-isp";
+			power-domains = <&ve_pd>;
 			reg = <0x0 0x54600000 0x0 0x00040000>;
 			interrupts = <0 71 0x04>;
 			iommus = <&smmu TEGRA_SWGROUP_ISP>;
@@ -521,6 +606,7 @@
 
 		isp@54680000 {
 			compatible = "nvidia,tegra210-isp";
+			power-domains = <&ve2_pd>;
 			reg = <0x0 0x54680000 0x0 0x00040000>;
 			interrupts = <0 70 0x04>;
 			iommus = <&smmu TEGRA_SWGROUP_ISP2B>;
@@ -529,6 +615,7 @@
 
 		dc@54200000 {
 			compatible = "nvidia,tegra210-dc";
+			power-domains = <&mc_clk_pd>;
 			reg = <0x0 0x54200000 0x0 0x00040000>;
 			interrupts = <0 73 0x04>;
 			iommus = <&smmu TEGRA_SWGROUP_DC>,
@@ -543,6 +630,7 @@
 
 		dc@54240000 {
 			compatible = "nvidia,tegra210-dc";
+			power-domains = <&mc_clk_pd>;
 			reg = <0x0 0x54240000 0x0 0x00040000>;
 			interrupts = <0 74 0x04>;
 			iommus = <&smmu TEGRA_SWGROUP_DC>,
@@ -564,6 +652,7 @@
 
 		vic {
 			compatible = "nvidia,tegra210-vic";
+			power-domains = <&vic03_pd>;
 			reg = <0x0 0x54340000 0x0 0x00040000>;
 			iommus = <&smmu TEGRA_SWGROUP_VIC>;
 			status = "disabled";
@@ -571,6 +660,7 @@
 
 		nvenc {
 			compatible = "nvidia,tegra210-nvenc";
+			power-domains = <&msenc_pd>;
 			reg = <0x0 0x544c0000 0x0 0x00040000>;
 			iommus = <&smmu TEGRA_SWGROUP_MPE>;
 			status = "disabled";
@@ -578,6 +668,7 @@
 
 		tsec {
 			compatible = "nvidia,tegra210-tsec";
+			power-domains = <&tsec_pd>;
 			reg = <0x0 0x54500000 0x0 0x00040000>;
 			iommus = <&smmu TEGRA_SWGROUP_TSEC>;
 			status = "disabled";
@@ -585,6 +676,7 @@
 
 		tsecb {
 			compatible = "nvidia,tegra210-tsec";
+			power-domains = <&tsec_pd>;
 			reg = <0x0 0x54100000 0x0 0x00040000>;
 			iommus = <&smmu TEGRA_SWGROUP_TSECB>;
 			status = "disabled";
@@ -592,6 +684,7 @@
 
 		nvdec {
 			compatible = "nvidia,tegra210-nvdec";
+			power-domains = <&nvdec_pd>;
 			reg = <0x0 0x54480000 0x0 0x00040000>;
 			iommus = <&smmu TEGRA_SWGROUP_NVDEC>;
 			status = "disabled";
@@ -599,6 +692,7 @@
 
 		nvjpg {
 			compatible = "nvidia,tegra210-nvjpg";
+			power-domains = <&nvjpg_pd>;
 			reg = <0x0 0x54380000 0x0 0x00040000>;
 			iommus = <&smmu TEGRA_SWGROUP_NVJPG>;
 			status = "disabled";
@@ -638,6 +732,7 @@
 	gpu {
 		compatible = "nvidia,tegra210-gm20b";
 		nvidia,host1x = <&host1x>;
+		power-domains = <&gpu_pd>;
 		reg = <0x0 0x57000000 0x0 0x01000000>,
 		    <0x0 0x58000000 0x0 0x01000000>,
 		    <0x0 0x538f0000 0x0 0x00001000>;
@@ -663,6 +758,7 @@
 
 	adma: adma@702e2000 {
 		compatible = "nvidia,tegra210-adma";
+		power-domains = <&ape_pd>;
 		reg = <0x0 0x702e2000 0x0 0x2000>;
 		interrupts = <0 24 0x04
 			      0 25 0x04
@@ -693,6 +789,7 @@
 
 	se: se@70012000 {
 		compatible = "nvidia,tegra210-se";
+		power-domains = <&mc_clk_pd>;
 		reg = <0x0 0x70012000 0x0 0x2000 /* SE base */
 			0x0 0x7000e400 0x0 0x400>; /* PMC base */
 		interrupts = <0 58 0x04>;
@@ -701,6 +798,7 @@
 
 	tegra_axbar: ahub {
 		compatible = "nvidia,tegra210-axbar";
+		power-domains = <&ape_pd>;
 		reg = <0x0 0x702d0800 0x0 0x800>;
 		status = "disabled";
 
@@ -947,6 +1045,7 @@
 
 	hda@70030000 {
 		compatible = "nvidia,tegra30-hda";
+		power-domains = <&mc_clk_pd>;
 		reg = <0x0 0x70030000 0x0 0x10000>;
 		interrupts = <0 81 0x04>;
 		status = "disabled";
@@ -954,12 +1053,14 @@
 
 	tegra_adsp_audio: adsp_audio {
 		compatible = "nvidia,tegra210-adsp-audio";
+		power-domains = <&ape_pd>;
 		iommus = <&smmu TEGRA_SWGROUP_APE>;
 		status = "disabled";
 	};
 
 	adsp {
 	     compatible = "nvidia,tegra210-adsp";
+	     power-domains = <&ape_pd>;
 	     reg = <0x0 0x702ef000 0x0 0x1000>, /* AMC */
 		   <0x0 0x702ec000 0x0 0x2000>, /* AMISC */
 		   <0x0 0x702ee000 0x0 0x1000>, /* ABRIDGE */
@@ -971,6 +1072,7 @@
 
 	pcie-controller {
 		compatible = "nvidia,tegra210-pcie", "nvidia,tegra124-pcie";
+		power-domains = <&mc_clk_pd>;
 		device_type = "pci";
 		reg = <0x0 0x01003000 0x0 0x00000800   /* PADS registers */
 		       0x0 0x01003800 0x0 0x00000800   /* AFI registers */
@@ -1026,8 +1128,8 @@
 
 	sata@70020000 {
 		compatible = "nvidia,tegra210-ahci-sata";
-		reg = <0x0 0x70027000 0x0 0x00002000>,
-			<0x0 0x70021000 0x0 0x00001000>;
+		reg = <0x0 0x70021000 0x0 0x00001000>,
+			<0x0 0x70027000 0x0 0x00002000>;
 		interrupts = <0 23 0x04>;
 		iommus = <&smmu TEGRA_SWGROUP_SATA2>;
 		status = "disabled";
@@ -1117,36 +1219,46 @@
 
 	sdhci@700b0600 {
 		compatible = "nvidia,tegra210-sdhci";
+		power-domains = <&mc_clk_pd>;
 		reg = <0x0 0x700b0600 0x0 0x200>;
 		interrupts = < 0 31 0x04 >;
 		iommus = <&smmu TEGRA_SWGROUP_SDMMC4A>;
+		nvidia,runtime-pm-type = <1>;
 		status = "disabled";
 	};
 
 	sdhci@700b0400 {
 		compatible = "nvidia,tegra210-sdhci";
+		power-domains = <&mc_clk_pd>;
 		reg = <0x0 0x700b0400 0x0 0x200>;
 		interrupts = < 0 19 0x04 >;
 		iommus = <&smmu TEGRA_SWGROUP_SDMMC3A>;
 		pwrdet-support;
-		pwrdet-bit = <13>;
+		pad-controllers = <&tegra_pmc TEGRA210_PAD_SDMMC3>;
+		pad-names = "sdmmc";
+		nvidia,runtime-pm-type = <0>;
 		status = "disabled";
 	};
 
 	sdhci@700b0200 {
 		compatible = "nvidia,tegra210-sdhci";
+		power-domains = <&mc_clk_pd>;
 		reg = <0x0 0x700b0200 0x0 0x200>;
 		interrupts = < 0 15 0x04 >;
+		nvidia,runtime-pm-type = <1>;
 		status = "disabled";
 	};
 
 	sdhci@700b0000 {
 		compatible = "nvidia,tegra210-sdhci";
+		power-domains = <&mc_clk_pd>;
 		reg = <0x0 0x700b0000 0x0 0x200>;
 		interrupts = < 0 14 0x04 >;
 		iommus = <&smmu TEGRA_SWGROUP_SDMMC1A>;
 		pwrdet-support;
-		pwrdet-bit = <12>;
+		pad-controllers = <&tegra_pmc TEGRA210_PAD_SDMMC1>;
+		pad-names = "sdmmc";
+		nvidia,runtime-pm-type = <1>;
 		status = "disabled";
 	};
 
@@ -1165,6 +1277,7 @@
 
 	otg: otg@7d000000 {
 		compatible = "nvidia,tegra132-otg";
+		power-domains = <&mc_clk_pd>;
 		reg = <0x0 0x7d000000 0x0 0x4000>;
 		interrupts = <0 20 0x04>;
 		nvidia,hc-device = <&ehci1>;
@@ -1173,6 +1286,7 @@
 
 	ehci1: ehci@7d000000 {
 		compatible = "nvidia,tegra132-ehci";
+		power-domains = <&mc_clk_pd>;
 		reg = <0x0 0x7d000000 0x0 0x4000>;
 		interrupts = <0 20 0x04>;
 		nvidia,port-otg;
@@ -1196,6 +1310,23 @@
 
 	power-detect {
 		compatible = "nvidia,tegra210-pwr-detect";
+		pad-controllers = <&tegra_pmc TEGRA210_PAD_SYS
+					&tegra_pmc TEGRA210_PAD_UART
+					&tegra_pmc TEGRA210_PAD_AUDIO
+					&tegra_pmc TEGRA210_PAD_CAM
+					&tegra_pmc TEGRA210_PAD_PEX_CTRL
+					&tegra_pmc TEGRA210_PAD_SDMMC1
+					&tegra_pmc TEGRA210_PAD_SDMMC3
+					&tegra_pmc TEGRA210_PAD_HV
+					&tegra_pmc TEGRA210_PAD_AUDIO_HV
+					&tegra_pmc TEGRA210_PAD_DBG
+					&tegra_pmc TEGRA210_PAD_DMIC
+					&tegra_pmc TEGRA210_PAD_GPIO
+					&tegra_pmc TEGRA210_PAD_SPI
+					&tegra_pmc TEGRA210_PAD_SPI_HV>;
+		pad-names = "sys", "uart", "audio", "cam", "pex-ctrl",
+			"sdmmc1", "sdmmc3", "hv", "audio-hv", "debug", "dmic",
+			"gpio", "spi", "spi-hv";
 		status = "disabled";
 	};
 
@@ -1242,14 +1373,14 @@
 		fuse_war@fuse_rev_0_1 {
 			device_type = "fuse_war";
 			match_fuse_rev = <0 1>;
-			cpu0 = <1074800    1260300 >;
-			cpu1 = <1090900    3345900 >;
-			cpu2 = <1090400     116700 >;
-			cpu3 = <1095400   (-285300)>;
-			mem0 = <1091300     887300 >;
-			mem1 = <1121300    1734500 >;
-			gpu  = <1087000  (-1561600)>;
-			pllx = <1085800  (-1550400)>;
+			cpu0 = <1088700    397600 >;
+			cpu1 = <1077600    1073200 >;
+			cpu2 = <1104800    (-617000) >;
+			cpu3 = <1093800   (-901200)>;
+			mem0 = <1085300     (-98400) >;
+			mem1 = <1104800    (-99000) >;
+			gpu  = <1085800  (-1097500)>;
+			pllx = <1078800  (-890700)>;
 		};
 		/* thermctl - groups of sensors */
 		therm_cpu {
@@ -1339,8 +1470,8 @@
 		sensor-nominal-temp-cp = <25>;
 		sensor-nominal-temp-ft = <105>;
 
-		sensor-compensation-a = <10503>;
-		sensor-compensation-b = <(-63275)>;
+		sensor-compensation-a = <10632>;
+		sensor-compensation-b = <(-67490)>;
 	};
 
 	tegra_cec {
@@ -1352,6 +1483,7 @@
 
 	ehci2: ehci@7d004000 {
 		compatible = "nvidia,tegra132-ehci";
+		power-domains = <&mc_clk_pd>;
 		reg = <0x0 0x7d004000 0x0 0x4000>;
 		interrupts = <0 21 0x04>;
 		nvidia,has-hostpc;
@@ -1373,6 +1505,7 @@
 		      <0x0 0x72030000 0x0 0x1000>, /* etf */
 		      <0x0 0x72040000 0x0 0x1000>, /* replicator */
 		      <0x0 0x72050000 0x0 0x1000>, /* etr */
+		      <0x0 0x72060000 0x0 0x1000>, /* tpiu */
 		      <0x0 0x73010000 0x0 0x1000>, /* funnel_bccplex */
 		      <0x0 0x73440000 0x0 0x1000>, /* ptm0 */
 		      <0x0 0x73540000 0x0 0x1000>, /* ptm1 */
@@ -1387,5 +1520,9 @@
 		interrupts = < 0 175 0x4 >;
 		reg = < 0x0 0x50060000 0x0 0x1000 >;
 		status = "disabled";
+	};
+
+	cpuidle {
+		compatible = "nvidia,tegra210-cpuidle";
 	};
 };

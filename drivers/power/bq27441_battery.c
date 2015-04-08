@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -97,6 +97,24 @@
 #define BQ27441_CC_DELTA		0x48
 
 #define BQ27441_MAX_REGS		0x7F
+
+#define BQ27441_DESIGN_CAPACITY_DEFAULT		7800
+#define BQ27441_DESIGN_ENERGY_DEFAULT		28080
+#define BQ27441_TAPER_RATE_DEFAULT		100
+#define BQ27441_TERMINATE_VOLTAGE_DEFAULT	3200
+#define BQ27441_VAT_CHG_TERM_DEFAULT		4100
+#define BQ27441_CC_GAIN_DEFAULT		0x7F7806C9
+#define BQ27441_CC_DELTA_DEFAULT	0x940D197A
+#define BQ27441_QMAX_CELL_DEFAULT	16384
+#define BQ27441_RESERVE_CAP_DEFAULT	0
+
+#define BQ27441_OPCTEMPS_MASK	0x01
+#define BQ27441_OPCONFIG_1	0x40
+#define BQ27441_OPCONFIG_2	0x41
+
+#define BQ27441_CHARGE_CURNT_THRESHOLD	2000
+#define BQ27441_INPUT_POWER_THRESHOLD		7000
+#define BQ27441_BATTERY_SOC_THRESHOLD		90
 
 struct bq27441_chip {
 	struct i2c_client		*client;
@@ -211,6 +229,22 @@ static int bq27441_write_byte(struct i2c_client *client, u8 reg, u8 value)
 	return ret;
 }
 
+static int bq27441_get_battery_soc(struct battery_gauge_dev *bg_dev)
+{
+	struct bq27441_chip *chip = battery_gauge_get_drvdata(bg_dev);
+	int val;
+
+	val = bq27441_read_word(chip->client, BQ27441_STATE_OF_CHARGE);
+	if (val < 0)
+		dev_err(&chip->client->dev, "%s: err %d\n", __func__, val);
+	else
+		val =  battery_gauge_get_adjusted_soc(chip->bg_dev,
+				chip->pdata->threshold_soc,
+				chip->pdata->maximum_soc, val * 100);
+
+	return val;
+}
+
 static int bq27441_update_soc_voltage(struct bq27441_chip *chip)
 {
 	int val;
@@ -268,7 +302,114 @@ static void bq27441_work(struct work_struct *work)
 	}
 
 	mutex_unlock(&chip->mutex);
+	battery_gauge_report_battery_soc(chip->bg_dev, chip->soc);
 	schedule_delayed_work(&chip->work, BQ27441_DELAY);
+}
+
+static int bq27441_battemps_enable(struct bq27441_chip *chip)
+{
+	struct i2c_client *client = chip->client;
+	u8 temp;
+	int ret;
+	int old_opconfig;
+	int old_csum, new_csum;
+	unsigned long timeout = jiffies + HZ;
+
+	/* Unseal the fuel gauge for data access */
+	ret = bq27441_write_byte(client, BQ27441_CONTROL_1, 0x00);
+	if (ret < 0)
+		goto fail;
+
+	ret = bq27441_write_byte(client, BQ27441_CONTROL_2, 0x80);
+	if (ret < 0)
+		goto fail;
+
+	ret = bq27441_write_byte(client, BQ27441_CONTROL_1, 0x00);
+	if (ret < 0)
+		goto fail;
+
+	ret = bq27441_write_byte(client, BQ27441_CONTROL_2, 0x80);
+	if (ret < 0)
+		goto fail;
+
+	/* setup fuel gauge state data block block for ram access */
+	ret = bq27441_write_byte(client, BQ27441_BLOCK_DATA_CONTROL, 0x00);
+	if (ret < 0)
+		goto fail;
+
+	ret = bq27441_write_byte(client, BQ27441_DATA_BLOCK_CLASS, 0x40);
+	if (ret < 0)
+		goto fail;
+
+	ret = bq27441_write_byte(client, BQ27441_DATA_BLOCK, 0x00);
+	if (ret < 0)
+		goto fail;
+	mdelay(1);
+
+	old_opconfig = bq27441_read_word(client, BQ27441_OPCONFIG_1);
+
+	/* if the TEMPS bit is set seal the fuel gauge and return */
+	if (BQ27441_OPCTEMPS_MASK & be16_to_cpu(old_opconfig)) {
+		dev_info(&chip->client->dev, "FG TEMPS already enabled\n");
+		goto seal;
+	}
+
+	/* read check sum */
+	old_csum = bq27441_read_byte(client, BQ27441_BLOCK_DATA_CHECKSUM);
+
+	/* place the fuel gauge into config update */
+	ret = bq27441_write_byte(client, BQ27441_CONTROL_1, 0x13);
+	if (ret < 0)
+		goto fail;
+
+	ret = bq27441_write_byte(client, BQ27441_CONTROL_2, 0x00);
+	if (ret < 0)
+		goto fail;
+
+	while (!(bq27441_read_byte(client, BQ27441_FLAGS) & 0x10)) {
+		if (time_after(jiffies, timeout)) {
+			dev_warn(&chip->client->dev,
+					"timeout waiting for cfg update\n");
+			goto fail;
+		}
+		msleep(1);
+	}
+
+	/* update TEMPS config to fuel gauge */
+	ret = bq27441_write_byte(client, BQ27441_OPCONFIG_2,
+				((old_opconfig >> 8) | BQ27441_OPCTEMPS_MASK));
+	if (ret < 0)
+		goto fail;
+
+	temp = (255 - old_csum
+		- (old_opconfig & 0xFF)
+		- ((old_opconfig >> 8) & 0xFF)) % 256;
+
+	new_csum = 255 - ((temp
+				+ (old_opconfig & 0xFF)
+				+ ((old_opconfig >> 8) |
+				BQ27441_OPCTEMPS_MASK)) % 256);
+
+	ret = bq27441_write_byte(client, BQ27441_BLOCK_DATA_CHECKSUM,
+				new_csum);
+	if (ret < 0)
+		goto fail;
+
+seal:
+	/* seal the fuel gauge before exit */
+	ret = bq27441_write_byte(client, BQ27441_CONTROL_1, 0x20);
+	if (ret < 0)
+		goto fail;
+
+	ret = bq27441_write_byte(client, BQ27441_CONTROL_2, 0x00);
+	if (ret < 0)
+		goto fail;
+
+	return 0;
+
+fail:
+	dev_info(&chip->client->dev, "FG OPCONFIG TEMPS enable failed\n");
+	return -EIO;
 }
 
 static int bq27441_initialize_cc_cal_block(struct bq27441_chip *chip)
@@ -695,6 +836,7 @@ static enum power_supply_property bq27441_battery_props[] = {
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
+	POWER_SUPPLY_PROP_CHARGER_STANDARD,
 	POWER_SUPPLY_PROP_TEMP,
 };
 
@@ -705,6 +847,7 @@ static int bq27441_get_property(struct power_supply *psy,
 	struct bq27441_chip *chip = container_of(psy,
 				struct bq27441_chip, battery);
 	int temperature;
+	int power_mw = 0, input_curnt_ma = 0;
 	int ret = 0;
 
 	mutex_lock(&chip->mutex);
@@ -749,6 +892,23 @@ static int bq27441_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
 		val->intval = chip->capacity_level;
+		break;
+	case POWER_SUPPLY_PROP_CHARGER_STANDARD:
+		val->strval = "unknown";
+		input_curnt_ma = battery_gauge_get_input_current_limit(
+							chip->bg_dev);
+
+		battery_gauge_get_input_power(chip->bg_dev, &power_mw);
+		power_mw = abs(power_mw);
+
+		if (input_curnt_ma >= BQ27441_CHARGE_CURNT_THRESHOLD &&
+				power_mw <= BQ27441_INPUT_POWER_THRESHOLD &&
+				chip->soc < BQ27441_BATTERY_SOC_THRESHOLD)
+			val->strval = "sub-standard";
+		else if (input_curnt_ma == 0 && power_mw == 0)
+			val->strval = "no-charger";
+		else
+			val->strval = "standard";
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
 		if (chip->enable_temp_prop) {
@@ -816,6 +976,7 @@ done:
 static struct battery_gauge_ops bq27441_bg_ops = {
 	.update_battery_status = bq27441_update_battery_status,
 	.get_battery_temp = bq27441_get_temperature,
+	.get_battery_soc = bq27441_get_battery_soc,
 };
 
 static struct battery_gauge_info bq27441_bgi = {
@@ -838,17 +999,18 @@ static irqreturn_t bq27441_irq(int id, void *dev)
 {
 	struct bq27441_chip *chip = dev;
 	struct i2c_client *client = chip->client;
-	int flags_msb;
 
 	bq27441_update_soc_voltage(chip);
 	power_supply_changed(&chip->battery);
 	dev_info(&client->dev, "%s() Battery Voltage %dmV and SoC %d%%\n",
 				__func__, chip->vcell, chip->soc);
 
-	flags_msb = bq27441_read_byte(chip->client, BQ27441_FLAGS_1);
-	if (chip->full_charge_state !=
-				(flags_msb & BQ27441_FLAGS_FC_DETECT)) {
-		chip->full_charge_state = flags_msb & BQ27441_FLAGS_FC_DETECT;
+	if (chip->soc == BQ27441_BATTERY_FULL && !chip->full_charge_state) {
+		chip->full_charge_state = 1;
+		schedule_delayed_work(&chip->fc_work, 0);
+	} else if (chip->soc < BQ27441_BATTERY_FULL &&
+					chip->full_charge_state) {
+		chip->full_charge_state = 0;
 		schedule_delayed_work(&chip->fc_work, 0);
 	}
 
@@ -860,39 +1022,72 @@ static void of_bq27441_parse_platform_data(struct i2c_client *client,
 {
 	u32 tmp;
 	char const *pstr;
+	bool dt_param_not_found = 0;
 	struct device_node *np = client->dev.of_node;
 
 	if (!of_property_read_u32(np, "ti,design-capacity", &tmp))
 		pdata->full_capacity = (unsigned long)tmp;
+	else {
+		dt_param_not_found = 1;
+		dev_warn(&client->dev, "fail to read design-capacity\n");
+	}
 
 	if (!of_property_read_u32(np, "ti,design-energy", &tmp))
 		pdata->full_energy = (unsigned long)tmp;
+	else {
+		dt_param_not_found = 1;
+		dev_warn(&client->dev, "fail to read design-energy\n");
+	}
 
 	if (!of_property_read_u32(np, "ti,taper-rate", &tmp))
 		pdata->taper_rate = (unsigned long)tmp;
+	else {
+		dt_param_not_found = 1;
+		dev_warn(&client->dev, "fail to read taper-rate\n");
+	}
 
 	if (!of_property_read_u32(np, "ti,terminate-voltage", &tmp))
 		pdata->terminate_voltage = (unsigned long)tmp;
+	else {
+		dt_param_not_found = 1;
+		dev_warn(&client->dev, "fail to read terminate-voltage\n");
+	}
 
 	if (!of_property_read_u32(np, "ti,v-at-chg-term", &tmp))
 		pdata->v_at_chg_term = (unsigned long)tmp;
 
 	if (!of_property_read_u32(np, "ti,cc-gain", &tmp))
 		pdata->cc_gain = tmp;
+	else {
+		dt_param_not_found = 1;
+		dev_warn(&client->dev, "fail to read cc-gain\n");
+	}
 
 	if (!of_property_read_u32(np, "ti,cc-delta", &tmp))
 		pdata->cc_delta = tmp;
+	else {
+		dt_param_not_found = 1;
+		dev_warn(&client->dev, "fail to read cc-delta\n");
+	}
 
 	if (!of_property_read_u32(np, "ti,qmax-cell", &tmp))
 		pdata->qmax_cell = tmp;
+	else {
+		dt_param_not_found = 1;
+		dev_warn(&client->dev, "fail to read qmax-cell\n");
+	}
 
 	if (!of_property_read_u32(np, "ti,reserve-cap-mah", &tmp))
 		pdata->reserve_cap = tmp;
+	else {
+		dt_param_not_found = 1;
+		dev_warn(&client->dev, "fail to read reserve-cap-mah\n");
+	}
 
 	if (!of_property_read_string(np, "ti,tz-name", &pstr))
 		pdata->tz_name = pstr;
 	else
-		dev_err(&client->dev, "Failed to read tz-name\n");
+		dev_warn(&client->dev, "Failed to read tz-name\n");
 
 	if (!of_property_read_u32(np, "ti,kernel-threshold-soc", &tmp))
 		pdata->threshold_soc = tmp;
@@ -904,6 +1099,8 @@ static void of_bq27441_parse_platform_data(struct i2c_client *client,
 
 	pdata->enable_temp_prop = of_property_read_bool(np,
 					"ti,enable-temp-prop");
+
+	WARN_ON(dt_param_not_found);
 }
 
 static int bq27441_probe(struct i2c_client *client,
@@ -935,24 +1132,21 @@ static int bq27441_probe(struct i2c_client *client,
 	chip->print_once = 0;
 	chip->full_charge_state = 0;
 
-	if (chip->pdata->full_capacity)
-		chip->full_capacity = chip->pdata->full_capacity;
-	if (chip->pdata->full_energy)
-		chip->design_energy = chip->pdata->full_energy;
-	if (chip->pdata->taper_rate)
-		chip->taper_rate = chip->pdata->taper_rate;
-	if (chip->pdata->terminate_voltage)
-		chip->terminate_voltage = chip->pdata->terminate_voltage;
-	if (chip->pdata->v_at_chg_term)
-		chip->v_chg_term = chip->pdata->v_at_chg_term;
-	if (chip->pdata->cc_gain)
-		chip->cc_gain = chip->pdata->cc_gain;
-	if (chip->pdata->cc_delta)
-		chip->cc_delta = chip->pdata->cc_delta;
-	if (chip->pdata->qmax_cell)
-		chip->qmax_cell = chip->pdata->qmax_cell;
-	if (chip->pdata->reserve_cap)
-		chip->reserve_cap = chip->pdata->reserve_cap;
+	chip->full_capacity = chip->pdata->full_capacity ?:
+				BQ27441_DESIGN_CAPACITY_DEFAULT;
+	chip->design_energy = chip->pdata->full_energy ?:
+				BQ27441_DESIGN_ENERGY_DEFAULT;
+	chip->taper_rate = chip->pdata->taper_rate ?:
+				BQ27441_TAPER_RATE_DEFAULT;
+	chip->terminate_voltage = chip->pdata->terminate_voltage ?:
+				BQ27441_TERMINATE_VOLTAGE_DEFAULT;
+	chip->v_chg_term = chip->pdata->v_at_chg_term ?:
+				BQ27441_VAT_CHG_TERM_DEFAULT;
+	chip->cc_gain = chip->pdata->cc_gain ?: BQ27441_CC_GAIN_DEFAULT;
+	chip->cc_delta = chip->pdata->cc_delta ?: BQ27441_CC_DELTA_DEFAULT;
+	chip->qmax_cell = chip->pdata->qmax_cell ?: BQ27441_QMAX_CELL_DEFAULT;
+	chip->reserve_cap = chip->pdata->reserve_cap ?:
+				BQ27441_RESERVE_CAP_DEFAULT;
 	chip->enable_temp_prop = chip->pdata->enable_temp_prop;
 
 	dev_info(&client->dev, "Battery capacity is %d\n", chip->full_capacity);
@@ -1010,6 +1204,9 @@ static int bq27441_probe(struct i2c_client *client,
 	if (ret < 0)
 		dev_err(&client->dev, "chip init failed - %d\n", ret);
 
+	if (chip->enable_temp_prop)
+		bq27441_battemps_enable(chip);
+
 	bq27441_update_soc_voltage(chip);
 
 	INIT_DEFERRABLE_WORK(&chip->work, bq27441_work);
@@ -1035,6 +1232,11 @@ static int bq27441_probe(struct i2c_client *client,
 
 	dev_info(&client->dev, "Battery Voltage %dmV and SoC %d%%\n",
 			chip->vcell, chip->soc);
+
+	if (chip->soc == BQ27441_BATTERY_FULL && !chip->full_charge_state) {
+		chip->full_charge_state = 1;
+		schedule_delayed_work(&chip->fc_work, 0);
+	}
 
 	return 0;
 irq_reg_error:

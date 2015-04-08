@@ -50,6 +50,7 @@
 #include <asm/cputype.h>
 #include <asm/elf.h>
 #include <asm/cputable.h>
+#include <asm/cpufeature.h>
 #include <asm/cpu_ops.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
@@ -84,6 +85,8 @@ unsigned int compat_elf_hwcap2 __read_mostly;
 #ifdef CONFIG_ARM64_MACH_FRAMEWORK
 const struct machine_desc *machine_desc __initdata;
 #endif
+DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+
 phys_addr_t __fdt_pointer __initdata;
 
 /*

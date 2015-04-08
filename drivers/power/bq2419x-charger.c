@@ -1,7 +1,7 @@
 /*
  * bq2419x-charger.c -- BQ24190/BQ24192/BQ24192i/BQ24193 Charger driver
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Laxman Dewangan <ldewangan@nvidia.com>
  * Author: Syed Rafiuddin <srafiuddin@nvidia.com>
@@ -58,6 +58,7 @@
 #define BQ2419X_PRE_CHG_TERM_OFFSET	128
 #define BQ2419X_CHARGE_VOLTAGE_OFFSET	3504
 #define BQ2419x_OTG_ENABLE_TIME		msecs_to_jiffies(30000)
+#define BQ2419X_PC_USB_LP0_THRESHOLD	95
 
 /* input current limit */
 static const unsigned int iinlim[] = {
@@ -115,6 +116,7 @@ struct bq2419x_chip {
 	bool				wake_lock_released;
 	int				last_temp;
 	bool				shutdown_complete;
+	bool				charging_disabled_on_suspend;
 	struct bq2419x_reg_info		input_src;
 	struct bq2419x_reg_info		chg_current_control;
 	struct bq2419x_reg_info		prechg_term_control;
@@ -494,7 +496,6 @@ static int bq2419x_set_charging_current(struct regulator_dev *rdev,
 	int val;
 
 	dev_info(bq2419x->dev, "Setting charging current %d\n", max_uA/1000);
-	msleep(200);
 	bq2419x->chg_status = BATTERY_DISCHARGING;
 
 	if (!bq2419x->is_otg_connected) {
@@ -680,9 +681,7 @@ static int bq2419x_fault_clear_sts(struct bq2419x_chip *bq2419x,
 			((reg09_2 & BQ2419x_FAULT_CHRG_FAULT_MASK) ==
 				BQ2419x_FAULT_CHRG_SAFTY))
 			reg09 |= BQ2419x_FAULT_CHRG_SAFTY;
-		else if (((reg09_1 & BQ2419x_FAULT_CHRG_FAULT_MASK) ==
-				BQ2419x_FAULT_CHRG_INPUT) ||
-			((reg09_2 & BQ2419x_FAULT_CHRG_FAULT_MASK) ==
+		else if (((reg09_2 & BQ2419x_FAULT_CHRG_FAULT_MASK) ==
 				BQ2419x_FAULT_CHRG_INPUT))
 			reg09 |= BQ2419x_FAULT_CHRG_INPUT;
 		else if (((reg09_1 & BQ2419x_FAULT_CHRG_FAULT_MASK) ==
@@ -740,6 +739,8 @@ static irqreturn_t bq2419x_irq(int irq, void *data)
 			bq_chg_err(bq2419x, "otg mode disable failed\n");
 			goto out;
 		}
+		regulator_notifier_call_chain(bq2419x->vbus_rdev,
+				REGULATOR_EVENT_OVER_CURRENT, NULL);
 	}
 
 	if (!bq2419x->battery_presense)
@@ -758,6 +759,9 @@ static irqreturn_t bq2419x_irq(int irq, void *data)
 			bq_chg_err(bq2419x, "otg mode disable failed\n");
 			goto out;
 		}
+		if (bq2419x->is_otg_connected)
+			regulator_notifier_call_chain(bq2419x->vbus_rdev,
+				REGULATOR_EVENT_OVER_TEMP, NULL);
 		break;
 	default:
 		break;
@@ -1339,6 +1343,16 @@ static const struct attribute_group bq2419x_attr_group = {
 	.attrs = bq2419x_attributes,
 };
 
+static int bq2419x_get_input_current_limit(struct battery_charger_dev *bc_dev)
+{
+	struct bq2419x_chip *bq2419x = battery_charger_get_drvdata(bc_dev);
+
+	if (!bq2419x->cable_connected)
+		return 0;
+
+	return bq2419x->in_current_limit;
+}
+
 static int bq2419x_charger_termination_configure(
 		struct battery_charger_dev *bc_dev, int full_charge_state)
 {
@@ -1369,6 +1383,7 @@ static int bq2419x_charger_get_status(struct battery_charger_dev *bc_dev)
 static struct battery_charging_ops bq2419x_charger_bci_ops = {
 	.get_charging_status = bq2419x_charger_get_status,
 	.charge_term_configure = bq2419x_charger_termination_configure,
+	.get_input_current_limit = bq2419x_get_input_current_limit,
 };
 
 static struct battery_charger_info bq2419x_charger_bci = {
@@ -1560,6 +1575,7 @@ static int bq2419x_probe(struct i2c_client *client,
 	bq2419x->is_otg_connected = 0;
 	bq2419x->shutdown_complete = 0;
 	bq2419x->wake_lock_released = false;
+	bq2419x->charging_disabled_on_suspend = 0;
 
 	ret = bq2419x_show_chip_version(bq2419x);
 	if (ret < 0) {
@@ -1647,8 +1663,6 @@ static int bq2419x_probe(struct i2c_client *client,
 		goto scrub_mutex;
 	}
 
-	INIT_DELAYED_WORK(&bq2419x->otg_reset_work,
-				bq2419x_otg_reset_work_handler);
 	ret = bq2419x_fault_clear_sts(bq2419x, NULL);
 	if (ret < 0) {
 		dev_err(bq2419x->dev, "fault clear status failed %d\n", ret);
@@ -1688,6 +1702,9 @@ skip_bcharger_init:
 		bq2419x_thermal_init_work(&bq2419x->thermal_init_work.work);
 #endif
 	}
+
+	INIT_DELAYED_WORK(&bq2419x->otg_reset_work,
+				bq2419x_otg_reset_work_handler);
 
 	return 0;
 scrub_wq:
@@ -1780,12 +1797,27 @@ static int bq2419x_suspend(struct device *dev)
 {
 	struct bq2419x_chip *bq2419x = dev_get_drvdata(dev);
 	int ret = 0;
+	int battery_soc = 0;
 
 	if (device_may_wakeup(bq2419x->dev) && (bq2419x->irq > 0))
 		enable_irq_wake(bq2419x->irq);
 
 	if (!bq2419x->battery_presense)
 		return 0;
+
+	battery_soc = battery_gauge_get_battery_soc(bq2419x->bc_dev);
+	if (battery_soc > BQ2419X_PC_USB_LP0_THRESHOLD &&
+			(bq2419x->in_current_limit <= 500) &&
+			!bq2419x->is_otg_connected) {
+		ret = regmap_update_bits(bq2419x->regmap, BQ2419X_PWR_ON_REG,
+				BQ2419X_ENABLE_CHARGE_MASK,
+				BQ2419X_DISABLE_CHARGE);
+		if (ret < 0)
+			dev_err(bq2419x->dev,
+				"REG update failed: err %d\n", ret);
+		else
+			bq2419x->charging_disabled_on_suspend = true;
+	}
 
 	if (!bq2419x->cable_connected)
 		goto end;
@@ -1801,6 +1833,17 @@ static int bq2419x_suspend(struct device *dev)
 		if (ret < 0)
 			dev_err(bq2419x->dev,
 			"Config of charging failed: %d\n", ret);
+		if (battery_soc > BQ2419X_PC_USB_LP0_THRESHOLD &&
+					!bq2419x->is_otg_connected) {
+			ret = regmap_update_bits(bq2419x->regmap,
+				BQ2419X_PWR_ON_REG, BQ2419X_ENABLE_CHARGE_MASK,
+				BQ2419X_DISABLE_CHARGE);
+			if (ret < 0)
+				dev_err(bq2419x->dev,
+					"REG update failed: err %d\n", ret);
+			else
+				bq2419x->charging_disabled_on_suspend = true;
+		}
 	} else
 		dev_info(bq2419x->dev, "Battery charging with high current\n");
 
@@ -1816,6 +1859,16 @@ static int bq2419x_resume(struct device *dev)
 
 	if (device_may_wakeup(bq2419x->dev) && (bq2419x->irq > 0))
 		disable_irq_wake(bq2419x->irq);
+
+	if (bq2419x->charging_disabled_on_suspend) {
+		bq2419x->charging_disabled_on_suspend = false;
+		ret = regmap_update_bits(bq2419x->regmap, BQ2419X_PWR_ON_REG,
+				BQ2419X_ENABLE_CHARGE_MASK,
+				BQ2419X_ENABLE_CHARGE);
+		if (ret < 0)
+			dev_err(bq2419x->dev,
+				"register update failed: err %d\n", ret);
+	}
 
 	ret = regmap_read(bq2419x->regmap, BQ2419X_SYS_STAT_REG, &val);
 	if (ret < 0) {

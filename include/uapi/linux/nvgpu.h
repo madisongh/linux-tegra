@@ -1,7 +1,7 @@
 /*
  * NVGPU Public Interface Header
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -104,12 +104,13 @@ struct nvgpu_gpu_zbc_query_table_args {
 #define NVGPU_GPU_FLAGS_SUPPORT_SYNC_FENCE_FDS		(1 << 3)
 /* NVGPU_IOCTL_CHANNEL_CYCLE_STATS is available */
 #define NVGPU_GPU_FLAGS_SUPPORT_CYCLE_STATS		(1 << 4)
+/* MAP_BUFFER_EX with unmapped PTE */
+#define NVGPU_GPU_FLAGS_SUPPORT_UNMAPPED_PTE		(1 << 5)
 
 struct nvgpu_gpu_characteristics {
 	__u32 arch;
 	__u32 impl;
 	__u32 rev;
-
 	__u32 num_gpc;
 
 	__u64 L2_cache_size;               /* bytes */
@@ -151,8 +152,21 @@ struct nvgpu_gpu_characteristics {
 	__s16 as_ioctl_nr_last;
 
 	__u8 gpu_va_bit_count;
-
 	__u8 reserved;
+
+	__u32 max_fbps_count;
+	__u32 fbp_en_mask;
+	__u32 max_ltc_per_fbp;
+	__u32 max_lts_per_ltc;
+	__u32 max_tex_per_tpc;
+	__u32 max_gpc_count;
+	/* mask of Rop_L2 for each FBP */
+	__u32 rop_l2_en_mask[2];
+
+
+	__u8 chipname[8];
+
+
 
 	/* Notes:
 	   - This struct can be safely appended with new fields. However, always
@@ -238,6 +252,57 @@ struct nvgpu_gpu_get_tpc_masks_args {
 	__u64 mask_buf_addr;
 };
 
+struct nvgpu_gpu_open_channel_args {
+	__s32 channel_fd;
+};
+
+/* L2 cache writeback, optionally invalidate clean lines and flush fb */
+struct nvgpu_gpu_l2_fb_args {
+	__u32 l2_flush:1;
+	__u32 l2_invalidate:1;
+	__u32 fb_flush:1;
+	__u32 reserved;
+} __packed;
+
+struct nvgpu_gpu_inval_icache_args {
+	int channel_fd;
+	__u32 reserved;
+} __packed;
+
+struct nvgpu_gpu_mmu_debug_mode_args {
+	__u32 state;
+	__u32 reserved;
+} __packed;
+
+struct nvgpu_gpu_sm_debug_mode_args {
+	int channel_fd;
+	__u32 enable;
+	__u64 sms;
+} __packed;
+
+struct warpstate {
+	__u64 valid_warps;
+	__u64 trapped_warps;
+	__u64 paused_warps;
+};
+
+struct nvgpu_gpu_wait_pause_args {
+	__u64 pwarpstate;
+};
+
+struct nvgpu_gpu_tpc_exception_en_status_args {
+	__u64 tpc_exception_en_sm_mask;
+};
+
+struct nvgpu_gpu_num_vsms {
+	__u32 num_vsms;
+	__u32 reserved;
+};
+
+struct nvgpu_gpu_vsms_mapping {
+	__u64 vsms_map_buf_addr;
+};
+
 #define NVGPU_GPU_IOCTL_ZCULL_GET_CTX_SIZE \
 	_IOR(NVGPU_GPU_IOCTL_MAGIC, 1, struct nvgpu_gpu_zcull_get_ctx_size_args)
 #define NVGPU_GPU_IOCTL_ZCULL_GET_INFO \
@@ -258,12 +323,29 @@ struct nvgpu_gpu_get_tpc_masks_args {
 	_IOWR(NVGPU_GPU_IOCTL_MAGIC, 9, struct nvgpu_gpu_open_tsg_args)
 #define NVGPU_GPU_IOCTL_GET_TPC_MASKS \
 	_IOWR(NVGPU_GPU_IOCTL_MAGIC, 10, struct nvgpu_gpu_get_tpc_masks_args)
+#define NVGPU_GPU_IOCTL_OPEN_CHANNEL \
+	_IOWR(NVGPU_GPU_IOCTL_MAGIC, 11, struct nvgpu_gpu_open_channel_args)
+#define NVGPU_GPU_IOCTL_FLUSH_L2 \
+	_IOWR(NVGPU_DBG_GPU_IOCTL_MAGIC, 12, struct nvgpu_gpu_l2_fb_args)
+#define NVGPU_GPU_IOCTL_INVAL_ICACHE \
+	_IOWR(NVGPU_GPU_IOCTL_MAGIC, 13, struct nvgpu_gpu_inval_icache_args)
+#define NVGPU_GPU_IOCTL_SET_MMUDEBUG_MODE \
+	_IOWR(NVGPU_GPU_IOCTL_MAGIC, 14, struct nvgpu_gpu_mmu_debug_mode_args)
+#define NVGPU_GPU_IOCTL_SET_SM_DEBUG_MODE \
+	_IOWR(NVGPU_GPU_IOCTL_MAGIC, 15, struct nvgpu_gpu_sm_debug_mode_args)
+#define NVGPU_GPU_IOCTL_WAIT_FOR_PAUSE \
+	_IOWR(NVGPU_GPU_IOCTL_MAGIC, 16, struct nvgpu_gpu_wait_pause_args)
+#define NVGPU_GPU_IOCTL_GET_TPC_EXCEPTION_EN_STATUS \
+	_IOWR(NVGPU_GPU_IOCTL_MAGIC, 17, struct nvgpu_gpu_tpc_exception_en_status_args)
+#define NVGPU_GPU_IOCTL_NUM_VSMS \
+	_IOWR(NVGPU_GPU_IOCTL_MAGIC, 18, struct nvgpu_gpu_num_vsms)
+#define NVGPU_GPU_IOCTL_VSMS_MAPPING \
+	_IOWR(NVGPU_GPU_IOCTL_MAGIC, 19, struct nvgpu_gpu_vsms_mapping)
 
 #define NVGPU_GPU_IOCTL_LAST		\
-	_IOC_NR(NVGPU_GPU_IOCTL_GET_TPC_MASKS)
+	_IOC_NR(NVGPU_GPU_IOCTL_VSMS_MAPPING)
 #define NVGPU_GPU_IOCTL_MAX_ARG_SIZE	\
 	sizeof(struct nvgpu_gpu_prepare_compressible_read_args)
-
 
 /*
  * /dev/nvhost-tsg-gpu device
@@ -426,10 +508,38 @@ struct nvgpu_dbg_gpu_suspend_resume_all_sms_args {
 #define NVGPU_DBG_GPU_IOCTL_SUSPEND_RESUME_ALL_SMS			\
 	_IOWR(NVGPU_DBG_GPU_IOCTL_MAGIC, 6, struct nvgpu_dbg_gpu_suspend_resume_all_sms_args)
 
+struct nvgpu_dbg_gpu_perfbuf_map_args {
+	__u32 dmabuf_fd;	/* in */
+	__u32 reserved;
+	__u64 mapping_size;	/* in, size of mapped buffer region */
+	__u64 offset;		/* out, virtual address of the mapping */
+};
+
+struct nvgpu_dbg_gpu_perfbuf_unmap_args {
+	__u64 offset;
+};
+
+#define NVGPU_DBG_GPU_IOCTL_PERFBUF_MAP \
+	_IOWR(NVGPU_DBG_GPU_IOCTL_MAGIC, 7, struct nvgpu_dbg_gpu_perfbuf_map_args)
+#define NVGPU_DBG_GPU_IOCTL_PERFBUF_UNMAP \
+	_IOWR(NVGPU_DBG_GPU_IOCTL_MAGIC, 8, struct nvgpu_dbg_gpu_perfbuf_unmap_args)
+
+/* Enable/disable PC Sampling */
+struct nvgpu_dbg_gpu_pc_sampling_args {
+	__u32 enable;
+	__u32 _pad0[1];
+};
+
+#define NVGPU_DBG_GPU_IOCTL_PC_SAMPLING_DISABLE	0
+#define NVGPU_DBG_GPU_IOCTL_PC_SAMPLING_ENABLE	1
+
+#define NVGPU_DBG_GPU_IOCTL_PC_SAMPLING \
+	_IOW(NVGPU_DBG_GPU_IOCTL_MAGIC,  9, struct nvgpu_dbg_gpu_pc_sampling_args)
+
 #define NVGPU_DBG_GPU_IOCTL_LAST		\
-	_IOC_NR(NVGPU_DBG_GPU_IOCTL_SUSPEND_RESUME_ALL_SMS)
+	_IOC_NR(NVGPU_DBG_GPU_IOCTL_PC_SAMPLING)
 #define NVGPU_DBG_GPU_IOCTL_MAX_ARG_SIZE		\
-	sizeof(struct nvgpu_dbg_gpu_exec_reg_ops_args)
+	sizeof(struct nvgpu_dbg_gpu_perfbuf_map_args)
 
 /*
  * /dev/nvhost-gpu device
@@ -459,9 +569,11 @@ struct nvgpu_set_nvmap_fd_args {
 	__u32 fd;
 } __packed;
 
+#define NVGPU_ALLOC_OBJ_FLAGS_LOCKBOOST_ZERO	(1 << 0)
+
 struct nvgpu_alloc_obj_ctx_args {
 	__u32 class_num; /* kepler3d, 2d, compute, etc       */
-	__u32 padding;
+	__u32 flags;     /* input, output */
 	__u64 obj_id;    /* output, used to free later       */
 };
 
@@ -826,7 +938,7 @@ struct nvgpu_as_get_va_regions_args {
 #define NVGPU_AS_IOCTL_GET_VA_REGIONS \
 	_IOWR(NVGPU_AS_IOCTL_MAGIC, 8, struct nvgpu_as_get_va_regions_args)
 
-#define NVGPU_AS_IOCTL_LAST		\
+#define NVGPU_AS_IOCTL_LAST            \
 	_IOC_NR(NVGPU_AS_IOCTL_GET_VA_REGIONS)
 #define NVGPU_AS_IOCTL_MAX_ARG_SIZE	\
 	sizeof(struct nvgpu_as_map_buffer_ex_args)

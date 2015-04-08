@@ -216,6 +216,7 @@ struct uart_port {
 	struct attribute_group	*attr_group;		/* port specific attributes */
 	const struct attribute_group **tty_groups;	/* all attributes (serial core use only) */
 	void			*private_data;		/* generic platform data pointer */
+	bool			enable_rx_poll_timer;
 };
 
 static inline int serial_port_in(struct uart_port *up, int offset)

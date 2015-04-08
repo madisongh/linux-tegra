@@ -17,6 +17,7 @@
 #include <linux/of.h>
 #include <linux/platform_data/lp855x.h>
 #include <linux/pwm.h>
+#include <../../../arch/arm/mach-tegra/board-panel.h>
 
 /* LP8550/1/2/3/6 Registers */
 #define LP855X_BRIGHTNESS_CTRL		0x00
@@ -40,39 +41,6 @@
 
 #define DEFAULT_BL_NAME		"lcd-backlight"
 #define MAX_BRIGHTNESS		255
-
-enum lp855x_brightness_ctrl_mode {
-	PWM_BASED = 1,
-	REGISTER_BASED,
-};
-
-struct lp855x;
-
-/*
- * struct lp855x_device_config
- * @pre_init_device: init device function call before updating the brightness
- * @reg_brightness: register address for brigthenss control
- * @reg_devicectrl: register address for device control
- * @post_init_device: late init device function call
- */
-struct lp855x_device_config {
-	int (*pre_init_device)(struct lp855x *);
-	u8 reg_brightness;
-	u8 reg_devicectrl;
-	int (*post_init_device)(struct lp855x *);
-};
-
-struct lp855x {
-	const char *chipname;
-	enum lp855x_chip_id chip_id;
-	enum lp855x_brightness_ctrl_mode mode;
-	struct lp855x_device_config *cfg;
-	struct i2c_client *client;
-	struct backlight_device *bl;
-	struct device *dev;
-	struct lp855x_platform_data *pdata;
-	struct pwm_device *pwm;
-};
 
 static int lp855x_write_byte(struct lp855x *lp, u8 reg, u8 data)
 {
@@ -261,13 +229,22 @@ static int lp855x_bl_update_status(struct backlight_device *bl)
 		bl->props.brightness = 0;
 
 	if (lp->mode == PWM_BASED) {
-		int br = bl->props.brightness;
-		int max_br = bl->props.max_brightness;
+		int max_br, br;
+
+		br = bl->props.brightness;
+
+		if (lp->notify)
+			br = lp->notify(lp->dev, br);
+
+		max_br = bl->props.max_brightness;
 
 		lp855x_pwm_ctrl(lp, br, max_br);
 
 	} else if (lp->mode == REGISTER_BASED) {
 		u8 val = bl->props.brightness;
+
+		if (lp->notify)
+			val = lp->notify(lp->dev, val);
 
 		lp855x_write_byte(lp, lp->cfg->reg_brightness, val);
 	}
@@ -345,6 +322,11 @@ static int lp855x_parse_dt(struct device *dev, struct device_node *node)
 {
 	struct lp855x_platform_data *pdata;
 	int rom_length;
+	int n_bl_measured = 0;
+	const __be32 *p;
+	u32 u;
+	struct property *prop;
+	int ret = 0;
 
 	if (!node) {
 		dev_err(dev, "no platform data\n");
@@ -381,6 +363,21 @@ static int lp855x_parse_dt(struct device *dev, struct device_node *node)
 		pdata->rom_data = &rom[0];
 	}
 
+	of_property_for_each_u32(node, "bl-measured", prop, p, u)
+		n_bl_measured++;
+	if (n_bl_measured > 0) {
+		pdata->bl_measured = devm_kzalloc(dev,
+		sizeof(*pdata->bl_measured) * n_bl_measured, GFP_KERNEL);
+		if (!pdata->bl_measured) {
+			pr_err("bl_measured memory allocation failed\n");
+			ret = -ENOMEM;
+		}
+		n_bl_measured = 0;
+		of_property_for_each_u32(node,
+			"bl-measured", prop, p, u)
+			pdata->bl_measured[n_bl_measured++] = u;
+	}
+
 	dev->platform_data = pdata;
 
 	return 0;
@@ -397,6 +394,7 @@ static int lp855x_probe(struct i2c_client *cl, const struct i2c_device_id *id)
 	struct lp855x *lp;
 	struct lp855x_platform_data *pdata = dev_get_platdata(&cl->dev);
 	struct device_node *node = cl->dev.of_node;
+	struct generic_bl_data_dt_ops *gn;
 	int ret;
 
 	if (!pdata) {
@@ -424,6 +422,11 @@ static int lp855x_probe(struct i2c_client *cl, const struct i2c_device_id *id)
 	lp->pdata = pdata;
 	lp->chipname = id->name;
 	lp->chip_id = id->driver_data;
+
+	gn = (struct generic_bl_data_dt_ops *)dev_get_drvdata(lp->dev);
+	if (gn->notify)
+		lp->notify = gn->notify;
+
 	i2c_set_clientdata(cl, lp);
 
 	ret = lp855x_configure(lp);

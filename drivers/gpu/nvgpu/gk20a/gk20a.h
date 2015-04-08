@@ -1,7 +1,7 @@
 /*
  * GK20A Graphics
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -37,6 +37,7 @@ struct acr_gm20b;
 
 #include "as_gk20a.h"
 #include "clk_gk20a.h"
+#include "ce2_gk20a.h"
 #include "fifo_gk20a.h"
 #include "tsg_gk20a.h"
 #include "gr_gk20a.h"
@@ -47,6 +48,7 @@ struct acr_gm20b;
 #include "platform_gk20a.h"
 #include "gm20b/acr_gm20b.h"
 #include "cde_gk20a.h"
+#include "debug_gk20a.h"
 
 struct cooling_device_gk20a {
 	struct thermal_cooling_device *gk20a_cooling_dev;
@@ -85,6 +87,10 @@ struct gpu_ops {
 		u32 (*cbc_fix_config)(struct gk20a *g, int base);
 		void (*flush)(struct gk20a *g);
 	} ltc;
+	struct {
+		void (*isr_stall)(struct gk20a *g);
+		void (*isr_nonstall)(struct gk20a *g);
+	} ce2;
 	struct {
 		int (*init_fs_state)(struct gk20a *g);
 		void (*access_smpc_reg)(struct gk20a *g, u32 quad, u32 offset);
@@ -150,13 +156,23 @@ struct gpu_ops {
 		int (*init_ctx_state)(struct gk20a *g);
 		int (*alloc_gr_ctx)(struct gk20a *g,
 			  struct gr_ctx_desc **__gr_ctx, struct vm_gk20a *vm,
-			  u32 padding);
+			  u32 class, u32 padding);
 		void (*free_gr_ctx)(struct gk20a *g,
 			  struct vm_gk20a *vm,
 			  struct gr_ctx_desc *gr_ctx);
 		void (*update_ctxsw_preemption_mode)(struct gk20a *g,
 				struct channel_ctx_gk20a *ch_ctx,
 				void *ctx_ptr);
+		int (*dump_gr_regs)(struct gk20a *g,
+				struct gk20a_debug_output *o);
+		int (*update_pc_sampling)(struct channel_gk20a *ch,
+					   bool enable);
+		u32 (*get_max_fbps_count)(struct gk20a *g);
+		u32 (*get_fbp_en_mask)(struct gk20a *g);
+		u32 (*get_max_ltc_per_fbp)(struct gk20a *g);
+		u32 (*get_max_lts_per_ltc)(struct gk20a *g);
+		u32* (*get_rop_l2_en_mask)(struct gk20a *g);
+		void (*init_sm_dsm_reg_info)(void);
 	} gr;
 	const char *name;
 	struct {
@@ -165,6 +181,9 @@ struct gpu_ops {
 		void (*init_uncompressed_kind_map)(struct gk20a *g);
 		void (*init_kind_attr)(struct gk20a *g);
 		void (*set_mmu_page_size)(struct gk20a *g);
+		int (*compression_page_size)(struct gk20a *g);
+		int (*compressible_page_size)(struct gk20a *g);
+		void (*dump_vpr_wpr_info)(struct gk20a *g);
 	} fb;
 	struct {
 		void (*slcg_bus_load_gating_prod)(struct gk20a *g, bool prod);
@@ -207,6 +226,7 @@ struct gpu_ops {
 		void (*apply_pb_timeout)(struct gk20a *g);
 		int (*wait_engine_idle)(struct gk20a *g);
 		u32 (*get_num_fifos)(struct gk20a *g);
+		u32 (*get_pbdma_signature)(struct gk20a *g);
 	} fifo;
 	struct pmu_v {
 		/*used for change of enum zbc update cmd id from ver 0 to ver1*/
@@ -290,8 +310,7 @@ struct gpu_ops {
 		bool (*is_fw_defined)(void);
 	} gr_ctx;
 	struct {
-		int (*set_sparse)(struct vm_gk20a *vm, u64 vaddr,
-			       u32 num_pages, u32 pgsz_idx, bool refplus);
+		bool (*support_sparse)(struct gk20a *g);
 		bool (*is_debug_mode_enabled)(struct gk20a *g);
 		u64 (*gmmu_map)(struct vm_gk20a *vm,
 				u64 map_offset,
@@ -303,13 +322,15 @@ struct gpu_ops {
 				u32 ctag_offset,
 				u32 flags,
 				int rw_flag,
-				bool clear_ctags);
+				bool clear_ctags,
+				bool sparse);
 		void (*gmmu_unmap)(struct vm_gk20a *vm,
 				u64 vaddr,
 				u64 size,
 				int pgsz_idx,
 				bool va_allocated,
-				int rw_flag);
+				int rw_flag,
+				bool sparse);
 		void (*vm_remove)(struct vm_gk20a *vm);
 		int (*vm_alloc_share)(struct gk20a_as_share *as_share,
 				      u32 flags);
@@ -323,6 +344,14 @@ struct gpu_ops {
 					  void *inst_ptr, int size);
 		u32 (*get_big_page_sizes)(void);
 		u32 (*get_physical_addr_bits)(struct gk20a *g);
+		int (*init_mm_setup_hw)(struct gk20a *g);
+		int (*init_bar2_vm)(struct gk20a *g);
+		int (*init_bar2_mm_hw_setup)(struct gk20a *g);
+		const struct gk20a_mmu_level *
+			(*get_mmu_levels)(struct gk20a *g, u32 big_page_size);
+		void (*init_pdb)(struct gk20a *g, void *inst_ptr, u64 pdb_addr);
+		u64 (*get_iova_addr)(struct gk20a *g, struct scatterlist *sgl,
+					 u32 flags);
 	} mm;
 	struct {
 		int (*prepare_ucode)(struct gk20a *g);
@@ -367,6 +396,10 @@ struct gpu_ops {
 		irqreturn_t (*isr_thread_nonstall)(struct gk20a *g);
 		u32 intr_mask_restore[4];
 	} mc;
+	struct {
+		void (*show_dump)(struct gk20a *g,
+				struct gk20a_debug_output *o);
+	} debug;
 };
 
 struct gk20a {
@@ -382,9 +415,6 @@ struct gk20a {
 	void __iomem *bar1_saved;
 
 	bool power_on;
-#ifdef CONFIG_INPUT_CFBOOST
-	bool boost_added;
-#endif
 
 	struct rw_semaphore busy_lock;
 
@@ -480,8 +510,6 @@ struct gk20a {
 	u32 max_ltc_count;
 	u32 ltc_count;
 
-	struct generic_pm_domain pd;
-
 	struct devfreq *devfreq;
 
 	struct gk20a_scale_profile *scale_profile;
@@ -489,6 +517,7 @@ struct gk20a {
 	struct device_dma_parameters dma_parms;
 
 	struct gk20a_cde_app cde_app;
+	bool mmu_debug_ctrl;
 };
 
 static inline unsigned long gk20a_get_gr_idle_timeout(struct gk20a *g)
@@ -530,6 +559,11 @@ struct gk20a_cyclestate_buffer_elem {
 /* out */
 /* keep 64 bits to be consistent */
 	u64 data;
+};
+
+struct gk20a_domain_data {
+	struct generic_pm_domain gpd;
+	struct gk20a *gk20a;
 };
 
 /* debug accessories */
@@ -755,7 +789,7 @@ void gk20a_idle(struct platform_device *pdev);
 void gk20a_disable(struct gk20a *g, u32 units);
 void gk20a_enable(struct gk20a *g, u32 units);
 void gk20a_reset(struct gk20a *g, u32 units);
-int __gk20a_do_idle(struct platform_device *pdev);
+int __gk20a_do_idle(struct platform_device *pdev, bool force_reset);
 int __gk20a_do_unidle(struct platform_device *pdev);
 
 const struct firmware *

@@ -1,7 +1,7 @@
 /*
  * arch/arm/boot/dts/tegra124-p1859.dts
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,12 +25,11 @@
  * included and then the required changes should be made in the
  * corresponding dts
  */
-
 #include "tegra124-vcm30_t124.dtsi"
-#include <tegra124-platforms/tegra124-p1859-gpio-default.dtsi>
-#include <tegra124-platforms/tegra124-p1859-pinmux.dtsi>
 #include <panel-a-edp-1080p-14-0.dtsi>
 #include <tegra124-platforms/tegra124-vcm30-t124-hdmi.dtsi>
+#include <tegra124-platforms/tegra124-pmic-vcm30t124-max20024.dtsi>
+#include <dt-bindings/pinctrl/pinctrl-tegra.h>
 
 / {
 	#address-cells = <2>;
@@ -40,6 +39,7 @@
 		sor {
 			status = "okay";
 			panel-a-edp-1080p-14-0 {
+				status = "okay";
 				disp-default-out {
 					nvidia,out-max-pixclk = <3367>;
 					nvidia,dither = <TEGRA_DC_ORDERED_DITHER>;
@@ -82,6 +82,21 @@
 
 	i2c@7000c400 {
 		nvidia,clock-always-on;
+		clock-frequency = <50000>;
+
+		/* U17 of p1892 */
+		pca9539_77: pca9546@77 {
+			compatible = "nxp,pca9539";
+			gpio-controller;
+			#gpio-cells = <2>;
+			reg = <0x77>;
+			gpio-init-names = "aggreg_default";
+			gpio-init-0 = <&pca9539_aggreg_default>;
+			pca9539_aggreg_default: aggreg_default {
+				gpio-output-low = <7 8>;
+				gpio-output-high = <1>;
+			};
+		};
 
 		/* U21 */
 		pca9539_75: pca9546@75 {
@@ -165,6 +180,13 @@
 			};
 		};
 
+		max20024@3c {
+			regulators {
+				ldo5 {
+					status = "okay";
+				};
+			};
+		};
 	};
 
 	regulators {
@@ -181,6 +203,20 @@
 			gpio = <&pca9539_75 11 1>;
 			enable-active-high;
 		};
+
+		vdd_fuse: regulator@2 {
+			compatible = "regulator-fixed-sync";
+			regulator-name = "vdd_fuse";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			gpio = <&max20024 0 0>;
+			enable-active-high;
+		};
+	};
+
+	/* Populate fuse supply */
+	efuse@7000f800 {
+		vpp_fuse-supply = <&vdd_fuse>;
 	};
 
 	serial@70006000 {
@@ -204,19 +240,24 @@
 	spi@7000d400 {
 		status = "okay";
 		compatible = "nvidia,tegra124-spi-slave";
+		nvidia,clk-pin = "gpio_x5_aud_px5";
 		nvidia,rx-trigger-words = <0>;
+		spi-max-frequency = <48000000>;
 	};
 
 	spi@7000d600 {
 		status = "okay";
+		nvidia,maximum-dma-buffer-size = <65536>;
 	};
 
 	spi@7000d800 {
 		status = "okay";
+		nvidia,maximum-dma-buffer-size = <65536>;
 	};
 
 	spi@7000dc00 {
 		status = "okay";
+		nvidia,maximum-dma-buffer-size = <65536>;
 	};
 
 	xusb@70090000 {
@@ -305,6 +346,10 @@
 
 	sata@70020000 {
 		status = "okay";
+		nvidia,gen1-amp = /bits/8 <0x12>;
+		nvidia,gen2-amp = /bits/8 <0x18>;
+		nvidia,gen1-peak = /bits/8 <0x4>;
+		nvidia,gen2-peak = /bits/8 <0xA>;
 	};
 
 	sdhci@700b0000 {
@@ -328,15 +373,26 @@
 
 	sdhci@700b0400 {
 		vddio_sd_slot-supply = <&vdd_sd>;
-		nvidia,update-pinctrl-settings;
-		pinctrl-names = "default_mode", "uhs_sdr50_mode", "uhs_sdr104_mode";
-		pinctrl-0 = <&sdmmc3_hs_mode>;
-		pinctrl-1 = <&sdmmc3_uhs_sdr50_mode>;
-		pinctrl-2 = <&sdmmc3_uhs_sdr104_mode>;
+		vddio_sdmmc-supply = <&max20024_ldo5>;
 		status = "okay";
 	};
 
 	snor {
+		status = "okay";
+	};
+
+	ehci@7d000000 {
+		nvidia,is-intf-utmi;
+		status = "disabled";
+	};
+
+	ehci@7d004000 {
+		nvidia,is-intf-utmi;
+		status = "okay";
+	};
+
+	ehci@7d008000 {
+		nvidia,is-intf-utmi;
 		status = "okay";
 	};
 
@@ -381,6 +437,61 @@
 			linux,code = <KEY_POWER>;
 			gpios = <&gpio TEGRA_GPIO(S, 4) GPIO_ACTIVE_LOW>;
 			gpio-key,wakeup;
+		};
+	};
+
+	isc-mgr.0 {
+		compatible = "nvidia,isc-mgr";
+		i2c-bus = <0>;
+		csi-port = <0>;
+		misc-gpios = <&pca9539_77 1 GPIO_ACTIVE_HIGH>;	/* CSI1 switch */
+		/* default-power-on; */
+		status = "okay";
+	};
+
+	isc-mgr.1 {
+		compatible = "nvidia,isc-mgr";
+		i2c-bus = <0>;
+		csi-port = <2>;
+		/* default-power-on; */
+		status = "okay";
+	};
+
+	pinmux@70000868 {
+		sdmmc1_hs_mode: sdmmc1_hs_mode_drive {
+			drive_sdio1 {
+				nvidia,pins = "drive_sdio1";
+				nvidia,high-speed-mode = <TEGRA_PIN_ENABLE>;
+				nvidia,schmitt = <TEGRA_PIN_ENABLE>;
+				nvidia,pull-down-strength = <32>;
+				nvidia,pull-up-strength = <42>;
+				nvidia,slew-rate-rising = <TEGRA_PIN_SLEW_RATE_SLOWEST>;
+				nvidia,slew-rate-falling = <TEGRA_PIN_SLEW_RATE_SLOWEST>;
+			};
+		};
+
+		sdmmc1_uhs_sdr50_mode: sdmmc1_uhs_sdr50_mode_drive {
+			drive_sdio1 {
+				nvidia,pins = "drive_sdio1";
+				nvidia,high-speed-mode = <TEGRA_PIN_ENABLE>;
+				nvidia,schmitt = <TEGRA_PIN_ENABLE>;
+				nvidia,pull-down-strength = <40>;
+				nvidia,pull-up-strength = <51>;
+				nvidia,slew-rate-rising = <TEGRA_PIN_SLEW_RATE_SLOWEST>;
+				nvidia,slew-rate-falling = <TEGRA_PIN_SLEW_RATE_SLOWEST>;
+			};
+		};
+
+		sdmmc1_uhs_sdr104_mode: sdmmc1_uhs_sdr104_mode_drive {
+			drive_sdio1 {
+				nvidia,pins = "drive_sdio1";
+				nvidia,high-speed-mode = <TEGRA_PIN_ENABLE>;
+				nvidia,schmitt = <TEGRA_PIN_ENABLE>;
+				nvidia,pull-down-strength = <40>;
+				nvidia,pull-up-strength = <51>;
+				nvidia,slew-rate-rising = <TEGRA_PIN_SLEW_RATE_SLOWEST>;
+				nvidia,slew-rate-falling = <TEGRA_PIN_SLEW_RATE_SLOWEST>;
+			};
 		};
 	};
 };

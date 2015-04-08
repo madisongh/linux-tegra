@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -47,6 +47,10 @@
 #include <linux/of_address.h>
 #include <linux/tegra_pm_domains.h>
 #include <linux/uaccess.h>
+#ifdef CONFIG_TRUSTED_LITTLE_KERNEL
+#include <linux/ote_protocol.h>
+#endif
+#include <linux/tegra-timer.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/display.h>
@@ -74,9 +78,6 @@ EXPORT_TRACEPOINT_SYMBOL(display_readl);
 #include "tegra_adf.h"
 #endif
 
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-#include "hdmi.h"
-#endif /* CONFIG_FRAMEBUFFER_CONSOLE */
 #include "edid.h"
 
 #ifdef CONFIG_TEGRA_DC_FAKE_PANEL_SUPPORT
@@ -482,6 +483,13 @@ static struct tegra_dc_cmu default_limited_cmu = {
 		234, 234, 234, 234, 234, 235, 235, 235,
 	},
 };
+#elif defined(CONFIG_TEGRA_DC_CMU_V2)
+static struct tegra_dc_cmu default_cmu = {
+	{},
+};
+static struct tegra_dc_cmu default_limited_cmu = {
+	{},
+};
 #endif
 
 void tegra_dc_clk_enable(struct tegra_dc *dc)
@@ -699,7 +707,7 @@ static void _dump_regs(struct tegra_dc *dc, void *data,
 	DUMP_REG(DC_COM_CMU_CSC_KBR);
 	DUMP_REG(DC_COM_CMU_CSC_KRG);
 	DUMP_REG(DC_COM_CMU_CSC_KGG);
-	DUMP_REG(DC_COM_CMU_CSC_KBR);
+	DUMP_REG(DC_COM_CMU_CSC_KBG);
 	DUMP_REG(DC_COM_CMU_CSC_KRB);
 	DUMP_REG(DC_COM_CMU_CSC_KGB);
 	DUMP_REG(DC_COM_CMU_CSC_KBB);
@@ -908,6 +916,11 @@ static int dbg_dc_stats_show(struct seq_file *s, void *unused)
 		dc->stats.underflows_d,
 		dc->stats.underflows_h,
 		dc->stats.underflows_t);
+#endif
+#if defined(CONFIG_TEGRA_NVDISPLAY)
+	seq_printf(s,
+		"underflow_frames: %llu\n",
+		dc->stats.underflow_frames);
 #endif
 	mutex_unlock(&dc->lock);
 
@@ -1286,12 +1299,35 @@ static const struct file_operations outtype_fops = {
 static int dbg_edid_show(struct seq_file *s, void *unused)
 {
 	struct tegra_dc *dc = s->private;
+	struct tegra_edid *edid = dc->edid;
+	struct tegra_dc_edid *data;
+	u8 *buf;
+	int i;
 
-	if (WARN_ON(!dc || !dc->out))
+	if (WARN_ON(!dc || !dc->out || !dc->edid))
 		return -EINVAL;
 
-	/* seq_put_decimal_ll(s, '\0', dc->edid); */
-	seq_putc(s, '\n');
+	data = tegra_edid_get_data(edid);
+	if (!data) {
+		seq_puts(s, "No EDID\n");
+		return 0;
+	}
+
+	buf = data->buf;
+
+	for (i = 0; i < data->len; i++) {
+		if (i % 16 == 0)
+			seq_printf(s, "edid[%03x] =", i);
+
+		seq_printf(s, " %02x", buf[i]);
+
+		if (i % 16 == 15)
+			seq_puts(s, "\n");
+
+	}
+
+	tegra_edid_put_data(data);
+
 	return 0;
 }
 
@@ -1327,13 +1363,17 @@ const char __user *addr, size_t len, loff_t *pos)
 
 	tegra_edid_get_monspecs(dc->edid, &mon_spec, vedid);
 	kfree(vedid);
+	kfree(mon_spec.modedb);
 	dc->vedid = true;
 	return len;
 }
 
 static const struct file_operations edid_fops = {
 	.open		= dbg_edid_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
 	.write		= dbg_edid_write,
+	.release	= single_release,
 };
 
 static int dbg_hotplug_show(struct seq_file *s, void *unused)
@@ -1403,6 +1443,143 @@ static const struct file_operations dbg_hotplug_fops = {
 	.release	= single_release,
 };
 
+static int dbg_vrr_enable_show(struct seq_file *m, void *unused)
+{
+	struct tegra_vrr *vrr = m->private;
+
+	if (!vrr) return -EINVAL;
+
+	seq_printf(m, "vrr enable state: %d\n", vrr->enable);
+
+	return 0;
+}
+
+static int dbg_vrr_enable_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dbg_vrr_enable_show, inode->i_private);
+}
+
+static const struct file_operations dbg_vrr_enable_ops = {
+	.open = dbg_vrr_enable_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int dbg_vrr_dc_balance_show(struct seq_file *m, void *unused)
+{
+	struct tegra_vrr *vrr = m->private;
+
+	if (!vrr)
+		return -EINVAL;
+
+	seq_printf(m, "vrr dc balance: %d\n", vrr->dc_balance);
+
+	return 0;
+}
+
+static int dbg_vrr_dc_balance_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dbg_vrr_dc_balance_show, inode->i_private);
+}
+
+static const struct file_operations dbg_vrr_dc_balance_ops = {
+	.open = dbg_vrr_dc_balance_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int dbg_vrr_frame_avg_pct_show(struct seq_file *m, void *unused)
+{
+	struct tegra_vrr *vrr = m->private;
+
+	if (!vrr)
+		return -EINVAL;
+
+	seq_printf(m, "vrr frame average percent: %d\n", vrr->frame_avg_pct);
+
+	return 0;
+}
+
+static ssize_t dbg_vrr_frame_avg_pct_write(struct file *file,
+		const char __user *addr, size_t len, loff_t *pos)
+{
+	struct seq_file *m = file->private_data;
+	struct tegra_vrr *vrr = m->private;
+	long   new_pct;
+	int    ret;
+
+	if (!vrr)
+		return -EINVAL;
+
+	ret = kstrtol_from_user(addr, len, 10, &new_pct);
+	if (ret < 0)
+		return ret;
+
+	vrr->frame_avg_pct = new_pct;
+
+	return len;
+}
+
+static int dbg_vrr_frame_avg_pct_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dbg_vrr_frame_avg_pct_show, inode->i_private);
+}
+
+static const struct file_operations dbg_vrr_frame_avg_pct_ops = {
+	.open = dbg_vrr_frame_avg_pct_open,
+	.read = seq_read,
+	.write = dbg_vrr_frame_avg_pct_write,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int dbg_vrr_fluct_avg_pct_show(struct seq_file *m, void *unused)
+{
+	struct tegra_vrr *vrr = m->private;
+
+	if (!vrr)
+		return -EINVAL;
+
+	seq_printf(m, "vrr fluct average percent: %d\n", vrr->fluct_avg_pct);
+
+	return 0;
+}
+
+static ssize_t dbg_vrr_fluct_avg_pct_write(struct file *file,
+		const char __user *addr, size_t len, loff_t *pos)
+{
+	struct seq_file *m = file->private_data;
+	struct tegra_vrr *vrr = m->private;
+	long   new_pct;
+	int    ret;
+
+	if (!vrr)
+		return -EINVAL;
+
+	ret = kstrtol_from_user(addr, len, 10, &new_pct);
+	if (ret < 0)
+		return ret;
+
+	vrr->fluct_avg_pct = new_pct;
+
+	return len;
+}
+
+static int dbg_vrr_fluct_avg_pct_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dbg_vrr_fluct_avg_pct_show, inode->i_private);
+}
+
+static const struct file_operations dbg_vrr_fluct_avg_pct_ops = {
+	.open = dbg_vrr_fluct_avg_pct_open,
+	.read = seq_read,
+	.write = dbg_vrr_fluct_avg_pct_write,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
 static void tegra_dc_remove_debugfs(struct tegra_dc *dc)
 {
 	if (dc->debugdir)
@@ -1412,7 +1589,7 @@ static void tegra_dc_remove_debugfs(struct tegra_dc *dc)
 
 static void tegra_dc_create_debugfs(struct tegra_dc *dc)
 {
-	struct dentry *retval;
+	struct dentry *retval, *vrrdir;
 	char   devname[50];
 
 	snprintf(devname, sizeof(devname), "tegradc.%d", dc->ctrl_num);
@@ -1458,6 +1635,30 @@ static void tegra_dc_create_debugfs(struct tegra_dc *dc)
 			goto remove_out;
 	}
 
+	vrrdir = debugfs_create_dir("vrr",  dc->debugdir);
+	if (!vrrdir)
+		goto remove_out;
+
+	retval = debugfs_create_file("enable", S_IRUGO, vrrdir,
+				dc->out->vrr, &dbg_vrr_enable_ops);
+	if (!retval)
+		goto remove_out;
+
+	retval = debugfs_create_file("dc_balance", S_IRUGO, vrrdir,
+				dc->out->vrr, &dbg_vrr_dc_balance_ops);
+	if (!retval)
+		goto remove_out;
+
+	retval = debugfs_create_file("frame_avg_pct", S_IRUGO, vrrdir,
+				dc->out->vrr, &dbg_vrr_frame_avg_pct_ops);
+	if (!retval)
+		goto remove_out;
+
+	retval = debugfs_create_file("fluct_avg_pct", S_IRUGO, vrrdir,
+				dc->out->vrr, &dbg_vrr_fluct_avg_pct_ops);
+	if (!retval)
+		goto remove_out;
+
 	return;
 remove_out:
 	dev_err(&dc->ndev->dev, "could not create debugfs\n");
@@ -1468,6 +1669,80 @@ remove_out:
 static inline void tegra_dc_create_debugfs(struct tegra_dc *dc) { };
 static inline void tegra_dc_remove_debugfs(struct tegra_dc *dc) { };
 #endif /* CONFIG_DEBUGFS */
+
+static s32 tegra_dc_calc_v_front_porch(struct tegra_dc_mode *mode,
+				int desired_fps)
+{
+	int vfp = 0;
+
+	if (desired_fps > 0) {
+		int line = mode->h_sync_width + mode->h_back_porch +
+			mode->h_active + mode->h_front_porch;
+		int lines_per_frame = mode->pclk / line / desired_fps;
+		vfp = lines_per_frame - mode->v_sync_width -
+			mode->v_active - mode->v_back_porch;
+	}
+
+	return vfp;
+}
+
+void tegra_dc_setup_vrr(struct tegra_dc *dc)
+{
+	int lines_per_frame_max, lines_per_frame_min;
+
+	struct tegra_dc_mode *m = &dc->mode;
+	struct tegra_vrr *vrr  = dc->out->vrr;
+
+	if (!vrr) return;
+
+	vrr->v_front_porch = m->v_front_porch;
+	vrr->v_back_porch = m->v_back_porch;
+	vrr->pclk = m->pclk;
+
+	if (vrr->vrr_min_fps > 0)
+		vrr->v_front_porch_max = tegra_dc_calc_v_front_porch(m,
+				vrr->vrr_min_fps);
+
+	if (vrr->vrr_max_fps > 0)
+		vrr->v_front_porch_min = tegra_dc_calc_v_front_porch(m,
+				vrr->vrr_max_fps);
+
+	vrr->line_width = m->h_sync_width + m->h_back_porch +
+			m->h_active + m->h_front_porch;
+	vrr->lines_per_frame_common = m->v_sync_width +
+			m->v_back_porch + m->v_active;
+	lines_per_frame_max = vrr->lines_per_frame_common +
+			vrr->v_front_porch_max;
+	lines_per_frame_min = vrr->lines_per_frame_common +
+			vrr->v_front_porch_min;
+
+	if (lines_per_frame_max < 2*lines_per_frame_min) {
+		pr_err("max fps is less than 2 times min fps.\n");
+		return;
+	}
+
+	vrr->frame_len_max = vrr->line_width * lines_per_frame_max /
+					(m->pclk / 1000000);
+	vrr->frame_len_min = vrr->line_width * lines_per_frame_min /
+					(m->pclk / 1000000);
+	if(vrr->v_front_porch_min < vrr->v_front_porch)
+		vrr->v_front_porch_min = vrr->v_front_porch;
+	vrr->vfp_extend = vrr->v_front_porch_max;
+	vrr->vfp_shrink = vrr->v_front_porch_min;
+
+	vrr->frame_len_fluct = 2000;
+	vrr->frame_type = 0;
+	vrr->frame_delta_us = 0;
+
+	vrr->max_adj_pct = 50;
+	vrr->max_flip_pct = 20;
+	vrr->max_dc_balance = 16667;
+	vrr->max_inc_pct = 5;
+
+	vrr->dc_balance = 0;
+	vrr->frame_avg_pct = 75;
+	vrr->fluct_avg_pct = 75;
+}
 
 unsigned long tegra_dc_poll_register(struct tegra_dc *dc, u32 reg, u32 mask,
 		u32 exp_val, u32 poll_interval_us, u32 timeout_ms)
@@ -1692,9 +1967,32 @@ static int _tegra_dc_config_frame_end_intr(struct tegra_dc *dc, bool enable)
 	return 0;
 }
 
+#if defined(CONFIG_TEGRA_DC_CMU) || defined(CONFIG_TEGRA_DC_CMU_V2)
+static struct tegra_dc_cmu *tegra_dc_get_cmu(struct tegra_dc *dc)
+{
+	if (dc->pdata->cmu)
+		return dc->pdata->cmu;
+	else if (dc->out->type == TEGRA_DC_OUT_HDMI)
+		return &default_limited_cmu;
+	else
+		return &default_cmu;
+}
+
+void tegra_dc_cmu_enable(struct tegra_dc *dc, bool cmu_enable)
+{
+	dc->cmu_enabled = cmu_enable;
+#if defined(CONFIG_TEGRA_NVDISPLAY)
+	tegra_dc_cache_cmu(dc, tegra_dc_get_cmu(dc));
+	tegra_nvdisp_update_cmu(dc, &dc->cmu);
+#else
+	tegra_dc_update_cmu(dc, tegra_dc_get_cmu(dc));
+#endif
+}
+#endif
+
 #ifdef CONFIG_TEGRA_DC_CMU
-static void tegra_dc_cache_cmu(struct tegra_dc *dc,
-					struct tegra_dc_cmu *src_cmu)
+void tegra_dc_cache_cmu(struct tegra_dc *dc,
+				struct tegra_dc_cmu *src_cmu)
 {
 	if (&dc->cmu != src_cmu) /* ignore if it would require memmove() */
 		memcpy(&dc->cmu, src_cmu, sizeof(*src_cmu));
@@ -1769,6 +2067,7 @@ int tegra_dc_update_cmu(struct tegra_dc *dc, struct tegra_dc_cmu *cmu)
 
 	_tegra_dc_update_cmu(dc, cmu);
 	tegra_dc_set_color_control(dc);
+	tegra_dc_writel(dc, GENERAL_ACT_REQ, DC_CMD_STATE_CONTROL);
 
 	tegra_dc_put(dc);
 	mutex_unlock(&dc->lock);
@@ -1777,39 +2076,31 @@ int tegra_dc_update_cmu(struct tegra_dc *dc, struct tegra_dc_cmu *cmu)
 }
 EXPORT_SYMBOL(tegra_dc_update_cmu);
 
-int tegra_dc_update_cmu_aligned(struct tegra_dc *dc, struct tegra_dc_cmu *cmu)
+static int _tegra_dc_update_cmu_aligned(struct tegra_dc *dc,
+				struct tegra_dc_cmu *cmu,
+				bool force)
 {
-	mutex_lock(&dc->lock);
-	if (!dc->enabled) {
-		mutex_unlock(&dc->lock);
-		return 0;
-	}
-
 	memcpy(&dc->cmu_shadow, cmu, sizeof(dc->cmu));
 	dc->cmu_shadow_dirty = true;
+	dc->cmu_shadow_force_update = dc->cmu_shadow_force_update || force;
 	_tegra_dc_config_frame_end_intr(dc, true);
-
-	mutex_unlock(&dc->lock);
 
 	return 0;
 }
+
+int tegra_dc_update_cmu_aligned(struct tegra_dc *dc, struct tegra_dc_cmu *cmu)
+{
+	int ret;
+
+	mutex_lock(&dc->lock);
+	ret = _tegra_dc_update_cmu_aligned(dc, cmu, false);
+	mutex_unlock(&dc->lock);
+
+	return ret;
+}
+
 EXPORT_SYMBOL(tegra_dc_update_cmu_aligned);
 
-static struct tegra_dc_cmu *tegra_dc_get_cmu(struct tegra_dc *dc)
-{
-	if (dc->pdata->cmu)
-		return dc->pdata->cmu;
-	else if (dc->out->type == TEGRA_DC_OUT_HDMI)
-		return &default_limited_cmu;
-	else
-		return &default_cmu;
-}
-
-void tegra_dc_cmu_enable(struct tegra_dc *dc, bool cmu_enable)
-{
-	dc->cmu_enabled = cmu_enable;
-	tegra_dc_update_cmu(dc, tegra_dc_get_cmu(dc));
-}
 #else
 #define tegra_dc_cache_cmu(dc, src_cmu)
 #define tegra_dc_set_cmu(dc, cmu)
@@ -2006,9 +2297,47 @@ void tegra_dc_set_out_pin_polars(struct tegra_dc *dc,
 
 static struct tegra_dc_mode *tegra_dc_get_override_mode(struct tegra_dc *dc)
 {
-	if (dc->out->type == TEGRA_DC_OUT_RGB ||
+	if (dc->out->type == TEGRA_DC_OUT_HDMI &&
+			tegra_is_bl_display_initialized(dc->ndev->id)) {
+
+		/* For seamless HDMI, read mode parameters from bootloader
+		 * set DC configuration
+		 */
+		u32 val = 0;
+		struct tegra_dc_mode *mode = &override_disp_mode[dc->out->type];
+		struct clk *parent_clk = clk_get_sys(NULL,
+				dc->out->parent_clk ? : "pll_d2");
+
+		memset(mode, 0, sizeof(struct tegra_dc_mode));
+		mode->pclk = clk_get_rate(parent_clk);
+		mode->rated_pclk = 0;
+
+		tegra_dc_get(dc);
+		val = tegra_dc_readl(dc, DC_DISP_REF_TO_SYNC);
+		mode->h_ref_to_sync = val & 0xffff;
+		mode->v_ref_to_sync = (val >> 16) & 0xffff;
+
+		val = tegra_dc_readl(dc, DC_DISP_SYNC_WIDTH);
+		mode->h_sync_width = val & 0xffff;
+		mode->v_sync_width = (val >> 16) & 0xffff;
+
+		val = tegra_dc_readl(dc, DC_DISP_BACK_PORCH);
+		mode->h_back_porch = val & 0xffff;
+		mode->v_back_porch = (val >> 16) & 0xffff;
+
+		val = tegra_dc_readl(dc, DC_DISP_FRONT_PORCH);
+		mode->h_front_porch = val & 0xffff;
+		mode->v_front_porch = (val >> 16) & 0xffff;
+
+		val = tegra_dc_readl(dc, DC_DISP_DISP_ACTIVE);
+		mode->h_active = val & 0xffff;
+		mode->v_active = (val >> 16) & 0xffff;
+		tegra_dc_put(dc);
+	}
+
+	if (dc->out->type == TEGRA_DC_OUT_RGB  ||
 		dc->out->type == TEGRA_DC_OUT_HDMI ||
-		dc->out->type == TEGRA_DC_OUT_DSI ||
+		dc->out->type == TEGRA_DC_OUT_DSI  ||
 		dc->out->type == TEGRA_DC_OUT_NULL)
 		return override_disp_mode[dc->out->type].pclk ?
 			&override_disp_mode[dc->out->type] : NULL;
@@ -2022,6 +2351,25 @@ static int tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 	int err = 0;
 
 	dc->out = out;
+
+	if (dc->out->type == TEGRA_DC_OUT_HDMI &&
+			tegra_is_bl_display_initialized(dc->ndev->id)) {
+		/*
+		 * Bootloader enables clk and host1x in seamless
+		 * usecase. Below extra reference accounts for it
+		 */
+		tegra_dc_get(dc);
+	}
+	/*
+	 * Seamless supporting panels can work in seamless mode
+	 * only if BL initializes DC/DSI. If not, panel should
+	 * go with complete initialization.
+	 */
+	if (dc->out->type == TEGRA_DC_OUT_DSI &&
+			!tegra_is_bl_display_initialized(dc->ndev->id)) {
+		dc->out->flags &= ~TEGRA_DC_OUT_INITIALIZED_MODE;
+	}
+
 	mode = tegra_dc_get_override_mode(dc);
 
 	if (mode) {
@@ -2038,16 +2386,6 @@ static int tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 				dc->out->h_size, dc->out->v_size,
 				dc->mode.pclk);
 		dc->initialized = true;
-
-#ifdef CONFIG_TEGRA_DC_CMU
-		/*
-		 * If the bootloader already set the mode, assume the CMU
-		 * parameters are also correctly set. It would be better to
-		 * read them, but unfortunately there is no reliable and
-		 * flicker-free way to do this!
-		 */
-		tegra_dc_cache_cmu(dc, tegra_dc_get_cmu(dc));
-#endif
 	} else if (out->n_modes > 0)
 		tegra_dc_set_mode(dc, &dc->out->modes[0]);
 
@@ -2114,6 +2452,11 @@ static int tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 		dc->out_ops = NULL;
 		break;
 	}
+
+#ifdef CONFIG_TEGRA_DC_CMU
+	tegra_dc_cache_cmu(dc, tegra_dc_get_cmu(dc));
+#endif
+
 	if (dc->out_ops && dc->out_ops->init) {
 		err = dc->out_ops->init(dc);
 		if (err < 0) {
@@ -2274,7 +2617,7 @@ static void _tegra_dc_vsync_enable(struct tegra_dc *dc)
 {
 	int vsync_irq;
 
-	if (dc->out->type == TEGRA_DC_OUT_DSI)
+	if (dc->out->flags & TEGRA_DC_OUT_ONE_SHOT_MODE)
 		vsync_irq = MSF_INT;
 	else
 		vsync_irq = V_BLANK_INT;
@@ -2331,7 +2674,8 @@ static void _tegra_dc_user_vsync_enable(struct tegra_dc *dc, bool enable)
 		_tegra_dc_vsync_enable(dc);
 	} else {
 		_tegra_dc_vsync_disable(dc);
-		dc->out->user_needs_vblank--;
+		if (dc->out->user_needs_vblank > 0)
+			dc->out->user_needs_vblank--;
 	}
 }
 
@@ -2403,6 +2747,63 @@ static void tegra_dc_prism_update_backlight(struct tegra_dc *dc)
 	}
 }
 
+void tegra_dc_set_act_vfp(struct tegra_dc *dc, int vfp)
+{
+	WARN_ON(!mutex_is_locked(&dc->lock));
+
+	tegra_dc_writel(dc, WRITE_MUX_ACTIVE | READ_MUX_ACTIVE,
+			DC_CMD_STATE_ACCESS);
+	tegra_dc_writel(dc, dc->mode.h_front_porch |
+			(vfp << 16), DC_DISP_FRONT_PORCH);
+	tegra_dc_writel(dc, WRITE_MUX_ASSEMBLY | READ_MUX_ASSEMBLY,
+			DC_CMD_STATE_ACCESS);
+}
+
+static void tegra_dc_vrr_extend_vfp(struct tegra_dc *dc)
+{
+	struct tegra_vrr *vrr  = dc->out->vrr;
+
+	if (!vrr)
+		return;
+
+	if (vrr->enable)
+		tegra_dc_set_act_vfp(dc, vrr->vfp_extend);
+}
+
+int tegra_dc_get_v_count(struct tegra_dc *dc)
+{
+	u32     value;
+
+	value = tegra_dc_readl(dc, DC_DISP_DISPLAY_DBG_TIMING);
+	return (value & DBG_V_COUNT_MASK) >> DBG_V_COUNT_SHIFT;
+}
+
+static void tegra_dc_vrr_get_ts(struct tegra_dc *dc)
+{
+	struct timespec time_now;
+	struct tegra_vrr *vrr  = dc->out->vrr;
+
+	if (!vrr || !vrr->enable)
+		return;
+
+	getnstimeofday(&time_now);
+	vrr->fe_time_us = (s64)time_now.tv_sec * 1000000 +
+				time_now.tv_nsec / 1000;
+	vrr->v_count = tegra_dc_get_v_count(dc);
+}
+
+static void tegra_dc_vrr_sec(struct tegra_dc *dc)
+{
+	struct tegra_vrr *vrr  = dc->out->vrr;
+
+	if (!vrr || !vrr->enable)
+		return;
+
+#ifdef CONFIG_TRUSTED_LITTLE_KERNEL
+	te_vrr_sec();
+#endif
+}
+
 static void tegra_dc_vblank(struct work_struct *work)
 {
 	struct tegra_dc *dc = container_of(work, struct tegra_dc, vblank_work);
@@ -2449,7 +2850,8 @@ static void tegra_dc_vblank(struct work_struct *work)
 }
 
 #define CSC_UPDATE_IF_CHANGED(entry, ENTRY) do { \
-		if (cmu_active->csc.entry != cmu_shadow->csc.entry) { \
+		if (cmu_active->csc.entry != cmu_shadow->csc.entry || \
+			dc->cmu_shadow_force_update) { \
 			cmu_active->csc.entry = cmu_shadow->csc.entry; \
 			tegra_dc_writel(dc, \
 				cmu_active->csc.entry, \
@@ -2478,6 +2880,16 @@ static void tegra_dc_frame_end(struct work_struct *work)
 		struct tegra_dc_cmu *cmu_active = &dc->cmu;
 		struct tegra_dc_cmu *cmu_shadow = &dc->cmu_shadow;
 
+		for (i = 0; i < 256; i++) {
+			if (cmu_active->lut1[i] != cmu_shadow->lut1[i] ||
+				dc->cmu_shadow_force_update) {
+				cmu_active->lut1[i] = cmu_shadow->lut1[i];
+				val = LUT1_ADDR(i) |
+					LUT1_DATA(cmu_shadow->lut1[i]);
+				tegra_dc_writel(dc, val, DC_COM_CMU_LUT1);
+			}
+		}
+
 		CSC_UPDATE_IF_CHANGED(krr, KRR);
 		CSC_UPDATE_IF_CHANGED(kgr, KGR);
 		CSC_UPDATE_IF_CHANGED(kbr, KBR);
@@ -2489,7 +2901,8 @@ static void tegra_dc_frame_end(struct work_struct *work)
 		CSC_UPDATE_IF_CHANGED(kbb, KBB);
 
 		for (i = 0; i < 960; i++)
-			if (cmu_active->lut2[i] != cmu_shadow->lut2[i]) {
+			if (cmu_active->lut2[i] != cmu_shadow->lut2[i] ||
+				dc->cmu_shadow_force_update) {
 				cmu_active->lut2[i] = cmu_shadow->lut2[i];
 				val = LUT2_ADDR(i) |
 					LUT2_DATA(cmu_active->lut2[i]);
@@ -2497,6 +2910,7 @@ static void tegra_dc_frame_end(struct work_struct *work)
 			}
 
 		dc->cmu_shadow_dirty = false;
+		dc->cmu_shadow_force_update = false;
 		_tegra_dc_config_frame_end_intr(dc, false);
 	}
 
@@ -2523,6 +2937,7 @@ static void tegra_dc_one_shot_worker(struct work_struct *work)
 	mutex_unlock(&dc->lock);
 }
 
+#if !defined(CONFIG_TEGRA_NVDISPLAY)
 /* return an arbitrarily large number if count overflow occurs.
  * make it a nice base-10 number to show up in stats output */
 static u64 tegra_dc_underflow_count(struct tegra_dc *dc, unsigned reg)
@@ -2532,9 +2947,12 @@ static u64 tegra_dc_underflow_count(struct tegra_dc *dc, unsigned reg)
 	tegra_dc_writel(dc, 0, reg);
 	return ((count & 0x80000000) == 0) ? count : 10000000000ll;
 }
+#endif
 
 static void tegra_dc_underflow_handler(struct tegra_dc *dc)
 {
+#if !defined(CONFIG_TEGRA_NVDISPLAY)
+
 	const u32 masks[] = {
 		WIN_A_UF_INT,
 		WIN_B_UF_INT,
@@ -2612,6 +3030,10 @@ static void tegra_dc_underflow_handler(struct tegra_dc *dc)
 		}
 	}
 
+#else
+	tegra_nvdisp_underflow_handler(dc);
+#endif /* CONFIG_TEGRA_NVDISPLAY */
+
 	/* Clear the underflow mask now that we've checked it. */
 	tegra_dc_writel(dc, dc->underflow_mask, DC_CMD_INT_STATUS);
 	dc->underflow_mask = 0;
@@ -2667,6 +3089,11 @@ static void tegra_dc_vpulse2(struct work_struct *work)
 
 static void tegra_dc_process_vblank(struct tegra_dc *dc, ktime_t timestamp)
 {
+	/* pending user vblank, so wakeup */
+	if (dc->out->user_needs_vblank) {
+		dc->out->user_needs_vblank = false;
+		complete(&dc->out->user_vblank_comp);
+	}
 	if (test_bit(V_BLANK_USER, &dc->vblank_ref_count)) {
 #ifdef CONFIG_ADF_TEGRA
 		tegra_adf_process_vblank(dc->adf, timestamp);
@@ -2691,14 +3118,8 @@ int tegra_dc_config_frame_end_intr(struct tegra_dc *dc, bool enable)
 static void tegra_dc_one_shot_irq(struct tegra_dc *dc, unsigned long status,
 		ktime_t timestamp)
 {
-	/* pending user vblank, so wakeup */
-	if (status & (V_BLANK_INT | MSF_INT)) {
-		if (dc->out->user_needs_vblank) {
-			dc->out->user_needs_vblank = false;
-			complete(&dc->out->user_vblank_comp);
-		}
+	if (status & MSF_INT)
 		tegra_dc_process_vblank(dc, timestamp);
-	}
 
 	if (status & V_BLANK_INT) {
 		/* Sync up windows. */
@@ -2716,7 +3137,7 @@ static void tegra_dc_one_shot_irq(struct tegra_dc *dc, unsigned long status,
 		if (!completion_done(&dc->crc_complete))
 			complete(&dc->crc_complete);
 
-		if (dc->out->flags & TEGRA_DC_OUT_ONE_SHOT_MODE && !dc->nvsr)
+		if (dc->out->flags & TEGRA_DC_OUT_ONE_SHOT_MODE)
 			tegra_dc_put(dc);
 
 		queue_work(system_freezable_wq, &dc->frame_end_work);
@@ -2735,13 +3156,22 @@ static void tegra_dc_continuous_irq(struct tegra_dc *dc, unsigned long status,
 	if (status & V_BLANK_INT)
 		queue_work(system_freezable_wq, &dc->vblank_work);
 
-	if (status & (V_BLANK_INT | MSF_INT))
+	if (status & (V_BLANK_INT | MSF_INT)) {
+		if (dc->out->user_needs_vblank) {
+			dc->out->user_needs_vblank = false;
+			complete(&dc->out->user_vblank_comp);
+		}
 		tegra_dc_process_vblank(dc, timestamp);
+	}
 
 	if (status & FRAME_END_INT) {
 		struct timespec tm = CURRENT_TIME;
 		dc->frame_end_timestamp = timespec_to_ns(&tm);
 		wake_up(&dc->timestamp_wq);
+
+		tegra_dc_vrr_extend_vfp(dc);
+		tegra_dc_vrr_get_ts(dc);
+		tegra_dc_vrr_sec(dc);
 
 		/* Mark the frame_end as complete. */
 		if (!completion_done(&dc->frame_end_complete))
@@ -2826,7 +3256,8 @@ static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 			msecs_to_jiffies(1));
 	}
 
-	if (dc->out->flags & TEGRA_DC_OUT_ONE_SHOT_MODE)
+	if (dc->out->flags & TEGRA_DC_OUT_ONE_SHOT_MODE ||
+		dc->out->flags & TEGRA_DC_OUT_NVSR_MODE)
 		tegra_dc_one_shot_irq(dc, status, timestamp);
 	else
 		tegra_dc_continuous_irq(dc, status, timestamp);
@@ -2955,7 +3386,9 @@ static void tegra_dc_init_vpulse2_int(struct tegra_dc *dc)
 	tegra_dc_writel(dc, val , DC_CMD_INT_ENABLE);
 
 	tegra_dc_mask_interrupt(dc, V_PULSE2_INT);
-	tegra_dc_writel(dc, V_PULSE_2_ENABLE, DC_DISP_DISP_SIGNAL_OPTIONS0);
+	val = tegra_dc_readl(dc, DC_DISP_DISP_SIGNAL_OPTIONS0);
+	val |= V_PULSE_2_ENABLE;
+	tegra_dc_writel(dc, val, DC_DISP_DISP_SIGNAL_OPTIONS0);
 #endif
 }
 
@@ -3038,7 +3471,11 @@ static int tegra_dc_init(struct tegra_dc *dc)
 #endif
 
 #ifdef CONFIG_TEGRA_DC_CMU
-	_tegra_dc_update_cmu(dc, tegra_dc_get_cmu(dc));
+	if (dc->is_cmu_set_bl)
+		_tegra_dc_update_cmu_aligned(dc, &dc->cmu, true);
+	else
+		_tegra_dc_update_cmu(dc, &dc->cmu);
+	dc->is_cmu_set_bl = false;
 #endif
 	tegra_dc_set_color_control(dc);
 	for_each_set_bit(i, &dc->valid_windows, DC_N_WINDOWS) {
@@ -3199,6 +3636,8 @@ static bool _tegra_dc_controller_enable(struct tegra_dc *dc)
 	dc->out->flags &= ~TEGRA_DC_OUT_INITIALIZED_MODE;
 
 	tegra_dc_put(dc);
+
+	clk_prepare_enable(dc->emc_la_clk);
 
 	return true;
 }
@@ -3417,6 +3856,9 @@ static void _tegra_dc_controller_disable(struct tegra_dc *dc)
 		tegra_dc_clk_disable(dc);
 	else
 		tegra_dvfs_set_rate(dc->clk, 0);
+
+	if (!tegra_platform_is_linsim())
+		clk_disable_unprepare(dc->emc_la_clk);
 }
 
 void tegra_dc_stats_enable(struct tegra_dc *dc, bool enable)
@@ -3626,9 +4068,9 @@ static void tegra_dc_underflow_worker(struct work_struct *work)
 	mutex_lock(&dc->lock);
 	tegra_dc_get(dc);
 
-	if (dc->enabled) {
+	if (dc->enabled)
 		tegra_dc_underflow_handler(dc);
-	}
+
 	tegra_dc_put(dc);
 	mutex_unlock(&dc->lock);
 }
@@ -3736,6 +4178,7 @@ static int tegra_dc_probe(struct platform_device *ndev)
 #else
 	int isomgr_client_id = -1;
 #endif
+	struct clk *emc_la_clk;
 	struct device_node *np = ndev->dev.of_node;
 	struct resource *res;
 	struct resource dt_res;
@@ -3746,7 +4189,7 @@ static int tegra_dc_probe(struct platform_device *ndev)
 	int irq;
 	int i;
 #ifdef CONFIG_TEGRA_NVDISPLAY
-	static char *clk_name = "disp1";
+	static char *clk_name = "disp0";
 #endif
 
 #ifdef CONFIG_ARCH_TEGRA_21x_SOC
@@ -3848,11 +4291,7 @@ static int tegra_dc_probe(struct platform_device *ndev)
 		goto err_release_resource_reg;
 	}
 
-#ifdef CONFIG_TEGRA_NVDISPLAY
-	ret = tegra_nvdisp_init(dc);
-	if (ret)
-		goto err_release_resource_reg;
-#else
+#ifndef CONFIG_TEGRA_NVDISPLAY
 	for (i = 0; i < DC_N_WINDOWS; i++)
 		dc->windows[i].syncpt.id = NVSYNCPT_INVALID;
 
@@ -3962,6 +4401,13 @@ static int tegra_dc_probe(struct platform_device *ndev)
 
 	dc->bw_kbps = 0;
 
+#ifdef CONFIG_TEGRA_NVDISPLAY
+	/* dc variables need to initialized before nvdisp init */
+	ret = tegra_nvdisp_init(dc);
+	if (ret)
+		goto err_iounmap_reg;
+#endif
+
 	mutex_init(&dc->lock);
 	mutex_init(&dc->one_shot_lock);
 	mutex_init(&dc->lp_lock);
@@ -3998,7 +4444,9 @@ static int tegra_dc_probe(struct platform_device *ndev)
 		win->idx = i;
 		tmp_win->idx = i;
 		tmp_win->dc = dc;
+#if defined(CONFIG_TEGRA_CSC)
 		tegra_dc_init_csc_defaults(&win->csc);
+#endif
 		tegra_dc_init_lut_defaults(&win->lut);
 	}
 
@@ -4033,33 +4481,6 @@ static int tegra_dc_probe(struct platform_device *ndev)
 	}
 	dc->mode_dirty = false; /* ignore changes tegra_dc_set_out has done */
 
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-	if (dc->out && dc->out->n_modes &&
-	    (dc->out->type == TEGRA_DC_OUT_HDMI)) {
-		struct fb_monspecs specs;
-		struct tegra_dc_hdmi_data *hdmi = tegra_dc_get_outdata(dc);
-		if (!tegra_edid_get_monspecs(hdmi->edid, &specs, NULL)) {
-			struct tegra_dc_mode *dcmode = &dc->out->modes[0];
-			dcmode->pclk          = specs.modedb->pixclock;
-			dcmode->pclk          = PICOS2KHZ(dcmode->pclk);
-			dcmode->pclk         *= 1000;
-			dcmode->h_ref_to_sync = 1;
-			dcmode->v_ref_to_sync = 1;
-			dcmode->h_sync_width  = specs.modedb->hsync_len;
-			dcmode->v_sync_width  = specs.modedb->vsync_len;
-			dcmode->h_back_porch  = specs.modedb->left_margin;
-			dcmode->v_back_porch  = specs.modedb->upper_margin;
-			dcmode->h_active      = specs.modedb->xres;
-			dcmode->v_active      = specs.modedb->yres;
-			dcmode->h_front_porch = specs.modedb->right_margin;
-			dcmode->v_front_porch = specs.modedb->lower_margin;
-			tegra_dc_set_mode(dc, dcmode);
-			dc->pdata->fb->xres = dcmode->h_active;
-			dc->pdata->fb->yres = dcmode->v_active;
-		}
-	}
-#endif /* CONFIG_FRAMEBUFFER_CONSOLE */
-
 	if ((dc->pdata->flags & TEGRA_DC_FLAG_ENABLED) &&
 			dc->out && dc->out->type == TEGRA_DC_OUT_LVDS) {
 		struct fb_monspecs specs;
@@ -4081,6 +4502,18 @@ static int tegra_dc_probe(struct platform_device *ndev)
 		}
 		dc->emc_clk = emc_clk;
 #endif
+		/*
+		 * The emc_la clock is being added to set the floor value
+		 * for emc depending on the LA calculaions for each window
+		 */
+		emc_la_clk = clk_get(&ndev->dev, "emc.la");
+		if (IS_ERR_OR_NULL(emc_la_clk)) {
+			dev_err(&ndev->dev, "can't get emc.la clock\n");
+			ret = -ENOENT;
+			goto err_put_clk;
+		}
+		dc->emc_la_clk = emc_la_clk;
+		clk_set_rate(dc->emc_la_clk, 0);
 
 #ifdef CONFIG_TEGRA_DC_EXTENSIONS
 	dc->ext = tegra_dc_ext_register(ndev, dc);
@@ -4104,16 +4537,17 @@ static int tegra_dc_probe(struct platform_device *ndev)
 	pm_runtime_set_autosuspend_delay(&ndev->dev, 100);
 	pm_runtime_enable(&ndev->dev);
 
-#ifdef CONFIG_TEGRA_DC_CMU
+#if defined(CONFIG_TEGRA_DC_CMU) || defined(CONFIG_TEGRA_DC_CMU_V2)
 	/* if bootloader leaves this head enabled, then skip CMU programming. */
-	dc->cmu_dirty = (dc->pdata->flags & TEGRA_DC_FLAG_ENABLED) == 0;
+	dc->is_cmu_set_bl = (dc->pdata->flags & TEGRA_DC_FLAG_ENABLED) != 0;
 	dc->cmu_enabled = dc->pdata->cmu_enable;
 #endif
 
 	if (dc->pdata->flags & TEGRA_DC_FLAG_ENABLED) {
 		/* WAR: BL is putting DC in bad state for EDP configuration */
-		if (dc->out->type == TEGRA_DC_OUT_DP ||
-			dc->out->type == TEGRA_DC_OUT_NVSR_DP) {
+		if (!tegra_platform_is_linsim() &&
+			(dc->out->type == TEGRA_DC_OUT_DP ||
+				dc->out->type == TEGRA_DC_OUT_NVSR_DP)) {
 			clk_prepare_enable(dc->clk);
 			tegra_periph_reset_assert(dc->clk);
 			udelay(10);
@@ -4259,6 +4693,7 @@ err_disable_dc:
 #else
 	clk_put(emc_clk);
 #endif
+	clk_put(dc->emc_la_clk);
 err_put_clk:
 #ifdef CONFIG_SWITCH
 	if (dc->switchdev_registered)
@@ -4336,6 +4771,8 @@ static int tegra_dc_remove(struct platform_device *ndev)
 #else
 	clk_put(dc->emc_clk);
 #endif
+	clk_put(dc->emc_la_clk);
+
 	clk_put(dc->clk);
 	iounmap(dc->base);
 	if (dc->fb_mem)

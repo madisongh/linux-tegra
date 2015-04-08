@@ -1,7 +1,7 @@
 /*
  * This header provides constants for binding nvidia,swgroup ID
  *
- * Copyright (c) 2014 NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2014-2015 NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -16,6 +16,7 @@
 #ifndef _DT_BINDINGS_MEMORY_TEGRA_SWGROUP_H
 #define _DT_BINDINGS_MEMORY_TEGRA_SWGROUP_H
 
+#define TEGRA_SWGROUP_INVALID	0xff	/* 0x238 */
 #define TEGRA_SWGROUP_AFI	0	/* 0x238 */
 #define TEGRA_SWGROUP_AVPC	1	/* 0x23c */
 #define TEGRA_SWGROUP_DC	2	/* 0x240 */
@@ -65,13 +66,14 @@
 #define TEGRA_SWGROUP_TSEC1	42	/* 0xad8 */
 #define TEGRA_SWGROUP_TSECB1	43	/* 0xadc */
 #define TEGRA_SWGROUP_NVDEC1	44	/* 0xae0 */
-
+/*	Reserved		45 */
 #define TEGRA_SWGROUP_AXIS	46	/* 0xae8 */
 #define TEGRA_SWGROUP_EQOS	47	/* 0xaec */
 #define TEGRA_SWGROUP_UFSHC	48	/* 0xaf0 */
 #define TEGRA_SWGROUP_NVDISPLAY	49	/* 0xaf4 */
 #define TEGRA_SWGROUP_BPMP	50	/* 0xaf8 */
 #define TEGRA_SWGROUP_AON	51	/* 0xafc */
+/*	Reserved		50 */
 
 #define TWO_U32_OF_U64(x)	((x) & 0xffffffff) ((x) >> 32)
 #define TEGRA_SWGROUP_BIT(x)	(1ULL << TEGRA_SWGROUP_##x)
@@ -95,6 +97,16 @@
 						TEGRA_SWGROUP_BIT(x3) | \
 						TEGRA_SWGROUP_BIT(x4) | \
 						TEGRA_SWGROUP_BIT(x5))
+#define TEGRA_SWGROUP_CELLS9(x1, x2, x3, x4, x5, x6, x7, x8, x9) \
+				TWO_U32_OF_U64( TEGRA_SWGROUP_BIT(x1) | \
+						TEGRA_SWGROUP_BIT(x2) | \
+						TEGRA_SWGROUP_BIT(x3) | \
+						TEGRA_SWGROUP_BIT(x4) | \
+						TEGRA_SWGROUP_BIT(x5) | \
+						TEGRA_SWGROUP_BIT(x6) | \
+						TEGRA_SWGROUP_BIT(x7) | \
+						TEGRA_SWGROUP_BIT(x8) | \
+						TEGRA_SWGROUP_BIT(x9))
 #define TEGRA_SWGROUP_CELLS12(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) \
 				TWO_U32_OF_U64( TEGRA_SWGROUP_BIT(x1) | \
 						TEGRA_SWGROUP_BIT(x2) | \

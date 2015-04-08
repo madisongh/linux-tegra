@@ -18,6 +18,12 @@ config SOC_CAMERA_IMX135
 	help
 	  This driver supports IMX135 cameras from Sony
 
+config SOC_CAMERA_IMX214
+        tristate "IMX214 camera sensor support"
+	depends on SOC_CAMERA && I2C
+	help
+	  This driver supports IMX214 cameras from Sony
+
 config SOC_CAMERA_MT9M001
 	tristate "mt9m001 support"
 	depends on SOC_CAMERA && I2C
@@ -73,6 +79,12 @@ config SOC_CAMERA_OV5650
 	depends on SOC_CAMERA && I2C
 	help
 	  This is a V4L2 camera driver for the OmniVision OV5650 sensor
+
+config SOC_CAMERA_OV5693
+	tristate "ov5693 sensor support"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a V4L2 camera driver for the OmniVision OV5693 sensor
 
 config SOC_CAMERA_OV6650
 	tristate "ov6650 sensor support"

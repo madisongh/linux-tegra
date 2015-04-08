@@ -1,7 +1,7 @@
 /*
  * Driver for TI,ADS1015 ADC
  *
- * Copyright (c) 2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2014 - 2015, NVIDIA Corporation. All rights reserved.
  *
  * Author: Mallikarjun Kasoju <mkasoju@nvidia.com>
  *         Laxman Dewangan <ldewangan@nvidia.com>
@@ -155,6 +155,7 @@ static int ads1015_start_conversion(struct ads1015 *adc, int chan)
 	int timeout = 10;
 
 	reg_val = adc->config;
+	reg_val |= (ADS1015_SINGLE_SHOT_MODE << ADS1015_OPERATION_MODE_SHIFT);
 	reg_val &= ~ADS1015_INPUT_MULTIPLEXER_MASK;
 	reg_val |= (channel_mux_val << ADS1015_INPUT_MULTIPLEXER_SHIFT);
 	ret = ads1015_write(adc->rmap, ADS1015_CONFIG_REG, reg_val);
@@ -190,6 +191,7 @@ static int ads1015_threshold_update(struct ads1015 *adc, int *adc_val)
 	struct ads1015_adc_threshold_ranges *thres_range;
 	u16 reg_val = 0;
 	int ret;
+	int lower, upper;
 	s16 lower_s16;
 	s16 upper_s16;
 	int i;
@@ -231,22 +233,36 @@ static int ads1015_threshold_update(struct ads1015 *adc, int *adc_val)
 		last_val = cur_val;
 	} while (--max_retry > 0);
 
+	lower = -2047;
+	upper = 2047;
 	for (i = 0; i < adc_prop->num_conditions; i++) {
 		thres_range = &adc_prop->threshold_ranges[i];
 		if (thres_range->lower <= cur_val &&
 			thres_range->upper >= cur_val) {
-			lower_s16 = (s16) (thres_range->lower * 16);
-			upper_s16 = (s16) (thres_range->upper * 16);
+			lower = thres_range->lower;
+			upper = thres_range->upper;
 			in_valid_range = true;
 			break;
+		}
+
+		if (thres_range->upper < cur_val) {
+			if (lower < thres_range->upper)
+				lower = thres_range->upper;
+		}
+
+		if (thres_range->lower > cur_val) {
+			if (upper > thres_range->lower)
+				upper = thres_range->lower;
 		}
 	}
 
 	*adc_val = cur_val;
+	lower_s16 = (s16) (lower * 16);
+	upper_s16 = (s16)(upper * 16);
 	if (!in_valid_range) {
 		dev_info(adc->dev,
 			"Not in valid threshold range. Val: %d\n", cur_val);
-		return  0;
+		WARN_ON(1);
 	}
 
 	ret = ads1015_write(adc->rmap, ADS1015_LO_THRESH_REG, (u16)lower_s16);
@@ -282,7 +298,8 @@ static int ads1015_read_raw(struct iio_dev *iodev,
 
 	mutex_lock(&iodev->mlock);
 
-	if (adc->adc_prop.is_continuous_mode) {
+	if ((adc->adc_prop.is_continuous_mode) &&
+		(chan->channel == adc->adc_prop.channel_number)) {
 		ret = ads1015_threshold_update(adc, val);
 		goto done;
 	}
@@ -301,6 +318,15 @@ static int ads1015_read_raw(struct iio_dev *iodev,
 	}
 	rval = (s16)reg_val;
 	*val = (rval >> 4);
+
+	/* if device is enabled in cotinuous mode set it here again */
+	if (adc->adc_prop.is_continuous_mode) {
+		ret = ads1015_write(adc->rmap, ADS1015_CONFIG_REG, adc->config);
+		if (ret < 0) {
+			dev_err(adc->dev, "CONFIG reg write failed %d\n", ret);
+			return ret;
+		}
+	}
 done:
 	mutex_unlock(&iodev->mlock);
 	if (!ret)

@@ -2,7 +2,7 @@
  * drivers/platform/tegra/common.c
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (C) 2010-2014 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2010-2015 NVIDIA Corporation. All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -155,12 +155,10 @@ unsigned long nvdumper_reserved;
 #endif
 bool tegra_lp0_vec_relocate;
 unsigned long tegra_grhost_aperture = ~0ul;
-static   bool is_tegra_debug_uart_hsport;
 static struct board_info main_board_info;
 static struct board_info pmu_board_info;
 static struct board_info display_board_info;
 static int panel_id;
-static bool is_hdmi_initialised;
 static struct board_info camera_board_info;
 static int touch_vendor_id;
 static int touch_panel_id;
@@ -183,6 +181,9 @@ static u8 power_config;
 static u8 display_config;
 
 static int tegra_split_mem_set;
+
+/* Bootloader configured dfll frequency */
+static unsigned long int dfll_boot_req_khz;
 
 struct device tegra_generic_cma_dev;
 struct device tegra_vpr_cma_dev;
@@ -285,7 +286,6 @@ void ahb_gizmo_writel(unsigned long val, void __iomem *reg)
 static int modem_id;
 static int commchip_id;
 static int sku_override;
-static int debug_uart_port_id;
 static bool uart_over_sd;
 static enum audio_codec_type audio_codec_name;
 static enum image_type board_image_type = system_image;
@@ -294,6 +294,7 @@ static int emc_max_dvfs;
 static unsigned int memory_type;
 static int usb_port_owner_info;
 static int lane_owner_info;
+static int chip_personality;
 
 #ifdef CONFIG_ARCH_TEGRA_11x_SOC
 static __initdata struct tegra_clk_init_table tegra11x_clk_init_table[] = {
@@ -874,8 +875,9 @@ void __init tegra11x_init_early(void)
 #ifdef CONFIG_ARCH_TEGRA_12x_SOC
 void __init tegra12x_init_early(void)
 {
-	if (of_find_compatible_node(NULL, NULL, "arm,psci"))
-		tegra_with_secure_firmware = 1;
+	if (of_find_compatible_node(NULL, NULL, "arm,psci") ||
+	    of_find_compatible_node(NULL, NULL, "arm,psci-0.2"))
+			tegra_with_secure_firmware = 1;
 
 	display_tegra_dt_info();
 	tegra_apb_io_init();
@@ -989,6 +991,21 @@ int tegra_get_sku_override(void)
 	return sku_override;
 }
 
+static int __init tegra_chip_personality(char *id)
+{
+	char *p = id;
+
+	chip_personality = memparse(p, &p);
+
+	return 0;
+}
+early_param("chip_personality", tegra_chip_personality);
+
+int tegra_get_chip_personality(void)
+{
+	return chip_personality;
+}
+
 static int __init tegra_vpr_resize_arg(char *options)
 {
 	tegra_vpr_resize = true;
@@ -1068,17 +1085,21 @@ static int __init tegra_board_panel_id(char *options)
 }
 __setup("display_panel=", tegra_board_panel_id);
 
-bool tegra_is_hdmi_initialised(void)
+/* returns true if bl initialized the display */
+bool tegra_is_bl_display_initialized(int instance)
 {
-	return is_hdmi_initialised;
+	/* display initialized implies non-zero
+	 * fb size is passed from bl to kernel
+	 */
+	switch (instance) {
+	case 0:
+		return tegra_bootloader_fb_start && tegra_bootloader_fb_size;
+	case 1:
+		return tegra_bootloader_fb2_start && tegra_bootloader_fb2_size;
+	default:
+		return false;
+	}
 }
-static int __init tegra_hdmi_initialised(char *options)
-{
-	char *p = options;
-	is_hdmi_initialised = (bool) memparse(p, &p);
-	return is_hdmi_initialised;
-}
-__setup("is_hdmi_initialised=", tegra_hdmi_initialised);
 
 int tegra_get_touch_vendor_id(void)
 {
@@ -1172,49 +1193,55 @@ static int __init tegra_memory_type(char *options)
 }
 __setup("memtype=", tegra_memory_type);
 
+static int tegra_get_uart_over_sd_property(void)
+{
+	struct device_node *np;
+	u32 pval;
+	int ret;
+
+	np = of_find_node_by_path("/chosen");
+	if (!np)
+		return -EINVAL;
+
+	ret = of_property_read_u32(np, "nvidia,debug-console-over-sd", &pval);
+	if (ret < 0) {
+		pr_err("/chosen/nvidia,debug-console-over-sd read failed: %d\n",
+			ret);
+		return ret;
+	}
+	return (int)pval;
+}
+
 static int __init tegra_debug_uartport(char *info)
 {
 	char *p = info;
 	unsigned long long port_id;
-	if (!strncmp(p, "hsport", 6))
-		is_tegra_debug_uart_hsport = true;
-	else if (!strncmp(p, "lsport", 6))
-		is_tegra_debug_uart_hsport = false;
+	int uart_port_id;
 
 	if (p[6] == ',') {
-		if (p[7] == '-') {
-			debug_uart_port_id = -1;
-		} else {
+		if (p[7] != '-') {
 			port_id = memparse(p + 7, &p);
-			debug_uart_port_id = (int) port_id;
-			if (debug_uart_port_id == 5)
+			uart_port_id = (int) port_id;
+			if (uart_port_id == 5)
 				uart_over_sd = true;
 		}
-	} else {
-		debug_uart_port_id = -1;
 	}
 
 	return 1;
 }
 
-bool is_tegra_debug_uartport_hs(void)
-{
-	return is_tegra_debug_uart_hsport;
-}
-
 bool is_uart_over_sd_enabled(void)
 {
+	static bool dt_parsed = 0;
+	int ret;
+
+	if (!dt_parsed) {
+		dt_parsed = 1;
+		ret = tegra_get_uart_over_sd_property();
+		if (ret == 1)
+			 uart_over_sd = true;
+	}
 	return uart_over_sd;
-}
-
-void set_sd_uart_port_id(int port_id)
-{
-	debug_uart_port_id = port_id;
-}
-
-int get_tegra_uart_debug_port_id(void)
-{
-	return debug_uart_port_id;
 }
 __setup("debug_uartport=", tegra_debug_uartport);
 
@@ -1490,6 +1517,7 @@ int tegra_get_modem_id(void)
 {
 	return modem_id;
 }
+EXPORT_SYMBOL(tegra_get_modem_id);
 
 __setup("modem_id=", tegra_modem_id);
 
@@ -1505,6 +1533,7 @@ int tegra_get_usb_port_owner_info(void)
 {
 	return usb_port_owner_info;
 }
+EXPORT_SYMBOL(tegra_get_usb_port_owner_info);
 
 __setup("usb_port_owner_info=", tegra_usb_port_owner_info);
 
@@ -2189,45 +2218,6 @@ void __init tegra_init_late(void)
 	tegra_powergate_debugfs_init();
 }
 
-#if defined(CONFIG_SMSC911X)
-static struct resource tegra_smsc911x_resources[] = {
-	[0] = {
-		.start		= 0x4E000000,
-		.end		= 0x4E000000 + SZ_64K - 1,
-		.flags		= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start		= IRQ_ETH,
-		.end		= IRQ_ETH,
-		.flags		= IORESOURCE_IRQ,
-	},
-};
-
-static struct smsc911x_platform_config tegra_smsc911x_config = {
-	.flags          = SMSC911X_USE_32BIT,
-	.irq_polarity   = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
-	.irq_type       = SMSC911X_IRQ_TYPE_PUSH_PULL,
-	.phy_interface  = PHY_INTERFACE_MODE_MII,
-};
-
-static struct platform_device tegra_smsc911x_device = {
-	.name              = "smsc911x",
-	.id                = 0,
-	.resource          = tegra_smsc911x_resources,
-	.num_resources     = ARRAY_SIZE(tegra_smsc911x_resources),
-	.dev.platform_data = &tegra_smsc911x_config,
-};
-
-static int __init enet_smsc911x_init(void)
-{
-	if (!tegra_cpu_is_dsim() && !tegra_platform_is_qt())
-		platform_device_register(&tegra_smsc911x_device);
-	return 0;
-}
-
-rootfs_initcall(enet_smsc911x_init);
-#endif
-
 int tegra_split_mem_active(void)
 {
 	return tegra_split_mem_set;
@@ -2239,6 +2229,23 @@ static int __init set_tegra_split_mem(char *options)
 	return 0;
 }
 early_param("tegra_split_mem", set_tegra_split_mem);
+
+unsigned long int tegra_dfll_boot_req_khz(void)
+{
+	return dfll_boot_req_khz;
+}
+
+static int __init dfll_freq_cmd_line(char *line)
+{
+	int status = kstrtoul(line, 0, &dfll_boot_req_khz);
+	if (status) {
+		pr_err("\n%s:Error in parsing dfll_boot_req_khz:%d\n",
+			__func__, status);
+		dfll_boot_req_khz = 0;
+	}
+	return status;
+}
+early_param("dfll_boot_req_khz", dfll_freq_cmd_line);
 
 void __init display_tegra_dt_info(void)
 {

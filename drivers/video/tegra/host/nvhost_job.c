@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Job
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -114,6 +114,7 @@ struct nvhost_job *nvhost_job_alloc(struct nvhost_channel *ch,
 
 	return job;
 }
+EXPORT_SYMBOL(nvhost_job_alloc);
 
 void nvhost_job_get(struct nvhost_job *job)
 {
@@ -141,6 +142,18 @@ void nvhost_job_put(struct nvhost_job *job)
 {
 	kref_put(&job->ref, job_free);
 }
+EXPORT_SYMBOL(nvhost_job_put);
+
+int nvhost_job_add_client_gather_address(struct nvhost_job *job,
+		u32 num_words, u32 class_id, dma_addr_t gather_address)
+{
+	nvhost_job_add_gather(job, 0, num_words, 0, class_id, 0);
+
+	job->gathers[0].mem_base = gather_address;
+
+	return 0;
+}
+EXPORT_SYMBOL(nvhost_job_add_client_gather_address);
 
 void nvhost_job_add_gather(struct nvhost_job *job,
 		u32 mem_id, u32 words, u32 offset, u32 class_id, int pre_fence)
@@ -199,6 +212,7 @@ void nvhost_job_set_notifier(struct nvhost_job *job, u32 error)
 static int do_waitchks(struct nvhost_job *job, struct nvhost_syncpt *sp,
 		u32 patch_mem, struct dma_buf *buf)
 {
+	struct nvhost_device_data *pdata = platform_get_drvdata(job->ch->dev);
 	int i;
 
 	/* compare syncpt vs wait threshold */
@@ -206,7 +220,10 @@ static int do_waitchks(struct nvhost_job *job, struct nvhost_syncpt *sp,
 		struct nvhost_waitchk *wait = &job->waitchk[i];
 
 		/* validate syncpt id */
-		if (wait->syncpt_id > nvhost_syncpt_nb_pts(sp))
+		if (!nvhost_syncpt_is_valid_hw_pt(sp, wait->syncpt_id))
+			continue;
+
+		if (!wait->mem)
 			continue;
 
 		/* skip all other gathers */
@@ -218,7 +235,7 @@ static int do_waitchks(struct nvhost_job *job, struct nvhost_syncpt *sp,
 				nvhost_syncpt_read(sp, wait->syncpt_id));
 		if (nvhost_syncpt_is_expired(sp,
 		    wait->syncpt_id, wait->thresh) ||
-		    nvhost_get_channel_policy() == MAP_CHANNEL_ON_SUBMIT) {
+		     pdata->resource_policy == RESOURCE_PER_CHANNEL_INSTANCE) {
 			void *patch_addr = NULL;
 
 			/*
@@ -380,17 +397,18 @@ static int do_relocs(struct nvhost_job *job,
 int nvhost_job_pin(struct nvhost_job *job, struct nvhost_syncpt *sp)
 {
 	int err = 0, i = 0, j = 0;
-	DECLARE_BITMAP(waitchk_mask, nvhost_syncpt_nb_pts(sp));
+	int nb_hw_pts = nvhost_syncpt_nb_hw_pts(sp);
+	DECLARE_BITMAP(waitchk_mask, nb_hw_pts);
 
-	bitmap_zero(waitchk_mask, nvhost_syncpt_nb_pts(sp));
+	bitmap_zero(waitchk_mask, nb_hw_pts);
 	for (i = 0; i < job->num_waitchk; i++) {
 		u32 syncpt_id = job->waitchk[i].syncpt_id;
-		if (syncpt_id < nvhost_syncpt_nb_pts(sp))
+		if (nvhost_syncpt_is_valid_hw_pt(sp, syncpt_id))
 			set_bit(syncpt_id, waitchk_mask);
 	}
 
 	/* get current syncpt values for waitchk */
-	for_each_set_bit(i, waitchk_mask, nvhost_syncpt_nb_pts(sp))
+	for_each_set_bit(i, waitchk_mask, nb_hw_pts)
 		nvhost_syncpt_update_min(sp, i);
 
 	/* pin memory */

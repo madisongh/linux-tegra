@@ -1,7 +1,7 @@
 /*
  * Tegra GK20A GPU Debugger Driver Register Ops
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -403,9 +403,9 @@ int exec_regops_gk20a(struct dbg_session_gk20a *dbg_s,
 	if (gk20a_gpu_is_virtual(dbg_s->pdev))
 		return -ENOSYS;
 
-	ok = g->allow_all || validate_reg_ops(dbg_s,
+	ok = validate_reg_ops(dbg_s,
 			      &ctx_rd_count, &ctx_wr_count,
-			      ops, num_ops);
+			      ops, num_ops) || g->allow_all;
 	if (!ok) {
 		dev_err(dbg_s->dev, "invalid op(s)");
 		err = -EINVAL;
@@ -561,7 +561,8 @@ static bool check_whitelists(struct dbg_session_gk20a *dbg_s,
 
 	if (op->type == REGOP(TYPE_GLOBAL)) {
 		/* search global list */
-		valid = !!bsearch(&offset,
+		valid = g->ops.regops.get_global_whitelist_ranges &&
+			!!bsearch(&offset,
 			g->ops.regops.get_global_whitelist_ranges(),
 			g->ops.regops.get_global_whitelist_ranges_count(),
 			sizeof(*g->ops.regops.get_global_whitelist_ranges()),
@@ -570,7 +571,8 @@ static bool check_whitelists(struct dbg_session_gk20a *dbg_s,
 		/* if debug session and channel is bound search context list */
 		if ((!valid) && (!dbg_s->is_profiler && dbg_s->ch)) {
 			/* binary search context list */
-			valid = !!bsearch(&offset,
+			valid = g->ops.regops.get_context_whitelist_ranges &&
+				!!bsearch(&offset,
 			g->ops.regops.get_context_whitelist_ranges(),
 			g->ops.regops.get_context_whitelist_ranges_count(),
 			sizeof(*g->ops.regops.get_context_whitelist_ranges()),
@@ -579,7 +581,8 @@ static bool check_whitelists(struct dbg_session_gk20a *dbg_s,
 
 		/* if debug session and channel is bound search runcontrol list */
 		if ((!valid) && (!dbg_s->is_profiler && dbg_s->ch)) {
-			valid = linear_search(offset,
+			valid = g->ops.regops.get_runcontrol_whitelist &&
+				linear_search(offset,
 				g->ops.regops.get_runcontrol_whitelist(),
 				g->ops.regops.get_runcontrol_whitelist_count());
 		}
@@ -592,7 +595,8 @@ static bool check_whitelists(struct dbg_session_gk20a *dbg_s,
 		}
 
 		/* binary search context list */
-		valid = !!bsearch(&offset,
+		valid = g->ops.regops.get_context_whitelist_ranges &&
+			!!bsearch(&offset,
 			g->ops.regops.get_context_whitelist_ranges(),
 			g->ops.regops.get_context_whitelist_ranges_count(),
 			sizeof(*g->ops.regops.get_context_whitelist_ranges()),
@@ -600,13 +604,15 @@ static bool check_whitelists(struct dbg_session_gk20a *dbg_s,
 
 		/* if debug session and channel is bound search runcontrol list */
 		if ((!valid) && (!dbg_s->is_profiler && dbg_s->ch)) {
-			valid = linear_search(offset,
+			valid = g->ops.regops.get_runcontrol_whitelist &&
+				linear_search(offset,
 				g->ops.regops.get_runcontrol_whitelist(),
 				g->ops.regops.get_runcontrol_whitelist_count());
 		}
 
 	} else if (op->type == REGOP(TYPE_GR_CTX_QUAD)) {
-		valid = linear_search(offset,
+		valid = g->ops.regops.get_qctl_whitelist &&
+			linear_search(offset,
 				g->ops.regops.get_qctl_whitelist(),
 				g->ops.regops.get_qctl_whitelist_count());
 	}
@@ -691,7 +697,7 @@ static bool validate_reg_ops(struct dbg_session_gk20a *dbg_s,
 		ok &= !err;
 	}
 
-	gk20a_dbg(gpu_dbg_gpu_dbg, "ctx_wrs:%d ctx_rds:%d\n",
+	gk20a_dbg(gpu_dbg_gpu_dbg, "ctx_wrs:%d ctx_rds:%d",
 		   *ctx_wr_count, *ctx_rd_count);
 
 	return ok;

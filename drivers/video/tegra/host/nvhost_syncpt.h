@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Syncpoints
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -28,7 +28,7 @@
 
 /* when searching for free syncpt id, start from this base */
 #define NVHOST_FREE_SYNCPT_BASE(sp)	\
-	(nvhost_syncpt_graphics_host_sp(sp) + 1)
+	(nvhost_syncpt_pts_base(sp) + 1)
 
 /* timeout to wait for a syncpt to become free */
 #define NVHOST_SYNCPT_FREE_WAIT_TIMEOUT (1 * HZ)
@@ -106,7 +106,11 @@ static inline u32 nvhost_syncpt_read_min(struct nvhost_syncpt *sp, u32 id)
 void nvhost_syncpt_patch_check(struct nvhost_syncpt *sp);
 void nvhost_syncpt_set_min_eq_max(struct nvhost_syncpt *sp, u32 id);
 int nvhost_syncpt_client_managed(struct nvhost_syncpt *sp, u32 id);
+int nvhost_syncpt_nb_hw_pts(struct nvhost_syncpt *sp);
 int nvhost_syncpt_nb_pts(struct nvhost_syncpt *sp);
+int nvhost_syncpt_pts_base(struct nvhost_syncpt *sp);
+bool nvhost_syncpt_is_valid_hw_pt(struct nvhost_syncpt *sp, u32 id);
+bool nvhost_syncpt_is_valid_pt(struct nvhost_syncpt *sp, u32 id);
 int nvhost_nb_syncpts_store(struct nvhost_syncpt *sp, const char *buf);
 int nvhost_syncpt_nb_mlocks(struct nvhost_syncpt *sp);
 void nvhost_syncpt_set_manager(struct nvhost_syncpt *sp, int id, bool client);
@@ -160,11 +164,6 @@ static inline int nvhost_syncpt_wait(struct nvhost_syncpt *sp, u32 id, u32 thres
 
 int nvhost_syncpt_patch_wait(struct nvhost_syncpt *sp, void *patch_addr);
 
-static inline int nvhost_syncpt_is_valid(struct nvhost_syncpt *sp, u32 id)
-{
-	return id != NVSYNCPT_INVALID && id < nvhost_syncpt_nb_pts(sp);
-}
-
 int nvhost_mutex_try_lock(struct nvhost_syncpt *sp, int idx);
 
 void nvhost_mutex_unlock(struct nvhost_syncpt *sp, int idx);
@@ -173,4 +172,8 @@ bool nvhost_syncpt_wrapping_comparison(u32 syncpt, u32 threshold);
 
 struct nvhost_sync_timeline *nvhost_syncpt_timeline(struct nvhost_syncpt *sp,
 		int idx);
+int nvhost_syncpt_mark_unused(struct nvhost_syncpt *sp, u32 syncptid);
+int nvhost_syncpt_mark_used(struct nvhost_syncpt *sp,
+			    u32 chid, u32 syncptid);
+
 #endif

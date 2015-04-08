@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -23,6 +23,16 @@
 #include <linux/i2c.h>
 #include <linux/wait.h>
 #include <mach/dc.h>
+
+#define TEGRA_DC_Y420_30	1	/* YCbCr 4:2:0 deep color 30bpp */
+#define TEGRA_DC_Y420_36	2	/* YCbCr 4:2:0 deep color 36bpp */
+#define TEGRA_DC_Y420_48	4	/* YCbCr 4:2:0 deep color 48bpp */
+#define TEGRA_DC_Y420_MASK	(TEGRA_DC_Y420_30 | \
+				TEGRA_DC_Y420_36 | TEGRA_DC_Y420_48)
+
+#define TEGRA_EDID_MAX_RETRY 20
+#define TEGRA_EDID_MIN_RETRY_DELAY_US 200
+#define TEGRA_EDID_MAX_RETRY_DELAY_US (TEGRA_EDID_MIN_RETRY_DELAY_US + 200)
 
 enum {
 	CEA_DATA_BLOCK_RSVD0,
@@ -104,8 +114,13 @@ struct tegra_edid_hdmi_eld {
 struct tegra_edid *tegra_edid_create(struct tegra_dc *dc,
 	i2c_transfer_func_t func);
 void tegra_edid_destroy(struct tegra_edid *edid);
-int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs,
-	u8 *vedid);
+int tegra_edid_get_monspecs(struct tegra_edid *edid,
+				struct fb_monspecs *specs, u8 *vedid);
+u16 tegra_edid_get_cd_flag(struct tegra_edid *edid);
+u16 tegra_edid_get_max_clk_rate(struct tegra_edid *edid);
+bool tegra_edid_is_scdc_present(struct tegra_edid *edid);
+bool tegra_edid_is_420db_present(struct tegra_edid *edid);
+bool tegra_edid_is_hfvsdb_present(struct tegra_edid *edid);
 int tegra_edid_get_eld(struct tegra_edid *edid, struct tegra_edid_hdmi_eld *elddata);
 
 struct tegra_dc_edid *tegra_edid_get_data(struct tegra_edid *edid);

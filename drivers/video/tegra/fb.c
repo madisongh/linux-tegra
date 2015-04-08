@@ -6,7 +6,7 @@
  *         Colin Cross <ccross@android.com>
  *         Travis Geiselbrecht <travis@palm.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -42,6 +42,7 @@
 
 #include "host/dev.h"
 #include "dc/dc_priv.h"
+#include "dc/edid.h"
 
 /* Pad pitch to 256-byte boundary. */
 #define TEGRA_LINEAR_PITCH_ALIGNMENT 256
@@ -80,7 +81,7 @@ static int tegra_fb_check_var(struct fb_var_screeninfo *var,
 	struct tegra_dc_out_ops *ops = dc->out_ops;
 	struct fb_videomode mode;
 
-	if ((var->yres * var->xres * var->bits_per_pixel / 8 * 2) >
+	if ((var->yres * var->xres * var->bits_per_pixel / 8) >
 		info->screen_size) {
 		dev_err(&tegra_fb->ndev->dev,
 			"FB %lu is NOT enough for %dx%d %dbpp!\n",
@@ -107,8 +108,8 @@ static int tegra_fb_check_var(struct fb_var_screeninfo *var,
 		var->yoffset = yoffset;
 	}
 
-	/* Double yres_virtual to allow double buffering through pan_display */
-	var->yres_virtual = var->yres * 2;
+	/* no support for double buffering */
+	var->yres_virtual = var->yres;
 
 	return 0;
 }
@@ -248,9 +249,15 @@ static int tegra_fb_setcmap(struct fb_cmap *cmap, struct fb_info *info)
 	struct tegra_fb_info *tegra_fb = info->par;
 	struct tegra_dc *dc = tegra_fb->win.dc;
 	int i;
+#if defined(CONFIG_TEGRA_LUT)
 	u16 *red = cmap->red;
 	u16 *green = cmap->green;
 	u16 *blue = cmap->blue;
+#elif defined(CONFIG_TEGRA_LUT_V2)
+	u64 *red = (u64 *)cmap->red;
+	u64 *green = (u64 *)cmap->green;
+	u64 *blue = (u64 *)cmap->blue;
+#endif
 	int start = cmap->start;
 
 	if (((unsigned)start > 255) || ((start + cmap->len) > 256))
@@ -285,9 +292,15 @@ static int tegra_fb_setcmap(struct fb_cmap *cmap, struct fb_info *info)
 		} else {
 			/* High-color schemes*/
 			for (i = 0; i < cmap->len; i++) {
+#if defined(CONFIG_TEGRA_LUT)
 				dc->fb_lut.r[start+i] = *red++ >> 8;
 				dc->fb_lut.g[start+i] = *green++ >> 8;
 				dc->fb_lut.b[start+i] = *blue++ >> 8;
+#elif defined(CONFIG_TEGRA_LUT_V2)
+				dc->fb_lut.rgb[start+i] = ((*red++ >> 8) |
+						((*green++ >> 8) << 16) |
+						((*blue++ >> 8) << 32));
+#endif
 			}
 			tegra_dc_update_lut(dc, -1, -1);
 		}
@@ -688,6 +701,23 @@ void tegra_fb_update_monspecs(struct tegra_fb_info *fb_info,
 	mutex_unlock(&fb_info->info->lock);
 }
 
+void tegra_fb_update_fix(struct tegra_fb_info *fb_info,
+				struct fb_monspecs *specs)
+{
+	struct tegra_dc *dc = fb_info->win.dc;
+	struct tegra_edid *dc_edid = dc->edid;
+	struct fb_fix_screeninfo *fix = &fb_info->info->fix;
+
+	mutex_lock(&fb_info->info->lock);
+
+	fix->capabilities |= (tegra_edid_get_cd_flag(dc_edid) <<
+			FB_CAP_FOURCC) & FB_CAP_DC_MASK;
+
+	fix->max_clk_rate = tegra_edid_get_max_clk_rate(dc_edid);
+
+	mutex_unlock(&fb_info->info->lock);
+}
+
 static ssize_t nvdps_show(struct device *device,
 	struct device_attribute *attr, char *buf)
 {
@@ -810,7 +840,7 @@ struct tegra_fb_info *tegra_fb_register(struct platform_device *ndev,
 	tegra_dc_to_fb_videomode(&m, &dc->mode);
 	fb_videomode_to_var(&info->var, &m);
 	info->var.xres_virtual		= fb_data->xres;
-	info->var.yres_virtual		= fb_data->yres * 2;
+	info->var.yres_virtual		= fb_data->yres;
 	info->var.bits_per_pixel	= fb_data->bits_per_pixel;
 	info->var.activate		= FB_ACTIVATE_VBL;
 	info->var.height		= tegra_dc_get_out_height(dc);

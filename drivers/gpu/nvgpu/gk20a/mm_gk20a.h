@@ -1,7 +1,7 @@
 /*
  * GK20A memory management
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -25,10 +25,13 @@
 #include <asm/cacheflush.h>
 #include "gk20a_allocator.h"
 
-/* For now keep the size relatively small-ish compared to the full
- * 40b va.  32GB for now. It consists of two 16GB spaces. */
-#define NV_GMMU_VA_RANGE	35ULL
-#define NV_GMMU_VA_IS_UPPER(x)	((x) >= ((u64)0x1 << (NV_GMMU_VA_RANGE-1)))
+/*
+ * Amount of the GVA space we actually use is smaller than the available space.
+ * The bottom 16GB of the space are used for small pages, the remaining high
+ * memory is for large pages.
+ */
+#define NV_GMMU_VA_RANGE	37ULL
+#define NV_GMMU_VA_IS_UPPER(x)	((x) >= ((u64)SZ_1G * 16))
 
 #ifdef CONFIG_ARM64
 #define outer_flush_range(a, b)
@@ -43,7 +46,8 @@
 
 struct mem_desc {
 	void *cpu_va;
-	dma_addr_t iova;
+	struct page **pages;
+	struct sg_table *sgt;
 	size_t size;
 	u64 gpu_va;
 };
@@ -54,51 +58,13 @@ struct mem_desc_sub {
 };
 
 struct gpfifo_desc {
-	size_t size;
+	struct mem_desc mem;
 	u32 entry_num;
 
 	u32 get;
 	u32 put;
 
 	bool wrap;
-
-	u64 iova;
-	struct gpfifo *cpu_va;
-	u64 gpu_va;
-};
-
-struct mmu_desc {
-	void *cpuva;
-	u64 iova;
-	size_t size;
-};
-
-struct inst_desc {
-	u64 iova;
-	void *cpuva;
-	phys_addr_t cpu_pa;
-	size_t size;
-};
-
-struct surface_mem_desc {
-	u64 iova;
-	void *cpuva;
-	struct sg_table *sgt;
-	size_t size;
-};
-
-struct userd_desc {
-	struct sg_table *sgt;
-	u64 iova;
-	void *cpuva;
-	size_t size;
-	u64 gpu_va;
-};
-
-struct runlist_mem_desc {
-	u64 iova;
-	void *cpuva;
-	size_t size;
 };
 
 struct patch_desc {
@@ -110,34 +76,16 @@ struct patch_desc {
 	u32 data_count;
 };
 
-struct pmu_mem_desc {
-	void *cpuva;
-	u64 iova;
-	u64 pmu_va;
-	size_t size;
-};
-
-struct priv_cmd_queue_mem_desc {
-	u64 base_iova;
-	u32 *base_cpuva;
-	size_t size;
-};
-
 struct zcull_ctx_desc {
 	u64 gpu_va;
 	u32 ctx_attr;
 	u32 ctx_sw_mode;
 };
 
-struct gr_ctx_buffer_desc;
-struct platform_device;
+struct gk20a;
 struct gr_ctx_buffer_desc {
-	void (*destroy)(struct platform_device *, struct gr_ctx_buffer_desc *);
-	struct sg_table *sgt;
-	struct page **pages;
-	size_t size;
-	u64 iova;
-	struct dma_attrs attrs;
+	void (*destroy)(struct gk20a *, struct gr_ctx_buffer_desc *);
+	struct mem_desc mem;
 	void *priv;
 };
 
@@ -146,20 +94,19 @@ struct gr_ctx_buffer_desc {
 #endif
 
 struct gr_ctx_desc {
-	struct page **pages;
-	u64 iova;
-	size_t size;
-	u64 gpu_va;
+	struct mem_desc mem;
+
+	int preempt_mode;
 #ifdef CONFIG_ARCH_TEGRA_18x_SOC
 	struct gr_ctx_desc_t18x t18x;
 #endif
 };
 
+#define NVGPU_GR_PREEMPTION_MODE_WFI		0
+#define NVGPU_GR_PREEMPTION_MODE_CTA		2
+
 struct compbit_store_desc {
-	struct page **pages;
-	struct sg_table *sgt;
-	size_t size;
-	u64 base_iova;
+	struct mem_desc mem;
 
 	/* The value that is written to the hardware. This depends on
 	 * on the number of ltcs and is not an address. */
@@ -188,15 +135,6 @@ struct gk20a_buffer_state {
 	struct gk20a_fence *fence;
 };
 
-struct page_table_gk20a {
-	/* backing for */
-	/* Either a *page or a *mem_handle */
-	void *ref;
-	/* track mapping cnt on this page table */
-	struct sg_table *sgt;
-	size_t size;
-};
-
 enum gmmu_pgsz_gk20a {
 	gmmu_page_size_small = 0,
 	gmmu_page_size_big   = 1,
@@ -208,24 +146,21 @@ struct gk20a_comptags {
 	u32 lines;
 };
 
-
-struct page_directory_gk20a {
+struct gk20a_mm_entry {
 	/* backing for */
-	u32 num_pdes;
-	void *kv;
-	/* Either a *page or a *mem_handle */
-	void *ref;
+	void *cpu_va;
 	struct sg_table *sgt;
+	struct page **pages;
 	size_t size;
-	struct page_table_gk20a *ptes[gmmu_nr_page_sizes];
+	int pgsz;
+	struct gk20a_mm_entry *entries;
 };
 
 struct priv_cmd_queue {
-	struct priv_cmd_queue_mem_desc mem;
-	u64 base_gpuva;	/* gpu_va base */
-	u16 size;	/* num of entries in words */
-	u16 put;	/* put for priv cmd queue */
-	u16 get;	/* get for priv cmd queue */
+	struct mem_desc mem;
+	u32 size;	/* num of entries in words */
+	u32 put;	/* put for priv cmd queue */
+	u32 get;	/* get for priv cmd queue */
 	struct list_head free;	/* list of pre-allocated free entries */
 	struct list_head head;	/* list of used entries */
 };
@@ -233,8 +168,8 @@ struct priv_cmd_queue {
 struct priv_cmd_entry {
 	u32 *ptr;
 	u64 gva;
-	u16 get;	/* start of entry in queue */
-	u16 size;	/* in words */
+	u32 get;	/* start of entry in queue */
+	u32 size;	/* in words */
 	u32 gp_get;	/* gp_get when submitting last priv cmd */
 	u32 gp_put;	/* gp_put when submitting last priv cmd */
 	u32 gp_wrap;	/* wrap when submitting last priv cmd */
@@ -272,6 +207,19 @@ struct vm_reserved_va_node {
 	bool sparse;
 };
 
+struct gk20a_mmu_level {
+	int hi_bit[2];
+	int lo_bit[2];
+	int (*update_entry)(struct vm_gk20a *vm,
+			   struct gk20a_mm_entry *pte,
+			   u32 i, u32 gmmu_pgsz_idx,
+			   u64 iova,
+			   u32 kind_v, u32 *ctag,
+			   bool cacheable, bool unmapped_pte,
+			   int rw_flag, bool sparse, u32 flags);
+	size_t entry_size;
+};
+
 struct vm_gk20a {
 	struct mm_gk20a *mm;
 	struct gk20a_as_share *as_share; /* as_share this represents */
@@ -283,24 +231,17 @@ struct vm_gk20a {
 
 	bool big_pages;   /* enable large page support */
 	bool enable_ctag;
-	bool tlb_dirty;
 	bool mapped;
 
-	u32 compression_page_size;
 	u32 big_page_size;
-	u32 pde_stride;
-	u32 pde_stride_shift;
 
-	struct {
-		u32 order;
-		u32 num_ptes;
-	} page_table_sizing[gmmu_nr_page_sizes];
+	const struct gk20a_mmu_level *mmu_levels;
 
 	struct kref ref;
 
 	struct mutex update_gmmu_lock;
 
-	struct page_directory_gk20a pdes;
+	struct gk20a_mm_entry pdb;
 
 	struct gk20a_allocator vma[gmmu_nr_page_sizes];
 	struct rb_root mapped_buffers;
@@ -318,6 +259,7 @@ struct channel_gk20a;
 
 int gk20a_init_mm_support(struct gk20a *g);
 int gk20a_init_mm_setup_sw(struct gk20a *g);
+int gk20a_init_mm_setup_hw(struct gk20a *g);
 
 int gk20a_mm_fb_flush(struct gk20a *g);
 void gk20a_mm_l2_flush(struct gk20a *g, bool invalidate);
@@ -333,17 +275,31 @@ struct mm_gk20a {
 	struct {
 		u32 aperture_size;
 		struct vm_gk20a vm;
-		struct inst_desc inst_block;
+		struct mem_desc inst_block;
 	} bar1;
 
 	struct {
 		u32 aperture_size;
 		struct vm_gk20a vm;
-		struct inst_desc inst_block;
+		struct mem_desc inst_block;
+	} bar2;
+
+	struct {
+		u32 aperture_size;
+		struct vm_gk20a vm;
+		struct mem_desc inst_block;
 	} pmu;
 
-	struct mutex l2_op_lock;
+	struct {
+		/* using pmu vm currently */
+		struct mem_desc inst_block;
+	} hwpm;
 
+
+	struct mutex l2_op_lock;
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+	struct mem_desc bar2_desc;
+#endif
 	void (*remove_support)(struct mm_gk20a *mm);
 	bool sw_ready;
 	int physical_bits;
@@ -389,6 +345,11 @@ static inline int max_vaddr_bits_gk20a(void)
 #define bar1_instance_block_shift_gk20a() bus_bar1_block_ptr_shift_v()
 #endif
 
+int gk20a_alloc_inst_block(struct gk20a *g, struct mem_desc *inst_block);
+void gk20a_free_inst_block(struct gk20a *g, struct mem_desc *inst_block);
+void gk20a_init_inst_block(struct mem_desc *inst_block, struct vm_gk20a *vm,
+		u32 big_page_size);
+
 void gk20a_mm_dump_vm(struct vm_gk20a *vm,
 		u64 va_begin, u64 va_end, char *label);
 
@@ -407,7 +368,8 @@ int gk20a_get_sgtable_from_pages(struct device *d, struct sg_table **sgt,
 
 void gk20a_free_sgtable(struct sg_table **sgt);
 
-u64 gk20a_mm_iova_addr(struct gk20a *g, struct scatterlist *sgl);
+u64 gk20a_mm_iova_addr(struct gk20a *g, struct scatterlist *sgl,
+		u32 flags);
 u64 gk20a_mm_smmu_vaddr_translate(struct gk20a *g, dma_addr_t iova);
 
 void gk20a_mm_ltc_isr(struct gk20a *g);
@@ -426,8 +388,34 @@ int gk20a_gmmu_alloc_map(struct vm_gk20a *vm,
 		size_t size,
 		struct mem_desc *mem);
 
+int gk20a_gmmu_alloc_map_attr(struct vm_gk20a *vm,
+		enum dma_attr attr,
+		size_t size,
+		struct mem_desc *mem);
+
 void gk20a_gmmu_unmap_free(struct vm_gk20a *vm,
 		struct mem_desc *mem);
+
+int gk20a_gmmu_alloc(struct gk20a *g,
+		size_t size,
+		struct mem_desc *mem);
+
+int gk20a_gmmu_alloc_attr(struct gk20a *g,
+		enum dma_attr attr,
+		size_t size,
+		struct mem_desc *mem);
+
+void gk20a_gmmu_free(struct gk20a *g,
+		struct mem_desc *mem);
+
+void gk20a_gmmu_free_attr(struct gk20a *g,
+		enum dma_attr attr,
+		struct mem_desc *mem);
+
+static inline phys_addr_t gk20a_mem_phys(struct mem_desc *mem)
+{
+	return sg_phys(mem->sgt->sgl);
+}
 
 u64 gk20a_locked_gmmu_map(struct vm_gk20a *vm,
 			u64 map_offset,
@@ -439,7 +427,8 @@ u64 gk20a_locked_gmmu_map(struct vm_gk20a *vm,
 			u32 ctag_offset,
 			u32 flags,
 			int rw_flag,
-			bool clear_ctags);
+			bool clear_ctags,
+			bool sparse);
 
 void gk20a_gmmu_unmap(struct vm_gk20a *vm,
 		u64 vaddr,
@@ -451,7 +440,8 @@ void gk20a_locked_gmmu_unmap(struct vm_gk20a *vm,
 			u64 size,
 			int pgsz_idx,
 			bool va_allocated,
-			int rw_flag);
+			int rw_flag,
+			bool sparse);
 
 struct sg_table *gk20a_mm_pin(struct device *dev, struct dma_buf *dmabuf);
 void gk20a_mm_unpin(struct device *dev, struct dma_buf *dmabuf,
@@ -515,14 +505,23 @@ int gk20a_vm_free_space(struct gk20a_as_share *as_share,
 			struct nvgpu_as_free_space_args *args);
 int gk20a_vm_bind_channel(struct gk20a_as_share *as_share,
 			  struct channel_gk20a *ch);
-int gk20a_vm_map_buffer(struct gk20a_as_share *as_share,
+int gk20a_vm_map_buffer(struct vm_gk20a *vm,
 			int dmabuf_fd,
 			u64 *offset_align,
 			u32 flags, /* NVGPU_AS_MAP_BUFFER_FLAGS_ */
 			int kind,
 			u64 buffer_offset,
 			u64 mapping_size);
-int gk20a_vm_unmap_buffer(struct gk20a_as_share *, u64 offset);
+
+int gk20a_init_vm(struct mm_gk20a *mm,
+		struct vm_gk20a *vm,
+		u32 big_page_size,
+		u64 low_hole,
+		u64 aperture_size,
+		bool big_pages,
+		char *name);
+void gk20a_deinit_vm(struct vm_gk20a *vm);
+int gk20a_vm_unmap_buffer(struct vm_gk20a *vm, u64 offset);
 void gk20a_get_comptags(struct device *dev, struct dma_buf *dmabuf,
 			struct gk20a_comptags *comptags);
 dma_addr_t gk20a_mm_gpuva_to_iova_base(struct vm_gk20a *vm, u64 gpu_vaddr);
@@ -532,28 +531,27 @@ int gk20a_dmabuf_alloc_drvdata(struct dma_buf *dmabuf, struct device *dev);
 int gk20a_dmabuf_get_state(struct dma_buf *dmabuf, struct device *dev,
 			   u64 offset, struct gk20a_buffer_state **state);
 
-int map_gmmu_pages(void *handle, struct sg_table *sgt,
-			  void **va, size_t size);
-void unmap_gmmu_pages(void *handle, struct sg_table *sgt, void *va);
+int map_gmmu_pages(struct gk20a_mm_entry *entry);
+void unmap_gmmu_pages(struct gk20a_mm_entry *entry);
 void pde_range_from_vaddr_range(struct vm_gk20a *vm,
 					      u64 addr_lo, u64 addr_hi,
 					      u32 *pde_lo, u32 *pde_hi);
+int gk20a_mm_pde_coverage_bit_count(struct vm_gk20a *vm);
 u32 *pde_from_index(struct vm_gk20a *vm, u32 i);
 u32 pte_index_from_vaddr(struct vm_gk20a *vm,
 			       u64 addr, enum gmmu_pgsz_gk20a pgsz_idx);
-int validate_gmmu_page_table_gk20a_locked(struct vm_gk20a *vm,
-				u32 i, enum gmmu_pgsz_gk20a gmmu_pgsz_idx);
-int zalloc_gmmu_page_table_gk20a(struct vm_gk20a *vm,
-					enum gmmu_pgsz_gk20a gmmu_pgsz_idx,
-					struct page_table_gk20a *pte);
-
-void free_gmmu_pages(struct vm_gk20a *vm, void *handle,
-			    struct sg_table *sgt, u32 order,
-			    size_t size);
-void update_gmmu_pde_locked(struct vm_gk20a *vm, u32 i);
+void free_gmmu_pages(struct vm_gk20a *vm,
+		     struct gk20a_mm_entry *entry);
 
 u32 gk20a_mm_get_physical_addr_bits(struct gk20a *g);
 
 struct gpu_ops;
 void gk20a_init_mm(struct gpu_ops *gops);
+const struct gk20a_mmu_level *gk20a_mm_get_mmu_levels(struct gk20a *g,
+						      u32 big_page_size);
+void gk20a_mm_init_pdb(struct gk20a *g, void *inst_ptr, u64 pdb_addr);
+
+extern const struct gk20a_mmu_level gk20a_mm_levels_64k[];
+extern const struct gk20a_mmu_level gk20a_mm_levels_128k[];
+
 #endif /* MM_GK20A_H */

@@ -1,7 +1,7 @@
 /*
  * drivers/misc/tegra-profiler/backtrace.h
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -27,6 +27,14 @@
 
 struct quadd_hrt_ctx;
 
+struct quadd_unw_methods {
+	unsigned int
+		fp:1,
+		ut:1,
+		ut_ce:1,
+		dwarf:1;
+};
+
 struct quadd_callchain {
 	int nr;
 
@@ -39,12 +47,17 @@ struct quadd_callchain {
 
 	int cs_64;
 
-	unsigned int unw_method;
-	unsigned int unw_rc;
+	struct quadd_unw_methods um;
+
+	unsigned int urc_fp;
+	unsigned int urc_ut;
+	unsigned int urc_dwarf;
 
 	unsigned long curr_sp;
 	unsigned long curr_fp;
+	unsigned long curr_fp_thumb;
 	unsigned long curr_pc;
+	unsigned long curr_lr;
 
 	struct quadd_hrt_ctx *hrt;
 };

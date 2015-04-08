@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/mc/tegra_emc_dt_parse.c
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -151,7 +151,7 @@ static void *tegra_emc_dt_parse_pdata_comp(const char *emc_mode,
 				burst_up_down_regs_num);
 			PNE_U32(iter, "nvidia,emc-zcal-cnt-long",
 				emc_zcal_cnt_long);
-			PNE_U32(iter, "nvidia,emc-ctt-term-ctrl",
+			PNE_U32(iter, "nvidia,emc-ctt-term_ctrl",
 				emc_ctt_term_ctrl);
 			PNE_U32(iter, "nvidia,emc-cfg", emc_cfg);
 			PNE_U32(iter, "nvidia,emc-cfg-dig-dll",
@@ -170,6 +170,47 @@ static void *tegra_emc_dt_parse_pdata_comp(const char *emc_mode,
 #elif defined(CONFIG_ARCH_TEGRA_21x_SOC)
 			PNE_U32(iter, "nvidia,needs-training", needs_training);
 			PNE_U32(iter, "nvidia,trained", trained);
+
+			if (tables[i].rev < 0x6)
+				goto skip_periodic_training_params;
+			PNE_U32(iter, "nvidia,periodic_training",
+				periodic_training);
+			PNE_U32(iter, "nvidia,trained_dram_clktree_c0d0u0",
+				trained_dram_clktree_c0d0u0);
+			PNE_U32(iter, "nvidia,trained_dram_clktree_c0d0u1",
+				trained_dram_clktree_c0d0u1);
+			PNE_U32(iter, "nvidia,trained_dram_clktree_c0d1u0",
+				trained_dram_clktree_c0d1u0);
+			PNE_U32(iter, "nvidia,trained_dram_clktree_c0d1u1",
+				trained_dram_clktree_c0d1u1);
+			PNE_U32(iter, "nvidia,trained_dram_clktree_c1d0u0",
+				trained_dram_clktree_c1d0u0);
+			PNE_U32(iter, "nvidia,trained_dram_clktree_c1d0u1",
+				trained_dram_clktree_c1d0u1);
+			PNE_U32(iter, "nvidia,trained_dram_clktree_c1d1u0",
+				trained_dram_clktree_c1d1u0);
+			PNE_U32(iter, "nvidia,trained_dram_clktree_c1d1u1",
+				trained_dram_clktree_c1d1u1);
+			PNE_U32(iter, "nvidia,current_dram_clktree_c0d0u0",
+				current_dram_clktree_c0d0u0);
+			PNE_U32(iter, "nvidia,current_dram_clktree_c0d0u1",
+				current_dram_clktree_c0d0u1);
+			PNE_U32(iter, "nvidia,current_dram_clktree_c0d1u0",
+				current_dram_clktree_c0d1u0);
+			PNE_U32(iter, "nvidia,current_dram_clktree_c0d1u1",
+				current_dram_clktree_c0d1u1);
+			PNE_U32(iter, "nvidia,current_dram_clktree_c1d0u0",
+				current_dram_clktree_c1d0u0);
+			PNE_U32(iter, "nvidia,current_dram_clktree_c1d0u1",
+				current_dram_clktree_c1d0u1);
+			PNE_U32(iter, "nvidia,current_dram_clktree_c1d1u0",
+				current_dram_clktree_c1d1u0);
+			PNE_U32(iter, "nvidia,current_dram_clktree_c1d1u1",
+				current_dram_clktree_c1d1u1);
+			PNE_U32(iter, "nvidia,run_clocks", run_clocks);
+			PNE_U32(iter, "nvidia,tree_margin", tree_margin);
+
+skip_periodic_training_params:
 			PNE_U32(iter, "nvidia,burst-regs-per-ch-num",
 				burst_regs_per_ch_num);
 			PNE_U32(iter, "nvidia,trim-regs-num", trim_regs_num);

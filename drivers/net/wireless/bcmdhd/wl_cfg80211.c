@@ -1241,7 +1241,7 @@ s32 wl_get_tx_power(struct net_device *dev, s32 *dbm)
 static chanspec_t wl_cfg80211_get_shared_freq(struct wiphy *wiphy)
 {
 	chanspec_t chspec;
-	int err = 0;
+	int cur_band, err = 0;
 	struct bcm_cfg80211 *cfg = wiphy_priv(wiphy);
 	struct net_device *dev = bcmcfg_to_prmry_ndev(cfg);
 	struct ether_addr bssid;
@@ -1253,7 +1253,15 @@ static chanspec_t wl_cfg80211_get_shared_freq(struct wiphy *wiphy)
 		 * via set_channel (cfg80211 API).
 		 */
 		WL_DBG(("Not associated. Return a temp channel. \n"));
-		return wl_ch_host_to_driver(WL_P2P_TEMP_CHAN);
+		err = wldev_ioctl(dev, WLC_GET_BAND, &cur_band, sizeof(int), false);
+		if (unlikely(err)) {
+			WL_ERR(("Get band failed\n"));
+			return wl_ch_host_to_driver(WL_P2P_TEMP_CHAN);
+		}
+		if (cur_band == WLC_BAND_5G)
+			return wl_ch_host_to_driver(WL_P2P_TEMP_CHAN_5G);
+		else
+			return wl_ch_host_to_driver(WL_P2P_TEMP_CHAN);
 	}
 
 
@@ -8051,7 +8059,7 @@ wl_notify_connect_status_ap(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	channel_info_t ci;
 #else
 	struct station_info sinfo;
-#endif 
+#endif
 
 	WL_DBG(("event %d status %d reason %d\n", event, ntoh32(e->status), reason));
 	/* if link down, bsscfg is disabled. */
@@ -8360,6 +8368,8 @@ wl_notify_connect_status(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
 					/* In case this event comes while associating another AP */
 #endif /* ESCAN_RESULT_PATCH */
 					wl_bss_connect_done(cfg, ndev, e, data, false);
+				/* Clear driver status as CONNECTING since the link is already down */
+				wl_clr_drv_status(cfg, CONNECTING, ndev);
 			}
 			wl_clr_drv_status(cfg, DISCONNECTING, ndev);
 
@@ -8373,8 +8383,10 @@ wl_notify_connect_status(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
 			/* Clean up any pending scan request */
 			if (cfg->scan_request)
 				wl_notify_escan_complete(cfg, ndev, true, true);
-			if (wl_get_drv_status(cfg, CONNECTING, ndev))
+			if (wl_get_drv_status(cfg, CONNECTING, ndev)) {
 				wl_bss_connect_done(cfg, ndev, e, data, false);
+				wl_clr_drv_status(cfg, CONNECTING, ndev);
+			}
 		} else {
 			WL_DBG(("%s nothing\n", __FUNCTION__));
 		}
@@ -8567,14 +8579,13 @@ static s32 wl_update_bss_info(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	s32 err = 0;
 	struct wiphy *wiphy;
 	u32 channel;
+	struct ieee80211_channel *cur_channel;
+	u32 freq, band;
 
 	wiphy = bcmcfg_to_wiphy(cfg);
 
 	ssid = (struct wlc_ssid *)wl_read_prof(cfg, ndev, WL_PROF_SSID);
 	curbssid = wl_read_prof(cfg, ndev, WL_PROF_BSSID);
-	bss = cfg80211_get_bss(wiphy, NULL, curbssid,
-		ssid->SSID, ssid->SSID_len, WLAN_CAPABILITY_ESS,
-		WLAN_CAPABILITY_ESS);
 
 	mutex_lock(&cfg->usr_sync);
 
@@ -8588,6 +8599,17 @@ static s32 wl_update_bss_info(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	bi = (struct wl_bss_info *)(cfg->extra_buf + 4);
 	channel = wf_chspec_ctlchan(wl_chspec_driver_to_host(bi->chanspec));
 	wl_update_prof(cfg, ndev, NULL, &channel, WL_PROF_CHAN);
+#if LINUX_VERSION_CODE == KERNEL_VERSION(2, 6, 38) && !defined(WL_COMPAT_WIRELESS)
+	freq = ieee80211_channel_to_frequency(channel);
+#else
+	band = (channel <= CH_MAX_2G_CHANNEL) ? IEEE80211_BAND_2GHZ : IEEE80211_BAND_5GHZ;
+	freq = ieee80211_channel_to_frequency(channel, band);
+#endif
+	cur_channel = ieee80211_get_channel(wiphy, freq);
+
+	bss = cfg80211_get_bss(wiphy, cur_channel, curbssid,
+		ssid->SSID, ssid->SSID_len, WLAN_CAPABILITY_ESS,
+		WLAN_CAPABILITY_ESS);
 
 	if (!bss) {
 		WL_DBG(("Could not find the AP\n"));
@@ -8683,16 +8705,13 @@ wl_bss_roaming_done(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	printk("wl_bss_roaming_done succeeded to " MACDBG "\n",
 		MAC2STRDBG((u8*)(&e->addr)));
 
-	if (memcmp(curbssid, connect_req_bssid, ETHER_ADDR_LEN) != 0) {
-		WL_DBG(("BSSID Mismatch, so indicate roam to cfg80211\n"));
-		cfg80211_roamed(ndev,
+	cfg80211_roamed(ndev,
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39))
-			notify_channel,
+		notify_channel,
 #endif
-			curbssid,
-			conn_info->req_ie, conn_info->req_ie_len,
-			conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
-	}
+		curbssid,
+		conn_info->req_ie, conn_info->req_ie_len,
+		conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
 	WL_DBG(("Report roaming result\n"));
 
 	wl_set_drv_status(cfg, CONNECTED, ndev);
@@ -10130,6 +10149,7 @@ static s32 wl_notifier_change_state(struct bcm_cfg80211 *cfg, struct net_info *_
 				_net_info->pm_restore = true;
 			}
 			pm = PM_OFF;
+			down_read(&cfg->netif_sem);
 			for_each_ndev(cfg, iter, next) {
 				if (iter->pm_restore)
 					continue;
@@ -10155,6 +10175,7 @@ static s32 wl_notifier_change_state(struct bcm_cfg80211 *cfg, struct net_info *_
 					wl_cfg80211_update_power_mode(iter->ndev);
 				}
 			}
+			up_read(&cfg->netif_sem);
 		} else {
 			/* add PM Enable timer to go to power save mode
 			 * if supplicant control pm mode, it will be cleared or
@@ -10165,6 +10186,7 @@ static s32 wl_notifier_change_state(struct bcm_cfg80211 *cfg, struct net_info *_
 			/*
 			 * before calling pm_enable_timer, we need to set PM -1 for all ndev
 			 */
+			down_read(&cfg->netif_sem);
 			pm = PM_OFF;
 			if (!_net_info->pm_block) {
 				for_each_ndev(cfg, iter, next) {
@@ -10191,7 +10213,7 @@ static s32 wl_notifier_change_state(struct bcm_cfg80211 *cfg, struct net_info *_
 						WL_ERR(("%s:error (%d)\n", iter->ndev->name, err));
 				}
 			}
-
+			up_read(&cfg->netif_sem);
 			if (cfg->pm_enable_work_on) {
 				wl_add_remove_pm_enable_work(cfg, FALSE, WL_HANDLER_DEL);
 			}
@@ -10216,6 +10238,7 @@ static s32 wl_notifier_change_state(struct bcm_cfg80211 *cfg, struct net_info *_
 		/* clear chan information when the net device is disconnected */
 		wl_update_prof(cfg, _net_info->ndev, NULL, &chan, WL_PROF_CHAN);
 		wl_cfg80211_determine_vsdb_mode(cfg);
+		down_read(&cfg->netif_sem);
 		for_each_ndev(cfg, iter, next) {
 			if (iter->pm_restore && iter->pm) {
 				WL_DBG(("%s:restoring power save %s\n",
@@ -10233,6 +10256,7 @@ static s32 wl_notifier_change_state(struct bcm_cfg80211 *cfg, struct net_info *_
 				wl_cfg80211_update_power_mode(iter->ndev);
 			}
 		}
+		up_read(&cfg->netif_sem);
 		wl_cfg80211_concurrent_roam(cfg, 0);
 #if defined(WLTDLS)
 		if (!cfg->vsdb_mode) {
@@ -10262,7 +10286,8 @@ static void wl_dealloc_netinfo(struct work_struct *work)
 {
 	struct net_info *_net_info, *next;
 	struct bcm_cfg80211 *cfg = container_of(work, struct bcm_cfg80211, dealloc_work);
-
+	down_interruptible(&cfg->net_wdev_sema);
+	down_write(&cfg->netif_sem);
 	list_for_each_entry_safe(_net_info, next, &cfg->dealloc_list, list) {
 		list_del(&_net_info->list);
 		if (_net_info->wdev) {
@@ -10273,11 +10298,20 @@ static void wl_dealloc_netinfo(struct work_struct *work)
 			/* rtnl_lock is required to protect wdev from nl80211_pre_doit
 			 * and nl80211_post_doit calls */
 			rtnl_lock();
+			if (cfg->wdev == _net_info->wdev)
+				cfg->wdev = NULL;
+			else if (cfg->p2p_wdev == _net_info->wdev)
+				cfg->p2p_wdev = NULL;
+			else
+				WL_ERR(("Unknown wdev freeed!\n"));
 			kfree(_net_info->wdev);
+			_net_info->wdev = NULL;
 			rtnl_unlock();
 		}
 		kfree(_net_info);
 	}
+	up_write(&cfg->netif_sem);
+	up(&cfg->net_wdev_sema);
 }
 
 static s32 wl_init_priv(struct bcm_cfg80211 *cfg)
@@ -10301,6 +10335,8 @@ static s32 wl_init_priv(struct bcm_cfg80211 *cfg)
 	set_bit(WL_STATUS_CONNECTED, &cfg->interrested_state);
 	spin_lock_init(&cfg->cfgdrv_lock);
 	mutex_init(&cfg->ioctl_buf_sync);
+	init_rwsem(&cfg->netif_sem);
+	sema_init(&cfg->net_wdev_sema, 1);
 	init_waitqueue_head(&cfg->netif_change_event);
 	init_completion(&cfg->send_af_done);
 	init_completion(&cfg->iface_disable);
@@ -10604,6 +10640,7 @@ static s32 wl_event_handler(void *data)
 			 * there is no corresponding bsscfg for P2P interface. Map it to p2p0
 			 * interface.
 			 */
+			down_interruptible(&cfg->net_wdev_sema);
 #if defined(WL_CFG80211_P2P_DEV_IF)
 			if (WL_IS_P2P_DEV_EVENT(e) && (cfg->p2p_wdev)) {
 				cfgdev = bcmcfg_to_p2p_wdev(cfg);
@@ -10630,11 +10667,14 @@ static s32 wl_event_handler(void *data)
 				cfgdev = bcmcfg_to_prmry_ndev(cfg);
 #endif /* WL_CFG80211_P2P_DEV_IF */
 			}
-			if (e->etype < WLC_E_LAST && cfg->evt_handler[e->etype]) {
-				cfg->evt_handler[e->etype] (cfg, cfgdev, &e->emsg, e->edata);
+			if (e->etype < WLC_E_LAST && cfg->evt_handler[e->etype]
+				&& cfgdev) {
+				cfg->evt_handler[e->etype] (cfg,
+						cfgdev, &e->emsg, e->edata);
 			} else {
 				WL_DBG(("Unknown Event (%d): ignoring\n", e->etype));
 			}
+			up(&cfg->net_wdev_sema);
 			wl_put_event(e);
 		}
 		DHD_OS_WAKE_UNLOCK(cfg->pub);

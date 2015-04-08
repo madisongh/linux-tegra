@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -109,6 +109,14 @@ static inline u32 ctxsw_prog_main_image_pm_smpc_mode_ctxsw_f(void)
 static inline u32 ctxsw_prog_main_image_pm_smpc_mode_no_ctxsw_f(void)
 {
 	return 0x0;
+}
+static inline u32 ctxsw_prog_main_image_pm_pc_sampling_f(u32 v)
+{
+	return (v & 0x1) << 6;
+}
+static inline u32 ctxsw_prog_main_image_pm_pc_sampling_m(void)
+{
+	return 0x1 << 6;
 }
 static inline u32 ctxsw_prog_main_image_pm_ptr_o(void)
 {
@@ -237,5 +245,17 @@ static inline u32 ctxsw_prog_main_image_misc_options_verif_features_m(void)
 static inline u32 ctxsw_prog_main_image_misc_options_verif_features_disabled_f(void)
 {
 	return 0x0;
+}
+static inline u32 ctxsw_prog_main_image_preemption_options_o(void)
+{
+	return 0x00000060;
+}
+static inline u32 ctxsw_prog_main_image_preemption_options_control_f(u32 v)
+{
+	return (v & 0x3) << 0;
+}
+static inline u32 ctxsw_prog_main_image_preemption_options_control_cta_enabled_f(void)
+{
+	return 0x1;
 }
 #endif

@@ -184,19 +184,23 @@
 
 	i2c@7000c000 {
 		icm20628@68 {
-			vlogic-supply = <&max77620_ldo3>;
-			vdd-supply = <&vdd_3v3>;
+			vlogic-supply = <&max77620_sd3>;
+			vdd-supply = <&max77620_ldo3>;
 		};
 
 		ak8963c@0c {
-			vid-supply = <&max77620_ldo3>;
-			vdd-supply = <&vdd_3v3>;
+			vid-supply = <&max77620_sd3>;
+			vdd-supply = <&max77620_ldo3>;
 		};
 
 		jsa1127@39 {
 			vdd-supply = <&vdd_disp_3v0>;
 		};
 
+	};
+
+	i2c@546c0000 {
+		bus-pullup-supply = <&max77620_sd3>;
 	};
 
 	efuse@7000f800 {
@@ -241,6 +245,10 @@
 		avdd_usb-supply = <&vdd_3v3>;
 		avdd_pll_utmip-supply = <&max77620_sd3>;
 		usb_vbus-supply = <&usb0_vbus>;
+	};
+
+	usb_cd@7009f000 {
+		usb_bat_chg-supply = <&battery_charger>;
 	};
 
 	xusb@70090000 {

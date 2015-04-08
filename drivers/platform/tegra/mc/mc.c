@@ -2,7 +2,7 @@
  * arch/arm/mach-tegra/mc.c
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (C) 2011-2014, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2011-2015, NVIDIA Corporation.  All rights reserved.
  *
  * Author:
  *	Erik Gilling <konkers@google.com>
@@ -280,14 +280,23 @@ int tegra_mc_flush(int id)
 
 	timeout = 0;
 	do {
+		bool exit = false;
 		udelay(10);
 		rst_stat = 0;
 		ret = tegra_stable_hotreset_check(rst_stat_reg, &rst_stat);
-		if ((timeout++ > 100) && (tegra_platform_is_qt() ||
-			tegra_platform_is_fpga())) {
-			pr_warn("%s flush %d timeout\n", __func__, id);
-			break;
+
+		timeout++;
+
+		/* keep lower timeout if we are running in qt or fpga */
+		exit |= (timeout > 100) && (tegra_platform_is_qt() ||
+			tegra_platform_is_fpga());
+		/* otherwise have huge timeout (~1s) */
+		exit |= timeout > 100000;
+		if (exit) {
+			WARN(1, "%s flush %d timeout\n", __func__, id);
+			return -ETIMEDOUT;
 		}
+
 		if (!ret)
 			continue;
 	} while (!(rst_stat & (1 << id)));
@@ -382,7 +391,7 @@ static int tegra_mc_probe(struct platform_device *pdev)
 	u32 reg;
 #endif
 	const void *prop;
-	struct dentry *mc_debugfs_dir;
+	struct dentry *mc_debugfs_dir = NULL;
 	const struct of_device_id *match;
 
 	if (!pdev->dev.of_node)
@@ -443,12 +452,12 @@ static int tegra_mc_probe(struct platform_device *pdev)
 	mc_writel(reg, MC_EMEM_ARB_OVERRIDE);
 #endif
 
+#ifdef CONFIG_DEBUG_FS
 	mc_debugfs_dir = debugfs_create_dir("mc", NULL);
-	if (mc_debugfs_dir == NULL) {
+	if (mc_debugfs_dir == NULL)
 		pr_err("Failed to make debugfs node: %ld\n",
 		       PTR_ERR(mc_debugfs_dir));
-		return PTR_ERR(mc_debugfs_dir);
-	}
+#endif
 
 	tegra_mcerr_init(mc_debugfs_dir, pdev);
 

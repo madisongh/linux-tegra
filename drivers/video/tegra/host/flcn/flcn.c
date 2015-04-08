@@ -1,7 +1,7 @@
 /*
 * Tegra flcn common driver
 *
-* Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+* Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
 *
 * This program is free software; you can redistribute it and/or modify it
 * under the terms and conditions of the GNU General Public License,
@@ -33,6 +33,7 @@
 #include "class_ids.h"
 #include "bus_client.h"
 #include "nvhost_acm.h"
+#include "nvhost_vm.h"
 #include "nvhost_scale.h"
 #include "nvhost_channel.h"
 
@@ -251,6 +252,8 @@ static int flcn_read_ucode(struct platform_device *dev, const char *fw_name)
 	}
 
 	v->valid = true;
+
+	nvhost_vm_map_static(dev, v->mapped, v->dma_addr, v->size);
 
 	release_firmware(ucode_fw);
 
@@ -508,10 +511,11 @@ static int flcn_probe(struct platform_device *dev)
 	nvhost_module_init(dev);
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS
+#ifndef CONFIG_PM_GENERIC_DOMAINS_OF
 	pdata->pd.name = kstrdup(dev->name, GFP_KERNEL);
 	if (!pdata->pd.name)
 		return -ENOMEM;
-
+#endif
 	err = nvhost_module_add_domain(&pdata->pd, dev);
 #endif
 
@@ -528,12 +532,7 @@ static int flcn_probe(struct platform_device *dev)
 
 static int __exit flcn_remove(struct platform_device *dev)
 {
-#ifdef CONFIG_PM_RUNTIME
-	pm_runtime_put(&dev->dev);
-	pm_runtime_disable(&dev->dev);
-#else
-	nvhost_module_disable_clk(&dev->dev);
-#endif
+	nvhost_client_device_release(dev);
 	return 0;
 }
 
@@ -560,8 +559,24 @@ static struct platform_driver flcn_driver = {
 	.id_table = flcn_id_table,
 };
 
+static struct of_device_id tegra21x_flcn_domain_match[] = {
+	{.compatible = "nvidia,tegra210-vic03-pd",
+	 .data = (struct nvhost_device_data *)&t21_vic_info},
+	{.compatible = "nvidia,tegra210-msenc-pd",
+	 .data = (struct nvhost_device_data *)&t21_msenc_info},
+	{.compatible = "nvidia,tegra210-nvjpg-pd",
+	 .data = (struct nvhost_device_data *)&t21_nvjpg_info},
+	{},
+};
+
 static int __init flcn_init(void)
 {
+	int ret;
+
+	ret = nvhost_domain_init(tegra21x_flcn_domain_match);
+	if (ret)
+		return ret;
+
 	return platform_driver_register(&flcn_driver);
 }
 

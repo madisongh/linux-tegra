@@ -116,6 +116,7 @@ static void of_get_regulation_constraints(struct device_node *np,
 		constraints->valid_ops_mask |= REGULATOR_CHANGE_CURRENT;
 
 	constraints->boot_on = of_property_read_bool(np, "regulator-boot-on");
+	constraints->boot_off = of_property_read_bool(np, "regulator-boot-off");
 	constraints->always_on = of_property_read_bool(np, "regulator-always-on");
 	if (!constraints->always_on) /* status change should be possible. */
 		constraints->valid_ops_mask |= REGULATOR_CHANGE_STATUS;
@@ -149,6 +150,11 @@ static void of_get_regulation_constraints(struct device_node *np,
 	ret = of_property_read_u32(np, "regulator-init-mode", &pval);
 	if (!ret)
 		constraints->initial_mode = pval;
+
+	ret = of_property_read_u32(np, "regulator-sleep-mode", &pval);
+	if (!ret)
+		constraints->sleep_mode = pval;
+
 	if (of_find_property(np, "regulator-disable-parent-after-enable", NULL))
 		constraints->disable_parent_after_enable = true;
 }

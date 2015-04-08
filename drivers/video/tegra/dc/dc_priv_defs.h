@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -55,6 +55,8 @@ static inline u32 ALL_UF_INT(void)
 	defined(CONFIG_ARCH_TEGRA_3x_SOC) || \
 	defined(CONFIG_ARCH_TEGRA_11x_SOC)
 	return WIN_A_UF_INT | WIN_B_UF_INT | WIN_C_UF_INT;
+#elif defined(CONFIG_TEGRA_NVDISPLAY)
+	return NVDISP_UF_INT;
 #else
 	return WIN_A_UF_INT | WIN_B_UF_INT | WIN_C_UF_INT | HC_UF_INT |
 		WIN_D_UF_INT | WIN_T_UF_INT;
@@ -113,7 +115,7 @@ struct tegra_dc_out_ops {
 	 * during OSidle.
 	 */
 	bool (*osidle)(struct tegra_dc *dc);
-	/* callback after new mode is programmed.
+	/* callback before new mode is programmed.
 	 * dc clocks are on at this point */
 	void (*modeset_notifier)(struct tegra_dc *dc);
 	/* Set up interface and sink for partial frame update.
@@ -124,6 +126,8 @@ struct tegra_dc_out_ops {
 	int (*ddc_enable)(struct tegra_dc *dc);
 	/* refcounted disable of pads and clocks after performing DDC/I2C. */
 	int (*ddc_disable)(struct tegra_dc *dc);
+	/* Enable/disable VRR */
+	void (*vrr_enable)(struct tegra_dc *dc, bool enable);
 };
 
 struct tegra_dc_shift_clk_div {
@@ -161,6 +165,7 @@ struct tegra_dc {
 #else
 	struct clk			*emc_clk;
 #endif
+	struct clk			*emc_la_clk;
 	long				bw_kbps; /* bandwidth in KBps */
 	long				new_bw_kbps;
 	struct tegra_dc_shift_clk_div	shift_clk_div;
@@ -193,11 +198,20 @@ struct tegra_dc {
 
 	struct tegra_dc_blend		blend;
 	int				n_windows;
-#ifdef CONFIG_TEGRA_DC_CMU
+
+#if defined(CONFIG_TEGRA_DC_CMU)
 	struct tegra_dc_cmu		cmu;
+#elif defined(CONFIG_TEGRA_DC_CMU_V2)
+	struct tegra_dc_lut		cmu;
+#endif
+
+#if defined(CONFIG_TEGRA_DC_CMU) || defined(CONFIG_TEGRA_DC_CMU_V2)
 	struct tegra_dc_cmu		cmu_shadow;
 	bool				cmu_dirty;
+	/* Is CMU set by bootloader */
+	bool				is_cmu_set_bl;
 	bool				cmu_shadow_dirty;
+	bool				cmu_shadow_force_update;
 	bool				cmu_enabled;
 #endif
 	wait_queue_head_t		wq;
@@ -242,6 +256,7 @@ struct tegra_dc {
 		u64			underflows_d;
 		u64			underflows_h;
 		u64			underflows_t;
+		u64			underflow_frames;
 	} stats;
 
 #ifdef CONFIG_TEGRA_DC_EXTENSIONS

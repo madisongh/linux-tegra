@@ -74,6 +74,7 @@
 /* SMMU global address space */
 #define ARM_SMMU_GR0(smmu)		((smmu)->base)
 #define ARM_SMMU_GR1(smmu)		((smmu)->base + (1 << (smmu)->pgshift))
+#define ARM_SMMU_PME(smmu)		((smmu)->base + (3 << (smmu)->pgshift))
 
 /*
  * SMMU global address space with conditional offset to access secure
@@ -200,9 +201,9 @@
 #define ARM_SMMU_GR0_SMR(n)		(0x800 + ((n) << 2))
 #define SMR_VALID			(1 << 31)
 #define SMR_MASK_SHIFT			16
-#define SMR_MASK_MASK			0x7fff
+#define SMR_MASK_MASK			0x7f80
 #define SMR_ID_SHIFT			0
-#define SMR_ID_MASK			0x7fff
+#define SMR_ID_MASK			0x7f80
 
 #define ARM_SMMU_GR0_S2CR(n)		(0xc00 + ((n) << 2))
 #define S2CR_CBNDX_SHIFT		0
@@ -340,6 +341,8 @@
 
 #define FSYNR0_WNR			(1 << 4)
 
+#define NUM_SID				64
+
 static int force_stage;
 module_param_named(force_stage, force_stage, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(force_stage,
@@ -386,6 +389,7 @@ struct arm_smmu_device {
 	u32				features;
 
 #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
+#define ARM_SMMU_OPT_BROKEN_SIM_IRQ    (1 << 1)
 	u32				options;
 	enum arm_smmu_arch_version	version;
 
@@ -431,18 +435,21 @@ struct arm_smmu_cfg {
 struct arm_smmu_domain {
 	struct arm_smmu_device		*smmu;
 	struct arm_smmu_cfg		cfg;
+	struct page *arm_dummy_page;   /* dummy page for faulted address*/
 	spinlock_t			lock;
 };
 
 static DEFINE_SPINLOCK(arm_smmu_devices_lock);
 static LIST_HEAD(arm_smmu_devices);
 
+static struct arm_smmu_device *smmu_handle; /* assmu only one smmu device */
+static u32 arm_smmu_skip_mapping; /* For debug */
+static u32 arm_smmu_gr0_tlbiallnsnh; /* Insert TLBIALLNSNH at all */
+
 #ifdef CONFIG_ARM_SMMU_WAR
 /*
  * linsim hacks: Indirect register accessor
  */
-static struct arm_smmu_device *smmu_handle; /* assmu only one smmu device */
-
 #undef readl_relaxed
 #undef writel_relaxed
 #undef writel
@@ -501,6 +508,10 @@ static inline u32 readl_relaxed(const volatile void __iomem *virt_addr)
 }
 #endif
 
+void __weak platform_override_streamid(int streamid)
+{
+}
+
 struct arm_smmu_option_prop {
 	u32 opt;
 	const char *prop;
@@ -508,6 +519,8 @@ struct arm_smmu_option_prop {
 
 static struct arm_smmu_option_prop arm_smmu_options[] = {
 	{ ARM_SMMU_OPT_SECURE_CFG_ACCESS, "calxeda,smmu-secure-config-access" },
+	{ ARM_SMMU_OPT_SECURE_CFG_ACCESS, "-calxeda,smmu-secure-config-access" },
+	{ ARM_SMMU_OPT_BROKEN_SIM_IRQ, "linsim,smmu-broken-sim-irq" },
 	{ 0, NULL},
 };
 
@@ -518,7 +531,10 @@ static void parse_driver_options(struct arm_smmu_device *smmu)
 	do {
 		if (of_property_read_bool(smmu->dev->of_node,
 						arm_smmu_options[i].prop)) {
-			smmu->options |= arm_smmu_options[i].opt;
+			if (arm_smmu_options[i].prop[0] == '-')
+				smmu->options &= ~arm_smmu_options[i].opt;
+			else
+				smmu->options |= arm_smmu_options[i].opt;
 			dev_notice(smmu->dev, "option %s\n",
 				arm_smmu_options[i].prop);
 		}
@@ -638,6 +654,7 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
 			return -ERANGE;
 		}
 		master->cfg.streamids[i] = streamid;
+		platform_override_streamid(streamid);
 	}
 	return insert_smmu_master(smmu, master);
 }
@@ -682,6 +699,9 @@ static void arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
 {
 	int count = 0;
 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+
+	if (tegra_platform_is_linsim() || arm_smmu_gr0_tlbiallnsnh)
+		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
 
 	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_sTLBGSYNC);
 	while (readl_relaxed(gr0_base + ARM_SMMU_GR0_sTLBGSTATUS)
@@ -973,7 +993,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
 	}
 
 	/* SCTLR */
-	reg = SCTLR_CFCFG | SCTLR_CFIE | SCTLR_CFRE | SCTLR_M | SCTLR_EAE_SBOP;
+	reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_M | SCTLR_EAE_SBOP;
 	if (stage1)
 		reg |= SCTLR_S1_ASIDPNE;
 #ifdef __BIG_ENDIAN
@@ -1088,6 +1108,11 @@ static int arm_smmu_domain_init(struct iommu_domain *domain)
 	smmu_domain->cfg.pgd = pgd;
 
 	spin_lock_init(&smmu_domain->lock);
+
+	smmu_domain->arm_dummy_page = alloc_page(GFP_KERNEL | __GFP_ZERO);
+	if (!smmu_domain->arm_dummy_page)
+		return -ENOMEM;
+
 	domain->priv = smmu_domain;
 	return 0;
 
@@ -1169,6 +1194,7 @@ static void arm_smmu_domain_destroy(struct iommu_domain *domain)
 	 */
 	arm_smmu_destroy_domain_context(domain);
 	arm_smmu_free_pgtables(smmu_domain);
+	__free_page(smmu_domain->arm_dummy_page);
 	kfree(smmu_domain);
 }
 
@@ -1203,7 +1229,7 @@ static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
 
 		smrs[i] = (struct arm_smmu_smr) {
 			.idx	= idx,
-			.mask	= 0, /* We don't currently share SMRs */
+			.mask	= SMR_ID_MASK,
 			.id	= cfg->streamids[i],
 		};
 	}
@@ -1247,6 +1273,7 @@ static void arm_smmu_master_free_smrs(struct arm_smmu_device *smmu,
 	kfree(smrs);
 }
 
+#ifdef CONFIG_ARM_SMMU_WAR
 /* HACK: c-model uses legacy swgroup interface */
 static void tegra_smmu_conf_swgroup(struct arm_smmu_device *smmu, int swgid,
 				    u8 cbndx)
@@ -1261,6 +1288,12 @@ static void tegra_smmu_conf_swgroup(struct arm_smmu_device *smmu, int swgid,
 	pr_info("%s() ASID_0=0x%zx val=0x%08x streamID=%d cbndx=%d\n",
 		__func__, offs, val, swgid, cbndx);
 }
+#else
+static inline void tegra_smmu_conf_swgroup(struct arm_smmu_device *smmu,
+					   int swgid, u8 cbndx)
+{
+}
+#endif
 
 static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
 				      struct arm_smmu_master_cfg *cfg)
@@ -1328,35 +1361,38 @@ static int smmu_ptdump_show(struct seq_file *s, void *unused)
 	unsigned long addr = 0;
 
 	pgd = cfg->pgd;
-	for (i = 0; i < PTRS_PER_PGD; ++i, pgd++) {
+	for (i = 0; i < PTRS_PER_PGD;
+		++i, pgd++, addr += PGDIR_SIZE) {
 		if (pgd_none(*pgd))
 			continue;
 		pud = pud_offset(pgd, addr);
 		for (j = 0; j < PTRS_PER_PUD; ++j, pud++) {
-			if (pud_none(*pud))
+			if (pud_none(*pud)) {
+				if ((ulong)pgd != (ulong)pud)
+					addr += PUD_SIZE;
 				continue;
+			}
 			pmd = pmd_offset(pud, addr);
-			for (k = 0; k < PTRS_PER_PMD; ++k, pmd++) {
+			for (k = 0; k < PTRS_PER_PMD;
+				++k, pmd++, addr += PMD_SIZE) {
 				if (pmd_none(*pmd))
 					continue;
 				pte = pmd_page_vaddr(*pmd) + pte_index(addr);
-				for (l = 0; l < PTRS_PER_PTE; ++l, pte++) {
+				for (l = 0; l < PTRS_PER_PTE;
+					++l, pte++, addr += PAGE_SIZE) {
 					phys_addr_t pa;
 
-					pa = *pte;
-					pa &= PAGE_MASK;
+					pa = __pfn_to_phys(pte_pfn(*pte));
 					if (!pa)
 						continue;
 					seq_printf(s,
 						   "va=0x%016lx pa=%pap *pte=%pad\n",
 						   addr, &pa, &(*pte));
-					addr += PAGE_SIZE;
 				}
-				addr += PMD_SIZE;
 			}
-			addr += PUD_SIZE;
+			if ((ulong)pgd != (ulong)pud)
+				addr += PUD_SIZE;
 		}
-		addr += PGDIR_SIZE;
 	}
 	return 0;
 }
@@ -1751,9 +1787,13 @@ static int arm_smmu_handle_mapping(struct arm_smmu_domain *smmu_domain,
 
 	if (test_bit(cfg->cbndx, smmu->context_filter)) {
 		trace_smmu_map(cfg->cbndx, iova, paddr, size, prot);
-		pr_debug("cbndx=%d iova=%pad paddr=%pap size=%zx prot=%x\n",
-			 cfg->cbndx, &iova, &paddr, size, prot);
+		pr_debug("cbndx=%d iova=%pad paddr=%pap size=%zx prot=%x skip=%d\n",
+			 cfg->cbndx, &iova, &paddr, size, prot,
+			 arm_smmu_skip_mapping);
 	}
+
+	if (arm_smmu_skip_mapping)
+		return 0;
 
 	spin_lock_irqsave(&smmu_domain->lock, flags);
 	pgd += pgd_index(iova);
@@ -1883,6 +1923,25 @@ static void __arm_smmu_release_pci_iommudata(void *data)
 	kfree(data);
 }
 
+static int arm_iommu_fault(struct iommu_domain *domain, struct device *dev,
+		unsigned long iova, int flags, void *token)
+{
+	struct arm_smmu_domain *smmu_domain = domain->priv;
+
+	dev_err(dev, "iommu fault: iova 0x%lx flags 0x%x\n",
+		iova, flags);
+
+	if (arm_smmu_skip_mapping)
+		arm_smmu_skip_mapping = 0;
+
+	arm_smmu_handle_mapping(smmu_domain, iova,
+		page_to_phys(smmu_domain->arm_dummy_page),
+				PAGE_SIZE, 0);
+	arm_smmu_tlb_inv_context(smmu_domain);
+
+	return 0;
+}
+
 static int arm_smmu_add_device(struct device *dev)
 {
 	struct arm_smmu_device *smmu;
@@ -1956,6 +2015,9 @@ static int arm_smmu_add_device(struct device *dev)
 	if (ret)
 		goto err_attach_dev;
 
+	if (smmu->options & ARM_SMMU_OPT_BROKEN_SIM_IRQ)
+		iommu_set_fault_handler(mapping->domain, arm_iommu_fault, 0);
+
 	return 0;
 
 err_attach_dev:
@@ -2021,13 +2083,13 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
 	reg = readl_relaxed(ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
 
 	/* Enable fault reporting */
-	reg |= (sCR0_GFRE | sCR0_GFIE | sCR0_GCFGFRE | sCR0_GCFGFIE);
+	reg |= (sCR0_GFRE | sCR0_GFIE | sCR0_GCFGFRE | sCR0_GCFGFIE | sCR0_USFCFG);
 
 	/* Disable TLB broadcasting. */
 	reg |= (sCR0_VMIDPNE | sCR0_PTM);
 
 	/* Enable client access, but bypass when no mapping is found */
-	reg &= ~(sCR0_CLIENTPD | sCR0_USFCFG);
+	reg &= ~(sCR0_CLIENTPD);
 
 	/* Disable forced broadcasting */
 	reg &= ~sCR0_FB;
@@ -2360,6 +2422,10 @@ static void arm_smmu_debugfs_create(struct arm_smmu_device *smmu)
 	debugfs_create_file("context_filter", S_IRUGO | S_IWUSR,
 			    smmu->debugfs_root, smmu,
 			    &smmu_context_filter_fops);
+	debugfs_create_bool("skip_mapping",  S_IRUGO | S_IWUSR,
+			    smmu->debugfs_root, &arm_smmu_skip_mapping);
+	debugfs_create_bool("gr0_tlbiallnsnh",  S_IRUGO | S_IWUSR,
+			smmu->debugfs_root, &arm_smmu_gr0_tlbiallnsnh);
 	return;
 
 err_out:
@@ -2385,6 +2451,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 	struct rb_node *node;
 	struct of_phandle_args masterspec;
 	int num_irqs, i, err, count;
+
+	if (tegra_platform_is_unit_fpga())
+		return -ENODEV;
 
 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
 	if (!smmu) {
@@ -2455,6 +2524,10 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 	while (!of_parse_phandle_with_args(dev->of_node, "mmu-masters",
 					   "#stream-id-cells", i,
 					   &masterspec)) {
+
+		dev_dbg(dev, "%s() masterspec.np->name=%s\n",
+			__func__, masterspec.np->name);
+
 		err = register_smmu_master(smmu, dev, &masterspec);
 		if (err) {
 			dev_err(dev, "failed to add master %s\n",
@@ -2563,8 +2636,8 @@ static int __init arm_smmu_init(void)
 {
 	int ret;
 
-	if (config_enabled(CONFIG_ARM_SMMU_WAR) &&
-	    tegra_platform_is_linsim()) {
+#ifdef CONFIG_ARM_SMMU_WAR
+	if (tegra_platform_is_linsim()) {
 		mc_base = ioremap_nocache(MC_BASE, MC_SIZE);
 		if (!mc_base)
 			return -EINVAL;
@@ -2573,7 +2646,7 @@ static int __init arm_smmu_init(void)
 			__func__, MC_BASE, mc_base);
 		__writel(SMMU_CONFIG_ENABLE, mc_base + SMMU_CONFIG);
 	}
-
+#endif
 	ret = platform_driver_register(&arm_smmu_driver);
 	if (ret)
 		return ret;

@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Virtualization Host Interrupt Management
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -62,11 +62,12 @@ static int syncpt_thresh_cascade_handler(void *dev_id)
 		}
 
 		sp_id = msg->id;
-		if (unlikely(sp_id < dev->info.pts_base ||
-			sp_id >= dev->info.pts_limit)) {
+		if (unlikely(!nvhost_syncpt_is_valid_hw_pt(&dev->syncpt,
+				sp_id))) {
 			dev_err(&dev->dev->dev,
 				"%s(): syncpoint id %d is beyond the number of syncpoints (%d)\n",
-				__func__, sp_id, dev->info.nb_pts);
+				__func__, sp_id,
+				nvhost_syncpt_nb_hw_pts(&dev->syncpt));
 			tegra_gr_comm_release(handle);
 			continue;
 		}
@@ -113,7 +114,7 @@ static void vhost_intr_init_host_sync(struct nvhost_intr *intr)
 
 	intr_op().disable_all_syncpt_intrs(intr);
 
-	for (i = 0; i < dev->info.nb_pts; i++)
+	for (i = 0; i < nvhost_syncpt_nb_hw_pts(&dev->syncpt); i++)
 		INIT_WORK(&intr->syncpt[i].work, syncpt_thresh_cascade_fn);
 
 	ctx->syncpt_handler =

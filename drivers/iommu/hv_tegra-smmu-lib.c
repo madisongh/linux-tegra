@@ -1,7 +1,7 @@
 /*
  * IVC based Library for SMMU services.
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -28,6 +28,7 @@ struct tegra_hv_smmu_comm_dev *saved_smmu_comm_dev;
 
 static void ivc_rx(struct tegra_hv_ivc_cookie *ivck);
 static int ivc_poll = 1;
+void print_server_error(const struct device *dev, int err);
 
 static int ivc_send(struct tegra_hv_smmu_comm_chan *comm_chan,
 			struct smmu_ivc_msg *msg, int size)
@@ -46,6 +47,13 @@ static int ivc_send(struct tegra_hv_smmu_comm_chan *comm_chan,
 	}
 
 	ret = tegra_hv_ivc_write(comm_chan->ivck, msg, size);
+	/* Assumption here is server will not reset the ivc channel
+	 * for a active guest.
+	 * If we have reached here that means ivc chanel went to
+	 * established state.
+	 */
+	BUG_ON(ret == -ECONNRESET);
+
 	if (ret != size) {
 		ret = -EIO;
 		goto fail;
@@ -111,9 +119,12 @@ int ivc_send_recv(enum smmu_msg_t msg,
 {
 	int err = -EINVAL;
 	unsigned long flags;
+	struct device *dev;
 
 	if (!comm_chan || !tx_msg || !rx_msg)
 		return err;
+
+	dev = comm_chan->hv_comm_dev->dev;
 
 	/* Serialize requests per ASID */
 	spin_lock_irqsave(&comm_chan->lock, flags);
@@ -127,17 +138,25 @@ int ivc_send_recv(enum smmu_msg_t msg,
 	tx_msg->e_marker = 0xBEAFDEAD;
 	comm_chan->rx_state = RX_PENDING;
 	err = ivc_send(comm_chan, tx_msg, sizeof(struct smmu_ivc_msg));
-	if (err < 0)
+	if (err < 0) {
+		dev_err(dev, "ivc_send failed err %d\n", err);
 		goto fail;
+	}
 
 	err = ivc_recv_sync(comm_chan, rx_msg, sizeof(struct smmu_ivc_msg));
-	if (err < 0)
+	if (err < 0) {
+		dev_err(dev, "ivc_recv failed err %d\n", err);
 		goto fail;
+	}
 
 	/* Return the server error code to the caller
 	 * Using positive error codes for server status
 	 * Using negative error codes for IVC comm errors
 	 */
+	if (rx_msg->err) {
+		dev_err(dev, "server error %d", rx_msg->err);
+		print_server_error(dev, rx_msg->err);
+	}
 	err = rx_msg->err;
 fail:
 	spin_unlock_irqrestore(&comm_chan->lock, flags);
@@ -158,13 +177,20 @@ void ivc_rx(struct tegra_hv_ivc_cookie *ivck)
 		/* Message available */
 		struct tegra_hv_smmu_comm_chan *comm_chan = NULL;
 		int comm_chan_id;
-		u32 len = 0;
+		int ret = 0;
 		struct smmu_ivc_msg rx_msg;
 
 		memset(&rx_msg, 0, sizeof(struct smmu_ivc_msg));
-		len = tegra_hv_ivc_read(ivck, &rx_msg,
+		ret = tegra_hv_ivc_read(ivck, &rx_msg,
 					sizeof(struct smmu_ivc_msg));
-		if (len != sizeof(struct smmu_ivc_msg)) {
+		/* Assumption here is server will not reset the ivc channel
+		 * for a active guest.
+		 * If we have reached here that means ivc chanel went to
+		 * established state.
+		 */
+		BUG_ON(ret == -ECONNRESET);
+
+		if (ret != sizeof(struct smmu_ivc_msg)) {
 			dev_err(saved_smmu_comm_dev->dev,
 				"IVC read failure (msg size error)\n");
 			goto fail;
@@ -323,6 +349,17 @@ int tegra_hv_smmu_comm_init(struct device *dev)
 	smmu_comm_dev->ivck = ivck;
 	smmu_comm_dev->dev = dev;
 
+	/* set ivc channel to invalid state */
+	tegra_hv_ivc_channel_reset(ivck);
+
+	/* Poll to enter established state
+	 * Sync -> Established
+	 * Client driver is polling based so we can't move forward till
+	 * ivc queue communication path is established.
+	 */
+	while (tegra_hv_ivc_channel_notified(ivck))
+		;
+
 	spin_lock_init(&smmu_comm_dev->ivck_rx_lock);
 	spin_lock_init(&smmu_comm_dev->ivck_tx_lock);
 	spin_lock_init(&smmu_comm_dev->lock);
@@ -380,14 +417,8 @@ int libsmmu_get_num_asids(int comm_chan_id, unsigned int *num_asids)
 	memset(&rx_msg, 0, sizeof(struct smmu_ivc_msg));
 
 	err = ivc_send_recv(SMMU_INFO, comm_chan, &tx_msg, &rx_msg);
-	if (err < 0) {
-		dev_err(dev,
-			"IVC comm error (asid) %d\n", comm_chan->id);
+	if (err)
 		return -EIO;
-	} else if (err) {
-		print_server_error(dev, err);
-		return -EIO;
-	}
 
 	info = &rx_msg.sinfo;
 	*num_asids = info->as_pool.end - info->as_pool.start;
@@ -417,15 +448,8 @@ int libsmmu_get_dma_window(int comm_chan_id, u64 *base,	size_t *size)
 	memset(&rx_msg, 0, sizeof(struct smmu_ivc_msg));
 
 	err = ivc_send_recv(SMMU_INFO, comm_chan, &tx_msg, &rx_msg);
-
-	if (err < 0) {
-		dev_err(dev,
-			"IVC comm error (asid) %d\n", comm_chan->id);
+	if (err)
 		return -EIO;
-	} else if (err) {
-		print_server_error(dev, err);
-		return -EIO;
-	}
 
 	info = &rx_msg.sinfo;
 	*base = info->window.start;
@@ -456,15 +480,8 @@ int libsmmu_connect(int comm_chan_id)
 	memset(&rx_msg, 0, sizeof(struct smmu_ivc_msg));
 
 	err = ivc_send_recv(CONNECT, comm_chan, &tx_msg, &rx_msg);
-
-	if (err < 0) {
-		dev_err(dev,
-			"IVC comm error (asid) %d\n", comm_chan->id);
+	if (err)
 		return -EIO;
-	} else if (err) {
-		print_server_error(dev, err);
-		return -EIO;
-	}
 
 	return err;
 }
@@ -492,15 +509,8 @@ int libsmmu_get_swgids(int comm_chan_id, u64 *swgids)
 	memset(&rx_msg, 0, sizeof(struct smmu_ivc_msg));
 
 	err = ivc_send_recv(SMMU_INFO, comm_chan, &tx_msg, &rx_msg);
-
-	if (err < 0) {
-		dev_err(dev,
-			"IVC comm error (asid) %d\n", comm_chan->id);
+	if (err)
 		return -EIO;
-	} else if (err) {
-		print_server_error(dev, err);
-		return -EIO;
-	}
 
 	info = &rx_msg.sinfo;
 	*swgids = info->swgids;
@@ -536,15 +546,8 @@ int libsmmu_attach_hwgrp(int comm_chan_id, u32 hwgrp, u32 asid)
 	dctxt->hwgrp = hwgrp;
 
 	err = ivc_send_recv(ATTACH, comm_chan, &tx_msg, &rx_msg);
-
-	if (err < 0) {
-		dev_err(dev,
-			"IVC communication failed chanid %d\n",	comm_chan->id);
+	if (err)
 		return -EIO;
-	} else if (err) {
-		print_server_error(dev, err);
-		return -EIO;
-	}
 
 	return err;
 }
@@ -575,15 +578,8 @@ int libsmmu_detach_hwgrp(int comm_chan_id, u32 hwgrp)
 
 	dctxt->hwgrp = hwgrp;
 	err = ivc_send_recv(DETACH, comm_chan, &tx_msg, &rx_msg);
-
-	if (err < 0) {
-		dev_err(dev,
-			"IVC comm error (asid) %d\n", comm_chan->id);
+	if (err)
 		return -EIO;
-	} else if (err) {
-		print_server_error(dev, err);
-		return -EIO;
-	}
 
 	return err;
 }
@@ -620,15 +616,8 @@ int libsmmu_map_large_page(int comm_chan_id, u32 asid, u64 iova, u64 ipa,
 	dctxt->attr = attr;
 
 	err = ivc_send_recv(MAP_LARGE_PAGE, comm_chan, &tx_msg, &rx_msg);
-
-	if (err < 0) {
-		dev_err(dev,
-			"IVC comm error (asid) %d\n", comm_chan->id);
+	if (err)
 		return -EIO;
-	} else if (err) {
-		print_server_error(dev, err);
-		return -EIO;
-	}
 
 	BUG_ON(rx_msg.dctxt.asid != tx_msg.dctxt.asid);
 	return err;
@@ -667,15 +656,8 @@ int libsmmu_map_page(int comm_chan_id, u32 asid, u64 iova, u64 ipa,
 	dctxt->attr = attr;
 
 	err = ivc_send_recv(MAP_PAGE, comm_chan, &tx_msg, &rx_msg);
-
-	if (err < 0) {
-		dev_err(dev,
-			"IVC comm error (asid) %d\n", comm_chan->id);
+	if (err)
 		return -EIO;
-	} else if (err) {
-		print_server_error(dev, err);
-		return -EIO;
-	}
 
 	BUG_ON(rx_msg.dctxt.asid != tx_msg.dctxt.asid);
 	return err;
@@ -708,15 +690,8 @@ int libsmmu_unmap(int comm_chan_id, u32 asid, u64 iova, u64 bytes)
 	dctxt->ipa = bytes;
 
 	err = ivc_send_recv(UNMAP_PAGE, comm_chan, &tx_msg, &rx_msg);
-
-	if (err < 0) {
-		dev_err(dev,
-			"IVC communication failed chanid %d\n", comm_chan->id);
+	if (err)
 		return -EIO;
-	} else if (err) {
-		print_server_error(dev, err);
-		return -EIO;
-	}
 
 	BUG_ON(rx_msg.dctxt.asid != tx_msg.dctxt.asid);
 	return bytes;
@@ -748,20 +723,8 @@ int libsmmu_iova_to_phys(int comm_chan_id, u32 asid, u64 iova, u64 *ipa)
 	dctxt->iova = iova;
 
 	err = ivc_send_recv(IPA, comm_chan, &tx_msg, &rx_msg);
-
-	if (err < 0) {
-		dev_err(comm_chan->hv_comm_dev->dev,
-			"IVC comm error (asid) %d\n", comm_chan->id);
+	if (err)
 		return -EIO;
-	}
-
-	if (err) {
-		dev_err(dev,
-			"Operation failed resp_code %d\n", rx_msg.err);
-	} else if (err) {
-		print_server_error(dev, err);
-		return -EIO;
-	}
 
 	*ipa = rx_msg.dctxt.ipa;
 	return err;
@@ -795,20 +758,8 @@ int libsmmu_debug_op(int comm_chan_id, u32 op, u64 op_data_in, u64 *op_data_out)
 	dctxt->iova = op_data_in;
 
 	err = ivc_send_recv(DEBUG_OP, comm_chan, &tx_msg, &rx_msg);
-
-	if (err < 0) {
-		dev_err(comm_chan->hv_comm_dev->dev,
-			"IVC comm error (asid) %d\n", comm_chan->id);
+	if (err)
 		return -EIO;
-	}
-
-	if (err) {
-		dev_err(dev,
-			"Operation failed resp_code %d\n", rx_msg.err);
-	} else if (err) {
-		print_server_error(dev, err);
-		return -EIO;
-	}
 
 	/* Hack ipa member for debug data out */
 	*op_data_out = rx_msg.dctxt.ipa;

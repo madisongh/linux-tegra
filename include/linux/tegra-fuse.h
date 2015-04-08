@@ -60,9 +60,11 @@ int tegra_cpu_speedo_id(void);
 int tegra_cpu_speedo_mv(void);
 int tegra_cpu_speedo_value(void);
 int tegra_core_speedo_mv(void);
+int tegra_core_speedo_min_mv(void);
 int tegra_gpu_speedo_id(void);
 int tegra_get_sku_override(void);
 int tegra_get_cpu_iddq_value(void);
+int tegra_get_chip_personality(void);
 
 #if defined(CONFIG_ARCH_TEGRA_12x_SOC) || defined(CONFIG_ARCH_TEGRA_21x_SOC)
 int tegra_cpu_speedo_0_value(void);

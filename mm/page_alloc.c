@@ -1142,17 +1142,30 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 	unsigned int current_order;
 	struct page *page;
 	int migratetype, new_type, i;
+	int non_cma_order;
 
 	/* Find the largest possible block of pages in the other list */
-	for (current_order = MAX_ORDER-1;
-				current_order >= order && current_order <= MAX_ORDER-1;
-				--current_order) {
+	for (non_cma_order = MAX_ORDER-1;
+				non_cma_order >= order && non_cma_order <= MAX_ORDER-1;
+				--non_cma_order) {
 		for (i = 0;; i++) {
 			migratetype = fallbacks[start_migratetype][i];
 
 			/* MIGRATE_RESERVE handled later if necessary */
 			if (migratetype == MIGRATE_RESERVE)
 				break;
+
+			if (is_migrate_cma(migratetype))
+				/* CMA page blocks are not movable across
+				 * migrate types. Seach for free blocks
+				 * from lowest order to avoid contiguous
+				 * higher alignment allocations for subsequent
+				 * alloc requests.
+				 */
+				current_order = order + MAX_ORDER - 1 -
+						non_cma_order;
+			else
+				current_order = non_cma_order;
 
 			area = &(zone->free_area[current_order]);
 			if (list_empty(&area->free_list[migratetype]))
@@ -1190,6 +1203,10 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 	return NULL;
 }
 
+#ifdef CONFIG_CMA
+unsigned long cma_get_total_pages(void);
+#endif
+
 /*
  * Do the hard work of removing an element from the buddy allocator.
  * Call me with the zone->lock already held.
@@ -1197,10 +1214,24 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 static struct page *__rmqueue(struct zone *zone, unsigned int order,
 						int migratetype)
 {
-	struct page *page;
+	struct page *page = NULL;
 
 retry_reserve:
-	page = __rmqueue_smallest(zone, order, migratetype);
+#ifdef CONFIG_CMA
+	if (migratetype == MIGRATE_MOVABLE) {
+
+		unsigned long nr_cma_pages = cma_get_total_pages();
+		unsigned long nr_free_cma_pages =
+			global_page_state(NR_FREE_CMA_PAGES);
+		unsigned int current_cma_usage = 100 -
+			((nr_free_cma_pages * 100) / nr_cma_pages);
+
+		if (current_cma_usage < cma_threshold_get())
+			page = __rmqueue_smallest(zone, order, MIGRATE_CMA);
+	}
+	if (!page)
+#endif
+		page = __rmqueue_smallest(zone, order, migratetype);
 
 	if (unlikely(!page) && migratetype != MIGRATE_RESERVE) {
 		page = __rmqueue_fallback(zone, order, migratetype);

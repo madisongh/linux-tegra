@@ -3,7 +3,7 @@
  *
  * GK20A Graphics
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -228,7 +228,10 @@ static ssize_t railgate_delay_store(struct device *dev,
 				    const char *buf, size_t count)
 {
 	struct gk20a_platform *platform = dev_get_drvdata(dev);
+	struct platform_device *ndev = to_platform_device(dev);
 	int railgate_delay = 0, ret = 0;
+	struct gk20a *g = get_gk20a(ndev);
+	int err;
 
 	if (!platform->can_railgate) {
 		dev_info(dev, "does not support power-gating\n");
@@ -242,6 +245,11 @@ static ssize_t railgate_delay_store(struct device *dev,
 		pm_genpd_set_poweroff_delay(genpd, platform->railgate_delay);
 	} else
 		dev_err(dev, "Invalid powergate delay\n");
+	/* wake-up system to make rail-gating delay effective immediately */
+	err = gk20a_busy(g->dev);
+	if (err)
+		return err;
+	gk20a_idle(g->dev);
 
 	return count;
 }
@@ -562,7 +570,7 @@ static ssize_t force_idle_store(struct device *device,
 		if (g->forced_idle)
 			return count; /* do nothing */
 		else {
-			err = __gk20a_do_idle(ndev);
+			err = __gk20a_do_idle(ndev, false);
 			if (!err) {
 				g->forced_idle = 1;
 				dev_info(device, "gpu is idle : %d\n",

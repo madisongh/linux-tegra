@@ -88,7 +88,7 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  *
- * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -2592,6 +2592,9 @@ void sk_common_release(struct sock *sk)
 }
 EXPORT_SYMBOL(sk_common_release);
 
+#define APK_NAME_MAX_LEN 108
+#define PROCESS_ID_LENGTH 20
+
 char *sk_get_waiting_task_cmdline(struct sock *sk, char *cmdline)
 {
 	bool softirq_enabled = false;
@@ -2600,7 +2603,7 @@ char *sk_get_waiting_task_cmdline(struct sock *sk, char *cmdline)
 	char *program_name = cmdline;
 	struct task_struct *task = NULL;
 	struct mm_struct *mm = NULL;
-	static char *apk_path_prefix = "/data/data";
+	char *apk_path_prefix = "/data/data";
 	wait_queue_t *wq = NULL;
 	struct list_head *lh = NULL;
 	struct socket_wq *sk_wq = NULL;
@@ -2663,12 +2666,17 @@ char *sk_get_waiting_task_cmdline(struct sock *sk, char *cmdline)
 		goto out;
 	}
 
+	if (softirq_count()) {
+		softirq_enabled = true;
+		local_bh_enable();
+	}
+
 	mm = get_task_mm(task);
 	if (mm && mm->arg_end) {
 		len = mm->arg_end - mm->arg_start;
 
-		if (len > PAGE_SIZE)
-			len = PAGE_SIZE;
+		if (len > APK_NAME_MAX_LEN)
+			len = APK_NAME_MAX_LEN;
 
 		if (softirq_count()) {
 			softirq_enabled = true;
@@ -2676,24 +2684,16 @@ char *sk_get_waiting_task_cmdline(struct sock *sk, char *cmdline)
 		}
 		res = access_process_vm(task, mm->arg_start, cmdline, len, 0);
 
-		if (res > 0 && cmdline[res-1] != '\0' && len < PAGE_SIZE) {
+		if (res > 0 && cmdline[res-1] != '\0' && len < APK_NAME_MAX_LEN) {
 			len = strnlen(cmdline, res);
-			if (len < res) {
+			if (len < res)
 				res = len;
-			} else {
-				len = mm->env_end - mm->env_start;
-				if (len > PAGE_SIZE - res)
-					len = PAGE_SIZE - res;
-				res += access_process_vm(task,
-					mm->env_start, cmdline+res, len, 0);
-				res = strnlen(cmdline, res);
-			}
 		}
 		if (softirq_enabled)
 			local_bh_disable();
 
-		if (res > PAGE_SIZE)
-			cmdline[PAGE_SIZE-1] = '\0';
+		if (res > APK_NAME_MAX_LEN)
+			cmdline[APK_NAME_MAX_LEN-1] = '\0';
 
 		len = strlen(apk_path_prefix);
 		if (!strncmp(apk_path_prefix, program_name, len))
@@ -2710,9 +2710,11 @@ char *sk_get_waiting_task_cmdline(struct sock *sk, char *cmdline)
 	if (mm)
 		mmput(mm);
 
+	if (softirq_enabled)
+		local_bh_disable();
+
 	len = strlen(program_name);
-	snprintf(program_name + len, PAGE_SIZE-(program_name-cmdline)-len,
-		 " %d %s", task->pid, task->comm);
+	snprintf(program_name + len, PROCESS_ID_LENGTH," %d", task->pid);
 out:
 	return program_name;
 }

@@ -95,6 +95,15 @@ config VIDEO_IMX132
         ---help---
           This is a driver for the IMX132 camera sensor
 
+config VIDEO_IMX208
+        tristate "IMX208 camera sensor support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+	  This is a driver for the IMX208
+	  camera sensor for use with the tegra isp.
+	  This sensor has a maximum of 2MP
+	  resolution.
+
 config VIDEO_OV9772
         tristate "OV9772 camera sensor support"
         depends on I2C && ARCH_TEGRA
@@ -217,6 +226,15 @@ config VIDEO_IMX179
           This is a driver for the IMX179 camera sensor
           for use with the tegra isp.
 
+config VIDEO_IMX219
+        tristate "IMX219 camera sensor support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+	  This is a driver for the IMX219
+	  camera sensor for use with the tegra isp.
+	  The sensor has a maximum of 8MP
+	  resolution.
+
 config VIDEO_IMX214
         tristate "IMX214 camera sensor support"
         depends on I2C && ARCH_TEGRA
@@ -228,7 +246,16 @@ config VIDEO_IMX214
 
 config VIDEO_CAMERA
         tristate "generic camera device support"
-        depends on I2C && ARCH_TEGRA
+        depends on I2C && PLATFORM_TEGRA
+        select REGMAP_I2C
         ---help---
           This is a driver for generic camera devices
           for use with the tegra isp.
+
+config VIDEO_ISC
+        tristate "ISC(Image Sensor Control) device support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the ISC
+          for controlling power, interrupt and registering
+          i2c clients related to image sensor.

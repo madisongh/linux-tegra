@@ -2,7 +2,7 @@
  * arch/arm/mach-tegra/board.h
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@google.com>
@@ -122,11 +122,7 @@ static inline void tegra_clear_framebuffer(unsigned long to, unsigned long size)
 {
 	__tegra_clear_framebuffer(NULL, to, size);
 }
-bool is_tegra_debug_uartport_hs(void);
-int get_tegra_uart_debug_port_id(void);
 bool is_uart_over_sd_enabled(void);
-int get_sd_uart_port_id(void);
-void set_sd_uart_port_id(int);
 int __init tegra_register_fuse(void);
 
 extern phys_addr_t tegra_bootloader_fb_start;
@@ -231,6 +227,12 @@ enum audio_codec_type {
 enum image_type {
 	system_image = 0,
 	rck_image,
+};
+
+/* Usage Model */
+enum chip_personality {
+	normal = 0,
+	always_on,
 };
 
 void tegra_get_board_info(struct board_info *);

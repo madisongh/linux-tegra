@@ -3,7 +3,7 @@
  *
  * GPU memory management driver for Tegra
  *
- * Copyright (c) 2009-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -55,9 +55,7 @@
 #define __GFP_NVMAP     (GFP_KERNEL | __GFP_HIGHMEM)
 #endif
 
-#define GFP_NVMAP       (__GFP_NVMAP | __GFP_NOWARN)
-
-extern bool zero_memory;
+#define GFP_NVMAP              (__GFP_NVMAP | __GFP_NOWARN)
 
 #ifdef CONFIG_64BIT
 #define NVMAP_LAZY_VFREE
@@ -145,6 +143,8 @@ struct nvmap_handle {
 	struct mutex lock;
 	void *nvhost_priv;	/* nvhost private data */
 	void (*nvhost_priv_delete)(void *priv);
+	unsigned int ivm_id;
+	int peer;		/* Peer VM number */
 };
 
 /* handle_ref objects are client-local references to an nvmap_handle;
@@ -189,11 +189,12 @@ struct nvmap_handle_ref {
 
 struct nvmap_page_pool {
 	struct mutex lock;
-	u32 alloc;  /* Alloc index. */
-	u32 fill;   /* Fill index. */
-	u32 count;  /* Number of pages in the table. */
-	u32 length; /* Length of the pages array. */
-	struct page **page_array;
+	u32 count;  /* Number of pages in the page list. */
+	u32 max;    /* Max length of the page list. */
+	int to_zero; /* Number of pages on the zero list */
+	struct list_head page_list;
+	struct list_head zero_list;
+	u32 dirty_pages;
 
 #ifdef CONFIG_NVMAP_PAGE_POOL_DEBUG
 	u64 allocs;
@@ -203,45 +204,18 @@ struct nvmap_page_pool {
 #endif
 };
 
-#define pp_empty(pp)				\
-	((pp)->fill == (pp)->alloc && !(pp)->page_array[(pp)->alloc])
-#define pp_full(pp)				\
-	((pp)->fill == (pp)->alloc && (pp)->page_array[(pp)->alloc])
-
-#define nvmap_pp_alloc_inc(pp) nvmap_pp_inc_index((pp), &(pp)->alloc)
-#define nvmap_pp_fill_inc(pp)  nvmap_pp_inc_index((pp), &(pp)->fill)
-
-/* Handle wrap around. */
-static inline void nvmap_pp_inc_index(struct nvmap_page_pool *pp, u32 *ind)
-{
-	*ind += 1;
-
-	/* Wrap condition. */
-	if (*ind >= pp->length)
-		*ind = 0;
-}
-
-static inline void nvmap_page_pool_lock(struct nvmap_page_pool *pool)
-{
-	mutex_lock(&pool->lock);
-}
-
-static inline void nvmap_page_pool_unlock(struct nvmap_page_pool *pool)
-{
-	mutex_unlock(&pool->lock);
-}
-
 int nvmap_page_pool_init(struct nvmap_device *dev);
 int nvmap_page_pool_fini(struct nvmap_device *dev);
 struct page *nvmap_page_pool_alloc(struct nvmap_page_pool *pool);
-bool nvmap_page_pool_fill(struct nvmap_page_pool *pool, struct page *page);
-int __nvmap_page_pool_alloc_lots_locked(struct nvmap_page_pool *pool,
+int nvmap_page_pool_alloc_lots(struct nvmap_page_pool *pool,
 					struct page **pages, u32 nr);
-int __nvmap_page_pool_fill_lots_locked(struct nvmap_page_pool *pool,
+int nvmap_page_pool_fill_lots(struct nvmap_page_pool *pool,
 				       struct page **pages, u32 nr);
 int nvmap_page_pool_clear(void);
 int nvmap_page_pool_debugfs_init(struct dentry *nvmap_root);
 #endif
+
+#define NVMAP_IVM_INVALID_PEER		(-1)
 
 struct nvmap_client {
 	const char			*name;
@@ -272,9 +246,11 @@ struct nvmap_device {
 	struct nvmap_page_pool pool;
 #endif
 	struct list_head clients;
+	struct rb_root pids;
 	struct mutex	clients_lock;
 	struct list_head lru_handles;
 	spinlock_t	lru_lock;
+	struct dentry *handles_by_pid;
 };
 
 enum nvmap_stats_t {
@@ -353,11 +329,12 @@ static inline pgprot_t nvmap_pgprot(struct nvmap_handle *h, pgprot_t prot)
 			char task_comm[TASK_COMM_LEN];
 			h->owner->warned = 1;
 			get_task_comm(task_comm, h->owner->task);
-			pr_err("PID %d: %s: WARNING: "
+			pr_err("PID %d: %s: TAG: 0x%04x WARNING: "
 				"NVMAP_HANDLE_WRITE_COMBINE "
 				"should be used in place of "
 				"NVMAP_HANDLE_UNCACHEABLE on ARM64\n",
-				h->owner->task->pid, task_comm);
+				h->owner->task->pid, task_comm,
+				h->userflags >> 16);
 		}
 #endif
 		return pgprot_noncached(prot);
@@ -373,7 +350,8 @@ int nvmap_init(struct platform_device *pdev);
 
 struct nvmap_heap_block *nvmap_carveout_alloc(struct nvmap_client *dev,
 					      struct nvmap_handle *handle,
-					      unsigned long type);
+					      unsigned long type,
+					      phys_addr_t *start);
 
 unsigned long nvmap_carveout_usage(struct nvmap_client *c,
 				   struct nvmap_heap_block *b);
@@ -399,7 +377,7 @@ struct nvmap_handle_ref *nvmap_create_handle_from_fd(
 int nvmap_alloc_handle(struct nvmap_client *client,
 		       struct nvmap_handle *h, unsigned int heap_mask,
 		       size_t align, u8 kind,
-		       unsigned int flags);
+		       unsigned int flags, int peer);
 
 void nvmap_free_handle(struct nvmap_client *c, struct nvmap_handle *h);
 
@@ -442,6 +420,7 @@ extern void __clean_dcache_all(void *arg);
 void inner_flush_cache_all(void);
 void inner_clean_cache_all(void);
 void nvmap_clean_cache(struct page **pages, int numpages);
+void nvmap_clean_cache_page(struct page *page);
 void nvmap_flush_cache(struct page **pages, int numpages);
 
 int nvmap_do_cache_maint_list(struct nvmap_handle **handles, u32 *offsets,

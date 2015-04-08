@@ -1,7 +1,7 @@
 /*
  * Virtualized GPU
  *
- * Copyright (c) 2014 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -114,6 +114,8 @@ static int vgpu_intr_thread(void *dev_id)
 
 		if (msg->unit == TEGRA_VGPU_INTR_GR)
 			vgpu_gr_isr(g, &msg->info.gr_intr);
+		else if (msg->unit == TEGRA_VGPU_INTR_FIFO)
+			vgpu_fifo_isr(g, &msg->info.fifo_intr);
 
 		tegra_gr_comm_release(handle);
 	}
@@ -247,6 +249,7 @@ static int vgpu_init_hal(struct gk20a *g)
 		vgpu_init_gr_ops(&g->ops);
 		vgpu_init_ltc_ops(&g->ops);
 		vgpu_init_mm_ops(&g->ops);
+		vgpu_init_debug_ops(&g->ops);
 		break;
 	default:
 		gk20a_err(&g->dev->dev, "no support for %x", ver);
@@ -308,7 +311,17 @@ static int vgpu_pm_initialise_domain(struct platform_device *pdev)
 {
 	struct gk20a_platform *platform = platform_get_drvdata(pdev);
 	struct dev_power_governor *pm_domain_gov = NULL;
-	struct generic_pm_domain *domain = &platform->g->pd;
+	struct gk20a_domain_data *vgpu_pd_data;
+	struct generic_pm_domain *domain;
+
+	vgpu_pd_data = (struct gk20a_domain_data *)kzalloc
+		(sizeof(struct gk20a_domain_data), GFP_KERNEL);
+
+	if (!vgpu_pd_data)
+		return -ENOMEM;
+
+	domain = &vgpu_pd_data->gpd;
+	vgpu_pd_data->gk20a = platform->g;
 
 	domain->name = "gpu";
 
@@ -429,10 +442,15 @@ int vgpu_probe(struct platform_device *dev)
 int vgpu_remove(struct platform_device *dev)
 {
 	struct gk20a *g = get_gk20a(dev);
+	struct gk20a_domain_data *vgpu_gpd;
 	gk20a_dbg_fn("");
 
 	if (g->remove_support)
 		g->remove_support(dev);
+
+	vgpu_gpd = container_of(&g, struct gk20a_domain_data, gk20a);
+	vgpu_gpd->gk20a = NULL;
+	kfree(vgpu_gpd);
 
 	vgpu_comm_deinit();
 	gk20a_user_deinit(dev);

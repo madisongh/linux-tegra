@@ -1,7 +1,7 @@
 /*
  * drivers/misc/tegra-profiler/main.c
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -86,11 +86,13 @@ static int start(void)
 	}
 
 	if (!atomic_cmpxchg(&ctx.started, 0, 1)) {
+		preempt_disable();
+
 		if (ctx.pmu) {
 			err = ctx.pmu->enable();
 			if (err) {
 				pr_err("error: pmu enable\n");
-				goto errout;
+				goto errout_preempt;
 			}
 		}
 
@@ -98,41 +100,48 @@ static int start(void)
 			err = ctx.pl310->enable();
 			if (err) {
 				pr_err("error: pl310 enable\n");
-				goto errout;
+				goto errout_preempt;
 			}
 		}
 
 		ctx.comm->reset();
+
+		err = quadd_hrt_start();
+		if (err) {
+			pr_err("error: hrt start\n");
+			goto errout_preempt;
+		}
+
+		preempt_enable();
 
 		err = quadd_power_clk_start();
 		if (err < 0) {
 			pr_err("error: power_clk start\n");
 			goto errout;
 		}
-
-		err = quadd_hrt_start();
-		if (err) {
-			pr_err("error: hrt start\n");
-			goto errout;
-		}
 	}
 
 	return 0;
 
+errout_preempt:
+	preempt_enable();
+
 errout:
 	atomic_set(&ctx.started, 0);
 	tegra_profiler_unlock();
+
 	return err;
 }
 
 static void stop(void)
 {
 	if (atomic_cmpxchg(&ctx.started, 1, 0)) {
+		preempt_disable();
+
 		quadd_hrt_stop();
 
 		ctx.comm->reset();
 
-		quadd_power_clk_stop();
 		quadd_unwind_stop();
 
 		if (ctx.pmu)
@@ -142,6 +151,10 @@ static void stop(void)
 			ctx.pl310->disable();
 
 		tegra_profiler_unlock();
+
+		preempt_enable();
+
+		quadd_power_clk_stop();
 	}
 }
 
@@ -172,7 +185,6 @@ set_parameters(struct quadd_parameters *p, uid_t *debug_app_uid)
 	int pl310_events_id;
 	int nr_pmu = 0, nr_pl310 = 0;
 	struct task_struct *task;
-	unsigned int extra;
 	u64 *low_addr_p;
 
 	if (!validate_freq(p->freq)) {
@@ -180,13 +192,7 @@ set_parameters(struct quadd_parameters *p, uid_t *debug_app_uid)
 		return -EINVAL;
 	}
 
-	ctx.param.freq = p->freq;
-	ctx.param.ma_freq = p->ma_freq;
-	ctx.param.backtrace = p->backtrace;
-	ctx.param.use_freq = p->use_freq;
-	ctx.param.system_wide = p->system_wide;
-	ctx.param.power_rate_freq = p->power_rate_freq;
-	ctx.param.debug_samples = p->debug_samples;
+	ctx.param = *p;
 
 	for (i = 0; i < ARRAY_SIZE(p->reserved); i++)
 		ctx.param.reserved[i] = p->reserved[i];
@@ -287,17 +293,6 @@ set_parameters(struct quadd_parameters *p, uid_t *debug_app_uid)
 			ctx.pl310->set_events(NULL, 0);
 		}
 	}
-
-	extra = p->reserved[QUADD_PARAM_IDX_EXTRA];
-
-	if (extra & QUADD_PARAM_EXTRA_BT_UNWIND_TABLES)
-		pr_info("unwinding: exception-handling tables\n");
-
-	if (extra & QUADD_PARAM_EXTRA_BT_FP)
-		pr_info("unwinding: frame pointers\n");
-
-	if (extra & QUADD_PARAM_EXTRA_BT_MIXED)
-		pr_info("unwinding: mixed mode\n");
 
 	low_addr_p = (u64 *)&p->reserved[QUADD_PARAM_IDX_BT_LOWER_BOUND];
 	ctx.hrt->low_addr = (unsigned long)*low_addr_p;
@@ -462,7 +457,7 @@ void quadd_get_state(struct quadd_module_state *state)
 }
 
 static int
-set_extab(struct quadd_extables *extabs,
+set_extab(struct quadd_sections *extabs,
 	  struct quadd_mmap_area *mmap)
 {
 	return quadd_unwind_set_extab(extabs, mmap);

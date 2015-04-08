@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Interrupt Management
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -65,9 +65,8 @@ static inline bool nvhost_intr_is_virtual_dev(struct nvhost_intr_syncpt *sp)
 {
 	struct nvhost_intr *intr = intr_syncpt_to_intr(sp);
 	struct nvhost_master *host = intr_to_dev(intr);
-	struct nvhost_device_data *data = platform_get_drvdata(host->dev);
 
-	return data->virtual_dev;
+	return nvhost_dev_is_virtual(host->dev);
 }
 
 static inline void nvhost_intr_syncpt_lock(struct nvhost_intr_syncpt *sp)
@@ -237,7 +236,8 @@ static void action_signal_sync_pt(struct nvhost_waitlist *waiter)
 {
 #ifdef CONFIG_TEGRA_GRHOST_SYNC
 	struct nvhost_sync_pt *pt = waiter->data;
-	nvhost_sync_pt_signal(pt);
+	ktime_t time = timespec_to_ktime(waiter->isr_recv);
+	nvhost_sync_pt_signal(pt, ktime_to_ns(time));
 #endif
 }
 
@@ -313,9 +313,8 @@ irqreturn_t nvhost_syncpt_thresh_fn(void *dev_id)
 	unsigned int id = syncpt->id;
 	struct nvhost_intr *intr = intr_syncpt_to_intr(syncpt);
 	struct nvhost_master *dev = intr_to_dev(intr);
-	struct nvhost_device_data *data = platform_get_drvdata(dev->dev);
 
-	if (data->virtual_dev)
+	if (nvhost_dev_is_virtual(dev->dev))
 		(void)process_wait_list(intr, syncpt,
 				nvhost_syncpt_read_min(&dev->syncpt, id));
 	else
@@ -482,7 +481,7 @@ int nvhost_intr_init(struct nvhost_intr *intr, u32 irq_gen, u32 irq_sync)
 	unsigned int id;
 	struct nvhost_intr_syncpt *syncpt;
 	struct nvhost_master *host = intr_to_dev(intr);
-	u32 nb_pts = nvhost_syncpt_nb_pts(&host->syncpt);
+	u32 nb_pts = nvhost_syncpt_nb_hw_pts(&host->syncpt);
 
 	mutex_init(&intr->mutex);
 	intr->syncpt_irq = irq_sync;
@@ -528,7 +527,7 @@ void nvhost_intr_stop(struct nvhost_intr *intr)
 {
 	unsigned int id;
 	struct nvhost_intr_syncpt *syncpt;
-	u32 nb_pts = nvhost_syncpt_nb_pts(&intr_to_dev(intr)->syncpt);
+	u32 nb_pts = nvhost_syncpt_nb_hw_pts(&intr_to_dev(intr)->syncpt);
 
 	mutex_lock(&intr->mutex);
 

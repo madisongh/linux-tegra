@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -82,22 +82,10 @@
 
 #define SMMU_PTC_FLUSH_1			0x9b8
 
-#define SMMU_ASID_SECURITY			0x38
-#define SMMU_ASID_SECURITY_1			0x3c
-#define SMMU_ASID_SECURITY_2			0x9e0
-#define SMMU_ASID_SECURITY_3			0x9e4
-#define SMMU_ASID_SECURITY_4			0x9e8
-#define SMMU_ASID_SECURITY_5			0x9ec
-#define SMMU_ASID_SECURITY_6			0x9f0
-#define SMMU_ASID_SECURITY_7			0x9f4
-
 #define SMMU_STATS_CACHE_COUNT_BASE		0x1f0
 
 #define SMMU_STATS_CACHE_COUNT(mc, cache, hitmiss)	\
 	(SMMU_STATS_CACHE_COUNT_BASE + 8 * cache + 4 * hitmiss)
-
-#define SMMU_TRANSLATION_ENABLE_0		0x228
-#define SMMU_TRANSLATION_ENABLE_4		0xb98
 
 #define SMMU_AFI_ASID				0x238   /* PCIE */
 
@@ -178,8 +166,7 @@
 						((page_to_phys(page) >> SMMU_PDIR_SHIFT) | (attr))
 #define SMMU_MK_PDE(page, attr)			\
 						(u32)((page_to_phys(page) >> SMMU_PDE_SHIFT) | (attr))
-#define SMMU_EX_PTBL_PAGE(pde)			\
-						pfn_to_page((u32)(pde) & SMMU_PFN_MASK)
+#define SMMU_EX_PTBL_PAGE(pde)			phys_to_page((phys_addr_t)(pde & SMMU_PFN_MASK) << SMMU_PDE_SHIFT)
 #define SMMU_PFN_TO_PTE(pfn, attr)		(u32)((pfn) | (attr))
 
 #define SMMU_ASID_ENABLE(asid, idx)		(((asid) << (idx * 8)) | (1 << 31))
@@ -190,6 +177,7 @@
 #define SMMU_CLIENT_CONF0			0x40
 
 struct smmu_domain {
+	struct iommu_domain *iommu_domain;
 	struct smmu_as *as[MAX_AS_PER_DEV];
 	unsigned long bitmap[1];
 };
@@ -226,7 +214,7 @@ struct smmu_as {
 	struct list_head        client;
 	spinlock_t              client_lock; /* for client list */
 
-	u32                     tegra_hv_comm_chan;
+	int                     tegra_hv_comm_chan;
 	spinlock_t              tegra_hv_comm_chan_lock;
 	struct dentry           *debugfs_root;
 };
@@ -251,22 +239,13 @@ struct smmu_device {
 	unsigned long   iovmm_base;     /* remappable base address */
 	unsigned long   page_count;     /* total remappable size */
 	spinlock_t      lock;
+	spinlock_t      ptc_lock;
 	char            *name;
 	struct device   *dev;
 	u64             swgids;         /* memory client ID bitmap */
-	u32             ptc_cache_size; /* u32 is ok as ptc_cache_size < 4 GB */
+	u32		ptc_cache_line;
 
 	struct rb_root  clients;
-
-	struct page *avp_vector_page;   /* dummy page shared by all AS's */
-
-	/*
-	 * Register image savers for suspend/resume
-	 */
-	u32 num_translation_enable;
-	u32 translation_enable[5];
-	u32 num_asid_security;
-	u32 asid_security[8];
 
 	struct dentry *debugfs_root;
 	struct smmu_debugfs_info *debugfs_info;
@@ -275,8 +254,8 @@ struct smmu_device {
 	const struct tegra_smmu_chip_data *chip_data;
 	struct list_head asprops;
 
-	u32     tegra_hv_comm_chan;
-	u32     tegra_hv_debug_chan;
+	int     tegra_hv_comm_chan;
+	int     tegra_hv_debug_chan;
 
 	u32             num_as;
 	struct smmu_as  as[0];          /* Run-time allocated array */
@@ -294,14 +273,22 @@ extern struct smmu_as *(*smmu_as_alloc) (void);
 extern void (*smmu_as_free) (struct smmu_domain *dom,
 				unsigned long as_alloc_bitmap);
 extern void (*smmu_domain_destroy) (struct smmu_device *smmu, struct smmu_as *as);
-extern int (*__smmu_iommu_map_pfn) (struct smmu_as *as, dma_addr_t iova,
-					unsigned long pfn, unsigned long prot);
 extern int (*__tegra_smmu_suspend) (struct device *dev);
 extern int (*__tegra_smmu_resume) (struct device *dev);
 extern int (*__tegra_smmu_probe)(struct platform_device *pdev,
 						struct smmu_device *smmu);
 extern const struct iommu_ops *smmu_iommu_ops;
 extern const struct file_operations *smmu_debugfs_stats_fops;
+
+extern int (*__smmu_iommu_map_pfn)(struct smmu_as *as, dma_addr_t iova, unsigned long pfn, unsigned long prot);
+extern int (*__smmu_iommu_map_largepage)(struct smmu_as *as, dma_addr_t iova, phys_addr_t pa, unsigned long prot);
+extern size_t (*__smmu_iommu_unmap)(struct smmu_as *as, dma_addr_t iova, size_t bytes);
+extern int (*__smmu_iommu_map_sg)(struct iommu_domain *domain, unsigned long iova, struct scatterlist *sgl, int npages, unsigned long prot);
+
+extern void (*flush_ptc_and_tlb)(struct smmu_device *smmu, struct smmu_as *as, dma_addr_t iova, u32 *pte, struct page *page, int is_pde);
+extern void (*flush_ptc_and_tlb_range)(struct smmu_device *smmu, struct smmu_as *as, dma_addr_t iova, u32 *pte, struct page *page, size_t count);
+extern void (*flush_ptc_and_tlb_as)(struct smmu_as *as, dma_addr_t start, dma_addr_t end);
+extern void (*free_pdir)(struct smmu_as *as);
 
 #ifdef CONFIG_TEGRA_HV_MANAGER
 extern int tegra_smmu_probe_hv(struct platform_device *pdev,

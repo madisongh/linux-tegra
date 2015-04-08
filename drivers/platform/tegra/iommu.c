@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -16,7 +16,7 @@
 #include <linux/tegra_smmu.h>
 #include <linux/dma-contiguous.h>
 #include <linux/tegra-soc.h>
-#include <linux/platform_data/tegra_bpmp.h>
+#include <soc/tegra/tegra_bpmp.h>
 
 #include <asm/dma-iommu.h>
 
@@ -34,7 +34,7 @@ phys_addr_t __weak tegra_fb_start, tegra_fb_size,
 
 static struct iommu_linear_map tegra_fb_linear_map[16]; /* Terminated with 0 */
 
-#ifdef CONFIG_TEGRA_BPMP
+#if defined(CONFIG_TEGRA_BPMP) && defined(CONFIG_ARCH_TEGRA_21x_SOC)
 static struct iommu_linear_map tegra_bpmp_linear_map[2];
 static void tegra_bpmp_linear_set(void)
 {
@@ -124,12 +124,10 @@ static struct swgid_fixup tegra_swgid_fixup_t124[] = {
 	{ .name = "sdhci-tegra.1",	.swgids = TEGRA_SWGROUP_BIT(SDMMC2A) },
 	{ .name = "sdhci-tegra.2",	.swgids = TEGRA_SWGROUP_BIT(SDMMC3A) },
 	{ .name = "serial8250",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
-	{ .name = "serial-tegra",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "dtv",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "snd-soc-dummy",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "spdif-dit",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "tegra12-se",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
-	{ .name = "spi-tegra114",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "tegra30-ahub",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "tegra30-dam",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "tegra30-hda",	.swgids = TEGRA_SWGROUP_BIT(HDA), },
@@ -160,7 +158,6 @@ static struct swgid_fixup tegra_swgid_fixup_t124[] = {
 	{ .name = "tegra-se",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "tegra-snd",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "tegra-tzram",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
-	{ .name = "tegra_uart",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "tegra-udc",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "tegra_usb_modem_power",
 				.swgids = TEGRA_SWGROUP_BIT(PPCS), },
@@ -170,7 +167,6 @@ static struct swgid_fixup tegra_swgid_fixup_t124[] = {
 	{ .name = "vi",	.swgids = TEGRA_SWGROUP_BIT(VI), },
 	{ .name = "therm_est",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 	{ .name = "tegra124-apbdma",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
-	{ .name = "tegra-nor",	.swgids = TEGRA_SWGROUP_BIT(PPCS), },
 #ifdef CONFIG_PLATFORM_ENABLE_IOMMU
 	{ .name = dummy_name,	.swgids = TEGRA_SWGROUP_BIT(PPCS) },
 #endif

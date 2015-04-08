@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,11 +19,6 @@
 #include <dt-bindings/pinctrl/pinctrl-tegra.h>
 
 / {
-	i2c@7000d000 {
-		pinctrl-names = "hs_mode";
-		pinctrl-0 = <&pwr_i2c_hs_drive>;
-	};
-
 	pinmux: pinmux@700008d4 {
 		status = "okay";
 		pinctrl-names = "default", "drive", "unused";
@@ -1376,28 +1371,10 @@
 			};
 		};
 
-		pwr_i2c_hs_drive: pwr_i2c_drive {
-			drive_pwr_i2c_scl {
-				nvidia,pins = "drive_pwr_i2c_scl";
-				nvidia,pull-down-strength = <31>;
-				nvidia,pull-up-strength = <31>;
-			};
+		regulator_enable_state: regulator_enable {
+		};
 
-			drive_pwr_i2c_sda {
-				nvidia,pins = "drive_pwr_i2c_sda";
-				nvidia,pull-down-strength = <31>;
-				nvidia,pull-up-strength = <31>;
-			};
-
-			pwr_i2c_scl_py3 {
-				nvidia,pins = "pwr_i2c_scl_py3";
-				nvidia,schmitt = <TEGRA_PIN_ENABLE>;
-			};
-
-			pwr_i2c_sda_py4 {
-				nvidia,pins = "pwr_i2c_sda_py4";
-				nvidia,schmitt = <TEGRA_PIN_ENABLE>;
-			};
+		regulator_disable_state: regulator_disable {
 		};
 	};
 };

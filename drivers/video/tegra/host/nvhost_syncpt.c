@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Syncpoints
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -52,10 +52,10 @@ static const char *max_name = "max";
  */
 void nvhost_syncpt_reset(struct nvhost_syncpt *sp)
 {
-	struct nvhost_master *host = syncpt_to_dev(sp);
 	u32 i;
 
-	for (i = host->info.pts_base; i < host->info.pts_limit; i++)
+	for (i = nvhost_syncpt_pts_base(sp);
+			i < nvhost_syncpt_pts_limit(sp); i++)
 		syncpt_op().reset(sp, i);
 	wmb();
 }
@@ -77,7 +77,8 @@ void nvhost_syncpt_save(struct nvhost_syncpt *sp)
 	u32 i;
 	struct nvhost_master *master = syncpt_to_dev(sp);
 
-	for (i = 0; i < nvhost_syncpt_nb_pts(sp); i++) {
+	for (i = nvhost_syncpt_pts_base(sp);
+			i < nvhost_syncpt_pts_limit(sp); i++) {
 		if (nvhost_syncpt_client_managed(sp, i))
 			syncpt_op().update_min(sp, i);
 		else
@@ -202,12 +203,11 @@ int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id,
 	int err = 0, check_count = 0, low_timeout = 0;
 	u32 val, old_val, new_val;
 	struct nvhost_master *host = syncpt_to_dev(sp);
-	struct nvhost_device_data *data = platform_get_drvdata(host->dev);
 	bool (*syncpt_is_expired)(struct nvhost_syncpt *sp,
 			u32 id,
 			u32 thresh);
 
-	if (!id || id >= nvhost_syncpt_nb_pts(sp))
+	if (!id || !nvhost_syncpt_is_valid_hw_pt(sp, id))
 		return -EINVAL;
 
 	if (value)
@@ -266,7 +266,7 @@ int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id,
 	if (timeout < SYNCPT_CHECK_PERIOD)
 		low_timeout = timeout;
 
-	if (data->virtual_dev)
+	if (nvhost_dev_is_virtual(host->dev))
 		syncpt_is_expired = nvhost_syncpt_is_expired;
 	else
 		syncpt_is_expired = syncpt_update_min_is_expired;
@@ -296,13 +296,6 @@ int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id,
 			err = 0;
 			break;
 		}
-
-		/* short-circuit if we are turning off the system */
-		if (atomic_read(&host->shutdown)) {
-			err = -ETIMEDOUT;
-			break;
-		}
-
 		if (remain < 0) {
 			err = remain;
 			break;
@@ -745,7 +738,7 @@ static int nvhost_reserve_syncpt(struct nvhost_syncpt *sp, u32 id,
 					bool client_managed)
 {
 	/* is it already reserved ? */
-	if (id < NVHOST_FREE_SYNCPT_BASE(sp) || sp->assigned[id])
+	if (!nvhost_syncpt_is_valid_pt(sp, id) || sp->assigned[id])
 		return -EINVAL;
 
 	sp->assigned[id] = true;
@@ -823,11 +816,12 @@ static u32 nvhost_get_syncpt(struct nvhost_syncpt *sp, bool client_managed,
 u32 nvhost_get_syncpt_host_managed(struct platform_device *pdev,
 					u32 param)
 {
-	u32 id;
-	char *syncpt_name;
+	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	struct nvhost_master *nvhost_master = nvhost;
+	char *syncpt_name;
+	u32 id;
 
-	if (nvhost_get_syncpt_policy() == SYNCPT_PER_CHANNEL_INSTANCE)
+	if (pdata->resource_policy == RESOURCE_PER_CHANNEL_INSTANCE)
 		syncpt_name = kasprintf(GFP_KERNEL, "%s_%s_%d",
 				dev_name(&pdev->dev), current->comm, param);
 	else
@@ -901,6 +895,11 @@ void nvhost_free_syncpt(u32 id)
 	struct device *d = &host->dev->dev;
 
 	/* first check if we are freeing a valid syncpt */
+	if (!nvhost_syncpt_is_valid_pt(sp, id)) {
+		nvhost_warn(d, "trying to free syncpt out of s/w range %u\n",
+			id);
+		return;
+	}
 	if (!sp->assigned[id]) {
 		nvhost_warn(d, "trying to free unused syncpt %u\n", id);
 		return;
@@ -949,40 +948,49 @@ static void nvhost_reserve_syncpts(struct nvhost_syncpt *sp)
 	mutex_unlock(&sp->syncpt_mutex);
 }
 
+int nvhost_syncpt_mark_used(struct nvhost_syncpt *sp,
+			    u32 chid, u32 syncptid)
+{
+	if (syncpt_op().mark_used)
+		return syncpt_op().mark_used(sp, chid, syncptid);
+	return 0;
+}
+
+int nvhost_syncpt_mark_unused(struct nvhost_syncpt *sp, u32 syncptid)
+{
+	if (syncpt_op().mark_unused)
+		return syncpt_op().mark_unused(sp, syncptid);
+	return 0;
+}
+
 int nvhost_syncpt_init(struct platform_device *dev,
 		struct nvhost_syncpt *sp)
 {
 	int i;
 	struct nvhost_master *host = syncpt_to_dev(sp);
-	struct nvhost_device_data *data = platform_get_drvdata(dev);
+	int nb_pts = nvhost_syncpt_nb_hw_pts(sp);
 	int err = 0;
 
 	/* Allocate structs for min, max and base values */
-	sp->assigned = kzalloc(sizeof(bool) * nvhost_syncpt_nb_pts(sp),
-			GFP_KERNEL);
-	sp->client_managed = kzalloc(sizeof(bool) * nvhost_syncpt_nb_pts(sp),
-			GFP_KERNEL);
-	sp->syncpt_names = kzalloc(sizeof(char *) * nvhost_syncpt_nb_pts(sp),
-			GFP_KERNEL);
-	sp->last_used_by = kzalloc(sizeof(char *) * nvhost_syncpt_nb_pts(sp),
-			GFP_KERNEL);
-	sp->min_val = kzalloc(sizeof(atomic_t) * nvhost_syncpt_nb_pts(sp),
-			GFP_KERNEL);
-	sp->max_val = kzalloc(sizeof(atomic_t) * nvhost_syncpt_nb_pts(sp),
-			GFP_KERNEL);
+	sp->assigned = kzalloc(sizeof(bool) * nb_pts, GFP_KERNEL);
+	sp->client_managed = kzalloc(sizeof(bool) * nb_pts, GFP_KERNEL);
+	sp->syncpt_names = kzalloc(sizeof(char *) * nb_pts, GFP_KERNEL);
+	sp->last_used_by = kzalloc(sizeof(char *) * nb_pts, GFP_KERNEL);
+	sp->min_val = kzalloc(sizeof(atomic_t) * nb_pts, GFP_KERNEL);
+	sp->max_val = kzalloc(sizeof(atomic_t) * nb_pts, GFP_KERNEL);
 	sp->lock_counts =
 		kzalloc(sizeof(atomic_t) * nvhost_syncpt_nb_mlocks(sp),
 			GFP_KERNEL);
 #ifdef CONFIG_TEGRA_GRHOST_SYNC
 	sp->timeline = kzalloc(sizeof(struct nvhost_sync_timeline *) *
-			nvhost_syncpt_nb_pts(sp), GFP_KERNEL);
+			nb_pts, GFP_KERNEL);
 	if (!sp->timeline) {
 		err = -ENOMEM;
 		goto fail;
 	}
 #endif
 
-	if (data->virtual_dev) {
+	if (nvhost_dev_is_virtual(dev)) {
 		struct nvhost_virt_ctx *ctx = nvhost_get_virt_data(dev);
 		u32 size;
 
@@ -1010,7 +1018,7 @@ int nvhost_syncpt_init(struct platform_device *dev,
 
 	/* Allocate two attributes for each sync point: min and max */
 	sp->syncpt_attrs = kzalloc(sizeof(*sp->syncpt_attrs)
-			* nvhost_syncpt_nb_pts(sp) * NUM_SYSFS_ENTRY,
+			* nb_pts * NUM_SYSFS_ENTRY,
 			GFP_KERNEL);
 	if (!sp->syncpt_attrs) {
 		err = -ENOMEM;
@@ -1023,7 +1031,7 @@ int nvhost_syncpt_init(struct platform_device *dev,
 	}
 
 	/* Fill in the attributes */
-	for (i = 0; i < nvhost_syncpt_nb_pts(sp); i++) {
+	for (i = 0; i < nvhost_syncpt_nb_hw_pts(sp); i++) {
 		struct nvhost_syncpt_attr *min =
 			&sp->syncpt_attrs[i*NUM_SYSFS_ENTRY];
 		struct nvhost_syncpt_attr *max =
@@ -1042,7 +1050,10 @@ int nvhost_syncpt_init(struct platform_device *dev,
 
 		/* initialize syncpt status */
 		sp->assigned[i] = false;
-		sp->client_managed[i] = false;
+		if (nvhost_syncpt_is_valid_pt(sp, i))
+			sp->client_managed[i] = false;
+		else
+			sp->client_managed[i] = true;
 		sp->syncpt_names[i] = NULL;
 		sp->last_used_by[i] = NULL;
 
@@ -1090,7 +1101,7 @@ static void nvhost_syncpt_deinit_timeline(struct nvhost_syncpt *sp)
 {
 #ifdef CONFIG_TEGRA_GRHOST_SYNC
 	int i;
-	for (i = 0; i < nvhost_syncpt_nb_pts(sp); i++) {
+	for (i = 0; i < nvhost_syncpt_nb_hw_pts(sp); i++) {
 		if (sp->timeline && sp->timeline[i]) {
 			sync_timeline_destroy(
 				(struct sync_timeline *)sp->timeline[i]);
@@ -1140,9 +1151,41 @@ int nvhost_syncpt_client_managed(struct nvhost_syncpt *sp, u32 id)
 	return sp->client_managed[id];
 }
 
+int nvhost_syncpt_nb_hw_pts(struct nvhost_syncpt *sp)
+{
+	return syncpt_to_dev(sp)->info.nb_hw_pts;
+}
+
 int nvhost_syncpt_nb_pts(struct nvhost_syncpt *sp)
 {
 	return syncpt_to_dev(sp)->info.nb_pts;
+}
+
+int nvhost_syncpt_graphics_host_sp(struct nvhost_syncpt *sp)
+{
+	return syncpt_to_dev(sp)->info.pts_base;
+}
+
+int nvhost_syncpt_pts_limit(struct nvhost_syncpt *sp)
+{
+	return syncpt_to_dev(sp)->info.pts_limit;
+}
+
+int nvhost_syncpt_pts_base(struct nvhost_syncpt *sp)
+{
+	return syncpt_to_dev(sp)->info.pts_base;
+}
+
+bool nvhost_syncpt_is_valid_hw_pt(struct nvhost_syncpt *sp, u32 id)
+{
+	return (id >= 0 && id < nvhost_syncpt_nb_hw_pts(sp) &&
+		id != NVSYNCPT_INVALID);
+}
+
+bool nvhost_syncpt_is_valid_pt(struct nvhost_syncpt *sp, u32 id)
+{
+	return (id >= nvhost_syncpt_pts_base(sp) &&
+		id < nvhost_syncpt_pts_limit(sp) && id != NVSYNCPT_INVALID);
 }
 
 int nvhost_nb_syncpts_store(struct nvhost_syncpt *sp, const char *buf)
@@ -1156,6 +1199,8 @@ int nvhost_nb_syncpts_store(struct nvhost_syncpt *sp, const char *buf)
 		nvhost_warn(d, "number of syncpts modified from %d to %d\n",
 			master->info.nb_pts, nb_syncpts);
 		master->info.nb_pts = nb_syncpts;
+		master->info.pts_limit = master->info.pts_base +
+						master->info.nb_pts;
 	} else
 		ret = -EIO;
 
@@ -1170,16 +1215,6 @@ int nvhost_syncpt_nb_mlocks(struct nvhost_syncpt *sp)
 void nvhost_syncpt_set_manager(struct nvhost_syncpt *sp, int id, bool client)
 {
 	sp->client_managed[id] = client;
-}
-
-int nvhost_syncpt_graphics_host_sp(struct nvhost_syncpt *sp)
-{
-	return syncpt_to_dev(sp)->info.pts_base;
-}
-
-int nvhost_syncpt_pts_limit(struct nvhost_syncpt *sp)
-{
-	return syncpt_to_dev(sp)->info.pts_limit;
 }
 
 /* public sync point API */
@@ -1253,12 +1288,25 @@ void nvhost_syncpt_set_min_eq_max_ext(struct platform_device *dev, u32 id)
 }
 EXPORT_SYMBOL(nvhost_syncpt_set_min_eq_max_ext);
 
+/*
+ * For external clients, check the validity in full
+ * h/w supported syncpoint range
+ */
+bool nvhost_syncpt_is_valid_pt_ext(struct platform_device *dev, u32 id)
+{
+	struct nvhost_master *master = nvhost_get_host(dev);
+	struct nvhost_syncpt *sp = &master->syncpt;
+
+	return nvhost_syncpt_is_valid_hw_pt(sp, id);
+}
+EXPORT_SYMBOL(nvhost_syncpt_is_valid_pt_ext);
+
 int nvhost_syncpt_nb_pts_ext(struct platform_device *dev)
 {
 	struct nvhost_master *master = nvhost_get_host(dev);
 	struct nvhost_syncpt *sp = &master->syncpt;
 
-	return syncpt_to_dev(sp)->info.nb_pts;
+	return nvhost_syncpt_nb_pts(sp);
 }
 EXPORT_SYMBOL(nvhost_syncpt_nb_pts_ext);
 

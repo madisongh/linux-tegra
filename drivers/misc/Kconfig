@@ -650,6 +650,15 @@ config TEGRA_PROC_POWER_MODEL
 	  A simple model of processor power relating voltage, frequency,
 	  cores, and chip specific data. Used by various drivers.
 
+config NV_GAMEPAD_RESET
+	tristate "Nvidia Gamepad Reset Driver"
+	help
+	 This driver provides an interface that can be used to recover
+	 gamepad uC when needed
+
+config SAF775x_HWDEP
+        tristate "SAF775x HWDEP Driver"
+        depends on I2C
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

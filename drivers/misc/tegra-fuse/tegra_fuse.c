@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 Google, Inc.
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -79,6 +79,7 @@ static DEVICE_ATTR(aid, 0444, tegra_fuse_show, NULL);
 #define MINOR_ASIM_QT		2
 #define MINOR_ASIM_LINSIM	3
 #define MINOR_DSIM_ASIM_LINSIM	4
+#define MINOR_UNIT_FPGA		5
 
 #define FUSE_SKU_INFO       0x110
 #define FUSE_SKU_MSB_MASK	0xFF00
@@ -154,6 +155,7 @@ static const char *tegra_platform_name[TEGRA_PLATFORM_MAX] = {
 	[TEGRA_PLATFORM_QT]      = "quickturn",
 	[TEGRA_PLATFORM_LINSIM]  = "linsim",
 	[TEGRA_PLATFORM_FPGA]    = "fpga",
+	[TEGRA_PLATFORM_UNIT_FPGA] = "unit fpga",
 };
 
 struct tegra_fuse_chip_data {
@@ -483,6 +485,7 @@ static struct chip_revision tegra_chip_revisions[] = {
 	CHIP_REVISION(TEGRA14, 1, 2, 0,   A02),
 	CHIP_REVISION(TEGRA21, 1, 1, 0,   A01),
 	CHIP_REVISION(TEGRA21, 1, 1, 'q', A01q),
+	CHIP_REVISION(TEGRA21, 1, 2, 0,   A02),
 };
 
 static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
@@ -521,9 +524,8 @@ static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
 	return revision;
 }
 
-static void tegra_set_tegraid(u32 chipid,
-					u32 major, u32 minor,
-					u32 nlist, u32 patch, const char *priv)
+void tegra_set_tegraid(u32 chipid, u32 major, u32 minor,
+	u32 nlist, u32 patch, const char *priv)
 {
 	tegra_id.chipid  = (enum tegra_chipid) chipid;
 	tegra_id.major   = major;
@@ -550,6 +552,9 @@ static void tegra_set_tegraid(u32 chipid,
 			cpu_is_asim = true;
 			cpu_is_dsim = true;
 			tegra_platform = TEGRA_PLATFORM_LINSIM;
+		} else if (tegra_id.minor == MINOR_UNIT_FPGA) {
+			cpu_is_asim = true;
+			tegra_platform = TEGRA_PLATFORM_UNIT_FPGA;
 		}
 	} else {
 		cpu_is_asim = false;
@@ -565,7 +570,8 @@ static void tegra_fuse_cfg_reg_visible(void)
 	writel(reg, IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
 }
 
-static void tegra_get_tegraid_from_hw(void)
+/* Overridable by implementation of future platforms */
+__weak void tegra_get_tegraid_from_hw(void)
 {
 	u32 cid;
 	u32 nlist;
@@ -575,51 +581,8 @@ static void tegra_get_tegraid_from_hw(void)
 	char prime;
 #endif
 
-#ifndef CONFIG_ARM64
 	cid = tegra_read_chipid();
 	nlist = tegra_read_apb_misc_reg(0x860);
-#elif defined(CONFIG_ARCH_TEGRA_13x_SOC) || defined(CONFIG_ARCH_TEGRA_21x_SOC)
-	void __iomem *chip_id;
-	void __iomem *netlist;
-
-	/*
-	 * tegra_get_tegraid_from_hw can be called really early on when
-	 * final kernel page tables haven't been set up. Thus, APB_MISC
-	 * aperature must be mapped into kernel VA before tegra_id can
-	 * be accessed here. Coincidentally, Tegra UART and ChipId reside
-	 * in the same memory section (1MB), and UART has been mapped
-	 * prior to this.
-	 *
-	 * On ARM, this is okay b/c Tegra code tells ARM what VA to map.
-	 * However, ARM64 internally uses EARLYCON_IOBASE as base VA.
-	 * To workaround this, we have to derive the base VA manually
-	 * ad-hoc and modify the chip_id and netlist address accordingly
-	 * for ARM64. Such handling is only needed until Tegra static
-	 * mapping is done in mach-tegra/io.c.
-	 */
-	void __iomem *early_base;
-	extern bool iotable_init_done;
-	if (!iotable_init_done) {
-		early_base = early_ioremap(TEGRA_APB_MISC_BASE, TEGRA_APB_MISC_SIZE);
-		BUG_ON(!early_base);
-		/* Map in APB_BASE in case earlyprintk is not enabled */
-		chip_id = early_base + 0x804;
-		netlist = early_base + 0x860;
-		cid = readl(chip_id);
-		nlist = readl(netlist);
-		early_iounmap(early_base, TEGRA_APB_MISC_SIZE);
-	} else {
-		cid = tegra_read_apb_misc_reg(0x804);
-		nlist = tegra_read_apb_misc_reg(0x860);
-	}
-#else
-	void __iomem *apb_misc = ioremap(
-		TEGRA_APB_MISC_BASE, TEGRA_APB_MISC_SIZE);
-	BUG_ON(!apb_misc);
-	cid = readl(apb_misc + 0x804);
-	nlist = readl(apb_misc + 0x860);
-	iounmap(apb_misc);
-#endif
 
 #if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 	tegra_fuse_cfg_reg_visible();

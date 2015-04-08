@@ -1,18 +1,32 @@
-#include <dt-bindings/gpio/tegra-gpio.h>
+/*
+ * Copyright (c) 2014-2015 NVIDIA CORPORATION. All rights reserved.
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
 
-#define SET_MAP_TRIP(domain, vtype, num, temp)				\
+#include <dt-bindings/gpio/tegra-gpio.h>
+#include <dt-bindings/clk/tegra210-clk.h>
+
+#define SET_MAP_TRIP(tdomain, cdomain, vtype, num, temp)		\
 	trips {								\
-		domain##_##vtype##num: domain-vtype##num {		\
+		tdomain##_##vtype##num: tdomain-vtype##num {		\
 			temperature = <temp>;				\
 			hysteresis = <1000>;				\
 			type = "active";				\
-			writable;					\
 		};							\
 	};								\
 	cooling-maps {							\
-		domain-vtype-map##num {					\
-			trip = <&domain##_##vtype##num>;		\
-			cooling-device = <&domain##_##vtype##_cdev num num>; \
+		tdomain-vtype-map##num {				\
+			trip = <&tdomain##_##vtype##num>;		\
+			cooling-device = <&cdomain##_##vtype##_cdev num num>; \
 		};							\
 	}
 
@@ -23,6 +37,12 @@
 		compatible = "nvidia,tegra210-dfll";
 		reg = <0x0 0x70110000 0x0 0x400>;
 		out-clock-name="dfll_cpu";
+		clocks = <&tegra_car TEGRA210_CLK_ID_DFLL_CPU>,
+			 <&tegra_car TEGRA210_CLK_ID_DFLL_SOC>,
+			 <&tegra_car TEGRA210_CLK_ID_DFLL_REF>,
+			 <&tegra_car TEGRA210_CLK_ID_CPU_G>,
+			 <&tegra_car TEGRA210_CLK_ID_I2C5>;
+		clock-names = "dfll_cpu", "soc", "ref", "safe_dvfs", "i2c";
 		board-params = <&dfll_ovr_params>;
 
 		pwm_dfll: pwm-pmic-integration {
@@ -50,6 +70,12 @@
 		compatible = "nvidia,tegra210-dfll";
 		reg = <0x0 0x70110000 0x0 0x400>;
 		out-clock-name="dfll_cpu";
+		clocks = <&tegra_car TEGRA210_CLK_ID_DFLL_CPU>,
+			 <&tegra_car TEGRA210_CLK_ID_DFLL_SOC>,
+			 <&tegra_car TEGRA210_CLK_ID_DFLL_REF>,
+			 <&tegra_car TEGRA210_CLK_ID_CPU_G>,
+			 <&tegra_car TEGRA210_CLK_ID_I2C5>;
+		clock-names = "dfll_cpu", "soc", "ref", "safe_dvfs", "i2c";
 		board-params = <&dfll_max77621_parms>;
 		i2c-pmic-integration = <&i2c_dfll>;
 
@@ -84,8 +110,8 @@
 			compatible = "regulator-pwm";
 			pwms = <&pwm_dfll 0 2500>;
 			regulator-name = "vdd_cpu";
-			regulator-min-microvolt = <709000>;
-			regulator-max-microvolt = <1320200>;
+			regulator-min-microvolt = <708000>;
+			regulator-max-microvolt = <1322400>;
 			regulator-init-microvolt = <1000000>;
 			regulator-always-on;
 			regulator-boot-on;
@@ -104,7 +130,6 @@
 			regulator-init-microvolt = <1000000>;
 			regulator-n-voltages = <62>;
 			regulator-enable-ramp-delay = <1000>;
-			regulator-boot-on;
 			enable-gpio = <&max77620 6 0>;
 			voltage-time-sel = <80>;
 		};
@@ -131,6 +156,7 @@
 			compatible = "nvidia,tegra210-dvfs-rail";
 			vdd_cpu-supply = <&cpu_ovr_reg>;
 			vmin-cdev = <&cpu_vmin_cdev>;
+			vmax-cdev = <&cpu_vmax_cdev>;
 		};
 
 		vdd-gpu-rail-ovr@1 {
@@ -139,6 +165,7 @@
 			compatible = "nvidia,tegra210-dvfs-rail";
 			vdd_gpu-supply = <&gpu_ovr_reg>;
 			scaling-cdev = <&gpu_scaling_cdev>;
+			vmax-cdev = <&gpu_vmax_cdev>;
 		};
 
 
@@ -148,6 +175,7 @@
 			compatible = "nvidia,tegra210-dvfs-rail";
 			vdd_cpu-supply = <&cpu_max77621_reg>;
 			vmin-cdev = <&cpu_vmin_cdev>;
+			vmax-cdev = <&cpu_vmax_cdev>;
 		};
 
 		vdd-gpu-rail-max77621@3 {
@@ -156,6 +184,7 @@
 			compatible = "nvidia,tegra210-dvfs-rail";
 			vdd_gpu-supply = <&gpu_max77621_reg>;
 			scaling-cdev = <&gpu_scaling_cdev>;
+			vmax-cdev = <&gpu_vmax_cdev>;
 		};
 
 		vdd-core-rail-max77620@4 {
@@ -164,6 +193,7 @@
 			compatible = "nvidia,tegra210-dvfs-rail";
 			vdd_core-supply = <&max77620_sd0>;
 			vmin-cdev = <&core_vmin_cdev>;
+			vmax-cdev = <&core_vmax_cdev>;
 		};
 
 		cpu_vmin_cdev: vdd-cpu-vmin-cdev@5 {
@@ -191,7 +221,7 @@
 		gpu_scaling_cdev: vdd-gpu-scaling-cdev@7 {
 			reg = <7>;
 			cooling-min-state = <0>;
-			cooling-max-state = <1>;
+			cooling-max-state = <4>;
 			#cooling-cells = <2>;
 			compatible = "nvidia,tegra210-rail-scaling-cdev";
 			cdev-type = "gpu_scaling";
@@ -200,28 +230,72 @@
 					&gpu_scaling2 0 &gpu_scaling3 0
 					&gpu_scaling4 0>;
 		};
+
+		cpu_vmax_cdev: vdd-cpu-vmax-cdev@8 {
+			reg = <8>;
+			cooling-min-state = <0>;
+			cooling-max-state = <1>;
+			#cooling-cells = <2>;
+			compatible = "nvidia,tegra210-rail-vmax-cdev";
+			cdev-type = "cpu_hot";
+			nvidia,constraint;
+			nvidia,trips = <&cpu_vmax1 1170 &cpu_vmax2 1132>;
+		};
+
+		gpu_vmax_cdev: vdd-gpu-vmax-cdev@9 {
+			reg = <9>;
+			cooling-min-state = <0>;
+			cooling-max-state = <1>;
+			#cooling-cells = <2>;
+			compatible = "nvidia,tegra210-rail-vmax-cdev";
+			cdev-type = "gpu_hot";
+			nvidia,constraint;
+			nvidia,trips = <&gpu_vmax1 1132>;
+		};
+
+		core_vmax_cdev: vdd-core-vmax-cdev@10 {
+			reg = <10>;
+			cooling-min-state = <0>;
+			cooling-max-state = <1>;
+			#cooling-cells = <2>;
+			compatible = "nvidia,tegra210-rail-vmax-cdev";
+			cdev-type = "core_hot";
+			nvidia,constraint;
+			nvidia,trips = <&core_vmax1 1132>;
+		};
 	};
 
 	thermal-zones {
-		CPU-therm {
-			SET_MAP_TRIP(cpu, vmin, 1, 15000);
+		Tdiode_tegra {
+			SET_MAP_TRIP(cpu, cpu, vmin, 1, 15000);
 		};
-		GPU-therm {
+		Tdiode_tegra {
 			trips {
 				/* Reference only trip, not mapped */
 				gpu_scaling0: gpu-scaling0 {
-					temperature = <(-40000)>;
+					temperature = <(-25000)>;
 					hysteresis = <0>;
 					type = "active";
 				};
 			};
-			SET_MAP_TRIP(gpu, scaling, 1, 15000);
-			SET_MAP_TRIP(gpu, scaling, 2, 30000);
-			SET_MAP_TRIP(gpu, scaling, 3, 50000);
-			SET_MAP_TRIP(gpu, scaling, 4, 70000);
+			SET_MAP_TRIP(gpu, gpu, scaling, 1, 15000);
+			SET_MAP_TRIP(gpu, gpu, scaling, 2, 30000);
+			SET_MAP_TRIP(gpu, gpu, scaling, 3, 50000);
+			SET_MAP_TRIP(gpu, gpu, scaling, 4, 70000);
+
+			SET_MAP_TRIP(gpu, gpu, vmax, 1, 83000);
 		};
-		PLL-therm {
-			SET_MAP_TRIP(core, vmin, 1, 20000);
+		Tdiode_tegra {
+			SET_MAP_TRIP(core, core, vmin, 1, 15000);
+			SET_MAP_TRIP(core, core, vmax, 1, 86000);
+		};
+		CPU-therm {
+			SET_MAP_TRIP(cpu, cpu, vmax, 1, 66000);
+			SET_MAP_TRIP(cpu, cpu, vmax, 2, 86000);
+		};
+		LCPU-therm {
+			SET_MAP_TRIP(lcpu, cpu, vmax, 1, 66000);
+			SET_MAP_TRIP(lcpu, cpu, vmax, 2, 86000);
 		};
 	};
 };

@@ -866,7 +866,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 #ifdef CONFIG_DMA_API_DEBUG
 	u64 limit = (mask + 1) & ~mask;
 	if (limit && size >= limit) {
-		dev_warn(dev, "coherent allocation too big (requested %#x mask %#llx)\n",
+		dev_warn(dev, "coherent allocation too big (requested %#zx mask %#llx)\n",
 			size, mask);
 		return NULL;
 	}
@@ -1398,8 +1398,6 @@ static void iommu_mapping_list_del(struct dma_iommu_mapping *mapping)
 static inline int iommu_get_num_pf_pages(struct dma_iommu_mapping *mapping,
 					 struct dma_attrs *attrs)
 {
-	int count = 0;
-
 	/* XXX: give priority to DMA_ATTR_SKIP_IOVA_GAP */
 	if (dma_get_attr(DMA_ATTR_SKIP_IOVA_GAP, attrs))
 		return 0;
@@ -1407,9 +1405,16 @@ static inline int iommu_get_num_pf_pages(struct dma_iommu_mapping *mapping,
 	/* XXX: currently we support only 1 prefetch page */
 	WARN_ON(mapping->num_pf_page > prefetch_page_count);
 
-	count += mapping->num_pf_page;
-	count += mapping->gap_page ? gap_page_count : 0;
-	return count;
+	return mapping->num_pf_page;
+}
+
+static inline int iommu_gap_pg_count(struct dma_iommu_mapping *mapping,
+				     struct dma_attrs *attrs)
+{
+	if (dma_get_attr(DMA_ATTR_SKIP_IOVA_GAP, attrs))
+		return 0;
+
+	return mapping->gap_page ? gap_page_count : 0;
 }
 
 static int pg_iommu_map(struct dma_iommu_mapping *mapping, unsigned long iova,
@@ -1550,6 +1555,7 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
 	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
 
 	count += iommu_get_num_pf_pages(mapping, attrs);
+	count += iommu_gap_pg_count(mapping, attrs);
 
 	align = (1 << order) - 1;
 
@@ -1610,6 +1616,7 @@ static dma_addr_t __alloc_iova_at(struct dma_iommu_mapping *mapping,
 	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
 
 	count += iommu_get_num_pf_pages(mapping, attrs);
+	count += iommu_gap_pg_count(mapping, attrs);
 
 	bytes = count << PAGE_SHIFT;
 
@@ -1725,6 +1732,7 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
 		count = size >> PAGE_SHIFT;
 
 	count += iommu_get_num_pf_pages(mapping, attrs);
+	count += iommu_gap_pg_count(mapping, attrs);
 
 	spin_lock_irqsave(&mapping->lock, flags);
 	bitmap_clear(mapping->bitmaps[bitmap_index], start, count);
@@ -2155,8 +2163,6 @@ skip_cmaint:
 
 	return 0;
 fail:
-	pg_iommu_unmap(mapping, iova_base, count * PAGE_SIZE,
-		       (ulong)attrs);
 	__free_iova(mapping, iova_base, size, attrs);
 	return ret;
 }

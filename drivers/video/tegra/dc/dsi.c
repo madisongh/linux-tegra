@@ -1,7 +1,7 @@
 /*
  * drivers/video/tegra/dc/dsi.c
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -483,7 +483,10 @@ static int __maybe_unused tegra_dsi_syncpt
 
 	val = DSI_INCR_SYNCPT_COND(OP_DONE) |
 		DSI_INCR_SYNCPT_INDX(dsi->syncpt_id);
-	tegra_dsi_controller_writel(dsi, val, DSI_INCR_SYNCPT, link_id);
+	if (dsi->info.ganged_type && dsi->info.ganged_write_to_all_links)
+		tegra_dsi_writel(dsi, val, DSI_INCR_SYNCPT);
+	else
+		tegra_dsi_controller_writel(dsi, val, DSI_INCR_SYNCPT, link_id);
 
 	ret = nvhost_syncpt_wait_timeout_ext(dsi->dc->ndev, dsi->syncpt_id,
 		dsi->syncpt_val + 1, (u32)MAX_SCHEDULE_TIMEOUT, NULL, NULL);
@@ -654,8 +657,7 @@ static void tegra_dsi_pix_correction(struct tegra_dc *dc,
 		if (temp) {
 			hfp_corr += dsi->info.n_data_lanes;
 			h_width_pixels += dsi->info.n_data_lanes;
-		}
-		else
+		} else
 			break;
 	}
 
@@ -697,7 +699,9 @@ void tegra_dsi_init_clock_param(struct tegra_dc *dc)
 
 	n_data_lanes = dsi->info.n_data_lanes;
 	if (dsi->info.ganged_type == TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT ||
-		dsi->info.ganged_type == TEGRA_DSI_GANGED_SYMMETRIC_EVEN_ODD)
+		dsi->info.ganged_type == TEGRA_DSI_GANGED_SYMMETRIC_EVEN_ODD ||
+		dsi->info.ganged_type ==
+			TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT_OVERLAP)
 		n_data_lanes /= 2;
 
 	dsi->dsi_control_val =
@@ -1357,7 +1361,9 @@ static void tegra_dsi_set_sol_delay(struct tegra_dc *dc,
 		if (dsi->info.ganged_type ==
 			TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT ||
 			dsi->info.ganged_type ==
-			TEGRA_DSI_GANGED_SYMMETRIC_EVEN_ODD) {
+			TEGRA_DSI_GANGED_SYMMETRIC_EVEN_ODD ||
+			dsi->info.ganged_type ==
+			TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT_OVERLAP) {
 			n_data_lanes_this_cont = dsi->info.n_data_lanes / 2;
 			n_data_lanes_ganged = dsi->info.n_data_lanes;
 		}
@@ -1445,6 +1451,11 @@ static void tegra_dsi_setup_ganged_mode_pkt_length(struct tegra_dc *dc,
 		hact_pkt_len_pix = DIV_ROUND_UP(hact_pkt_len_pix_orig, 2);
 		pix_per_line = DIV_ROUND_UP(pix_per_line_orig, 2);
 		break;
+	case TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT_OVERLAP:
+		hact_pkt_len_pix = DIV_ROUND_UP(hact_pkt_len_pix_orig, 2) +
+			dsi->info.ganged_overlap;
+		pix_per_line = DIV_ROUND_UP(pix_per_line_orig, 2);
+		break;
 	default:
 		dev_err(&dc->ndev->dev, "dsi: invalid ganged type\n");
 	}
@@ -1464,9 +1475,12 @@ static void tegra_dsi_setup_ganged_mode_pkt_length(struct tegra_dc *dc,
 			DSI_PKT_LEN_4_5_LENGTH_5(0);
 		tegra_dsi_controller_writel(dsi, val, DSI_PKT_LEN_4_5, i);
 
-		hact_pkt_len_pix =
-			hact_pkt_len_pix_orig - hact_pkt_len_pix;
-		pix_per_line = pix_per_line_orig - pix_per_line;
+		if (dsi->info.ganged_type !=
+			TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT_OVERLAP) {
+			hact_pkt_len_pix =
+				hact_pkt_len_pix_orig - hact_pkt_len_pix;
+			pix_per_line = pix_per_line_orig - pix_per_line;
+		}
 	}
 
 	val = DSI_PKT_LEN_6_7_LENGTH_6(0) |
@@ -2129,7 +2143,7 @@ tegra_dsi_mipi_calibration_status(struct tegra_dc_dsi_data *dsi)
 #if defined(CONFIG_ARCH_TEGRA_13x_SOC)
 void tegra_dsi_mipi_calibration_13x(struct tegra_dc_dsi_data *dsi)
 {
-	u32 val;
+	u32 val, reg;
 	struct clk *clk72mhz = NULL;
 
 	clk72mhz = clk_get_sys("clk72mhz", NULL);
@@ -2156,6 +2170,15 @@ void tegra_dsi_mipi_calibration_13x(struct tegra_dc_dsi_data *dsi)
 	val |= (DSI_PAD_PREEMP_PD_CLK(0x3) | DSI_PAD_PREEMP_PU_CLK(0x3) |
 		   DSI_PAD_PREEMP_PD(0x3) | DSI_PAD_PREEMP_PU(0x3));
 	tegra_dsi_writel(dsi, val, DSI_PAD_CONTROL_3_VS1);
+
+	/* Deselect shared clk lane with DSI pads */
+	for (reg = MIPI_CAL_CILC_MIPI_CAL_CONFIG_2_0;
+		reg <= MIPI_CAL_CSIE_MIPI_CAL_CONFIG_2_0;
+		reg += 4) {
+		val = tegra_mipi_cal_read(dsi->mipi_cal, reg);
+		val &= ~(MIPI_CAL_SELA(0x1));
+		tegra_mipi_cal_write(dsi->mipi_cal, val, reg);
+	}
 
 	/* Calibrate DSI 0 */
 	if (dsi->info.ganged_type ||
@@ -2277,15 +2300,15 @@ static void tegra_dsi_mipi_calibration_21x(struct tegra_dc_dsi_data *dsi)
 	tegra_mipi_cal_write(dsi->mipi_cal, val,
 			MIPI_CAL_MIPI_BIAS_PAD_CFG1_0);
 
-	val = (DSI_PAD_SLEWUPADJ(0x7) | DSI_PAD_SLEWDNADJ(0x7) |
-		DSI_PAD_LPUPADJ(0x1) | DSI_PAD_LPDNADJ(0x1) |
-		DSI_PAD_OUTADJCLK(0x0));
-	tegra_dsi_writel(dsi, val, DSI_PAD_CONTROL_2_VS1);
+	tegra_dsi_writel(dsi, 0, DSI_PAD_CONTROL_1_VS1);
+	tegra_dsi_writel(dsi, 0, DSI_PAD_CONTROL_2_VS1);
 
 	val = tegra_dsi_readl(dsi, DSI_PAD_CONTROL_3_VS1);
 	val |= (DSI_PAD_PREEMP_PD_CLK(0x3) | DSI_PAD_PREEMP_PU_CLK(0x3) |
 		   DSI_PAD_PREEMP_PD(0x3) | DSI_PAD_PREEMP_PU(0x3));
 	tegra_dsi_writel(dsi, val, DSI_PAD_CONTROL_3_VS1);
+
+	tegra_dsi_writel(dsi, 0, DSI_PAD_CONTROL_4_VS1);
 
 	/* Calibrate DSI 0 */
 	if (dsi->info.ganged_type ||
@@ -2356,7 +2379,7 @@ static void tegra_dsi_mipi_calibration_21x(struct tegra_dc_dsi_data *dsi)
 static void __maybe_unused
 tegra_dsi_mipi_calibration_12x(struct tegra_dc_dsi_data *dsi)
 {
-	u32 val;
+	u32 val, reg;
 	struct clk *clk72mhz = NULL;
 
 	clk72mhz = clk_get_sys("clk72mhz", NULL);
@@ -2390,6 +2413,15 @@ tegra_dsi_mipi_calibration_12x(struct tegra_dc_dsi_data *dsi)
 	val |= (DSI_PAD_PREEMP_PD_CLK(0x3) | DSI_PAD_PREEMP_PU_CLK(0x3) |
 		   DSI_PAD_PREEMP_PD(0x3) | DSI_PAD_PREEMP_PU(0x3));
 	tegra_dsi_writel(dsi, val, DSI_PAD_CONTROL_3_VS1);
+
+	/* Deselect shared clk lane with DSI pads */
+	for (reg = MIPI_CAL_CILC_MIPI_CAL_CONFIG_2_0;
+		reg <= MIPI_CAL_CSIE_MIPI_CAL_CONFIG_2_0;
+		reg += 4) {
+		val = tegra_mipi_cal_read(dsi->mipi_cal, reg);
+		val &= ~(MIPI_CAL_SELA(0x1));
+		tegra_mipi_cal_write(dsi->mipi_cal, val, reg);
+	}
 
 	/* Calibrate DSI 0 */
 	if (dsi->info.ganged_type ||
@@ -2633,7 +2665,7 @@ static void tegra_dsi_mipi_calibration_11x(struct tegra_dc_dsi_data *dsi)
 #endif
 static void tegra_dsi_pad_calibration(struct tegra_dc_dsi_data *dsi)
 {
-	u32 val = 0;
+	u32 val = 0, reg;
 
 	if (!dsi->ulpm)
 		tegra_dsi_pad_enable(dsi);
@@ -2645,6 +2677,15 @@ static void tegra_dsi_pad_calibration(struct tegra_dc_dsi_data *dsi)
 		tegra_mipi_cal_init_hw(dsi->mipi_cal);
 
 		tegra_mipi_cal_clk_enable(dsi->mipi_cal);
+
+		/* Deselect CSI pads */
+		for (reg = MIPI_CAL_CILA_MIPI_CAL_CONFIG_0;
+			reg <= MIPI_CAL_CILF_MIPI_CAL_CONFIG_0;
+			reg += 4) {
+			val = tegra_mipi_cal_read(dsi->mipi_cal, reg);
+			val &= ~(MIPI_CAL_SELA(0x1));
+			tegra_mipi_cal_write(dsi->mipi_cal, val, reg);
+		}
 
 		/* enable mipi bias pad */
 		val = tegra_mipi_cal_read(dsi->mipi_cal,
@@ -2859,6 +2900,8 @@ static void tegra_dsi_ganged(struct tegra_dc *dc,
 	u32 high_width = 0;
 	u32 h_active = dc->out->modes->h_active;
 	u32 val = 0;
+	int dsi_instances[2];
+	u16 ganged_pointer = DIV_ROUND_UP(h_active, 2);
 
 	if (dsi->info.controller_vs < DSI_VS_1) {
 		dev_err(&dc->ndev->dev, "dsi: ganged mode not"
@@ -2866,18 +2909,33 @@ static void tegra_dsi_ganged(struct tegra_dc *dc,
 		return;
 	}
 
+	if (dsi->info.ganged_swap_links) {
+		dsi_instances[0] = DSI_INSTANCE_1;
+		dsi_instances[1] = DSI_INSTANCE_0;
+	} else {
+		dsi_instances[0] = DSI_INSTANCE_0;
+		dsi_instances[1] = DSI_INSTANCE_1;
+	}
+
 	if (dsi->info.ganged_type ==
-			TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT) {
+		TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT_OVERLAP &&
+		dsi->info.ganged_overlap)
+		ganged_pointer -= dsi->info.ganged_overlap;
+
+	if (dsi->info.ganged_type ==
+			TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT ||
+		dsi->info.ganged_type ==
+			TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT_OVERLAP) {
 		/* DSI 0 */
 		tegra_dsi_controller_writel(dsi,
 			DSI_GANGED_MODE_START_POINTER(0),
-			DSI_GANGED_MODE_START, DSI_INSTANCE_0);
+			DSI_GANGED_MODE_START, dsi_instances[0]);
 		/* DSI 1 */
 		tegra_dsi_controller_writel(dsi,
-			DSI_GANGED_MODE_START_POINTER(h_active / 2),
-			DSI_GANGED_MODE_START, DSI_INSTANCE_1);
+			DSI_GANGED_MODE_START_POINTER(ganged_pointer),
+			DSI_GANGED_MODE_START, dsi_instances[1]);
 
-		low_width = DIV_ROUND_UP(h_active, 2);
+		low_width = ganged_pointer;
 		high_width = h_active - low_width;
 		val = DSI_GANGED_MODE_SIZE_VALID_LOW_WIDTH(low_width) |
 			DSI_GANGED_MODE_SIZE_VALID_HIGH_WIDTH(high_width);
@@ -2887,11 +2945,11 @@ static void tegra_dsi_ganged(struct tegra_dc *dc,
 		/* DSI 0 */
 		tegra_dsi_controller_writel(dsi,
 			DSI_GANGED_MODE_START_POINTER(0),
-			DSI_GANGED_MODE_START, DSI_INSTANCE_0);
+			DSI_GANGED_MODE_START, dsi_instances[0]);
 		/* DSI 1 */
 		tegra_dsi_controller_writel(dsi,
 			DSI_GANGED_MODE_START_POINTER(1),
-			DSI_GANGED_MODE_START, DSI_INSTANCE_1);
+			DSI_GANGED_MODE_START, dsi_instances[1]);
 
 		low_width = 0x1;
 		high_width = 0x1;
@@ -3208,8 +3266,8 @@ fail:
 	return status;
 }
 
-static int _tegra_dsi_write_data(struct tegra_dc_dsi_data *dsi,
-					struct tegra_dsi_cmd *cmd)
+static int _tegra_dsi_controller_write_data(struct tegra_dc_dsi_data *dsi,
+					struct tegra_dsi_cmd *cmd, int link_id)
 {
 	u8 virtual_channel;
 	u32 val;
@@ -3220,7 +3278,7 @@ static int _tegra_dsi_write_data(struct tegra_dc_dsi_data *dsi,
 
 	err = 0;
 
-	if (!dsi->info.ganged_type && cmd->link_id == TEGRA_DSI_LINK1) {
+	if (!dsi->info.ganged_type && link_id == TEGRA_DSI_LINK1) {
 		dev_err(&dsi->dc->ndev->dev, "DSI invalid command\n");
 		return -EINVAL;
 	}
@@ -3231,7 +3289,7 @@ static int _tegra_dsi_write_data(struct tegra_dc_dsi_data *dsi,
 	/* always use hw for ecc */
 	val = (virtual_channel | data_id) << 0 |
 			data_len << 8;
-	tegra_dsi_controller_writel(dsi, val, DSI_WR_DATA, cmd->link_id);
+	tegra_dsi_controller_writel(dsi, val, DSI_WR_DATA, link_id);
 
 	/* if pdata != NULL, pkt type is long pkt */
 	if (pdata != NULL) {
@@ -3247,15 +3305,32 @@ static int _tegra_dsi_write_data(struct tegra_dc_dsi_data *dsi,
 				data_len = 0;
 			}
 			tegra_dsi_controller_writel(dsi, val,
-				DSI_WR_DATA, cmd->link_id);
+				DSI_WR_DATA, link_id);
 		}
 	}
 
 	if (cmd->cmd_type != TEGRA_DSI_PACKET_VIDEO_VBLANK_CMD) {
-		err = tegra_dsi_host_trigger(dsi, cmd->link_id);
+		err = tegra_dsi_host_trigger(dsi, link_id);
 		if (err < 0)
 			dev_err(&dsi->dc->ndev->dev, "DSI host trigger failed\n");
 	}
+
+	return err;
+}
+
+static int _tegra_dsi_write_data(struct tegra_dc_dsi_data *dsi,
+					struct tegra_dsi_cmd *cmd)
+{
+	int i, err = 0;
+
+	if (dsi->info.ganged_type && dsi->info.ganged_write_to_all_links)
+		for (i = 0; i < dsi->max_instances; i++) {
+			err = _tegra_dsi_controller_write_data(dsi, cmd, i);
+			if (err)
+				break;
+		}
+	else
+		err = _tegra_dsi_controller_write_data(dsi, cmd, cmd->link_id);
 
 	return err;
 }
@@ -3484,13 +3559,13 @@ static u16 tegra_dsi_cs(char *pdata, u16 data_len)
 		for (byte_cnt = 0; byte_cnt < data_len; byte_cnt++) {
 			curr_byte = pdata[byte_cnt];
 			for (bit_cnt = 0; bit_cnt < 8; bit_cnt++) {
-				if (((crc & 0x0001 ) ^
+				if (((crc & 0x0001) ^
 					(curr_byte & 0x0001)) > 0)
 					crc = ((crc >> 1) & 0x7FFF) ^ poly;
 				else
 					crc = (crc >> 1) & 0x7FFF;
 
-				curr_byte = (curr_byte >> 1 ) & 0x7F;
+				curr_byte = (curr_byte >> 1) & 0x7F;
 			}
 		}
 	}
@@ -3640,7 +3715,11 @@ static int tegra_dsi_bta(struct tegra_dc_dsi_data *dsi)
 
 	val = tegra_dsi_readl(dsi, DSI_HOST_DSI_CONTROL);
 	val |= DSI_HOST_DSI_CONTROL_IMM_BTA(TEGRA_DSI_ENABLE);
-	tegra_dsi_controller_writel(dsi, val,
+
+	if (dsi->info.ganged_type && dsi->info.ganged_write_to_all_links)
+		tegra_dsi_writel(dsi, val, DSI_HOST_DSI_CONTROL);
+	else
+		tegra_dsi_controller_writel(dsi, val,
 				DSI_HOST_DSI_CONTROL, TEGRA_DSI_LINK0);
 
 	if (!tegra_cpu_is_asim() && DSI_USE_SYNC_POINTS) {
@@ -5239,7 +5318,7 @@ static long tegra_dc_dsi_setup_clk(struct tegra_dc *dc, struct clk *clk)
 	} else {
 		if (dc->pdata->default_out->dsi->dsi_instance) {
 			parent_clk = clk_get_sys(NULL,
-				dc->out->parent_clk ? : "pll_d2_out0");
+				dc->out->parent_clk ? : "pll_d2");
 			base_clk = clk_get_parent(parent_clk);
 		} else {
 			parent_clk = clk_get_sys(NULL,
@@ -5261,6 +5340,22 @@ skip_setup:
 	return tegra_dc_pclk_round_rate(dc, dc->mode.pclk);
 }
 
+static void tegra_dc_dsi_vrr_enable(struct tegra_dc *dc, bool enable)
+{
+	struct tegra_vrr *vrr  = dc->out->vrr;
+
+	if (vrr)
+		vrr->enable = enable;
+}
+
+static void tegra_dc_dsi_modeset_notifier(struct tegra_dc *dc)
+{
+	struct tegra_dc_dsi_data *dsi = tegra_dc_get_outdata(dc);
+
+	if (dsi->info.ganged_type)
+		tegra_dsi_pix_correction(dc, dsi);
+}
+
 struct tegra_dc_out_ops tegra_dc_dsi_ops = {
 	.init = tegra_dc_dsi_init,
 	.destroy = tegra_dc_dsi_destroy,
@@ -5277,4 +5372,6 @@ struct tegra_dc_out_ops tegra_dc_dsi_ops = {
 #endif
 	.setup_clk = tegra_dc_dsi_setup_clk,
 	.osidle = tegra_dc_dsi_osidle,
+	.vrr_enable = tegra_dc_dsi_vrr_enable,
+	.modeset_notifier = tegra_dc_dsi_modeset_notifier,
 };

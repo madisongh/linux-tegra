@@ -164,6 +164,7 @@ static inline void console_sysfs_notify(void)
 { }
 #endif
 extern bool console_suspend_enabled;
+extern bool console_enabled;
 
 /* Suspend and resume console messages over PM events */
 extern void suspend_console(void);

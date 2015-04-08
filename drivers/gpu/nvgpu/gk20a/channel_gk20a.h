@@ -1,7 +1,7 @@
 /*
  * GK20A graphics channel
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -84,6 +84,7 @@ struct channel_gk20a {
 	bool first_init;
 	bool vpr;
 	pid_t pid;
+	struct mutex ioctl_lock;
 
 	int tsgid;
 	struct list_head ch_entry; /* channel's entry in TSG */
@@ -98,7 +99,7 @@ struct channel_gk20a {
 
 	struct channel_ctx_gk20a ch_ctx;
 
-	struct inst_desc inst_block;
+	struct mem_desc inst_block;
 	struct mem_desc_sub ramfc;
 
 	void *userd_cpu_va;
@@ -185,6 +186,8 @@ int gk20a_channel_resume(struct gk20a *g);
 
 /* Channel file operations */
 int gk20a_channel_open(struct inode *inode, struct file *filp);
+int gk20a_channel_open_ioctl(struct gk20a *g,
+		struct nvgpu_channel_open_args *args);
 long gk20a_channel_ioctl(struct file *filp,
 			 unsigned int cmd,
 			 unsigned long arg);

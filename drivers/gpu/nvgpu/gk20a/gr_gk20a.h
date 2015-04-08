@@ -1,7 +1,7 @@
 /*
  * GK20A Graphics Engine
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -26,8 +26,9 @@
 #include "tsg_gk20a.h"
 #include "gr_ctx_gk20a.h"
 
-#define GR_IDLE_CHECK_DEFAULT		100 /* usec */
-#define GR_IDLE_CHECK_MAX		5000 /* usec */
+#define GR_IDLE_CHECK_DEFAULT		10 /* usec */
+#define GR_IDLE_CHECK_MAX		200 /* usec */
+#define GR_FECS_POLL_INTERVAL		5 /* usec */
 
 #define INVALID_SCREEN_TILE_ROW_OFFSET	0xFFFFFFFF
 #define INVALID_MAX_WAYS		0xFFFFFFFF
@@ -164,6 +165,11 @@ struct zbc_query_params {
 	u32 index_size;	/* [out] size, [in] index */
 };
 
+struct sm_info {
+	u8 gpc_index;
+	u8 tpc_index;
+};
+
 struct gr_gk20a {
 	struct gk20a *g;
 	struct {
@@ -217,6 +223,7 @@ struct gr_gk20a {
 	u32 comptags_per_cacheline;
 	u32 slices_per_ltc;
 	u32 cacheline_size;
+	u32 gobs_per_comptagline_per_slice;
 
 	u32 max_gpc_count;
 	u32 max_fbps_count;
@@ -249,17 +256,12 @@ struct gr_gk20a {
 
 	struct gr_ctx_buffer_desc global_ctx_buffer[NR_GLOBAL_CTX_BUF];
 
-	struct mmu_desc mmu_wr_mem;
-	u32 mmu_wr_mem_size;
-	struct mmu_desc mmu_rd_mem;
-	u32 mmu_rd_mem_size;
+	struct mem_desc mmu_wr_mem;
+	struct mem_desc mmu_rd_mem;
 
 	u8 *map_tiles;
 	u32 map_tile_count;
 	u32 map_row_offset;
-
-#define COMP_TAG_LINE_SIZE_SHIFT	(17)	/* one tag covers 128K */
-#define COMP_TAG_LINE_SIZE		(1 << COMP_TAG_LINE_SIZE_SHIFT)
 
 	u32 max_comptag_mem; /* max memory size (MB) for comptag */
 	struct compbit_store_desc compbit_store;
@@ -277,8 +279,6 @@ struct gr_gk20a {
 	s32 max_used_color_index;
 	s32 max_used_depth_index;
 
-	u32 status_disable_mask;
-
 #define GR_CHANNEL_MAP_TLB_SIZE		2 /* must of power of 2 */
 	struct gr_channel_map_tlb_entry chid_tlb[GR_CHANNEL_MAP_TLB_SIZE];
 	u32 channel_tlb_flush_index;
@@ -291,6 +291,9 @@ struct gr_gk20a {
 #ifdef CONFIG_ARCH_TEGRA_18x_SOC
 	struct gr_t18x t18x;
 #endif
+	u32 fbp_en_mask;
+	u32 no_of_sm;
+	struct sm_info *sm_to_cluster;
 };
 
 void gk20a_fecs_dump_falcon_stats(struct gk20a *g);
@@ -329,9 +332,8 @@ struct gk20a_ctxsw_ucode_segments {
 
 struct gk20a_ctxsw_ucode_info {
 	u64 *p_va;
-	struct inst_desc inst_blk_desc;
-	struct surface_mem_desc surface_desc;
-	u64 ucode_gpuva;
+	struct mem_desc inst_blk_desc;
+	struct mem_desc surface_desc;
 	struct gk20a_ctxsw_ucode_segments fecs;
 	struct gk20a_ctxsw_ucode_segments gpccs;
 };
@@ -459,14 +461,6 @@ void gr_gk20a_commit_global_pagepool(struct gk20a *g,
 				     u64 addr, u32 size, bool patch);
 void gk20a_gr_set_shader_exceptions(struct gk20a *g, u32 data);
 void gr_gk20a_enable_hww_exceptions(struct gk20a *g);
-void gr_gk20a_get_sm_dsm_perf_regs(struct gk20a *g,
-				   u32 *num_sm_dsm_perf_regs,
-				   u32 **sm_dsm_perf_regs,
-				   u32 *perf_register_stride);
-void gr_gk20a_get_sm_dsm_perf_ctrl_regs(struct gk20a *g,
-					u32 *num_sm_dsm_perf_regs,
-					u32 **sm_dsm_perf_regs,
-					u32 *perf_register_stride);
 int gr_gk20a_setup_rop_mapping(struct gk20a *g, struct gr_gk20a *gr);
 int gr_gk20a_init_ctxsw_ucode(struct gk20a *g);
 int gr_gk20a_load_ctxsw_ucode(struct gk20a *g);
@@ -493,10 +487,13 @@ int gr_gk20a_wait_idle(struct gk20a *g, unsigned long end_jiffies,
 		       u32 expect_delay);
 int gr_gk20a_init_ctx_state(struct gk20a *g);
 int gr_gk20a_submit_fecs_method_op(struct gk20a *g,
-				   struct fecs_method_op_gk20a op);
+				   struct fecs_method_op_gk20a op,
+				   bool sleepduringwait);
 int gr_gk20a_alloc_gr_ctx(struct gk20a *g,
 			  struct gr_ctx_desc **__gr_ctx, struct vm_gk20a *vm,
-			  u32 padding);
+			  u32 class, u32 padding);
 void gr_gk20a_free_gr_ctx(struct gk20a *g,
 			  struct vm_gk20a *vm, struct gr_ctx_desc *gr_ctx);
+int gr_gk20a_halt_pipe(struct gk20a *g);
+
 #endif /*__GR_GK20A_H__*/

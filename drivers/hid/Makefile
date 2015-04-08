@@ -125,6 +125,10 @@ obj-$(CONFIG_HID_WIIMOTE)	+= hid-wiimote.o
 obj-$(CONFIG_HID_SENSOR_HUB)	+= hid-sensor-hub.o
 obj-$(CONFIG_HID_NVIDIA)	+= hid-nvidia.o \
 	hid-nvidia-blake.o
+obj-$(CONFIG_HID_SHIELD_REMOTE)	+= hid-atv-jarvis.o
+obj-$(CONFIG_HID_SHIELD_REMOTE)	+= sbcdec.o
+obj-$(CONFIG_HID_ANDROIDTV_REMOTE)	+= hid-atv-remote.o
+obj-$(CONFIG_HID_ANDROIDTV_REMOTE)	+= sbcdec.o
 
 obj-$(CONFIG_USB_HID)		+= usbhid/
 obj-$(CONFIG_USB_MOUSE)		+= usbhid/

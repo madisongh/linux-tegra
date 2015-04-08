@@ -1,7 +1,7 @@
 /*
  * spi-tegra.h: SPI interface for Nvidia slink/spi controller.
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,8 +31,9 @@ struct tegra_spi_platform_data {
 	int rx_trig_words;
 	int ls_bit;
 	int gpio_slave_ready;
-	bool slave_ready_pol;
+	bool slave_ready_active_high;
 	int max_dma_buffer_size;
+	const char *clk_pin;
 };
 
 /*
@@ -48,6 +49,8 @@ struct tegra_spi_device_controller_data {
 	int rx_clk_tap_delay;
 	int tx_clk_tap_delay;
 	int cs_inactive_cycles;
+	int clk_delay_between_packets;
+	int cs_gpio;
 };
 
 typedef int (*spi_callback)(void *client_data);

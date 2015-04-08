@@ -83,6 +83,8 @@
 #define MAX77620_REG_SD1_CFG		0x1E
 #define MAX77620_REG_SD2_CFG		0x1F
 #define MAX77620_REG_SD3_CFG		0x20
+#define MAX77620_REG_SD4_CFG		0x21
+#define MAX77620_REG_SD_CFG2		0x22
 #define MAX77620_REG_LDO0_CFG		0x23
 #define MAX77620_REG_LDO0_CFG2		0x24
 #define MAX77620_REG_LDO1_CFG		0x25
@@ -176,6 +178,10 @@
 #define MAX77620_CID_DIDM_MASK		0xF0
 #define MAX77620_CID_DIDM_SHIFT		4
 
+/* CNCG2SD */
+#define MAX77620_SD_CNF2_ROVS_EN_SD1	BIT(1)
+#define MAX77620_SD_CNF2_ROVS_EN_SD0	BIT(2)
+
 /* Device Identification Metal */
 #define MAX77620_CID5_DIDM(n)			(((n) >> 4) & 0xF)
 /* Device Indentification OTP */
@@ -242,12 +248,15 @@
 #define MAX77620_CNFG1_32K_OUT0_EN		BIT(2)
 
 #define MAX77620_ONOFFCNFG1_SFT_RST		BIT(7)
+#define MAX77620_ONOFFCNFG1_MRT_MASK		0x38
+#define MAX77620_ONOFFCNFG1_MRT_SHIFT		0x3
 #define MAX77620_ONOFFCNFG1_SLPEN		BIT(2)
 #define MAX77620_ONOFFCNFG1_PWR_OFF		BIT(1)
 
 #define MAX77620_ONOFFCNFG2_SFT_RST_WK		BIT(7)
 #define MAX77620_ONOFFCNFG2_WD_RST_WK		BIT(6)
 #define MAX77620_ONOFFCNFG2_SLP_LPM_MSK		BIT(5)
+#define MAX77620_ONOFFCNFG2_WK_EN0		BIT(0)
 
 #define	MAX77620_GLBLM_MASK			BIT(0)
 
@@ -395,6 +404,7 @@ struct max77620_chip {
 	bool shutdown;
 	bool sleep_enable;
 	bool enable_global_lpm;
+	bool avoid_rtc_bulk_write;
 
 	int es_minor_version;
 	int es_major_version;
@@ -424,7 +434,7 @@ static inline int max77620_reg_writes(struct device *dev, int sid,
 	struct max77620_chip *chip = dev_get_drvdata(dev);
 	int ret = 0;
 
-	if (sid == MAX77620_RTC_SLAVE) {
+	if ((sid == MAX77620_RTC_SLAVE) && (!chip->avoid_rtc_bulk_write)) {
 		/* RTC registers support sequential writing */
 		ret = regmap_bulk_write(chip->rmap[sid], reg, val, len);
 	} else {

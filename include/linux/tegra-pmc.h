@@ -34,6 +34,8 @@ extern void __iomem *tegra_pmc_base;
 
 extern void tegra_pmc_register_update(int offset,
 	unsigned long mask, unsigned long val);
+extern void tegra_pmc_write_bootrom_command(u32 command_offset,
+	unsigned long val);
 
 extern void tegra_pmc_pwr_detect_update(unsigned long mask, unsigned long val);
 extern unsigned long tegra_pmc_pwr_detect_get(unsigned long mask);
@@ -110,23 +112,12 @@ void set_power_timers(unsigned long us_on, unsigned long us_off);
 bool tegra_pmc_cpu_is_powered(int cpuid);
 int tegra_pmc_cpu_power_on(int cpuid);
 int tegra_pmc_cpu_remove_clamping(int cpuid);
-void tegra_pmc_pmu_interrupt_polarity(bool active_low);
 struct pmc_pm_data *tegra_get_pm_data(void);
 
 extern void tegra_pmc_config_thermal_trip(struct tegra_thermtrip_pmic_data *data);
 
 extern void tegra_pmc_enable_thermal_trip(void);
 extern void tegra_pmc_lock_thermal_shutdown(void);
-
-enum pwrdet_bit {
-	SPI_HV_PWR_DET = 23,
-	AUDIO_HV_PWR_DET = 18,
-	SDMMC1_PWR_DET = 12,
-	SDMMC3_PWR_DET = 13,
-	GPIO_PWR_DET = 21
-};
-
-extern void pwr_detect_bit_write(u32 pwrdet_bit, bool enable);
 
 #ifdef CONFIG_PADCTRL_TEGRA210_PMC
 extern int tegra210_pmc_padctrl_init(struct device *dev,
@@ -142,5 +133,19 @@ static inline int tegra_pmc_padctrl_init(struct device *dev,
 #endif
 	return 0;
 }
+
+#ifdef CONFIG_TEGRA210_BOOTROM_PMC
+extern int tegra210_boorom_pmc_init(struct device *dev);
+#endif
+
+static inline int tegra_boorom_pmc_init(struct device *dev)
+{
+#ifdef CONFIG_TEGRA210_BOOTROM_PMC
+	return tegra210_boorom_pmc_init(dev);
+#else
+	return 0;
+#endif
+}
+
 
 #endif	/* __LINUX_TEGRA_PMC_H__ */

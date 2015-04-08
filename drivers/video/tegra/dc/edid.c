@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/seq_file.h>
 #include <linux/vmalloc.h>
+#include <linux/delay.h>
 
 #include "edid.h"
 #include "dc_priv.h"
@@ -34,69 +35,17 @@ struct tegra_edid_pvt {
 	bool				support_stereo;
 	bool				support_underscan;
 	bool				support_audio;
+	bool				scdc_present;
+	bool				db420_present;
+	bool				hfvsdb_present;
 	int			        hdmi_vic_len;
 	u8			        hdmi_vic[7];
+	u16			color_depth_flag;
+	u16			max_tmds_char_rate_hf_mhz;
+	u16			max_tmds_char_rate_hllc_mhz;
 	/* Note: dc_edid must remain the last member */
 	struct tegra_dc_edid		dc_edid;
 };
-
-#if defined(DEBUG) || defined(CONFIG_DEBUG_FS)
-static int tegra_edid_show(struct seq_file *s, void *unused)
-{
-	struct tegra_edid *edid = s->private;
-	struct tegra_dc_edid *data;
-	u8 *buf;
-	int i;
-
-	data = tegra_edid_get_data(edid);
-	if (!data) {
-		seq_printf(s, "No EDID\n");
-		return 0;
-	}
-
-	buf = data->buf;
-
-	for (i = 0; i < data->len; i++) {
-		if (i % 16 == 0)
-			seq_printf(s, "edid[%03x] =", i);
-
-		seq_printf(s, " %02x", buf[i]);
-
-		if (i % 16 == 15)
-			seq_printf(s, "\n");
-	}
-
-	tegra_edid_put_data(data);
-
-	return 0;
-}
-#endif
-
-#ifdef CONFIG_DEBUG_FS
-static int tegra_edid_debug_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, tegra_edid_show, inode->i_private);
-}
-
-static const struct file_operations tegra_edid_debug_fops = {
-	.open		= tegra_edid_debug_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
-static void tegra_edid_debug_add(struct tegra_edid *edid)
-{
-	char name[] = "edidX";
-
-	snprintf(name, sizeof(name), "edid%1d", edid->dc->ndev->id);
-	debugfs_create_file(name, S_IRUGO, NULL, edid, &tegra_edid_debug_fops);
-}
-#else
-void tegra_edid_debug_add(struct tegra_edid *edid)
-{
-}
-#endif
 
 #ifdef DEBUG
 static char tegra_edid_dump_buff[16 * 1024];
@@ -138,9 +87,9 @@ int tegra_edid_read_block(struct tegra_edid *edid, int block, u8 *data)
 {
 	u8 block_buf[] = {block >> 1};
 	u8 cmd_buf[] = {(block & 0x1) * 128};
-	int status;
-	u8 checksum = 0;
 	u8 i;
+	u8 last_checksum = 0;
+	size_t attempt_cnt = 0;
 	struct i2c_msg msg[] = {
 		{
 			.addr = 0x30,
@@ -171,19 +120,63 @@ int tegra_edid_read_block(struct tegra_edid *edid, int block, u8 *data)
 		m = &msg[1];
 	}
 
-	status = edid->i2c_ops.i2c_transfer(edid->dc, m, msg_len);
+	do {
+		u8 checksum = 0;
+		int status = edid->i2c_ops.i2c_transfer(edid->dc, m, msg_len);
 
-	if (status < 0)
-		return status;
+		if (status < 0)
+			return status;
 
-	if (status != msg_len)
-		return -EIO;
+		if (status != msg_len)
+			return -EIO;
 
-	for (i = 0; i < 128; i++)
-		checksum += data[i];
-	if (checksum != 0) {
-		pr_err("%s: checksum failed\n", __func__);
-		return -EIO;
+		for (i = 0; i < 128; i++)
+			checksum += data[i];
+		if (checksum != 0) {
+			/*
+			 * It is completely possible that the sink that we are
+			 * reading has a bad EDID checksum (specifically, some
+			 * of the older TVs). These TVs have the modes, etc
+			 * programmed in their EDID correctly, but just have
+			 * a bad checksum. It then becomes hard to distinguish
+			 * between an i2c failure vs bad EDID.
+			 * To get around this, read the EDID multiple times.
+			 * If the calculated checksum is the exact same
+			 * multiple number of times, just print a
+			 * warning and ignore.
+			 */
+
+			if (attempt_cnt == 0)
+				last_checksum = checksum;
+
+			if (last_checksum != checksum) {
+				pr_warn("%s: checksum failed and did not match consecutive reads. Previous remainder was %u. New remainder is %u. Failed at attempt %zu\n",
+					__func__, last_checksum, checksum,
+					attempt_cnt);
+				return -EIO;
+			}
+
+			usleep_range(TEGRA_EDID_MIN_RETRY_DELAY_US,
+				TEGRA_EDID_MAX_RETRY_DELAY_US);
+		}
+	} while (last_checksum != 0 && ++attempt_cnt < TEGRA_EDID_MAX_RETRY);
+
+	/*
+	 * Re-calculate the checksum since the standard EDID parser doesn't
+	 * like the bad checksum
+	 */
+	if (last_checksum != 0) {
+		u8 checksum = 0;
+
+		for (i = 0; i < 127; i++)
+			checksum += data[i];
+
+		checksum = (u8)(256 - checksum);
+		data[127] = checksum;
+
+		pr_warn("%s: remainder is %u for the last %d attempts. Assuming bad sink EDID and ignoring. New checksum is %u\n",
+				__func__, last_checksum, TEGRA_EDID_MAX_RETRY,
+				checksum);
 	}
 
 	return 0;
@@ -205,6 +198,9 @@ static int tegra_edid_parse_ext_block(const u8 *raw, int idx,
 	}
 	edid->support_audio = 0;
 	edid->hdmi_vic_len = 0;
+	edid->scdc_present = false;
+	edid->hfvsdb_present = false;
+	edid->db420_present = false;
 	ptr = &raw[0];
 
 	/* If CEA 861 block get info for eld struct */
@@ -265,12 +261,32 @@ static int tegra_edid_parse_ext_block(const u8 *raw, int idx,
 		{
 			int j = 0;
 
+			/* OUI for hdmi licensing, LLC */
 			if ((ptr[1] == 0x03) &&
 				(ptr[2] == 0x0c) &&
 				(ptr[3] == 0)) {
 				edid->eld.port_id[0] = ptr[4];
 				edid->eld.port_id[1] = ptr[5];
+
+				if (len >= 7)
+					edid->max_tmds_char_rate_hllc_mhz =
+								ptr[7] * 5;
+				edid->max_tmds_char_rate_hllc_mhz =
+					edid->max_tmds_char_rate_hllc_mhz ? :
+					165; /* for <=165MHz field may be 0 */
 			}
+
+			/* OUI for hdmi forum */
+			if ((ptr[1] == 0xd8) &&
+				(ptr[2] == 0x5d) &&
+				(ptr[3] == 0xc4)) {
+				edid->hfvsdb_present = true;
+				edid->color_depth_flag = ptr[7] &
+							TEGRA_DC_Y420_MASK;
+				edid->max_tmds_char_rate_hf_mhz = ptr[5] * 5;
+				edid->scdc_present = (ptr[6] >> 7) & 0x1;
+			}
+
 			if ((len >= 8) &&
 				(ptr[1] == 0x03) &&
 				(ptr[2] == 0x0c) &&
@@ -323,6 +339,21 @@ static int tegra_edid_parse_ext_block(const u8 *raw, int idx,
 			ptr += len; /* adding the header */
 			break;
 		}
+		case CEA_DATA_BLOCK_EXT:
+		{
+			u8 ext_db = ptr[1];
+
+			switch (ext_db) {
+			case CEA_DATA_BLOCK_EXT_Y420VDB: /* fall through */
+			case CEA_DATA_BLOCK_EXT_Y420CMDB:
+				edid->db420_present = true;
+				break;
+			};
+
+			len++;
+			ptr += len;
+			break;
+		}
 		default:
 			len++; /* len does not include header */
 			ptr += len;
@@ -356,6 +387,71 @@ static void data_release(struct kref *ref)
 	vfree(data);
 }
 
+u16 tegra_edid_get_cd_flag(struct tegra_edid *edid)
+{
+	if (!edid || !edid->data) {
+		pr_warn("edid invalid\n");
+		return -EFAULT;
+	}
+
+	return edid->data->color_depth_flag;
+}
+
+/* hdmi spec mandates sink to specify correct max_tmds_clk only for >165MHz */
+u16 tegra_edid_get_max_clk_rate(struct tegra_edid *edid)
+{
+	u16 tmds_hf, tmds_llc;
+
+	if (!edid || !edid->data) {
+		pr_warn("edid invalid\n");
+		return -EFAULT;
+	}
+
+	tmds_hf = edid->data->max_tmds_char_rate_hf_mhz;
+	tmds_llc = edid->data->max_tmds_char_rate_hllc_mhz;
+
+	if (tmds_hf || tmds_llc)
+		return tmds_hf ? : tmds_llc;
+
+	return 0;
+}
+
+bool tegra_edid_is_scdc_present(struct tegra_edid *edid)
+{
+	if (!edid || !edid->data) {
+		pr_warn("edid invalid\n");
+		return false;
+	}
+
+	if (edid->data->scdc_present &&
+		!tegra_edid_is_hfvsdb_present(edid)) {
+		pr_warn("scdc presence incorrectly parsed\n");
+		dump_stack();
+	}
+
+	return edid->data->scdc_present;
+}
+
+bool tegra_edid_is_hfvsdb_present(struct tegra_edid *edid)
+{
+	if (!edid || !edid->data) {
+		pr_warn("edid invalid\n");
+		return false;
+	}
+
+	return edid->data->hfvsdb_present;
+}
+
+bool tegra_edid_is_420db_present(struct tegra_edid *edid)
+{
+	if (!edid || !edid->data) {
+		pr_warn("edid invalid\n");
+		return false;
+	}
+
+	return edid->data->db420_present;
+}
+
 int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs,
 u8 *vedid)
 {
@@ -379,6 +475,9 @@ u8 *vedid)
 	kref_init(&new_data->refcnt);
 
 	new_data->support_stereo = 0;
+	new_data->color_depth_flag = 0;
+	new_data->max_tmds_char_rate_hf_mhz = 0;
+	new_data->max_tmds_char_rate_hllc_mhz = 0;
 
 	data = new_data->dc_edid.buf;
 
@@ -534,8 +633,6 @@ struct tegra_edid *tegra_edid_create(struct tegra_dc *dc,
 	mutex_init(&edid->lock);
 	edid->i2c_ops.i2c_transfer = i2c_func;
 	edid->dc = dc;
-
-	tegra_edid_debug_add(edid);
 
 	return edid;
 }

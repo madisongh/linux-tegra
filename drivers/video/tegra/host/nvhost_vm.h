@@ -1,7 +1,7 @@
 /*
  * Tegra Graphics Host Virtual Memory
  *
- * Copyright (c) 2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -19,10 +19,94 @@
 #ifndef NVHOST_VM_H
 #define NVHOST_VM_H
 
+#include <linux/kref.h>
+
 struct platform_device;
-struct nvhost_vm;
 struct nvhost_vm_pin;
 struct dma_buf;
+struct dma_buf_attachment;
+struct sg_table;
+
+struct nvhost_vm {
+	struct platform_device *pdev;
+
+	struct kref kref;	/* reference to this VM */
+	struct mutex mutex;
+
+	/* rb-tree of buffers mapped into this VM */
+	struct rb_root buffer_list;
+
+	/* count of application viewed buffers mapped into this VM */
+	unsigned int num_user_mapped_buffers;
+
+	/* used by hardware layer */
+	void *private_data;
+
+	/* to track all vms in the system */
+	struct list_head vm_list;
+};
+
+struct nvhost_vm_buffer {
+	struct nvhost_vm *vm;
+
+	/* buffer attachment */
+	struct dma_buf *dmabuf;
+	struct dma_buf_attachment *attach;
+	struct sg_table *sgt;
+
+	/* context specific view to the buffer */
+	dma_addr_t addr;
+	size_t size;
+
+	struct kref kref;	/* reference to this buffer */
+
+	/* bookkeeping */
+	unsigned int user_map_count;	/* application view to the buffer */
+	unsigned int submit_map_count;	/* hw view to this buffer */
+	struct rb_node node;
+
+	/* used by hardware layer */
+	void *private_data;
+};
+
+struct nvhost_vm_static_buffer {
+	struct sg_table *sgt;
+
+	void *vaddr;
+	dma_addr_t paddr;
+	size_t size;
+
+	/* list of all statically mapped buffers */
+	struct list_head list;
+};
+
+/**
+ * nvhost_vm_get_id - get hw identifier of this vm
+ *	@vm: Pointer to nvhost_vm structure
+ *
+ * This function returns hardware identifier of the given vm.
+ */
+int nvhost_vm_get_id(struct nvhost_vm *vm);
+
+/**
+ * nvhost_vm_map_static - map allocated area to iova
+ *	@pdev: pointer to host1x or host1x client device
+ *	@vaddr: kernel virtual address
+ *	@paddr: desired physical address for this buffer
+ *	@size: size of the buffer (in bytes)
+ *
+ * This call maps given area to all existing (and future) address spaces.
+ * The mapping is permanent and cannot be removed. User of this API is
+ * responsible to ensure that the backing memory is not released at any
+ * point.
+ *
+ * Return 0 on succcess, error otherwise. Base address is returned
+ * in address pointer.
+ *
+ */
+int nvhost_vm_map_static(struct platform_device *pdev,
+			 void *vaddr, dma_addr_t paddr,
+			 size_t size);
 
 /**
  * nvhost_vm_pin_buffers - Pin mapped buffers to the hardware

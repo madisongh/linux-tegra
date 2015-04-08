@@ -27,6 +27,7 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 
 #include <mach/irqs.h>
 
@@ -611,9 +612,6 @@ static struct actmon_dev actmon_dev_avp = {
 
 #if defined(CONFIG_ARCH_TEGRA_12x_SOC) || defined(CONFIG_ARCH_TEGRA_13x_SOC)
 #define CPU_AVG_ACT_THRESHOLD 2000
-#else
-#define CPU_AVG_ACT_THRESHOLD 50000
-#endif
 /* EMC-cpu activity monitor: frequency sampling device:
  * activity counter is incremented every 256 memory transactions, and
  * each transaction takes 2 EMC clocks; count_weight = 512 on Tegra3.
@@ -635,14 +633,7 @@ static struct actmon_dev actmon_dev_cpu_emc = {
 	.up_wmark_window	= 1,
 	.down_wmark_window	= 3,
 	.avg_window_log2	= ACTMON_DEFAULT_AVG_WINDOW_LOG2,
-#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
-	.count_weight		= 0x200,
-#elif defined(CONFIG_ARCH_TEGRA_12x_SOC) || defined(CONFIG_ARCH_TEGRA_13x_SOC)
 	.count_weight		= 0x400,
-#else
-	.count_weight		= 0x100,
-#endif
-
 	.type			= ACTMON_FREQ_SAMPLER,
 	.state			= ACTMON_UNINITIALIZED,
 
@@ -650,11 +641,14 @@ static struct actmon_dev actmon_dev_cpu_emc = {
 		.notifier_call = actmon_rate_notify_cb,
 	},
 };
+#endif
 
 static struct actmon_dev *actmon_devices[] = {
 	&actmon_dev_emc,
 	&actmon_dev_avp,
+#if defined(CONFIG_ARCH_TEGRA_12x_SOC) || defined(CONFIG_ARCH_TEGRA_13x_SOC)
 	&actmon_dev_cpu_emc,
+#endif
 };
 
 int tegra_actmon_save(void)
@@ -983,6 +977,12 @@ static int __init tegra_actmon_init(void)
 		pr_err("%s: Failed to find actmon clock\n", __func__);
 		return 0;
 	}
+
+	/* Reset ACTMON */
+	tegra_periph_reset_assert(c);
+	udelay(10);
+	tegra_periph_reset_deassert(c);
+
 	actmon_clk_freq = clk_get_rate(c) / 1000;
 	ret = tegra_clk_prepare_enable(c);
 	if (ret) {

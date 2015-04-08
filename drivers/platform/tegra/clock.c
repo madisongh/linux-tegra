@@ -5,7 +5,7 @@
  * Author:
  *	Colin Cross <ccross@google.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -101,6 +101,36 @@ struct tegra_cpu_car_ops *tegra_cpu_car_ops;
 static DEFINE_MUTEX(clock_list_lock);
 static LIST_HEAD(clocks);
 static unsigned long osc_freq;
+
+#ifdef CONFIG_OF
+struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec)
+{
+	u32 clk_id;
+	struct clk *c;
+
+	if (!clkspec->args_count) {
+		pr_err("%s: no clock id is specified\n", __func__);
+		return ERR_PTR(-ENOENT);
+	}
+
+	clk_id = clkspec->args[0];
+	if (!clk_id) {
+		pr_err("%s: clock id 0 is not assigned\n", __func__);
+		return ERR_PTR(-ENOENT);
+	}
+
+	mutex_lock(&clock_list_lock);
+	list_for_each_entry(c, &clocks, node) {
+		if (c->clk_id == clk_id) {
+			mutex_unlock(&clock_list_lock);
+			return c;
+		}
+	}
+	mutex_unlock(&clock_list_lock);
+	pr_err("%s: tegra clock %u not found\n", __func__, clk_id);
+	return ERR_PTR(-ENOENT);
+}
+#endif
 
 struct clk *tegra_get_clock_by_name(const char *name)
 {
@@ -1321,8 +1351,8 @@ int tegra_clk_dfll_range_control(enum dfll_range use_dfll)
 	}
 
 	clk_lock_save(c->parent, &p_flags);
-	old_use_dfll = tegra_dvfs_get_dfll_range(c->parent->dvfs);
-	ret = tegra_dvfs_set_dfll_range(c->parent->dvfs, use_dfll);
+	ret = tegra_dvfs_swap_dfll_range(c->parent->dvfs, use_dfll,
+					 &old_use_dfll);
 	if (!ret) {
 		/* Get the current parent clock running rate and
 		   set it to new parent clock */
@@ -1337,6 +1367,7 @@ int tegra_clk_dfll_range_control(enum dfll_range use_dfll)
 	clk_unlock_restore(c->parent, &p_flags);
 	clk_unlock_restore(c, &c_flags);
 	tegra_update_cpu_edp_limits();
+	tegra_cpu_volt_cap_apply(NULL, 0, 0);
 	return ret;
 
 error_1:
@@ -1412,6 +1443,24 @@ unsigned long tegra_clk_measure_input_freq(void)
 
 	return osc_freq;
 }
+
+/* Tegra main rate (CLK_M) sysfs node */
+static ssize_t tegra_main_rate_show(struct kobject *kobj,
+				    struct kobj_attribute *attr, char *buf)
+{
+	struct clk *c = tegra_get_clock_by_name("clk_m");
+
+	if (c)
+		return sprintf(buf, "%lu\n", clk_get_rate(c));
+	return sprintf(buf, "N/A\n");
+}
+static struct kobj_attribute tegra_main_rate = __ATTR_RO(tegra_main_rate);
+
+static int __init tegra_main_rate_sysfs_init(void)
+{
+	return sysfs_create_file(kernel_kobj, &tegra_main_rate.attr);
+}
+late_initcall(tegra_main_rate_sysfs_init);
 
 
 #ifdef CONFIG_DEBUG_FS
@@ -1934,13 +1983,21 @@ static int possible_rates_show(struct seq_file *s, void *data)
 {
 	struct clk *c = s->private;
 	long rate = 0;
+	bool at_min = !c->min_rate;
 
 	/* shared bus clock must round up, unless top of range reached */
 	while (rate <= c->max_rate) {
 		unsigned long rounded_rate = c->ops->round_rate(c, rate);
-		if (IS_ERR_VALUE(rounded_rate) || (rounded_rate <= rate))
+		if (IS_ERR_VALUE(rounded_rate) || (rounded_rate <= rate)) {
+			if ((rate == rounded_rate) && at_min) {
+				/* bus doesn't clip rates to discrete set */
+				seq_printf(s, "... %lu", c->max_rate / 1000);
+				seq_printf(s, "(kHz): discrete rates N/A\n");
+				return 0;
+			}
 			break;
-
+		}
+		at_min = rounded_rate == c->min_rate;
 		rate = rounded_rate + 2000;	/* 2kHz resolution */
 		seq_printf(s, "%ld ", rounded_rate / 1000);
 	}

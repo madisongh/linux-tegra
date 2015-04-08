@@ -107,6 +107,11 @@
 #define CMD_MAXLINKSPEED	"MAXLINKSPEED"
 #define CMD_RXRATESTATS 	"RXRATESTATS"
 #define CMD_AMPDU_SEND_DELBA	"AMPDU_SEND_DELBA"
+
+/* Commands for iovar settings */
+#define CMD_SETIOVAR		"SETIOVAR"
+#define CMD_GETIOVAR		"GETIOVAR"
+
 /* CCX Private Commands */
 
 #ifdef PNO_SUPPORT
@@ -122,6 +127,7 @@
 
 #define	CMD_HAPD_MAC_FILTER	"HAPD_MAC_FILTER"
 
+#define	CMD_AUTOSLEEP		"AUTOSLEEP"
 
 
 #define CMD_ROAM_OFFLOAD			"SETROAMOFFLOAD"
@@ -202,6 +208,8 @@ int wl_cfg80211_get_p2p_noa(struct net_device *net, char* buf, int len)
 int wl_cfg80211_set_p2p_ps(struct net_device *net, char* buf, int len)
 { return 0; }
 #endif /* WK_CFG80211 */
+
+extern int dhd_set_slpauto_mode(struct net_device *dev, s32 val);
 
 
 #ifdef ENABLE_4335BT_WAR
@@ -845,6 +853,21 @@ int wl_android_set_roam_mode(struct net_device *dev, char *command, int total_le
 	return 0;
 }
 
+int wl_android_set_slpauto(struct net_device *dev, char *command, int total_len)
+{
+	int error = 0;
+	char slpauto_enable = 0;
+
+	slpauto_enable = command[strlen(CMD_AUTOSLEEP) + 1] - '0';
+	error = dhd_set_slpauto_mode(dev, slpauto_enable);
+	if (error) {
+		DHD_ERROR(("Failed to %s auto sleep, error = %d\n",
+			slpauto_enable ? "enable" : "disable", error));
+	}
+
+	return error;
+}
+
 int wl_android_set_ibss_beacon_ouidata(struct net_device *dev, char *command, int total_len)
 {
 	char ie_buf[VNDR_IE_MAX_LEN];
@@ -1279,6 +1302,114 @@ wl_android_ampdu_send_delba(struct net_device *dev, char *command)
 
 	return error;
 }
+
+static int wl_android_mkeep_alive(struct net_device *dev, char *command, int total_len)
+{
+	char *pcmd = command;
+	char *str = NULL;
+	wl_mkeep_alive_pkt_t *mkeep_alive_pkt = NULL;
+	char *ioctl_buf = NULL;
+	u16 kflags = in_atomic() ? GFP_ATOMIC : GFP_KERNEL;
+	s32 err = BCME_OK;
+	uint32 len;
+	char *endptr;
+	int i = 0;
+
+	len = sizeof(wl_mkeep_alive_pkt_t);
+	mkeep_alive_pkt = (wl_mkeep_alive_pkt_t *)kzalloc(len, kflags);
+	if (!mkeep_alive_pkt) {
+		WL_ERR(("%s: mkeep_alive pkt alloc failed\n", __func__));
+		return -ENOMEM;
+	}
+
+	ioctl_buf = kzalloc(WLC_IOCTL_MEDLEN, GFP_KERNEL);
+	if (!ioctl_buf) {
+		WL_ERR(("ioctl memory alloc failed\n"));
+		if (mkeep_alive_pkt) {
+			kfree(mkeep_alive_pkt);
+		}
+		return -ENOMEM;
+	}
+	memset(ioctl_buf, 0, WLC_IOCTL_MEDLEN);
+
+	/* drop command */
+	str = bcmstrtok(&pcmd, " ", NULL);
+
+	/* get index */
+	str = bcmstrtok(&pcmd, " ", NULL);
+	if (!str) {
+		WL_ERR(("Invalid index parameter %s\n", str));
+		err = -EINVAL;
+		goto exit;
+	}
+	mkeep_alive_pkt->keep_alive_id = bcm_strtoul(str, &endptr, 0);
+	if (*endptr != '\0') {
+		WL_ERR(("Invalid index parameter %s\n", str));
+		err = -EINVAL;
+		goto exit;
+	}
+
+	/* get period */
+	str = bcmstrtok(&pcmd, " ", NULL);
+	if (!str) {
+		WL_ERR(("Invalid period parameter %s\n", str));
+		err = -EINVAL;
+		goto exit;
+	}
+	mkeep_alive_pkt->period_msec = bcm_strtoul(str, &endptr, 0);
+	if (*endptr != '\0') {
+		WL_ERR(("Invalid period parameter %s\n", str));
+		err = -EINVAL;
+		goto exit;
+	}
+
+	mkeep_alive_pkt->version = htod16(WL_MKEEP_ALIVE_VERSION);
+	mkeep_alive_pkt->length = htod16(WL_MKEEP_ALIVE_FIXED_LEN);
+
+	/*get packet*/
+	str = bcmstrtok(&pcmd, " ", NULL);
+	if (str) {
+		if (strncmp(str, "0x", 2) != 0 &&
+				strncmp(str, "0X", 2) != 0) {
+			WL_ERR(("Packet invalid format. Needs to start with 0x\n"));
+			err = -EINVAL;
+			goto exit;
+		}
+		str = str + 2; /* Skip past 0x */
+		if (strlen(str) % 2 != 0) {
+			WL_ERR(("Packet invalid format. Needs to be of even length\n"));
+			err = -EINVAL;
+			goto exit;
+		}
+		for (i = 0; *str != '\0'; i++) {
+			char num[3];
+			strncpy(num, str, 2);
+			num[2] = '\0';
+			mkeep_alive_pkt->data[i] = (uint8)bcm_strtoul(num, NULL, 16);
+			str += 2;
+		}
+		mkeep_alive_pkt->len_bytes = i;
+	}
+
+	err = wldev_iovar_setbuf(dev, "mkeep_alive", mkeep_alive_pkt,
+		len + i, ioctl_buf, WLC_IOCTL_MEDLEN, NULL);
+	if (err != BCME_OK) {
+		WL_ERR(("%s: Fail to set iovar %d\n", __func__, err));
+		err = -EINVAL;
+	}
+
+exit:
+	if (mkeep_alive_pkt)
+		kfree(mkeep_alive_pkt);
+
+	if (ioctl_buf)
+		kfree(ioctl_buf);
+
+	return err;
+
+
+}
+
 #define NETLINK_OXYGEN     30
 #define AIBSS_BEACON_TIMEOUT	10
 
@@ -1421,6 +1552,82 @@ int wl_keep_alive_set(struct net_device *dev, char* extra, int total_len)
 	}
 
 	return res;
+}
+
+static int wl_android_get_iovar(struct net_device *dev, char *command,
+					int total_len)
+{
+	int skip = strlen(CMD_GETIOVAR) + 1;
+	char iovbuf[WLC_IOCTL_SMLEN];
+	s32 param = -1;
+	int bytes_written = 0;
+
+	if (strlen(command) < skip ) {
+		DHD_ERROR(("%s: Invalid command length", __func__));
+		return BCME_BADARG;
+	}
+
+	DHD_INFO(("%s: command buffer %s command length:%d\n",
+			__func__, (command + skip), strlen(command + skip)));
+
+	/* Initiate get_iovar command */
+	memset(iovbuf, 0, sizeof(iovbuf));
+	bytes_written = wldev_iovar_getbuf(dev, (command + skip), &param,
+				sizeof(param), iovbuf, sizeof(iovbuf), NULL);
+
+	/* Check for errors, log the error and reset bytes written value */
+	if (bytes_written < 0) {
+		DHD_ERROR(("%s: get iovar failed (error=%d)\n",
+				__func__, bytes_written));
+		bytes_written = 0;
+	} else {
+		snprintf(command, total_len, iovbuf);
+		bytes_written = snprintf(command, total_len,
+					"%d:%s", dtoh32(param), iovbuf);
+		DHD_INFO(("%s: param:%d iovbuf:%s strlen(iovbuf):%d"
+				" bytes_written:%d\n", __func__, param, iovbuf,
+				strlen(iovbuf), bytes_written));
+	}
+
+	return bytes_written;
+}
+
+static int wl_android_set_iovar(struct net_device *dev, char *command,
+					int total_len)
+{
+	int skip = strlen(CMD_GETIOVAR) + 1;
+	char iovbuf[WLC_IOCTL_SMLEN];
+	char iovar[WLC_IOCTL_SMLEN];
+	s32 param = -1;
+	int bytes_written = 0;
+	int ret = -1;
+
+	if (strlen(command) < skip ) {
+		DHD_ERROR(("Short command length"));
+		return BCME_BADARG;
+	}
+
+	DHD_INFO(("%s: command buffer:%s command length:%d\n",
+			__func__, (command + skip), strlen(command + skip)));
+
+	/* Parse command and get iovbuf and param values */
+	memset(iovbuf, 0, sizeof(iovbuf));
+	memset(iovar, 0, sizeof(iovbuf));
+	ret = sscanf((command + skip), "%s %d:%s", iovar, &param, iovbuf);
+	if (ret < 3) {
+		DHD_ERROR(("%s: Failed to get Parameter %d\n", __func__, ret));
+		return BCME_BADARG;
+	}
+	DHD_INFO(("%s: iovar:%s param:%d iovbuf:%s strlen(iovbuf):%d\n", __func__,
+			iovar, param, iovbuf, strlen(iovbuf)));
+
+	bytes_written = wldev_iovar_setbuf(dev, iovar, &param,
+				sizeof(param), iovbuf, sizeof(iovbuf), NULL);
+	if (bytes_written < 0)
+		DHD_ERROR(("%s: set iovar failed (error=%d)\n",
+				__func__, bytes_written));
+
+	return bytes_written;
 }
 
 int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
@@ -1649,12 +1856,11 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	else if (strnicmp(command, CMD_KEEP_ALIVE, strlen(CMD_KEEP_ALIVE)) == 0) {
 		int skip = strlen(CMD_KEEP_ALIVE) + 1;
 		bytes_written = wl_keep_alive_set(net, command + skip, priv_cmd.total_len - skip);
-	}
-	else if (strnicmp(command, CMD_MKEEP_ALIVE, strlen(CMD_MKEEP_ALIVE)) == 0) {
-		int skip = strlen(CMD_MKEEP_ALIVE) + 1;
-		bytes_written = wl_keep_alive_set(net, command + skip, priv_cmd.total_len - skip);
-	}
-	else if (strnicmp(command, CMD_SETMIRACAST, strlen(CMD_SETMIRACAST)) == 0)
+	} else if (strnicmp(command, CMD_MKEEP_ALIVE,
+		strlen(CMD_MKEEP_ALIVE)) == 0) {
+		DHD_ERROR(("%s: CMD_MKEEP_ALIVE\n", __func__));
+		bytes_written = wl_android_mkeep_alive(net, command, priv_cmd.total_len);
+	} else if (strnicmp(command, CMD_SETMIRACAST, strlen(CMD_SETMIRACAST)) == 0)
 		bytes_written = wldev_miracast_tuning(net, command, priv_cmd.total_len);
 	else if (strnicmp(command, CMD_ASSOCRESPIE, strlen(CMD_ASSOCRESPIE)) == 0)
 		bytes_written = wldev_get_assoc_resp_ie(net, command, priv_cmd.total_len);
@@ -1665,6 +1871,14 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	else if (strnicmp(command, CMD_ROAM_OFFLOAD, strlen(CMD_ROAM_OFFLOAD)) == 0) {
 		int enable = *(command + strlen(CMD_ROAM_OFFLOAD) + 1) - '0';
 		bytes_written = wl_cfg80211_enable_roam_offload(net, enable);
+	}
+	else if (strnicmp(command, CMD_GETIOVAR, strlen(CMD_GETIOVAR)) == 0)
+		bytes_written = wl_android_get_iovar(net, command, priv_cmd.total_len);
+	else if (strnicmp(command, CMD_SETIOVAR, strlen(CMD_GETIOVAR)) == 0)
+		bytes_written = wl_android_set_iovar(net, command, priv_cmd.total_len);
+	else if (strnicmp(command, CMD_AUTOSLEEP, strlen(CMD_AUTOSLEEP)) == 0) {
+		bytes_written = wl_android_set_slpauto(net, command,
+			priv_cmd.total_len);
 	}
 	else {
 		DHD_ERROR(("Unknown PRIVATE command %s - ignored\n", command));

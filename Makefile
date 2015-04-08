@@ -722,6 +722,10 @@ ifdef CONFIG_DEBUG_INFO_DWARF4
 KBUILD_CFLAGS	+= $(call cc-option, -gdwarf-4,)
 endif
 
+ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
+KBUILD_CFLAGS += -I$(srctree)/../kernel-t18x/include
+endif
+
 ifdef CONFIG_DEBUG_INFO_REDUCED
 KBUILD_CFLAGS 	+= $(call cc-option, -femit-struct-debug-baseonly) \
 		   $(call cc-option,-fno-var-tracking)

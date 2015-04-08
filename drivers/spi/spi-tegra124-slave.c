@@ -1,7 +1,7 @@
 /*
  * SPI driver for NVIDIA's Tegra124 SPI Controller.
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -37,6 +37,7 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/spi-tegra.h>
 #include <linux/clk/tegra.h>
+#include <linux/pinctrl/pinconf-tegra.h>
 
 #define SPI_COMMAND1				0x000
 #define SPI_BIT_LENGTH(x)			(((x) & 0x1f) << 0)
@@ -303,7 +304,7 @@ struct tegra_spi_data {
 
 	/* Slave Ready Polarity (true: Active High, false: Active Low) */
 	int					gpio_slave_ready;
-	bool					slave_ready_pol;
+	bool					slave_ready_active_high;
 
 	struct completion			rx_dma_complete;
 	struct completion			tx_dma_complete;
@@ -340,6 +341,10 @@ struct tegra_spi_data {
 	int				rem_len;
 	int				rx_trig_words;
 	int				force_unpacked_mode;
+	char				*clk_pin;
+	int				clk_pin_group;
+	struct pinctrl_dev		*pctl_dev;
+	bool				clk_pin_state_enabled;
 #ifdef PROFILE_SPI_SLAVE
 	ktime_t				start_time;
 	ktime_t				end_time;
@@ -353,6 +358,7 @@ static int tegra_spi_runtime_suspend(struct device *dev);
 static int tegra_spi_runtime_resume(struct device *dev);
 static int tegra_spi_validate_request(struct spi_device *spi,
 			struct tegra_spi_data *tspi, struct spi_transfer *t);
+static int tegra_clk_pin_control(bool enable, struct tegra_spi_data *tspi);
 
 #ifdef TEGRA_SPI_SLAVE_DEBUG
 static ssize_t force_unpacked_mode_set(struct device *dev,
@@ -469,7 +475,7 @@ static void reset_controller(struct tegra_spi_data *tspi)
 	if (tspi->is_curr_dma_xfer &&
 			(tspi->cur_direction & DATA_DIR_RX))
 		dmaengine_terminate_all(tspi->rx_dma_chan);
-
+	tegra_clk_pin_control(false, tspi);
 	wmb(); /* barrier for dma terminate to happen */
 	tegra_periph_reset_assert(tspi->clk);
 	wmb(); /* barrier for assert */
@@ -783,7 +789,7 @@ static inline void tegra_spi_slave_busy(struct tegra_spi_data *tspi)
 {
 	int deassert_val;
 
-	if (tspi->slave_ready_pol)
+	if (tspi->slave_ready_active_high)
 		deassert_val = 0;
 	else
 		deassert_val = 1;
@@ -797,7 +803,7 @@ static inline void tegra_spi_slave_ready(struct tegra_spi_data *tspi)
 {
 	int assert_val;
 
-	if (tspi->slave_ready_pol)
+	if (tspi->slave_ready_active_high)
 		assert_val = 1;
 	else
 		assert_val = 0;
@@ -905,7 +911,40 @@ static int tegra_spi_start_dma_based_transfer(
 	tegra_spi_writel(tspi, val, SPI_DMA_CTL);
 	tegra_spi_fence(tspi);
 	spin_unlock_irqrestore(&tspi->lock, flags);
+	ret = tegra_clk_pin_control(true, tspi);
 
+	return ret;
+}
+
+/* Enable/Disable clk input using pinctrl config. It helps to avoid
+ * meta-stability issue by preventing interface clock while writing controller
+ * register or resetting controller. This function should not be called from
+ * non-sleepable context.
+ */
+static int tegra_clk_pin_control(bool enable, struct tegra_spi_data *tspi)
+{
+	unsigned long val;
+	int ret = 0;
+
+	if (tspi->clk_pin) {
+		if (tspi->clk_pin_state_enabled == enable)
+			return ret;
+
+		tspi->clk_pin_state_enabled = enable;
+		if (enable) {
+			val = TEGRA_PINCONF_PACK(TEGRA_PINCONF_PARAM_ENABLE_INPUT,
+					TEGRA_PIN_ENABLE);
+		} else {
+			val = TEGRA_PINCONF_PACK(TEGRA_PINCONF_PARAM_ENABLE_INPUT,
+					TEGRA_PIN_DISABLE);
+		}
+		ret = pinctrl_set_config_for_group_sel(tspi->pctl_dev,
+				tspi->clk_pin_group, val);
+		if (ret < 0) {
+			dev_err(tspi->dev,
+				"spi clk pin input state change err %d\n", ret);
+		}
+	}
 	return ret;
 }
 
@@ -965,8 +1004,9 @@ static int tegra_spi_start_cpu_based_transfer(
 	tegra_spi_writel(tspi, val, SPI_COMMAND1);
 	tegra_spi_fence(tspi);
 	spin_unlock_irqrestore(&tspi->lock, flags);
+	ret = tegra_clk_pin_control(true, tspi);
 
-	return 0;
+	return ret;
 }
 
 static int tegra_spi_init_dma_param(struct tegra_spi_data *tspi,
@@ -1107,6 +1147,7 @@ static int tegra_spi_start_transfer_one(struct spi_device *spi,
 	struct tegra_spi_data *tspi = spi_master_get_devdata(spi->master);
 	struct tegra_spi_device_controller_data *cdata = spi->controller_data;
 	u32 speed;
+	u32 core_speed;
 	u8 bits_per_word;
 	unsigned total_fifo_words;
 	int ret;
@@ -1119,15 +1160,24 @@ static int tegra_spi_start_transfer_one(struct spi_device *spi,
 	if (!speed)
 		speed = tspi->spi_max_frequency;
 
-	speed = speed * 4;
+	/* To maintain min 1.5x and max 4x ratio between
+	 * slave core clk and interface clk */
+	core_speed = speed * 4;
+	if (core_speed > tspi->spi_max_frequency)
+		core_speed = tspi->spi_max_frequency;
 
-	if (speed != tspi->cur_speed) {
-		ret = clk_set_rate(tspi->clk, speed);
+	if (core_speed < ((speed * 3) >> 1)) {
+		dev_err(tspi->dev, "Cannot set requested clk freq %d\n", speed);
+		return -EINVAL;
+	}
+
+	if (core_speed != tspi->cur_speed) {
+		ret = clk_set_rate(tspi->clk, core_speed);
 		if (ret) {
 			dev_err(tspi->dev, "Failed to set clk freq %d\n", ret);
 			return -EINVAL;
 		}
-		tspi->cur_speed = speed;
+		tspi->cur_speed = core_speed;
 	}
 
 	tspi->cur_spi = spi;
@@ -1508,6 +1558,7 @@ static int tegra_spi_transfer_one_message(struct spi_master *master,
 		ret = tegra_spi_wait_on_message_xfer(tspi);
 		if (ret)
 			goto exit;
+		tegra_clk_pin_control(false, tspi);
 		/* unpack and copy data to client */
 		ret = tegra_spi_handle_message(tspi, xfer);
 		if (ret < 0)
@@ -1543,6 +1594,7 @@ static int tegra_spi_transfer_one_message(struct spi_master *master,
 	}
 	ret = 0;
 exit:
+	tegra_clk_pin_control(false, tspi);
 	tegra_spi_writel(tspi, tspi->def_command1_reg, SPI_COMMAND1);
 	pm_runtime_put(tspi->dev);
 	msg->status = ret;
@@ -1591,6 +1643,7 @@ static struct tegra_spi_platform_data *tegra_spi_parse_dt(
 	struct tegra_spi_platform_data *pdata;
 	const unsigned int *prop;
 	struct device_node *np = pdev->dev.of_node;
+	enum of_gpio_flags gpio_flags;
 	u32 of_dma[2];
 
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
@@ -1618,14 +1671,16 @@ static struct tegra_spi_platform_data *tegra_spi_parse_dt(
 	if (of_find_property(np, "nvidia,clock-always-on", NULL))
 		pdata->is_clkon_always = true;
 
+	of_property_read_string(np, "nvidia,clk-pin", &pdata->clk_pin);
+
 	pdata->gpio_slave_ready =
-		of_get_named_gpio(np, "nvidia,gpio-slave-ready", 0);
+		of_get_named_gpio_flags(np, "nvidia,slave-ready-gpio", 0,
+				&gpio_flags);
 
-	/* Set the polarity to active low by default */
-	pdata->slave_ready_pol = false;
-
-	if (of_find_property(np, "nvidia,gpio-slave-ready-active-high", NULL))
-		pdata->slave_ready_pol = true;
+	if (gpio_flags & OF_GPIO_ACTIVE_LOW)
+		pdata->slave_ready_active_high = false;
+	else
+		pdata->slave_ready_active_high = true;
 
 	return pdata;
 }
@@ -1704,9 +1759,32 @@ static int tegra_spi_probe(struct platform_device *pdev)
 	tspi->dma_req_sel = pdata->dma_req_sel;
 	tspi->clock_always_on = pdata->is_clkon_always;
 	tspi->rx_trig_words = pdata->rx_trig_words;
+	tspi->clk_pin = (char *)pdata->clk_pin;
+	if (tspi->clk_pin) {
+		tspi->clk_pin_state_enabled = true;
+		tspi->pctl_dev = pinctrl_get_dev_from_of_compatible
+			("nvidia,tegra124-pinmux");
+		if (!tspi->pctl_dev) {
+			ret = -EINVAL;
+			dev_err(&pdev->dev, "invalid pinctrl\n");
+			goto exit_free_master;
+		}
+		tspi->clk_pin_group = pinctrl_get_group_from_group_name
+			(tspi->pctl_dev, tspi->clk_pin);
+		if (tspi->clk_pin_group < 0) {
+			ret = tspi->clk_pin_group;
+			dev_err(&pdev->dev, "invalid clk_pin group\n");
+			goto exit_free_master;
+		}
+	} else {
+		ret = -EINVAL;
+		dev_err(&pdev->dev, "Pin group name for clock line is not defined.\n");
+		goto exit_free_master;
+	}
 
 	tspi->gpio_slave_ready = pdata->gpio_slave_ready;
 
+	tegra_clk_pin_control(false, tspi);
 	if (gpio_is_valid(tspi->gpio_slave_ready))
 		if (gpio_cansleep(tspi->gpio_slave_ready)) {
 			dev_err(&pdev->dev, "Slave Ready GPIO %d is unusable as it can sleep\n",
@@ -1714,12 +1792,12 @@ static int tegra_spi_probe(struct platform_device *pdev)
 			tspi->gpio_slave_ready = -EINVAL;
 		}
 
-	tspi->slave_ready_pol = pdata->slave_ready_pol;
+	tspi->slave_ready_active_high = pdata->slave_ready_active_high;
 
 	if (gpio_is_valid(tspi->gpio_slave_ready)) {
 		gpio_request(tspi->gpio_slave_ready, "gpio-spi-slave-ready");
 
-		if (tspi->slave_ready_pol)
+		if (tspi->slave_ready_active_high)
 			deassert_val = 0;
 		else
 			deassert_val = 1;

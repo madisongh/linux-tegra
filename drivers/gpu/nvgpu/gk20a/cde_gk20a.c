@@ -46,15 +46,11 @@ static struct gk20a_cde_ctx *gk20a_cde_allocate_context(struct gk20a *g);
 
 static void gk20a_deinit_cde_img(struct gk20a_cde_ctx *cde_ctx)
 {
-	struct device *dev = &cde_ctx->pdev->dev;
 	int i;
 
 	for (i = 0; i < cde_ctx->num_bufs; i++) {
-		struct gk20a_cde_mem_desc *mem = cde_ctx->mem + i;
-		gk20a_gmmu_unmap(cde_ctx->vm, mem->gpu_va, mem->num_bytes, 1);
-		gk20a_free_sgtable(&mem->sgt);
-		dma_free_writecombine(dev, mem->num_bytes, mem->cpuva,
-							  mem->iova);
+		struct mem_desc *mem = cde_ctx->mem + i;
+		gk20a_gmmu_unmap_free(cde_ctx->vm, mem);
 	}
 
 	kfree(cde_ctx->init_convert_cmd);
@@ -83,7 +79,7 @@ __must_hold(&cde_app->mutex)
 	/* ..then release mapped memory */
 	gk20a_deinit_cde_img(cde_ctx);
 	gk20a_gmmu_unmap(vm, cde_ctx->backing_store_vaddr,
-			 g->gr.compbit_store.size, 1);
+			 g->gr.compbit_store.mem.size, 1);
 
 	/* housekeeping on app */
 	list_del(&cde_ctx->list);
@@ -225,8 +221,7 @@ static int gk20a_init_cde_buf(struct gk20a_cde_ctx *cde_ctx,
 			      const struct firmware *img,
 			      struct gk20a_cde_hdr_buf *buf)
 {
-	struct device *dev = &cde_ctx->pdev->dev;
-	struct gk20a_cde_mem_desc *mem;
+	struct mem_desc *mem;
 	int err;
 
 	/* check that the file can hold the buf */
@@ -246,49 +241,21 @@ static int gk20a_init_cde_buf(struct gk20a_cde_ctx *cde_ctx,
 
 	/* allocate buf */
 	mem = cde_ctx->mem + cde_ctx->num_bufs;
-	mem->num_bytes = buf->num_bytes;
-	mem->cpuva = dma_alloc_writecombine(dev, mem->num_bytes, &mem->iova,
-					GFP_KERNEL);
-	if (!mem->cpuva) {
+	err = gk20a_gmmu_alloc_map(cde_ctx->vm, buf->num_bytes, mem);
+	if (err) {
 		gk20a_warn(&cde_ctx->pdev->dev, "cde: could not allocate device memory. buffer idx = %d",
 			   cde_ctx->num_bufs);
 		return -ENOMEM;
 	}
 
-	err = gk20a_get_sgtable(dev, &mem->sgt, mem->cpuva, mem->iova,
-				mem->num_bytes);
-	if (err) {
-		gk20a_warn(&cde_ctx->pdev->dev, "cde: could not get sg table. buffer idx = %d",
-			   cde_ctx->num_bufs);
-		err = -ENOMEM;
-		goto err_get_sgtable;
-	}
-
-	mem->gpu_va = gk20a_gmmu_map(cde_ctx->vm, &mem->sgt, mem->num_bytes,
-					0,
-					gk20a_mem_flag_none);
-	if (!mem->gpu_va) {
-		gk20a_warn(&cde_ctx->pdev->dev, "cde: could not map buffer to gpuva. buffer idx = %d",
-			   cde_ctx->num_bufs);
-		err = -ENOMEM;
-		goto err_map_buffer;
-	}
-
 	/* copy the content */
 	if (buf->data_byte_offset != 0)
-		memcpy(mem->cpuva, img->data + buf->data_byte_offset,
+		memcpy(mem->cpu_va, img->data + buf->data_byte_offset,
 		       buf->num_bytes);
 
 	cde_ctx->num_bufs++;
 
 	return 0;
-
-err_map_buffer:
-	gk20a_free_sgtable(&mem->sgt);
-	kfree(mem->sgt);
-err_get_sgtable:
-	dma_free_writecombine(dev, mem->num_bytes, &mem->cpuva, mem->iova);
-	return err;
 }
 
 static int gk20a_replace_data(struct gk20a_cde_ctx *cde_ctx, void *target,
@@ -340,8 +307,8 @@ static int gk20a_init_cde_replace(struct gk20a_cde_ctx *cde_ctx,
 				  const struct firmware *img,
 				  struct gk20a_cde_hdr_replace *replace)
 {
-	struct gk20a_cde_mem_desc *source_mem;
-	struct gk20a_cde_mem_desc *target_mem;
+	struct mem_desc *source_mem;
+	struct mem_desc *target_mem;
 	u32 *target_mem_ptr;
 	u64 vaddr;
 	int err;
@@ -356,15 +323,15 @@ static int gk20a_init_cde_replace(struct gk20a_cde_ctx *cde_ctx,
 
 	source_mem = cde_ctx->mem + replace->source_buf;
 	target_mem = cde_ctx->mem + replace->target_buf;
-	target_mem_ptr = target_mem->cpuva;
+	target_mem_ptr = target_mem->cpu_va;
 
-	if (source_mem->num_bytes < (replace->source_byte_offset + 3) ||
-	    target_mem->num_bytes < (replace->target_byte_offset + 3)) {
+	if (source_mem->size < (replace->source_byte_offset + 3) ||
+	    target_mem->size < (replace->target_byte_offset + 3)) {
 		gk20a_warn(&cde_ctx->pdev->dev, "cde: invalid buffer offsets. target_buf_offs=%lld, source_buf_offs=%lld, source_buf_size=%zu, dest_buf_size=%zu",
 			   replace->target_byte_offset,
 			   replace->source_byte_offset,
-			 source_mem->num_bytes,
-			 target_mem->num_bytes);
+			 source_mem->size,
+			 target_mem->size);
 		return -EINVAL;
 	}
 
@@ -390,7 +357,7 @@ static int gk20a_init_cde_replace(struct gk20a_cde_ctx *cde_ctx,
 static int gk20a_cde_patch_params(struct gk20a_cde_ctx *cde_ctx)
 {
 	struct gk20a *g = cde_ctx->g;
-	struct gk20a_cde_mem_desc *target_mem;
+	struct mem_desc *target_mem;
 	u32 *target_mem_ptr;
 	u64 new_data;
 	int user_id = 0, i, err;
@@ -398,7 +365,7 @@ static int gk20a_cde_patch_params(struct gk20a_cde_ctx *cde_ctx)
 	for (i = 0; i < cde_ctx->num_params; i++) {
 		struct gk20a_cde_hdr_param *param = cde_ctx->params + i;
 		target_mem = cde_ctx->mem + param->target_buf;
-		target_mem_ptr = target_mem->cpuva;
+		target_mem_ptr = target_mem->cpu_va;
 		target_mem_ptr += (param->target_byte_offset / sizeof(u32));
 
 		switch (param->id) {
@@ -425,7 +392,7 @@ static int gk20a_cde_patch_params(struct gk20a_cde_ctx *cde_ctx)
 			new_data = cde_ctx->compbit_size;
 			break;
 		case TYPE_PARAM_BACKINGSTORE_SIZE:
-			new_data = g->gr.compbit_store.size;
+			new_data = g->gr.compbit_store.mem.size;
 			break;
 		case TYPE_PARAM_SOURCE_SMMU_ADDR:
 			new_data = gk20a_mm_gpuva_to_iova_base(cde_ctx->vm,
@@ -435,6 +402,9 @@ static int gk20a_cde_patch_params(struct gk20a_cde_ctx *cde_ctx)
 			break;
 		case TYPE_PARAM_BACKINGSTORE_BASE_HW:
 			new_data = g->gr.compbit_store.base_hw;
+			break;
+		case TYPE_PARAM_GOBS_PER_COMPTAGLINE_PER_SLICE:
+			new_data = g->gr.gobs_per_comptagline_per_slice;
 			break;
 		default:
 			user_id = param->id - NUM_RESERVED_PARAMS;
@@ -469,7 +439,7 @@ static int gk20a_init_cde_param(struct gk20a_cde_ctx *cde_ctx,
 				const struct firmware *img,
 				struct gk20a_cde_hdr_param *param)
 {
-	struct gk20a_cde_mem_desc *target_mem;
+	struct mem_desc *target_mem;
 
 	if (param->target_buf >= cde_ctx->num_bufs) {
 		gk20a_warn(&cde_ctx->pdev->dev, "cde: invalid buffer parameter. param idx = %d, target_buf=%u, num_bufs=%u",
@@ -479,10 +449,10 @@ static int gk20a_init_cde_param(struct gk20a_cde_ctx *cde_ctx,
 	}
 
 	target_mem = cde_ctx->mem + param->target_buf;
-	if (target_mem->num_bytes < (param->target_byte_offset + 3)) {
+	if (target_mem->size< (param->target_byte_offset + 3)) {
 		gk20a_warn(&cde_ctx->pdev->dev, "cde: invalid buffer parameter. param idx = %d, target_buf_offs=%lld, target_buf_size=%zu",
 			   cde_ctx->num_params, param->target_byte_offset,
-			   target_mem->num_bytes);
+			   target_mem->size);
 		return -EINVAL;
 	}
 
@@ -515,7 +485,7 @@ static int gk20a_init_cde_required_class(struct gk20a_cde_ctx *cde_ctx,
 	int err;
 
 	alloc_obj_ctx.class_num = required_class;
-	alloc_obj_ctx.padding = 0;
+	alloc_obj_ctx.flags = 0;
 
 	err = gk20a_alloc_obj_ctx(cde_ctx->ch, &alloc_obj_ctx);
 	if (err) {
@@ -560,7 +530,7 @@ static int gk20a_init_cde_command(struct gk20a_cde_ctx *cde_ctx,
 
 	gpfifo_elem = *gpfifo;
 	for (i = 0; i < num_elems; i++, cmd_elem++, gpfifo_elem++) {
-		struct gk20a_cde_mem_desc *target_mem;
+		struct mem_desc *target_mem;
 
 		/* validate the current entry */
 		if (cmd_elem->target_buf >= cde_ctx->num_bufs) {
@@ -570,10 +540,10 @@ static int gk20a_init_cde_command(struct gk20a_cde_ctx *cde_ctx,
 		}
 
 		target_mem = cde_ctx->mem + cmd_elem->target_buf;
-		if (target_mem->num_bytes <
+		if (target_mem->size<
 		    cmd_elem->target_byte_offset + cmd_elem->num_bytes) {
 			gk20a_warn(&cde_ctx->pdev->dev, "cde: target buffer cannot hold all entries (target_size=%zu, target_byte_offset=%lld, num_bytes=%llu)",
-				   target_mem->num_bytes,
+				   target_mem->size,
 				   cmd_elem->target_byte_offset,
 				   cmd_elem->num_bytes);
 			return -EINVAL;
@@ -759,12 +729,13 @@ __releases(&cde_app->mutex)
 
 	mutex_lock(&cde_app->mutex);
 
-	if (!cde_ctx->in_use)
+	if (cde_ctx->in_use) {
+		cde_ctx->in_use = false;
+		list_move(&cde_ctx->list, &cde_app->free_contexts);
+		cde_app->ctx_usecount--;
+	} else {
 		gk20a_dbg_info("double release cde context %p", cde_ctx);
-
-	cde_ctx->in_use = false;
-	list_move(&cde_ctx->list, &cde_app->free_contexts);
-	cde_app->ctx_usecount--;
+	}
 
 	mutex_unlock(&cde_app->mutex);
 }
@@ -1027,7 +998,7 @@ __releases(&cde_app->mutex)
 	}
 
 	gk20a_dbg(gpu_dbg_cde, "cde: buffer=cbc, size=%zu, gpuva=%llx\n",
-		 g->gr.compbit_store.size, cde_ctx->backing_store_vaddr);
+		 g->gr.compbit_store.mem.size, cde_ctx->backing_store_vaddr);
 	gk20a_dbg(gpu_dbg_cde, "cde: buffer=compbits, size=%llu, gpuva=%llx\n",
 		 cde_ctx->compbit_size, cde_ctx->compbit_vaddr);
 
@@ -1151,8 +1122,8 @@ static int gk20a_cde_load(struct gk20a_cde_ctx *cde_ctx)
 	}
 
 	/* map backing store to gpu virtual space */
-	vaddr = gk20a_gmmu_map(ch->vm, &gr->compbit_store.sgt,
-			       g->gr.compbit_store.size,
+	vaddr = gk20a_gmmu_map(ch->vm, &gr->compbit_store.mem.sgt,
+			       g->gr.compbit_store.mem.size,
 			       NVGPU_MAP_BUFFER_FLAGS_CACHEABLE_TRUE,
 			       gk20a_mem_flag_read_only);
 
@@ -1180,7 +1151,7 @@ static int gk20a_cde_load(struct gk20a_cde_ctx *cde_ctx)
 	return 0;
 
 err_init_cde_img:
-	gk20a_gmmu_unmap(ch->vm, vaddr, g->gr.compbit_store.size, 1);
+	gk20a_gmmu_unmap(ch->vm, vaddr, g->gr.compbit_store.mem.size, 1);
 err_map_backingstore:
 err_alloc_gpfifo:
 	gk20a_vm_put(ch->vm);
@@ -1300,103 +1271,6 @@ enum programs {
 /* maximum number of WRITE_PATCHes in the below function */
 #define MAX_CDE_LAUNCH_PATCHES		  32
 
-static int gk20a_buffer_convert_gpu_to_cde_v0(
-		struct gk20a *g,
-		struct dma_buf *dmabuf, u32 consumer,
-		u64 offset, u64 compbits_hoffset, u64 compbits_voffset,
-		u32 width, u32 height, u32 block_height_log2,
-		u32 submit_flags, struct nvgpu_fence *fence_in,
-		struct gk20a_buffer_state *state)
-{
-	struct gk20a_cde_param params[MAX_CDE_LAUNCH_PATCHES];
-	int param = 0;
-	int err = 0;
-	struct gk20a_fence *new_fence = NULL;
-	const int wgx = 8;
-	const int wgy = 8;
-	const int compbits_per_byte = 4; /* one byte stores 4 compbit pairs */
-	const int xalign = compbits_per_byte * wgx;
-	const int yalign = wgy;
-
-	/* firmware v0 needs to call swizzling twice */
-	int i;
-	for (i = 0; i < 2; i++) {
-		/* Compute per launch parameters */
-		const bool vpass = (i == 1);
-		const int transposed_width = vpass ? height : width;
-		const int transposed_height = vpass ? width : height;
-		const int xtiles = (transposed_width + 7) >> 3;
-		const int ytiles = (transposed_height + 7) >> 3;
-		const int gridw = roundup(xtiles, xalign) / xalign;
-		const int gridh = roundup(ytiles, yalign) / yalign;
-		const int flags = (vpass ? 4 : 0) |
-			g->cde_app.shader_parameter;
-		const int dst_stride = 128; /* chip constant */
-
-		if ((vpass && !(consumer & NVGPU_GPU_COMPBITS_CDEV)) ||
-		    (!vpass && !(consumer & NVGPU_GPU_COMPBITS_CDEH)))
-			continue;
-
-		if (xtiles > 4096 / 8 || ytiles > 4096 / 8)
-			gk20a_warn(&g->dev->dev, "cde: surface is exceptionally large (xtiles=%d, ytiles=%d)",
-				   xtiles, ytiles);
-
-		gk20a_dbg(gpu_dbg_cde, "pass=%c", vpass ? 'V' : 'H');
-		gk20a_dbg(gpu_dbg_cde, "w=%d, h=%d, bh_log2=%d, compbits_hoffset=0x%llx, compbits_voffset=0x%llx",
-			  width, height, block_height_log2,
-			  compbits_hoffset, compbits_voffset);
-		gk20a_dbg(gpu_dbg_cde, "resolution (%d, %d) tiles (%d, %d)",
-			  width, height, xtiles, ytiles);
-		gk20a_dbg(gpu_dbg_cde, "group (%d, %d) grid (%d, %d)",
-			  wgx, wgy, gridw, gridh);
-
-		/* Write parameters */
-#define WRITE_PATCH(NAME, VALUE) \
-	params[param++] = (struct gk20a_cde_param){NAME##_ID, 0, VALUE}
-		param = 0;
-		WRITE_PATCH(PATCH_USER_CONST_XTILES, xtiles);
-		WRITE_PATCH(PATCH_USER_CONST_YTILES, ytiles);
-		WRITE_PATCH(PATCH_USER_CONST_BLOCKHEIGHTLOG2,
-			block_height_log2);
-		WRITE_PATCH(PATCH_USER_CONST_DSTPITCH, dst_stride);
-		WRITE_PATCH(PATCH_H_USER_CONST_FLAGS, flags);
-		WRITE_PATCH(PATCH_H_VPC_CURRENT_GRID_SIZE_X, gridw);
-		WRITE_PATCH(PATCH_H_VPC_CURRENT_GRID_SIZE_Y, gridh);
-		WRITE_PATCH(PATCH_H_VPC_CURRENT_GRID_SIZE_Z, 1);
-		WRITE_PATCH(PATCH_VPC_CURRENT_GROUP_SIZE_X, wgx);
-		WRITE_PATCH(PATCH_VPC_CURRENT_GROUP_SIZE_Y, wgy);
-		WRITE_PATCH(PATCH_VPC_CURRENT_GROUP_SIZE_Z, 1);
-		WRITE_PATCH(PATCH_H_QMD_CTA_RASTER_WIDTH, gridw);
-		WRITE_PATCH(PATCH_H_QMD_CTA_RASTER_HEIGHT, gridh);
-		WRITE_PATCH(PATCH_QMD_CTA_RASTER_DEPTH, 1);
-		WRITE_PATCH(PATCH_QMD_CTA_THREAD_DIMENSION0, wgx);
-		WRITE_PATCH(PATCH_QMD_CTA_THREAD_DIMENSION1, wgy);
-		WRITE_PATCH(PATCH_QMD_CTA_THREAD_DIMENSION2, 1);
-#undef WRITE_PATCH
-
-		err = gk20a_cde_convert(g, dmabuf,
-					0, /* dst kind */
-					vpass ?
-					compbits_voffset :
-					compbits_hoffset,
-					0, /* dst_size, 0 = auto */
-					fence_in, submit_flags,
-					params, param,
-					&new_fence);
-		if (err)
-			goto out;
-
-		/* compbits generated, update state & fence */
-		gk20a_fence_put(state->fence);
-		state->fence = new_fence;
-		state->valid_compbits |= vpass ?
-			NVGPU_GPU_COMPBITS_CDEV :
-			NVGPU_GPU_COMPBITS_CDEH;
-	}
-out:
-	return err;
-}
-
 static int gk20a_buffer_convert_gpu_to_cde_v1(
 		struct gk20a *g,
 		struct dma_buf *dmabuf, u32 consumer,
@@ -1438,7 +1312,7 @@ static int gk20a_buffer_convert_gpu_to_cde_v1(
 			PROG_VPASS_SMALL_DEBUG;
 	}
 
-	if (xtiles > 4096 / 8 || ytiles > 4096 / 8)
+	if (xtiles > 8192 / 8 || ytiles > 8192 / 8)
 		gk20a_warn(&g->dev->dev, "cde: surface is exceptionally large (xtiles=%d, ytiles=%d)",
 			   xtiles, ytiles);
 
@@ -1554,16 +1428,15 @@ static int gk20a_buffer_convert_gpu_to_cde(
 	gk20a_dbg(gpu_dbg_cde, "firmware version = %d\n",
 		g->cde_app.firmware_version);
 
-	if (g->cde_app.firmware_version == 0) {
-		err = gk20a_buffer_convert_gpu_to_cde_v0(
-		    g, dmabuf, consumer, offset, compbits_hoffset,
-		    compbits_voffset, width, height, block_height_log2,
-		    submit_flags, fence_in, state);
-	} else {
+	if (g->cde_app.firmware_version == 1) {
 		err = gk20a_buffer_convert_gpu_to_cde_v1(
 		    g, dmabuf, consumer, offset, compbits_hoffset,
 		    compbits_voffset, width, height, block_height_log2,
 		    submit_flags, fence_in, state);
+	} else {
+		dev_err(dev_from_gk20a(g), "unsupported CDE firmware version %d",
+			g->cde_app.firmware_version);
+		err = -EINVAL;
 	}
 
 	gk20a_idle(g->dev);

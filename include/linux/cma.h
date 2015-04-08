@@ -28,6 +28,7 @@ extern int cma_init_reserved_mem(phys_addr_t base,
 extern struct page *cma_alloc(struct cma *cma, int count, unsigned int align);
 extern struct page *cma_alloc_at(struct cma *cma, int count,
 					unsigned int align,
-					phys_addr_t at_addr);
+					phys_addr_t at_addr,
+					bool map_non_cached);
 extern bool cma_release(struct cma *cma, struct page *pages, int count);
 #endif

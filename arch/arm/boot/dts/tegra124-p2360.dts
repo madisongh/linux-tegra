@@ -1,7 +1,7 @@
 /*
  * arch/arm/boot/dts/tegra124-p2360.dts
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@
 #include <tegra124-platforms/tegra124-vcm30-t124-hdmi.dtsi>
 #include <panel-a-lvds-800-480-14-0.dtsi>
 #include <dt-bindings/display/tegra-panel.h>
+#include <tegra124-platforms/tegra124-pmic-vcm30t124-max20024.dtsi>
 
 / {
 	model = "NVIDIA Tegra124 p2360";
@@ -36,6 +37,7 @@
 		sor {
 			status = "okay";
 			panel-lvds-800-480 {
+				status = "okay";
 				disp-default-out {
 					nvidia,out-max-pixclk = <3367>;
 				};
@@ -76,6 +78,7 @@
 			reg = <0x0c>;
 			ti,enable-gpio = <&gpio TEGRA_GPIO(R, 4) 0>; /*PR4*/
 			ti,power-on-delay = <4>;
+			ti,power-off-delay = <3>;
 		};
 	};
 
@@ -124,7 +127,6 @@
 				};
 			};
 		};
-
 	};
 
 
@@ -137,6 +139,7 @@
 	spi@7000d400 {
 		status = "okay";
 		compatible = "nvidia,tegra124-spi-slave";
+		nvidia,clk-pin = "gpio_x5_aud_px5";
 		nvidia,gpio-slave-ready = <&gpio TEGRA_GPIO(K, 4) 0>; /*PK4*/
 		nvidia,gpio-slave-ready-active-high;
 		nvidia,rx-trigger-words = <0>;
@@ -144,6 +147,7 @@
 
 	spi@7000d600 {
 		status = "okay";
+		nvidia,maximum-dma-buffer-size = <65536>;
 
 		spi@1 {
 			status = "disabled";
@@ -158,7 +162,7 @@
 
 	spi@7000d800 {
 		status = "okay";
-
+		nvidia,maximum-dma-buffer-size = <65536>;
 		spi@1 {
 			status = "disabled";
 		};
@@ -167,6 +171,7 @@
 	spi@7000dc00 {
 		status = "okay";
 		compatible = "nvidia,tegra124-spi-slave";
+		nvidia,clk-pin = "ulpi_nxt_py2";
 		nvidia,gpio-slave-ready = <&gpio TEGRA_GPIO(I, 3) 0>; /*PI3*/
 		nvidia,gpio-slave-ready-active-high;
 		nvidia,rx-trigger-words = <0>;
@@ -174,6 +179,7 @@
 
 	pcie-controller {
 		status = "okay";
+		nvidia,boot-detect-delay = <10000>;
 
 		pci@1,0 {
 			status = "okay";
@@ -192,6 +198,21 @@
 		status = "okay";
 	};
 
+	ehci@7d000000 {
+		nvidia,is-intf-utmi;
+		status = "disabled";
+	};
+
+	ehci@7d004000 {
+		nvidia,is-intf-utmi;
+		status = "okay";
+	};
+
+	ehci@7d008000 {
+		nvidia,is-intf-utmi;
+		status = "okay";
+	};
+
 	smmu: iommu {
 		#asids = <120>;
 	};
@@ -202,4 +223,51 @@
 		i2c-fs-rate = <400000>;
 		sel-conversion-slope = <1>;
 	};
+
+	isc-mgr.0 {
+		compatible = "nvidia,isc-mgr";
+		i2c-bus = <2>;
+		csi-port = <0>;
+		pwdn-gpios = < &gpio TEGRA_GPIO(Q, 1) GPIO_ACTIVE_HIGH	/* GMSL_IN1_PDN */
+			&gpio TEGRA_GPIO(I, 5) GPIO_ACTIVE_HIGH		/* CSI1_TV_EN1 */
+			&gpio TEGRA_GPIO(K, 2) GPIO_ACTIVE_HIGH		/* CSI1_TV_EN2 */
+			&gpio TEGRA_GPIO(K, 0) GPIO_ACTIVE_HIGH		/* CSI1_TV_EN3 */
+			&gpio TEGRA_GPIO(K, 1) GPIO_ACTIVE_HIGH>;	/* CSI1_TV_EN4 */
+		/* default-power-on; */
+		interrupt-parent = <&gpio>;
+		interrupts = <TEGRA_GPIO(S, 3) 2>; /* gpio PS3 : falling edge sensitive */
+		status = "okay";
+	};
+
+	isc-mgr.1 {
+		compatible = "nvidia,isc-mgr";
+		i2c-bus = <3>;
+		csi-port = <2>;
+		/* default-power-on; */
+		interrupt-parent = <&gpio>;
+		interrupts = <TEGRA_GPIO(R, 3) 2>; /* gpio PR3 : falling edge sensitive */
+		status = "okay";
+	};
+
+	regulators {
+		compatible = "simple-bus";
+		device_type = "fixed-regulators";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		vdd_fuse: regulator@1 {
+			compatible = "regulator-fixed-sync";
+			regulator-name = "vdd_fuse";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			gpio = <&max20024 0 0>;
+			enable-active-high;
+		};
+	};
+
+	/* Populate fuse supply */
+	efuse@7000f800 {
+		vpp_fuse-supply = <&vdd_fuse>;
+	};
+
 };

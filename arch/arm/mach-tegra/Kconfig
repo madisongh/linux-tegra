@@ -65,7 +65,6 @@ config ARCH_TEGRA_3x_SOC
 config ARCH_TEGRA_12x_SOC
 	bool "Tegra 12x family SOC"
 	select ARCH_TEGRA_HAS_DUAL_CPU_CLUSTERS if !ARM64
-	select ARCH_TEGRA_HAS_PCIE
 	select CPU_V7
 	select ARM_L1_CACHE_SHIFT_6
 	select ARM_ARCH_TIMER
@@ -108,6 +107,7 @@ config ARCH_TEGRA_12x_SOC
 	select PROC_DEVICETREE
 	select ZONE_DMA if !TEGRA_IOMMU_SMMU
 	select CMA
+	select FIQ_GLUE if !ARM64
 	help
 	  Support for NVIDIA Tegra 12x family of SoCs, based upon the
 	  ARM Cortex-A15MP CPU
@@ -132,9 +132,6 @@ config ARCH_TEGRA_HAS_DUAL_CPU_CLUSTERS
 	bool
 
 config ARCH_TEGRA_HAS_SYMMETRIC_CPU_PWR_GATE
-	bool
-
-config ARCH_TEGRA_HAS_PCIE
 	bool
 
 config ARCH_TEGRA_HAS_SATA
@@ -791,4 +788,7 @@ config AID_FUSE
 	  When enabled, allows sysfs reads of the AID fuse, which contains
 	  the chip family ID and a chip-unique Tegra ID. Supported on t132+.
 
+config BOARD_HAS_PWR_INT_WAKE_SOURCE
+	bool "Enable PMC PWR INT wake source(WAKE18)"
+	default n
 endif

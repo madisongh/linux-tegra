@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -607,6 +607,7 @@ static int tegra210_pg_gpu_powergate(int id)
 	udelay(10);
 
 	pmc_write(0x1, PMC_GPU_RG_CONTROL);
+	pmc_read(PMC_GPU_RG_CONTROL);
 
 	udelay(10);
 
@@ -644,17 +645,16 @@ static int tegra210_pg_gpu_unpowergate(int id)
 			goto err_power;
 		}
 		first = true;
-	} else {
-		if (tegra_powergate_is_powered(id)) {
-			WARN(1, "GPU rail is already on, \
-					refcount and status mismatch\n");
-			return 0;
-		}
-
-		ret = tegra_dvfs_rail_power_up(gpu_rail);
-		if (ret)
-			goto err_power;
 	}
+
+	if (tegra_powergate_is_powered(id)) {
+		WARN(1, "GPU rail is already on, refcount and status mismatch\n");
+		return 0;
+	}
+
+	ret = tegra_dvfs_rail_power_up(gpu_rail);
+	if (ret)
+		goto err_power;
 
 	if (!partition->clk_info[0].clk_ptr)
 		get_clk_info(partition);
@@ -672,6 +672,7 @@ static int tegra210_pg_gpu_unpowergate(int id)
 	udelay(10);
 
 	pmc_write(0, PMC_GPU_RG_CONTROL);
+	pmc_read(PMC_GPU_RG_CONTROL);
 
 	udelay(10);
 

@@ -37,7 +37,7 @@
 #define TEGRA21_GPU_SPEEDO_OFFS 75
 
 
-#define CPU_PROCESS_CORNERS_NUM		3
+#define CPU_PROCESS_CORNERS_NUM		2
 #define GPU_PROCESS_CORNERS_NUM		2
 #define CORE_PROCESS_CORNERS_NUM	3
 
@@ -61,6 +61,8 @@ static int soc_speedo_id;
 static int gpu_speedo_id;
 static int package_id;
 
+static int core_min_mv;
+
 static int cpu_iddq_value;
 static int gpu_iddq_value;
 static int soc_iddq_value;
@@ -81,9 +83,9 @@ static int speedo_rev;
 static int enable_app_profiles;
 
 static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
-/* proc_id  0,	  1,         2 */
-	{2060, 2119,  UINT_MAX}, /* [0]: threshold_index 0 */
-	{   0, 2119,  UINT_MAX}, /* [1]: threshold_index 1 */
+/* proc_id  0,	      1 */
+	{2119,  UINT_MAX}, /* [0]: threshold_index 0 */
+	{2119,  UINT_MAX}, /* [1]: threshold_index 1 */
 };
 
 static const u32 gpu_process_speedos[][GPU_PROCESS_CORNERS_NUM] = {
@@ -100,22 +102,38 @@ static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
 
 static void rev_sku_to_speedo_ids(int rev, int sku, int speedo_rev)
 {
+	bool shield_sku = false;
+
+#ifdef CONFIG_OF
+	shield_sku = of_property_read_bool(of_chosen,
+					   "nvidia,tegra-shield-sku");
+#endif
 	switch (sku) {
 	case 0x00: /* Engg sku */
 	case 0x01: /* Engg sku */
 	case 0x07:
 	case 0x17:
 	case 0x27:
-		cpu_speedo_id = 0;
+		cpu_speedo_id = shield_sku ? 2 : 0;
 		soc_speedo_id = 0;
 		gpu_speedo_id = speedo_rev >= 2 ? 1 : 0;
 		threshold_index = 0;
+		core_min_mv = 825;
 		break;
 	case 0x13:
-		cpu_speedo_id = 1;
+		cpu_speedo_id = shield_sku ? 2 : 1;
 		soc_speedo_id = 0;
 		gpu_speedo_id = speedo_rev >= 2 ? 1 : 0;
-		threshold_index = 1;
+		threshold_index = 0;
+		core_min_mv = 825;
+		break;
+	case 0x83:
+	case 0x87:
+		cpu_speedo_id = 3;
+		soc_speedo_id = 0;
+		gpu_speedo_id = speedo_rev >= 2 ? 2 : 0;
+		threshold_index = 0;
+		core_min_mv = 800;
 		break;
 	default:
 		pr_warn("Tegra21: Unknown SKU %d\n", sku);
@@ -123,6 +141,7 @@ static void rev_sku_to_speedo_ids(int rev, int sku, int speedo_rev)
 		soc_speedo_id = 0;
 		gpu_speedo_id = 0;
 		threshold_index = 0;
+		core_min_mv = 950;
 		break;
 	}
 }
@@ -326,10 +345,10 @@ int tegra_soc_speedo_2_value(void)
 {
 	return soc_speedo_2_value;
 }
+
 /*
- * CPU and core nominal voltage levels as determined by chip SKU and speedo
- * (not final - can be lowered by dvfs tables and rail dependencies; the
- * latter is resolved by the dvfs code)
+ * Core nominal and minimum voltage levels as determined by chip SKU and speedo
+ * (not final - will be clipped to dvfs tables).
  */
 int tegra_cpu_speedo_mv(void)
 {
@@ -351,6 +370,11 @@ int tegra_core_speedo_mv(void)
 	default:
 		BUG();
 	}
+}
+
+int tegra_core_speedo_min_mv(void)
+{
+	return core_min_mv;
 }
 
 int tegra_get_cpu_iddq_value(void)

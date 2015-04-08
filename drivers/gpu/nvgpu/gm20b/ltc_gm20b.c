@@ -1,7 +1,7 @@
 /*
  * GM20B L2
  *
- * Copyright (c) 2014 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -15,6 +15,7 @@
 
 #include <linux/types.h>
 #include <linux/jiffies.h>
+#include <trace/events/gk20a.h>
 
 #include "hw_mc_gm20b.h"
 #include "hw_ltc_gm20b.h"
@@ -25,6 +26,7 @@
 #include "gk20a/ltc_common.c"
 #include "gk20a/gk20a.h"
 #include "gk20a/gk20a_allocator.h"
+
 
 static int gm20b_ltc_init_comptags(struct gk20a *g, struct gr_gk20a *gr)
 {
@@ -51,10 +53,8 @@ static int gm20b_ltc_init_comptags(struct gk20a *g, struct gr_gk20a *gr)
 
 	gk20a_dbg_fn("");
 
-	if (max_comptag_lines == 0) {
-		gr->compbit_store.size = 0;
+	if (max_comptag_lines == 0)
 		return 0;
-	}
 
 	if (max_comptag_lines > hw_max_comptag_lines)
 		max_comptag_lines = hw_max_comptag_lines;
@@ -101,21 +101,21 @@ static int gm20b_ltc_init_comptags(struct gk20a *g, struct gr_gk20a *gr)
 	return 0;
 }
 
-static int gm20b_ltc_cbc_ctrl(struct gk20a *g, enum gk20a_cbc_op op,
-			      u32 min, u32 max)
+int gm20b_ltc_cbc_ctrl(struct gk20a *g, enum gk20a_cbc_op op,
+		       u32 min, u32 max)
 {
 	int err = 0;
 	struct gr_gk20a *gr = &g->gr;
 	u32 ltc, slice, ctrl1, val, hw_op = 0;
-	unsigned long end_jiffies = jiffies +
-		msecs_to_jiffies(gk20a_get_gr_idle_timeout(g));
-	u32 delay = GR_IDLE_CHECK_DEFAULT;
+	s32 retry = 200;
 	u32 slices_per_ltc = ltc_ltcs_ltss_cbc_param_slices_per_ltc_v(
 				gk20a_readl(g, ltc_ltcs_ltss_cbc_param_r()));
 
 	gk20a_dbg_fn("");
 
-	if (gr->compbit_store.size == 0)
+	trace_gk20a_ltc_cbc_ctrl_start(g->dev->name, op, min, max);
+
+	if (gr->compbit_store.mem.size == 0)
 		return 0;
 
 	mutex_lock(&g->mm.l2_op_lock);
@@ -139,25 +139,22 @@ static int gm20b_ltc_cbc_ctrl(struct gk20a *g, enum gk20a_cbc_op op,
 	for (ltc = 0; ltc < g->ltc_count; ltc++) {
 		for (slice = 0; slice < slices_per_ltc; slice++) {
 
-			delay = GR_IDLE_CHECK_DEFAULT;
-
 			ctrl1 = ltc_ltc0_lts0_cbc_ctrl1_r() +
 				ltc * proj_ltc_stride_v() +
 				slice * proj_lts_stride_v();
 
+			retry = 200;
 			do {
 				val = gk20a_readl(g, ctrl1);
 				if (!(val & hw_op))
 					break;
+				retry--;
+				udelay(5);
 
-				usleep_range(delay, delay * 2);
-				delay = min_t(u32, delay << 1,
-					GR_IDLE_CHECK_MAX);
-
-			} while (time_before(jiffies, end_jiffies) |
+			} while (retry >= 0 ||
 					!tegra_platform_is_silicon());
 
-			if (!time_before(jiffies, end_jiffies)) {
+			if (retry < 0 && tegra_platform_is_silicon()) {
 				gk20a_err(dev_from_gk20a(g),
 					   "comp tag clear timeout\n");
 				err = -EBUSY;
@@ -166,11 +163,12 @@ static int gm20b_ltc_cbc_ctrl(struct gk20a *g, enum gk20a_cbc_op op,
 		}
 	}
 out:
+	trace_gk20a_ltc_cbc_ctrl_done(g->dev->name);
 	mutex_unlock(&g->mm.l2_op_lock);
 	return 0;
 }
 
-static void gm20b_ltc_init_fs_state(struct gk20a *g)
+void gm20b_ltc_init_fs_state(struct gk20a *g)
 {
 	u32 reg;
 
@@ -196,7 +194,7 @@ static void gm20b_ltc_init_fs_state(struct gk20a *g)
 	gk20a_writel(g, ltc_ltcs_ltss_intr_r(), reg);
 }
 
-static void gm20b_ltc_isr(struct gk20a *g)
+void gm20b_ltc_isr(struct gk20a *g)
 {
 	u32 mc_intr, ltc_intr;
 	int ltc, slice;
@@ -221,7 +219,7 @@ static void gm20b_ltc_isr(struct gk20a *g)
 	}
 }
 
-static void gm20b_ltc_g_elpg_flush_locked(struct gk20a *g)
+void gm20b_ltc_g_elpg_flush_locked(struct gk20a *g)
 {
 	u32 data;
 	bool done[g->ltc_count];
@@ -231,6 +229,8 @@ static void gm20b_ltc_g_elpg_flush_locked(struct gk20a *g)
 	u32 ltc_d = ltc_ltc1_ltss_g_elpg_r() - ltc_ltc0_ltss_g_elpg_r();
 
 	gk20a_dbg_fn("");
+
+	trace_gk20a_mm_g_elpg_flush_locked(g->dev->name);
 
 	for (i = 0; i < g->ltc_count; i++)
 		done[i] = 0;
@@ -255,17 +255,19 @@ static void gm20b_ltc_g_elpg_flush_locked(struct gk20a *g)
 
 		if (num_done < g->ltc_count) {
 			retry--;
-			usleep_range(20, 40);
+			udelay(5);
 		} else
 			break;
 	} while (retry >= 0 || !tegra_platform_is_silicon());
 
-	if (retry < 0)
+	if (retry < 0 && tegra_platform_is_silicon())
 		gk20a_warn(dev_from_gk20a(g),
 			    "g_elpg_flush too many retries");
+
+	trace_gk20a_mm_g_elpg_flush_locked_done(g->dev->name);
 }
 
-static u32 gm20b_ltc_cbc_fix_config(struct gk20a *g, int base)
+u32 gm20b_ltc_cbc_fix_config(struct gk20a *g, int base)
 {
 	u32 val = gk20a_readl(g, ltc_ltcs_ltss_cbc_num_active_ltcs_r());
 	if (val == 2) {
@@ -281,7 +283,7 @@ static u32 gm20b_ltc_cbc_fix_config(struct gk20a *g, int base)
 /*
  * Performs a full flush of the L2 cache.
  */
-static void gm20b_flush_ltc(struct gk20a *g)
+void gm20b_flush_ltc(struct gk20a *g)
 {
 	u32 op_pending;
 	unsigned long now, timeout;

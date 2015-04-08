@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2010 Google, Inc.
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -502,6 +502,49 @@ void tegra_dc_win_partial_update(struct tegra_dc *dc, struct tegra_dc_win *win,
 	}
 }
 
+static void tegra_dc_vrr_frame_time(struct tegra_dc *dc)
+{
+	struct timespec time_now;
+	struct tegra_vrr *vrr  = dc->out->vrr;
+
+	if (!vrr) return;
+
+	if (vrr->enable) {
+		vrr->lastenable = 1;
+		getnstimeofday(&time_now);
+		vrr->curr_flip_us = (s64)time_now.tv_sec * 1000000 +
+				time_now.tv_nsec / 1000;
+
+		vrr->flip = 1;
+	}
+	else {
+		vrr->curr_flip_us = 0;
+		vrr->last_flip_us = 0;
+	}
+}
+
+static void tegra_dc_vrr_cancel_vfp(struct tegra_dc *dc)
+{
+	struct tegra_vrr *vrr  = dc->out->vrr;
+
+	if (!vrr) return;
+
+	if (vrr->enable) {
+		tegra_dc_set_act_vfp(dc, vrr->vfp_shrink);
+	}
+	else {
+ 		if(vrr->lastenable) {
+			tegra_dc_set_act_vfp(dc, vrr->v_front_porch);
+			vrr->lastenable = 0;
+			vrr->frame_type = 0;
+			vrr->last_frame_us = 0;
+			vrr->flip_interval_us = 0;
+			vrr->frame_count = 0;
+			vrr->flip_count = 0;
+		}
+	}
+}
+
 /* Does not support updating windows on multiple dcs in one call.
  * Requires a matching sync_windows to avoid leaking ref-count on clocks. */
 int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n,
@@ -622,9 +665,27 @@ int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n,
 			update_mask |= WIN_A_ACT_REQ << win->idx;
 
 		if (!WIN_IS_ENABLED(win)) {
+		#define RGB_TO_YUV420_8BPC_BLACK_PIX 0x00801010
+		#define RGB_TO_YUV422_10BPC_BLACK_PIX 0x00001080
+
 			dc_win->dirty = no_vsync ? 0 : 1;
 			tegra_dc_writel(dc, 0, DC_WIN_WIN_OPTIONS);
+			if (dc->yuv_bypass) {
+				if (dc->mode.vmode &
+					(FB_VMODE_Y420 | FB_VMODE_Y24))
+					tegra_dc_writel(dc,
+						RGB_TO_YUV420_8BPC_BLACK_PIX,
+						DC_DISP_BLEND_BACKGROUND_COLOR);
+				else if (dc->mode.vmode &
+					(FB_VMODE_Y422 | FB_VMODE_Y30))
+					tegra_dc_writel(dc,
+						RGB_TO_YUV422_10BPC_BLACK_PIX,
+						DC_DISP_BLEND_BACKGROUND_COLOR);
+			}
 			continue;
+
+		#undef RGB_TO_YUV422_10BPC_BLACK_PIX
+		#undef RGB_TO_YUV420_8BPC_BLACK_PIX
 		}
 
 		filter_h = win_use_h_filter(dc, win);
@@ -1038,6 +1099,8 @@ int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n,
 			tegra_dc_get_window(dc, windows[i]->idx)->dirty = 0;
 	}
 
+	tegra_dc_vrr_frame_time(dc);
+	tegra_dc_vrr_cancel_vfp(dc);
 	mutex_unlock(&dc->lock);
 	if (dc->out->flags & TEGRA_DC_OUT_ONE_SHOT_MODE)
 		mutex_unlock(&dc->one_shot_lock);

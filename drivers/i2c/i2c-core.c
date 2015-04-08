@@ -1319,14 +1319,37 @@ i2c_sysfs_delete_device(struct device *dev, struct device_attribute *attr,
 	return res;
 }
 
+static ssize_t show_bus_clk_rate(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct i2c_adapter *adap = to_i2c_adapter(dev);
+
+	return sprintf(buf, "%ld\n", adap->bus_clk_rate);
+}
+
+static ssize_t set_bus_clk_rate(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct i2c_adapter *adap = to_i2c_adapter(dev);
+	char *p = (char *)buf;
+	int bus_clk_rate;
+
+	bus_clk_rate = memparse(p, &p);
+	dev_info(dev, "Setting clock rate %d on next transfer\n", bus_clk_rate);
+	adap->bus_clk_rate = bus_clk_rate;
+	return count;
+}
+
 static DEVICE_ATTR(new_device, S_IWUSR, NULL, i2c_sysfs_new_device);
 static DEVICE_ATTR_IGNORE_LOCKDEP(delete_device, S_IWUSR, NULL,
 				   i2c_sysfs_delete_device);
+static DEVICE_ATTR(bus_clk_rate, 0644, show_bus_clk_rate, set_bus_clk_rate);
 
 static struct attribute *i2c_adapter_attrs[] = {
 	&dev_attr_name.attr,
 	&dev_attr_new_device.attr,
 	&dev_attr_delete_device.attr,
+	&dev_attr_bus_clk_rate.attr,
 	NULL
 };
 
@@ -1961,6 +1984,20 @@ void i2c_clients_command(struct i2c_adapter *adap, unsigned int cmd, void *arg)
 }
 EXPORT_SYMBOL(i2c_clients_command);
 
+static int __init i2c_first_dynamic_bus_num_init(void)
+{
+	int max_bus;
+
+	max_bus = of_alias_get_max_id("i2c");
+	if (max_bus > 0)
+		__i2c_first_dynamic_bus_num = max_bus + 1;
+
+	pr_info("I2C first dynamic bus number based on alias = %d\n",
+			__i2c_first_dynamic_bus_num);
+
+	return 0;
+}
+
 static int __init i2c_init(void)
 {
 	int retval;
@@ -1968,6 +2005,9 @@ static int __init i2c_init(void)
 	retval = bus_register(&i2c_bus_type);
 	if (retval)
 		return retval;
+
+	i2c_first_dynamic_bus_num_init();
+
 #ifdef CONFIG_I2C_COMPAT
 	i2c_adapter_compat_class = class_compat_register("i2c-adapter");
 	if (!i2c_adapter_compat_class) {

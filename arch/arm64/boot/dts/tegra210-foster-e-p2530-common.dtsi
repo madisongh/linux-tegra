@@ -1,7 +1,7 @@
 /*
  * arch/arm64/boot/dts/tegra210-foster-e-p2530-common.dtsi
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,14 +23,14 @@
 /memreserve/ 0x80000000 0x00020000;
 
 #include "tegra210-common.dtsi"
+#include "tegra210-platforms/tegra210-foster-e-prods.dtsi"
+#include "tegra210-platforms/tegra210-sdhci.dtsi"
 #include "tegra210-platforms/tegra210-p2530-common.dtsi"
-#include "tegra210-platforms/tegra210-ers-extgpio-e2141-1100-a00.dtsi"
 #include "tegra210-platforms/tegra210-foster-e-power-tree-p2530-0932-e00.dtsi"
 #include "tegra210-platforms/tegra210-foster-e-gpio-p2530-0930-e00.dtsi"
 #include "tegra210-platforms/tegra210-foster-e-pinmux-p2530-0930-e00.dtsi"
 #include "tegra210-platforms/tegra210-loki-e-comms.dtsi"
 #include "tegra210-platforms/tegra210-foster-e-pwm-fan.dtsi"
-#include "tegra210-platforms/tegra210-sdhci.dtsi"
 #include "tegra210-platforms/tegra210-ers-hdmi-e2190-1100-a00.dtsi"
 #include "tegra210-platforms/tegra210-foster-e-thermal-fan-est.dtsi"
 #include "tegra210-platforms/tegra210-loki-e-keys-p2530-0032-e00.dtsi"
@@ -38,6 +38,7 @@
 #include "tegra210-platforms/tegra210-edp.dtsi"
 #include <dt-bindings/iio/meter/ina3221x.h>
 #include "tegra210-platforms/tegra210-sysedp.dtsi"
+#include "tegra210-platforms/tegra210-audio.dtsi"
 
 / {
 	host1x {
@@ -46,13 +47,24 @@
 			status = "okay";
 			nvidia,dc-flags = <TEGRA_DC_FLAG_ENABLED>;
 			nvidia,emc-clk-rate = <300000000>;
+			nvidia,cmu-enable = <1>;
 			nvidia,fb-bpp = <32>; /* bits per pixel */
 			nvidia,fb-flags = <TEGRA_FB_FLIP_ON_PROBE>;
 		};
 	};
 
+	pmc@7000e400 {
+		platform-io-pad-voltage = <
+				TEGRA210_PAD_AUDIO_HV IO_PAD_VOLTAGE_1_8V
+				TEGRA210_PAD_SPI_HV IO_PAD_VOLTAGE_1_8V>;
+	};
+
 	spi@7000da00 {
 		status = "disabled";
+	};
+
+	sdhci@700b0000 {
+		default-drv-type = <1>;
 	};
 
 	ahub {
@@ -218,5 +230,145 @@
 		compatible = "nvidia,tegra124-sysedp-dynamic-capping";
 		nvidia,throttle_depth = <75>;
 		nvidia,cap_method = <1>;
+	};
+
+	bcmdhd_wlan {
+		country_code_map {
+			CC1 {
+				iso_abbrev = "XV";
+				custom_locale = "XV";
+				custom_locale_rev = <997>;
+			};
+			CC2 {
+				iso_abbrev = "US";
+				custom_locale = "Q2";
+				custom_locale_rev = <998>;
+			};
+			CC3 {
+				iso_abbrev = "CA";
+				custom_locale = "Q2";
+				custom_locale_rev = <998>;
+			};
+			CC4 {
+				iso_abbrev = "AT";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC5 {
+				iso_abbrev = "BE";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC6 {
+				iso_abbrev = "BG";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC7 {
+				iso_abbrev = "HR";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC8 {
+				iso_abbrev = "CZ";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC9 {
+				iso_abbrev = "DK";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC10 {
+				iso_abbrev = "FR";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC11 {
+				iso_abbrev = "DE";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC12 {
+				iso_abbrev = "GR";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC13 {
+				iso_abbrev = "HU";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC14 {
+				iso_abbrev = "IT";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC15 {
+				iso_abbrev = "NL";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC16 {
+				iso_abbrev = "NO";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC17 {
+				iso_abbrev = "PL";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC18 {
+				iso_abbrev = "PT";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC19 {
+				iso_abbrev = "RO";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC20 {
+				iso_abbrev = "SK";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC21 {
+				iso_abbrev = "ES";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC22 {
+				iso_abbrev = "SE";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC23 {
+				iso_abbrev = "CH";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC24 {
+				iso_abbrev = "GB";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC25 {
+				iso_abbrev = "EU";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC26 {
+				iso_abbrev = "E0";
+				custom_locale = "E0";
+				custom_locale_rev = <994>;
+			};
+			CC27 {
+				iso_abbrev = "IN";
+				custom_locale = "Q2";
+				custom_locale_rev = <998>;
+			};
+		};
 	};
 };

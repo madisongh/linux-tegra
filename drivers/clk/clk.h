@@ -15,3 +15,6 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
 void of_clk_lock(void);
 void of_clk_unlock(void);
 #endif
+#if defined(CONFIG_OF) && defined(CONFIG_TEGRA_CLK_FRAMEWORK)
+struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
+#endif

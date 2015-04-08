@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2012-2015 NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
+#include <linux/syscalls.h>
 #include <asm/smp_plat.h>
 
 #include "ote_protocol.h"
@@ -36,12 +37,16 @@ core_param(verbose_smc, verbose_smc, bool, 0644);
 #define SET_RESULT(req, r, ro)	{ req->result = r; req->result_origin = ro; }
 
 static int te_pin_user_pages(void *buffer, size_t size,
-		unsigned long *pages_ptr, uint32_t buf_type)
+		unsigned long *pages_ptr, uint32_t buf_type, bool *is_locked)
 {
 	int ret = 0;
 	unsigned int nr_pages;
 	struct page **pages = NULL;
 	bool writable;
+	struct vm_area_struct *vma = NULL;
+	unsigned int flags;
+	int i;
+	bool is_locked_prev;
 
 	nr_pages = (((uintptr_t)buffer & (PAGE_SIZE - 1)) +
 			(size + PAGE_SIZE - 1)) >> PAGE_SHIFT;
@@ -60,9 +65,68 @@ static int te_pin_user_pages(void *buffer, size_t size,
 
 	up_read(&current->mm->mmap_sem);
 
-	*pages_ptr = (unsigned long) pages;
+	if (ret <= 0) {
+		pr_err("%s: Error %d in get_user_pages\n", __func__, ret);
+		return ret;
+	}
 
-	return ret;
+	*pages_ptr = (unsigned long) pages;
+	nr_pages = ret;
+
+	down_read(&current->mm->mmap_sem);
+
+	is_locked_prev = false;
+	vma = find_extend_vma(current->mm, (unsigned long)buffer);
+	if (vma && (vma->vm_flags & VM_LOCKED))
+		is_locked_prev = true;
+
+	up_read(&current->mm->mmap_sem);
+
+	/*
+	 * Lock the pages if they are not already locked to ensure that
+	 * AF bit is not set to zero.
+	 */
+	*is_locked = false;
+	if (!is_locked_prev) {
+		ret = sys_mlock((unsigned long)buffer, size);
+		if (!ret)
+			*is_locked = true;
+		else
+			/*
+			 * Follow through even if mlock failed as it can be
+			 * failed due to memory restrictions or invalid
+			 * capabilities
+			 */
+			pr_warn("%s: Error %d in mlock, continuing session\n",
+								__func__, ret);
+	}
+
+	down_read(&current->mm->mmap_sem);
+
+	/* Fault pages to set the AF bit in PTE */
+	flags = FAULT_FLAG_USER;
+	if (writable)
+		flags |= FAULT_FLAG_WRITE;
+	for (i = 0; i < nr_pages; i++) {
+		ret = fixup_user_fault(current, current->mm,
+			(unsigned long)(buffer + (i * PAGE_SIZE)), flags);
+		if (ret) {
+			pr_err("%s: Error %d in fixup_user_fault\n",
+							__func__, ret);
+			break;
+		}
+	}
+
+	up_read(&current->mm->mmap_sem);
+
+	if (ret) {
+		if (*is_locked)
+			sys_munlock((unsigned long)buffer, size);
+		return ret;
+	}
+
+	/* Return the number of pages pinned */
+	return nr_pages;
 }
 
 static int te_prep_mem_buffer(uint32_t session_id,
@@ -72,6 +136,7 @@ static int te_prep_mem_buffer(uint32_t session_id,
 	unsigned long pages = 0;
 	struct te_shmem_desc *shmem_desc = NULL;
 	int ret = 0, nr_pages = 0;
+	bool is_locked = false;
 
 	/* allocate new shmem descriptor */
 	shmem_desc = kzalloc(sizeof(struct te_shmem_desc), GFP_KERNEL);
@@ -82,7 +147,8 @@ static int te_prep_mem_buffer(uint32_t session_id,
 	}
 
 	/* pin pages */
-	nr_pages = te_pin_user_pages(buffer, size, &pages, buf_type);
+	nr_pages = te_pin_user_pages(buffer, size, &pages,
+					buf_type, &is_locked);
 	if (nr_pages <= 0) {
 		pr_err("%s: te_pin_user_pages failed (%d)\n", __func__,
 			nr_pages);
@@ -97,6 +163,7 @@ static int te_prep_mem_buffer(uint32_t session_id,
 	shmem_desc->size = size;
 	shmem_desc->nr_pages = nr_pages;
 	shmem_desc->pages = (struct page **)(uintptr_t)pages;
+	shmem_desc->is_locked = is_locked;
 
 	/* add shmem descriptor to proper list */
 	if ((buf_type == TE_PARAM_TYPE_MEM_RO) ||
@@ -154,6 +221,7 @@ static int te_prep_mem_buffers(struct te_request *request,
 static void te_release_mem_buffer(struct te_shmem_desc *shmem_desc)
 {
 	uint32_t i;
+	int status;
 
 	list_del(&shmem_desc->list);
 	for (i = 0; i < shmem_desc->nr_pages; i++) {
@@ -163,6 +231,14 @@ static void te_release_mem_buffer(struct te_shmem_desc *shmem_desc)
 		page_cache_release(shmem_desc->pages[i]);
 	}
 	kfree(shmem_desc->pages);
+
+	if (shmem_desc->is_locked && current->mm) {
+		status = sys_munlock((unsigned long)shmem_desc->buffer,
+							shmem_desc->size);
+		if (status)
+			pr_err("%s:Error %d in munlock\n", __func__, status);
+	}
+
 	kfree(shmem_desc);
 }
 
@@ -339,6 +415,48 @@ int te_set_vpr_params(void *vpr_base, size_t vpr_size)
 }
 EXPORT_SYMBOL(te_set_vpr_params);
 
+void te_restore_keyslots(void)
+{
+	uint32_t retval;
+
+	/* Share the same lock used when request is send from user side */
+	mutex_lock(&smc_lock);
+
+	retval = send_smc(TE_SMC_TA_EVENT, TA_EVENT_RESTORE_KEYS, 0);
+
+	mutex_unlock(&smc_lock);
+
+	if (retval != OTE_SUCCESS) {
+		pr_err("%s: smc failed err (0x%x)\n", __func__, retval);
+	}
+}
+EXPORT_SYMBOL(te_restore_keyslots);
+
+/*
+ * VRR Set Buffer
+ *
+ * Called from the DC driver and implemented as a monitor fastcall
+ * to avoid taking the smc_lock. This call passes in the physical
+ * address for the shared memory buffer.
+ */
+int te_vrr_set_buf(phys_addr_t addr)
+{
+	return _tlk_generic_smc(TE_SMC_VRR_SET_BUF, addr, 0);
+}
+EXPORT_SYMBOL(te_vrr_set_buf);
+
+/*
+ * VRR Sec
+ *
+ * Called from the DC driver and implemented as a monitor fastcall
+ * to avoid taking the smc_lock.
+ */
+void te_vrr_sec(void)
+{
+	_tlk_generic_smc(TE_SMC_VRR_SEC, 0, 0);
+}
+EXPORT_SYMBOL(te_vrr_sec);
+
 /*
  * Open session SMC (supporting client-based te_open_session() calls)
  */
@@ -387,6 +505,8 @@ void te_open_session(struct te_opensession *cmd,
 	if (request->result) {
 		/* release any persistent mem buffers if we failed */
 		te_release_mem_buffers(&session->inactive_persist_shmem_list);
+
+		kfree(session);
 	} else {
 		/* otherwise mark active any persistent mem buffers */
 		te_activate_persist_mem_buffers(session);

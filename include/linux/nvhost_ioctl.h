@@ -3,7 +3,7 @@
  *
  * Tegra graphics host driver
  *
- * Copyright (c) 2009-2014, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2009-2015, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -116,6 +116,7 @@ enum nvhost_clk_attr {
 	NVHOST_CLOCK = 0,
 	NVHOST_BW,
 	NVHOST_PIXELRATE,
+	NVHOST_BW_KHZ,
 };
 
 /*
@@ -263,7 +264,7 @@ struct nvhost_channel_map_buffer_args {
 #define NVHOST_IOCTL_CHANNEL_NULL_KICKOFF	\
 	_IOR(NVHOST_IOCTL_MAGIC, 6, struct nvhost_get_param_args)
 #define NVHOST_IOCTL_CHANNEL_GET_CLK_RATE		\
-	_IOR(NVHOST_IOCTL_MAGIC, 9, struct nvhost_clk_rate_args)
+	_IOWR(NVHOST_IOCTL_MAGIC, 9, struct nvhost_clk_rate_args)
 #define NVHOST_IOCTL_CHANNEL_SET_CLK_RATE		\
 	_IOW(NVHOST_IOCTL_MAGIC, 10, struct nvhost_clk_rate_args)
 #define NVHOST_IOCTL_CHANNEL_SET_TIMEOUT	\

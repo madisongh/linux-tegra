@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Syncpoint Integration to linux/sync Framework
  *
- * Copyright (c) 2013-2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -360,7 +360,7 @@ struct nvhost_sync_timeline *nvhost_sync_timeline_create(
 	return obj;
 }
 
-void nvhost_sync_pt_signal(struct nvhost_sync_pt *pt)
+void nvhost_sync_pt_signal(struct nvhost_sync_pt *pt, u64 timestamp)
 {
 	/* At this point the fence (and its sync_pt's) might already be gone if
 	 * the user has closed its fd's. The nvhost_sync_pt object still exists
@@ -371,7 +371,7 @@ void nvhost_sync_pt_signal(struct nvhost_sync_pt *pt)
 		pt->has_intr = false;
 		kref_put(&pt->refcount, nvhost_sync_pt_free_shared);
 	}
-	sync_timeline_signal(&obj->obj);
+	sync_timeline_signal(&obj->obj, timestamp);
 }
 
 int nvhost_sync_fence_set_name(int fence_fd, const char *name)
@@ -421,14 +421,19 @@ struct sync_fence *nvhost_sync_create_fence(struct platform_device *pdev,
 	struct sync_fence *fence = NULL;
 
 	for (i = 0; i < num_pts; i++) {
+		if (!nvhost_syncpt_is_valid_hw_pt(sp, pts[i].id)) {
+			WARN_ON(1);
+			return ERR_PTR(-EINVAL);
+		}
+	}
+
+	for (i = 0; i < num_pts; i++) {
 		struct nvhost_sync_timeline *obj;
 		struct sync_pt *pt;
 		struct sync_fence *f, *f2;
 		u32 id = pts[i].id;
 		u32 thresh = pts[i].thresh;
 
-		BUG_ON(id >= nvhost_syncpt_nb_pts(sp) &&
-				(id != NVSYNCPT_INVALID));
 		obj = nvhost_syncpt_timeline(sp, id);
 		pt = nvhost_sync_pt_create_inst(obj, thresh);
 		if (pt == NULL) {

@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Init for T124 Architecture Chips
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -35,6 +35,7 @@
 #include "flcn/flcn.h"
 #include "vi/vi.h"
 #include "isp/isp.h"
+#include "isp/isp_isr_v1.h"
 #include "scale3d.h"
 #include "chip_support.h"
 #include "nvhost_scale.h"
@@ -74,9 +75,12 @@ static struct resource tegra_host1x04_resources[] = {
 
 static struct host1x_device_info host1x04_info = {
 	.nb_channels	= T124_NVHOST_NUMCHANNELS,
-	.nb_pts		= NV_HOST1X_SYNCPT_NB_PTS,
+	.ch_base	= 0,
+	.ch_limit	= T124_NVHOST_NUMCHANNELS,
 	.nb_mlocks	= NV_HOST1X_NB_MLOCKS,
 	.initialize_chip_support = nvhost_init_t124_support,
+	.nb_hw_pts	= NV_HOST1X_SYNCPT_NB_PTS,
+	.nb_pts		= NV_HOST1X_SYNCPT_NB_PTS,
 	.pts_base	= 0,
 	.pts_limit	= NV_HOST1X_SYNCPT_NB_PTS,
 	.syncpt_policy	= SYNCPT_PER_CHANNEL,
@@ -90,7 +94,6 @@ struct nvhost_device_data t124_host1x_info = {
 	.private_data	= &host1x04_info,
 	.finalize_poweron = nvhost_host1x_finalize_poweron,
 	.prepare_poweroff = nvhost_host1x_prepare_poweroff,
-	.gather_filter_enabled = false,
 };
 
 
@@ -137,8 +140,8 @@ struct nvhost_device_data t124_isp_info = {
 		{"sclk", 80000000} },
 	.finalize_poweron = nvhost_isp_t124_finalize_poweron,
 	.prepare_poweroff = nvhost_isp_t124_prepare_poweroff,
+	.hw_init          = nvhost_isp_register_isr_v1,
 	.ctrl_ops         = &tegra_isp_ctrl_ops,
-	.gather_filter_enabled = true,
 };
 static struct platform_device tegra_isp01_device = {
 	.name          = "isp",
@@ -178,8 +181,8 @@ struct nvhost_device_data t124_ispb_info = {
 		{"sclk", 80000000} },
 	.finalize_poweron = nvhost_isp_t124_finalize_poweron,
 	.prepare_poweroff = nvhost_isp_t124_prepare_poweroff,
+	.hw_init          = nvhost_isp_register_isr_v1,
 	.ctrl_ops         = &tegra_isp_ctrl_ops,
-	.gather_filter_enabled = true,
 };
 
 static struct platform_device tegra_isp01b_device = {
@@ -232,7 +235,6 @@ struct nvhost_device_data t124_vi_info = {
 	.finalize_poweron = nvhost_vi_finalize_poweron,
 	.ctrl_ops         = &tegra_vi_ctrl_ops,
 	.reset            = nvhost_vi_reset_all,
-	.gather_filter_enabled = true,
 };
 EXPORT_SYMBOL(t124_vi_info);
 
@@ -272,7 +274,6 @@ struct nvhost_device_data t124_vi_info = {
 	.ctrl_ops         = &tegra_vi_ctrl_ops,
 	.reset            = nvhost_vi_reset,
 	.slave         = &tegra_vi01b_device,
-	.gather_filter_enabled = true,
 };
 EXPORT_SYMBOL(t124_vi_info);
 
@@ -311,7 +312,6 @@ struct nvhost_device_data t124_vib_info = {
 	.ctrl_ops         = &tegra_vi_ctrl_ops,
 	.master           = &tegra_vi01_device,
 	.reset            = nvhost_vi_reset,
-	.gather_filter_enabled = true,
 };
 
 static struct platform_device tegra_vi01b_device = {
@@ -355,7 +355,6 @@ struct nvhost_device_data t124_msenc_info = {
 	.actmon_regs	= HOST1X_CHANNEL_ACTMON1_REG_BASE,
 	.actmon_enabled	= true,
 	.firmware_name	= "nvhost_msenc031.fw",
-	.gather_filter_enabled = true,
 };
 
 static struct platform_device tegra_msenc03_device = {
@@ -395,7 +394,6 @@ struct nvhost_device_data t124_tsec_info = {
 	.moduleid      = NVHOST_MODULE_TSEC,
 	.finalize_poweron = nvhost_tsec_finalize_poweron,
 	.prepare_poweroff = nvhost_tsec_prepare_poweroff,
-	.gather_filter_enabled = true,
 };
 
 static struct platform_device tegra_tsec01_device = {
@@ -449,8 +447,9 @@ struct nvhost_device_data t124_vic_info = {
 	.actmon_regs		= HOST1X_CHANNEL_ACTMON2_REG_BASE,
 	.actmon_enabled		= true,
 	.linear_emc		= true,
+	.serialize		= true,
+	.push_work_done		= true,
 	.firmware_name		= "vic03_ucode.bin",
-	.gather_filter_enabled = true,
 	.aggregate_constraints	= nvhost_vic_aggregate_constraints,
 	.num_ppc		= 2,
 };
@@ -486,7 +485,6 @@ static struct nvhost_device_data t132_msenc_info = {
 	.poweron_reset	= true,
 	.finalize_poweron = nvhost_flcn_finalize_poweron,
 	.firmware_name	= "nvhost_msenc031.fw",
-	.gather_filter_enabled = true,
 };
 
 static struct {
@@ -589,10 +587,11 @@ int nvhost_init_t124_support(struct nvhost_master *host,
 	op->actmon = host1x_actmon_ops;
 
 
-	if (data->virtual_dev) {
+	if (nvhost_dev_is_virtual(host->dev)) {
 		data->can_powergate = false;
 		vhost_init_host1x_syncpt_ops(&op->syncpt);
 		vhost_init_host1x_intr_ops(&op->intr);
+		vhost_init_host1x_cdma_ops(&op->cdma);
 	}
 
 	t124 = kzalloc(sizeof(struct t124), GFP_KERNEL);

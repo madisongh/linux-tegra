@@ -7,7 +7,7 @@
  *	Colin Cross <ccross@google.com>
  *	Based on arch/arm/plat-omap/cpu-omap.c, (C) 2005 Nokia Corporation
  *
- * Copyright (C) 2010-2014 NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2010-2015 NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -55,6 +55,7 @@ static struct clk *emc_clk;
 
 static unsigned long policy_max_speed[CONFIG_NR_CPUS];
 static unsigned long target_cpu_speed[CONFIG_NR_CPUS];
+static bool preserve_cpu_speed;
 static DEFINE_MUTEX(tegra_cpu_lock);
 static bool is_suspended;
 static int suspend_index;
@@ -199,6 +200,7 @@ static struct attribute_group stats_attr_grp = {
 static u32 lp_to_g_ratio = LP_TO_G_PERCENTAGE;
 static u32 disable_virtualization;
 static struct clk *lp_clock, *g_clock;
+static int volt_cap_level;
 
 unsigned long lp_to_virtual_gfreq(unsigned long lp_freq)
 {
@@ -326,7 +328,8 @@ static unsigned int sysedp_cap_speed(unsigned int requested_speed)
 				 cpumask_weight(&edp_cpumask), eff_cpupwr,
 				 cur_cpupwr_freqcap);
 		}
-		trace_sysedp_max_cpu_pwr(eff_cpupwr, cur_cpupwr_freqcap);
+		trace_sysedp_max_cpu_pwr(cpumask_weight(&edp_cpumask),
+					 eff_cpupwr, cur_cpupwr_freqcap);
 	}
 
 	if (cur_cpupwr_freqcap && requested_speed > cur_cpupwr_freqcap)
@@ -520,6 +523,20 @@ static int cpu_edp_safe_set(void *data, u64 val)
 DEFINE_SIMPLE_ATTRIBUTE(cpu_edp_safe_fops, cpu_edp_safe_get,
 			cpu_edp_safe_set, "%llu\n");
 
+static int __init tegra_cap_debugfs_init(struct dentry *cpu_tegra_debugfs_root)
+{
+	if (!debugfs_create_u32("cap_kHz", 0444, cpu_tegra_debugfs_root,
+				&volt_capped_speed))
+		return -ENOMEM;
+
+#ifdef CONFIG_TEGRA_HMP_CLUSTER_CONTROL
+	if (!debugfs_create_u32("cap_mv", 0444, cpu_tegra_debugfs_root,
+				&volt_cap_level))
+		return -ENOMEM;
+#endif
+	return 0;
+}
+
 static int __init tegra_virt_debugfs_init(struct dentry *cpu_tegra_debugfs_root)
 {
 #ifdef CONFIG_TEGRA_HMP_CLUSTER_CONTROL
@@ -609,6 +626,9 @@ static int __init tegra_cpu_debug_init(void)
 	if (tegra_edp_debug_init(cpu_tegra_debugfs_root))
 		goto err_out;
 
+	if (tegra_cap_debugfs_init(cpu_tegra_debugfs_root))
+		goto err_out;
+
 	if (tegra_virt_debugfs_init(cpu_tegra_debugfs_root))
 		goto err_out;
 
@@ -669,6 +689,9 @@ unsigned int tegra_getspeed(unsigned int cpu)
 	if (cpu >= CONFIG_NR_CPUS)
 		return 0;
 
+	if (!cpu_clk)
+		return 0;
+
 	/*
 	 * Explicitly holding the cpu_clk lock across get_rate and is_lp_cluster
 	 * check to prevent a racy getspeed. Cannot hold tegra_cpu_lock here.
@@ -699,7 +722,10 @@ int tegra_update_cpu_speed(unsigned long rate)
 	struct cpufreq_freqs freqs;
 	struct cpufreq_freqs actual_freqs;
 	struct cpufreq_policy *policy = cpufreq_cpu_get(0); /* boot CPU */
-	unsigned int mode, mode_limit = cpu_reg_mode_predict_idle_limit();
+	unsigned int mode, mode_limit;
+
+	if (!cpu_clk)
+		return -EINVAL;
 
 	freqs.old = tegra_getspeed(0);
 	actual_freqs.new = rate;
@@ -712,6 +738,7 @@ int tegra_update_cpu_speed(unsigned long rate)
 	if (!IS_ERR_VALUE(rate))
 		actual_freqs.new = rate / 1000;
 
+	mode_limit = cpu_reg_mode_predict_idle_limit();
 	mode = REGULATOR_MODE_NORMAL;
 	if (mode_limit && (mode_limit < actual_freqs.new ||
 	    reg_mode_force_normal)) {
@@ -795,13 +822,75 @@ _err:
 
 #ifdef CONFIG_TEGRA_HMP_CLUSTER_CONTROL
 
+static int update_volt_cap(struct clk *cluster_clk, int level,
+			   unsigned int *capped_speed)
+{
+#ifndef CONFIG_TEGRA_CPU_VOLT_CAP
+	unsigned long cap_rate, flags;
+
+	/*
+	 * If CPU is on DFLL clock, cap level is already applied by DFLL control
+	 * loop directly - no cap speed to be set. Otherwise, convert cap level
+	 * to cap speed. Hold cpu_clk lock to avoid race with rail mode change.
+	 */
+	clk_lock_save(cpu_clk, &flags);
+	if (!level || tegra_dvfs_rail_is_dfll_mode(tegra_cpu_rail))
+		cap_rate = 0;
+	else
+		cap_rate = tegra_dvfs_predict_hz_at_mv_max_tfloor(
+			cluster_clk, level);
+	clk_unlock_restore(cpu_clk, &flags);
+
+	if (!IS_ERR_VALUE(cap_rate)) {
+		volt_cap_level = level;
+		*capped_speed = cap_rate / 1000;
+		pr_debug("%s: Updated capped speed to %ukHz (cap level %dmV)\n",
+			__func__, *capped_speed, level);
+		return 0;
+	}
+
+	pr_err("%s: Failed to find capped speed for cap level %dmV\n",
+		__func__, level);
+#endif
+	return -EINVAL;
+}
+
+int tegra_cpu_volt_cap_apply(int *cap_idx, int new_idx, int level)
+{
+	int ret;
+	unsigned int capped_speed;
+	struct clk *cluster_clk;
+
+	mutex_lock(&tegra_cpu_lock);
+	if (cap_idx)
+		*cap_idx = new_idx;	/* protect index update by cpu mutex */
+	else
+		level = volt_cap_level; /* keep current level if no index*/
+
+	cluster_clk = is_lp_cluster() ? lp_clock : g_clock;
+	ret = update_volt_cap(cluster_clk, level, &capped_speed);
+	if (!ret) {
+		if (volt_capped_speed != capped_speed) {
+			volt_capped_speed = capped_speed;
+			tegra_cpu_set_speed_cap_locked(NULL);
+		}
+	}
+	mutex_unlock(&tegra_cpu_lock);
+
+	return ret;
+}
+
 static int tegra_cluster_switch_locked(struct clk *cpu_clk, struct clk *new_clk)
 {
 	int ret;
+	unsigned int capped_speed;
 
 	ret = clk_set_parent(cpu_clk, new_clk);
 	if (ret)
 		return ret;
+
+	if (!update_volt_cap(new_clk, volt_cap_level, &capped_speed))
+		volt_capped_speed = capped_speed;
 
 	tegra_cpu_set_speed_cap_locked(NULL);
 
@@ -1043,40 +1132,7 @@ static inline void tegra_auto_cluster_switch(void) {}
 static inline void tegra_auto_cluster_switch_exit(void) {}
 #endif
 
-unsigned int tegra_count_slow_cpus(unsigned long speed_limit)
-{
-	unsigned int cnt = 0;
-	int i;
-
-	for_each_online_cpu(i)
-		if (target_cpu_speed[i] <= speed_limit)
-			cnt++;
-	return cnt;
-}
-
-unsigned int tegra_get_slowest_cpu_n(void) {
-	unsigned int cpu = nr_cpu_ids;
-	unsigned long rate = ULONG_MAX;
-	int i;
-
-	for_each_online_cpu(i)
-		if ((i > 0) && (rate > target_cpu_speed[i])) {
-			cpu = i;
-			rate = target_cpu_speed[i];
-		}
-	return cpu;
-}
-
-unsigned long tegra_cpu_lowest_speed(void) {
-	unsigned long rate = ULONG_MAX;
-	int i;
-
-	for_each_online_cpu(i)
-		rate = min(rate, target_cpu_speed[i]);
-	return rate;
-}
-
-unsigned long tegra_cpu_highest_speed(void) {
+static unsigned long tegra_cpu_highest_speed(void) {
 	unsigned long policy_max = ULONG_MAX;
 	unsigned long rate = 0;
 	int i;
@@ -1123,6 +1179,9 @@ int tegra_cpu_set_speed_cap_locked(unsigned int *speed_cap)
 
 	if (is_suspended)
 		return -EBUSY;
+
+	if (!cpu_clk)
+		return -EINVAL;
 
 	/* Caps based on virtual G-cpu freq */
 	new_speed = tegra_throttle_governor_speed(new_speed);
@@ -1223,10 +1282,12 @@ static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
 	unsigned long rate;
 
 	if (event == PM_SUSPEND_PREPARE) {
-		pm_qos_update_request(&cpufreq_min_req,
-			freq_table[suspend_index].frequency);
-		pm_qos_update_request(&cpufreq_max_req,
-			freq_table[suspend_index].frequency);
+		if (!preserve_cpu_speed) {
+			pm_qos_update_request(&cpufreq_min_req,
+				freq_table[suspend_index].frequency);
+			pm_qos_update_request(&cpufreq_max_req,
+				freq_table[suspend_index].frequency);
+		}
 
 		mutex_lock(&tegra_cpu_lock);
 		is_suspended = true;
@@ -1254,10 +1315,12 @@ static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
 			freq);
 		mutex_unlock(&tegra_cpu_lock);
 
-		pm_qos_update_request(&cpufreq_max_req,
-			PM_QOS_CPU_FREQ_MAX_DEFAULT_VALUE);
-		pm_qos_update_request(&cpufreq_min_req,
-			PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
+		if (!preserve_cpu_speed) {
+			pm_qos_update_request(&cpufreq_max_req,
+				PM_QOS_CPU_FREQ_MAX_DEFAULT_VALUE);
+			pm_qos_update_request(&cpufreq_min_req,
+				PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
+		}
 	}
 
 	return NOTIFY_OK;
@@ -1275,20 +1338,11 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
 	if (policy->cpu >= CONFIG_NR_CPUS)
 		return -EINVAL;
 
-	cpu_clk = clk_get_sys(NULL, "cpu");
-	if (IS_ERR(cpu_clk))
-		return PTR_ERR(cpu_clk);
-
-	emc_clk = clk_get_sys("tegra-cpu", "cpu_emc");
-	if (IS_ERR(emc_clk))
-		emc_clk = NULL;
-
 	freq = tegra_getspeed(policy->cpu);
 	if (emc_clk) {
 		clk_set_rate(emc_clk, tegra_emc_cpu_limit(freq));
 		clk_prepare_enable(emc_clk);
 	}
-	clk_prepare_enable(cpu_clk);
 
 	cpufreq_table_validate_and_show(policy, freq_table);
 
@@ -1383,6 +1437,7 @@ static int __init tegra_cpufreq_init(void)
 
 	freq_table = table_data->freq_table;
 
+	preserve_cpu_speed = table_data->preserve_across_suspend;
 	cpu_suspend_freq = tegra_cpu_suspend_freq();
 	if (cpu_suspend_freq == 0) {
 		suspend_index = table_data->suspend_index;
@@ -1393,6 +1448,16 @@ static int __init tegra_cpufreq_init(void)
 		}
 		suspend_index = i;
 	}
+
+	cpu_clk = clk_get_sys(NULL, "cpu");
+	if (IS_ERR(cpu_clk))
+		return PTR_ERR(cpu_clk);
+
+	clk_prepare_enable(cpu_clk);
+
+	emc_clk = clk_get_sys("tegra-cpu", "cpu_emc");
+	if (IS_ERR(emc_clk))
+		emc_clk = NULL;
 
 	ret = tegra_auto_hotplug_init(&tegra_cpu_lock);
 	if (ret)

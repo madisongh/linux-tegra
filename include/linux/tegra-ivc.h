@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This header is BSD licensed so anyone can use the definitions to implement
  * compatible drivers/servers.
@@ -62,7 +62,7 @@ struct ivc;
  * @dn:		Device node pointer to the queue in the DT
  *		If NULL, then operate on first HV device
  * @queue_id	Id number of the queue to use.
- * @ops		Ops structure or NULL
+ * @ops		Ops structure or NULL (deprecated)
  *
  * Reserves the queue for use
  *
@@ -70,6 +70,8 @@ struct ivc;
  * Note that returning EPROBE_DEFER means that the ivc driver
  * hasn't loaded yet and you should try again later in the
  * boot sequence.
+ *
+ * Note that @ops must be NULL for channels that handle reset.
  */
 struct tegra_hv_ivc_cookie *tegra_hv_ivc_reserve(
 		struct device_node *dn, int id,
@@ -252,5 +254,54 @@ void *tegra_ivc_write_get_next_frame(struct ivc *ivc);
  */
 int tegra_hv_ivc_write_advance(struct tegra_hv_ivc_cookie *ivck);
 int tegra_ivc_write_advance(struct ivc *ivc);
+
+struct tegra_hv_ivm_cookie {
+	uint64_t ipa;
+	uint64_t size;
+	unsigned peer_vmid;
+	void *reserved;
+};
+
+/**
+ * tegra_hv_mempool_reserve - reserve a mempool for use
+ * @dn		Ignored
+ * @id		Id of the requested mempool.
+ *
+ * Returns a cookie representing the mempool on success, otherwise an ERR_PTR.
+ */
+struct tegra_hv_ivm_cookie *tegra_hv_mempool_reserve(struct device_node *dn,
+		unsigned id);
+
+/**
+ * tegra_hv_mempool_release - release a reserved mempool
+ * @ck		Cookie returned by tegra_hv_mempool_reserve().
+ *
+ * Returns 0 on success or a negative error code otherwise.
+ */
+int tegra_hv_mempool_unreserve(struct tegra_hv_ivm_cookie *ck);
+
+/**
+ * ivc_channel_notified - handle internal messages
+ * @ivck	IVC cookie of the queue
+ *
+ * This function must be called following every notification (interrupt or
+ * callback invocation) for the tegra_hv_- version).
+ *
+ * Returns 0 if the channel is ready for communication, or -EAGAIN if a channel
+ * reset is in progress.
+ */
+int tegra_hv_ivc_channel_notified(struct tegra_hv_ivc_cookie *ivck);
+int tegra_ivc_channel_notified(struct ivc *ivc);
+
+/**
+ * ivc_channel_reset - initiates a reset of the shared memory state
+ * @ivck	IVC cookie of the queue
+ *
+ * This function must be called after a channel is reserved before it is used
+ * for communication. The channel will be ready for use when a subsequent call
+ * to ivc_channel_notified() returns 0.
+ */
+void tegra_hv_ivc_channel_reset(struct tegra_hv_ivc_cookie *ivck);
+void tegra_ivc_channel_reset(struct ivc *ivc);
 
 #endif

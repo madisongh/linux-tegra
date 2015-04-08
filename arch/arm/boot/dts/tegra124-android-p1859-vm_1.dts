@@ -1,7 +1,7 @@
 /*
  * arch/arm/boot/dts/tegra124-p1859-vm_1.dts
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,6 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
-
  /dts-v1/;
 
 / {
@@ -54,6 +53,7 @@
 		reg = <0x0 0x70300000 0x0 0x200>,
 			<0x0 0x70300800 0x0 0x800>,
 			<0x0 0x70300200 0x0 0x200>;
+		interrupts = <0 103 0x04>;
 		status = "okay";
 
 		#address-cells = <1>;
@@ -64,6 +64,7 @@
 		tegra_virt_i2s0: i2s@70301000 {
 			compatible = "nvidia,tegra124-i2s";
 			reg = <0x70301000 0x100>;
+			interrupts = <0 103 0x04>;
 			nvidia,ahub-cif-ids = <4 4>;
 			nvidia,ahub-i2s-id = <0>;
 			status = "okay";
@@ -72,6 +73,7 @@
 		tegra_virt_i2s1: i2s@70301100 {
 			compatible = "nvidia,tegra124-i2s";
 			reg = <0x70301100 0x100>;
+			interrupts = <0 103 0x04>;
 			nvidia,ahub-cif-ids = <5 5>;
 			nvidia,ahub-i2s-id = <1>;
 			status = "okay";
@@ -80,6 +82,7 @@
 		tegra_virt_i2s2: i2s@70301200 {
 			compatible = "nvidia,tegra124-i2s";
 			reg = <0x70301200 0x100>;
+			interrupts = <0 103 0x04>;
 			nvidia,ahub-cif-ids = <6 6>;
 			nvidia,ahub-i2s-id = <2>;
 			status = "okay";
@@ -88,6 +91,7 @@
 		tegra_virt_i2s3: i2s@70301300 {
 			compatible = "nvidia,tegra124-i2s";
 			reg = <0x70301300 0x100>;
+			interrupts = <0 103 0x04>;
 			nvidia,ahub-cif-ids = <7 7>;
 			nvidia,ahub-i2s-id = <3>;
 			status = "okay";
@@ -96,6 +100,7 @@
 		tegra_virt_i2s4: i2s@70301400 {
 			compatible = "nvidia,tegra124-i2s";
 			reg = <0x70301400 0x100>;
+			interrupts = <0 103 0x04>;
 			nvidia,ahub-cif-ids = <8 8>;
 			nvidia,ahub-i2s-id = <4>;
 			status = "okay";
@@ -249,19 +254,18 @@
 	tegra_hv_net {
 		compatible = "nvidia,tegra-hv-net";
 		status = "okay";
-		/* ivc channel to use definition (third one in tegra_hv) */
 		ivc = <&tegra_hv 2>;
 	};
 
 	tegra_hv_wdt {
 		compatible = "nvidia,tegra-hv-wdt";
 		status = "okay";
-		ivc_queue = <&tegra_hv 13>;
+		ivc = <&tegra_hv 15>;
 	};
 
 	iommu {
 		compatible = "nvidia,tegra124-smmu-hv";
-		ivc_queue = <&tegra_hv 11>;
+		ivc_queue = <&tegra_hv 13>;
 
 		domains = <
 			&ppcs_as TEGRA_SWGROUP_CELLS(PPCS)
@@ -275,25 +279,34 @@
 			&common_as TEGRA_SWGROUP_CELLS(SDMMC2A)
 			&common_as TEGRA_SWGROUP_CELLS(SDMMC3A)
 			&common_as TEGRA_SWGROUP_CELLS(SDMMC4A)
-			&host1x_as TEGRA_SWGROUP_CELLS12(EPP, HC, HDA, VDE, VI, ISP, ISP2B, VIC, MSENC, TSEC, AVPC, A9AVP)
+			&host1x_as TEGRA_SWGROUP_CELLS9(EPP, HC, HDA, VI, ISP, ISP2B, VIC, MSENC, TSEC)
+			&nvavp_as TEGRA_SWGROUP_CELLS3(AVPC, A9AVP, VDE)
 			&common_as 0xFFFFFFFF 0xFFFFFFFF>;
 
 		address-space-prop {
 			gpu_as: gpu {
-				iova-start = <0x0 0x80000000>;
-				iova-size = <0x0 0x7FFFFFFF>;
+				iova-start = <0x0 0x80100000>;
+				iova-size = <0x0 0x7BEFFFFF>;
 				alignment = <0xFFFFF>;
 				num-pf-page = <0>;
 				gap-page = <0>;
-				};
+			};
 
 			host1x_as: host1x {
-				iova-start = <0x0 0x80000000>;
-				iova-size = <0x0 0x7FFFFFFF>;
+				iova-start = <0x0 0x80100000>;
+				iova-size = <0x0 0x77EFFFFF>;
 				alignment = <0xFFFFF>;
 				num-pf-page = <0>;
 				gap-page = <0>;
-				};
+			};
+
+			nvavp_as: nvavp {
+				iova-start = <0x0 0x80000000>;
+				iova-size = <0x0 0x67FFFFFF>;
+				alignment = <0xFFFFF>;
+				num-pf-page = <0>;
+				gap-page = <0>;
+			};
 		};
 	};
 
@@ -302,6 +315,15 @@
 
 		ivc-queue0 = <&tegra_hv 3>;
 		ivc-queue1 = <&tegra_hv 4>;
+		ivc-queue2 = <&tegra_hv 5>;
+
+		iommus = <&smmu TEGRA_SWGROUP_EPP>,
+			<&smmu TEGRA_SWGROUP_HC>,
+			<&smmu TEGRA_SWGROUP_HDA>;
+
+		vic {
+			compatible = "nvidia,tegra124-vhost-vic";
+		};
 
 		/delete-node/ dpaux;
 		/delete-node/ sor;
@@ -311,9 +333,6 @@
 			status = "disabled";
 		};
 
-		vi {
-			status = "disabled";
-		};
 	};
 
 	gk20a {
@@ -326,8 +345,8 @@
 		reg = <0x0 0x58000000 0x0 0x01000000>;
 		iommus = <&smmu TEGRA_SWGROUP_GPU &smmu TEGRA_SWGROUP_GPUB>;
 
-		ivc-queue2 = <&tegra_hv 5>;
 		ivc-queue3 = <&tegra_hv 6>;
+		ivc-queue4 = <&tegra_hv 7>;
 	};
 
 	chosen {
@@ -337,6 +356,41 @@
 
 	soctherm@0x700E2000 {
 		status = "disabled";
+	};
+
+	serial@70006000 {
+		iommus = <&smmu TEGRA_SWGROUP_PPCS>;
+		status = "okay";
+	};
+
+	serial@70006040 {
+		iommus = <&smmu TEGRA_SWGROUP_PPCS>;
+		status = "okay";
+	};
+
+	serial@70006300 {
+		iommus = <&smmu TEGRA_SWGROUP_PPCS>;
+		status = "okay";
+	};
+
+	spi@7000d400 {
+		iommus = <&smmu TEGRA_SWGROUP_PPCS>;
+		status = "okay";
+	};
+
+	spi@7000d600 {
+		iommus = <&smmu TEGRA_SWGROUP_PPCS>;
+		status = "okay";
+	};
+
+	spi@7000d800 {
+		iommus = <&smmu TEGRA_SWGROUP_PPCS>;
+		status = "okay";
+	};
+
+	spi@7000dc00 {
+		iommus = <&smmu TEGRA_SWGROUP_PPCS>;
+		status = "okay";
 	};
 
 	i2c@7000d000 {
@@ -357,8 +411,27 @@
 
 	gpio: gpio@6000d000 {
 		gpio_default: default {
-		gpio-output-high = <TEGRA_GPIO(R, 0)
-				TEGRA_GPIO(R, 2)>;
+		gpio-output-low = <TEGRA_GPIO(K, 3)
+				TEGRA_GPIO(W, 5)
+				TEGRA_GPIO(R, 3)
+				TEGRA_GPIO(R, 5)
+				TEGRA_GPIO(R, 6)>;
+		};
+	};
+
+	snor {
+		iommus = <&smmu TEGRA_SWGROUP_PPCS>;
+		status = "okay";
+	};
+
+	tegra_carveouts {
+		compatible = "nvidia,carveouts";
+		status = "okay";
+		ivm_carveouts {
+			carveout0 {
+				ivm = <&tegra_hv 0>;
+				alloc = <0>;
+			};
 		};
 	};
 };

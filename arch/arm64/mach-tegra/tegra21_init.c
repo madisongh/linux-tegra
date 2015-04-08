@@ -3,7 +3,7 @@
  *
  * NVIDIA Tegra210 initialization support
  *
- * Copyright (C) 2013-2014 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2013-2015 NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -18,7 +18,7 @@
 
 #include <linux/kernel.h>
 #include <linux/tegra-fuse.h>
-#include <linux/platform_data/tegra_bpmp.h>
+#include <soc/tegra/tegra_bpmp.h>
 #include <mach/powergate.h>
 
 #include <linux/platform/tegra/reset.h>
@@ -140,7 +140,7 @@ static __initdata struct tegra_clk_init_table tegra21x_clk_init_table[] = {
 	{ "adma.ape",	NULL,		25500000,	false },
 	{ "adsp.ape",	NULL,		25500000,	false },
 	{ "xbar.ape",	NULL,		25500000,	false },
-	{ "adsp_cpu",	NULL,		600000000,	false },
+	{ "adsp_cpu.abus", NULL,	600000000,	false },
 	{ "apb2ape",	NULL,		0,		true },
 	{ NULL,         NULL,           0,              0},
 

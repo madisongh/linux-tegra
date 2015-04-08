@@ -337,6 +337,15 @@ struct regulator_config {
 	unsigned int ena_gpio_flags;
 };
 
+/* Time profile for operations */
+struct regulator_time_profile {
+	int enable_profiling;
+	int max_index;
+	u32 min_time;
+	u32 max_time;
+	u64 occurance_count[150];
+};
+
 /*
  * struct regulator_dev
  *
@@ -367,6 +376,7 @@ struct regulator_dev {
 	struct regulation_constraints *constraints;
 	struct regulator *supply;	/* for tree */
 	struct regmap *regmap;
+	int machine_constraints;
 
 	struct delayed_work disable_work;
 	int deferred_disables;
@@ -374,6 +384,9 @@ struct regulator_dev {
 	void *reg_data;		/* regulator_dev data */
 
 	struct dentry *debugfs;
+	struct dentry *pdebugfs;
+
+	struct regulator_time_profile set_volt_profile;
 
 	struct regulator_enable_gpio *ena_pin;
 	unsigned int ena_gpio_state:1;

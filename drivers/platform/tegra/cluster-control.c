@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -23,7 +23,7 @@
 #include <linux/notifier.h>
 #include <linux/stop_machine.h>
 #include <linux/tegra_cluster_control.h>
-#include <linux/platform_data/tegra_bpmp.h>
+#include <soc/tegra/tegra_bpmp.h>
 #include <asm/psci.h>
 #include <asm/smp_plat.h>
 #include <asm/suspend.h>
@@ -43,8 +43,8 @@ static unsigned long pg_core_arg, pg_cluster_arg;
 
 static struct psci_power_state core_pg __initdata = {
 	.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-	.id = 31,
-	.affinity_level = 0,
+	.id = 30,
+	.affinity_level = 1,
 };
 
 static struct psci_power_state cluster_pg __initdata = {
@@ -95,6 +95,20 @@ int unregister_cluster_switch_notifier(struct notifier_block *notifier)
 {
 	return blocking_notifier_chain_unregister(&cluster_switch_chain,
 						notifier);
+}
+
+static int tegra_bpmp_switch_cluster(int cpu)
+{
+	int32_t mb = cpu_to_le32(cpu);
+	int32_t on_cpus;
+
+	if (tegra_bpmp_send_receive_atomic(MRQ_SWITCH_CLUSTER, &mb, sizeof(mb),
+			&on_cpus, sizeof(on_cpus))) {
+		WARN_ON(1);
+		return -EFAULT;
+	}
+
+	return le32_to_cpu(on_cpus);
 }
 
 /* Must be called with the hotplug lock held */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -54,6 +54,22 @@
 		};
 	};
 
+	cpuidle {
+		vdd-cpu-supply = <&cpu_max77621_reg>;
+		cc4-microvolt = <606250>;
+	};
+
+	i2c@546c0000 {
+		bus-pullup-supply = <&en_vdd_cam>;
+	};
+
+	spi@7000da00 {
+		spi-touch@0 {
+			avdd-supply = <&max77620_ldo5>;
+			dvdd-supply = <&max77620_ldo6>;
+		};
+	};
+
 	udc@7d000000 {
 		avdd_usb-supply = <&vdd_3v3>;
 		avdd_pll_utmip-supply = <&max77620_sd3>;
@@ -73,4 +89,95 @@
 	modem {
 		vdd-supply = <&tps61280>;
 	};
+
+	sdhci@700b0600 {
+		vddio_sdmmc-supply = <&max77620_sd3>; /* SDMMC4 for EMMC on hawkeye */
+		vddio_sd_slot-supply = <&vdd_3v3>;
+	};
+
+	sdhci@700b0400 {
+		vddio_sdmmc-supply = <&max77620_ldo2>; /* SDMMC3 for SD card on hawkeye */
+		vddio_sd_slot-supply = <&vdd_sdcard>;
+	};
+
+	sdhci@700b0200 {
+		vddio_sdmmc-supply = <&max77620_sd3>; /* SDMMC2 for Wifi on hawkeye */
+		vddio_sd_slot-supply = <&vdd_3v3>;
+	};
+
+	sdhci@700b0000 {
+		vddio_sdmmc-supply = <&max77620_sd3>; /* SDMMC1 for 2nd Wifi on hawkeye */
+		vddio_sd_slot-supply = <&vdd_3v3>;
+	};
+
+	host1x {
+		/* tegradc.0 */
+		dc@54200000 {
+			avdd_dsi_csi-supply = <&mipi_1v2>;
+			avdd_lcd-supply = <&vdd_lcd_3v0>;
+			dvdd_lcd-supply = <&max77620_sd3>;
+		};
+
+		/* tegradc.1 */
+		dc@54240000 {
+			avdd_hdmi-supply = <&max77620_ldo8>;
+			avdd_hdmi_pll-supply = <&max77620_sd3>;
+			vdd_hdmi_5v0-supply = <&vdd_hdmi>;
+		};
+
+		vi {
+			avdd_dsi_csi-supply = <&mipi_1v2>;
+		};
+
+		vii2c {
+			avdd_dsi_csi-supply = <&mipi_1v2>;
+		};
+	};
+
+	bluedroid_pm {
+		avdd-supply = <&battery_reg>;
+		dvdd-supply = <&max77620_sd3>;
+	};
+
+	power-detect {
+		pwrdet-sys-supply = <&max77620_sd3>;
+		pwrdet-uart-supply = <&max77620_sd3>;
+		pwrdet-audio-supply = <&max77620_sd3>;
+		pwrdet-cam-supply = <&max77620_sd3>;
+		pwrdet-pex-ctrl-supply = <&max77620_sd3>;
+		pwrdet-sdmmc1-supply = <&max77620_sd3>;
+		pwrdet-sdmmc3-supply = <&max77620_ldo2>;
+		pwrdet-sdmmc4-supply = <&max77620_sd3>;
+		pwrdet-audio-hv-supply = <&max77620_sd3>;
+		pwrdet-debug-supply = <&max77620_sd3>;
+		pwrdet-dmic-supply = <&max77620_sd3>;
+		pwrdet-gpio-supply = <&max77620_sd3>;
+		pwrdet-spi-supply = <&max77620_sd3>;
+		pwrdet-spi-hv-supply = <&max77620_sd3>;
+		pwrdet-sdmmc2-supply = <&max77620_sd3>;
+		pwrdet-dp-supply = <&max77620_sd3>;
+	};
+
+	thermal-zones {
+		PMIC-Die-max77621-0 {
+			status = "okay";
+		};
+
+		PMIC-Die-max77621-1 {
+			status = "okay";
+		};
+
+                PMIC-Die-tps61280 {
+                        status = "okay";
+                };
+	};
+
+	sound {
+		ldoen-supply = <&vdd_sys_boost>;
+		spkvdd-supply = <&vdd_sys_boost>;
+		dbvdd-supply = <&vdd_sys_boost>;
+		avdd-supply = <&vdd_sys_boost>;
+		dmicvdd-supply = <&max77620_sd3>;
+	};
+
 };

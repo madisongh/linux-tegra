@@ -108,17 +108,14 @@
 #ifdef CONFIG_BCMDHD_CUSTOM_SYSFS_TEGRA
 #include "dhd_custom_sysfs_tegra.h"
 
-#define netif_rx(skb)\
+#define RX_CAPTURE(skb)\
 	{\
 		tegra_sysfs_histogram_tcpdump_rx(skb, __func__, __LINE__);\
-		netif_rx(skb);\
 	}\
 
-#define netif_rx_ni(skb)\
-	{\
-		tegra_sysfs_histogram_tcpdump_rx(skb, __func__, __LINE__);\
-		netif_rx_ni(skb);\
-	}\
+#else
+
+#define RX_CAPTURE(skb)
 
 #endif
 
@@ -220,7 +217,7 @@ DECLARE_WAIT_QUEUE_HEAD(dhd_dpc_wait);
 extern void dhd_enable_oob_intr(struct dhd_bus *bus, bool enable);
 #endif 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
-static void dhd_hang_process(void *dhd_info, void *event_data, u8 event);
+static void dhd_hang_process(void *dhd_pub, void *event_data, u8 event);
 #endif 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0))
 MODULE_LICENSE("GPL v2");
@@ -243,6 +240,9 @@ extern bool dhd_wlfc_skip_fc(void);
 extern void dhd_wlfc_plat_init(void *dhd);
 extern void dhd_wlfc_plat_deinit(void *dhd);
 #endif /* PROP_TXSTATUS */
+#ifdef BCMSDIO
+extern int dhd_slpauto_config(dhd_pub_t *dhd, s32 val);
+#endif
 
 #if LINUX_VERSION_CODE == KERNEL_VERSION(2, 6, 15)
 const char *
@@ -731,6 +731,11 @@ static int dhd_pm_callback(struct notifier_block *nfb, unsigned long action, voi
 		break;
 	}
 
+	/* FIXME: dhd_wlfc_suspend acquires wd wakelock and calling
+	   in this function is breaking LP0. So moving this function
+	   call to dhd_set_suspend. Need to enable it after fixing
+	   wd wakelock issue. */
+#if 0
 #if defined(SUPPORT_P2P_GO_PS)
 #ifdef PROP_TXSTATUS
 	if (suspend) {
@@ -741,6 +746,7 @@ static int dhd_pm_callback(struct notifier_block *nfb, unsigned long action, voi
 		dhd_wlfc_resume(&dhdinfo->pub);
 #endif
 #endif /* defined(SUPPORT_P2P_GO_PS) */
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && (LINUX_VERSION_CODE <= \
 	KERNEL_VERSION(2, 6, 39))
@@ -1406,6 +1412,13 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 						DHD_ERROR(("failed to set nd_ra_filter (%d)\n",
 							ret));
 				}
+#if defined(SUPPORT_P2P_GO_PS)
+#ifdef PROP_TXSTATUS
+				DHD_OS_WAKE_LOCK_WAIVE(dhd);
+				dhd_wlfc_suspend(dhd);
+				DHD_OS_WAKE_LOCK_RESTORE(dhd);
+#endif
+#endif /* defined(SUPPORT_P2P_GO_PS) */
 			} else {
 #ifdef PKT_FILTER_SUPPORT
 				dhd->early_suspended = 0;
@@ -1447,6 +1460,12 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 						DHD_ERROR(("failed to set nd_ra_filter (%d)\n",
 							ret));
 				}
+#if defined(SUPPORT_P2P_GO_PS)
+#ifdef PROP_TXSTATUS
+				dhd_wlfc_resume(dhd);
+#endif
+#endif /* defined(SUPPORT_P2P_GO_PS) */
+
 			}
 	}
 	dhd_suspend_unlock(dhd);
@@ -2722,6 +2741,7 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt, uint8 chan)
 		dhd_htsf_addrxts(dhdp, pktbuf);
 #endif
 		/* Strip header, count, deliver upward */
+		RX_CAPTURE(skb);
 		skb_pull(skb, ETH_HLEN);
 
 		/* Process special event packets and then discard them */
@@ -2979,7 +2999,7 @@ static int
 dhd_dpc_thread(void *data)
 {
 	unsigned long timeout;
-	unsigned int loopcnt;
+	unsigned int loopcnt, count;
 	tsk_ctl_t *tsk = (tsk_ctl_t *)data;
 	dhd_info_t *dhd = (dhd_info_t *)tsk->parent;
 
@@ -3016,17 +3036,21 @@ dhd_dpc_thread(void *data)
 				dhd_os_wd_timer_extend(&dhd->pub, TRUE);
 				timeout = jiffies + msecs_to_jiffies(100);
 				loopcnt = 0;
+				count = 0;
 				while (dhd_bus_dpc(dhd->pub.bus)) {
 					++loopcnt;
 					if (time_after(jiffies, timeout) &&
 						(loopcnt % 1000 == 0)) {
-						DHD_ERROR(("%s is consuming "
-							"too much time. %uth "
-							"iteration\b",
-							__func__, loopcnt));
+						count++;
+						timeout = jiffies +
+							msecs_to_jiffies(100);
 					}
 					/* process all data */
 				}
+				if (count)
+					DHD_ERROR(("%s is consuming too much time"
+						" Looped %u times for 1000 iterations in 100ms timeout\n",
+						__func__, count));
 				dhd_os_wd_timer_extend(&dhd->pub, FALSE);
 				DHD_OS_WAKE_UNLOCK(&dhd->pub);
 
@@ -7272,12 +7296,12 @@ dhd_dev_pno_get_for_batch(struct net_device *dev, char *buf, int bufsize)
 #endif /* PNO_SUPPORT */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
-static void dhd_hang_process(void *dhd_info, void *event_info, u8 event)
+static void dhd_hang_process(void *dhd_pub, void *event_info, u8 event)
 {
 	dhd_info_t *dhd;
 	struct net_device *dev;
 
-	dhd = (dhd_info_t *)dhd_info;
+	dhd = (dhd_info_t *)((dhd_pub_t *)dhd_pub)->info;
 	dev = dhd->iflist[0]->net;
 
 	if (dev) {
@@ -8694,3 +8718,26 @@ int dhd_l2_filter_block_ping(dhd_pub_t *pub, void *pktbuf, int ifidx)
 	return BCME_ERROR;
 }
 #endif /* DHD_L2_FILTER */
+
+int
+dhd_set_slpauto_mode(struct net_device *dev, s32 val)
+{
+#ifdef BCMSDIO
+	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
+	int ret;
+
+	if (!dhd)
+		return -1;
+
+	DHD_ERROR(("Setting dhd auto sleep(dhd_slpauto) to %s\n",
+			val ? "enable" : "disable"));
+	dhd_os_sdlock(&dhd->pub);
+	val = htod32(val);
+	ret = dhd_slpauto_config(&dhd->pub, val);
+	dhd_os_sdunlock(&dhd->pub);
+
+	return ret;
+#else
+	return BCME_UNSUPPORTED;
+#endif
+}

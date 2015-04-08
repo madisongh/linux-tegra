@@ -49,6 +49,8 @@ enum tegra_pinconf_param {
 	TEGRA_PINCONF_PARAM_SLEW_RATE_RISING,
 	/* argument: Integer, range is HW-dependant */
 	TEGRA_PINCONF_PARAM_DRIVE_TYPE,
+	/* Set pin to GPIO mode */
+	TEGRA_PINCONF_PARAM_GPIO_MODE,
 };
 
 /*
@@ -78,5 +80,18 @@ enum tegra_pinconf_param {
 #define TEGRA_PINCONF_PACK(_param_, _arg_) ((_param_) << 16 | (_arg_))
 #define TEGRA_PINCONF_UNPACK_PARAM(_conf_) ((_conf_) >> 16)
 #define TEGRA_PINCONF_UNPACK_ARG(_conf_) ((_conf_) & 0xffff)
+
+struct device;
+
+#ifndef CONFIG_PINCTRL_TEGRA
+static inline int tegra_pinctrl_config_prod(struct device *dev,
+		const char *prod_name)
+{
+	return 0;
+}
+#else
+extern int tegra_pinctrl_config_prod(struct device *dev,
+		const char *prod_name);
+#endif
 
 #endif

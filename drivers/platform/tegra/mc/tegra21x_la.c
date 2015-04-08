@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2014-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -221,7 +221,7 @@ static void t21x_init_ptsa(void)
 	int gd_fpa;
 
 	/* get emc frequency */
-	emc_clk = clk_get(NULL, "emc");
+	emc_clk = clk_get_sys("tegra_emc", "emc");
 	emc_freq_mhz = clk_get_rate(emc_clk) /
 			LA_HZ_TO_MHZ_FACTOR;
 	la_debug("emc clk_rate = %u MHz", emc_freq_mhz);
@@ -544,7 +544,7 @@ static int t21x_set_la(enum tegra_la_id id,
 		return -1;
 	} else if (id == ID(MSENCSRD)) {
 		/* This is a special case. */
-		struct clk *emc_clk = clk_get(NULL, "emc");
+		struct clk *emc_clk = clk_get_sys("tegra_emc", "emc");
 		unsigned int emc_freq_mhz = clk_get_rate(emc_clk) /
 						LA_HZ_TO_MHZ_FACTOR;
 		unsigned int val_1 = 53;
@@ -561,7 +561,7 @@ static int t21x_set_la(enum tegra_la_id id,
 				val_2);
 	} else if (ci->la_ref_clk_mhz != 0) {
 		/* In this case we need to scale LA with emc frequency. */
-		struct clk *emc_clk = clk_get(NULL, "emc");
+		struct clk *emc_clk = clk_get_sys("tegra_emc", "emc");
 		unsigned long emc_freq_mhz = clk_get_rate(emc_clk) /
 					(unsigned long)LA_HZ_TO_MHZ_FACTOR;
 
@@ -602,15 +602,15 @@ static int t21x_set_disp_la(enum tegra_la_id id,
 {
 	int idx = 0;
 	struct la_client_info *ci = NULL;
-	unsigned int la_to_set = 0;
+	long long la_to_set = 0;
 	unsigned int dvfs_time_nsec = 0;
 	unsigned int dvfs_buffering_reqd_bytes = 0;
 	unsigned int thresh_dvfs_bytes = 0;
 	unsigned int total_buf_sz_bytes = 0;
 	int effective_mccif_buf_sz = 0;
-	unsigned int la_bw_upper_bound_nsec_fp = 0;
-	unsigned int la_bw_upper_bound_nsec = 0;
-	unsigned int la_nsec = 0;
+	long long la_bw_upper_bound_nsec_fp = 0;
+	long long la_bw_upper_bound_nsec = 0;
+	long long la_nsec = 0;
 
 	if (!is_display_client(id)) {
 		/* Non-display clients should be handled by t21x_set_la(...). */
@@ -664,12 +664,12 @@ static int t21x_set_disp_la(enum tegra_la_id id,
 
 
 	la_nsec = min(la_bw_upper_bound_nsec,
-			(unsigned int)MAX_LA_NSEC);
+			(long long)MAX_LA_NSEC);
 
-	la_to_set = min(la_nsec / cs->ns_per_tick,
-			(unsigned int)MC_LA_MAX_VALUE);
+	la_to_set = min((long long)(la_nsec/cs->ns_per_tick),
+			(long long)MC_LA_MAX_VALUE);
 
-	if (la_to_set < t21x_min_la(&disp_params))
+	if ((la_to_set < t21x_min_la(&disp_params)) || (la_to_set > 255))
 		return -1;
 
 	program_la(ci, la_to_set);

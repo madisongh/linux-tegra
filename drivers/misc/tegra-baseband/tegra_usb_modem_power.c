@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,6 +43,8 @@
 #include <asm/segment.h>
 #include <asm/uaccess.h>
 #include <linux/platform_data/modem_thermal.h>
+#include <linux/platform_data/sysedp_modem.h>
+#include <linux/system-wakeup.h>
 
 #define BOOST_CPU_FREQ_MIN	1200000
 #define BOOST_CPU_FREQ_TIMEOUT	5000
@@ -120,6 +122,7 @@ static struct tegra_usb_platform_data tegra_ehci2_hsic_baseband_pdata = {
 		.hot_plug = false,
 		.remote_wakeup_supported = true,
 		.power_off_on_suspend = true,
+		.skip_resume = true,
 	},
 };
 
@@ -158,14 +161,13 @@ struct tegra_usb_modem {
 	int short_autosuspend_enabled;
 	struct platform_device *hc;	/* USB host controller */
 	struct mutex hc_lock;
-	struct mutex sysedp_lock;
-	unsigned int mdm_power_irq;	/* modem power increase irq */
-	bool mdm_power_irq_wakeable;	/* not used for LP0 wakeup */
-	int sysedp_prev_request;	/* previous modem request */
-	int sysedp_file_created;	/* sysedp state file created */
 	enum { EHCI_HSIC = 0, XHCI_HSIC, XHCI_UTMI } phy_type;
 	struct platform_device *modem_thermal_pdev;
 	int pre_boost_gpio;		/* control regulator output voltage */
+	int modem_state_file_created;	/* modem_state sysfs created */
+	enum { AIRPLANE = 0, RAT_3G_LTE, RAT_2G} modem_power_state;
+	struct mutex modem_state_lock;
+	struct platform_device *modem_edp_pdev;
 };
 
 
@@ -247,45 +249,6 @@ static irqreturn_t tegra_usb_modem_wake_thread(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
-static irqreturn_t tegra_usb_modem_sysedp_thread(int irq, void *data)
-{
-	struct tegra_usb_modem *modem = (struct tegra_usb_modem *)data;
-
-	mutex_lock(&modem->sysedp_lock);
-	if (gpio_get_value(modem->pdata->mdm_power_report_gpio))
-		sysedp_set_state_by_name("icemdm", 0);
-	else
-		sysedp_set_state_by_name("icemdm", modem->sysedp_prev_request);
-	mutex_unlock(&modem->sysedp_lock);
-
-	return IRQ_HANDLED;
-}
-
-static ssize_t store_sysedp_state(struct device *dev,
-			       struct device_attribute *attr,
-			       const char *buf, size_t count)
-{
-	struct tegra_usb_modem *modem = dev_get_drvdata(dev);
-	int state;
-
-	if (sscanf(buf, "%d", &state) != 1)
-		return -EINVAL;
-
-	mutex_lock(&modem->sysedp_lock);
-	/*
-	 * If the GPIO is low we set the state, otherwise the threaded
-	 * interrupt handler will set it.
-	 */
-	if (!gpio_get_value(modem->pdata->mdm_power_report_gpio))
-		sysedp_set_state_by_name("icemdm", state);
-
-	/* store state for threaded interrupt handler */
-	modem->sysedp_prev_request = state;
-	mutex_unlock(&modem->sysedp_lock);
-
-	return count;
-}
-static DEVICE_ATTR(sysedp_state, S_IWUSR, NULL, store_sysedp_state);
 
 static irqreturn_t tegra_usb_modem_boot_thread(int irq, void *data)
 {
@@ -561,10 +524,6 @@ static int mdm_request_irq(struct tegra_usb_modem *modem,
 {
 	int ret;
 
-	ret = gpio_request(irq_gpio, label);
-	if (ret)
-		return ret;
-
 	/* enable IRQ for GPIO */
 	*irq = gpio_to_irq(irq_gpio);
 
@@ -723,6 +682,82 @@ static ssize_t load_unload_usb_host(struct device *dev,
 static DEVICE_ATTR(load_host, S_IRUSR | S_IWUSR, show_usb_host,
 		   load_unload_usb_host);
 
+/* Export a new sysfs for the user land (RIL) to notify modem state
+ * Airplane mode = 0
+ * 3G/LTE mode = 1
+ * 2G mode = 2
+*/
+static ssize_t show_modem_state(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct tegra_usb_modem *modem = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", modem->modem_power_state);
+}
+
+static ssize_t set_modem_state(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct tegra_usb_modem *modem = dev_get_drvdata(dev);
+	int modem_state_value;
+
+	if (sscanf(buf, "%d", &modem_state_value) != 1)
+		return -EINVAL;
+
+	mutex_lock(&modem->modem_state_lock);
+	switch (modem_state_value) {
+	case AIRPLANE:
+		modem->modem_power_state = modem_state_value;
+
+		/* Release BYPASS */
+		if (regulator_allow_bypass(modem->regulator, false))
+			dev_warn(dev,
+			"failed to set modem regulator in non bypass mode\n");
+
+		/* auto PFM mode*/
+		if (regulator_set_mode(modem->regulator, REGULATOR_MODE_NORMAL))
+			dev_warn(dev,
+			"failed to set modem regulator in normal mode\n");
+		break;
+	case RAT_2G:
+		modem->modem_power_state = modem_state_value;
+
+		/* Release BYPASS */
+		if (regulator_allow_bypass(modem->regulator, true))
+			dev_warn(dev,
+			"failed to set modem regulator in bypass mode\n");
+
+		/* forced PWM  mode*/
+		if (regulator_set_mode(modem->regulator, REGULATOR_MODE_FAST))
+			dev_warn(dev,
+			"failed to set modem regulator in fast mode\n");
+		break;
+	case RAT_3G_LTE:
+		modem->modem_power_state = modem_state_value;
+
+		/* Release BYPASS */
+		if (regulator_allow_bypass(modem->regulator, true))
+			dev_warn(dev,
+			"failed to set modem regulator in bypass mode\n");
+
+		/* auto PFM mode*/
+		if (regulator_set_mode(modem->regulator, REGULATOR_MODE_NORMAL))
+			dev_warn(dev,
+			"failed to set modem regulator in normal mode\n");
+		break;
+	default:
+		dev_warn(dev, "%s: wrong modem power state:%d\n", __func__,
+		modem_state_value);
+	}
+	mutex_unlock(&modem->modem_state_lock);
+
+	return count;
+}
+
+static DEVICE_ATTR(modem_state, S_IRUSR | S_IWUSR, show_modem_state,
+			set_modem_state);
+
 static struct tegra_usb_phy_platform_ops tegra_usb_modem_platform_ops = {
 	.post_remote_wakeup = tegra_usb_modem_post_remote_wakeup,
 };
@@ -733,6 +768,20 @@ static struct modem_thermal_platform_data thermdata = {
 
 static struct platform_device modem_thermal_device = {
 	.name = "modem-thermal",
+	.id = -1,
+	.num_resources = 0,
+	.dev = {
+		.platform_data = NULL,
+	},
+};
+
+static struct modem_edp_platform_data edpdata = {
+	.mdm_power_report = -1,
+	.consumer_name = "icemdm",
+};
+
+static struct platform_device modem_edp_device = {
+	.name = "sysedp_modem",
 	.id = -1,
 	.num_resources = 0,
 	.dev = {
@@ -805,31 +854,6 @@ static int mdm_init(struct tegra_usb_modem *modem, struct platform_device *pdev)
 	} else
 		dev_warn(&pdev->dev, "boot irq not specified\n");
 
-	if (gpio_is_valid(pdata->mdm_power_report_gpio)) {
-		ret = mdm_request_irq(modem,
-				      tegra_usb_modem_sysedp_thread,
-				      pdata->mdm_power_report_gpio,
-				      pdata->mdm_power_irq_flags,
-				      "mdm_power_report",
-				      &modem->mdm_power_irq,
-				      &modem->mdm_power_irq_wakeable);
-		if (ret) {
-			dev_err(&pdev->dev, "request power irq error\n");
-			goto error;
-		}
-
-		disable_irq_wake(modem->mdm_power_irq);
-		modem->mdm_power_irq_wakeable = false;
-
-		ret = device_create_file(&pdev->dev, &dev_attr_sysedp_state);
-		if (ret) {
-			dev_err(&pdev->dev, "can't create edp sysfs file\n");
-			goto error;
-		}
-		modem->sysedp_file_created = 1;
-		mutex_init(&modem->sysedp_lock);
-	}
-
 	/* create sysfs node to load/unload host controller */
 	ret = device_create_file(&pdev->dev, &dev_attr_load_host);
 	if (ret) {
@@ -842,6 +866,20 @@ static int mdm_init(struct tegra_usb_modem *modem, struct platform_device *pdev)
 		dev_set_name(&pdev->dev, "MDM%d", pdev->id);
 	else
 		dev_set_name(&pdev->dev, "MDM");
+
+	/* create sysfs node for RIL to report modem power state */
+	/* only if a regulator has been requested          */
+	modem->modem_state_file_created = 0;
+	if (pdata->regulator_name) {
+		ret = device_create_file(&pdev->dev, &dev_attr_modem_state);
+		if (ret) {
+			dev_err(&pdev->dev,
+			"can't create modem state sysfs file\n");
+			goto error;
+		}
+		modem->modem_state_file_created = 1;
+		mutex_init(&modem->modem_state_lock);
+	}
 
 	/* create work queue platform_driver_registe */
 	modem->wq = create_workqueue("tegra_usb_mdm_queue");
@@ -868,6 +906,13 @@ static int mdm_init(struct tegra_usb_modem *modem, struct platform_device *pdev)
 		platform_device_register(modem->modem_thermal_pdev);
 	}
 
+	if (pdata->mdm_power_report_gpio) {
+		edpdata.mdm_power_report = pdata->mdm_power_report_gpio;
+		modem_edp_device.dev.platform_data = &edpdata;
+		modem->modem_edp_pdev = &modem_edp_device;
+		platform_device_register(modem->modem_edp_pdev);
+	}
+
 	/* start modem */
 	if (modem->ops && modem->ops->start)
 		modem->ops->start();
@@ -883,11 +928,8 @@ error:
 	if (modem->boot_irq)
 		free_irq(modem->boot_irq, modem);
 
-	if (modem->sysedp_file_created)
-		device_remove_file(&pdev->dev, &dev_attr_sysedp_state);
-
-	if (modem->mdm_power_irq)
-		free_irq(modem->mdm_power_irq, modem);
+	if (modem->modem_state_file_created)
+		device_remove_file(&pdev->dev, &dev_attr_modem_state);
 
 	return ret;
 }
@@ -937,6 +979,28 @@ static int tegra_usb_modem_parse_dt(struct tegra_usb_modem *modem,
 			regulator_put(modem->regulator);
 			return ret;
 		}
+
+		dev_info(&pdev->dev, "set modem regulator:%s\n",
+		pdata->regulator_name);
+
+		/* Enable regulator bypass */
+		if (regulator_allow_bypass(modem->regulator, true))
+			dev_warn(&pdev->dev,
+			"failed to set modem regulator in bypass mode\n");
+		else
+			dev_info(&pdev->dev,
+			"set modem regulator in bypass mode");
+
+		/* Enable autoPFM */
+		if (regulator_set_mode(modem->regulator, REGULATOR_MODE_NORMAL))
+			dev_warn(&pdev->dev,
+			"failed to set modem regulator in normal mode\n");
+		else
+			dev_info(&pdev->dev,
+			"set modem regulator in normal mode");
+
+		/* Set modem_power_state */
+		modem->modem_power_state = RAT_3G_LTE;
 	}
 
 	/* determine phy type */
@@ -956,18 +1020,34 @@ static int tegra_usb_modem_parse_dt(struct tegra_usb_modem *modem,
 	if (prop)
 		pdata->num_temp_sensors = be32_to_cpup(prop);
 
-	/* GPIO */
+	/* Configure input GPIOs */
 	gpio = of_get_named_gpio(node, "nvidia,wake-gpio", 0);
 	pdata->wake_gpio = gpio_is_valid(gpio) ? gpio : -1;
-	dev_info(&pdev->dev, "set wake gpio:%d\n", pdata->wake_gpio);
+	dev_info(&pdev->dev, "set MDM_WAKE_AP gpio:%d\n", pdata->wake_gpio);
+	if (gpio_is_valid(gpio)) {
+		ret = gpio_request(gpio, "MDM_WAKE_AP");
+		if (ret) {
+			dev_err(&pdev->dev, "request gpio %d failed\n", gpio);
+			return ret;
+		}
+		gpio_direction_input(gpio);
+	}
 
 	gpio = of_get_named_gpio(node, "nvidia,boot-gpio", 0);
 	pdata->boot_gpio = gpio_is_valid(gpio) ? gpio : -1;
-	dev_info(&pdev->dev, "set boot gpio:%d\n", pdata->boot_gpio);
+	dev_info(&pdev->dev, "set MDM_COLDBOOT gpio:%d\n", pdata->boot_gpio);
+	if (gpio_is_valid(gpio)) {
+		ret = gpio_request(gpio, "MDM_COLDBOOT");
+		if (ret) {
+			dev_err(&pdev->dev, "request gpio %d failed\n", gpio);
+			return ret;
+		}
+		gpio_direction_input(gpio);
+	}
 
 	gpio = of_get_named_gpio(node, "nvidia,mdm-power-report-gpio", 0);
 	pdata->mdm_power_report_gpio = gpio_is_valid(gpio) ? gpio : -1;
-	dev_info(&pdev->dev, "set mdm power report gpio:%d\n",
+	dev_info(&pdev->dev, "set MDM_PWR_REPORT gpio:%d\n",
 		pdata->mdm_power_report_gpio);
 
 	gpio = of_get_named_gpio(node, "nvidia,pre-boost-gpio", 0);
@@ -990,7 +1070,7 @@ static int tegra_usb_modem_parse_dt(struct tegra_usb_modem *modem,
 		pdata->mdm_power_irq_flags =
 		IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT;
 
-	/* initialize necessary GPIO and start modem here */
+	/* initialize necessary output GPIO and start modem here */
 	gpio = of_get_named_gpio(node, "nvidia,mdm-en-gpio", 0);
 	if (gpio_is_valid(gpio)) {
 		dev_info(&pdev->dev, "set MODEM EN (%d) to 1\n", gpio);
@@ -1000,18 +1080,6 @@ static int tegra_usb_modem_parse_dt(struct tegra_usb_modem *modem,
 			return ret;
 		}
 		gpio_direction_output(gpio, 1);
-	}
-
-	gpio = of_get_named_gpio(node, "nvidia,mdm-sar0-gpio", 0);
-	if (gpio_is_valid(gpio)) {
-		dev_info(&pdev->dev, "set MODEM SAR0 (%d) to 0\n", gpio);
-		ret = gpio_request(gpio, "MODEM SAR0");
-		if (ret) {
-			dev_err(&pdev->dev, "request gpio %d failed\n", gpio);
-			return ret;
-		}
-		gpio_direction_output(gpio, 0);
-		gpio_export(gpio, false);
 	}
 
 	gpio = of_get_named_gpio(node, "nvidia,reset-gpio", 0);
@@ -1029,6 +1097,9 @@ static int tegra_usb_modem_parse_dt(struct tegra_usb_modem *modem,
 		dev_info(&pdev->dev, "set MODEM RESET (%d) to 1\n", gpio);
 		gpio_direction_output(gpio, 1);
 		gpio_export(gpio, false);
+
+		/* also create a dedicated sysfs for the modem-reset gpio */
+		gpio_export_link(&pdev->dev, "modem_reset", gpio);
 	}
 
 	return 0;
@@ -1071,20 +1142,20 @@ static int __exit tegra_usb_modem_remove(struct platform_device *pdev)
 	unregister_pm_notifier(&modem->pm_notifier);
 	usb_unregister_notify(&modem->usb_notifier);
 
+	if (modem->modem_edp_pdev)
+		platform_device_unregister(modem->modem_edp_pdev);
+
 	if (modem->wake_irq)
 		free_irq(modem->wake_irq, modem);
 
 	if (modem->boot_irq)
 		free_irq(modem->boot_irq, modem);
 
-	if (modem->mdm_power_irq)
-		free_irq(modem->mdm_power_irq, modem);
-
-	if (modem->sysedp_file_created)
-		device_remove_file(&pdev->dev, &dev_attr_sysedp_state);
-
 	if (modem->sysfs_file_created)
 		device_remove_file(&pdev->dev, &dev_attr_load_host);
+
+	if (modem->modem_state_file_created)
+		device_remove_file(&pdev->dev, &dev_attr_modem_state);
 
 	if (!IS_ERR(modem->regulator))
 		regulator_put(modem->regulator);
@@ -1162,6 +1233,11 @@ static int tegra_usb_modem_resume(struct platform_device *pdev)
 		ret = disable_irq_wake(modem->wake_irq);
 		if (ret)
 			pr_err("Failed to disable modem wake_irq\n");
+	} else if (get_wakeup_reason_irq() == INT_USB2) {
+		pr_info("%s: remote wakeup from USB. Hold a timed wakelock\n",
+				__func__);
+		wake_lock_timeout(&modem->wake_lock,
+				WAKELOCK_TIMEOUT_FOR_REMOTE_WAKE);
 	}
 
 	/* send L3->L0 hint to modem */

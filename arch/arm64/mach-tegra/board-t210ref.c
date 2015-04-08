@@ -1,7 +1,7 @@
  /*
  * arch/arm64/mach-tegra/board-t210ref.c
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -85,7 +85,6 @@
 #include "board.h"
 #include "board-panel.h"
 #include "board-common.h"
-#include "board-t210ref.h"
 #include "board-touch-raydium.h"
 #include "board-touch-maxim_sti.h"
 #include <linux/platform/tegra/clock.h>
@@ -99,6 +98,8 @@
 #include <linux/platform/tegra/dvfs.h>
 #include <linux/platform/tegra/tegra12_emc.h>
 #include "board-t210.h"
+
+#define UTMI1_PORT_OWNER_XUSB 0x1
 
 static struct tegra_usb_platform_data tegra_udc_pdata;
 static struct tegra_usb_otg_data tegra_otg_pdata;
@@ -214,49 +215,11 @@ static struct of_dev_auxdata t210ref_auxdata_lookup[] __initdata = {
 			"tegra210-axbar", NULL),
 	OF_DEV_AUXDATA("nvidia,tegra210-adma",  TEGRA_ADMA_BASE,
 			"tegra210-adma", NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-i2c", 0x7000c000,
-			"tegra21-i2c.0", NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-i2c", 0x7000c400,
-			"tegra21-i2c.1", NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-i2c", 0x7000c500,
-			"tegra21-i2c.2", NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-i2c", 0x7000c700,
-			"tegra21-i2c.3", NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-i2c", 0x7000d000,
-			"tegra21-i2c.4", NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-i2c", 0x7000d100,
-			"tegra21-i2c.5", NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-vii2c", 0x546c0000,
-			"tegra21-i2c.6", NULL),
 	OF_DEV_AUXDATA("nvidia,tegra124-apbdma", 0x60020000, "tegra-apbdma",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-spi", 0x7000d400, "spi-tegra114.0",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-spi", 0x7000d600, "spi-tegra114.1",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-spi", 0x7000d800, "spi-tegra114.2",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-spi", 0x7000da00, "spi-tegra114.3",
 			NULL),
 	OF_DEV_AUXDATA("nvidia,tegra210-qspi", 0x70410000, "qspi",
 			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-uart", 0x70006000, "serial8250.0",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-uart", 0x70006040, "serial8250.1",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-uart", 0x70006200, "serial8250.2",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-uart", 0x70006300, "serial8250.3",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra114-hsuart", 0x70006000, "serial-tegra.0",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra114-hsuart", 0x70006040, "serial-tegra.1",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra114-hsuart", 0x70006200, "serial-tegra.2",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra114-hsuart", 0x70006300, "serial-tegra.3",
-			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-ahci-sata", 0x70027000, "tegra-sata.0",
+	OF_DEV_AUXDATA("nvidia,tegra210-ahci-sata", 0x70021000, "tegra-sata.0",
 		NULL),
 #if defined(CONFIG_TEGRA_NVADSP) && \
 		!defined(CONFIG_TEGRA_NVADSP_ON_SMMU)
@@ -270,13 +233,10 @@ static struct of_dev_auxdata t210ref_auxdata_lookup[] __initdata = {
 	OF_DEV_AUXDATA("linux,spdif-dit", 1, "spdif-dit.1", NULL),
 	OF_DEV_AUXDATA("linux,spdif-dit", 2, "spdif-dit.2", NULL),
 	OF_DEV_AUXDATA("linux,spdif-dit", 3, "spdif-dit.3", NULL),
-	OF_DEV_AUXDATA("nvidia,tegra210-dfll", 0x70110000, "tegra_cl_dvfs",
-			NULL),
 	OF_DEV_AUXDATA("nvidia,tegra210-xhci", 0x70090000, "tegra-xhci",
 			NULL),
 	OF_DEV_AUXDATA("nvidia,tegra210-xudc", 0x700D0000, "tegra-xudc",
 			NULL),
-	OF_DEV_AUXDATA("nvidia,tegra124-pwm", 0x7000a000, "tegra-pwm", NULL),
 	OF_DEV_AUXDATA("nvidia,tegra210-camera", 0, "pcl-generic",
 			NULL),
 	OF_DEV_AUXDATA("nvidia,tegra210-dc", TEGRA_DISPLAY_BASE, "tegradc.0",
@@ -337,36 +297,15 @@ static struct tegra_io_dpd pexclk2_io = {
 };
 
 static struct tegra_suspend_platform_data t210ref_suspend_data = {
-	.cpu_timer      = 500,
+	.cpu_timer      = 1700,
 	.cpu_off_timer  = 300,
 	.suspend_mode   = TEGRA_SUSPEND_LP0,
 	.core_timer     = 0x257e,
-	.core_off_timer = 10,
+	.core_off_timer = 640,
+	.cpu_suspend_freq = 204000,
 	.corereq_high   = true,
 	.sysclkreq_high = true,
 };
-
-#define T210REF_CPU_VDD_MIN_UV		703000
-#define T210REF_CPU_VDD_STEP_UV		19200
-#define E2190_CPU_VDD_MIN_UV		606250
-#define E2190_CPU_VDD_STEP_UV		6250
-
-
-static int __init t210ref_rail_alignment_init(void)
-{
-	int step_uv, offset_uv;
-
-	if (of_machine_is_compatible("nvidia,e2190")) {
-		step_uv = E2190_CPU_VDD_STEP_UV;
-		offset_uv = E2190_CPU_VDD_MIN_UV;
-	} else {
-		step_uv = T210REF_CPU_VDD_STEP_UV;
-		offset_uv = T210REF_CPU_VDD_MIN_UV;
-	}
-
-	tegra21x_vdd_cpu_align(step_uv, offset_uv);
-	return 0;
-}
 
 static int __init t210ref_suspend_init(void)
 {
@@ -393,7 +332,7 @@ static void __init tegra_t210ref_late_init(void)
 	tegra_fb_copy_or_clear();
 
 #if defined(CONFIG_TEGRA_FIQ_DEBUGGER) && defined(CONFIG_FIQ)
-	tegra_serial_debug_init(TEGRA_UARTA_BASE, INT_WDT_CPU, NULL, -1, -1);
+	tegra_serial_debug_init(TEGRA_UARTA_BASE, nLEGACYFIQ_PPI, NULL, -1, -1);
 #endif
 
 	/* put PEX pads into DPD mode to save additional power */
@@ -402,13 +341,10 @@ static void __init tegra_t210ref_late_init(void)
 	tegra_io_dpd_enable(&pexclk2_io);
 
 	t210ref_camera_init();
-
-	t210ref_thermal_sensors_init();
 }
 
 static void __init tegra_t210ref_init_early(void)
 {
-	t210ref_rail_alignment_init();
 	tegra21x_init_early();
 }
 
@@ -436,9 +372,53 @@ static int tegra_t210ref_notifier_call(struct notifier_block *nb,
 	return NOTIFY_DONE;
 }
 
+static int tegra_t210ref_i2c_notifier_call(struct notifier_block *nb,
+			unsigned long event, void *data)
+{
+#ifndef CONFIG_TEGRA_HDMI_PRIMARY
+	struct device *dev = data;
+#endif
+
+	switch (event) {
+	case BUS_NOTIFY_BIND_DRIVER:
+#ifndef CONFIG_TEGRA_HDMI_PRIMARY
+		if (dev->of_node) {
+			if (of_device_is_compatible(dev->of_node,
+					"ti,lp8550") ||
+				of_device_is_compatible(dev->of_node,
+					"ti,lp8551") ||
+				of_device_is_compatible(dev->of_node,
+					"ti,lp8552") ||
+				of_device_is_compatible(dev->of_node,
+					"ti,lp8553") ||
+				of_device_is_compatible(dev->of_node,
+					"ti,lp8554") ||
+				of_device_is_compatible(dev->of_node,
+					"ti,lp8555") ||
+				of_device_is_compatible(dev->of_node,
+					"ti,lp8556") ||
+				of_device_is_compatible(dev->of_node,
+					"ti,lp8557")) {
+					ti_lp855x_bl_ops_register(dev);
+			}
+		}
+#endif
+		break;
+	default:
+		break;
+	}
+	return NOTIFY_DONE;
+}
+
+
 static struct notifier_block platform_nb = {
 	.notifier_call = tegra_t210ref_notifier_call,
 };
+
+static struct notifier_block i2c_nb = {
+	.notifier_call = tegra_t210ref_i2c_notifier_call,
+};
+
 static void __init tegra_t210ref_dt_init(void)
 {
 	unsigned long pinmux_clamp = readl(IO_ADDRESS(0x70000040));
@@ -461,6 +441,7 @@ static void __init tegra_t210ref_dt_init(void)
 	tegra_set_fixed_pwm_bl_ops(dsi_j_1440_810_5_8_ops.pwm_bl_ops);
 #endif
 	bus_register_notifier(&platform_bus_type, &platform_nb);
+	bus_register_notifier(&i2c_bus_type, &i2c_nb);
 	tegra_t210ref_early_init();
 	of_platform_populate(NULL,
 		of_default_bus_match_table, t210ref_auxdata_lookup,
@@ -478,12 +459,12 @@ static void __init tegra_t210ref_reserve(void)
 #if defined(CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM) || \
 		defined(CONFIG_TEGRA_NO_CARVEOUT)
 	ulong carveout_size = 0;
-	ulong fb2_size = SZ_16M;
+	ulong fb2_size = SZ_64M + SZ_8M;
 #else
 	ulong carveout_size = SZ_1G;
 	ulong fb2_size = SZ_4M;
 #endif
-	ulong fb1_size = SZ_16M + SZ_2M;
+	ulong fb1_size = SZ_64M + SZ_8M;
 	ulong vpr_size = 186 * SZ_1M;
 
 #if defined(CONFIG_TEGRA_NVADSP) && \
