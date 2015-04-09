@@ -1597,7 +1597,7 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
 	iova = mapping->base + ((mapping->bits << PAGE_SHIFT) * i);
 	iova += start << PAGE_SHIFT;
 
-	return mapping->base + (start << PAGE_SHIFT);
+	return iova;
 }
 
 static dma_addr_t __alloc_iova_at(struct dma_iommu_mapping *mapping,
