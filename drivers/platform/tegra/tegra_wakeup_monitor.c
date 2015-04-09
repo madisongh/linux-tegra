@@ -1035,8 +1035,6 @@ static int tegra_wakeup_monitor_resume(struct platform_device *pdev)
 			nf_valid_flag = true;
 		} else if (wake_reason_irq == twm->pdata->rtc_wakeup_source) {
 			twm->wakeup_source = TEGRA_WAKEUP_SOURCE_RTC;
-			if (twm->am_enable)
-				set_rtc_wakeup_src(1);
 		} else {
 			twm->wakeup_source = TEGRA_WAKEUP_SOURCE_OTHERS;
 		}
