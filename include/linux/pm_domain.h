@@ -151,6 +151,10 @@ extern int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
 				  struct generic_pm_domain *new_subdomain);
 extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
 				     struct generic_pm_domain *target);
+extern int pm_genpd_add_callbacks(struct device *dev,
+				  struct gpd_dev_ops *ops,
+				  struct gpd_timing_data *td);
+extern int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td);
 extern void pm_genpd_init(struct generic_pm_domain *genpd,
 			  struct dev_power_governor *gov, bool is_off);
 
@@ -196,6 +200,16 @@ static inline int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
 {
 	return -ENOSYS;
 }
+static inline int pm_genpd_add_callbacks(struct device *dev,
+					 struct gpd_dev_ops *ops,
+					 struct gpd_timing_data *td)
+{
+	return -ENOSYS;
+}
+static inline int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td)
+{
+	return -ENOSYS;
+}
 static inline void pm_genpd_init(struct generic_pm_domain *genpd,
 				 struct dev_power_governor *gov, bool is_off)
 {
@@ -206,6 +220,11 @@ static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
 				      struct device *dev)
 {
 	return __pm_genpd_add_device(genpd, dev, NULL);
+}
+
+static inline int pm_genpd_remove_callbacks(struct device *dev)
+{
+	return __pm_genpd_remove_callbacks(dev, true);
 }
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS_SLEEP
