@@ -689,6 +689,46 @@ static bool genpd_dev_active_wakeup(struct generic_pm_domain *genpd,
 	return GENPD_DEV_CALLBACK(genpd, bool, active_wakeup, dev);
 }
 
+static int genpd_suspend_dev(struct generic_pm_domain *genpd, struct device *dev)
+{
+	return GENPD_DEV_CALLBACK(genpd, int, suspend, dev);
+}
+
+static int genpd_suspend_late(struct generic_pm_domain *genpd, struct device *dev)
+{
+	return GENPD_DEV_CALLBACK(genpd, int, suspend_late, dev);
+}
+
+static int genpd_resume_early(struct generic_pm_domain *genpd, struct device *dev)
+{
+	return GENPD_DEV_CALLBACK(genpd, int, resume_early, dev);
+}
+
+static int genpd_resume_dev(struct generic_pm_domain *genpd, struct device *dev)
+{
+	return GENPD_DEV_CALLBACK(genpd, int, resume, dev);
+}
+
+static int genpd_freeze_dev(struct generic_pm_domain *genpd, struct device *dev)
+{
+	return GENPD_DEV_CALLBACK(genpd, int, freeze, dev);
+}
+
+static int genpd_freeze_late(struct generic_pm_domain *genpd, struct device *dev)
+{
+	return GENPD_DEV_CALLBACK(genpd, int, freeze_late, dev);
+}
+
+static int genpd_thaw_early(struct generic_pm_domain *genpd, struct device *dev)
+{
+	return GENPD_DEV_CALLBACK(genpd, int, thaw_early, dev);
+}
+
+static int genpd_thaw_dev(struct generic_pm_domain *genpd, struct device *dev)
+{
+	return GENPD_DEV_CALLBACK(genpd, int, thaw, dev);
+}
+
 /**
  * pm_genpd_sync_poweroff - Synchronously power off a PM domain and its masters.
  * @genpd: PM domain to power off, if possible.
@@ -874,7 +914,7 @@ static int pm_genpd_suspend(struct device *dev)
 
 	cancel_delayed_work_sync(&genpd->power_off_delayed_work);
 
-	return genpd->suspend_power_off ? 0 : pm_generic_suspend(dev);
+	return genpd->suspend_power_off ? 0 : genpd_suspend_dev(genpd, dev);
 }
 
 /**
@@ -897,7 +937,7 @@ static int pm_genpd_suspend_late(struct device *dev)
 
 	cancel_delayed_work_sync(&genpd->power_off_delayed_work);
 
-	return genpd->suspend_power_off ? 0 : pm_generic_suspend_late(dev);
+	return genpd->suspend_power_off ? 0 : genpd_suspend_late(genpd, dev);
 }
 
 /**
@@ -998,7 +1038,7 @@ static int pm_genpd_resume_early(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : pm_generic_resume_early(dev);
+	return genpd->suspend_power_off ? 0 : genpd_resume_early(genpd, dev);
 }
 
 /**
@@ -1019,7 +1059,7 @@ static int pm_genpd_resume(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : pm_generic_resume(dev);
+	return genpd->suspend_power_off ? 0 : genpd_resume_dev(genpd, dev);
 }
 
 /**
@@ -1040,7 +1080,7 @@ static int pm_genpd_freeze(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : pm_generic_freeze(dev);
+	return genpd->suspend_power_off ? 0 : genpd_freeze_dev(genpd, dev);
 }
 
 /**
@@ -1062,7 +1102,7 @@ static int pm_genpd_freeze_late(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : pm_generic_freeze_late(dev);
+	return genpd->suspend_power_off ? 0 : genpd_freeze_late(genpd, dev);
 }
 
 /**
@@ -1127,7 +1167,7 @@ static int pm_genpd_thaw_early(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : pm_generic_thaw_early(dev);
+	return genpd->suspend_power_off ? 0 : genpd_thaw_early(genpd, dev);
 }
 
 /**
@@ -1148,7 +1188,7 @@ static int pm_genpd_thaw(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : pm_generic_thaw(dev);
+	return genpd->suspend_power_off ? 0 : genpd_thaw_dev(genpd, dev);
 }
 
 /**
@@ -1702,8 +1742,16 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
 	if (genpd->flags & GENPD_FLAG_PM_CLK) {
 		genpd->dev_ops.stop = pm_clk_suspend;
 		genpd->dev_ops.start = pm_clk_resume;
+	} else {
+		genpd->dev_ops.suspend = pm_generic_suspend;
+		genpd->dev_ops.suspend_late = pm_generic_suspend_late;
+		genpd->dev_ops.resume_early = pm_generic_resume_early;
+		genpd->dev_ops.resume = pm_generic_resume;
+		genpd->dev_ops.freeze = pm_generic_freeze;
+		genpd->dev_ops.freeze_late = pm_generic_freeze_late;
+		genpd->dev_ops.thaw_early = pm_generic_thaw_early;
+		genpd->dev_ops.thaw = pm_generic_thaw;
 	}
-
 	mutex_lock(&gpd_list_lock);
 	list_add(&genpd->gpd_list_node, &gpd_list);
 	mutex_unlock(&gpd_list_lock);
