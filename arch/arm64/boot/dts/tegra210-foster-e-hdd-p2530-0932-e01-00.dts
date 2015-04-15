@@ -27,6 +27,10 @@
 	nvidia,dtsfilename = __FILE__;
 	nvidia,fastboot-usb-pid = <0xb422>;
 
+	chosen {
+		bootargs = "earlycon=uart8250,mmio32,0x70006000";
+	};
+
 	sata@70020000 {
 		status = "okay";
 		nvidia,sata-connector-type=<E_SATA_P>;

@@ -24,6 +24,10 @@
 	model = "loki_e_lte";
 	nvidia,dtsfilename = __FILE__;
 
+	chosen {
+		bootargs = "earlycon=uart8250,mmio32,0x70006000";
+	};
+
 	modem {
 		/* pre boost regulator gpio */
 		nvidia,pre-boost-gpio = <&gpio TEGRA_GPIO(E, 5) GPIO_ACTIVE_HIGH>;

@@ -27,6 +27,10 @@
 	model = "loki_e_base";
 	nvidia,dtsfilename = __FILE__;
 
+	chosen {
+		bootargs = "earlycon=uart8250,mmio32,0x70006000";
+	};
+
 	backlight {
 		compatible = "pwm-backlight";
 		status = "okay";
