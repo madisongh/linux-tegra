@@ -110,6 +110,7 @@ struct pm_domain_data {
 
 struct generic_pm_domain_data {
 	struct pm_domain_data base;
+	struct gpd_dev_ops ops;
 	struct gpd_timing_data td;
 	struct notifier_block nb;
 	struct mutex lock;
