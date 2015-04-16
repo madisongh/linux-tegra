@@ -2179,11 +2179,19 @@ static int dfll_build_lut(struct tegra_dfll *td)
 	}
 	v_max = dev_pm_opp_get_voltage(opp);
 
+	if (td->pmu_if == TEGRA_DFLL_PMU_PWM) {
+		rate = 0;
+		opp = dev_pm_opp_find_freq_ceil(td->soc->dev, &rate);
+		v = dev_pm_opp_get_voltage(opp);
+		lut = find_vdd_map_entry_min(td, v);
+	} else {
+		v = td->soc->min_millivolts * 1000;
+		lut = find_vdd_map_entry_exact(td, v);
+	}
+
 	v_min_align = DIV_ROUND_UP(td->soc->min_millivolts * 1000,
 			td->soc->alignment) * td->soc->alignment;
 
-	v = td->soc->min_millivolts * 1000;
-	lut = find_vdd_map_entry_exact(td, v);
 	if (lut < 0)
 		goto out;
 	td->lut[0] = lut;
@@ -2209,7 +2217,10 @@ static int dfll_build_lut(struct tegra_dfll *td)
 		}
 
 		v = (j == MAX_DFLL_VOLTAGES - 1) ? v_max : v_opp;
-		selector = find_vdd_map_entry_exact(td, v);
+		if (td->pmu_if == TEGRA_DFLL_PMU_PWM)
+			selector = find_vdd_map_entry_min(td, v);
+		else
+			selector = find_vdd_map_entry_exact(td, v);
 		if (selector < 0)
 			goto out;
 		if (selector != td->lut[j - 1])
