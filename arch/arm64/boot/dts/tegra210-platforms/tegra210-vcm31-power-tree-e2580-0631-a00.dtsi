@@ -17,6 +17,7 @@
 
 #include "tegra210-ers-pmic-e2174-1101-a00.dtsi"
 #include "tegra210-ers-power-dvfs-e2174-1101-a00.dtsi"
+#include "tegra210-overrides/tegra210-power-dvfs-override-vcm31.dtsi"
 
 / {
 	i2c@7000d000 {
