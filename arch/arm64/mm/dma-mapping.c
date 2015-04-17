@@ -1780,7 +1780,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
 	/*
 	 * IOMMU can map any pages, so himem can also be used here
 	 */
-	if (!(gfp & GFP_DMA))
+	if (!(gfp & GFP_DMA) && !(gfp & GFP_DMA32))
 		gfp |= __GFP_HIGHMEM;
 
 	gfp |= __GFP_NOWARN;
