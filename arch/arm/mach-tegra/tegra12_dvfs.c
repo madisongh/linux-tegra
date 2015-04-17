@@ -537,7 +537,7 @@ static struct dvfs core_dvfs_table_embedded_alwayson[] = {
 
 	CORE_DVFS("emc",        3, -1, 1, KHZ, 1,      1,      1,      600000,	 792000),
 
-        CORE_DVFS("cpu_lp",     3, -1, 1, KHZ,  1,      1,      1,      804000, 912000),
+        CORE_DVFS("cpu_lp",     3, -1, 1, KHZ,  1,      1,      1,      804000, 804000),
 
         CORE_DVFS("sbus",       3, -1, 1, KHZ,  1,      1,      1,      264000,	 312000),
 
