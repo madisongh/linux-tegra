@@ -64,8 +64,10 @@ struct dma_iommu_mapping *tegra_smmu_of_get_mapping(struct device *dev,
 			dev_info(dev, "mask=%llx doesn't include swgids=%llx\n",
 				 tmp->swgid_mask, swgids);
 
-		if (tmp->map)
+		if (tmp->map) {
+			kref_get(&tmp->map->kref);
 			return tmp->map;
+		}
 
 		map = arm_iommu_create_mapping(&platform_bus_type,
 					       (dma_addr_t)tmp->iova_start,
