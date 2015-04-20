@@ -71,6 +71,7 @@ dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-sim-cl34000094.dtb
 dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-sim-cl34116551.dtb
 dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-fpga-cl34078409.dtb
 dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-sim-cl34324618.dtb
+dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-sim-cl34563539.dtb
 
 DTC_FLAGS := -i $(srctree)/arch/arm/boot/dts
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
