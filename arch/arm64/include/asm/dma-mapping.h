@@ -151,7 +151,11 @@ static inline void dma_free_attrs(struct device *dev, size_t size,
 {
 	struct dma_map_ops *ops = get_dma_ops(dev);
 
-	if (dma_release_from_coherent(dev, get_order(size), vaddr))
+	/* Note: Deviation from upstream. upstream passes get_order(size)
+	 * instead of size. This has been modified to avoid memory failures
+	 * happening from internal fragmentation.
+	 */
+	if (dma_release_from_coherent(dev, size, vaddr))
 		return;
 
 	debug_dma_free_coherent(dev, size, vaddr, dev_addr);
