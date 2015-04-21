@@ -2690,6 +2690,12 @@ void set_dummy_dma_ops(struct device *dev)
 	set_dma_ops(dev, &__dummy_ops);
 }
 
+
+/* __alloc_iova_at() is broken with extensions enabled.
+ * Disable the extensions till it is fixed.
+ */
+#define DISABLE_EXTENSIONS 1
+
 /**
  * arm_iommu_create_mapping
  * @bus: pointer to the bus holding the client device (for IOMMU calls)
@@ -2715,7 +2721,7 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
 	if (!bitmap_size)
 		return ERR_PTR(-EINVAL);
 
-	if (bitmap_size > PAGE_SIZE) {
+	if (!DISABLE_EXTENSIONS && bitmap_size > PAGE_SIZE) {
 		extensions = bitmap_size / PAGE_SIZE;
 		bitmap_size = PAGE_SIZE;
 	}
