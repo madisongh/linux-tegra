@@ -780,7 +780,7 @@ int tegra_update_cpu_speed(unsigned long rate)
 		}
 	}
 
-	if (freqs.old != freqs.new)
+	if (policy && freqs.old != freqs.new)
 		cpufreq_freq_transition_begin(policy, &freqs);
 
 #ifdef CONFIG_CPU_FREQ_DEBUG
@@ -789,25 +789,23 @@ int tegra_update_cpu_speed(unsigned long rate)
 #endif
 
 	ret = clk_set_rate(cpu_clk, actual_freqs.new * 1000);
+
+	if (policy && freqs.old != freqs.new) {
+		freqs.new = tegra_getspeed(0);
+		cpufreq_freq_transition_end(policy, &freqs, 0);
+	}
+
 	if (ret) {
 		pr_err("cpu-tegra: Failed to set cpu frequency to %d kHz\n",
 			actual_freqs.new);
-		freqs.new = freqs.old;
-		cpufreq_freq_transition_end(policy, &freqs, 0);
 		goto _err;
 	}
-
-	freqs.new = tegra_getspeed(0);
-
-	if (freqs.old != freqs.new)
-		cpufreq_freq_transition_end(policy, &freqs, 0);
 
 	if (actual_freqs.old > actual_freqs.new)
 		tegra_update_mselect_rate(actual_freqs.new);
 
 	if (emc_clk && freqs.old > freqs.new)
 		clk_set_rate(emc_clk, tegra_emc_cpu_limit(freqs.new));
-
 
 _out:
 	mode = REGULATOR_MODE_IDLE;
@@ -816,7 +814,8 @@ _out:
 			reg_mode = mode;
 
 _err:
-	cpufreq_cpu_put(policy);
+	if (policy)
+		cpufreq_cpu_put(policy);
 	return ret;
 }
 
