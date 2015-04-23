@@ -150,6 +150,8 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR		(1<<14)
 #define SDHCI_QUIRK2_PERIODIC_CALIBRATION		(1<<15)
 #define SDHCI_QUIRK2_DISABLE_CARD_CLOCK_FIRST		(1<<16)
+/*Controller skips tuning if it is already done*/
+#define SDHCI_QUIRK2_SKIP_TUNING			(1<<17)
 
 	unsigned int  acmd12_ctrl;
 	unsigned int  command;

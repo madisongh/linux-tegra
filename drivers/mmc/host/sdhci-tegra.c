@@ -320,6 +320,9 @@ struct sdhci_tegra {
 	int drive_group_sel;
 	bool en_strobe;
 	unsigned int tuned_tap_delay;
+	unsigned int tuning_status;
+#define TUNING_STATUS_DONE	1
+#define TUNING_STATUS_RETUNE	2
 	struct padctrl *sdmmc_padctrl;
 	ktime_t timestamp;
 	struct regulator *vdd_io_reg;
@@ -379,6 +382,21 @@ static void tegra_sdhci_dumpregs(struct sdhci_host *sdhci)
 			trim_delay);
 	pr_info("sdhci: SDMMC Interrupt status: 0x%08x\n", sdhci_readl(sdhci,
 				SDMMC_VENDOR_ERR_INTR_STATUS_0));
+}
+
+static bool tegra_sdhci_is_tuning_done(struct sdhci_host *sdhci)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+
+	if (tegra_host->tuning_status == TUNING_STATUS_DONE) {
+		dev_info(mmc_dev(sdhci->mmc),
+			"Tuning already done, restoring the best tap value : %u\n",
+				tegra_host->tuned_tap_delay);
+		sdhci_tegra_set_tap_delay(sdhci, tegra_host->tuned_tap_delay);
+		return true;
+	}
+	return false;
 }
 
 static int sdhci_tegra_get_max_tuning_loop_counter(struct sdhci_host *sdhci)
@@ -715,6 +733,9 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 
 	if (plat->uhs_mask & MMC_MASK_HS400)
 		host->mmc->caps2 &= ~MMC_CAP2_HS400;
+
+	if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
+		tegra_host->tuning_status = TUNING_STATUS_RETUNE;
 }
 
 static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
@@ -1951,6 +1972,7 @@ static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option)
 		tap_delay >>= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT;
 		tap_delay &= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK;
 		tegra_host->tuned_tap_delay = tap_delay;
+		tegra_host->tuning_status = TUNING_STATUS_DONE;
 		break;
 	case SET_DEFAULT_TAP:
 		sdhci_tegra_set_tap_delay(sdhci, tegra_host->plat->tap_delay);
@@ -2196,6 +2218,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.config_tap_delay	= tegra_sdhci_config_tap,
 	.validate_sd2_0		= tegra_sdhci_validate_sd2_0,
 	.get_max_pio_transfer_limits = tegra_sdhci_set_max_pio_transfer_limits,
+	.is_tuning_done		= tegra_sdhci_is_tuning_done,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra124_pdata = {
@@ -2219,6 +2242,7 @@ static const struct sdhci_pltfm_data sdhci_tegra210_pdata = {
 	.quirks2 = TEGRA_SDHCI_QUIRKS2 |
 		SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK |
 		SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR |
+		SDHCI_QUIRK2_SKIP_TUNING |
 		SDHCI_QUIRK2_PERIODIC_CALIBRATION,
 	.ops  = &tegra_sdhci_ops,
 };
@@ -2248,6 +2272,7 @@ static const struct sdhci_pltfm_data sdhci_tegra186_pdata = {
 	.quirks2 = TEGRA_SDHCI_QUIRKS2 |
 		SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK |
 		SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR |
+		SDHCI_QUIRK2_SKIP_TUNING |
 		SDHCI_QUIRK2_PERIODIC_CALIBRATION,
 	.ops  = &tegra_sdhci_ops,
 };
