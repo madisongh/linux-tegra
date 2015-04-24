@@ -16,6 +16,9 @@ fhci-$(CONFIG_FHCI_DEBUG) += fhci-dbg.o
 xhci-hcd-y := xhci.o xhci-mem.o
 xhci-hcd-y += xhci-ring.o xhci-hub.o xhci-dbg.o
 xhci-hcd-y += xhci-trace.o
+ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
+	xhci-hcd-y 		+= xhci-tegra-t210-padctl.o
+endif
 
 xhci-plat-hcd-y := xhci-plat.o
 ifneq ($(CONFIG_USB_XHCI_MVEBU), )
