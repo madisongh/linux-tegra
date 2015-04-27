@@ -58,7 +58,6 @@ config ARCH_TEGRA_21x_SOC
 	select CMA
 	select NVMAP_CACHE_MAINT_BY_SET_WAYS if TEGRA_NVMAP
 	select NVMAP_CACHE_MAINT_BY_SET_WAYS_ON_ONE_CPU if TEGRA_NVMAP
-	select TEGRA_CPU_FREQ_GOVERNOR_KERNEL_START
 	select TEGRA_ISOMGR
 	select TEGRA_ISOMGR_SYSFS
 	select ARCH_HAS_PASR if STAGING
@@ -89,17 +88,6 @@ config DENVER_CPU
 	bool "Denver CPU"
 	help
 	  Support for NVIDIA Denver CPU
-
-config TEGRA_CPU_FREQ_GOVERNOR_KERNEL_START
-	bool "Initialize CPU governor to a performance after DVFS initialization"
-	default 0
-	help
-		During a boot up, once DVFS is initialized, there is a period of
-		time in which the frequency could adjusted higher before the userspace
-		configures the governor by using a more performance governor for
-		a faster boot up. Selecting this option will make the system to choose
-		a performance governor once the DVFS initialization is complete. Userspace
-		or init script can override the governor chosen here.
 
 config TEGRA_HMP_CLUSTER_CONTROL
 	bool "HMP Cluster control"
