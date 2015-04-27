@@ -1475,6 +1475,7 @@ static int put_input_route_value(struct snd_kcontrol *kcontrol,
 	int mux = ucontrol->value.enumerated.item[0];
 	int rc = 0;
 	u8 algo_type;
+	struct snd_soc_dapm_update update;
 
 	if (mux >= ARRAY_SIZE(proc_block_input_texts) || mux < 0) {
 		pr_err("%s(): Invalid input mux:%d Max valid value:%lu\n",
@@ -1489,11 +1490,13 @@ static int put_input_route_value(struct snd_kcontrol *kcontrol,
 	if (!mux && atomic_read(&escore->active_streams))
 		goto exit;
 
+	update.kcontrol = kcontrol;
+
 #if (defined(CONFIG_ARCH_OMAP) || defined(CONFIG_ARCH_EXYNOS) || \
 	defined(CONFIG_X86_32) || defined(CONFIG_ARCH_TEGRA))
-	rc = snd_soc_dapm_mux_update_power(widget, kcontrol, mux, e);
+	rc = snd_soc_dapm_mux_update_power(&codec->dapm, kcontrol, mux, e, &update);
 #else
-	rc = snd_soc_dapm_mux_update_power(widget, kcontrol, 1, mux, e);
+	rc = snd_soc_dapm_mux_update_power(&codec->dapm, kcontrol, 1, mux, e, &update);
 #endif
 
 exit:
@@ -1536,6 +1539,7 @@ static int put_output_route_value(struct snd_kcontrol *kcontrol,
 	int mux = ucontrol->value.enumerated.item[0];
 	int prev_mux;
 	u8 algo_type;
+	struct snd_soc_dapm_update update;
 
 	if (mux >= ARRAY_SIZE(proc_block_output_texts) || mux < 0) {
 		pr_err("%s(): Invalid output mux:%d Max valid value:%lu\n",
@@ -1577,11 +1581,13 @@ static int put_output_route_value(struct snd_kcontrol *kcontrol,
 	if (!mux && atomic_read(&escore->active_streams))
 		goto exit;
 
+	update.kcontrol = kcontrol;
+
 #if (defined(CONFIG_ARCH_OMAP) || defined(CONFIG_ARCH_EXYNOS) || \
 	defined(CONFIG_X86_32) || defined(CONFIG_ARCH_TEGRA))
-	rc = snd_soc_dapm_mux_update_power(widget, kcontrol, mux, e);
+	rc = snd_soc_dapm_mux_update_power(&codec->dapm, kcontrol, mux, e, &update);
 #else
-	rc = snd_soc_dapm_mux_update_power(widget, kcontrol, 1, mux, e);
+	rc = snd_soc_dapm_mux_update_power(&codec->dapm, kcontrol, 1, mux, e, &update);
 #endif
 
 exit:

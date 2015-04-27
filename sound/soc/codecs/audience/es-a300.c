@@ -214,7 +214,7 @@ const struct snd_kcontrol_new es_codec_snd_controls[] = {
 
 	SOC_ENUM("I2S Channels", i2s_ch_enum),
 	SOC_ENUM("FrameSync SEL", fs_sel_enum),
-	SOC_VALUE_ENUM("Bits per Sample", bps_enum),
+	SOC_ENUM("Bits per Sample", bps_enum),
 
 	SOC_ENUM("MICHS SEL MUX", michs_sel_mux_enum),
 
@@ -224,13 +224,13 @@ const struct snd_kcontrol_new es_codec_snd_controls[] = {
 	SOC_ENUM("MICHS Input Type", michs_input_type_enum),
 	SOC_ENUM("AUXIN Input Type", auxin_input_type_enum),
 
-	SOC_VALUE_ENUM("MIC0 Bias Output Voltage",
+	SOC_ENUM("MIC0 Bias Output Voltage",
 			mic0_bias_output_voltage_enum),
-	SOC_VALUE_ENUM("MIC1 Bias Output Voltage",
+	SOC_ENUM("MIC1 Bias Output Voltage",
 			mic1_bias_output_voltage_enum),
-	SOC_VALUE_ENUM("MIC2 Bias Output Voltage",
+	SOC_ENUM("MIC2 Bias Output Voltage",
 			mic2_bias_output_voltage_enum),
-	SOC_VALUE_ENUM("MICHS Bias Output Voltage",
+	SOC_ENUM("MICHS Bias Output Voltage",
 			michs_bias_output_voltage_enum),
 
 	SOC_ENUM("MIC0 Input Impedance Mode", mic0_zin_mode_enum),
