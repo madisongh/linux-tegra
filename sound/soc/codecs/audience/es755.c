@@ -234,7 +234,7 @@ static ssize_t es755_set_pm_enable(struct device *dev,
 	return count;
 
 }
-static DEVICE_ATTR(pm_enable, 0666, es755_get_pm_enable, es755_set_pm_enable);
+static DEVICE_ATTR(pm_enable, 0664, es755_get_pm_enable, es755_set_pm_enable);
 
 #define SIZE_OF_VERBUF 256
 /* TODO: fix for new read/write. use es755_read() instead of BUS ops */
