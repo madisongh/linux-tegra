@@ -1,7 +1,7 @@
 /*
  * drivers/usb/phy/tegra11x_usb_phy.c
  *
- * Copyright (c) 2012-2014 NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2012-2015 NVIDIA Corporation. All rights reserved.
  *
  *
  * This software is licensed under the terms of the GNU General Public
@@ -120,6 +120,7 @@
 #define UTMIP_HSRX_CFG0		0x810
 #define   UTMIP_ELASTIC_LIMIT(x)	(((x) & 0x1f) << 10)
 #define   UTMIP_IDLE_WAIT(x)		(((x) & 0x1f) << 15)
+#define   UTMIP_PCOUNT_UPDN_DIV(x)	(((x) & 0xf) << 24)
 
 #define UTMIP_HSRX_CFG1		0x814
 #define   UTMIP_HS_SYNC_START_DLY(x)	(((x) & 0x1f) << 1)
@@ -1048,6 +1049,9 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 
 	val = readl(base + UTMIP_HSRX_CFG0);
 	val &= ~(UTMIP_IDLE_WAIT(~0) | UTMIP_ELASTIC_LIMIT(~0));
+#ifndef CONFIG_ARCH_TEGRA_21x_SOC
+	val &= ~UTMIP_PCOUNT_UPDN_DIV(~0);
+#endif
 	val |= UTMIP_IDLE_WAIT(config->idle_wait_delay);
 	val |= UTMIP_ELASTIC_LIMIT(config->elastic_limit);
 	writel(val, base + UTMIP_HSRX_CFG0);
