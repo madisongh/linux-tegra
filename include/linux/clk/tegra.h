@@ -136,27 +136,7 @@ enum tegra_clk_ex_param {
 void tegra_periph_reset_deassert(struct clk *c);
 void tegra_periph_reset_assert(struct clk *c);
 
-#ifdef CONFIG_COMMON_CLK
-/* Keep using these functions until the replacement in place */
-int tegra_dvfs_get_freqs(struct clk *c, unsigned long **freqs, int *num_freqs);
-int tegra_dvfs_set_rate(struct clk *c, unsigned long rate);
-int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting);
-struct clk *tegra_get_clock_by_name(const char *name);
-int tegra_is_clk_enabled(struct clk *clk);
-int tegra_dvfs_use_alt_freqs_on_clk(struct clk *c, bool use_alt_freq);
-
-/* To be implemented for COMMON CLK framework */
-/* Get max rate safe at min voltage in all t-ranges; return zero if unknown */
-static inline unsigned long tegra_dvfs_get_fmax_at_vmin_safe_t(struct clk *c)
-{
-	return 0;
-}
-static inline long tegra_emc_round_rate_updown(unsigned long rate, bool up)
-{
-	return 0;
-}
-
-#else
+#ifndef CONFIG_COMMON_CLK
 
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 int tegra_dvfs_clamp_dfll_at_vmin(struct clk *dfll_clk, bool clamp);
@@ -184,5 +164,11 @@ static inline void tegra_clocks_apply_init_table(void)
 unsigned long clk_get_rate_all_locked(struct clk *c);
 int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting);
 #endif
+
+extern void tegra210_xusb_pll_hw_control_enable(void);
+extern void tegra210_xusb_pll_hw_sequence_start(void);
+extern void tegra210_sata_pll_hw_control_enable(void);
+extern void tegra210_sata_pll_hw_sequence_start(void);
+
 
 #endif /* __LINUX_CLK_TEGRA_H_ */
