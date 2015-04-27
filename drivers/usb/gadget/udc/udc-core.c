@@ -400,6 +400,7 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
 		driver->unbind(udc->gadget);
 		goto err1;
 	}
+#ifdef CONFIG_USB_G_ANDROID
 	/*
 	 * HACK: The Android gadget driver disconnects the gadget
 	 * on bind and expects the gadget to stay disconnected until
@@ -409,6 +410,9 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
 	 *
 	 * usb_gadget_connect(udc->gadget);
 	 */
+#else
+	 usb_gadget_connect(udc->gadget);
+#endif
 
 	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
 	return 0;
