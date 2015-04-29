@@ -92,7 +92,7 @@ void blk_set_default_limits(struct queue_limits *lim)
 	lim->virt_boundary_mask = 0;
 	lim->max_segment_size = BLK_MAX_SEGMENT_SIZE;
 	lim->max_sectors = lim->max_dev_sectors = lim->max_hw_sectors =
-		BLK_SAFE_MAX_SECTORS;
+		BLK_DEF_MAX_SECTORS;
 	lim->chunk_sectors = 0;
 	lim->max_write_same_sectors = 0;
 	lim->max_discard_sectors = 0;
