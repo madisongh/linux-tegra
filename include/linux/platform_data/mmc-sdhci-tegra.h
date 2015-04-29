@@ -103,6 +103,7 @@ struct tegra_sdhci_platform_data {
 	bool enb_feedback_clock;
 	bool en_periodic_calib;
 	unsigned int fixed_clk_freq_table[MMC_TIMINGS_MAX_MODES + 1];
+	const char *clk_name;
 };
 
 #endif

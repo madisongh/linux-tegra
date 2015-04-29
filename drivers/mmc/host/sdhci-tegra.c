@@ -2341,6 +2341,7 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	plat->en_periodic_calib = of_property_read_bool(np,
 			"nvidia,en-periodic-calib");
 	plat->pwrdet_support = of_property_read_bool(np, "pwrdet-support");
+	of_property_read_string_index(np, "nvidia,clk-name", 0, &plat->clk_name);
 
 	if (!of_property_read_u32(np, "mmc-ocr-mask", &val)) {
 		if (val == 0)
@@ -2455,7 +2456,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	}
 	host->mmc->rem_card_present = (mmc_gpio_get_cd(host->mmc) == 0);
 
-	clk = clk_get(mmc_dev(host->mmc), NULL);
+	clk = clk_get(mmc_dev(host->mmc), plat->clk_name);
 	if (IS_ERR(clk)) {
 		dev_err(mmc_dev(host->mmc), "clk err\n");
 		rc = PTR_ERR(clk);
@@ -2510,6 +2511,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		tegra_host->vddio_min_uv = SDHOST_HIGH_VOLT_MIN;
 		tegra_host->vddio_max_uv = SDHOST_HIGH_VOLT_MAX;
 	}
+
 	rc = tegra_sdhci_configure_regulators(host, CONFIG_REG_GET, 0, 0);
 	if (!rc) {
 		tegra_sdhci_pre_voltage_switch(host, MMC_SIGNAL_VOLTAGE_330);
