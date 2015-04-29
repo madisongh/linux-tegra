@@ -4989,6 +4989,10 @@ void xhci_init_driver(struct hc_driver *drv, int (*setup_fn)(struct usb_hcd *))
 	drv->reset = setup_fn;
 }
 EXPORT_SYMBOL_GPL(xhci_init_driver);
+#ifdef CONFIG_TEGRA_XUSB_PLATFORM
+#include "xhci-tegra.c"
+#define PLATFORM_DRIVER	tegra_xhci_driver
+#endif
 
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_AUTHOR(DRIVER_AUTHOR);
@@ -4996,6 +5000,15 @@ MODULE_LICENSE("GPL");
 
 static int __init xhci_hcd_init(void)
 {
+#ifdef CONFIG_TEGRA_XUSB_PLATFORM
+	int retval;
+
+	retval = tegra_xhci_register_plat();
+	if (retval < 0) {
+		printk(KERN_DEBUG "Problem registering platform driver.");
+	}
+#endif
+
 	/*
 	 * Check the compiler generated sizes of structures that must be laid
 	 * out in specific ways for hardware access.
