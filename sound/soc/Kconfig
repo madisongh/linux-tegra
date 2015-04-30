@@ -53,11 +53,14 @@ source "sound/soc/sh/Kconfig"
 source "sound/soc/sirf/Kconfig"
 source "sound/soc/spear/Kconfig"
 source "sound/soc/tegra/Kconfig"
+source "sound/soc/tegra-alt/Kconfig"
+source "sound/soc/tegra-virtual/Kconfig"
 source "sound/soc/txx9/Kconfig"
 source "sound/soc/ux500/Kconfig"
 
 # Supported codecs
 source "sound/soc/codecs/Kconfig"
+source "sound/soc/codecs/audience/Kconfig"
 
 # generic frame-work
 source "sound/soc/generic/Kconfig"
