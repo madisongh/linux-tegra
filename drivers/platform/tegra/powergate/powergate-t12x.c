@@ -827,9 +827,7 @@ static int tegra12x_powergate_init_refcount(void)
 {
 	bool disa_powered = tegra_powergate_is_powered(TEGRA_POWERGATE_DISA);
 	bool venc_powered = tegra_powergate_is_powered(TEGRA_POWERGATE_VENC);
-#ifdef CONFIG_ARCH_TEGRA_HAS_PCIE
 	bool pcie_powered = tegra_powergate_is_powered(TEGRA_POWERGATE_PCIE);
-#endif
 
 	WARN_ON(venc_powered && !disa_powered);
 
