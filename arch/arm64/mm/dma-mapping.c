@@ -76,7 +76,7 @@ static int __init early_coherent_pool(char *p)
 }
 early_param("coherent_pool", early_coherent_pool);
 
-static void *__alloc_from_pool(size_t size, struct page **ret_page)
+static void *__alloc_from_pool(size_t size, struct page **ret_page, gfp_t flags)
 {
 	unsigned long val;
 	void *ptr = NULL;
@@ -92,6 +92,8 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
 
 		*ret_page = phys_to_page(phys);
 		ptr = (void *)val;
+		if (flags & __GFP_ZERO)
+			memset(ptr, 0, size);
 	}
 
 	return ptr;
@@ -127,6 +129,7 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
 		flags |= GFP_DMA;
 	if (IS_ENABLED(CONFIG_DMA_CMA) && (flags & __GFP_WAIT)) {
 		struct page *page;
+		void *addr;
 
 		size = PAGE_ALIGN(size);
 		page = dma_alloc_from_contiguous(dev, size >> PAGE_SHIFT,
@@ -135,7 +138,10 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
 			return NULL;
 
 		*dma_handle = phys_to_dma(dev, page_to_phys(page));
-		return page_address(page);
+		addr = page_address(page);
+		if (flags & __GFP_ZERO)
+			memset(addr, 0, size);
+		return addr;
 	} else {
 		return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
 	}
@@ -171,7 +177,7 @@ static void *__dma_alloc_noncoherent(struct device *dev, size_t size,
 
 	if (!(flags & __GFP_WAIT)) {
 		struct page *page = NULL;
-		void *addr = __alloc_from_pool(size, &page);
+		void *addr = __alloc_from_pool(size, &page, flags);
 
 		if (addr)
 			*dma_handle = phys_to_dma(dev, page_to_phys(page));
@@ -902,7 +908,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 	if (is_coherent || nommu())
 		addr = __alloc_simple_buffer(dev, size, gfp, &page);
 	else if (!(gfp & __GFP_WAIT))
-		addr = __alloc_from_pool(size, &page);
+		addr = __alloc_from_pool(size, &page, gfp);
 	else if (!IS_ENABLED(CONFIG_CMA))
 		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller);
 	else
@@ -1977,7 +1983,7 @@ static void *__iommu_alloc_atomic(struct device *dev, size_t size,
 	struct page *page;
 	void *addr;
 
-	addr = __alloc_from_pool(size, &page);
+	addr = __alloc_from_pool(size, &page, GFP_ATOMIC);
 	if (!addr)
 		return NULL;
 
