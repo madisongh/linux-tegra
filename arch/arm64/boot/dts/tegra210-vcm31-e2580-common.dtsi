@@ -162,15 +162,15 @@
 		l4-dvddio-pex-supply = <&max77620_ldo1>;
 		l5-dvddio-pex-supply = <&max77620_ldo1>;
 		l6-dvddio-pex-supply = <&max77620_ldo1>;
-		hvdd-pex-pll-e-supply = <&max77620_sd3>;
-		l0-hvddio-pex-supply = <&max77620_sd3>;
-		l1-hvddio-pex-supply = <&max77620_sd3>;
-		l2-hvddio-pex-supply = <&max77620_sd3>;
-		l3-hvddio-pex-supply = <&max77620_sd3>;
-		l4-hvddio-pex-supply = <&max77620_sd3>;
-		l5-hvddio-pex-supply = <&max77620_sd3>;
-		l6-hvddio-pex-supply = <&max77620_sd3>;
-		vddio-pex-ctl-supply = <&max77620_sd3>;
+		hvdd-pex-pll-e-supply = <&vdd_dummy>;
+		l0-hvddio-pex-supply = <&vdd_dummy>;
+		l1-hvddio-pex-supply = <&vdd_dummy>;
+		l2-hvddio-pex-supply = <&vdd_dummy>;
+		l3-hvddio-pex-supply = <&vdd_dummy>;
+		l4-hvddio-pex-supply = <&vdd_dummy>;
+		l5-hvddio-pex-supply = <&vdd_dummy>;
+		l6-hvddio-pex-supply = <&vdd_dummy>;
+		vddio-pex-ctl-supply = <&vdd_dummy>;
 		pci@1,0 {
 			status = "okay";
 			nvidia,num-lanes = <0x2>;
@@ -464,8 +464,8 @@
 			pinctrl-0 = <>;
 			pinctrl-1 = <>;
 			regulator-supplies = "vdd-1v8-spi-hv", "vdd-1v8-spi-hv-bias";
-			vdd-1v8-spi-hv-supply = <&max77620_sd3>;
-			vdd-1v8-spi-hv-bias-supply = <&max77620_sd3>;
+			vdd-1v8-spi-hv-supply = <&vdd_dummy>;
+			vdd-1v8-spi-hv-bias-supply = <&vdd_dummy>;
 			fsync-width = <0>;
 		};
 		/* enable I2S4_CYA bit to select i2s4b pin */

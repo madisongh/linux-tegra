@@ -16,42 +16,12 @@
  */
 
 #include "tegra210-ers-pmic-e2174-1101-a00.dtsi"
-#include "tegra210-ers-fixed-e2174-1101-a00.dtsi"
 #include "tegra210-ers-power-dvfs-e2174-1101-a00.dtsi"
 
 / {
-
 	i2c@7000d000 {
 		max77620@3c {
 			regulators {
-				sd0 {
-					regulator-enable-ramp-delay = <146>;
-					regulator-disable-ramp-delay = <4080>;
-					regulator-ramp-delay = <27500>;
-					regulator-ramp-delay-scale = <300>;
-				};
-
-				sd1 {
-					regulator-enable-ramp-delay = <130>;
-					regulator-disable-ramp-delay = <145800>;
-					regulator-ramp-delay = <27500>;
-					regulator-ramp-delay-scale = <300>;
-				};
-
-				sd2 {
-					regulator-enable-ramp-delay = <176>;
-					regulator-disable-ramp-delay = <32000>;
-					regulator-ramp-delay = <27500>;
-					regulator-ramp-delay-scale = <350>;
-				};
-
-				sd3 {
-					regulator-enable-ramp-delay = <242>;
-					regulator-disable-ramp-delay = <118000>;
-					regulator-ramp-delay = <27500>;
-					regulator-ramp-delay-scale = <360>;
-				};
-
 				ldo0 {
 					regulator-enable-ramp-delay = <26>;
 					regulator-disable-ramp-delay = <626>;
@@ -80,13 +50,6 @@
 					regulator-ramp-delay-scale = <200>;
 				};
 
-				ldo4 {
-					regulator-enable-ramp-delay = <22>;
-					regulator-disable-ramp-delay = <610>;
-					regulator-ramp-delay = <100000>;
-					regulator-ramp-delay-scale = <200>;
-				};
-
 				ldo5 {
 					regulator-enable-ramp-delay = <62>;
 					regulator-disable-ramp-delay = <640>;
@@ -100,75 +63,46 @@
 					regulator-ramp-delay = <100000>;
 					regulator-ramp-delay-scale = <200>;
 				};
-
-				ldo7 {
-					regulator-enable-ramp-delay = <24>;
-					regulator-disable-ramp-delay = <2768>;
-					regulator-ramp-delay = <100000>;
-					regulator-ramp-delay-scale = <200>;
-				};
-
-				ldo8 {
-					regulator-enable-ramp-delay = <22>;
-					regulator-disable-ramp-delay = <1160>;
-					regulator-ramp-delay = <100000>;
-					regulator-ramp-delay-scale = <200>;
-				};
 			};
 		};
 	};
 
 	regulators {
-		regulator@1 {
-			regulator-enable-ramp-delay = <160>;
-			regulator-disable-ramp-delay = <10000>;
-		};
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <0>;
 
-		regulator@2 {
-			regulator-always-on;
-			regulator-min-microvolt = <1200000>;
-			regulator-max-microvolt = <1200000>;
-			regulator-enable-ramp-delay = <240>;
-			regulator-disable-ramp-delay = <11340>;
-		};
-
-		regulator@4 {
-			regulator-enable-ramp-delay = <472>;
-			regulator-disable-ramp-delay = <4880>;
-		};
-
-		regulator@6 {
-			regulator-enable-ramp-delay = <3090>;
-		};
-
-		regulator@7 {
-			regulator-enable-ramp-delay = <468>;
-			regulator-disable-ramp-delay = <13000>;
-		};
-
-		vdd_disp_3v0: regulator@12 {
+		vdd_3v3: regulator@1 {
 			compatible = "regulator-fixed-sync";
-			reg = <12>;
-			regulator-name = "vdd-disp-3v0";
-			regulator-min-microvolt = <3000000>;
-			regulator-max-microvolt = <3000000>;
-			gpio = <&gpio TEGRA_GPIO(I, 3) 0>;
+			reg = <1>;
+			regulator-name = "vdd-3v3";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
 			regulator-always-on;
+			gpio = <&max77620 3 0>;
 			enable-active-high;
-			regulator-enable-ramp-delay = <232>;
 		};
 
-		vdd_fan: regulator@13 {
+		lp_pwr_rails_en: regulator@2 {
 			compatible = "regulator-fixed-sync";
-			reg = <13>;
-			regulator-name = "vdd-fan";
-			regulator-min-microvolt = <5000000>;
-			regulator-max-microvolt = <5000000>;
-			gpio = <&gpio TEGRA_GPIO(E, 4) 0>;
-			regulator-always-on;
+			reg = <2>;
+			regulator-name = "lp_pwr_rails_en";
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-boot-on;
+			gpio = <&max77620 7 0>;
 			enable-active-high;
-			regulator-enable-ramp-delay = <284>;
-			regulator-disable-ramp-delay = <6200>;
+		};
+
+		en_vdd_sd: regulator@4 {
+			compatible = "regulator-fixed-sync";
+			reg = <4>;
+			regulator-name = "en_vdd_sd";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			gpio = <&gpio TEGRA_GPIO(Z, 4) 0>;
+			enable-active-high;
+			vin-supply = <&vdd_3v3>;
 		};
 
 		usb_vbus1: regulator@14 {
@@ -193,145 +127,107 @@
 			gpio-open-drain;
 		};
 
-		usb_vbus3: regulator@16 {
-			compatible = "regulator-fixed-sync";
-			reg = <16>;
-			regulator-name = "usb-vbus3";
+		vdd_dummy: regulator@17 {
+			compatible = "regulator-fixed";
+			reg = <17>;
+			regulator-name = "vdd_dummy";
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
-			gpio = <&gpio TEGRA_GPIO(D, 4) 0>;
-			enable-active-high;
-			gpio-open-drain;
+			regulator-always-on;
 		};
-	};
-
-	i2c@7000c500 {
-		battery-charger@6b {
-			status = "disabled";
-		};
-	};
-
-	i2c@546c0000 {
-		bus-pullup-supply = <&battery_reg>;
-	};
-
-	efuse@7000f800 {
-		vpp_fuse-supply = <&max77620_sd3>;
 	};
 
 	host1x {
 		/* tegradc.0 */
 		dc@54200000 {
 			avdd_hdmi-supply = <&max77620_ldo8>;
-			avdd_hdmi_pll-supply = <&max77620_sd3>;
-			vdd_hdmi_5v0-supply = <&vdd_hdmi>;
+			avdd_hdmi_pll-supply = <&vdd_dummy>;
+			vdd_hdmi_5v0-supply = <&vdd_dummy>;
 		};
 
 		vi {
-			avdd_dsi_csi-supply = <&max77620_gpio7>;
+			avdd_dsi_csi-supply = <&lp_pwr_rails_en>;
 		};
 	};
 
 	sound {
-		ldoen-supply = <&vdd_sys_boost>;
-		spkvdd-supply = <&vdd_sys_boost>;
-		dbvdd-supply = <&vdd_sys_boost>;
-		dmicvdd-supply = <&max77620_sd3>;
-	};
-
-	udc@7d000000 {
-		avdd_usb-supply = <&vdd_3v3>;
-		avdd_pll_utmip-supply = <&max77620_sd3>;
-		usb_bat_chg-supply = <&battery_charger>;
-	};
-
-	ehci@7d000000 {
-		avdd_usb-supply = <&vdd_3v3>;
-		avdd_pll_utmip-supply = <&max77620_sd3>;
-		usb_vbus-supply = <&battery_reg>;
+		ldoen-supply = <&vdd_dummy>;
+		spkvdd-supply = <&vdd_dummy>;
+		dbvdd-supply = <&vdd_dummy>;
+		dmicvdd-supply = <&vdd_dummy>;
 	};
 
 	xusb@70090000 {
-		usb_vbus0-supply = <&battery_reg>;
+		usb_vbus0-supply = <&vdd_dummy>;
 		usb_vbus1-supply = <&usb_vbus1>;
 		usb_vbus2-supply = <&usb_vbus2>;
-		usb_vbus3-supply = <&usb_vbus3>;
-		hvdd_usb-supply = <&vdd_3v3>;
-		avdd_pll_utmip-supply = <&max77620_sd3>;
+		usb_vbus3-supply = <&vdd_dummy>;
+		hvdd_usb-supply = <&vdd_dummy>;
+		avdd_pll_utmip-supply = <&vdd_dummy>;
 		vddio_hsic-supply = <&max77620_ldo0>;
 		avddio_usb-supply = <&max77620_ldo1>;
 		dvdd_sata-supply = <&max77620_ldo1>;
-		avddio_pll_uerefe-supply = <&max77620_ldo7>;
+		avddio_pll_uerefe-supply = <&vdd_dummy>;
 	};
 
 	xudc@700d0000 {
-		hvdd_usb-supply = <&vdd_3v3>;
-		avdd_pll_utmip-supply = <&max77620_sd3>;
+		hvdd_usb-supply = <&vdd_dummy>;
+		avdd_pll_utmip-supply = <&vdd_dummy>;
 		avddio_usb-supply = <&max77620_ldo1>;
-		avddio_pll_uerefe-supply = <&max77620_ldo7>;
+		avddio_pll_uerefe-supply = <&vdd_dummy>;
 	};
 
 	xotg {
-		usb_vbus-supply = <&battery_reg>;
+		usb_vbus-supply = <&vdd_dummy>;
 	};
 
-	otg@7d000000 {
-		usb_vbus-supply = <&battery_reg>;
-	};
-
+	/* SDMMC 4 for EMMC */
 	sdhci@700b0600 {
-		vddio_sdmmc-supply = <&max77620_sd3>; /* SDMMC4 for EMMC on loki */
-		vddio_sd_slot-supply = <&vdd_3v3>;
+		vddio_sdmmc-supply = <&max77620_sd3>;
 	};
 
+	/* SDMMC 3 for 2nd wifi */
 	sdhci@700b0400 {
-		vddio_sdmmc-supply = <&max77620_sd3>; /* SDMMC3 for 2nd Wifi on loki */
-		vddio_sd_slot-supply = <&vdd_3v3>; /* SDMMC3 no stuff for full size SD on foster */
-	};
-
-	sdhci@700b0200 {
-		vddio_sdmmc-supply = <&max77620_sd3>; /* SDMMC2 for Wifi on loki */
+		vddio_sdmmc-supply = <&max77620_sd3>;
 		vddio_sd_slot-supply = <&vdd_3v3>;
 	};
 
+	/* SDMMC 2 for wifi */
+	sdhci@700b0200 {
+		vddio_sdmmc-supply = <&vdd_dummy>;
+		vddio_sd_slot-supply = <&vdd_dummy>;
+	};
+
+	/* SDMMC 1 for SD Card */
 	sdhci@700b0000 {
-		vddio_sdmmc-supply = <&max77620_ldo2>; /* SDMMC1 for SD card on loki */
+		vddio_sdmmc-supply = <&max77620_ldo2>;
 		vddio_sd_slot-supply = <&en_vdd_sd>;
 	};
 
 	sata@70020000 {
-		hvdd_sata-supply = <&max77620_sd3>;
-		hvdd_pex_pll_e-supply = <&max77620_sd3>;
-		l0_hvddio_sata-supply = <&max77620_sd3>;
+		hvdd_sata-supply = <&vdd_dummy>;
+		hvdd_pex_pll_e-supply = <&vdd_dummy>;
+		l0_hvddio_sata-supply = <&vdd_dummy>;
 		l0_dvddio_sata-supply = <&max77620_ldo1>;
 		dvdd_sata_pll-supply = <&max77620_ldo1>;
 	};
 
-	bluedroid_pm {
-		avdd-supply = <&battery_reg>;
-		dvdd-supply = <&max77620_sd3>;
-	};
-
-	pwm-fan {
-		vdd-fan-supply = <&vdd_fan>;
-	};
-
 	power-detect {
-		pwrdet-sys-supply = <&max77620_sd3>;
-		pwrdet-uart-supply = <&max77620_sd3>;
-		pwrdet-audio-supply = <&max77620_sd3>;
-		pwrdet-cam-supply = <&max77620_sd3>;
-		pwrdet-pex-ctrl-supply = <&max77620_sd3>;
-		pwrdet-sdmmc1-supply = <&max77620_ldo2>;
-		pwrdet-sdmmc3-supply = <&max77620_sd3>;
-		pwrdet-sdmmc4-supply = <&max77620_sd3>;
-		pwrdet-audio-hv-supply = <&max77620_sd3>;
-		pwrdet-debug-supply = <&max77620_sd3>;
-		pwrdet-dmic-supply = <&max77620_sd3>;
-		pwrdet-gpio-supply = <&max77620_sd3>;
-		pwrdet-spi-supply = <&max77620_sd3>;
-		pwrdet-spi-hv-supply = <&max77620_sd3>;
-		pwrdet-sdmmc2-supply = <&max77620_sd3>;
-		pwrdet-dp-supply = <&max77620_sd3>;
+		pwrdet-sys-supply = <&vdd_dummy>;
+		pwrdet-uart-supply = <&vdd_dummy>;
+		pwrdet-audio-supply = <&vdd_dummy>;
+		pwrdet-cam-supply = <&vdd_dummy>;
+		pwrdet-pex-ctrl-supply = <&vdd_dummy>;
+		pwrdet-sdmmc1-supply = <&vdd_dummy>;
+		pwrdet-sdmmc3-supply = <&vdd_dummy>;
+		pwrdet-sdmmc4-supply = <&vdd_dummy>;
+		pwrdet-audio-hv-supply = <&vdd_dummy>;
+		pwrdet-debug-supply = <&vdd_dummy>;
+		pwrdet-dmic-supply = <&vdd_dummy>;
+		pwrdet-gpio-supply = <&vdd_dummy>;
+		pwrdet-spi-supply = <&vdd_dummy>;
+		pwrdet-spi-hv-supply = <&vdd_dummy>;
+		pwrdet-sdmmc2-supply = <&vdd_dummy>;
+		pwrdet-dp-supply = <&vdd_dummy>;
 	};
 };
