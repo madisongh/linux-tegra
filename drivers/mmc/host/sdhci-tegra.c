@@ -226,6 +226,7 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	u8 vendor_ctrl;
 
 	pr_debug("%s %s %u enabled=%u\n", __func__,
 		mmc_hostname(sdhci->mmc), clock, tegra_host->clk_enabled);
@@ -242,7 +243,9 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 		sdhci_set_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
 		sdhci_set_clock(sdhci, 0);
-		sdhci_writeb(sdhci, 0, SDHCI_VENDOR_CLOCK_CNTRL);
+		vendor_ctrl = sdhci_readb(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
+		vendor_ctrl &= ~0x1;
+		sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
 		clk_disable_unprepare(pltfm_host->clk);
 		tegra_host->clk_enabled = false;
 	}
