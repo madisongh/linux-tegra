@@ -39,6 +39,8 @@
 #include <linux/reboot.h>
 
 #include <mach/hardware.h>
+#include <mach/pm_domains.h>
+
 #include <linux/platform_data/mmc-sdhci-tegra.h>
 
 #include "sdhci-pltfm.h"
@@ -837,6 +839,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	/* disable access to boot partitions */
 	host->mmc->caps2 |= MMC_CAP2_BOOTPART_NOACC;
 
+	tegra_pd_add_device(&tegra_mc_chain_b, &pdev->dev);
 	rc = sdhci_add_host(host);
 	sdhci_tegra_error_stats_debugfs(host);
 	if (rc)
