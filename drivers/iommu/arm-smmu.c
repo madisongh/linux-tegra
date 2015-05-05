@@ -1428,6 +1428,7 @@ static const struct debugfs_reg32 arm_smmu_cb_regs[] = {
 	defreg_cb(FSYNR0),
 };
 
+#if 0
 static void debugfs_create_smmu_cb(struct arm_smmu_domain *smmu_domain,
 				   struct device *dev)
 {
@@ -1450,6 +1451,7 @@ static void debugfs_create_smmu_cb(struct arm_smmu_domain *smmu_domain,
 	debugfs_create_file("ptdump", S_IRUGO, dent, smmu_domain,
 			    &smmu_ptdump_fops);
 }
+#endif
 
 static int smmu_master_show(struct seq_file *s, void *unused)
 {
@@ -1477,6 +1479,7 @@ static const struct file_operations smmu_master_fops = {
 	.release        = single_release,
 };
 
+#if 0
 static void add_smmu_master_debugfs(struct arm_smmu_domain *smmu_domain,
 				    struct device *dev,
 				    struct arm_smmu_master *master)
@@ -1499,6 +1502,7 @@ static void add_smmu_master_debugfs(struct arm_smmu_domain *smmu_domain,
 	debugfs_create_symlink(name, dent, target);
 	master->debugfs_root = dent;
 }
+#endif
 
 static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 {
@@ -1545,11 +1549,8 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		return -ENODEV;
 
 	ret = arm_smmu_domain_add_master(smmu_domain, cfg);
-	if (!ret) {
+	if (!ret)
 		dev->archdata.iommu = domain;
-		add_smmu_master_debugfs(smmu_domain, dev,
-					find_smmu_master(smmu, dev->of_node));
-	}
 	return ret;
 }
 
