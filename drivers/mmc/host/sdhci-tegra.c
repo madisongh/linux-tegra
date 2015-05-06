@@ -847,6 +847,9 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	unsigned int timeout = 10;
 	unsigned int calib_offsets = 0;
 
+	if (tegra_host->plat->disable_auto_cal)
+		return;
+
 	tegra_sdhci_update_sdmmc_pinctrl_register(sdhci, set);
 
 	/*
@@ -1197,6 +1200,8 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	plat->pwr_off_during_lp0 = of_property_read_bool(np,
 		"pwr-off-during-lp0");
 	of_property_read_u32(np, "auto-cal-step", &plat->auto_cal_step);
+	plat->disable_auto_cal = of_property_read_bool(np,
+		"nvidia,disable-auto-cal");
 
 	return mmc_of_parse(host->mmc);
 }
