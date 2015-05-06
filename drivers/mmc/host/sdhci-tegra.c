@@ -564,12 +564,10 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_TUN_CTRL1_0);
 	}
 
-	/* Restore DLL calibration and DQS Trim delay values */
+	/* Restore DLL calibration values */
 	if (plat->dll_calib_needed && tegra_host->dll_calib)
 		sdhci_writel(host, tegra_host->dll_calib,
 				SDHCI_VNDR_DLLCAL_CFG);
-	if (plat->dqs_trim_delay)
-		sdhci_tegra_set_dqs_trim_delay(host, plat->dqs_trim_delay);
 
 	/* Use timeout clk data timeout counter for generating wr crc status */
 	if (soc_data->nvquirks &
