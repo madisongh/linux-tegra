@@ -912,6 +912,7 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 
 	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
 	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
+	of_property_read_u32(np, "ddr-trim-delay", &plat->ddr_trim_delay);
 	of_property_read_u32(np, "ddr-clk-limit", &plat->ddr_clk_limit);
 	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
 	of_property_read_u32(np, "uhs_mask", &plat->uhs_mask);
