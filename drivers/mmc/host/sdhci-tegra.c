@@ -961,6 +961,9 @@ static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
 	int div;
 	int index = 1;
 
+	if (pll_rate <= desired_rate)
+		return pll_rate;
+
 	div = pll_rate / desired_rate;
 	if (div > MAX_DIVISOR_VALUE) {
 		div = MAX_DIVISOR_VALUE;
@@ -1607,7 +1610,7 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	plat->power_off_rail = of_property_read_bool(np,
 		"power-off-rail");
 	plat->is_emmc = of_property_read_bool(np, "nvidia,is-emmc");
-
+	plat->enable_hs533_mode = of_property_read_bool(np, "nvidia,enable-hs533-mode");
 	return mmc_of_parse(host->mmc);
 }
 
@@ -2155,6 +2158,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		host->mmc->caps2 |= MMC_CAP2_EN_STROBE;
 	if (plat->pwr_off_during_lp0)
 		host->mmc->caps2 |= MMC_CAP2_NO_SLEEP_CMD;
+	if ((plat->enable_hs533_mode) && (host->mmc->caps2 & MMC_CAP2_HS400))
+		host->mmc->caps2 |= MMC_CAP2_HS533;
 
 	rc = sdhci_add_host(host);
 	sdhci_tegra_error_stats_debugfs(host);
