@@ -1180,6 +1180,8 @@ static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
 	}
 
 	for (i = 0; i < 2; i++) {
+		if (IS_ERR_OR_NULL(set_schmitt[i]))
+			continue;
 		ret = pinctrl_select_state(tegra_host->pinctrl_sdmmc,
 				set_schmitt[i]);
 		if (ret < 0)
