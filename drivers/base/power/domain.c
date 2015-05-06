@@ -2330,6 +2330,43 @@ out:
 	return ret ? -EPROBE_DEFER : 0;
 }
 EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+
+int genpd_dev_pm_add(const struct of_device_id *dev_id, struct device *dev)
+{
+	int ret;
+	struct device_node *node;
+	struct of_phandle_args pd_args;
+	struct generic_pm_domain *pd;
+
+	if (dev->pm_domain) {
+		pr_debug("%s is already registered to its power-domain\n",
+							dev_name(dev));
+		return 0;
+	}
+
+	node = of_find_matching_node(NULL, dev_id);
+	if (!node)
+		return -EINVAL;
+
+	ret = of_parse_phandle_with_args(node, "power-domains",
+				"#power-domain-cells", 0, &pd_args);
+	if (ret < 0)
+		return ret;
+
+	pd = of_genpd_get_from_provider(&pd_args);
+	if (IS_ERR(pd))
+		return PTR_ERR(pd);
+
+	while (1) {
+		ret = pm_genpd_add_device(pd, dev);
+		if (ret != -EAGAIN)
+			break;
+		cond_resched();
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(genpd_dev_pm_add);
 #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
 
 
