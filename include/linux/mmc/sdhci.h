@@ -149,9 +149,9 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK		(1<<13)
 #define SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR		(1<<14)
 #define SDHCI_QUIRK2_PERIODIC_CALIBRATION		(1<<15)
+#define SDHCI_QUIRK2_DISABLE_CARD_CLOCK_FIRST		(1<<16)
 
 	unsigned int  acmd12_ctrl;
-	unsigned int  ier;
 	unsigned int  command;
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */

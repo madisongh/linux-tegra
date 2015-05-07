@@ -73,19 +73,15 @@ struct tegra_sdhci_platform_data {
 	unsigned int ddr_trim_delay;
 	unsigned int dqs_trim_delay;
 	unsigned int uhs_mask;
-	unsigned int id;
 	struct mmc_platform_data mmc_data;
 	bool power_off_rail;
-	bool en_freq_scaling;
 	bool cd_wakeup_incapable;
-	bool en_nominal_vcore_tuning;
 	unsigned int calib_3v3_offsets;	/* Format to be filled: 0xXXXXPDPU */
 	unsigned int calib_1v8_offsets;	/* Format to be filled: 0xXXXXPDPU */
 	unsigned int compad_vref_3v3;
 	unsigned int compad_vref_1v8;
 	bool disable_clock_gate; /* no clock gate when true */
 	bool update_pinctrl_settings;
-	u32 cpu_speedo;
 	unsigned int default_drv_type;
 	bool dll_calib_needed;
 	bool pwr_off_during_lp0;
@@ -106,11 +102,7 @@ struct tegra_sdhci_platform_data {
 	bool en_strobe; /* Enable enhance strobe mode for eMMC */
 	bool enb_feedback_clock;
 	bool en_periodic_calib;
-	bool dll_calib_needed;
-	bool pwr_off_during_lp0;
-	unsigned int auto_cal_step;
 	unsigned int fixed_clk_freq_table[MMC_TIMINGS_MAX_MODES + 1];
-	bool enable_autocal_slew_override;
 };
 
 #endif

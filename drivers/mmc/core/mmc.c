@@ -862,7 +862,7 @@ static int __mmc_select_powerclass(struct mmc_card *card,
 				ext_csd->raw_pwr_cl_ddr_52_195;
 		else if (host->ios.clock <= MMC_HS533_MAX_DTR)
 			pwrclass_val = (bus_width == EXT_CSD_DDR_BUS_WIDTH_8) ?
-				ext_csd->raw_pwr_cl_ddr_200_195 :
+				ext_csd->raw_pwr_cl_ddr_200_360 :
 				ext_csd->raw_pwr_cl_200_195;
 		break;
 	case MMC_VDD_27_28:
@@ -1662,23 +1662,26 @@ err:
 
 static int mmc_can_sleep(struct mmc_card *card)
 {
-	return (card && card->ext_csd.rev >= 3);
+	return ((card && card->ext_csd.rev >= 3) &&
+		!(card->host->caps2 & MMC_CAP2_NO_SLEEP_CMD));
 }
 
-static int mmc_sleep(struct mmc_host *host)
+static int mmc_sleep(struct mmc_host *host, int sleep)
 {
 	struct mmc_command cmd = {0};
 	struct mmc_card *card = host->card;
 	unsigned int timeout_ms = DIV_ROUND_UP(card->ext_csd.sa_timeout, 10000);
 	int err;
 
+	if (sleep)
 	err = mmc_deselect_cards(host);
 	if (err)
 		return err;
 
 	cmd.opcode = MMC_SLEEP_AWAKE;
 	cmd.arg = card->rca << 16;
-	cmd.arg |= 1 << 15;
+	if (sleep)
+		cmd.arg |= 1 << 15;
 
 	/*
 	 * If the max_busy_timeout of the host is specified, validate it against
@@ -1706,6 +1709,8 @@ static int mmc_sleep(struct mmc_host *host)
 	if (!cmd.busy_timeout || !(host->caps & MMC_CAP_WAIT_WHILE_BUSY))
 		mmc_delay(timeout_ms);
 
+	if(!sleep)
+		err = mmc_select_card(card);
 	return err;
 }
 
@@ -1818,7 +1823,7 @@ static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
 		((host->caps2 & MMC_CAP2_FULL_PWR_CYCLE) || !is_suspend))
 		err = mmc_poweroff_notify(host->card, notify_type);
 	else if (mmc_can_sleep(host->card))
-		err = mmc_sleep(host);
+		err = mmc_sleep(host, 1);
 	else if (!mmc_host_is_spi(host))
 		err = mmc_deselect_cards(host);
 
@@ -1863,9 +1868,8 @@ static int _mmc_resume(struct mmc_host *host)
 	if (!mmc_card_suspended(host->card))
 		goto out;
 
-	if (mmc_card_can_sleep(host) &&
-		!(host->caps2 & MMC_CAP2_NO_SLEEP_CMD)) {
-		err = mmc_card_awake(host);
+	if (mmc_can_sleep(host->card)) {
+		err = mmc_sleep(host, 0);
 	} else {
 		mmc_power_up(host, host->card->ocr);
 		err = mmc_init_card(host, host->card->ocr, host->card);

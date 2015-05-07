@@ -1014,7 +1014,7 @@ retry:
 					"Initialization of UHS-1 card failed,"
 					"falling back to HS mode%d\n",
 					err);
-				mmc_power_cycle(host);
+				mmc_power_cycle(host, host->ocr_avail);
 				enable_uhs = 0;
 				ocr &= ~SD_OCR_S18R;
 				goto retry;

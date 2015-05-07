@@ -258,9 +258,9 @@ static int mmc_set_bus_speed_mode(struct mmc_card *card, u32 speed)
 	} else {
 		/* check card and host capability for HS200 to proceed */
 		if (!(((caps2 & MMC_CAP2_HS200_1_8V_SDR) &&
-				(card_type & EXT_CSD_CARD_TYPE_SDR_1_8V)) ||
+				(card_type & EXT_CSD_CARD_TYPE_HS200_1_8V)) ||
 		  ((caps2 & MMC_CAP2_HS200_1_2V_SDR) &&
-				(card_type & EXT_CSD_CARD_TYPE_SDR_1_2V)))) {
+				(card_type & EXT_CSD_CARD_TYPE_HS200_1_2V)))) {
 			err = -EINVAL;
 			goto err_node;
 		}
@@ -292,17 +292,7 @@ static int mmc_set_bus_speed_mode(struct mmc_card *card, u32 speed)
 		clock = MMC_HS200_MAX_DTR;
 	}
 	mmc_set_timing(card->host, card->host->ios.timing);
-	if (card->host->ios.timing == MMC_TIMING_UHS_DDR50) {
-		mmc_card_set_ddr_mode(card);
-		card->state &= ~(MMC_STATE_HIGHSPEED_200
-				 | MMC_STATE_HIGHSPEED_400
-				 | MMC_STATE_HIGHSPEED);
-	} else if (card->host->ios.timing == MMC_TIMING_MMC_HS200) {
-		mmc_card_set_hs200(card);
-		card->state &= ~(MMC_STATE_HIGHSPEED_DDR
-				 | MMC_STATE_HIGHSPEED_400
-				 | MMC_STATE_HIGHSPEED);
-	}
+
 	/* Based on bus width selected for card, set host side bus width */
 	switch (bus_width) {
 	case EXT_CSD_BUS_WIDTH_8:
@@ -389,16 +379,15 @@ static int mmc_speed_opt_get(void *data, u64 *val)
 	if (!host || !host->card)
 		return 0;
 
-	if (mmc_sd_card_uhs(host->card) &&
-		(host->card->sd_bus_speed < ARRAY_SIZE(uhs_speeds))) {
+	if (host->card->sd_bus_speed < ARRAY_SIZE(uhs_speeds)) {
 		str = uhs_speeds[host->card->sd_bus_speed];
 		*val = host->card->sd_bus_speed;
-	} else if (mmc_card_highspeed(host->card)) {
+	} else if (host->ios.timing == MMC_TIMING_MMC_HS) {
 		str = "high speed";
-	} else if (mmc_card_hs200(host->card)) {
+	} else if (host->ios.timing == MMC_TIMING_MMC_HS200) {
 		str = "HS200";
 		*val = UHS_SDR104_BUS_SPEED;
-	} else if (mmc_card_ddr_mode(host->card)) {
+	} else if (host->ios.timing == MMC_TIMING_MMC_DDR52) {
 		str = "DDR50";
 		*val = UHS_DDR50_BUS_SPEED;
 	}
@@ -517,7 +506,6 @@ static int mmc_get_ext_csd_byte_val(struct mmc_card *card, u64 *val,
 	if (!err)
 		*val = ext_csd[ext_csd_byte];
 
-out_free:
 	kfree(ext_csd);
 	return err;
 }

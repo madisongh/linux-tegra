@@ -134,6 +134,7 @@
 #define  SDHCI_INT_CARD_INSERT	0x00000040
 #define  SDHCI_INT_CARD_REMOVE	0x00000080
 #define  SDHCI_INT_CARD_INT	0x00000100
+#define  SDHCI_INT_RETUNING_EVENT	0x00001000
 #define  SDHCI_INT_ERROR	0x00008000
 #define  SDHCI_INT_TIMEOUT	0x00010000
 #define  SDHCI_INT_CRC		0x00020000
@@ -177,6 +178,8 @@
 #define   SDHCI_CTRL_DRV_TYPE_D		0x0030
 #define  SDHCI_CTRL_EXEC_TUNING		0x0040
 #define  SDHCI_CTRL_TUNED_CLK		0x0080
+#define  SDHCI_HOST_VERSION_4_EN	0x1000
+#define  SDHCI_ADDRESSING_64BIT_EN	0x2000
 #define  SDHCI_CTRL_PRESET_VAL_ENABLE	0x8000
 
 #define SDHCI_CAPABILITIES	0x40
@@ -233,7 +236,8 @@
 
 /* 55-57 reserved */
 
-#define SDHCI_ADMA_ADDRESS	0x58
+#define SDHCI_ADMA_ADDRESS		0x58
+#define SDHCI_UPPER_ADMA_ADDRESS	0x5C
 
 /* 60-FB reserved */
 
@@ -259,10 +263,7 @@
 #define   SDHCI_SPEC_100	0
 #define   SDHCI_SPEC_200	1
 #define   SDHCI_SPEC_300	2
-
-/*
- * End of controller registers.
- */
+#define   SDHCI_SPEC_400	3
 
 #define SDHCI_MAX_DIV_SPEC_200	256
 #define SDHCI_MAX_DIV_SPEC_300	2046
@@ -305,6 +306,7 @@ struct sdhci_ops {
 	void	(*hw_reset)(struct sdhci_host *host);
 	void    (*adma_workaround)(struct sdhci_host *host, u32 intmask);
 	void	(*platform_init)(struct sdhci_host *host);
+	void	(*platform_resume)(struct sdhci_host *host);
 	void    (*card_event)(struct sdhci_host *host);
 	void	(*switch_signal_voltage_exit)(struct sdhci_host *host,
 				unsigned char signal_voltage);

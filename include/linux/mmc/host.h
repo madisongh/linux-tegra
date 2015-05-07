@@ -340,6 +340,7 @@ struct mmc_host {
 #define MMC_CAP2_EN_STROBE	(1 << 18)       /* can support enhanced strobe*/
 #define MMC_CAP2_HS533		(1 << 19)       /* can support HS533*/
 #define MMC_CAP2_CQ		(1 << 20)       /* can support CQ*/
+#define MMC_CAP2_NO_SLEEP_CMD	(1 << 21)	/* cannot support sleep mode */
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
 #ifdef CONFIG_MMC_CLKGATE

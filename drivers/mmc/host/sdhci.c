@@ -266,6 +266,18 @@ void sdhci_reset(struct sdhci_host *host, u8 mask)
 		timeout--;
 		mdelay(1);
 	}
+
+	/*
+	 * VERSION_4_EN bit and 64BIT_EN bit are cleared after a full reset
+	 * need to re-configure them after each full reset
+	 */
+	if ((mask & SDHCI_RESET_ALL) && host->version >= SDHCI_SPEC_400) {
+		ctrl = sdhci_readl(host, SDHCI_ACMD12_ERR);
+		ctrl |= SDHCI_HOST_VERSION_4_EN;
+		if (host->quirks2 & SDHCI_QUIRK2_SUPPORT_64BIT_DMA)
+			ctrl |= SDHCI_ADDRESSING_64BIT_EN;
+		sdhci_writel(host, ctrl, SDHCI_ACMD12_ERR);
+	}
 }
 EXPORT_SYMBOL_GPL(sdhci_reset);
 
@@ -287,18 +299,6 @@ static void sdhci_do_reset(struct sdhci_host *host, u8 mask)
 
 		/* Resetting the controller clears many */
 		host->preset_enabled = false;
-	}
-
-	/*
-	 * VERSION_4_EN bit and 64BIT_EN bit are cleared after a full reset
-	 * need to re-configure them after each full reset
-	 */
-	if ((mask & SDHCI_RESET_ALL) && host->version >= SDHCI_SPEC_400) {
-		ctrl = sdhci_readl(host, SDHCI_ACMD12_ERR);
-		ctrl |= SDHCI_HOST_VERSION_4_EN;
-		if (host->quirks2 & SDHCI_QUIRK2_SUPPORT_64BIT_DMA)
-			ctrl |= SDHCI_ADDRESSING_64BIT_EN;
-		sdhci_writel(host, ctrl, SDHCI_ACMD12_ERR);
 	}
 }
 
@@ -686,12 +686,6 @@ static int sdhci_adma_table_pre(struct sdhci_host *host,
 			host->align_addr, 128 * 8, direction);
 	}
 
-	host->adma_addr = dma_map_single(mmc_dev(host->mmc),
-		host->adma_desc, ADMA_SIZE, DMA_TO_DEVICE);
-	if (dma_mapping_error(mmc_dev(host->mmc), host->adma_addr))
-		goto unmap_entries;
-	BUG_ON(host->adma_addr & 0x3);
-
 	return 0;
 
 unmap_align:
@@ -963,9 +957,9 @@ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
 
 				if ((host->version >= SDHCI_SPEC_400) &&
 				    (host->quirks &
-				     SDHCI_QUIRK_SUPPORT_64BIT_DMA)) {
+				     SDHCI_QUIRK2_SUPPORT_64BIT_DMA)) {
 					if (host->quirks &
-					    SDHCI_QUIRK_USE_64BIT_ADDR) {
+					    SDHCI_QUIRK2_USE_64BIT_ADDR) {
 
 						sdhci_writel(host,
 						(host->adma_addr >> 32)
@@ -1635,7 +1629,7 @@ void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 
 	host->mmc->actual_clock = 0;
 
-	if (host->quirks & SDHCI_QUIRK_DISABLE_CARD_CLOCK) {
+	if (host->quirks & SDHCI_QUIRK2_DISABLE_CARD_CLOCK_FIRST) {
 		clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
 		clk &= ~SDHCI_CLOCK_CARD_EN;
 		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
@@ -1929,7 +1923,7 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 				 * in case the pending finish_tasklet
 				 * finishes it incorrectly.
 				 */
-				host->mrq = NULL;
+				host->mrq_cmd = NULL;
 
 				spin_unlock_irqrestore(&host->lock, flags);
 				sdhci_execute_tuning(mmc, tuning_opcode);
@@ -1937,7 +1931,6 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 				mmc->ready_tuning = 0;
 				spin_lock_irqsave(&host->lock, flags);
 
-end_tuning:
 				/* Restore original mmc_request structure */
 				host->mrq_cmd = mrq;
 			}
@@ -2069,13 +2062,13 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 		u16 clk, ctrl_2;
 
 		/* In case of UHS-I modes, set High Speed Enable */
-		if ((ios->timing == MMC_TIMING_MMC_HS200) ||
+		if (((ios->timing == MMC_TIMING_MMC_HS200) ||
 		    (ios->timing == MMC_TIMING_MMC_DDR52) ||
 		    (ios->timing == MMC_TIMING_UHS_SDR50) ||
 		    (ios->timing == MMC_TIMING_UHS_SDR104) ||
 		    (ios->timing == MMC_TIMING_UHS_DDR50) ||
-		    (ios->timing == MMC_TIMING_UHS_SDR25) &&
-		    !(host->quirks & SDHCI_QUIRK_NO_HISPD_BIT))
+		    (ios->timing == MMC_TIMING_UHS_SDR25)) &&
+		    (!(host->quirks & SDHCI_QUIRK_NO_HISPD_BIT)))
 			ctrl |= SDHCI_CTRL_HISPD;
 
 		if (!host->preset_enabled) {
@@ -2428,7 +2421,7 @@ static int sdhci_validate_sd2_0(struct mmc_host *mmc)
 static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
-	u16 ctrl;
+	u16 ctrl, clk;
 	u32 ier;
 	int tuning_loop_counter = MAX_TUNING_LOOP;
 	int err = 0;
@@ -2693,8 +2686,8 @@ static void sdhci_card_event(struct mmc_host *mmc)
 
 	spin_lock_irqsave(&host->lock, flags);
 
-	/* Check host->mrq first in case we are runtime suspended */
-	if (host->mrq && !present) {
+	/* Check host->mrq_cmd first in case we are runtime suspended */
+	if (host->mrq_cmd && !present) {
 		pr_err("%s: Card removed during transfer!\n",
 			mmc_hostname(host->mmc));
 		pr_err("%s: Resetting controller.\n",
@@ -2888,7 +2881,7 @@ static void sdhci_tasklet_cmd_finish(unsigned long param)
 		/* Some controllers need this kick or reset won't work here */
 		if (host->quirks & SDHCI_QUIRK_CLOCK_BEFORE_RESET)
 			/* This is to force an update */
-			sdhci_update_clock(host);
+			host->ops->set_clock(host, host->clock);
 
 		sdhci_reset(host, SDHCI_RESET_CMD);
 	}
@@ -2949,7 +2942,7 @@ static void sdhci_tasklet_dat_finish(unsigned long param)
 		/* Some controllers need this kick or reset won't work here */
 		if (host->quirks & SDHCI_QUIRK_CLOCK_BEFORE_RESET)
 			/* This is to force an update */
-			sdhci_update_clock(host);
+			host->ops->set_clock(host, host->clock);
 
 		sdhci_reset(host, SDHCI_RESET_DATA);
 	}
@@ -3448,8 +3441,8 @@ int sdhci_suspend_host(struct sdhci_host *host)
 	 * but Vcc would still be powered on. In resume, we only restore
 	 * the controller context. So, set MMC_PM_KEEP_POWER flag.
 	 */
-	if (mmc_card_can_sleep(mmc) && !(mmc->caps2 & MMC_CAP2_NO_SLEEP_CMD))
-		mmc->pm_flags |= MMC_PM_KEEP_POWER;
+	if (!(host->mmc->caps2 & MMC_CAP2_NO_SLEEP_CMD))
+		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 
 	if (!device_may_wakeup(mmc_dev(host->mmc))) {
 		host->ier = 0;
@@ -3496,6 +3489,9 @@ int sdhci_resume_host(struct sdhci_host *host)
 	}
 
 	sdhci_enable_card_detection(host);
+
+	if (host->ops->platform_resume)
+		host->ops->platform_resume(host);
 
 	/* Set the re-tuning expiration flag */
 	if (host->flags & SDHCI_USING_RETUNING_TIMER)

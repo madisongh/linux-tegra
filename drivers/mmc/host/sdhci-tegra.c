@@ -45,8 +45,9 @@
 #include <linux/seq_file.h>
 #include <linux/reboot.h>
 
+#include <linux/clk/tegra.h>
+
 #include <mach/hardware.h>
-#include <mach/pinmux-defines.h>
 
 #include <linux/platform_data/mmc-sdhci-tegra.h>
 #include <linux/platform/tegra/common.h>
@@ -66,11 +67,12 @@
 #define SDHCI_VNDR_CLK_CTRL_SDMMC_CLK			0x1
 
 #define SDHCI_VNDR_MISC_CTRL		0x120
-#define SDHCI_VNDR_MISC_CTRL_ENABLE_SDR104		0x8
-#define SDHCI_VNDR_MISC_CTRL_ENABLE_SDR50		0x10
+#define SDHCI_VNDR_MISC_CTRL_ENABLE_SDR104_SUPPORT	0x8
+#define SDHCI_VNDR_MISC_CTRL_ENABLE_SDR50_SUPPORT	0x10
 #define SDHCI_VNDR_MISC_CTRL_ENABLE_SDHCI_SPEC_300	0x20
-#define SDHCI_VNDR_MISC_CTRL_ENABLE_DDR50		0x200
-#define SDHCI_VENDOR_MISC_CNTRL_INFINITE_ERASE_TIMEOUT	0x1
+#define SDHCI_VNDR_MISC_CTRL_ENABLE_DDR50_SUPPORT	0x200
+#define SDHCI_VNDR_MISC_CTRL_INFINITE_ERASE_TIMEOUT	0x1
+#define SDHCI_VNDR_MISC_CTRL_PIPE_STAGES_MASK		0x180
 #define SDHCI_VNDR_MISC_CTRL_EN_EXT_LOOPBACK_SHIFT	17
 
 #define SDHCI_VNDR_SYS_SW_CTRL				0x104
@@ -81,8 +83,8 @@
 #define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT	8
 #define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_MASK	0x3F
 
-#define SDMMC_VENDOR_IO_TRIM_CNTRL_0	0x1AC
-#define SDMMC_VENDOR_IO_TRIM_CNTRL_0_SEL_VREG_MASK	0x4
+#define SDMMC_VNDR_IO_TRIM_CTRL_0	0x1AC
+#define SDMMC_VNDR_IO_TRIM_CTRL_0_SEL_VREG_MASK	0x4
 
 #define SDHCI_VNDR_DLLCAL_CFG				0x1b0
 #define SDHCI_VNDR_DLLCAL_CFG_EN_CALIBRATE		0x80000000
@@ -121,7 +123,6 @@
 
 #define SDHCI_VNDR_TUN_CTRL1_TUN_STEP_SIZE		0x77
 
-
 #define SDMMC_SDMEMCOMPPADCTRL	0x1E0
 #define SDMMC_SDMEMCOMPPADCTRL_VREF_SEL_MASK	0xF
 #define SDMMC_SDMEMCOMPPADCTRL_PAD_E_INPUT_OR_E_PWRD_MASK	0x80000000
@@ -137,15 +138,14 @@
 
 #define SDMMC_AUTO_CAL_STATUS	0x1EC
 #define SDMMC_AUTO_CAL_STATUS_AUTO_CAL_ACTIVE	0x80000000
+#define SDMMC_AUTO_CAL_STATUS_PULLDOWN_OFFSET	24
+#define PULLUP_ADJUSTMENT_OFFSET	20
 
 #define SDMMC_VENDOR_ERR_INTR_STATUS_0	0x108
 
 #define SDMMC_IO_SPARE_0	0x1F0
 #define SPARE_OUT_3_OFFSET	19
 
-#define SDHCI_TEGRA_MAX_TAP_VALUES	0xFF
-#define SDHCI_TEGRA_MAX_TRIM_VALUES	0x1F
-#define DEFAULT_SDHOST_FREQ	50000000
 
 /* Erratum: Version register is invalid in HW */
 #define NVQUIRK_FORCE_SDHCI_SPEC_200		BIT(0)
@@ -154,11 +154,11 @@
 /* Enable SDHOST v3.0 support */
 #define NVQUIRK_ENABLE_SDHCI_SPEC_300		BIT(2)
 /* Enable SDR50 mode */
-#define NVQUIRK_DISABLE_SDR50			BIT(3)
+#define NVQUIRK_ENABLE_SDR50			BIT(3)
 /* Enable SDR104 mode */
-#define NVQUIRK_DISABLE_SDR104			BIT(4)
+#define NVQUIRK_ENABLE_SDR104			BIT(4)
 /* Enable DDR50 mode */
-#define NVQUIRK_DISABLE_DDR50			BIT(5)
+#define NVQUIRK_ENABLE_DDR50			BIT(5)
 /* Do not enable auto calibration if the platform doesn't support */
 #define NVQUIRK_DISABLE_AUTO_CALIBRATION	BIT(6)
 /* Set Calibration Offsets */
@@ -199,23 +199,29 @@
 #define NVQUIRK_UPDATE_PIN_CNTRL_REG		BIT(25)
 /* Use timeout clk for write crc status data timeout counter */
 #define NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT	BIT(26)
-#define NVQUIRK_DISABLE_EXTERNAL_LOOPBACK	BIT(27)
 /* Enable T210 specific SDMMC WAR - Tuning Step Size, Tuning Iterations*/
-#define NVQUIRK_UPDATE_HW_TUNING_CONFG		BIT(28)
+#define NVQUIRK_UPDATE_HW_TUNING_CONFG		BIT(27)
 /* Enable Enhanced strobe mode support */
-#define NVQUIRK_EN_STROBE_SUPPORT		BIT(29)
+#define NVQUIRK_EN_STROBE_SUPPORT		BIT(28)
 /*controller does not support cards if 1.8 V is not supported by cards*/
-#define NVQUIRK_BROKEN_SD2_0_SUPPORT		BIT(30)
-#define NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH	BIT(31)
+#define NVQUIRK_BROKEN_SD2_0_SUPPORT		BIT(29)
+#define NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH	BIT(30)
 
 #define NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION	BIT(0)
 
+/* max limit defines */
+#define SDHCI_TEGRA_MAX_TAP_VALUES	0xFF
+#define SDHCI_TEGRA_MAX_TRIM_VALUES	0x1F
+#define SDHCI_TEGRA_MAX_DQS_TRIM_VALUES	0x3F
+#define MAX_DIVISOR_VALUE		128
+#define DEFAULT_SDHOST_FREQ		50000000
 /* Max number of clock parents for sdhci is fixed to 2 */
 #define TEGRA_SDHCI_MAX_PLL_SOURCE 2
 
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
 	u32 nvquirks;
+	u32 nvquirks2;
 	const char *parent_clk_list[TEGRA_SDHCI_MAX_PLL_SOURCE];
 };
 
@@ -239,6 +245,7 @@ struct dbg_cfg_data {
 };
 #endif
 struct sdhci_tegra {
+	const struct tegra_sdhci_platform_data *plat;
 	const struct sdhci_tegra_soc_data *soc_data;
 	int power_gpio;
 	bool	clk_enabled;
@@ -274,14 +281,13 @@ struct sdhci_tegra {
 static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
 		unsigned long desired_rate);
 static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
-	unsigned int tap_delay);
+	int tap_delay);
 static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
-	unsigned int trim_delay);
+	int trim_delay);
 static inline int sdhci_tegra_set_dqs_trim_delay(struct sdhci_host *sdhci,
-	unsigned int dqs_trim_delay);
+	int dqs_trim_delay);
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	unsigned char signal_voltage);
-static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci);
 static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
 		bool set);
 static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option);
@@ -299,16 +305,14 @@ static void tegra_sdhci_dumpregs(struct sdhci_host *sdhci)
 	int i;
 
 	/* print tuning windows */
-	if (!(sdhci->quirks2 & SDHCI_QUIRK2_NON_STANDARD_TUNING)) {
-		for (i = 0; i <= TUNING_WORD_SEL_MASK; i++) {
-			reg = sdhci_readl(sdhci, SDHCI_VNDR_TUN_CTRL0_0);
-			reg &= ~TUNING_WORD_SEL_MASK;
-			reg |= i;
-			sdhci_writel(sdhci, reg, SDHCI_VNDR_TUN_CTRL0_0);
-			val = sdhci_readl(sdhci, SDHCI_VNDR_TUN_STATUS0_0);
-			pr_info("%s: tuning_window[%d]: %#x\n",
-			mmc_hostname(sdhci->mmc), i, val);
-		}
+	for (i = 0; i <= TUNING_WORD_SEL_MASK; i++) {
+		reg = sdhci_readl(sdhci, SDHCI_VNDR_TUN_CTRL0_0);
+		reg &= ~TUNING_WORD_SEL_MASK;
+		reg |= i;
+		sdhci_writel(sdhci, reg, SDHCI_VNDR_TUN_CTRL0_0);
+		val = sdhci_readl(sdhci, SDHCI_VNDR_TUN_STATUS0_0);
+		pr_info("%s: tuning_window[%d]: %#x\n",
+		mmc_hostname(sdhci->mmc), i, val);
 	}
 	tap_delay = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
 	trim_delay = tap_delay;
@@ -422,7 +426,7 @@ static void tegra_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
 
 static void tegra_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
 {
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 
@@ -448,11 +452,11 @@ static void tegra_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
 
 static unsigned int tegra_sdhci_get_ro(struct sdhci_host *sdhci)
 {
-	return mmc_gpio_get_ro(host->mmc);
+	return mmc_gpio_get_ro(sdhci->mmc);
 }
 
 static inline int sdhci_tegra_set_dqs_trim_delay(struct sdhci_host *sdhci,
-	u8 dqs_trim_delay)
+	int dqs_trim_delay)
 {
 	u32 vend_ovrds;
 
@@ -466,17 +470,20 @@ static inline int sdhci_tegra_set_dqs_trim_delay(struct sdhci_host *sdhci,
 			SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT);
 	vend_ovrds |= (dqs_trim_delay <<
 			SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT);
-	sdhci_writel(host, vend_ovrds, SDHCI_VNDR_CAP_OVERRIDES_0);
+	sdhci_writel(sdhci, vend_ovrds, SDHCI_VNDR_CAP_OVERRIDES_0);
+
+	return 0;
 }
 
 static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
-	u8 trim_delay)
+	int trim_delay)
 {
 	u32 vendor_ctrl;
 
 	if ((trim_delay > SDHCI_TEGRA_MAX_TRIM_VALUES) && (trim_delay < 0)) {
 		dev_err(mmc_dev(sdhci->mmc), "Invalid trim value\n");
 		return -1;
+	}
 
 	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
 	vendor_ctrl &= (SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK <<
@@ -488,7 +495,7 @@ static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 }
 
 static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
-	u8 tap_delay)
+	int tap_delay)
 {
 	u32 vendor_ctrl;
 	u16 clk;
@@ -507,11 +514,9 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 		sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
 	}
 
-	if (!(sdhci->quirks2 & SDHCI_QUIRK2_NON_STANDARD_TUNING)) {
-		vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_TUN_CTRL0_0);
-		vendor_ctrl &= ~SDHCI_VNDR_TUN_CTRL0_TUN_HW_TAP;
-		sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_TUN_CTRL0_0);
-	}
+	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_TUN_CTRL0_0);
+	vendor_ctrl &= ~SDHCI_VNDR_TUN_CTRL0_TUN_HW_TAP;
+	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_TUN_CTRL0_0);
 
 	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
 	vendor_ctrl &= (SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK <<
@@ -519,13 +524,11 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 	vendor_ctrl |= (tap_delay << SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
 	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 
-	if (!(sdhci->quirks2 & SDHCI_QUIRK2_NON_STANDARD_TUNING)) {
-		vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_TUN_CTRL0_0);
-		vendor_ctrl |= SDHCI_VNDR_TUN_CTRL0_TUN_HW_TAP;
-		sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_TUN_CTRL0_0);
-		udelay(1);
-		sdhci_reset(sdhci, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
-	}
+	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_TUN_CTRL0_0);
+	vendor_ctrl |= SDHCI_VNDR_TUN_CTRL0_TUN_HW_TAP;
+	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_TUN_CTRL0_0);
+	udelay(1);
+	sdhci_reset(sdhci, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
 
 	if (card_clk_enabled) {
 		clk |= SDHCI_CLOCK_CARD_EN;
@@ -548,8 +551,6 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	if (!(mask & SDHCI_RESET_ALL))
 		return;
 
-	sdhci_tegra_select_drive_strength(host, uhs);
-
 	if (tegra_host->sd_stat_head != NULL) {
 		tegra_host->sd_stat_head->data_crc_count = 0;
 		tegra_host->sd_stat_head->cmd_crc_count = 0;
@@ -564,7 +565,7 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	if (soc_data->nvquirks & NVQUIRK_EN_FEEDBACK_CLK)
 		vendor_ctrl &= ~SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK;
 	else
-		vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_INTERNAL_CLK;
+		vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK;
 	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDR50_TUNING)
 		vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_SDR50_TUNING;
 	sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
@@ -578,8 +579,8 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 
 	misc_ctrl = sdhci_readl(host, SDHCI_VNDR_MISC_CTRL);
 	/* Erratum: Enable SDHCI spec v3.00 support */
-	if (soc_data->nvquirks & NVQUIRK_ENABLE_SD_3_0)
-		misc_ctrl |= SDHCI_VNDR_MISC_CTRL_ENABLE_SD_3_0;
+	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDHCI_SPEC_300)
+		misc_ctrl |= SDHCI_VNDR_MISC_CTRL_ENABLE_SDHCI_SPEC_300;
 	/* Don't advertise UHS modes which aren't supported yet */
 	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDR104)
 		misc_ctrl |= SDHCI_VNDR_MISC_CTRL_ENABLE_SDR104_SUPPORT;
@@ -627,23 +628,6 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_TUN_CTRL1_0);
 	}
 
-	if (soc_data->nvquirks &
-		NVQUIRK_DISABLE_TIMER_BASED_TUNING) {
-		vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_TUN_CTRL);
-		vendor_ctrl |= SDHCI_VNDR_TUN_CTRL_RETUNE_REQ_EN;
-		vendor_ctrl |= SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS;
-		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_TUN_CTRL0_0);
-
-		vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_TUN_CTRL1_0);
-		vendor_ctrl &= ~(SDHCI_VNDR_TUN_CTRL1_TUN_STEP_SIZE);
-		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_TUN_CTRL1_0);
-	}
-
-	/* Restore DLL calibration values */
-	if (plat->dll_calib_needed && tegra_host->dll_calib)
-		sdhci_writel(host, tegra_host->dll_calib,
-				SDHCI_VNDR_DLLCAL_CFG);
-
 	/* Use timeout clk data timeout counter for generating wr crc status */
 	if (soc_data->nvquirks &
 		NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT) {
@@ -672,17 +656,17 @@ static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
 	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
 }
 
-static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
+void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		unsigned int timing)
 {
 	u16 clk;
-	u32 vndr_ctrl;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
 
 	/* Set the UHS signaling mode */
 	sdhci_set_uhs_signaling(host, timing);
+	sdhci_tegra_select_drive_strength(host, timing);
 
 	if (timing == MMC_TIMING_MMC_HS400)
 		sdhci_tegra_set_dqs_trim_delay(host, plat->dqs_trim_delay);       
@@ -703,8 +687,6 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		/* Set the ddr mode trim delay if required */
 		sdhci_tegra_set_trim_delay(host, plat->ddr_trim_delay);
 	}
-
-	return 0;
 }
 
 static void vendor_trim_clear_sel_vreg(struct sdhci_host *host, bool enable)
@@ -712,15 +694,15 @@ static void vendor_trim_clear_sel_vreg(struct sdhci_host *host, bool enable)
 	unsigned int misc_ctrl;
 	unsigned int wait_usecs;
 
-	misc_ctrl = sdhci_readl(host, SDMMC_VNDR_IO_TRIM_CNTRL_0);
+	misc_ctrl = sdhci_readl(host, SDMMC_VNDR_IO_TRIM_CTRL_0);
 	if (enable) {
-		misc_ctrl &= ~(SDMMC_VNDR_IO_TRIM_CNTRL_0_SEL_VREG);
+		misc_ctrl &= ~(SDMMC_VNDR_IO_TRIM_CTRL_0_SEL_VREG_MASK);
 		wait_usecs = 3;
 	} else {
-		misc_ctrl |= (SDMMC_VNDR_IO_TRIM_CNTRL_0_SEL_VREG);
+		misc_ctrl |= (SDMMC_VNDR_IO_TRIM_CTRL_0_SEL_VREG_MASK);
 		wait_usecs = 1;
 	}
-	sdhci_writel(host, misc_ctrl, SDMMC_VNDR_IO_TRIM_CNTRL_0);
+	sdhci_writel(host, misc_ctrl, SDMMC_VNDR_IO_TRIM_CTRL_0);
 	udelay(wait_usecs);
 }
 
@@ -873,8 +855,8 @@ static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
 	 * In ddr mode, tegra sdmmc controller clock frequency
 	 * should be double the card clock frequency.
 	 */
-	if (sdhci->mmc->card &&	mmc_card_ddr_mode(sdhci->mmc->card)) {
-		if (tegra_host->ddr_clk limit &&
+	if (sdhci->mmc->ios.timing == MMC_TIMING_UHS_DDR50) {
+		if (tegra_host->ddr_clk_limit &&
 				(tegra_host->ddr_clk_limit < clock))
 			clk_rate = tegra_host->ddr_clk_limit * 2;
 		else
@@ -967,11 +949,18 @@ static void tegra_sdhci_en_strobe(struct sdhci_host *host)
 	tegra_host->en_strobe = true;
 }
 
-static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci)
+static void tegra_sdhci_post_init(struct sdhci_host *sdhci)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	u32 dll_cfg;
 	u32 dll_ctrl0;
 	unsigned timeout = 5;
+
+	if ((sdhci->mmc->card->ext_csd.strobe_support) &&
+			(sdhci->mmc->caps2 & MMC_CAP2_EN_STROBE) &&
+			tegra_host->plat->en_strobe)
+		tegra_sdhci_en_strobe(sdhci);
 
 	/* Program TX_DLY_CODE_OFFSET Value for HS533 mode*/
 	if (sdhci->mmc->card->state & MMC_STATE_HIGHSPEED_533) {
@@ -1003,15 +992,10 @@ static void tegra_sdhci_do_dll_calibration(struct sdhci_host *sdhci)
 	if (!timeout) {
 		dev_err(mmc_dev(sdhci->mmc), "DLL calibration is failed\n");
 	}
-
-	tegra_host->dll_calib = sdhci_readl(sdhci, SDHCI_VNDR_DLLCAL_CFG);
-
-	if (tegra_host->en_strobe)
-		tegra_sdhci_en_strobe(host);
 }
 
 static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
-		bool set)
+	bool set)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
@@ -1063,10 +1047,11 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	unsigned int timeout = 10;
 	unsigned int calib_offsets = 0;
+	bool set;
 
 	if (tegra_host->plat->disable_auto_cal)
 		return;
-
+	set = (signal_voltage == MMC_SIGNAL_VOLTAGE_180) ? true : false;
 	tegra_sdhci_update_sdmmc_pinctrl_register(sdhci, set);
 
 	/*
@@ -1148,48 +1133,6 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 		sdhci_writel(sdhci, val, SDMMC_SDMEMCOMPPADCTRL);
 	}
 
-	if (unlikely(soc_data->nvquirks & NVQUIRK_SET_DRIVE_STRENGTH)) {
-		unsigned int pulldown_code;
-		unsigned int pullup_code;
-		unsigned long pin_config;
-		int err;
-
-		/* Disable Auto calibration */
-		val = sdhci_readl(sdhci, SDMMC_AUTO_CAL_CONFIG);
-		val &= ~SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE;
-		sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
-
-		if (tegra_host->pinctrl && tegra_host->drive_group_sel >= 0) {
-			/* Get the pull down codes from auto cal status reg */
-			pulldown_code = (
-				sdhci_readl(sdhci, SDMMC_AUTO_CAL_STATUS) >>
-				SDMMC_AUTO_CAL_STATUS_PULLDOWN_OFFSET);
-			pin_config = TEGRA_PINCONF_PACK(
-					TEGRA_PINCONF_PARAM_DRIVE_DOWN_STRENGTH,
-					pulldown_code);
-			err = pinctrl_set_config_for_group_sel(tegra_host->pinctrl,
-					tegra_host->drive_group_sel, pin_config);
-			if (err)
-				dev_err(mmc_dev(sdhci->mmc),
-				"Failed to set pulldown codes %d err %d\n",
-				pulldown_code, err);
-
-			/* Calculate the pull up codes */
-			pullup_code = pulldown_code + PULLUP_ADJUSTMENT_OFFSET;
-			if (pullup_code >= TEGRA_MAX_PULL)
-				pullup_code = TEGRA_MAX_PULL - 1;
-			pin_config = TEGRA_PINCONF_PACK(
-					TEGRA_PINCONF_PARAM_DRIVE_UP_STRENGTH,
-					pullup_code);
-			/* Set the pull up code in the pinmux reg */
-			err = pinctrl_set_config_for_group_sel(tegra_host->pinctrl,
-					tegra_host->drive_group_sel, pin_config);
-			if (err)
-				dev_err(mmc_dev(sdhci->mmc),
-				"Failed to set pullup codes %d err %d\n",
-				pullup_code, err);
-		}
-	}
 	if (tegra_host->plat->en_periodic_calib) {
 		tegra_host->timestamp = ktime_get();
 		sdhci->timestamp = ktime_get();
@@ -1242,6 +1185,8 @@ static int sdhci_tegra_sd_error_stats(struct sdhci_host *host, u32 int_status)
 static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
 {
 	tegra_sdhci_set_clock(sdhci, 0);
+
+	return 0;
 }
 
 static int tegra_sdhci_resume(struct sdhci_host *sdhci)
@@ -1251,33 +1196,8 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 
 	if (sdhci->mmc->pm_flags & MMC_PM_KEEP_POWER)
 		tegra_sdhci_do_calibration(sdhci, MMC_SIGNAL_VOLTAGE_330);
-}
 
-static void sdhci_tegra_error_stats_debugfs(struct sdhci_host *host)
-{
-	struct dentry *root;
-
-	root = debugfs_create_dir(dev_name(mmc_dev(host->mmc)), NULL);
-	if (IS_ERR(root))
-		/* Don't complain -- debugfs just isn't enabled */
-		return;
-	if (!root)
-		/* Complain -- debugfs is enabled, but it failed to
-		 * create the directory. */
-		goto err_root;
-
-	host->debugfs_root = root;
-
-	if (!debugfs_create_file("error_stats", S_IRUSR, root, host,
-				&sdhci_host_fops))
-		goto err_node;
-	return;
-err_node:
-	debugfs_remove_recursive(root);
-	host->debugfs_root = NULL;
-err_root:
-	pr_err("%s: Failed to initialize debugfs functionality\n", __func__);
-	return;
+	return 0;
 }
 
 static void tegra_sdhci_post_resume(struct sdhci_host *sdhci)
@@ -1290,245 +1210,12 @@ static void tegra_sdhci_post_resume(struct sdhci_host *sdhci)
 		(sdhci->mmc->card->type == MMC_TYPE_MMC) &&
 		(sdhci->mmc->ios.timing == MMC_TIMING_MMC_HS400));
 	if (dll_calib_req)
-		tegra_sdhci_do_dll_calibration(sdhci);
+		tegra_sdhci_post_init(sdhci);
 
 	/* Turn OFF the clocks if removable card is not present */
 	if (!(sdhci->mmc->caps & MMC_CAP_NONREMOVABLE) &&
 		(mmc_gpio_get_cd(sdhci->mmc) != 0) && tegra_host->clk_enabled)
 		tegra_sdhci_set_clock(sdhci, 0);
-}
-
-static const struct sdhci_ops tegra_sdhci_ops = {
-	.get_ro     = tegra_sdhci_get_ro,
-	.read_w     = tegra_sdhci_readw,
-	.write_l    = tegra_sdhci_writel,
-	.write_w    = tegra_sdhci_writew,
-	.set_clock  = tegra_sdhci_set_clock,
-	.set_bus_width = tegra_sdhci_set_bus_width,
-	.set_uhs_signaling = tegra_sdhci_set_uhs_signaling,
-	.reset      = tegra_sdhci_reset,
-	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
-	.suspend		= tegra_sdhci_suspend,
-	.resume			= tegra_sdhci_resume,
-	.platform_resume	= tegra_sdhci_post_resume,
-	.platform_reset_exit	= tegra_sdhci_reset_exit,
-	.switch_signal_voltage_exit = tegra_sdhci_do_calibration,
-	.sd_error_stats		= sdhci_tegra_sd_error_stats,
-	.get_drive_strength	= tegra_sdhci_get_drive_strength,
-	.dump_host_cust_regs	= tegra_sdhci_dumpregs,
-	.get_max_tuning_loop_counter = sdhci_tegra_get_max_tuning_loop_counter,
-	.config_tap_delay	= tegra_sdhci_config_tap,
-	.validate_sd2_0		= tegra_sdhci_validate_sd2_0,
-	.get_max_pio_transfer_limits = tegra_sdhci_set_max_pio_transfer_limits,
-};
-
-static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
-	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
-		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
-		  SDHCI_QUIRK_SINGLE_POWER_WRITE |
-		  SDHCI_QUIRK_NO_HISPD_BIT |
-		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
-		  SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
-	.quirks2 = SDHCI_QUIRK2_BROKEN_PRESET_VALUES,
-	.ops  = &tegra_sdhci_ops,
-};
-
-static struct sdhci_tegra_soc_data soc_data_tegra20 = {
-	.pdata = &sdhci_tegra20_pdata,
-	.nvquirks = NVQUIRK_FORCE_SDHCI_SPEC_200 |
-		    NVQUIRK_ENABLE_BLOCK_GAP_DET,
-};
-
-static const struct sdhci_pltfm_data sdhci_tegra30_pdata = {
-	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
-		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
-		  SDHCI_QUIRK_SINGLE_POWER_WRITE |
-		  SDHCI_QUIRK_NO_HISPD_BIT |
-		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
-		  SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
-	.quirks2 = SDHCI_QUIRK2_BROKEN_PRESET_VALUES,
-	.ops  = &tegra_sdhci_ops,
-};
-
-static struct sdhci_tegra_soc_data soc_data_tegra30 = {
-	.pdata = &sdhci_tegra30_pdata,
-	.nvquirks = NVQUIRK_ENABLE_SDHCI_SPEC_300 |
-		    NVQUIRK_DISABLE_SDR50 |
-		    NVQUIRK_DISABLE_SDR104,
-};
-
-static const struct sdhci_pltfm_data sdhci_tegra114_pdata = {
-	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
-		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
-		  SDHCI_QUIRK_SINGLE_POWER_WRITE |
-		  SDHCI_QUIRK_NO_HISPD_BIT |
-		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
-		  SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
-	.quirks2 = SDHCI_QUIRK2_BROKEN_PRESET_VALUES,
-	.ops  = &tegra_sdhci_ops,
-};
-
-static struct sdhci_tegra_soc_data soc_data_tegra114 = {
-	.pdata = &sdhci_tegra114_pdata,
-	.nvquirks = NVQUIRK_DISABLE_SDR50 |
-		    NVQUIRK_DISABLE_DDR50 |
-		    NVQUIRK_DISABLE_SDR104 |
-		    NVQUIRK_SHADOW_XFER_MODE_REG |
-		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD,
-};
-
-static struct sdhci_pltfm_data sdhci_tegra210_pdata = {
-	.quirks = TEGRA_SDHCI_QUIRKS,
-	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
-		   SDHCI_QUIRK2_NON_STD_VOLTAGE_SWITCHING |
-		   SDHCI_QUIRK2_NO_CALC_MAX_DISCARD_TO |
-		   SDHCI_QUIRK2_REG_ACCESS_REQ_HOST_CLK |
-		   SDHCI_QUIRK2_SUPPORT_64BIT_DMA |
-		   SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK,
-	.ops  = &tegra_sdhci_ops,
-};
-
-static struct sdhci_tegra_soc_data soc_data_tegra210 = {
-	.pdata = &sdhci_tegra21_pdata,
-	.nvquirks = TEGRA_SDHCI_NVQUIRKS |
-		    NVQUIRK_SET_TRIM_DELAY |
-		    NVQUIRK_ENABLE_DDR50 |
-		    NVQUIRK_ENABLE_AUTO_CMD23 |
-		    NVQUIRK_INFINITE_ERASE_TIMEOUT |
-		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
-		    NVQUIRK_SET_CALIBRATION_OFFSETS |
-		    NVQUIRK_DISABLE_TIMER_BASED_TUNING |
-		    NVQUIRK_DISABLE_EXTERNAL_LOOPBACK |
-		    NVQUIRK_UPDATE_PAD_CNTRL_REG |
-		    NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT |
-		    NVQUIRK_UPDATE_HW_TUNING_CONFG,
-	.nvquirks2 = NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION,
-};
-
-static struct sdhci_pltfm_data sdhci_tegra18_pdata = {
-	.quirks = TEGRA_SDHCI_QUIRKS,
-	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
-		   SDHCI_QUIRK2_NON_STD_VOLTAGE_SWITCHING |
-		   SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR |
-		   SDHCI_QUIRK2_NO_CALC_MAX_DISCARD_TO |
-		   SDHCI_QUIRK2_REG_ACCESS_REQ_HOST_CLK |
-		   SDHCI_QUIRK2_HOST_OFF_CARD_ON |
-		   SDHCI_QUIRK2_USE_64BIT_ADDR |
-		   SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK |
-		   SDHCI_QUIRK2_NON_STD_RTPM |
-		   SDHCI_QUIRK2_SUPPORT_64BIT_DMA,
-	.ops  = &tegra_sdhci_ops,
-};
-
-static struct sdhci_tegra_soc_data soc_data_tegra18 = {
-	.pdata = &sdhci_tegra18_pdata,
-	.nvquirks = TEGRA_SDHCI_NVQUIRKS |
-		    NVQUIRK_SET_TRIM_DELAY |
-		    NVQUIRK_ENABLE_DDR50 |
-		    NVQUIRK_ENABLE_HS200 |
-		    NVQUIRK_ENABLE_HS400 |
-		    NVQUIRK_ENABLE_AUTO_CMD23 |
-		    NVQUIRK_INFINITE_ERASE_TIMEOUT |
-		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
-		    NVQUIRK_SET_SDMEMCOMP_VREF_SEL |
-		    NVQUIRK_HIGH_FREQ_TAP_PROCEDURE |
-		    NVQUIRK_SET_CALIBRATION_OFFSETS |
-		    NVQUIRK_DISABLE_EXTERNAL_LOOPBACK |
-		    NVQUIRK_UPDATE_PAD_CNTRL_REG |
-		    NVQUIRK_UPDATE_PIN_CNTRL_REG,
-	.nvquirks2 = NVQUIRK2_UPDATE_HW_TUNING_CONFG |
-		     NVQUIRK2_CONFIG_PWR_DET |
-		     NVQUIRK2_BROKEN_SD2_0_SUPPORT |
-		     NVQUIRK2_SELECT_SDR50_MODE |
-		     NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION |
-		     NVQUIRK2_DYNAMIC_TRIM_SUPPLY_SWITCH,
-};
-
-static const struct of_device_id sdhci_tegra_dt_match[] = {
-	{ .compatible = "nvidia,tegra210-sdhci", .data = &soc_data_tegra210 },
-	{ .compatible = "nvidia,tegra124-sdhci", .data = &soc_data_tegra114 },
-	{ .compatible = "nvidia,tegra114-sdhci", .data = &soc_data_tegra114 },
-	{ .compatible = "nvidia,tegra30-sdhci", .data = &soc_data_tegra30 },
-	{ .compatible = "nvidia,tegra20-sdhci", .data = &soc_data_tegra20 },
-	{}
-};
-MODULE_DEVICE_TABLE(of, sdhci_tegra_dt_match);
-
-static int sdhci_tegra_parse_dt(struct device *dev) {
-	struct device_node *np = dev->of_node;
-	struct sdhci_host *host = dev_get_drvdata(dev);
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
-	struct tegra_sdhci_platform_data *plat;
-	int val;
-	struct property *prop;
-	const __be32 *p;
-	u32 u;
-	int i = 0;
-
-	if (!np)
-		return NULL;
-
-	tegra_host->power_gpio = of_get_named_gpio(np, "power-gpios", 0);
-	plat = devm_kzalloc(&pdev->dev, sizeof(*plat), GFP_KERNEL);
-	if (!plat) {
-		dev_err(&pdev->dev, "Can't allocate platform data\n");
-		return NULL;
-	}
-
-	if (of_find_property(np, "edp_support", NULL)) {
-		plat->edp_support = true;
-		of_property_for_each_u32(np, "edp_states", prop, p, u) {
-			if (i == SD_EDP_NUM_STATES)
-				break;
-			plat->edp_states[i] = u;
-			i++;
-		}
-		p = NULL;
-		prop = NULL;
-	}
-
-	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
-	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
-	of_property_read_u32(np, "ddr-trim-delay", &plat->ddr_trim_delay);
-	of_property_read_u32(np, "dqs-trim-delay", &plat->dqs_trim_delay);
-	of_property_read_u32(np, "ddr-clk-limit", &plat->ddr_clk_limit);
-	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
-	of_property_read_u32(np, "uhs_mask", &plat->uhs_mask);
-	of_property_read_u32(np, "compad-vref-3v3", &plat->compad_vref_3v3);
-	of_property_read_u32(np, "compad-vref-1v8", &plat->compad_vref_1v8);
-	of_property_read_u32(np, "calib_3v3_offsets", &plat->calib_3v3_offsets);
-	of_property_read_u32(np, "calib_1v8_offsets", &plat->calib_1v8_offsets);
-	of_property_read_u32(np, "default-drv-type", &plat->default_drv_type);
-	plat->update_pinctrl_settings = of_property_read_bool(np,
-		"nvidia,update-pinctrl-settings");
-	plat->dll_calib_needed = of_property_read_bool(np, "nvidia,dll-calib-needed");
-	plat->pwr_off_during_lp0 = of_property_read_bool(np,
-		"pwr-off-during-lp0");
-	of_property_read_u32(np, "auto-cal-step", &plat->auto_cal_step);
-	plat->disable_auto_cal = of_property_read_bool(np,
-		"nvidia,disable-auto-cal");
-	plat->en_io_trim_volt = of_property_read_bool(np,
-			"nvidia,en-io-trim-volt");
-	plat->power_off_rail = of_property_read_bool(np,
-		"power-off-rail");
-	plat->is_emmc = of_property_read_bool(np, "nvidia,is-emmc");
-	plat->is_sd_device = of_property_read_bool(np, "nvidia,sd-device");
-	plat->enable_hs533_mode = of_property_read_bool(np, "nvidia,enable-hs533-mode");
-	if (of_find_property(np, "fixed-clock-freq", NULL)) {
-		plat->is_fix_clock_freq = true;
-		of_property_read_u32_array(np,
-					"fixed-clock-freq",
-					(u32 *)&plat->fixed_clk_freq_table,
-					MMC_TIMINGS_MAX_MODES);
-	}
-	plat->enable_autocal_slew_override = of_property_read_bool(np,
-					"nvidia,auto-cal-slew-override");
-	plat->enable_cq = of_property_read_bool(np, "nvidia,enable-cq");
-	plat->en_periodic_calib = of_property_read_bool(np,
-			"nvidia,en-periodic-calib");
-
-	return mmc_of_parse(host->mmc);
 }
 
 static void tegra_sdhci_rail_off(struct sdhci_tegra *tegra_host)
@@ -1560,8 +1247,8 @@ static int set_disableclkgating_value(void *data, u64 value)
 			struct sdhci_tegra *tegra_host = pltfm_host->priv;
 			if (tegra_host != NULL) {
 				if (value) {
-					host->mmc->ops->set_ios(host->mmc,
-						&host->mmc->ios);
+					host->ops->set_clock(host,
+						host->mmc->ios.clock);
 					tegra_host->dbg_cfg.clk_ungated = true;
 				} else {
 					tegra_host->dbg_cfg.clk_ungated = false;
@@ -1646,11 +1333,6 @@ static int set_tap_override_value(void *data, u64 value)
 	}
 	return 0;
 }
-DEFINE_SIMPLE_ATTRIBUTE(sdhci_polling_period_fops, show_polling_period,
-		set_polling_period, "%llu\n");
-DEFINE_SIMPLE_ATTRIBUTE(sdhci_active_load_high_threshold_fops,
-		show_active_load_high_threshold,
-		set_active_load_high_threshold, "%llu\n");
 DEFINE_SIMPLE_ATTRIBUTE(sdhci_disable_clkgating_fops,
 		show_disableclkgating_value,
 		set_disableclkgating_value, "%llu\n");
@@ -1726,8 +1408,6 @@ err_root:
  */
 static int sdhci_tegra_carddetect(struct sdhci_host *sdhost, bool req)
 {
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhost);
-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	struct platform_device *pdev = to_platform_device(mmc_dev(sdhost->mmc));
 	struct tegra_sdhci_platform_data *plat;
 	bool card_present = false;
@@ -1754,11 +1434,10 @@ static int sdhci_tegra_carddetect(struct sdhci_host *sdhost, bool req)
 		dev_info(mmc_dev(sdhost->mmc),
 				"Card already in requested state\n");
 		goto err_config;
-	} else
-		tegra_host->card_present = req;
+	}
 
 	sdhost->mmc->trigger_card_event = true;
-	mmc_detect_change(host, msecs_to_jiffies(200));
+	mmc_detect_change(sdhost->mmc, msecs_to_jiffies(200));
 err_config:
 	return err;
 };
@@ -1766,10 +1445,8 @@ err_config:
 static int get_card_insert(void *data, u64 *val)
 {
 	struct sdhci_host *sdhost = data;
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhost);
-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 
-	*val = tegra_host->card_present;
+	*val = (mmc_gpio_get_cd(sdhost->mmc) == 0);
 
 	return 0;
 }
@@ -1828,15 +1505,13 @@ static ssize_t set_bus_timing(struct file *file,
 				 size_t count, loff_t *ppos)
 {
 	struct sdhci_host *sdhost = file->private_data;
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhost);
-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	char buf[16];
 	int err = 0;
 	u32 mask = 0;
 	u32 timing_req = 0;
 
 	/* Ignore the request if card is not yet removed*/
-	if (tegra_host->card_present != 0) {
+	if (mmc_gpio_get_cd(sdhost->mmc) == 0) {
 		dev_err(mmc_dev(sdhost->mmc),
 		    "Sdcard not removed. Set bus timing denied\n");
 		err = -EINVAL;
@@ -2004,7 +1679,6 @@ static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option)
 		tap_delay >>= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT;
 		tap_delay &= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK;
 		tegra_host->tuned_tap_delay = tap_delay;
-		tegra_host->tuning_status = TUNING_STATUS_DONE;
 		break;
 	case SET_DEFAULT_TAP:
 		sdhci_tegra_set_tap_delay(sdhci, tegra_host->plat->tap_delay);
@@ -2218,6 +1892,186 @@ static int sdhci_tegra_init_pinctrl_info(struct device *dev,
 	return 0;
 }
 
+static const struct sdhci_ops tegra_sdhci_ops = {
+	.get_ro     = tegra_sdhci_get_ro,
+	.read_w     = tegra_sdhci_readw,
+	.write_l    = tegra_sdhci_writel,
+	.write_w    = tegra_sdhci_writew,
+	.set_clock  = tegra_sdhci_set_clock,
+	.set_bus_width = tegra_sdhci_set_bus_width,
+	.set_uhs_signaling = tegra_sdhci_set_uhs_signaling,
+	.reset      = tegra_sdhci_reset,
+	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+	.suspend		= tegra_sdhci_suspend,
+	.resume			= tegra_sdhci_resume,
+	.post_init	= tegra_sdhci_post_init,
+	.platform_resume	= tegra_sdhci_post_resume,
+	.switch_signal_voltage_exit = tegra_sdhci_do_calibration,
+	.sd_error_stats		= sdhci_tegra_sd_error_stats,
+	.get_drive_strength	= tegra_sdhci_get_drive_strength,
+	.dump_host_cust_regs	= tegra_sdhci_dumpregs,
+	.get_max_tuning_loop_counter = sdhci_tegra_get_max_tuning_loop_counter,
+	.config_tap_delay	= tegra_sdhci_config_tap,
+	.validate_sd2_0		= tegra_sdhci_validate_sd2_0,
+	.get_max_pio_transfer_limits = tegra_sdhci_set_max_pio_transfer_limits,
+};
+
+static const struct sdhci_pltfm_data sdhci_tegra114_pdata = {
+	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
+		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
+		  SDHCI_QUIRK_SINGLE_POWER_WRITE |
+		  SDHCI_QUIRK_NO_HISPD_BIT |
+		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
+		  SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+	.quirks2 = SDHCI_QUIRK2_BROKEN_PRESET_VALUES,
+	.ops  = &tegra_sdhci_ops,
+};
+
+static struct sdhci_tegra_soc_data soc_data_tegra114 = {
+	.pdata = &sdhci_tegra114_pdata,
+	.nvquirks = NVQUIRK_DISABLE_SDR50 |
+		    NVQUIRK_DISABLE_DDR50 |
+		    NVQUIRK_DISABLE_SDR104 |
+		    NVQUIRK_SHADOW_XFER_MODE_REG |
+		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD,
+};
+
+static struct sdhci_pltfm_data sdhci_tegra210_pdata = {
+	.quirks = TEGRA_SDHCI_QUIRKS,
+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+		   SDHCI_QUIRK2_NON_STD_VOLTAGE_SWITCHING |
+		   SDHCI_QUIRK2_NO_CALC_MAX_DISCARD_TO |
+		   SDHCI_QUIRK2_REG_ACCESS_REQ_HOST_CLK |
+		   SDHCI_QUIRK2_SUPPORT_64BIT_DMA |
+		   SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK,
+	.ops  = &tegra_sdhci_ops,
+};
+
+static struct sdhci_tegra_soc_data soc_data_tegra210 = {
+	.pdata = &sdhci_tegra21_pdata,
+	.nvquirks = TEGRA_SDHCI_NVQUIRKS |
+		    NVQUIRK_SET_TRIM_DELAY |
+		    NVQUIRK_ENABLE_DDR50 |
+		    NVQUIRK_ENABLE_AUTO_CMD23 |
+		    NVQUIRK_INFINITE_ERASE_TIMEOUT |
+		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
+		    NVQUIRK_SET_CALIBRATION_OFFSETS |
+		    NVQUIRK_DISABLE_TIMER_BASED_TUNING |
+		    NVQUIRK_DISABLE_EXTERNAL_LOOPBACK |
+		    NVQUIRK_UPDATE_PAD_CNTRL_REG |
+		    NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT |
+		    NVQUIRK_UPDATE_HW_TUNING_CONFG,
+	.nvquirks2 = NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION,
+};
+
+static struct sdhci_pltfm_data sdhci_tegra18x_pdata = {
+	.quirks = TEGRA_SDHCI_QUIRKS,
+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+		   SDHCI_QUIRK2_NON_STD_VOLTAGE_SWITCHING |
+		   SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR |
+		   SDHCI_QUIRK2_NO_CALC_MAX_DISCARD_TO |
+		   SDHCI_QUIRK2_REG_ACCESS_REQ_HOST_CLK |
+		   SDHCI_QUIRK2_HOST_OFF_CARD_ON |
+		   SDHCI_QUIRK2_USE_64BIT_ADDR |
+		   SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK |
+		   SDHCI_QUIRK2_NON_STD_RTPM |
+		   SDHCI_QUIRK2_SUPPORT_64BIT_DMA,
+	.ops  = &tegra_sdhci_ops,
+};
+
+static struct sdhci_tegra_soc_data soc_data_tegra18x = {
+	.pdata = &sdhci_tegra18x_pdata,
+	.nvquirks = TEGRA_SDHCI_NVQUIRKS |
+		    NVQUIRK_SET_TRIM_DELAY |
+		    NVQUIRK_ENABLE_DDR50 |
+		    NVQUIRK_ENABLE_HS200 |
+		    NVQUIRK_ENABLE_HS400 |
+		    NVQUIRK_ENABLE_AUTO_CMD23 |
+		    NVQUIRK_INFINITE_ERASE_TIMEOUT |
+		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
+		    NVQUIRK_SET_SDMEMCOMP_VREF_SEL |
+		    NVQUIRK_HIGH_FREQ_TAP_PROCEDURE |
+		    NVQUIRK_SET_CALIBRATION_OFFSETS |
+		    NVQUIRK_DISABLE_EXTERNAL_LOOPBACK |
+		    NVQUIRK_UPDATE_PAD_CNTRL_REG |
+		    NVQUIRK_UPDATE_PIN_CNTRL_REG,
+	.nvquirks2 = NVQUIRK2_UPDATE_HW_TUNING_CONFG |
+		     NVQUIRK2_CONFIG_PWR_DET |
+		     NVQUIRK2_BROKEN_SD2_0_SUPPORT |
+		     NVQUIRK2_SELECT_SDR50_MODE |
+		     NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION |
+		     NVQUIRK2_DYNAMIC_TRIM_SUPPLY_SWITCH,
+};
+
+static const struct of_device_id sdhci_tegra_dt_match[] = {
+	{ .compatible = "nvidia,tegra186-sdhci", .data = &soc_data_tegra18x },
+	{ .compatible = "nvidia,tegra210-sdhci", .data = &soc_data_tegra210 },
+	{ .compatible = "nvidia,tegra124-sdhci", .data = &soc_data_tegra114 },
+	{}
+};
+MODULE_DEVICE_TABLE(of, sdhci_tegra_dt_match);
+
+static int sdhci_tegra_parse_dt(struct device *dev) {
+	struct device_node *np = dev->of_node;
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	struct tegra_sdhci_platform_data *plat;
+
+	if (!np)
+		return -EINVAL;
+
+	tegra_host->power_gpio = of_get_named_gpio(np, "power-gpios", 0);
+	plat = devm_kzalloc(dev, sizeof(*plat), GFP_KERNEL);
+	if (!plat) {
+		dev_err(dev, "Can't allocate platform data\n");
+		return -EINVAL;
+	}
+
+	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
+	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
+	of_property_read_u32(np, "ddr-trim-delay", &plat->ddr_trim_delay);
+	of_property_read_u32(np, "dqs-trim-delay", &plat->dqs_trim_delay);
+	of_property_read_u32(np, "ddr-clk-limit", &plat->ddr_clk_limit);
+	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
+	of_property_read_u32(np, "uhs_mask", &plat->uhs_mask);
+	of_property_read_u32(np, "compad-vref-3v3", &plat->compad_vref_3v3);
+	of_property_read_u32(np, "compad-vref-1v8", &plat->compad_vref_1v8);
+	of_property_read_u32(np, "calib_3v3_offsets", &plat->calib_3v3_offsets);
+	of_property_read_u32(np, "calib_1v8_offsets", &plat->calib_1v8_offsets);
+	of_property_read_u32(np, "default-drv-type", &plat->default_drv_type);
+	plat->update_pinctrl_settings = of_property_read_bool(np,
+		"nvidia,update-pinctrl-settings");
+	plat->dll_calib_needed = of_property_read_bool(np, "nvidia,dll-calib-needed");
+	plat->pwr_off_during_lp0 = of_property_read_bool(np,
+		"pwr-off-during-lp0");
+	of_property_read_u32(np, "auto-cal-step", &plat->auto_cal_step);
+	plat->disable_auto_cal = of_property_read_bool(np,
+		"nvidia,disable-auto-cal");
+	plat->en_io_trim_volt = of_property_read_bool(np,
+			"nvidia,en-io-trim-volt");
+	plat->power_off_rail = of_property_read_bool(np,
+		"power-off-rail");
+	plat->is_emmc = of_property_read_bool(np, "nvidia,is-emmc");
+	plat->is_sd_device = of_property_read_bool(np, "nvidia,sd-device");
+	plat->enable_hs533_mode = of_property_read_bool(np, "nvidia,enable-hs533-mode");
+	if (of_find_property(np, "fixed-clock-freq", NULL)) {
+		plat->is_fix_clock_freq = true;
+		of_property_read_u32_array(np,
+					"fixed-clock-freq",
+					(u32 *)&plat->fixed_clk_freq_table,
+					MMC_TIMINGS_MAX_MODES);
+	}
+	plat->enable_autocal_slew_override = of_property_read_bool(np,
+					"nvidia,auto-cal-slew-override");
+	plat->enable_cq = of_property_read_bool(np, "nvidia,enable-cq");
+	plat->en_periodic_calib = of_property_read_bool(np,
+			"nvidia,en-periodic-calib");
+
+	tegra_host->plat = plat;
+	return mmc_of_parse(host->mmc);
+}
+
 static int sdhci_tegra_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
@@ -2243,7 +2097,6 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	if (IS_ERR(host))
 		return PTR_ERR(host);
 	pltfm_host = sdhci_priv(host);
-	plat = pdev->dev.platform_data;
 
 	/* FIXME: This is for until dma-mask binding is supported in DT.
 	 *        Set coherent_dma_mask for each Tegra SKUs.
@@ -2260,7 +2113,12 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		goto err_alloc_tegra_host;
 	}
 
-	tegra_host->plat = plat;
+	tegra_host->soc_data = soc_data;
+	pltfm_host->priv = tegra_host;
+
+	rc = sdhci_tegra_parse_dt(&pdev->dev);
+	if (rc)
+		goto err_parse_dt;
 
 	tegra_host->sd_stat_head = devm_kzalloc(&pdev->dev,
 		sizeof(struct sdhci_tegra_sd_stats), GFP_KERNEL);
@@ -2269,12 +2127,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		rc = -ENOMEM;
 		goto err_power_req;
 	}
-	tegra_host->soc_data = soc_data;
-	pltfm_host->priv = tegra_host;
 
-	rc = sdhci_tegra_parse_dt(&pdev->dev);
-	if (rc)
-		goto err_parse_dt;
 	/* check if DT provide list possible pll parents */
 	if (sdhci_tegra_get_pll_from_dt(pdev,
 		&parent_clk_list[0], ARRAY_SIZE(parent_clk_list))) {
@@ -2311,31 +2164,6 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		gpio_direction_output(tegra_host->power_gpio, 1);
 	}
 
-	if (plat->is_sd_device &&
-		(tegra_get_chipid() == TEGRA_CHIPID_TEGRA21) &&
-		(tegra_chip_get_revision() == TEGRA_REVISION_A01)) {
-		opt_subrevision = tegra_get_fuse_opt_subrevision();
-		if ((opt_subrevision == 0) || (opt_subrevision == 1))
-			plat->limit_vddio_max_volt = true;
-	}
-
-	pll_c = clk_get_sys(NULL, "pll_c");
-	if (IS_ERR(pll_c)) {
-		rc = PTR_ERR(pll_c);
-		dev_err(mmc_dev(host->mmc),
-			"clk error in getting pll_c: %d\n", rc);
-	}
-
-	pll_p = clk_get_sys(NULL, "pll_p");
-	if (IS_ERR(pll_p)) {
-		rc = PTR_ERR(pll_p);
-		dev_err(mmc_dev(host->mmc),
-			"clk error in getting pll_p: %d\n", rc);
-	}
-
-	pll_c_rate = clk_get_rate(pll_c);
-	pll_p_rate = clk_get_rate(pll_p);
-
 
 	clk = clk_get(mmc_dev(host->mmc), NULL);
 	if (IS_ERR(clk)) {
@@ -2343,10 +2171,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		rc = PTR_ERR(clk);
 		goto err_clk_get;
 	}
-
 	if (clk_get_parent(pltfm_host->clk) == tegra_host->pll_source[0].pll)
 		tegra_host->is_parent_pll_source_1 = true;
-
 	rc = clk_prepare_enable(clk);
 	if (rc != 0)
 		goto err_clk_put;
@@ -2356,6 +2182,14 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	tegra_periph_reset_assert(pltfm_host->clk);
 	udelay(2);
 	tegra_periph_reset_deassert(pltfm_host->clk);
+
+	if (plat->is_sd_device &&
+		(tegra_get_chipid() == TEGRA_CHIPID_TEGRA21) &&
+		(tegra_chip_get_revision() == TEGRA_REVISION_A01)) {
+		opt_subrevision = tegra_get_fuse_opt_subrevision();
+		if ((opt_subrevision == 0) || (opt_subrevision == 1))
+			plat->limit_vddio_max_volt = true;
+	}
 
 	pltfm_host->priv = tegra_host;
 	tegra_host->clk_enabled = true;
@@ -2367,7 +2201,6 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 	host->mmc->pm_caps |= plat->pm_caps;
 	host->mmc->pm_flags |= plat->pm_flags;
-
 
 	tegra_pd_add_device(&pdev->dev);
 
@@ -2390,7 +2223,6 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	if (rc)
 		goto err_add_host;
 
-	sdhci_tegra_error_stats_debugfs(host);
 	sdhci_tegra_misc_debugfs(host);
 	/* Enable async suspend/resume to reduce LP0 latency */
 	device_enable_async_suspend(&pdev->dev);

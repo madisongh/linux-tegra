@@ -370,7 +370,7 @@ static void mmc_post_req(struct mmc_host *host, struct mmc_request *mrq,
 #define MMC_RUN_FROM_TASKLET	(1)
 static void mmc_run_queue(struct mmc_host *host, int from)
 {
-	u32 flags;
+	unsigned long flags;
 	struct mmc_request *mrq = NULL;
 
 	/* send next command */
@@ -3035,7 +3035,7 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 	} else {
 		/* error in attach sdio disables clock */
 		mmc_power_off(host);
-		mmc_power_up(host);
+		mmc_power_up(host, host->ocr_avail);
 	}
 
 	if (!mmc_attach_sd(host))
