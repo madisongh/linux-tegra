@@ -209,6 +209,32 @@
 
 #define NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION	BIT(0)
 
+/* Common quirks for Tegra 12x and later versions of sdmmc controllers */
+#define TEGRA_SDHCI_QUIRKS (SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | \
+		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK | \
+		  SDHCI_QUIRK_SINGLE_POWER_WRITE | \
+		  SDHCI_QUIRK_NO_HISPD_BIT | \
+		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC | \
+		  SDHCI_QUIRK_BROKEN_CARD_DETECTION | \
+		  SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC)
+
+#define TEGRA_SDHCI_QUIRKS2 (SDHCI_QUIRK2_PRESET_VALUE_BROKEN | \
+	SDHCI_QUIRK2_HOST_OFF_CARD_ON | \
+	SDHCI_QUIRK2_SUPPORT_64BIT_DMA | \
+	SDHCI_QUIRK2_USE_64BIT_ADDR | \
+	SDHCI_QUIRK2_DISABLE_CARD_CLOCK_FIRST)
+
+#define TEGRA_SDHCI_NVQUIRKS (NVQUIRK_ENABLE_PADPIPE_CLKEN | \
+				NVQUIRK_DISABLE_SPI_MODE_CLKEN | \
+				NVQUIRK_EN_FEEDBACK_CLK | \
+				NVQUIRK_ENABLE_SDR50 | \
+				NVQUIRK_ENABLE_DDR50 | \
+				NVQUIRK_ENABLE_SDR104 | \
+				NVQUIRK_SET_TAP_DELAY | \
+				NVQUIRK_SET_TRIM_DELAY | \
+				NVQUIRK_ENABLE_SDR50_TUNING | \
+				NVQUIRK_SHADOW_XFER_MODE_REG)
+
 /* max limit defines */
 #define SDHCI_TEGRA_MAX_TAP_VALUES	0xFF
 #define SDHCI_TEGRA_MAX_TRIM_VALUES	0x1F
@@ -276,6 +302,7 @@ struct sdhci_tegra {
 	unsigned int tuned_tap_delay;
 	struct padctrl *sdmmc_padctrl;
 	ktime_t timestamp;
+	bool limit_vddio_max_volt;
 };
 
 static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
@@ -616,7 +643,7 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH)
 		vendor_trim_clear_sel_vreg(host, true);
 
-	if (soc_data->nvquirks2 & NVQUIRK_UPDATE_HW_TUNING_CONFG) {
+	if (soc_data->nvquirks & NVQUIRK_UPDATE_HW_TUNING_CONFG) {
 		vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_TUN_CTRL0_0);
 		vendor_ctrl &= ~(SDHCI_VNDR_TUN_CTRL0_0_MUL_M);
 		vendor_ctrl |= SDHCI_VNDR_TUN_CTRL0_0_MUL_M_VAL;
@@ -904,7 +931,7 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 			vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_SDMMC_CLK;
 			sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 			tegra_host->clk_enabled = true;
-			if (tegra_host->soc_data->nvquirks2 &
+			if (tegra_host->soc_data->nvquirks &
 				NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH) {
 				/* power up / active state */
 				vendor_trim_clear_sel_vreg(sdhci, true);
@@ -922,7 +949,7 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 		sdhci_set_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
 		sdhci_set_clock(sdhci, 0);
-		if (tegra_host->soc_data->nvquirks2 &
+		if (tegra_host->soc_data->nvquirks &
 			NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH){
 			/* power down / idle state */
 			vendor_trim_clear_sel_vreg(sdhci, false);
@@ -963,7 +990,7 @@ static void tegra_sdhci_post_init(struct sdhci_host *sdhci)
 		tegra_sdhci_en_strobe(sdhci);
 
 	/* Program TX_DLY_CODE_OFFSET Value for HS533 mode*/
-	if (sdhci->mmc->card->state & MMC_STATE_HIGHSPEED_533) {
+	if (mmc_card_hs533(sdhci->mmc->card)) {
 		dll_ctrl0 = sdhci_readl(sdhci, SDHCI_VNDR_DLL_CTRL0_0);
 		dll_ctrl0 &= ~(SDHCI_VNDR_DLL_CTRL0_0_TX_DLY_MASK <<
 			SDHCI_VNDR_DLL_CTRL0_0_TX_DLY_SHIFT);
@@ -1150,8 +1177,8 @@ static int tegra_sdhci_validate_sd2_0(struct sdhci_host *sdhci)
 
 	plat = pdev->dev.platform_data;
 
-	if ((soc_data->nvquirks2 & NVQUIRK_BROKEN_SD2_0_SUPPORT) &&
-		(plat->limit_vddio_max_volt)) {
+	if ((soc_data->nvquirks & NVQUIRK_BROKEN_SD2_0_SUPPORT) &&
+		(tegra_host->limit_vddio_max_volt)) {
 		/* T210: Bug 1561291
 		 * Design issue where a cap connected to IO node is stressed
 		 * to 3.3v while it can only tolerate up to 1.8v.
@@ -1778,7 +1805,7 @@ static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
 
 static int sdhci_tegra_init_pinctrl_info(struct device *dev,
 		struct sdhci_tegra *tegra_host,
-		struct tegra_sdhci_platform_data *plat)
+		const struct tegra_sdhci_platform_data *plat)
 {
 	struct device_node *np = dev->of_node;
 	const char *drive_gname;
@@ -1916,97 +1943,82 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_max_pio_transfer_limits = tegra_sdhci_set_max_pio_transfer_limits,
 };
 
-static const struct sdhci_pltfm_data sdhci_tegra114_pdata = {
-	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
-		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
-		  SDHCI_QUIRK_SINGLE_POWER_WRITE |
-		  SDHCI_QUIRK_NO_HISPD_BIT |
-		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
-		  SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
-	.quirks2 = SDHCI_QUIRK2_BROKEN_PRESET_VALUES,
+static const struct sdhci_pltfm_data sdhci_tegra124_pdata = {
+	.quirks = TEGRA_SDHCI_QUIRKS,
+	.quirks2 = TEGRA_SDHCI_QUIRKS2,
 	.ops  = &tegra_sdhci_ops,
 };
 
-static struct sdhci_tegra_soc_data soc_data_tegra114 = {
-	.pdata = &sdhci_tegra114_pdata,
-	.nvquirks = NVQUIRK_DISABLE_SDR50 |
-		    NVQUIRK_DISABLE_DDR50 |
-		    NVQUIRK_DISABLE_SDR104 |
-		    NVQUIRK_SHADOW_XFER_MODE_REG |
-		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD,
+static struct sdhci_tegra_soc_data soc_data_tegra124 = {
+	.pdata = &sdhci_tegra124_pdata,
+	.nvquirks = TEGRA_SDHCI_NVQUIRKS |
+		NVQUIRK_INFINITE_ERASE_TIMEOUT |
+		NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
+		NVQUIRK_SET_CALIBRATION_OFFSETS |
+		NVQUIRK_SHADOW_XFER_MODE_REG |
+		NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD,
 };
 
-static struct sdhci_pltfm_data sdhci_tegra210_pdata = {
+static const struct sdhci_pltfm_data sdhci_tegra210_pdata = {
 	.quirks = TEGRA_SDHCI_QUIRKS,
-	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
-		   SDHCI_QUIRK2_NON_STD_VOLTAGE_SWITCHING |
-		   SDHCI_QUIRK2_NO_CALC_MAX_DISCARD_TO |
-		   SDHCI_QUIRK2_REG_ACCESS_REQ_HOST_CLK |
-		   SDHCI_QUIRK2_SUPPORT_64BIT_DMA |
-		   SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK,
+	.quirks2 = TEGRA_SDHCI_QUIRKS2 |
+		SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK |
+		SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR |
+		SDHCI_QUIRK2_PERIODIC_CALIBRATION,
 	.ops  = &tegra_sdhci_ops,
 };
 
 static struct sdhci_tegra_soc_data soc_data_tegra210 = {
-	.pdata = &sdhci_tegra21_pdata,
+	.pdata = &sdhci_tegra210_pdata,
 	.nvquirks = TEGRA_SDHCI_NVQUIRKS |
-		    NVQUIRK_SET_TRIM_DELAY |
-		    NVQUIRK_ENABLE_DDR50 |
-		    NVQUIRK_ENABLE_AUTO_CMD23 |
-		    NVQUIRK_INFINITE_ERASE_TIMEOUT |
-		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
-		    NVQUIRK_SET_CALIBRATION_OFFSETS |
-		    NVQUIRK_DISABLE_TIMER_BASED_TUNING |
-		    NVQUIRK_DISABLE_EXTERNAL_LOOPBACK |
-		    NVQUIRK_UPDATE_PAD_CNTRL_REG |
-		    NVQUIRK_USE_TMCLK_WR_CRC_TIMEOUT |
-		    NVQUIRK_UPDATE_HW_TUNING_CONFG,
+		NVQUIRK_INFINITE_ERASE_TIMEOUT |
+		NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
+		NVQUIRK_SET_CALIBRATION_OFFSETS |
+		NVQUIRK_SHADOW_XFER_MODE_REG |
+		NVQUIRK_DISABLE_TIMER_BASED_TUNING |
+		NVQUIRK_SET_SDMEMCOMP_VREF_SEL |
+		NVQUIRK_DISABLE_EXTERNAL_LOOPBACK |
+		NVQUIRK_UPDATE_PAD_CNTRL_REG |
+		NVQUIRK_UPDATE_PIN_CNTRL_REG |
+		NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
+		NVQUIRK_UPDATE_HW_TUNING_CONFG |
+		NVQUIRK_BROKEN_SD2_0_SUPPORT |
+		NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH,
 	.nvquirks2 = NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION,
 };
 
-static struct sdhci_pltfm_data sdhci_tegra18x_pdata = {
+static const struct sdhci_pltfm_data sdhci_tegra186_pdata = {
 	.quirks = TEGRA_SDHCI_QUIRKS,
-	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
-		   SDHCI_QUIRK2_NON_STD_VOLTAGE_SWITCHING |
-		   SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR |
-		   SDHCI_QUIRK2_NO_CALC_MAX_DISCARD_TO |
-		   SDHCI_QUIRK2_REG_ACCESS_REQ_HOST_CLK |
-		   SDHCI_QUIRK2_HOST_OFF_CARD_ON |
-		   SDHCI_QUIRK2_USE_64BIT_ADDR |
-		   SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK |
-		   SDHCI_QUIRK2_NON_STD_RTPM |
-		   SDHCI_QUIRK2_SUPPORT_64BIT_DMA,
+	.quirks2 = TEGRA_SDHCI_QUIRKS2 |
+		SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK |
+		SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR |
+		SDHCI_QUIRK2_PERIODIC_CALIBRATION,
 	.ops  = &tegra_sdhci_ops,
 };
 
-static struct sdhci_tegra_soc_data soc_data_tegra18x = {
-	.pdata = &sdhci_tegra18x_pdata,
+static struct sdhci_tegra_soc_data soc_data_tegra186 = {
+	.pdata = &sdhci_tegra210_pdata,
 	.nvquirks = TEGRA_SDHCI_NVQUIRKS |
-		    NVQUIRK_SET_TRIM_DELAY |
-		    NVQUIRK_ENABLE_DDR50 |
-		    NVQUIRK_ENABLE_HS200 |
-		    NVQUIRK_ENABLE_HS400 |
-		    NVQUIRK_ENABLE_AUTO_CMD23 |
-		    NVQUIRK_INFINITE_ERASE_TIMEOUT |
-		    NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
-		    NVQUIRK_SET_SDMEMCOMP_VREF_SEL |
-		    NVQUIRK_HIGH_FREQ_TAP_PROCEDURE |
-		    NVQUIRK_SET_CALIBRATION_OFFSETS |
-		    NVQUIRK_DISABLE_EXTERNAL_LOOPBACK |
-		    NVQUIRK_UPDATE_PAD_CNTRL_REG |
-		    NVQUIRK_UPDATE_PIN_CNTRL_REG,
-	.nvquirks2 = NVQUIRK2_UPDATE_HW_TUNING_CONFG |
-		     NVQUIRK2_CONFIG_PWR_DET |
-		     NVQUIRK2_BROKEN_SD2_0_SUPPORT |
-		     NVQUIRK2_SELECT_SDR50_MODE |
-		     NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION |
-		     NVQUIRK2_DYNAMIC_TRIM_SUPPLY_SWITCH,
+		NVQUIRK_INFINITE_ERASE_TIMEOUT |
+		NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
+		NVQUIRK_SET_CALIBRATION_OFFSETS |
+		NVQUIRK_SHADOW_XFER_MODE_REG |
+		NVQUIRK_DISABLE_TIMER_BASED_TUNING |
+		NVQUIRK_SET_SDMEMCOMP_VREF_SEL |
+		NVQUIRK_DISABLE_EXTERNAL_LOOPBACK |
+		NVQUIRK_UPDATE_PAD_CNTRL_REG |
+		NVQUIRK_UPDATE_PIN_CNTRL_REG |
+		NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
+		NVQUIRK_UPDATE_HW_TUNING_CONFG |
+		NVQUIRK_BROKEN_SD2_0_SUPPORT |
+		NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH,
+	.nvquirks2 = NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION,
 };
 
 static const struct of_device_id sdhci_tegra_dt_match[] = {
-	{ .compatible = "nvidia,tegra186-sdhci", .data = &soc_data_tegra18x },
+	{ .compatible = "nvidia,tegra186-sdhci", .data = &soc_data_tegra186 },
 	{ .compatible = "nvidia,tegra210-sdhci", .data = &soc_data_tegra210 },
-	{ .compatible = "nvidia,tegra124-sdhci", .data = &soc_data_tegra114 },
+	{ .compatible = "nvidia,tegra124-sdhci", .data = &soc_data_tegra124 },
 	{}
 };
 MODULE_DEVICE_TABLE(of, sdhci_tegra_dt_match);
@@ -2079,7 +2091,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	struct sdhci_host *host;
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_tegra *tegra_host;
-	struct tegra_sdhci_platform_data *plat;
+	const struct tegra_sdhci_platform_data *plat;
 	struct clk *clk;
 	const char *parent_clk_list[TEGRA_SDHCI_MAX_PLL_SOURCE];
 	int rc;
@@ -2119,6 +2131,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	rc = sdhci_tegra_parse_dt(&pdev->dev);
 	if (rc)
 		goto err_parse_dt;
+	plat = tegra_host->plat;
 
 	tegra_host->sd_stat_head = devm_kzalloc(&pdev->dev,
 		sizeof(struct sdhci_tegra_sd_stats), GFP_KERNEL);
@@ -2171,12 +2184,12 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		rc = PTR_ERR(clk);
 		goto err_clk_get;
 	}
+	pltfm_host->clk = clk;
 	if (clk_get_parent(pltfm_host->clk) == tegra_host->pll_source[0].pll)
 		tegra_host->is_parent_pll_source_1 = true;
 	rc = clk_prepare_enable(clk);
 	if (rc != 0)
 		goto err_clk_put;
-	pltfm_host->clk = clk;
 
 	/* Reset the sdhci controller to clear all previous status.*/
 	tegra_periph_reset_assert(pltfm_host->clk);
@@ -2188,7 +2201,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		(tegra_chip_get_revision() == TEGRA_REVISION_A01)) {
 		opt_subrevision = tegra_get_fuse_opt_subrevision();
 		if ((opt_subrevision == 0) || (opt_subrevision == 1))
-			plat->limit_vddio_max_volt = true;
+			tegra_host->limit_vddio_max_volt = true;
 	}
 
 	pltfm_host->priv = tegra_host;
@@ -2207,7 +2220,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	/* disable access to boot partitions */
 	host->mmc->caps2 |= MMC_CAP2_BOOTPART_NOACC;
 	host->mmc->caps2 |= MMC_CAP2_PACKED_CMD;
-	if (soc_data->nvquirks2 & NVQUIRK_EN_STROBE_SUPPORT)
+	if (soc_data->nvquirks & NVQUIRK_EN_STROBE_SUPPORT)
 		host->mmc->caps2 |= MMC_CAP2_EN_STROBE;
 	if (plat->pwr_off_during_lp0)
 		host->mmc->caps2 |= MMC_CAP2_NO_SLEEP_CMD;
@@ -2261,8 +2274,10 @@ static int sdhci_tegra_remove(struct platform_device *pdev)
 	struct sdhci_host *host = platform_get_drvdata(pdev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct tegra_sdhci_platform_data *plat;
 	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xffffffff);
 
+	plat = tegra_host->plat;
 	sdhci_remove_host(host, dead);
 
 	if (gpio_is_valid(tegra_host->power_gpio))
