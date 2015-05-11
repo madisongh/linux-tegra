@@ -240,7 +240,7 @@ static void sdhci_disable_card_detection(struct sdhci_host *host)
 
 void sdhci_reset(struct sdhci_host *host, u8 mask)
 {
-	u32 ctrl;
+	u16 ctrl;
 	unsigned long timeout;
 
 	sdhci_writeb(host, mask, SDHCI_SOFTWARE_RESET);
@@ -272,11 +272,11 @@ void sdhci_reset(struct sdhci_host *host, u8 mask)
 	 * need to re-configure them after each full reset
 	 */
 	if ((mask & SDHCI_RESET_ALL) && host->version >= SDHCI_SPEC_400) {
-		ctrl = sdhci_readl(host, SDHCI_ACMD12_ERR);
+		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 		ctrl |= SDHCI_HOST_VERSION_4_EN;
 		if (host->quirks2 & SDHCI_QUIRK2_SUPPORT_64BIT_DMA)
 			ctrl |= SDHCI_ADDRESSING_64BIT_EN;
-		sdhci_writel(host, ctrl, SDHCI_ACMD12_ERR);
+		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
 	}
 }
 EXPORT_SYMBOL_GPL(sdhci_reset);
@@ -1431,13 +1431,14 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 	}
 
 	timeout = jiffies;
-	if (!cmd->data && cmd->busy_timeout > 9000)
-		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
-	else if ((cmd->opcode == MMC_SWITCH) &&	(((cmd->arg >> 16) &
+	if ((cmd->opcode == MMC_SWITCH) && (((cmd->arg >> 16) &
 		EXT_CSD_SANITIZE_START)	== EXT_CSD_SANITIZE_START))
 		timeout += 100 * HZ;
+	else if (!cmd->data && cmd->busy_timeout > 9000)
+		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
 	else
 		timeout += 10 * HZ;
+
 	mod_timer(&host->timer, timeout);
 
 	host->cmd = cmd;
@@ -2025,9 +2026,11 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 		!(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN))
 		sdhci_enable_preset_value(host, false);
 
-	if (!ios->clock || ios->clock != host->clock) {
+	if (ios->clock && ios->clock != host->clock) {
+		spin_unlock_irqrestore(&host->lock, flags);
 		host->ops->set_clock(host, ios->clock);
 		host->clock = ios->clock;
+		spin_lock_irqsave(&host->lock, flags);
 
 		if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK &&
 		    host->clock) {
@@ -2127,7 +2130,9 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 		}
 
 		/* Re-enable SD Clock */
-		host->ops->set_clock(host, host->clock);
+		clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+		clk |= SDHCI_CLOCK_CARD_EN;
+		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
 	} else
 		sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
 
@@ -2141,6 +2146,11 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 
 	mmiowb();
 	spin_unlock_irqrestore(&host->lock, flags);
+
+	if (!ios->clock && ios->clock != host->clock) {
+		host->ops->set_clock(host, ios->clock);
+		host->clock = ios->clock;
+	}
 }
 
 static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)

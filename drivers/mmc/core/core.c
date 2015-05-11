@@ -2223,6 +2223,9 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
 	host->ios.power_mode = MMC_POWER_UP;
 	host->ios.bus_width = MMC_BUS_WIDTH_1;
 	host->ios.timing = MMC_TIMING_LEGACY;
+	if (host->caps2 & MMC_CAP2_SINGLE_POWERON)
+		host->ios.clock = host->f_init;
+
 	mmc_set_ios(host);
 
 	/* Try to set signal voltage to 3.3V but fall back to 1.8v or 1.2v */
@@ -2239,6 +2242,11 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
 	 */
 	mmc_delay(10);
 
+	if (host->caps2 & MMC_CAP2_SINGLE_POWERON) {
+		host->ios.power_mode = MMC_POWER_ON;
+		goto skip_power_on;
+	}
+
 	host->ios.clock = host->f_init;
 
 	host->ios.power_mode = MMC_POWER_ON;
@@ -2250,6 +2258,7 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
 	 */
 	mmc_delay(10);
 
+skip_power_on:
 	mmc_host_clk_release(host);
 }
 

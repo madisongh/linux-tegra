@@ -341,6 +341,8 @@ struct mmc_host {
 #define MMC_CAP2_HS533		(1 << 19)       /* can support HS533*/
 #define MMC_CAP2_CQ		(1 << 20)       /* can support CQ*/
 #define MMC_CAP2_NO_SLEEP_CMD	(1 << 21)	/* cannot support sleep mode */
+#define MMC_CAP2_SINGLE_POWERON (1 << 22)	/* Host can power up in single step */
+
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
 #ifdef CONFIG_MMC_CLKGATE
@@ -635,6 +637,12 @@ static inline bool mmc_card_ddr52(struct mmc_card *card)
 static inline bool mmc_card_hs400(struct mmc_card *card)
 {
 	return card->host->ios.timing == MMC_TIMING_MMC_HS400;
+}
+
+static inline bool mmc_card_hs533(struct mmc_card *card)
+{
+	return ((card->host->ios.timing == MMC_TIMING_MMC_HS400) &&
+		(card->host->caps2 & MMC_CAP2_HS533));
 }
 
 #endif /* LINUX_MMC_HOST_H */

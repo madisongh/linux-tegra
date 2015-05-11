@@ -845,13 +845,13 @@ static void tegra_sdhci_clock_set_parent(struct sdhci_host *host,
 static void tegra_sdhci_get_clock_freq_for_mode(struct sdhci_host *sdhci,
 			unsigned int *clock)
 {
-	struct platform_device *pdev = to_platform_device(mmc_dev(sdhci->mmc));
-	const struct tegra_sdhci_platform_data *plat = pdev->dev.platform_data;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
 	unsigned int ios_timing = sdhci->mmc->ios.timing;
 	unsigned int index;
 
-	if (!(plat->is_fix_clock_freq) || !(pdev->dev.of_node)
-		|| (ios_timing >= MMC_TIMINGS_MAX_MODES))
+	if (!(plat->is_fix_clock_freq) || (ios_timing >= MMC_TIMINGS_MAX_MODES))
 		return;
 
 	/*
@@ -2220,6 +2220,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	/* disable access to boot partitions */
 	host->mmc->caps2 |= MMC_CAP2_BOOTPART_NOACC;
 	host->mmc->caps2 |= MMC_CAP2_PACKED_CMD;
+	host->mmc->caps2 |= MMC_CAP2_SINGLE_POWERON;
 	if (soc_data->nvquirks & NVQUIRK_EN_STROBE_SUPPORT)
 		host->mmc->caps2 |= MMC_CAP2_EN_STROBE;
 	if (plat->pwr_off_during_lp0)
