@@ -197,6 +197,20 @@ static int reg_fixed_voltage_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static void reg_fixed_voltage_shutdown(struct platform_device *pdev)
+{
+	struct fixed_voltage_data *drvdata = platform_get_drvdata(pdev);
+	struct fixed_voltage_config *config = drvdata->config;
+	struct regulation_constraints *constraints = NULL;
+
+	if (!config->init_data)
+		return;
+
+	constraints = &config->init_data->constraints;
+	if (gpio_is_valid(config->gpio) && constraints->disable_on_shutdown)
+		gpio_set_value_cansleep(config->gpio, !config->enable_high);
+}
+
 #ifdef CONFIG_PM_SLEEP
 static int reg_fixed_voltage_suspend(struct device *dev)
 {
@@ -246,6 +260,7 @@ MODULE_DEVICE_TABLE(of, fixed_of_match);
 
 static struct platform_driver regulator_fixed_voltage_driver = {
 	.probe		= reg_fixed_voltage_probe,
+	.shutdown	= reg_fixed_voltage_shutdown,
 	.driver		= {
 		.name		= "reg-fixed-voltage",
 		.owner		= THIS_MODULE,
