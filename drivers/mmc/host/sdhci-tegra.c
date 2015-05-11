@@ -46,6 +46,7 @@
 #include <linux/reboot.h>
 
 #include <linux/clk/tegra.h>
+#include <linux/padctrl/padctrl.h>
 
 #include <mach/hardware.h>
 
@@ -208,6 +209,8 @@
 #define NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH	BIT(30)
 
 #define NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION	BIT(0)
+/* Enable T210 specific SDMMC WAR - sd card voltage switch */
+#define NVQUIRK2_CONFIG_PWR_DET			BIT(1)
 
 /* Common quirks for Tegra 12x and later versions of sdmmc controllers */
 #define TEGRA_SDHCI_QUIRKS (SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | \
@@ -241,6 +244,10 @@
 #define SDHCI_TEGRA_MAX_DQS_TRIM_VALUES	0x3F
 #define MAX_DIVISOR_VALUE		128
 #define DEFAULT_SDHOST_FREQ		50000000
+#define SDHCI_TEGRA_HIGH_VOLT_MAX_UV	3600000
+#define SDHCI_TEGRA_HIGH_VOLT_3V3_UV	3300000
+#define SDHCI_TEGRA_HIGH_VOLT_MIN_UV	2700000
+#define SDHCI_TEGRA_LOW_VOLT_UV	1800000
 /* Max number of clock parents for sdhci is fixed to 2 */
 #define TEGRA_SDHCI_MAX_PLL_SOURCE 2
 
@@ -303,6 +310,7 @@ struct sdhci_tegra {
 	struct padctrl *sdmmc_padctrl;
 	ktime_t timestamp;
 	bool limit_vddio_max_volt;
+	int vddio_prev;
 };
 
 static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
@@ -1074,12 +1082,9 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	unsigned int timeout = 10;
 	unsigned int calib_offsets = 0;
-	bool set;
 
 	if (tegra_host->plat->disable_auto_cal)
 		return;
-	set = (signal_voltage == MMC_SIGNAL_VOLTAGE_180) ? true : false;
-	tegra_sdhci_update_sdmmc_pinctrl_register(sdhci, set);
 
 	/*
 	 * Do not enable auto calibration if the platform doesn't
@@ -1165,6 +1170,66 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 		sdhci->timestamp = ktime_get();
 		sdhci->is_calibration_done = true;
 	}
+}
+
+static void tegra_sdhci_set_padctrl(struct sdhci_host *sdhci, int voltage)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
+	int ret;
+
+	if( !(soc_data->nvquirks2 & NVQUIRK2_CONFIG_PWR_DET))
+		return;
+
+	if (plat->pwrdet_support && tegra_host->sdmmc_padctrl) {
+		ret = padctrl_set_voltage(tegra_host->sdmmc_padctrl, voltage);
+		if(ret)
+			dev_err(mmc_dev(sdhci->mmc),
+				"padctrl set volt failed %d\n", ret);
+	}
+}
+
+static void tegra_sdhci_pre_voltage_switch(struct sdhci_host *sdhci,
+	unsigned char signal_voltage)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+
+	if (!tegra_host)
+		return;
+
+	tegra_host->vddio_prev = regulator_get_voltage(sdhci->mmc->supply.vqmmc);
+	pr_err("%s: vddio_prev %d\n", __func__, tegra_host->vddio_prev);
+	/* set pwrdet sdmmc1 before set 3.3 V */
+	if (signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
+		if (tegra_host->vddio_prev < SDHCI_TEGRA_HIGH_VOLT_MIN_UV)
+			tegra_sdhci_set_padctrl(sdhci,
+				SDHCI_TEGRA_HIGH_VOLT_3V3_UV);
+	}
+}
+
+static void tegra_sdhci_post_voltage_switch(struct sdhci_host *sdhci,
+	unsigned char signal_voltage)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	int voltage;
+	bool set;
+
+	/* Fix me: Check if pad control needs to be called */
+	voltage = regulator_get_voltage(sdhci->mmc->supply.vqmmc);
+	pr_err("%s: voltage set %d\n", __func__, voltage);
+	if (voltage <= tegra_host->vddio_prev)
+		tegra_sdhci_set_padctrl(sdhci, SDHCI_TEGRA_LOW_VOLT_UV);
+
+	set = (signal_voltage == MMC_SIGNAL_VOLTAGE_180) ? true : false;
+	tegra_sdhci_update_sdmmc_pinctrl_register(sdhci, set);
+
+	tegra_sdhci_do_calibration(sdhci, signal_voltage);
+
+	return;
 }
 
 static int tegra_sdhci_validate_sd2_0(struct sdhci_host *sdhci)
@@ -1933,7 +1998,8 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.resume			= tegra_sdhci_resume,
 	.post_init	= tegra_sdhci_post_init,
 	.platform_resume	= tegra_sdhci_post_resume,
-	.switch_signal_voltage_exit = tegra_sdhci_do_calibration,
+	.switch_signal_voltage_exit = tegra_sdhci_post_voltage_switch,
+	.switch_signal_voltage_enter = tegra_sdhci_pre_voltage_switch,
 	.sd_error_stats		= sdhci_tegra_sd_error_stats,
 	.get_drive_strength	= tegra_sdhci_get_drive_strength,
 	.dump_host_cust_regs	= tegra_sdhci_dumpregs,
@@ -1984,7 +2050,8 @@ static struct sdhci_tegra_soc_data soc_data_tegra210 = {
 		NVQUIRK_UPDATE_HW_TUNING_CONFG |
 		NVQUIRK_BROKEN_SD2_0_SUPPORT |
 		NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH,
-	.nvquirks2 = NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION,
+	.nvquirks2 = NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION |
+		NVQUIRK2_CONFIG_PWR_DET,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra186_pdata = {
@@ -2012,7 +2079,8 @@ static struct sdhci_tegra_soc_data soc_data_tegra186 = {
 		NVQUIRK_UPDATE_HW_TUNING_CONFG |
 		NVQUIRK_BROKEN_SD2_0_SUPPORT |
 		NVQUIRK_DYNAMIC_TRIM_SUPPLY_SWITCH,
-	.nvquirks2 = NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION,
+	.nvquirks2 = NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION |
+		NVQUIRK2_CONFIG_PWR_DET,
 };
 
 static const struct of_device_id sdhci_tegra_dt_match[] = {
