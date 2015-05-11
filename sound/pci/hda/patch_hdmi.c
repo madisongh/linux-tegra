@@ -37,6 +37,11 @@
 #include <sound/jack.h>
 #include <sound/asoundef.h>
 #include <sound/tlv.h>
+
+#ifdef CONFIG_SND_HDA_TEGRA
+#include <video/tegra_hdmi_audio.h>
+#endif
+
 #include "hda_codec.h"
 #include "hda_local.h"
 #include "hda_jack.h"
@@ -52,6 +57,8 @@ MODULE_PARM_DESC(static_hdmi_pcm, "Don't restrict PCM parameters per ELD info");
 #define is_valleyview(codec) ((codec)->vendor_id == 0x80862882)
 #define is_cherryview(codec) ((codec)->vendor_id == 0x80862883)
 #define is_valleyview_plus(codec) (is_valleyview(codec) || is_cherryview(codec))
+
+#define is_tegra21x(codec)  ((codec)->vendor_id == 0x10de0029)
 
 struct hdmi_spec_per_cvt {
 	hda_nid_t cvt_nid;
@@ -1452,6 +1459,18 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 	per_pin = get_pin(spec, pin_idx);
 	eld = &per_pin->sink_eld;
 
+#ifdef CONFIG_SND_HDA_TEGRA
+	if (is_tegra21x(codec)) {
+		if (!eld->monitor_present) {
+			if (tegra_hdmi_setup_hda_presence() < 0) {
+				codec_warn(codec,
+					"HDMI: No HDMI device connected\n");
+				return -ENODEV;
+			}
+		}
+	}
+#endif
+
 	err = hdmi_choose_cvt(codec, pin_idx, &cvt_idx, &mux_idx);
 	if (err < 0)
 		return err;
@@ -1809,6 +1828,27 @@ static int generic_hdmi_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 	per_pin->channels = substream->runtime->channels;
 	per_pin->setup = true;
 
+#ifdef CONFIG_SND_HDA_TEGRA
+	if (is_tegra21x(codec)) {
+		int err = 0;
+
+		if (substream->runtime->channels == 2)
+			tegra_hdmi_audio_null_sample_inject(true);
+		else
+			tegra_hdmi_audio_null_sample_inject(false);
+
+		/* Set hdmi:audio freq and source selection*/
+		err = tegra_hdmi_setup_audio_freq_source(
+					substream->runtime->rate, HDA);
+		if ( err < 0 ) {
+			codec_err(codec,
+				"Unable to set hdmi audio freq to %d \n",
+						substream->runtime->rate);
+			return err;
+		}
+	}
+#endif
+
 	hdmi_setup_audio_infoframe(codec, per_pin, non_pcm);
 	mutex_unlock(&per_pin->lock);
 
@@ -2152,6 +2192,10 @@ static int generic_hdmi_init_per_pins(struct hda_codec *codec)
 {
 	struct hdmi_spec *spec = codec->spec;
 	int pin_idx;
+
+	if (is_tegra21x(codec))
+		snd_hda_codec_write(codec, 4, 0,
+				    AC_VERB_SET_DIGI_CONVERT_1, 0x11);
 
 	for (pin_idx = 0; pin_idx < spec->num_pins; pin_idx++) {
 		struct hdmi_spec_per_pin *per_pin = get_pin(spec, pin_idx);
