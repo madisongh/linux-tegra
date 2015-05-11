@@ -96,6 +96,7 @@ struct max77620_pingroup {
 
 struct max77620_pin_info {
 	enum max77620_pin_ppdrv drv_type;
+	int pull_config;
 };
 
 struct max77620_pctrl_info {
@@ -299,7 +300,9 @@ static int max77620_pinconf_get(struct pinctrl_dev *pctldev,
 	struct max77620_pctrl_info *max77620_pci =
 					pinctrl_dev_get_drvdata(pctldev);
 	enum pin_config_param param = pinconf_to_config_param(*config);
+	u8 val;
 	int arg = 0;
+	int ret;
 
 	switch (param) {
 	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
@@ -309,6 +312,30 @@ static int max77620_pinconf_get(struct pinctrl_dev *pctldev,
 
 	case PIN_CONFIG_DRIVE_PUSH_PULL:
 		if (max77620_pci->pin_info[pin].drv_type == MAX77620_PIN_PP_DRV)
+			arg = 1;
+		break;
+
+	case PIN_CONFIG_BIAS_PULL_UP:
+		ret = max77620_reg_read(max77620_pci->max77620->dev,
+			MAX77620_PWR_SLAVE, MAX77620_REG_PUE_GPIO, &val);
+		if (ret < 0) {
+			dev_err(max77620_pci->dev,
+				"Reg PUE_GPIO read failed: %d\n", ret);
+			return ret;
+		}
+		if (val & BIT(pin))
+			arg = 1;
+		break;
+
+	case PIN_CONFIG_BIAS_PULL_DOWN:
+		ret = max77620_reg_read(max77620_pci->max77620->dev,
+			MAX77620_PWR_SLAVE, MAX77620_REG_PDE_GPIO, &val);
+		if (ret < 0) {
+			dev_err(max77620_pci->dev,
+				"Reg PDE_GPIO read failed: %d\n", ret);
+			return ret;
+		}
+		if (val & BIT(pin))
 			arg = 1;
 		break;
 
@@ -331,6 +358,8 @@ static int max77620_pinconf_set(struct pinctrl_dev *pctldev,
 	int param;
 	u16 param_val;
 	unsigned int val;
+	unsigned int pu_val;
+	unsigned int pd_val;
 	int mask, shift;
 	int addr, ret;
 	int i;
@@ -392,6 +421,31 @@ static int max77620_pinconf_set(struct pinctrl_dev *pctldev,
 		default:
 			dev_err(max77620_pci->dev, "Properties not supported\n");
 			return -ENOTSUPP;
+
+	case PIN_CONFIG_BIAS_PULL_UP:
+	case PIN_CONFIG_BIAS_PULL_DOWN:
+		pu_val = (param == PIN_CONFIG_BIAS_PULL_UP) ? BIT(pin) : 0;
+		pd_val = (param == PIN_CONFIG_BIAS_PULL_DOWN) ? BIT(pin) : 0;
+
+		ret = max77620_reg_update(max77620_pci->max77620->dev,
+			MAX77620_PWR_SLAVE, MAX77620_REG_PUE_GPIO, BIT(pin),
+			pu_val);
+		if (ret < 0) {
+			dev_err(max77620_pci->dev,
+				"Reg PUE_GPIO update failed: %d\n", ret);
+			return ret;
+		}
+
+		ret = max77620_reg_update(max77620_pci->max77620->dev,
+			MAX77620_PWR_SLAVE, MAX77620_REG_PDE_GPIO, BIT(pin),
+			pd_val);
+		if (ret < 0) {
+			dev_err(max77620_pci->dev,
+				"Reg PDE_GPIO update failed: %d\n", ret);
+			return ret;
+		}
+		break;
+
 		}
 	}
 
