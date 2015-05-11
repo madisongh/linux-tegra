@@ -2386,6 +2386,10 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
 	if (host->version < SDHCI_SPEC_300)
 		return 0;
 	sdhci_runtime_pm_get(host);
+	/* Do any post voltage switch platform specific configuration */
+	if  (host->ops->switch_signal_voltage_enter)
+		host->ops->switch_signal_voltage_enter(host,
+			ios->signal_voltage);
 	err = sdhci_do_start_signal_voltage_switch(host, ios);
 	/* Do any post voltage switch platform specific configuration */
 	if  (host->ops->switch_signal_voltage_exit)
