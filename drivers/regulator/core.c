@@ -2154,6 +2154,12 @@ static int _regulator_do_enable(struct regulator_dev *rdev)
 	_notifier_call_chain(rdev, REGULATOR_EVENT_POST_ENABLE, NULL);
 	trace_regulator_enable_complete(rdev_get_name(rdev));
 
+	if (rdev->desc->ops->post_enable) {
+		ret = rdev->desc->ops->post_enable(rdev);
+		if (ret < 0)
+			return ret;
+	}
+
 	return 0;
 }
 
@@ -2273,6 +2279,12 @@ static int _regulator_do_disable(struct regulator_dev *rdev)
 		udelay(delay % 1000);
 	} else if (delay) {
 		udelay(delay);
+	}
+
+	if (rdev->desc->ops->post_disable) {
+		ret = rdev->desc->ops->post_disable(rdev);
+		if (ret < 0)
+			return ret;
 	}
 
 	return 0;
