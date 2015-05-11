@@ -202,7 +202,7 @@
 
 	adsp_audio {
 		compr-ops = <1>;
-		num-plugin = <3>;
+		num-plugin = <5>;
 		plugin-info-1 {
 			plugin-name = "mp3-dec1";
 			firmware-name = "nvmp3dec.elf";
@@ -217,6 +217,11 @@
 			plugin-name = "spkprot";
 			firmware-name = "nvspkprot.elf";
 			widget-name = "SPKPROT-SW";
+		};
+		plugin-info-5 {
+			plugin-name = "aac-dec1";
+			firmware-name = "nvaacdec.elf";
+			widget-name = "AAC-DEC1";
 		};
 	};
 
