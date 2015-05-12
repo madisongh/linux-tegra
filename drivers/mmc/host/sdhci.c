@@ -540,7 +540,7 @@ static void sdhci_set_adma_desc(struct sdhci_host *host, u8 *desc,
 	__le32 *dataddr = (__le32 __force *)(desc + 4);
 	__le64 *dataddr64 = (__le64 __force *)(desc + 4);
 	__le16 *cmdlen = (__le16 __force *)desc;
-	u32 ctrl;
+	u16 ctrl;
 
 	/* SDHCI specification says ADMA descriptors should be 4 byte
 	 * aligned, so using 16 or 32bit operations should be safe. */
@@ -548,7 +548,7 @@ static void sdhci_set_adma_desc(struct sdhci_host *host, u8 *desc,
 	cmdlen[0] = cpu_to_le16(cmd);
 	cmdlen[1] = cpu_to_le16(len);
 
-	ctrl = sdhci_readl(host, SDHCI_ACMD12_ERR);
+	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 	if (ctrl & SDHCI_ADDRESSING_64BIT_EN)
 		dataddr64[0] = cpu_to_le64(addr);
 	else {
@@ -573,7 +573,7 @@ static int sdhci_adma_table_pre(struct sdhci_host *host,
 	char *buffer;
 	unsigned long flags;
 	int next_desc;
-	u32 ctrl;
+	u16 ctrl;
 
 	/*
 	 * The spec does not specify endianness of descriptor table.
@@ -601,7 +601,7 @@ static int sdhci_adma_table_pre(struct sdhci_host *host,
 
 	align_addr = host->align_addr;
 
-	ctrl = sdhci_readl(host, SDHCI_ACMD12_ERR);
+	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 	if (ctrl & SDHCI_ADDRESSING_64BIT_EN) {
 		if (ctrl & SDHCI_HOST_VERSION_4_EN)
 			next_desc = 16;
@@ -712,9 +712,6 @@ static void sdhci_adma_table_post(struct sdhci_host *host,
 		direction = DMA_FROM_DEVICE;
 	else
 		direction = DMA_TO_DEVICE;
-
-	dma_unmap_single(mmc_dev(host->mmc), host->adma_addr,
-		ADMA_SIZE, DMA_TO_DEVICE);
 
 	dma_unmap_single(mmc_dev(host->mmc), host->align_addr,
 		128 * 8, direction);
@@ -957,9 +954,9 @@ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
 					SDHCI_ADMA_ADDRESS);
 
 				if ((host->version >= SDHCI_SPEC_400) &&
-				    (host->quirks &
+				    (host->quirks2 &
 				     SDHCI_QUIRK2_SUPPORT_64BIT_DMA)) {
-					if (host->quirks &
+					if (host->quirks2 &
 					    SDHCI_QUIRK2_USE_64BIT_ADDR) {
 
 						sdhci_writel(host,
@@ -2569,6 +2566,7 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 		wait_event_interruptible_timeout(host->buf_ready_int,
 					(host->tuning_done == 1),
 					msecs_to_jiffies(50));
+
 		spin_lock_irqsave(&host->lock, flags);
 
 		if (!host->tuning_done) {
@@ -3105,9 +3103,9 @@ static void sdhci_show_adma_error(struct sdhci_host *host)
 	__le16 *len;
 	u8 attr;
 
-	u32 ctrl;
+	u16 ctrl;
 	int next_desc;
-	ctrl = sdhci_readl(host, SDHCI_ACMD12_ERR);
+	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 	if (ctrl & SDHCI_ADDRESSING_64BIT_EN) {
 		if (ctrl & SDHCI_HOST_VERSION_4_EN)
 			next_desc = 16;
