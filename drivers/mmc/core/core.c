@@ -2135,21 +2135,22 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
 	 * for 5 ms according to the SD spec
 	 */
 	clock = host->ios.clock;
+	host->skip_host_clkgate = true;
 	host->ios.clock = 0;
 	mmc_set_ios(host);
-
 	if (__mmc_set_signal_voltage(host, signal_voltage)) {
 		/*
 		 * Voltages may not have been switched, but we've already
 		 * sent CMD11, so a power cycle is required anyway
 		 */
 		err = -EAGAIN;
+		host->skip_host_clkgate = false;
 		goto power_cycle;
 	}
-
 	/* Keep clock gated for at least 5 ms */
 	mmc_delay(5);
 	host->ios.clock = clock;
+	host->skip_host_clkgate = false;
 	mmc_set_ios(host);
 
 	/* Wait for at least 1 ms according to spec */
