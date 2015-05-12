@@ -465,6 +465,13 @@ static void hdmi_state_machine_worker(struct work_struct *work)
 {
 	int pending_hpd_evt, cur_hpd;
 
+	/* Check if the DC and FB are setup, if not just abort */
+	if (!work_state.hdmi->dc || !work_state.hdmi->dc->fb) {
+		pr_warn("%s (tid %p): %s is not yet set!\n",
+				__func__, current, work_state.hdmi->dc ? "FB" : "DC");
+		return;
+	}
+
 	/* Observe and clear the pending flag and latch the current HPD state.
 	 */
 	rt_mutex_lock(&work_lock);
@@ -522,8 +529,11 @@ void hdmi_state_machine_set_pending_hpd(void)
 	rt_mutex_lock(&work_lock);
 
 	/* We always schedule work any time there is a pending HPD event */
-	work_state.pending_hpd_evt = 1;
-	hdmi_state_machine_sched_work_l(0);
+	/* But only if the state machine has been inited */
+	if (unlikely(work_state.hdmi)) {
+		work_state.pending_hpd_evt = 1;
+		hdmi_state_machine_sched_work_l(0);
+	}
 
 	rt_mutex_unlock(&work_lock);
 }
