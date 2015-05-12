@@ -436,6 +436,10 @@
 						     regulator-consumer-supply = "vdig";
 						     regulator-consumer-device = "2-0018";
 					     };
+					     c4 {
+						     regulator-consumer-supply = "vdig";
+						     regulator-consumer-device = "2-0036";
+					     };
 				     };
 			     };
 
@@ -506,6 +510,10 @@
 					      c4 {
 						      regulator-consumer-supply = "vdd";
 						      regulator-consumer-device = "2-000c";
+					      };
+					      c5 {
+						      regulator-consumer-supply = "vana_ar0261";
+						      regulator-consumer-device = "2-0036";
 					      };
 				      };
 			      };

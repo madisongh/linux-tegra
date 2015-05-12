@@ -249,7 +249,7 @@
 				datalen = <2>;
 				pinmuxgrp = <0xFFFF>;
 				gpios = <3>;
-				regulators = "vana", "vdig", "vif";
+				regulators = "vana_ar0261", "vdig", "vif";
 				clocks = "mclk2";
 				drivername = "ar0261";
 				detect = <0x0002 0x0003 0xFFFF 0x060A>;
