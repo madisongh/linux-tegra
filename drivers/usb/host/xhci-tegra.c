@@ -4264,7 +4264,7 @@ static int hsic_power_create_file(struct tegra_xhci_hcd *tegra)
 		tegra->hsic_power_attr[p].show = hsic_power_show;
 		tegra->hsic_power_attr[p].store = hsic_power_store;
 		tegra->hsic_power_attr[p].attr.mode = (S_IRUGO | S_IWUSR);
-		sysfs_attr_init(&tegra->hsic_power_attr[p]);
+		sysfs_attr_init(&tegra->hsic_power_attr[p].attr);
 
 		err = device_create_file(dev, &tegra->hsic_power_attr[p]);
 		if (err) {
