@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host 3D clock scaling
  *
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -839,15 +839,15 @@ static int nvhost_pod_init(struct devfreq *df)
 	podgov->p_use_throughput_hint = 1;
 
 	if (!strcmp(d->name, "vic03.0")) {
-		podgov->p_load_max = 990;
-		podgov->p_load_target = 800;
+		podgov->p_load_max = 100;
+		podgov->p_load_target = 10;
 		podgov->p_bias = 80;
 		podgov->p_hint_lo_limit = 500;
 		podgov->p_hint_hi_limit = 997;
 		podgov->p_scaleup_limit = 1100;
 		podgov->p_scaledown_limit = 1300;
-		podgov->p_smooth = 10;
-		podgov->p_damp = 7;
+		podgov->p_smooth = 30;
+		podgov->p_damp = 9;
 	} else {
 		switch (cid) {
 		case TEGRA_CHIPID_TEGRA14:
