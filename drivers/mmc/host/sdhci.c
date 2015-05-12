@@ -122,6 +122,7 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
 static int sdhci_validate_sd2_0(struct mmc_host *mmc);
 static void sdhci_tuning_timer(unsigned long data);
 static void sdhci_enable_preset_value(struct sdhci_host *host, bool enable);
+static int sdhci_do_get_cd(struct sdhci_host *host);
 
 #ifdef CONFIG_PM_RUNTIME
 static int sdhci_runtime_pm_get(struct sdhci_host *host);
@@ -1741,12 +1742,10 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
 		spin_unlock_irq(&host->lock);
 		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
 		spin_lock_irq(&host->lock);
-
 		if (mode != MMC_POWER_OFF)
 			sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL);
 		else
 			sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
-
 		return;
 	}
 
@@ -1767,10 +1766,8 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
 			BUG();
 		}
 	}
-
 	if (host->pwr == pwr)
 		return;
-
 	host->pwr = pwr;
 
 	if (pwr == 0) {
@@ -1855,7 +1852,7 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	sdhci_runtime_pm_get(host);
 
-	present = mmc_gpio_get_cd(host->mmc);
+	present = sdhci_do_get_cd(host);
 
 	spin_lock_irqsave(&host->lock, flags);
 
@@ -2031,7 +2028,6 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 		host->ops->set_clock(host, ios->clock);
 		host->clock = ios->clock;
 		spin_lock_irqsave(&host->lock, flags);
-
 		if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK &&
 		    host->clock) {
 			host->timeout_clk = host->mmc->actual_clock ?
@@ -2296,6 +2292,10 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 	struct mmc_host *mmc = host->mmc;
 	u16 ctrl;
 	int ret;
+
+	if (host->ops->switch_signal_voltage)
+		return host->ops->switch_signal_voltage(host,
+			ios->signal_voltage);
 
 	/*
 	 * Signal Voltage Switching is only applicable for Host Controllers
@@ -3129,7 +3129,7 @@ static void sdhci_show_adma_error(struct sdhci_host *host)
 			DBG("%s: %p: DMA-32 0x%08x, LEN 0x%04x, Attr=0x%02x\n",
 				name, desc, le32_to_cpu(*dma), le16_to_cpu(*len), attr);
 		} else if (next_desc == 16) {
-			DBG("%s: %p: DMA-64 0x%16x, LEN 0x%04x, Attr=0x%02x\n",
+			DBG("%s: %p: DMA-64 0x%16llx, LEN 0x%04x, Attr=0x%02x\n",
 				name, desc, le64_to_cpu(*((__le64 *)dma)), le16_to_cpu(*len), attr);
 		}
 		desc += next_desc;
@@ -3966,6 +3966,8 @@ int sdhci_add_host(struct sdhci_host *host)
 
 	if (mmc->caps2 & MMC_CAP2_HS533)
 		host->max_clk = MMC_HS533_MAX_DTR;
+	else
+		host->max_clk = MMC_HS200_MAX_DTR;
 
 	if (host->max_clk == 0 || host->quirks &
 			SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN) {
