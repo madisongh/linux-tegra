@@ -1625,6 +1625,7 @@ void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 	int real_div = div, clk_mul = 1;
 	u16 clk = 0;
 	unsigned long timeout;
+	bool ddr_mode = false;
 
 	host->mmc->actual_clock = 0;
 
@@ -1677,10 +1678,16 @@ void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 			clk_mul = host->clk_mul;
 			div--;
 		} else {
+			if ((host->mmc->ios.timing == MMC_TIMING_MMC_DDR52) ||
+				(host->mmc->ios.timing == MMC_TIMING_UHS_DDR50))
+				ddr_mode = true;
 			/* Version 3.00 divisors must be a multiple of 2. */
-			if (host->max_clk <= clock)
-				div = 1;
-			else {
+			if (host->max_clk <= clock) {
+				if (ddr_mode)
+					div = 2;
+				else
+					div = 1;
+			} else {
 				for (div = 2; div < SDHCI_MAX_DIV_SPEC_300;
 				     div += 2) {
 					if ((host->max_clk / div) <= clock)
