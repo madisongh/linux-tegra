@@ -722,18 +722,19 @@ void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 	sdhci_tegra_select_drive_strength(host, timing);
 
 	if (timing == MMC_TIMING_MMC_HS400)
-		sdhci_tegra_set_dqs_trim_delay(host, plat->dqs_trim_delay);       
+		sdhci_tegra_set_dqs_trim_delay(host, plat->dqs_trim_delay);
 
 	/*
 	 * Tegra SDMMC controllers support only a clock divisor of 2 in DDR
 	 * mode. No other divisors are supported.
 	 */
-	if (timing == MMC_TIMING_UHS_DDR50) {
+	if ((timing == MMC_TIMING_UHS_DDR50) ||
+		(timing == MMC_TIMING_MMC_DDR52)) {
 		clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
 		clk &= ~(0xFF << SDHCI_DIVIDER_SHIFT);
 		clk |= 1 << SDHCI_DIVIDER_SHIFT;
 		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
-		
+
 		/* Set ddr mode tap delay */
 		sdhci_tegra_set_tap_delay(host, plat->ddr_tap_delay);
 
@@ -908,7 +909,8 @@ static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
 	 * In ddr mode, tegra sdmmc controller clock frequency
 	 * should be double the card clock frequency.
 	 */
-	if (sdhci->mmc->ios.timing == MMC_TIMING_UHS_DDR50) {
+	if ((sdhci->mmc->ios.timing == MMC_TIMING_UHS_DDR50) ||
+		(sdhci->mmc->ios.timing == MMC_TIMING_MMC_DDR52)) {
 		if (tegra_host->ddr_clk_limit &&
 				(tegra_host->ddr_clk_limit < clock))
 			clk_rate = tegra_host->ddr_clk_limit * 2;
@@ -924,7 +926,6 @@ static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
 	tegra_sdhci_clock_set_parent(sdhci, clk_rate);
 	clk_set_rate(pltfm_host->clk, clk_rate);
 	sdhci->max_clk = clk_get_rate(pltfm_host->clk);
-
 	/* FPGA supports 26MHz of clock for SDMMC. */
 	if (tegra_platform_is_fpga())
 		sdhci->max_clk = 26000000;
@@ -1259,7 +1260,7 @@ static void tegra_sdhci_set_padctrl(struct sdhci_host *sdhci, int voltage)
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
 	int ret;
 
-	if( !(soc_data->nvquirks2 & NVQUIRK2_CONFIG_PWR_DET))
+	if (!(soc_data->nvquirks2 & NVQUIRK2_CONFIG_PWR_DET))
 		return;
 
 	if (plat->pwrdet_support && tegra_host->sdmmc_padctrl) {
@@ -1289,7 +1290,6 @@ static int tegra_sdhci_signal_voltage_switch(struct sdhci_host *sdhci,
 		if (ctrl & SDHCI_CTRL_VDD_180)
 			ctrl &= ~SDHCI_CTRL_VDD_180;
 	}
-
 	/* Check if the slot can support the required voltage */
 	if (min_uV > tegra_host->vddio_max_uv)
 		return 0;
@@ -1308,7 +1308,6 @@ static int tegra_sdhci_signal_voltage_switch(struct sdhci_host *sdhci,
 			CONFIG_REG_SET_VOLT, tegra_host->vddio_min_uv,
 			tegra_host->vddio_max_uv);
 	}
-
 	return rc;
 }
 
@@ -1317,14 +1316,17 @@ static void tegra_sdhci_pre_voltage_switch(struct sdhci_host *sdhci,
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	unsigned int min_uV = tegra_host->vddio_min_uv;
+
+	if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
+		min_uV = SDHOST_LOW_VOLT_MIN;
 
 	if (!tegra_host)
 		return;
-
 	tegra_host->vddio_prev = regulator_get_voltage(tegra_host->vdd_io_reg);
 	/* set pwrdet sdmmc1 before set 3.3 V */
 	if (signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
-		if (tegra_host->vddio_prev < SDHOST_LOW_VOLT_MAX)
+		if (tegra_host->vddio_prev < min_uV)
 			tegra_sdhci_set_padctrl(sdhci,
 				SDHOST_HIGH_VOLT_3V3);
 	}
@@ -1346,7 +1348,6 @@ static void tegra_sdhci_post_voltage_switch(struct sdhci_host *sdhci,
 
 	if (!IS_ERR_OR_NULL(tegra_host->pinctrl_sdmmc))
 		tegra_sdhci_update_sdmmc_pinctrl_register(sdhci, set);
-
 	tegra_sdhci_do_calibration(sdhci, signal_voltage);
 
 	return;
@@ -2421,19 +2422,15 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	if (plat->mmc_data.ocr_mask & SDHOST_1V8_OCR_MASK) {
 		tegra_host->vddio_min_uv = SDHOST_LOW_VOLT_MIN;
 		tegra_host->vddio_max_uv = SDHOST_LOW_VOLT_MAX;
-		host->mmc->ocr_avail = MMC_VDD_165_195;
 	} else if (plat->mmc_data.ocr_mask & MMC_OCR_2V8_MASK) {
 			tegra_host->vddio_min_uv = SDHOST_HIGH_VOLT_2V8;
 			tegra_host->vddio_max_uv = SDHOST_HIGH_VOLT_MAX;
-			host->mmc->ocr_avail = MMC_VDD_28_29;
 	} else if (plat->mmc_data.ocr_mask & MMC_OCR_3V2_MASK) {
 			tegra_host->vddio_min_uv = SDHOST_HIGH_VOLT_3V2;
 			tegra_host->vddio_max_uv = SDHOST_HIGH_VOLT_MAX;
-			host->mmc->ocr_avail = MMC_VDD_32_33;
 	} else if (plat->mmc_data.ocr_mask & MMC_OCR_3V3_MASK) {
 			tegra_host->vddio_min_uv = SDHOST_HIGH_VOLT_3V3;
 			tegra_host->vddio_max_uv = SDHOST_HIGH_VOLT_MAX;
-			host->mmc->ocr_avail = MMC_VDD_33_34;
 	} else {
 		/*
 		 * Set the minV and maxV to default
@@ -2444,6 +2441,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	}
 	rc = tegra_sdhci_configure_regulators(host, CONFIG_REG_GET, 0, 0);
 	if (!rc) {
+		tegra_sdhci_pre_voltage_switch(host, MMC_SIGNAL_VOLTAGE_330);
 		rc = tegra_sdhci_configure_regulators(host, CONFIG_REG_SET_VOLT,
 			tegra_host->vddio_min_uv, tegra_host->vddio_max_uv);
 		rc = tegra_sdhci_configure_regulators(host, CONFIG_REG_EN,
