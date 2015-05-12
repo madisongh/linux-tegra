@@ -1673,10 +1673,11 @@ static int mmc_sleep(struct mmc_host *host, int sleep)
 	unsigned int timeout_ms = DIV_ROUND_UP(card->ext_csd.sa_timeout, 10000);
 	int err;
 
-	if (sleep)
-	err = mmc_deselect_cards(host);
-	if (err)
-		return err;
+	if (sleep) {
+		err = mmc_deselect_cards(host);
+		if (err)
+			return err;
+	}
 
 	cmd.opcode = MMC_SLEEP_AWAKE;
 	cmd.arg = card->rca << 16;

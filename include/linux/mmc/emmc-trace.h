@@ -8,8 +8,6 @@
 #include <linux/blkdev.h>
 #include "../../../drivers/mmc/card/queue.h"
 
-#define DEBUG
-
 #ifdef DEBUG
 #define INFO_MSG(fmt, ...) printk("\nEMMC_TRACE: "fmt, ##__VA_ARGS__)
 #else
