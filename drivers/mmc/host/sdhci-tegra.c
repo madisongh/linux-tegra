@@ -688,6 +688,31 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		vendor_ctrl |= SDHCI_VNDR_SYS_SW_CTRL_WR_CRC_USE_TMCLK;
 		sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_SYS_SW_CTRL);
 	}
+
+	/* Mask any bus speed modes if set in platform data */
+	if (plat->uhs_mask & MMC_UHS_MASK_SDR12)
+		host->mmc->caps &= ~MMC_CAP_UHS_SDR12;
+
+	if (plat->uhs_mask & MMC_UHS_MASK_SDR25)
+		host->mmc->caps &= ~MMC_CAP_UHS_SDR25;
+
+	if (plat->uhs_mask & MMC_UHS_MASK_SDR50)
+		host->mmc->caps &= ~MMC_CAP_UHS_SDR50;
+
+	if (plat->uhs_mask & MMC_UHS_MASK_SDR104)
+		host->mmc->caps &= ~MMC_CAP_UHS_SDR104;
+
+	if (plat->uhs_mask & MMC_UHS_MASK_DDR50) {
+		host->mmc->caps &= ~MMC_CAP_UHS_SDR104;
+		host->mmc->caps &= ~MMC_CAP_1_8V_DDR;
+	}
+
+	if (plat->uhs_mask & MMC_MASK_HS200)
+		host->mmc->caps2 &= ~MMC_CAP2_HS200;
+
+	if (plat->uhs_mask & MMC_MASK_HS400)
+		host->mmc->caps2 &= ~MMC_CAP2_HS400;
+
 }
 
 static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
