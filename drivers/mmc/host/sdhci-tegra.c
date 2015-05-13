@@ -225,6 +225,7 @@
 	SDHCI_QUIRK2_HOST_OFF_CARD_ON | \
 	SDHCI_QUIRK2_SUPPORT_64BIT_DMA | \
 	SDHCI_QUIRK2_USE_64BIT_ADDR | \
+	SDHCI_QUIRK2_HOST_OFF_CARD_ON | \
 	SDHCI_QUIRK2_DISABLE_CARD_CLOCK_FIRST)
 
 #define TEGRA_SDHCI_NVQUIRKS (NVQUIRK_ENABLE_PADPIPE_CLKEN | \
@@ -702,8 +703,9 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	if (plat->uhs_mask & MMC_UHS_MASK_SDR104)
 		host->mmc->caps &= ~MMC_CAP_UHS_SDR104;
 
+
 	if (plat->uhs_mask & MMC_UHS_MASK_DDR50) {
-		host->mmc->caps &= ~MMC_CAP_UHS_SDR104;
+		host->mmc->caps &= ~MMC_CAP_UHS_DDR50;
 		host->mmc->caps &= ~MMC_CAP_1_8V_DDR;
 	}
 
@@ -712,7 +714,6 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 
 	if (plat->uhs_mask & MMC_MASK_HS400)
 		host->mmc->caps2 &= ~MMC_CAP2_HS400;
-
 }
 
 static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
@@ -1422,20 +1423,34 @@ static int sdhci_tegra_sd_error_stats(struct sdhci_host *host, u32 int_status)
 
 static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
 {
+	int ret;
+
 	tegra_sdhci_set_clock(sdhci, 0);
 
-	return 0;
+	ret = tegra_sdhci_configure_regulators(sdhci, CONFIG_REG_DIS, 0, 0);
+
+	return ret;
 }
 
 static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	int ret;
+	int signal_voltage = MMC_SIGNAL_VOLTAGE_330;
+
 	/* Setting the min identification clock of freq 400KHz */
 	tegra_sdhci_set_clock(sdhci, 400000);
+	if (tegra_host->vddio_max_uv < SDHOST_HIGH_VOLT_MIN)
+		signal_voltage = MMC_SIGNAL_VOLTAGE_180;
+	ret = tegra_sdhci_configure_regulators(sdhci, CONFIG_REG_EN, 0, 0);
+	if (!ret) {
+		tegra_sdhci_pre_voltage_switch(sdhci, signal_voltage);
+		ret = tegra_sdhci_signal_voltage_switch(sdhci, signal_voltage);
+		tegra_sdhci_post_voltage_switch(sdhci, signal_voltage);
+	}
 
-	if (sdhci->mmc->pm_flags & MMC_PM_KEEP_POWER)
-		tegra_sdhci_do_calibration(sdhci, MMC_SIGNAL_VOLTAGE_330);
-
-	return 0;
+	return ret;
 }
 
 static void tegra_sdhci_post_resume(struct sdhci_host *sdhci)
@@ -2270,7 +2285,7 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 	of_property_read_u32(np, "dqs-trim-delay", &plat->dqs_trim_delay);
 	of_property_read_u32(np, "ddr-clk-limit", &plat->ddr_clk_limit);
 	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
-	of_property_read_u32(np, "uhs_mask", &plat->uhs_mask);
+	of_property_read_u32(np, "uhs-mask", &plat->uhs_mask);
 	of_property_read_u32(np, "compad-vref-3v3", &plat->compad_vref_3v3);
 	of_property_read_u32(np, "compad-vref-1v8", &plat->compad_vref_1v8);
 	of_property_read_u32(np, "calib_3v3_offsets", &plat->calib_3v3_offsets);
@@ -2475,6 +2490,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 	host->mmc->pm_caps |= plat->pm_caps;
 	host->mmc->pm_flags |= plat->pm_flags;
+	if (host->mmc->pm_caps & MMC_PM_IGNORE_PM_NOTIFY)
+		host->mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
 
 	tegra_pd_add_device(&pdev->dev);
 
