@@ -2882,6 +2882,15 @@ int sdhci_suspend_host(struct sdhci_host *host)
 	mmc_retune_timer_stop(host->mmc);
 	mmc_retune_needed(host->mmc);
 
+	/*
+	 * If eMMC cards are put in sleep state, Vccq can be disabled
+	 * but Vcc would still be powered on. In resume, we only restore
+	 * the controller context. So, set MMC_PM_KEEP_POWER flag.
+	 */
+	if (!(host->mmc->caps2 & MMC_CAP2_NO_SLEEP_CMD) &&
+		(host->mmc->pm_caps & MMC_PM_KEEP_POWER))
+		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
+
 	if (!device_may_wakeup(mmc_dev(host->mmc))) {
 		host->ier = 0;
 		sdhci_writel(host, 0, SDHCI_INT_ENABLE);
