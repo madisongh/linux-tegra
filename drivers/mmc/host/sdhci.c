@@ -3461,7 +3461,8 @@ int sdhci_suspend_host(struct sdhci_host *host)
 	 * but Vcc would still be powered on. In resume, we only restore
 	 * the controller context. So, set MMC_PM_KEEP_POWER flag.
 	 */
-	if (!(host->mmc->caps2 & MMC_CAP2_NO_SLEEP_CMD))
+	if (!(host->mmc->caps2 & MMC_CAP2_NO_SLEEP_CMD) &&
+		(host->mmc->pm_caps & MMC_PM_KEEP_POWER))
 		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 
 	if (!device_may_wakeup(mmc_dev(host->mmc))) {

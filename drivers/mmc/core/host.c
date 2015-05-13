@@ -435,6 +435,8 @@ int mmc_of_parse(struct mmc_host *host)
 		host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
 	if (of_find_property(np, "keep-power-in-suspend", &len))
 		host->pm_caps |= MMC_PM_KEEP_POWER;
+	if (of_find_property(np, "ignore-pm-notify", &len))
+		host->pm_caps |= MMC_PM_IGNORE_PM_NOTIFY;
 	if (of_find_property(np, "enable-sdio-wakeup", &len))
 		host->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
 	if (of_find_property(np, "mmc-ddr-1_8v", &len))

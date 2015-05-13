@@ -1823,12 +1823,16 @@ static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
 	if (mmc_can_poweroff_notify(host->card) &&
 		((host->caps2 & MMC_CAP2_FULL_PWR_CYCLE) || !is_suspend))
 		err = mmc_poweroff_notify(host->card, notify_type);
-	else if (mmc_can_sleep(host->card))
+	else if (mmc_can_sleep(host->card)) {
 		err = mmc_sleep(host, 1);
-	else if (!mmc_host_is_spi(host))
+		if (!err) {
+			mmc_card_set_sleep(host->card);
+			mmc_card_set_suspended(host->card);
+		}
+	} else if (!mmc_host_is_spi(host))
 		err = mmc_deselect_cards(host);
 
-	if (!err) {
+	if (!err && !mmc_card_in_sleep(host->card)) {
 		mmc_power_off(host);
 		mmc_card_set_suspended(host->card);
 	}
@@ -1869,8 +1873,13 @@ static int _mmc_resume(struct mmc_host *host)
 	if (!mmc_card_suspended(host->card))
 		goto out;
 
-	if (mmc_can_sleep(host->card)) {
+	if (mmc_can_sleep(host->card) &&
+		mmc_card_in_sleep(host->card)) {
 		err = mmc_sleep(host, 0);
+		if (!err) {
+			mmc_card_clr_sleep(host->card);
+			mmc_card_clr_suspended(host->card);
+		}
 	} else {
 		mmc_power_up(host, host->card->ocr);
 		err = mmc_init_card(host, host->card->ocr, host->card);
