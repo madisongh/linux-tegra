@@ -1035,6 +1035,10 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
 	struct mmc_data *data = cmd->data;
 
 	if (data == NULL) {
+		/* Do nothing for tuning commands */
+		if ((cmd->opcode == MMC_SEND_TUNING_BLOCK) ||
+			(cmd->opcode == MMC_SEND_TUNING_BLOCK_HS200))
+			return;
 		/* clear Auto CMD settings for no data CMDs */
 		mode = sdhci_readw(host, SDHCI_TRANSFER_MODE);
 		sdhci_writew(host, mode & ~(SDHCI_TRNS_AUTO_CMD12 |
@@ -2582,6 +2586,7 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 				"Buffer Read Ready interrupt during tuning "
 				"procedure, falling back to fixed sampling "
 				"clock\n");
+			sdhci_dumpregs(host);
 			ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 			ctrl &= ~SDHCI_CTRL_TUNED_CLK;
 			ctrl &= ~SDHCI_CTRL_EXEC_TUNING;
