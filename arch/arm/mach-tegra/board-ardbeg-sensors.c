@@ -1740,6 +1740,7 @@ static struct balanced_throttle emergency_throttle = {
 static int __init ardbeg_balanced_throttle_init(void)
 {
 	if (of_machine_is_compatible("nvidia,ardbeg") ||
+		of_machine_is_compatible("nvidia,jetson-tk1") ||
 		of_machine_is_compatible("nvidia,norrin") ||
 		of_machine_is_compatible("nvidia,bowmore") ||
 		of_machine_is_compatible("nvidia,tn8")) {
