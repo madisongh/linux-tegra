@@ -2298,6 +2298,7 @@ static int sdhci_tegra_parse_dt(struct device *dev) {
 		return -EINVAL;
 	}
 
+	plat->cd_gpio = of_get_named_gpio(np, "cd-gpios", 0);
 	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
 	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
 	of_property_read_u32(np, "ddr-trim-delay", &plat->ddr_trim_delay);
@@ -2442,6 +2443,17 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		}
 		gpio_direction_output(tegra_host->power_gpio, 1);
 	}
+
+	if (gpio_is_valid(plat->cd_gpio)) {
+		rc = mmc_gpio_request_cd(host->mmc, plat->cd_gpio, 0);
+		if (rc) {
+			dev_err(mmc_dev(host->mmc),
+				"Failed to allocate cd gpio %d\n", rc);
+			goto err_clk_get;
+		}
+		mmc_gpiod_request_cd_irq(host->mmc);
+	}
+	host->mmc->rem_card_present = (mmc_gpio_get_cd(host->mmc) == 0);
 
 	clk = clk_get(mmc_dev(host->mmc), NULL);
 	if (IS_ERR(clk)) {

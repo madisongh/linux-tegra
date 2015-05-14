@@ -2169,16 +2169,16 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 static int sdhci_do_get_cd(struct sdhci_host *host)
 {
-	int gpio_cd = mmc_gpio_get_cd(host->mmc);
+	int gpio_cd;
 
 	if (host->flags & SDHCI_DEVICE_DEAD)
 		return 0;
 
 	/* If polling/nonremovable, assume that the card is always present. */
-	if ((host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) ||
-	    (host->mmc->caps & MMC_CAP_NONREMOVABLE))
+	if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
 		return 1;
 
+	gpio_cd = host->mmc->rem_card_present;
 	/* Try slot gpio detect */
 	if (!IS_ERR_VALUE(gpio_cd))
 		return !!gpio_cd;
@@ -4081,7 +4081,7 @@ int sdhci_add_host(struct sdhci_host *host)
 		mmc->caps |= MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED;
 
 	if ((host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) &&
-	    !(mmc->caps & MMC_CAP_NONREMOVABLE))
+	    !(mmc->caps & MMC_CAP_NONREMOVABLE) && !mmc->slot.handler_priv)
 		mmc->caps |= MMC_CAP_NEEDS_POLL;
 
 	/* If there are external regulators, get them */
