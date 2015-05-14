@@ -330,6 +330,7 @@ struct sdhci_tegra {
 	bool is_rail_enabled;
 	bool set_1v8_calib_offsets;
 	bool limit_vddio_max_volt;
+	bool check_pad_ctrl_setting;
 };
 
 static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
@@ -1306,6 +1307,7 @@ static int tegra_sdhci_signal_voltage_switch(struct sdhci_host *sdhci,
 	unsigned int max_uV = tegra_host->vddio_max_uv;
 	unsigned int rc = 0;
 	u16 ctrl;
+	unsigned int clock;
 
 	ctrl = sdhci_readw(sdhci, SDHCI_HOST_CONTROL2);
 	if (signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
@@ -1316,9 +1318,13 @@ static int tegra_sdhci_signal_voltage_switch(struct sdhci_host *sdhci,
 		if (ctrl & SDHCI_CTRL_VDD_180)
 			ctrl &= ~SDHCI_CTRL_VDD_180;
 	}
+
 	/* Check if the slot can support the required voltage */
 	if (min_uV > tegra_host->vddio_max_uv)
 		return 0;
+
+	clock = sdhci->clock;
+	sdhci_set_clock(sdhci, 0);
 
 	/* Set/clear the 1.8V signalling */
 	sdhci_writew(sdhci, ctrl, SDHCI_HOST_CONTROL2);
@@ -1334,6 +1340,17 @@ static int tegra_sdhci_signal_voltage_switch(struct sdhci_host *sdhci,
 			CONFIG_REG_SET_VOLT, tegra_host->vddio_min_uv,
 			tegra_host->vddio_max_uv);
 	}
+
+	/* Wait for the voltage to stabilize */
+	mdelay(10);
+
+	sdhci_set_clock(sdhci, clock);
+
+	/* Wait 1 msec for clock to stabilize */
+	mdelay(1);
+
+	tegra_host->check_pad_ctrl_setting = true;
+
 	return rc;
 }
 
@@ -1366,14 +1383,16 @@ static void tegra_sdhci_post_voltage_switch(struct sdhci_host *sdhci,
 	int voltage;
 	bool set;
 
-	/* Fix me: Check if pad control needs to be called */
-	voltage = regulator_get_voltage(tegra_host->vdd_io_reg);
-	set = (signal_voltage == MMC_SIGNAL_VOLTAGE_180) ? true : false;
-	if (set && (voltage <= tegra_host->vddio_prev))
-		tegra_sdhci_set_padctrl(sdhci, SDHOST_LOW_VOLT_MAX);
+	if (tegra_host->check_pad_ctrl_setting) {
+		voltage = regulator_get_voltage(tegra_host->vdd_io_reg);
+		set = (signal_voltage == MMC_SIGNAL_VOLTAGE_180) ? true : false;
+		if (set && (voltage <= tegra_host->vddio_prev))
+			tegra_sdhci_set_padctrl(sdhci, SDHOST_LOW_VOLT_MAX);
 
-	if (!IS_ERR_OR_NULL(tegra_host->pinctrl_sdmmc))
-		tegra_sdhci_update_sdmmc_pinctrl_register(sdhci, set);
+		if (!IS_ERR_OR_NULL(tegra_host->pinctrl_sdmmc))
+			tegra_sdhci_update_sdmmc_pinctrl_register(sdhci, set);
+		tegra_host->check_pad_ctrl_setting = false;
+	}
 	tegra_sdhci_do_calibration(sdhci, signal_voltage);
 
 	return;
