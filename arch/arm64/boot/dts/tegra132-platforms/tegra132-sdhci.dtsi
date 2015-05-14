@@ -16,7 +16,12 @@
 		calib-1v8-offsets = <0x0202>;
 		cap-mmc-highspeed;
 		cap-sd-highspeed;
+		non-removable;
 		nvidia,is-emmc;
+		keep-power-in-suspend;
+		ignore-pm-notify;
+		mmc-ddr-1_8v;
+		uhs-mask = <0x7F>;
 		pll_source = "pll_p";
 	};
 
@@ -32,6 +37,9 @@
 		cap-mmc-highspeed;
 		cap-sd-highspeed;
 		nvidia,sd-device;
+		keep-power-in-suspend;
+		ignore-pm-notify;
+		uhs-mask = <0x7F>;
 		pll_source = "pll_p";
 	};
 
@@ -46,5 +54,9 @@
 		calib-3v3-offsets = <0x7676>;
 		calib-1v8-offsets = <0x7676>;
 		pll_source = "pll_p";
+		non-removable;
+		keep-power-in-suspend;
+		uhs-mask = <0x7F>;
+		ignore-pm-notify;
 	};
 };
