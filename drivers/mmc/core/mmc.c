@@ -924,7 +924,8 @@ static int mmc_select_powerclass(struct mmc_card *card)
 	if (bus_width == MMC_BUS_WIDTH_1)
 		return 0;
 
-	ddr = card->mmc_avail_type & EXT_CSD_CARD_TYPE_DDR_52;
+	ddr = card->mmc_avail_type & (EXT_CSD_CARD_TYPE_DDR_52 |
+		EXT_CSD_CARD_TYPE_HS400);
 	if (ddr)
 		ext_csd_bits = (bus_width == MMC_BUS_WIDTH_8) ?
 			EXT_CSD_DDR_BUS_WIDTH_8 : EXT_CSD_DDR_BUS_WIDTH_4;
@@ -1135,8 +1136,6 @@ static int mmc_select_hs400(struct mmc_card *card)
 	 * it is required to convert from HS200 mode to HS mode.
 	 */
 	mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
-	mmc_set_bus_speed(card);
-
 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			   EXT_CSD_HS_TIMING, EXT_CSD_TIMING_HS,
 			   card->ext_csd.generic_cmd6_time,
@@ -1146,6 +1145,7 @@ static int mmc_select_hs400(struct mmc_card *card)
 			mmc_hostname(host), err);
 		return err;
 	}
+	mmc_set_bus_speed(card);
 
 	/* Enable enhanced strobe support if supported by both host and card */
 	if (card->ext_csd.strobe_support &&
