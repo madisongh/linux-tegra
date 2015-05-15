@@ -1602,7 +1602,7 @@ static int smmu_iommu_add_device(struct device *dev)
 	return 0;
 }
 
-static const struct iommu_ops smmu_iommu_ops_default = {
+static struct iommu_ops smmu_iommu_ops_default = {
 	.capable	= smmu_iommu_capable,
 	.domain_init	= smmu_iommu_domain_init,
 	.domain_destroy	= smmu_iommu_domain_destroy,
@@ -2309,7 +2309,7 @@ void (*flush_ptc_and_tlb_range)(struct smmu_device *smmu, struct smmu_as *as, dm
 void (*flush_ptc_and_tlb_as)(struct smmu_as *as, dma_addr_t start, dma_addr_t end) = flush_ptc_and_tlb_as_default;
 void (*free_pdir)(struct smmu_as *as) = free_pdir_default;
 
-const struct iommu_ops *smmu_iommu_ops = &smmu_iommu_ops_default;
+struct iommu_ops *smmu_iommu_ops = &smmu_iommu_ops_default;
 const struct file_operations *smmu_debugfs_stats_fops = &smmu_debugfs_stats_fops_default;
 
 static int tegra_smmu_device_notifier(struct notifier_block *nb,
