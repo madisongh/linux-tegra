@@ -43,6 +43,7 @@ struct tegra_edid_pvt {
 	u16			color_depth_flag;
 	u16			max_tmds_char_rate_hf_mhz;
 	u16			max_tmds_char_rate_hllc_mhz;
+	u16			colorimetry;
 	/* Note: dc_edid must remain the last member */
 	struct tegra_dc_edid		dc_edid;
 };
@@ -83,6 +84,49 @@ static void tegra_edid_dump(struct tegra_edid *edid)
 }
 #endif
 
+
+int tegra_edid_i2c_adap_change_rate(struct i2c_adapter *i2c_adap, int rate)
+{
+	const int MIN_RATE = 5000, MAX_RATE = 4000000;
+	int err = 0, cur_rate = 0;
+	if (rate < MIN_RATE || rate > MAX_RATE) {
+		pr_warn("Cannot change the i2c_ddc rate, the rate:%d cannot"
+"be below minimum rate:%d or above maximum rate:%d", rate, MIN_RATE, MAX_RATE);
+		return -1;
+	}
+
+	if (i2c_adap) {
+		cur_rate = i2c_get_adapter_bus_clk_rate(i2c_adap);
+		if (cur_rate == rate)
+			return 0;
+
+		err = i2c_set_adapter_bus_clk_rate(i2c_adap, rate);
+		if (err)
+			pr_warn("Could not change i2c_ddc sclk rate\n");
+		else
+			pr_warn("Switching i2c_ddc sclk rate: from %d, "
+"to %d\n", cur_rate, rate);
+	} else {
+		pr_warn("ddc i2c adapter NULL\n");
+		err = -1;
+	}
+	return err;
+}
+
+static int tegra_edid_i2c_divide_rate(struct tegra_edid *edid)
+{
+	struct i2c_adapter *i2c_adap = i2c_get_adapter(edid->dc->out->ddc_bus);
+	int new_rate = 0, old_rate = 0, err = 0;
+
+	if (i2c_adap) {
+		old_rate = i2c_get_adapter_bus_clk_rate(i2c_adap);
+		new_rate = old_rate >> 1;
+		err = tegra_edid_i2c_adap_change_rate(i2c_adap, new_rate);
+	} else
+		err = -1;
+	return err;
+}
+
 int tegra_edid_read_block(struct tegra_edid *edid, int block, u8 *data)
 {
 	u8 block_buf[] = {block >> 1};
@@ -111,7 +155,6 @@ int tegra_edid_read_block(struct tegra_edid *edid, int block, u8 *data)
 		}};
 	struct i2c_msg *m;
 	int msg_len;
-
 	if (block > 1) {
 		msg_len = 3;
 		m = msg;
@@ -149,15 +192,20 @@ int tegra_edid_read_block(struct tegra_edid *edid, int block, u8 *data)
 			if (attempt_cnt == 0)
 				last_checksum = checksum;
 
+			/* On different checksum remainder, lower i2c speed */
 			if (last_checksum != checksum) {
 				pr_warn("%s: checksum failed and did not match consecutive reads. Previous remainder was %u. New remainder is %u. Failed at attempt %zu\n",
-					__func__, last_checksum, checksum,
-					attempt_cnt);
-				return -EIO;
+					__func__, last_checksum, checksum, attempt_cnt);
+				if (tegra_edid_i2c_divide_rate(edid)) {
+					pr_warn("Cannot halve i2c speed giving"
+"up on trying to change the i2c speed for EDID read\n");
+					return -EIO;
+				} else {
+					attempt_cnt = 0;
+					continue;
+				}
 			}
-
-			usleep_range(TEGRA_EDID_MIN_RETRY_DELAY_US,
-				TEGRA_EDID_MAX_RETRY_DELAY_US);
+			usleep_range(TEGRA_EDID_MIN_RETRY_DELAY_US, TEGRA_EDID_MAX_RETRY_DELAY_US);
 		}
 	} while (last_checksum != 0 && ++attempt_cnt < TEGRA_EDID_MAX_RETRY);
 
@@ -201,6 +249,7 @@ static int tegra_edid_parse_ext_block(const u8 *raw, int idx,
 	edid->scdc_present = false;
 	edid->hfvsdb_present = false;
 	edid->db420_present = false;
+	edid->colorimetry = 0;
 	ptr = &raw[0];
 
 	/* If CEA 861 block get info for eld struct */
@@ -348,6 +397,9 @@ static int tegra_edid_parse_ext_block(const u8 *raw, int idx,
 			case CEA_DATA_BLOCK_EXT_Y420CMDB:
 				edid->db420_present = true;
 				break;
+			case CEA_DATA_BLOCK_EXT_CDB:
+				edid->colorimetry = ptr[2];
+				break;
 			};
 
 			len++;
@@ -450,6 +502,16 @@ bool tegra_edid_is_420db_present(struct tegra_edid *edid)
 	}
 
 	return edid->data->db420_present;
+}
+
+u16 tegra_edid_get_ex_colorimetry(struct tegra_edid *edid)
+{
+	if (!edid || !edid->data) {
+		pr_warn("edid invalid\n");
+		return 0;
+	}
+
+	return edid->data->colorimetry;
 }
 
 int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs,

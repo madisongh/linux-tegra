@@ -305,6 +305,24 @@ struct gpu_ops {
 		void (*set_perfmon_cntr_index)(struct pmu_gk20a *pmu, u8 val);
 		void (*set_perfmon_cntr_group_id)(struct pmu_gk20a *pmu,
 				u8 gid);
+
+		u8 (*pg_cmd_eng_buf_load_size)(struct pmu_pg_cmd *pg);
+		void (*pg_cmd_eng_buf_load_set_cmd_type)(struct pmu_pg_cmd *pg,
+				u8 value);
+		void (*pg_cmd_eng_buf_load_set_engine_id)(struct pmu_pg_cmd *pg,
+				u8 value);
+		void (*pg_cmd_eng_buf_load_set_buf_idx)(struct pmu_pg_cmd *pg,
+				u8 value);
+		void (*pg_cmd_eng_buf_load_set_pad)(struct pmu_pg_cmd *pg,
+				u8 value);
+		void (*pg_cmd_eng_buf_load_set_buf_size)(struct pmu_pg_cmd *pg,
+				u16 value);
+		void (*pg_cmd_eng_buf_load_set_dma_base)(struct pmu_pg_cmd *pg,
+				u32 value);
+		void (*pg_cmd_eng_buf_load_set_dma_offset)(struct pmu_pg_cmd *pg,
+				u8 value);
+		void (*pg_cmd_eng_buf_load_set_dma_idx)(struct pmu_pg_cmd *pg,
+				u8 value);
 	} pmu_ver;
 	struct {
 		int (*get_netlist_name)(int index, char *name);
@@ -359,15 +377,15 @@ struct gpu_ops {
 		int (*pmu_setup_hw_and_bootstrap)(struct gk20a *g);
 		int (*pmu_setup_elpg)(struct gk20a *g);
 		int (*init_wpr_region)(struct gk20a *g);
-		bool lspmuwprinitdone;
+		u32  lspmuwprinitdone;
 		bool fecsbootstrapdone;
-		u32  fecsrecoveryinprogress;
 	} pmu;
 	struct {
 		int (*init_clk_support)(struct gk20a *g);
 		int (*suspend_clk_support)(struct gk20a *g);
 	} clk;
 	bool privsecurity;
+	bool securegpccs;
 	struct {
 		const struct regop_offset_range* (
 				*get_global_whitelist_ranges)(void);
@@ -454,6 +472,7 @@ struct gk20a {
 	struct dentry *debugfs_gr_idle_timeout_default;
 	struct dentry *debugfs_bypass_smmu;
 	struct dentry *debugfs_disable_bigpage;
+	struct dentry *debugfs_gr_default_attrib_cb_size;
 #endif
 	struct gk20a_ctxsw_ucode_info ctxsw_ucode_info;
 

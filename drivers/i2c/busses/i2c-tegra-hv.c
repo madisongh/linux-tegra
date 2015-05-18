@@ -20,7 +20,6 @@
 #include <linux/i2c.h>
 #include <linux/i2c-tegra-hv.h>
 #include <linux/of_device.h>
-#include <linux/of_i2c.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <linux/completion.h>
@@ -71,6 +70,8 @@ static int tegra_hv_i2c_xfer_msg(struct tegra_hv_i2c_dev *i2c_dev,
 	int msg_err;
 	int msg_read;
 	int rv;
+	int j = 0;
+	uint32_t flags = 0;
 
 	if (msg->len == 0)
 		return -EINVAL;
@@ -80,10 +81,16 @@ static int tegra_hv_i2c_xfer_msg(struct tegra_hv_i2c_dev *i2c_dev,
 
 	msg_err = I2C_NO_ERROR;
 	msg_read = (msg->flags & I2C_M_RD);
-	INIT_COMPLETION(i2c_dev->msg_complete);
+	reinit_completion(&i2c_dev->msg_complete);
+
+	if (more_msgs)
+		flags |= HV_I2C_FLAGS_REPEAT_START;
+
+	if (msg->flags & I2C_M_TEN)
+		flags |= HV_I2C_FLAGS_10BIT_ADDR;
 
 	ret = hv_i2c_transfer(i2c_dev->comm_chan, i2c_dev->cont_id, msg->addr,
-			msg_read, msg->buf, msg->len, &msg_err, sno, more_msgs);
+			msg_read, msg->buf, msg->len, &msg_err, sno, flags);
 	if (ret < 0) {
 		dev_err(i2c_dev->dev, "unable to send message (%d)\n", ret);
 		return ret;
@@ -109,20 +116,26 @@ static int tegra_hv_i2c_xfer_msg(struct tegra_hv_i2c_dev *i2c_dev,
 	dev_dbg(i2c_dev->dev, "received error code %d\n", msg_err);
 	rv = -EIO;
 error:
-	INIT_COMPLETION(i2c_dev->msg_complete);
+	reinit_completion(&i2c_dev->msg_complete);
 	ret = hv_i2c_comm_chan_cleanup(i2c_dev->comm_chan, i2c_dev->cont_id);
 
 	if (ret < 0) {
 		dev_err(i2c_dev->dev, "Failed to send cleanup message\n");
-		BUG();
 	}
 
-	ret = wait_for_completion_timeout(&i2c_dev->msg_complete,
-			i2c_dev->completion_timeout * 2);
-	if (ret == 0) {
-		dev_err(i2c_dev->dev, "Cleanup failed after timeout\n");
-		BUG();
+	while ((ret = wait_for_completion_timeout(&i2c_dev->msg_complete,
+				i2c_dev->completion_timeout * 2)) == 0) {
+		dev_err(i2c_dev->dev, "Cleanup failed after timeout (%d tries)\n",
+				j++);
+		if (j >= 5)
+			break;
+		/* Skipping INIT_COMPLETION on purpose, if completion gets
+		 * signalled in the time between 2 calls to wait_for_completion
+		 * we don't want to overwrite that
+		 */
 	}
+	tegra_hv_i2c_poll_cleanup(i2c_dev->comm_chan);
+
 	return rv;
 }
 
@@ -145,7 +158,7 @@ static int tegra_hv_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 
 static u32 tegra_hv_i2c_func(struct i2c_adapter *adap)
 {
-	u32 ret = I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+	u32 ret = I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_10BIT_ADDR;
 
 	return ret;
 }
@@ -243,7 +256,21 @@ static int tegra_hv_i2c_probe(struct platform_device *pdev)
 	}
 	i2c_dev->cont_id = i2c_dev->adapter.nr;
 	init_completion(&i2c_dev->msg_complete);
-	INIT_COMPLETION(i2c_dev->msg_complete);
+
+	/* Send a cleanup message in case this is a reboot and we had a
+	 * transaction in progress
+	 */
+	ret = hv_i2c_comm_chan_cleanup(i2c_dev->comm_chan, i2c_dev->cont_id);
+	if (ret < 0) {
+		dev_warn(&pdev->dev, "Cleanup after (re)boot failed\n");
+	} else {
+		ret = wait_for_completion_timeout(&i2c_dev->msg_complete,
+				i2c_dev->completion_timeout);
+		if (ret == 0)
+			dev_warn(&pdev->dev, "Timed out sending cleanup after (re)boot\n");
+	}
+
+	reinit_completion(&i2c_dev->msg_complete);
 
 	ret = hv_i2c_get_max_payload(i2c_dev->comm_chan, i2c_dev->cont_id,
 				     &(i2c_dev->max_payload_size), &err);
@@ -261,8 +288,6 @@ static int tegra_hv_i2c_probe(struct platform_device *pdev)
 			i2c_dev->max_payload_size = 4096;
 		}
 	}
-
-	of_i2c_register_devices(&i2c_dev->adapter);
 
 	return 0;
 }

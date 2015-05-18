@@ -22,12 +22,14 @@
  */
 
 #include <linux/err.h>
+#include <linux/gpio.h>
 #include <linux/mutex.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/of_regulator.h>
 #include <linux/regulator/machine.h>
@@ -41,6 +43,8 @@ struct pinmux_fixed_regulator_config {
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *enable_state;
 	struct pinctrl_state *disable_state;
+	int ena_gpio;
+	int enable_high;
 };
 
 struct pinmux_fixed_regulator_data {
@@ -79,6 +83,13 @@ static struct pinmux_fixed_regulator_config
 		return ERR_PTR(-EINVAL);
 	}
 
+	config->ena_gpio = of_get_named_gpio(dev->of_node, "gpio", 0);
+	if (config->ena_gpio == -EPROBE_DEFER)
+		return ERR_PTR(-EPROBE_DEFER);
+
+	if (of_property_read_bool(dev->of_node, "enable-active-high"))
+		config->enable_high = 1;
+
 	config->pinctrl = devm_pinctrl_get(dev);
 	if (IS_ERR(config->pinctrl)) {
 		ret = PTR_ERR(config->pinctrl);
@@ -95,7 +106,7 @@ static struct pinmux_fixed_regulator_config
 	if (IS_ERR(config->disable_state))
 		config->disable_state = NULL;
 
-	if (!config->enable_state || !config->disable_state) {
+	if (!config->enable_state && !config->disable_state) {
 		dev_err(dev, "Pinconfig not found for enable/disable\n");
 		return ERR_PTR(-EINVAL);
 	}
@@ -137,12 +148,19 @@ static int pinmux_fixed_regulator_enable(struct regulator_dev *rdev)
 	struct pinmux_fixed_regulator_config *config = prdata->config;
 	int ret;
 
-	ret = pinctrl_select_state(config->pinctrl, config->enable_state);
-	if (ret < 0) {
-		dev_err(prdata->dev, "Setting pin enable state failed: %d\n",
-			ret);
-		return ret;
+	if (config->enable_state) {
+		ret = pinctrl_select_state(config->pinctrl,
+					config->enable_state);
+		if (ret < 0) {
+			dev_err(prdata->dev,
+				"Setting pin enable state failed: %d\n", ret);
+			return ret;
+		}
 	}
+
+	if (gpio_is_valid(config->ena_gpio))
+		gpio_direction_output(config->ena_gpio, config->enable_high);
+
 	prdata->current_state = 1;
 	return 0;
 }
@@ -153,11 +171,17 @@ static int pinmux_fixed_regulator_disable(struct regulator_dev *rdev)
 	struct pinmux_fixed_regulator_config *config = prdata->config;
 	int ret;
 
-	ret = pinctrl_select_state(config->pinctrl, config->disable_state);
-	if (ret < 0) {
-		dev_err(prdata->dev, "Setting pin disable state failed: %d\n",
-			ret);
-		return ret;
+	if (gpio_is_valid(config->ena_gpio))
+		gpio_direction_output(config->ena_gpio, !config->enable_high);
+
+	if (config->disable_state) {
+		ret = pinctrl_select_state(config->pinctrl,
+					config->disable_state);
+		if (ret < 0) {
+			dev_err(prdata->dev,
+				"Setting pin disable state failed: %d\n", ret);
+			return ret;
+		}
 	}
 	prdata->current_state = 0;
 	return 0;
@@ -206,6 +230,15 @@ static int pinmux_fixed_regulator_probe(struct platform_device *pdev)
 	prdata->desc.owner = THIS_MODULE;
 	prdata->desc.ops = &pinmux_fixed_regulator_ops;
 	prdata->desc.enable_time = config->startup_delay;
+
+	if (gpio_is_valid(config->ena_gpio)) {
+		ret = devm_gpio_request(&pdev->dev, config->ena_gpio,
+						"pinctl-fixed-gpio");
+		if (ret < 0) {
+			dev_err(&pdev->dev, "gpio requeste failed: %d\n", ret);
+			return ret;
+		}
+	}
 
 	prdata->desc.name = kstrdup(config->supply_name, GFP_KERNEL);
 	if (!prdata->desc.name) {

@@ -24,6 +24,7 @@
 #include <linux/list.h>
 #include <linux/interrupt.h>
 #include <linux/skbuff.h>
+#include <linux/delay.h>
 
 #include "i2c-tegra-hv-common.h"
 
@@ -36,6 +37,9 @@ static int _hv_i2c_ivc_send(struct tegra_hv_i2c_comm_chan *comm_chan,
 
 	if (!comm_chan->ivck || !msg || !size)
 		return -EINVAL;
+
+	while (tegra_hv_ivc_channel_notified(comm_chan->ivck))
+		/* Waiting for the channel to be ready */;
 
 	spin_lock_irqsave(&comm_dev->ivck_tx_lock, flags);
 
@@ -121,6 +125,8 @@ static int _hv_i2c_send_msg(struct device *dev,
 	rv = _hv_i2c_ivc_send(comm_chan, msg, total_len);
 	if (rv < 0) {
 		dev_err(dev, "ivc_send failed err %d\n", rv);
+		/* restore channel state because no message was sent */
+		comm_chan->rx_state = I2C_RX_INIT;
 		goto fail; /* Redundant but safe */
 	}
 fail:
@@ -163,14 +169,14 @@ int hv_i2c_comm_chan_cleanup(struct tegra_hv_i2c_comm_chan *comm_chan,
  */
 int hv_i2c_transfer(struct tegra_hv_i2c_comm_chan *comm_chan, int cont_id,
 		int addr, int read, uint8_t *buf, size_t len, int *err,
-		int seq_no, bool more_msgs)
+		int seq_no, uint32_t flags)
 {
 	/* Using skbs for fast allocation  and deallocation */
 	struct sk_buff *tx_msg_skb = NULL;
 	struct i2c_ivc_msg *tx_msg = NULL;
 	int rv;
 	int msg_len = I2C_IVC_COMMON_HEADER_LEN
-		      + sizeof(struct i2c_ivc_msg_tx_rx_hdr) + len - 1;
+		      + sizeof(struct i2c_ivc_msg_tx_rx_hdr) + len;
 	struct device *dev = comm_chan->dev;
 
 	tx_msg_skb = alloc_skb(msg_len, GFP_KERNEL);
@@ -186,18 +192,13 @@ int hv_i2c_transfer(struct tegra_hv_i2c_comm_chan *comm_chan, int cont_id,
 		i2c_ivc_msg_type(tx_msg) = I2C_READ;
 	else {
 		i2c_ivc_msg_type(tx_msg) = I2C_WRITE;
-		memcpy(&i2c_ivc_message_buffer(tx_msg), &(buf[1]), len-1);
-		len = len - 1;
+		memcpy(&i2c_ivc_message_buffer(tx_msg), &(buf[0]), len);
 	}
 
 	i2c_ivc_message_seq_nr(tx_msg) = seq_no;
 	i2c_ivc_message_slave_addr(tx_msg) = addr;
-	i2c_ivc_message_slave_reg(tx_msg) = buf[0];
 	i2c_ivc_message_buf_len(tx_msg) = len;
-	if (more_msgs)
-		i2c_ivc_message_flags(tx_msg) = HV_I2C_FLAGS_REPEAT_START;
-	else
-		i2c_ivc_message_flags(tx_msg) = 0;
+	i2c_ivc_message_flags(tx_msg) = flags;
 
 	rv = _hv_i2c_send_msg(dev, comm_chan, tx_msg, buf, err, len, msg_len);
 	kfree_skb(tx_msg_skb);
@@ -321,6 +322,12 @@ static void hv_i2c_work(struct work_struct *work)
 	int comm_chan_id;
 	u32 len = 0;
 
+	if (tegra_hv_ivc_channel_notified(ivck)) {
+		pr_warn("%s: Skipping work since queue is not ready\n",
+				__func__);
+		return;
+	}
+
 	for (; tegra_hv_ivc_can_read(ivck); tegra_hv_ivc_read_advance(ivck)) {
 		/* Message available
 		 * Initialize local variables to safe values
@@ -400,6 +407,20 @@ static void hv_i2c_work(struct work_struct *work)
 	return;
 }
 
+void tegra_hv_i2c_poll_cleanup(struct tegra_hv_i2c_comm_chan *comm_chan)
+{
+	struct tegra_hv_i2c_comm_dev *comm_dev = comm_chan->hv_comm_dev;
+	unsigned long ms = 0;
+
+	while (comm_chan->rx_state != I2C_RX_INIT) {
+		msleep(20);
+		ms += 20;
+		dev_err(comm_chan->dev, "Polling for response (Total %lu ms)\n",
+				ms);
+		hv_i2c_work(&comm_dev->work);
+	}
+}
+
 struct tegra_hv_i2c_comm_dev *_hv_i2c_get_comm_dev(struct device *dev,
 		struct device_node *hv_dn, uint32_t ivc_queue)
 {
@@ -449,6 +470,7 @@ struct tegra_hv_i2c_comm_dev *_hv_i2c_get_comm_dev(struct device *dev,
 
 	INIT_HLIST_NODE(&comm_dev->list);
 	hlist_add_head(&comm_dev->list, &ivc_comm_devs);
+	INIT_WORK(&comm_dev->work, hv_i2c_work);
 
 	/* Our comm_dev is ready, so enable irq here. But channels are
 	 * not yet allocated, we need to take care of that in the
@@ -464,7 +486,8 @@ struct tegra_hv_i2c_comm_dev *_hv_i2c_get_comm_dev(struct device *dev,
 		goto end;
 	}
 
-	INIT_WORK(&comm_dev->work, hv_i2c_work);
+	/* set ivc channel to invalid state */
+	tegra_hv_ivc_channel_reset(ivck);
 
 end:
 	spin_unlock_irqrestore(&ivc_comm_devs_lock, flags);

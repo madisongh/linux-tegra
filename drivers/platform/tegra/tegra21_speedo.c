@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/tegra21_speedo.c
  *
- * Copyright (C) 2013-2014 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2013-2015 NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -97,43 +97,63 @@ static const u32 gpu_process_speedos[][GPU_PROCESS_CORNERS_NUM] = {
 static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
 /* proc_id  0,	   1,         2 */
 	{1950,  2100,  UINT_MAX}, /* [0]: threshold_index 0 */
-	{1950,  2100,  UINT_MAX}, /* [1]: threshold_index 1 */
+	{UINT_MAX,  UINT_MAX,  UINT_MAX}, /* [1]: threshold_index 1 */
 };
 
 static void rev_sku_to_speedo_ids(int rev, int sku, int speedo_rev)
 {
 	bool shield_sku = false;
+	bool a02 = rev == TEGRA_REVISION_A02;
 
 #ifdef CONFIG_OF
 	shield_sku = of_property_read_bool(of_chosen,
 					   "nvidia,tegra-shield-sku");
 #endif
 	switch (sku) {
-	case 0x00: /* Engg sku */
 	case 0x01: /* Engg sku */
+	case 0x13:
+		if (a02) {
+			cpu_speedo_id = shield_sku ? 3 : 1;
+			soc_speedo_id = 0;
+			gpu_speedo_id = 2;
+			threshold_index = 0;
+			core_min_mv = 800;
+			break;
+		}
+		/* fall thru for a01 */
+	case 0x00: /* Engg sku */
 	case 0x07:
 	case 0x17:
 	case 0x27:
 		cpu_speedo_id = shield_sku ? 2 : 0;
 		soc_speedo_id = 0;
-		gpu_speedo_id = speedo_rev >= 2 ? 1 : 0;
-		threshold_index = 0;
-		core_min_mv = 825;
-		break;
-	case 0x13:
-		cpu_speedo_id = shield_sku ? 2 : 1;
-		soc_speedo_id = 0;
-		gpu_speedo_id = speedo_rev >= 2 ? 1 : 0;
+		gpu_speedo_id = 1;
 		threshold_index = 0;
 		core_min_mv = 825;
 		break;
 	case 0x83:
+		if (a02) {
+			cpu_speedo_id = 1;
+			soc_speedo_id = 0;
+			gpu_speedo_id = 4;
+			threshold_index = 0;
+			core_min_mv = 800;
+			break;
+		}
+		/* fall thru for a01 */
 	case 0x87:
-		cpu_speedo_id = 3;
+		cpu_speedo_id = (shield_sku && a02) ? 2 : 0;
 		soc_speedo_id = 0;
-		gpu_speedo_id = speedo_rev >= 2 ? 2 : 0;
+		gpu_speedo_id = 3;
 		threshold_index = 0;
-		core_min_mv = 800;
+		core_min_mv = 825;
+		break;
+	case 0x57:
+		cpu_speedo_id = 4;
+		soc_speedo_id = 1;
+		gpu_speedo_id = 5;
+		threshold_index = 1;
+		core_min_mv = 1100;
 		break;
 	default:
 		pr_warn("Tegra21: Unknown SKU %d\n", sku);
@@ -144,6 +164,10 @@ static void rev_sku_to_speedo_ids(int rev, int sku, int speedo_rev)
 		core_min_mv = 950;
 		break;
 	}
+
+	/* Overwrite GPU speedo selection for speedo revision 0, 1 */
+	if (speedo_rev < 2)
+		gpu_speedo_id = 0;
 }
 
 static int get_speedo_rev(void)
@@ -360,6 +384,8 @@ int tegra_core_speedo_mv(void)
 {
 	switch (core_process_id) {
 	case 0:
+		if (soc_speedo_id == 1)
+			return 1100;
 		if (speedo_rev <= 1)
 			return 1000;
 		return 1125;

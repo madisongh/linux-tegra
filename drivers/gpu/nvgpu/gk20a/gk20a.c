@@ -1122,8 +1122,27 @@ static int gk20a_pm_disable_clk(struct device *dev)
 
 static void gk20a_pm_shutdown(struct platform_device *pdev)
 {
+#ifdef CONFIG_PM_RUNTIME
+	unsigned long timeout = jiffies +
+		msecs_to_jiffies(GK20A_WAIT_FOR_IDLE_MS);
+	int ref_cnt;
+#endif
+
 	dev_info(&pdev->dev, "shutting down");
+
+#ifdef CONFIG_PM_RUNTIME
+	/* Prevent more requests by disabling Runtime PM */
 	__pm_runtime_disable(&pdev->dev, false);
+
+	/* Wait until current running requests are finished */
+	while (time_before(jiffies, timeout)) {
+		ref_cnt = atomic_read(&pdev->dev.power.usage_count);
+		if (ref_cnt > 1)
+			msleep(1);
+		else
+			break;
+	}
+#endif
 }
 
 #ifdef CONFIG_PM
@@ -1510,6 +1529,7 @@ static int gk20a_probe(struct platform_device *dev)
 					S_IRUGO|S_IWUSR,
 					platform->debugfs,
 					&gk20a->mm.disable_bigpage);
+	gr_gk20a_debugfs_init(gk20a);
 	gk20a_pmu_debugfs_init(dev);
 	gk20a_cde_debugfs_init(dev);
 #endif
@@ -1699,6 +1719,7 @@ int gk20a_busy(struct platform_device *pdev)
 		pm_runtime_put_noidle(&pdev->dev);
 		if (platform->idle)
 			platform->idle(pdev);
+		goto fail;
 	}
 #else
 	if (!g->power_on) {
@@ -1774,6 +1795,10 @@ void gk20a_reset(struct gk20a *g, u32 units)
  * __gk20a_do_idle() - force the GPU to idle and railgate
  *
  * In success, this call MUST be balanced by caller with __gk20a_do_unidle()
+ *
+ * Acquires two locks : &g->busy_lock and &platform->railgate_lock
+ * In success, we hold these locks and return
+ * In failure, we release these locks and return
  */
 int __gk20a_do_idle(struct platform_device *pdev, bool force_reset)
 {
@@ -1794,15 +1819,15 @@ int __gk20a_do_idle(struct platform_device *pdev, bool force_reset)
 	if (platform->is_railgated(pdev))
 		return 0;
 
-	/* check if global force_reset flag is set */
-	force_reset |= platform->force_reset_in_do_idle;
-
-	/* prevent suspend by incrementing usage counter */
-	pm_runtime_get_noresume(&pdev->dev);
+	/*
+	 * release railgate_lock, prevent suspend by incrementing usage counter,
+	 * re-acquire railgate_lock
+	 */
+	mutex_unlock(&platform->railgate_lock);
+	pm_runtime_get_sync(&pdev->dev);
+	mutex_lock(&platform->railgate_lock);
 
 	/* check and wait until GPU is idle (with a timeout) */
-	pm_runtime_barrier(&pdev->dev);
-
 	do {
 		msleep(1);
 		ref_cnt = atomic_read(&pdev->dev.power.usage_count);
@@ -1811,19 +1836,21 @@ int __gk20a_do_idle(struct platform_device *pdev, bool force_reset)
 	if (ref_cnt != 1) {
 		gk20a_err(&pdev->dev, "failed to idle - refcount %d != 1\n",
 			ref_cnt);
-		goto fail;
+		goto fail_drop_usage_count;
 	}
 
-	/*
-	 * if GPU is now idle, we will have only one ref count
-	 * drop this ref which will rail gate the GPU (if GPU
-	 * railgate is supported)
-	 * if GPU railgate is not supported then we need to
-	 * explicitly reset it
-	 */
-	pm_runtime_put_sync(&pdev->dev);
+	/* check if global force_reset flag is set */
+	force_reset |= platform->force_reset_in_do_idle;
 
 	if (platform->can_railgate && !force_reset) {
+		/*
+		 * Case 1 : GPU railgate is supported
+		 *
+		 * if GPU is now idle, we will have only one ref count,
+		 * drop this ref which will rail gate the GPU
+		 */
+		pm_runtime_put_sync(&pdev->dev);
+
 		/* add sufficient delay to allow GPU to rail gate */
 		msleep(platform->railgate_delay);
 
@@ -1842,12 +1869,24 @@ int __gk20a_do_idle(struct platform_device *pdev, bool force_reset)
 			goto fail_timeout;
 		}
 	} else {
+		/*
+		 * Case 2 : GPU railgate is not supported or we explicitly
+		 * do not want to do railgate
+		 *
+		 * if GPU is now idle, call prepare_poweroff() to save the
+		 * state and then assert the reset
+		 *
+		 * __gk20a_do_unidle() needs to deassert reset, call
+		 * finalize_poweron(), and then call pm_runtime_put_sync()
+		 * to balance the GPU usage counter
+		 */
 		if (!platform->reset_assert || !platform->reset_deassert)
-			goto fail_timeout;
+			goto fail_drop_usage_count;
 
-		pm_runtime_get_sync(&pdev->dev);
+		/* Save the GPU state */
 		gk20a_pm_prepare_poweroff(&pdev->dev);
 
+		/* assert GPU reset */
 		platform->reset_assert(pdev);
 
 		udelay(10);
@@ -1856,7 +1895,7 @@ int __gk20a_do_idle(struct platform_device *pdev, bool force_reset)
 		return 0;
 	}
 
-fail:
+fail_drop_usage_count:
 	pm_runtime_put_noidle(&pdev->dev);
 fail_timeout:
 	mutex_unlock(&platform->railgate_lock);
@@ -1892,9 +1931,16 @@ int __gk20a_do_unidle(struct platform_device *pdev)
 	struct gk20a_platform *platform = dev_get_drvdata(&pdev->dev);
 
 	if (g->forced_reset) {
+		/*
+		 * If we did a reset (and not railgate),
+		 * then deassert the GPU reset here first
+		 */
 		platform->reset_deassert(pdev);
 
+		/* restore the GPU state */
 		gk20a_pm_finalize_poweron(&pdev->dev);
+
+		/* balance GPU usage counter */
 		pm_runtime_put_sync(&pdev->dev);
 
 		g->forced_reset = false;
@@ -1982,8 +2028,13 @@ int gk20a_init_gpu_characteristics(struct gk20a *g)
 	gpu->max_ltc_per_fbp =  g->ops.gr.get_max_ltc_per_fbp(g);
 	gpu->max_lts_per_ltc = g->ops.gr.get_max_lts_per_ltc(g);
 	g->ops.gr.get_rop_l2_en_mask(g);
-
-	gpu->reserved = 0;
+	gpu->gr_compbit_store_base_hw = g->gr.compbit_store.base_hw;
+	gpu->gr_gobs_per_comptagline_per_slice =
+		g->gr.gobs_per_comptagline_per_slice;
+	gpu->num_ltc = g->ltc_count;
+	gpu->lts_per_ltc = g->gr.slices_per_ltc;
+	gpu->cbc_cache_line_size = g->gr.cacheline_size;
+	gpu->cbc_comptags_per_line = g->gr.comptags_per_cacheline;
 
 	return 0;
 }

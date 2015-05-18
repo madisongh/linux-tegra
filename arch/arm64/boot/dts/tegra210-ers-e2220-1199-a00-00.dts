@@ -22,6 +22,10 @@
 #include "tegra210-platforms/tegra210-ers-1199-emc.dtsi"
 
 / {
+	chosen {
+		nvidia,tegra-shield-sku;
+        };
+
 	sdhci@700b0200 {
 		nvidia,is-ddr-tap-delay;
 		nvidia,ddr-tap-delay = <0>;
@@ -34,5 +38,17 @@
 		vddio_sd_slot-supply = <&vdd_3v3>;
 		nvidia,dll-calib-needed;
 		nvidia,is-emmc;
+	};
+	i2c@7000c000 {
+		pca9546@71 {
+			i2c@3 {
+				gpio@76 {
+					pcie-mux {
+						gpio-output-low = <12 14 15>;
+						gpio-output-high = <5 6 11 13>;
+					};
+				};
+			};
+		};
 	};
 };

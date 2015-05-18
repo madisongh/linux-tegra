@@ -37,6 +37,7 @@
 #include <dt-bindings/iio/meter/ina3221x.h>
 #include "tegra124-platforms/tegra124-tn8-usb-devices.dtsi"
 #include "tegra124-platforms/tegra124-tn8-cmu-p1761-1270-a00.dtsi"
+#include "tegra124-platforms/tegra124-tn8-comms.dtsi"
 
 / {
 	model = "NVIDIA Tegra124 TN8 FFD";
@@ -51,6 +52,14 @@
 		linux,initrd-start = <0x85000000>;
 		linux,initrd-end = <0x851bc400>;
 	};
+
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "tn8";
+		};
+	};
+
 	host1x {
 		/* tegradc.0 */
 		dc@54200000 {
@@ -153,6 +162,10 @@
 						ti,disable-pull-down;
 					};
 				};
+			};
+
+			extcon {
+				/delete-property/ti,wakeup;
 			};
 		};
 	};

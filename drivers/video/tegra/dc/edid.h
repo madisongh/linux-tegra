@@ -30,7 +30,7 @@
 #define TEGRA_DC_Y420_MASK	(TEGRA_DC_Y420_30 | \
 				TEGRA_DC_Y420_36 | TEGRA_DC_Y420_48)
 
-#define TEGRA_EDID_MAX_RETRY 20
+#define TEGRA_EDID_MAX_RETRY 5
 #define TEGRA_EDID_MIN_RETRY_DELAY_US 200
 #define TEGRA_EDID_MAX_RETRY_DELAY_US (TEGRA_EDID_MIN_RETRY_DELAY_US + 200)
 
@@ -121,6 +121,7 @@ u16 tegra_edid_get_max_clk_rate(struct tegra_edid *edid);
 bool tegra_edid_is_scdc_present(struct tegra_edid *edid);
 bool tegra_edid_is_420db_present(struct tegra_edid *edid);
 bool tegra_edid_is_hfvsdb_present(struct tegra_edid *edid);
+u16 tegra_edid_get_ex_colorimetry(struct tegra_edid *edid);
 int tegra_edid_get_eld(struct tegra_edid *edid, struct tegra_edid_hdmi_eld *elddata);
 
 struct tegra_dc_edid *tegra_edid_get_data(struct tegra_edid *edid);
@@ -128,6 +129,7 @@ void tegra_edid_put_data(struct tegra_dc_edid *data);
 int tegra_dc_edid_blob(struct tegra_dc *dc, struct i2c_msg *msgs, int num);
 
 int tegra_edid_underscan_supported(struct tegra_edid *edid);
+int tegra_edid_i2c_adap_change_rate(struct i2c_adapter *i2c_adap, int rate);
 int tegra_edid_read_block(struct tegra_edid *edid, int block, u8 *data);
 int tegra_edid_audio_supported(struct tegra_edid *edid);
 #endif

@@ -198,7 +198,6 @@
 		vmmc-supply = <&vmmc_dummy>;
 		disable-clock-gate;
 		nvidia,disable-auto-cal;
-		nvidia,update-pinctrl-settings;
 		/* clock freq based on mode */
 		fixed-clock-freq = <25500000 24000000 24000000 47000000 24000000 47000000 94000000 204000000 0 0 0>;
 		status = "disabled";
@@ -257,7 +256,6 @@
 		calib-1v8-offsets = <0x710A>;
 		auto-cal-step = <0x7>;
 		status = "disabled";
-		nvidia,update-pinctrl-settings;
 		/* clock freq based on mode */
 		fixed-clock-freq = <25500000 24000000 24000000 47000000 24000000 47000000 94000000 204000000 0 0 0>;
 		nvidia,enable-ext-loopback;
@@ -283,6 +281,27 @@
 			nvidia,num_cs_gpio = <0x0>;
 			nvidia,phy_addr = <0x0 0x48000000>;
 			nvidia,phy_size = <0x04000000>;
+		};
+	};
+
+	extcon {
+		compatible = "simple-bus";
+
+		id_gpio_extcon: extcon@0 {
+			compatible = "extcon-gpio";
+			extcon-gpio,name = "OTG-nID";
+			extcon-gpio,cable-name = "OTG nID";
+			#extcon-cells = <1>;
+			status="disabled";
+		};
+
+		vbus_gpio_extcon: extcon@1 {
+			compatible = "extcon-gpio";
+			extcon-gpio,name = "gadget-VBUS";
+			extcon-gpio,default-connected;
+			extcon-gpio,cable-name = "gadget VBUS";
+			#extcon-cells = <1>;
+			status="disabled";
 		};
 	};
 

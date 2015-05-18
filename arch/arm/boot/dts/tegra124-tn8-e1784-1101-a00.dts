@@ -35,6 +35,7 @@
 #include "tegra124-platforms/tegra124-tn8-hdmi-p1761-1270-a00.dtsi"
 #include "tegra124-platforms/tegra124-tn8-thermal-zone-p1761-1270-a00.dtsi"
 #include "tegra124-platforms/tegra124-tn8-usb-devices.dtsi"
+#include "tegra124-platforms/tegra124-tn8-comms.dtsi"
 
 / {
 	model = "NVIDIA Tegra124 TN8 FFD";
@@ -49,6 +50,14 @@
 		linux,initrd-start = <0x85000000>;
 		linux,initrd-end = <0x851bc400>;
 	};
+
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "tn8";
+		};
+	};
+
 	i2c@7000c400 {
 		pca9546@71 {
 			vcc-supply = <&palmas_smps9>;

@@ -81,6 +81,10 @@
 			regulator-name = "vdd-5v0";
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
+			regulator-always-on;
+			regulator-boot-on;
+			regulator-disable-on-suspend;
+			startup-delay-us = <1000>;
 			gpio = <&palmas_gpio 1 0>;
 			enable-active-high;
 		};
@@ -116,6 +120,7 @@
 			regulator-always-on;
 			regulator-boot-on;
 			enable-active-high;
+			vin-supply = <&palmas_smps9>;
 		};
 
 		avdd_hdmi: regulator@9 {

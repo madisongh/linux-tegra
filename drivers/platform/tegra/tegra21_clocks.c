@@ -2621,7 +2621,8 @@ static void plld_set_defaults(struct clk *c, unsigned long input_rate)
 	}
 
 	/* set IDDQ, enable lock detect, disable SDM */
-	clk_writel(PLLD_MISC0_DEFAULT_VALUE, c->reg + c->u.pll.misc0);
+	val = clk_readl(c->reg + c->u.pll.misc0) & PLLD_MISC0_DSI_CLKENABLE;
+	clk_writel(val | PLLD_MISC0_DEFAULT_VALUE, c->reg + c->u.pll.misc0);
 	pll_writel_delay(PLLD_MISC1_DEFAULT_VALUE, c->reg + c->u.pll.misc1);
 }
 
@@ -3760,17 +3761,28 @@ static struct clk_ops tegra_plle_ops = {
 /* DFLL operations */
 static void __init tegra21_dfll_clk_init(struct clk *c)
 {
+	unsigned long int dfll_boot_req_khz = tegra_dfll_boot_req_khz();
 	c->ops->init = tegra21_dfll_cpu_late_init;
+
+	/*
+	 * If boot loader has set dfll clock, then dfll freq is
+	 * passed in kernel command line from bootloader
+	 */
+	if (dfll_boot_req_khz)
+		c->rate = dfll_boot_req_khz * 1000;
 }
 
 static int tegra21_dfll_clk_enable(struct clk *c)
 {
-	return tegra_cl_dvfs_enable(c->u.dfll.cl_dvfs);
+	if (c->u.dfll.cl_dvfs)
+		return tegra_cl_dvfs_enable(c->u.dfll.cl_dvfs);
+	return 0;
 }
 
 static void tegra21_dfll_clk_disable(struct clk *c)
 {
-	tegra_cl_dvfs_disable(c->u.dfll.cl_dvfs);
+	if (c->u.dfll.cl_dvfs)
+		tegra_cl_dvfs_disable(c->u.dfll.cl_dvfs);
 }
 
 static unsigned long boost_dfll_rate(struct clk *c, unsigned long rate)
@@ -3789,20 +3801,23 @@ static unsigned long boost_dfll_rate(struct clk *c, unsigned long rate)
 
 static int tegra21_dfll_clk_set_rate(struct clk *c, unsigned long rate)
 {
-	unsigned long boost_rate = boost_dfll_rate(c, rate);
-	int ret = tegra_cl_dvfs_request_rate(c->u.dfll.cl_dvfs, boost_rate);
+	if (c->u.dfll.cl_dvfs) {
+		unsigned long boost_rate = boost_dfll_rate(c, rate);
+		int ret = tegra_cl_dvfs_request_rate(c->u.dfll.cl_dvfs,
+						     boost_rate);
+		/*
+		 * Record requested rate. Thus, non boosted rate is reported.
+		 * It also ensures correct clock settings when switching back
+		 * and forth to a clock source with different than DFLL
+		 * granularity, and prevents other than DFLL clock source to run
+		 * at boost rate that is supported on DFLL only.
+		 */
+		if (!ret)
+			c->rate = rate;
 
-	/*
-	 * Record requested rate. Thus, non boosted rate is reported. It also
-	 * ensures correct clock settings when switching back and forth to a
-	 * clock source with different than DFLL granularity, and prevents other
-	 * than DFLL clock source to run at boost rate that is supported on DFLL
-	 * only.
-	 */
-	if (!ret)
-		c->rate = rate;
-
-	return ret;
+		return ret;
+	}
+	return 0;
 }
 
 static void tegra21_dfll_clk_reset(struct clk *c, bool assert)
@@ -3814,9 +3829,12 @@ static void tegra21_dfll_clk_reset(struct clk *c, bool assert)
 static int
 tegra21_dfll_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 {
-	if (p == TEGRA_CLK_DFLL_LOCK)
-		return setting ? tegra_cl_dvfs_lock(c->u.dfll.cl_dvfs) :
-				 tegra_cl_dvfs_unlock(c->u.dfll.cl_dvfs);
+	if (p == TEGRA_CLK_DFLL_LOCK) {
+		if (c->u.dfll.cl_dvfs)
+			return setting ? tegra_cl_dvfs_lock(c->u.dfll.cl_dvfs) :
+					tegra_cl_dvfs_unlock(c->u.dfll.cl_dvfs);
+		return 0;
+	}
 	return -EINVAL;
 }
 
@@ -3826,7 +3844,7 @@ static void tegra21_dfll_clk_resume(struct clk *c)
 	if (!(clk_readl(c->reg) & DFLL_BASE_RESET))
 		return;		/* already resumed */
 
-	if (c->state != UNINITIALIZED) {
+	if (c->u.dfll.cl_dvfs) {
 		tegra_periph_reset_deassert(c);
 		tegra_cl_dvfs_resume(c->u.dfll.cl_dvfs);
 	}
@@ -4954,16 +4972,6 @@ static struct clk_ops tegra_dtv_clk_ops = {
 	.set_rate		= &tegra21_periph_clk_set_rate,
 	.round_rate		= &tegra21_periph_clk_round_rate,
 	.clk_cfg_ex		= &tegra21_dtv_clk_cfg_ex,
-	.reset			= &tegra21_periph_clk_reset,
-};
-
-/* FIXME: this now just periph ops, can be removed */
-static struct clk_ops tegra_dsi_clk_ops = {
-	.init			= &tegra21_periph_clk_init,
-	.enable			= &tegra21_periph_clk_enable,
-	.disable		= &tegra21_periph_clk_disable,
-	.set_rate		= &tegra21_periph_clk_set_rate,
-	.round_rate		= &tegra21_periph_clk_round_rate,
 	.reset			= &tegra21_periph_clk_reset,
 };
 
@@ -6884,6 +6892,39 @@ static struct clk tegra_pll_a_out0 = {
 	.max_rate  = 600000000,
 };
 
+static struct clk_mux_sel mux_plla[] = {
+	{ .input = &tegra_pll_a, .value = 0},
+	{ NULL, 0},
+};
+
+static struct clk tegra_pll_a_out_adsp = {
+	.name       = "pll_a_out_adsp",
+	.clk_id     = TEGRA210_CLK_ID_PLL_A_OUT_ADSP,
+	.ops        = &tegra_periph_clk_ops,
+	.inputs     = mux_plla,
+	.flags      = PERIPH_NO_RESET,
+	.max_rate   = 1000000000,
+	.u.periph = {
+		.clk_num = 188,
+	},
+};
+
+static struct clk_mux_sel mux_plla_out0[] = {
+	{ .input = &tegra_pll_a_out0, .value = 0},
+	{ NULL, 0},
+};
+
+static struct clk tegra_pll_a_out0_out_adsp = {
+	.name       = "pll_a_out0_out_adsp",
+	.ops        = &tegra_periph_clk_ops,
+	.inputs     = mux_plla_out0,
+	.flags      = PERIPH_NO_RESET,
+	.max_rate   = 600000000,
+	.u.periph = {
+		.clk_num = 188,
+	},
+};
+
 static struct clk_pll_freq_table tegra_pll_d_freq_table[] = {
 	{ 12000000, 594000000,  99, 1, 2},
 	{ 13000000, 594000000,  91, 1, 2, 0, 0xfc4f},	/* actual: 594000183 */
@@ -7336,7 +7377,7 @@ static struct clk tegra_pll_m = {
 	.flags     = PLLM,
 	.ops       = &tegra_pllm_ops,
 	.reg       = 0x90,
-	.parent    = &tegra_pll_ref,
+	.parent    = &tegra_clk_osc,
 	.max_rate  = 1866000000,
 	.u.pll = {
 		.input_min = 9600000,
@@ -7368,7 +7409,7 @@ static struct clk tegra_pll_mb = {
 	.clk_id    = TEGRA210_CLK_ID_PLL_MB,
 	.ops       = &tegra_pllmb_ops,
 	.reg       = 0x5e8,
-	.parent    = &tegra_pll_ref,
+	.parent    = &tegra_clk_osc,
 	.max_rate  = 1866000000,
 	.u.pll = {
 		.input_min = 9600000,
@@ -7690,6 +7731,7 @@ static struct clk_mux_sel mux_pll_e_inputs[] = {
 
 static struct clk tegra_pll_e = {
 	.name      = "pll_e",
+	.clk_id    = TEGRA210_CLK_ID_PLL_E,
 	.flags     = PLL_FIXED,
 	.ops       = &tegra_plle_ops,
 	.reg       = 0xe8,
@@ -7710,8 +7752,21 @@ static struct clk tegra_pll_e = {
 	},
 };
 
+static struct clk tegra_pll_e_gate = {
+	.name      = "plle_gate",
+	.clk_id    = TEGRA210_CLK_ID_PLL_E_GATE,
+	.parent    = &tegra_pll_e,
+	.ops       = &tegra_cml_clk_ops,
+	.reg       = 0xec,
+        .max_rate  = 100000000,
+	.u.periph  = {
+		.clk_num = 15,
+	},
+};
+
 static struct clk tegra_cml0_clk = {
 	.name      = "cml0",
+	.clk_id    = TEGRA210_CLK_ID_PLL_E_CML0,
 	.parent    = &tegra_pll_e,
 	.ops       = &tegra_cml_clk_ops,
 	.reg       = PLLE_AUX,
@@ -7723,6 +7778,7 @@ static struct clk tegra_cml0_clk = {
 
 static struct clk tegra_cml1_clk = {
 	.name      = "cml1",
+	.clk_id    = TEGRA210_CLK_ID_PLL_E_CML1,
 	.parent    = &tegra_pll_e,
 	.ops       = &tegra_cml_clk_ops,
 	.reg       = PLLE_AUX,
@@ -7734,6 +7790,7 @@ static struct clk tegra_cml1_clk = {
 
 static struct clk tegra_pciex_clk = {
 	.name      = "pciex",
+	.clk_id    = TEGRA210_CLK_ID_PCIEX,
 	.parent    = &tegra_pll_e,
 	.ops       = &tegra_pciex_clk_ops,
 	.max_rate  = 500000000,
@@ -7743,9 +7800,10 @@ static struct clk tegra_pciex_clk = {
 };
 
 /* Audio sync clocks */
-#define SYNC_SOURCE(_id, _dev)				\
+#define SYNC_SOURCE(_id, _dev, _clk_id)			\
 	{						\
 		.name      = #_id "_sync",		\
+		.clk_id    = TEGRA210_CLK_ID_##_clk_id##_SYNC, \
 		.lookup    = {				\
 			.dev_id    = #_dev ,		\
 			.con_id    = "ext_audio_sync",	\
@@ -7755,13 +7813,13 @@ static struct clk tegra_pciex_clk = {
 		.ops       = &tegra_sync_source_ops	\
 	}
 static struct clk tegra_sync_source_list[] = {
-	SYNC_SOURCE(spdif_in, tegra210-spdif),
-	SYNC_SOURCE(i2s0, tegra210-i2s.0),
-	SYNC_SOURCE(i2s1, tegra210-i2s.1),
-	SYNC_SOURCE(i2s2, tegra210-i2s.2),
-	SYNC_SOURCE(i2s3, tegra210-i2s.3),
-	SYNC_SOURCE(i2s4, tegra210-i2s.4),
-	SYNC_SOURCE(vimclk, vimclk),
+	SYNC_SOURCE(spdif_in, tegra210-spdif, SPDIF_IN),
+	SYNC_SOURCE(i2s0, tegra210-i2s.0, I2S0),
+	SYNC_SOURCE(i2s1, tegra210-i2s.1, I2S1),
+	SYNC_SOURCE(i2s2, tegra210-i2s.2, I2S2),
+	SYNC_SOURCE(i2s3, tegra210-i2s.3, I2S3),
+	SYNC_SOURCE(i2s4, tegra210-i2s.4, I2S4),
+	SYNC_SOURCE(vimclk, vimclk, VIMCLK),
 };
 
 static struct clk_mux_sel mux_d_audio_clk[] = {
@@ -7792,9 +7850,10 @@ static struct clk_mux_sel mux_audio_sync_clk[] =
 	{ NULL, 0 }
 };
 
-#define AUDIO_SYNC_CLK(_id, _dev, _index)			\
+#define AUDIO_SYNC_CLK(_id, _dev, _index, _clk_id)	\
 	{						\
 		.name      = #_id,			\
+		.clk_id    = TEGRA210_CLK_ID_##_clk_id, \
 		.lookup    = {				\
 			.dev_id    = #_dev,		\
 			.con_id    = "audio_sync",	\
@@ -7805,17 +7864,18 @@ static struct clk_mux_sel mux_audio_sync_clk[] =
 		.ops       = &tegra_audio_sync_clk_ops	\
 	}
 static struct clk tegra_clk_audio_list[] = {
-	AUDIO_SYNC_CLK(audio0, tegra210-i2s.0, 0),
-	AUDIO_SYNC_CLK(audio1, tegra210-i2s.1, 1),
-	AUDIO_SYNC_CLK(audio2, tegra210-i2s.2, 2),
-	AUDIO_SYNC_CLK(audio3, tegra210-i2s.3, 3),
-	AUDIO_SYNC_CLK(audio4, tegra210-i2s.4, 4),
-	AUDIO_SYNC_CLK(audio, tegra210-spdif, 5),	/* SPDIF */
+	AUDIO_SYNC_CLK(audio0, tegra210-i2s.0, 0, AUDIO0),
+	AUDIO_SYNC_CLK(audio1, tegra210-i2s.1, 1, AUDIO1),
+	AUDIO_SYNC_CLK(audio2, tegra210-i2s.2, 2, AUDIO2),
+	AUDIO_SYNC_CLK(audio3, tegra210-i2s.3, 3, AUDIO3),
+	AUDIO_SYNC_CLK(audio4, tegra210-i2s.4, 4, AUDIO4),
+	AUDIO_SYNC_CLK(audio, tegra210-spdif,  5, AUDIO),	/* SPDIF */
 };
 
-#define AUDIO_SYNC_2X_CLK(_id, _dev, _index)				\
+#define AUDIO_SYNC_2X_CLK(_id, _dev, _index, _clk_id)		\
 	{							\
 		.name      = #_id "_2x",			\
+		.clk_id    = TEGRA210_CLK_ID_##_clk_id##_2x,	\
 		.lookup    = {					\
 			.dev_id    = #_dev,			\
 			.con_id    = "audio_sync_2x"		\
@@ -7831,7 +7891,7 @@ static struct clk tegra_clk_audio_list[] = {
 		},						\
 	}
 static struct clk tegra_clk_audio_2x_list[] = {
-	AUDIO_SYNC_2X_CLK(audio, tegra210-spdif, 5),	/* SPDIF */
+	AUDIO_SYNC_2X_CLK(audio, tegra210-spdif, 5, AUDIO),	/* SPDIF */
 };
 
 #define MUX_I2S_SPDIF(_id, _index)					\
@@ -7858,9 +7918,10 @@ static struct clk_mux_sel mux_pllaout0_audio_2x_pllp_clkm[] = {
 };
 
 /* Audio sync dmic clocks */
-#define AUDIO_SYNC_DMIC_CLK(_id, _dev, _reg)		\
+#define AUDIO_SYNC_DMIC_CLK(_id, _dev, _reg, _clk_id)	\
 	{						\
 		.name      = #_id "_dmic",		\
+		.clk_id    = TEGRA210_CLK_ID_##_clk_id##_DMIC, \
 		.lookup    = {				\
 			.dev_id    = #_dev,		\
 			.con_id    = "audio_sync_dmic",	\
@@ -7872,9 +7933,9 @@ static struct clk_mux_sel mux_pllaout0_audio_2x_pllp_clkm[] = {
 	}
 
 static struct clk tegra_clk_audio_dmic_list[] = {
-	AUDIO_SYNC_DMIC_CLK(audio0, tegra210-i2s.0, 0x560),
-	AUDIO_SYNC_DMIC_CLK(audio1, tegra210-i2s.1, 0x564),
-	AUDIO_SYNC_DMIC_CLK(audio2, tegra210-i2s.2, 0x6b8),
+	AUDIO_SYNC_DMIC_CLK(audio0, tegra210-i2s.0, 0x560, AUDIO0),
+	AUDIO_SYNC_DMIC_CLK(audio1, tegra210-i2s.1, 0x564, AUDIO1),
+	AUDIO_SYNC_DMIC_CLK(audio2, tegra210-i2s.2, 0x6b8, AUDIO2),
 };
 
 #define MUX_AUDIO_DMIC(_id, _index)					\
@@ -7908,9 +7969,10 @@ static struct clk_mux_sel *mux_extern_out_list[] = {
 	mux_clkm_clkm2_clkm4_extern3,
 };
 
-#define CLK_OUT_CLK(_id, _max_rate)					\
+#define CLK_OUT_CLK(_id, _max_rate)				\
 	{							\
 		.name      = "clk_out_" #_id,			\
+		.clk_id    = TEGRA210_CLK_ID_CLK_OUT_##_id,	\
 		.lookup    = {					\
 			.dev_id    = "clk_out_" #_id,		\
 			.con_id	   = "extern" #_id,		\
@@ -7983,9 +8045,9 @@ static struct clk_mux_sel mux_sclk[] = {
 /* ADSP cluster clocks */
 static struct clk_mux_sel mux_aclk_adsp[] = {
 	{ .input = &tegra_pll_p_out_adsp, .value = 2},
-	{ .input = &tegra_pll_a_out0,	.value = 3},
+	{ .input = &tegra_pll_a_out0_out_adsp, .value = 3},
 	{ .input = &tegra_clk_m,	.value = 6},
-	{ .input = &tegra_pll_a,	.value = 7},
+	{ .input = &tegra_pll_a_out_adsp, .value = 7},
 	{ .input = &tegra_pll_a1,	.value = 8},
 	{ NULL, 0},
 };
@@ -7994,11 +8056,22 @@ static void tegra21_adsp_clk_reset(struct clk *c, bool assert)
 {
 	unsigned long reg = assert ? RST_DEVICES_SET_Y : RST_DEVICES_CLR_Y;
 	u32 val = ADSP_NEON | ADSP_SCU | ADSP_WDT | ADSP_DBG
-		| ADSP_PERIPH | ADSP_CORE | ADSP_INTF;
+		| ADSP_PERIPH | ADSP_CORE;
 
 	pr_debug("%s %s\n", __func__, assert ? "assert" : "deassert");
 
-	clk_writel_delay(val, reg);
+	if (assert)
+		clk_writel_delay(val | ADSP_INTF, reg);
+	else {
+		clk_writel_delay(ADSP_INTF, reg);
+		/*
+		 * Considering adsp cpu clock (min: 12.5MHZ, max: 1GHz)
+		 * a delay of 5us ensures that it's at least
+		 * 6 * adsp_cpu_cycle_period long.
+		 */
+		udelay(5);
+		clk_writel_delay(val, reg);
+	}
 }
 
 static int tegra21_adsp_clk_enable(struct clk *c)
@@ -8528,7 +8601,7 @@ static struct clk_mux_sel mux_pllp_clkm_clk32_plle[] = {
 	{ .input = &tegra_pll_p, .value = 0},
 	{ .input = &tegra_clk_m, .value = 2},
 	{ .input = &tegra_clk_32k, .value = 4},
-	{ .input = &tegra_pll_e, .value = 6},
+	{ .input = &tegra_pll_e_gate, .value = 6},
 	{ NULL, 0},
 };
 
@@ -8578,7 +8651,7 @@ static struct clk_mux_sel mux_plla_clk32_pllp_clkm_plle[] = {
 	{ .input = &tegra_clk_32k,    .value = 1},
 	{ .input = &tegra_pll_p,      .value = 2},
 	{ .input = &tegra_clk_m,      .value = 3},
-	{ .input = &tegra_pll_e,      .value = 4},
+	{ .input = &tegra_pll_e_gate, .value = 4},
 	{ NULL, 0},
 };
 
@@ -8728,6 +8801,7 @@ static struct raw_notifier_head mselect_rate_change_nh;
 
 static struct clk tegra_clk_mselect = {
 	.name      = "mselect",
+	.clk_id = TEGRA210_CLK_ID_MSELECT,
 	.lookup    = {
 		.dev_id = "mselect",
 	},
@@ -8750,6 +8824,7 @@ static struct raw_notifier_head ape_rate_change_nh;
 
 static struct clk tegra_clk_ape = {
 	.name      = "ape",
+	.clk_id = TEGRA210_CLK_ID_APE,
 	.ops       = &tegra_1xbus_clk_ops,
 	.reg       = 0x6c0,
 	.inputs    = mux_plla_pllc4_out0_pllc_pllc4_out1_pllp_clkm_pllc4_out2,
@@ -8852,6 +8927,7 @@ static struct clk_ops tegra_clk_gpu_ops = {
  */
 static struct clk tegra_clk_gpu_gate = {
 	.name      = "gpu_gate",
+	.clk_id    = TEGRA210_CLK_ID_GPU_GATE,
 	.parent    = &tegra_clk_osc,
 	.ops       = &tegra_clk_gpu_ops,
 	.u.periph  = {
@@ -8870,6 +8946,7 @@ static struct clk tegra_clk_gpu_gate = {
  */
 static struct clk tegra_clk_gpu_ref = {
 	.name      = "gpu_ref",
+	.clk_id    = TEGRA210_CLK_ID_GPU_REF,
 	.ops       = &tegra_clk_gpu_ops,
 	.parent    = &tegra_pll_ref,
 	.u.periph  = {
@@ -9295,7 +9372,7 @@ static struct clk tegra_list_clks[] = {
 	PERIPH_CLK("iqc1",	"tegra210-iqc.0",	NULL,	221,	0,	38400000,  mux_clk_m,			PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_IQC1),
 	PERIPH_CLK("iqc2",	"tegra210-iqc.1",	NULL,	220,	0,	38400000,  mux_clk_m,			PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_IQC2),
 	PERIPH_CLK("kfuse",	"kfuse-tegra",		NULL,	40,	0,	38400000,  mux_clk_m,			PERIPH_ON_APB, TEGRA210_CLK_ID_KFUSE),
-	PERIPH_CLK("fuse",	"fuse-tegra",	      "fuse",	39,	0,	38400000,  mux_clk_m,			PERIPH_ON_APB, 0),
+	PERIPH_CLK("fuse",	"fuse-tegra",	      "fuse",	39,	0,	38400000,  mux_clk_m,			PERIPH_ON_APB, TEGRA210_CLK_ID_FUSE),
 	PERIPH_CLK("fuse_burn",	"fuse-tegra",	 "fuse_burn",	39,	0,	38400000,  mux_clk_m,			PERIPH_ON_APB, 0),
 
 	PERIPH_CLK("i2s0",	"tegra210-i2s.0",	NULL,	30,	0x1d8,	 24576000, mux_pllaout0_audio0_pllp_clkm,	MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_I2S0),
@@ -9303,8 +9380,8 @@ static struct clk tegra_list_clks[] = {
 	PERIPH_CLK("i2s2",	"tegra210-i2s.2",	NULL,	18,	0x104,	 24576000, mux_pllaout0_audio2_pllp_clkm,	MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_I2S2),
 	PERIPH_CLK("i2s3",	"tegra210-i2s.3",	NULL,	101,	0x3bc,	 24576000, mux_pllaout0_audio3_pllp_clkm,	MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_I2S3),
 	PERIPH_CLK("i2s4",	"tegra210-i2s.4",	NULL,	102,	0x3c0,	 24576000, mux_pllaout0_audio4_pllp_clkm,	MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_I2S4),
-	PERIPH_CLK("spdif_out",	"tegra210-spdif", "spdif_out",	10,	0x108,	 24727300, mux_pllaout0_audio_2x_pllp_clkm,	MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, 0),
-	PERIPH_CLK("spdif_in",	"tegra210-spdif",  "spdif_in",	10,	0x10c,	408000000, mux_pllp_pllc_clkm_1,		MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, 0),
+	PERIPH_CLK("spdif_out",	"tegra210-spdif", "spdif_out",	10,	0x108,	 24727300, mux_pllaout0_audio_2x_pllp_clkm,	MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_SPDIF_OUT),
+	PERIPH_CLK("spdif_in",	"tegra210-spdif",  "spdif_in",	10,	0x10c,	408000000, mux_pllp_pllc_clkm_1,		MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_SPDIF_IN),
 	PERIPH_CLK("dmic1",	"tegra210-dmic.0",	NULL,	161,	0x64c,	 12288000, mux_pllaout0_audio0_dmic_pllp_clkm,	MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_DMIC1),
 	PERIPH_CLK("dmic2",	"tegra210-dmic.1",	NULL,	162,	0x650,	 12288000, mux_pllaout0_audio1_dmic_pllp_clkm,	MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_DMIC2),
 	PERIPH_CLK("dmic3",	"tegra210-dmic.2",	NULL,	197,	0x6bc,	 12288000, mux_pllaout0_audio2_dmic_pllp_clkm,	MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_DMIC3),
@@ -9330,7 +9407,7 @@ static struct clk tegra_list_clks[] = {
 	PERIPH_CLK_EX("sdmmc4",	"sdhci-tegra.3",	NULL,	15,	0x164,	266000000, mux_pllp_clk_m_pllc4_out2_out1_out0_lj,	MUX | DIV_U71 | PERIPH_ON_APB, TEGRA210_CLK_ID_SDMMC4, &tegra_sdmmc24_clk_ops),
 	PERIPH_CLK_EX("sdmmc2_ddr", "sdhci-tegra.1",	"ddr",	9,	0x154,	102000000, mux_pllp_clk_m_pllc4_out2_out1_out0_lj,	MUX | DIV_U71 | DIV_U71_INT | PERIPH_ON_APB, 0, &tegra_sdmmc24_clk_ops),
 	PERIPH_CLK_EX("sdmmc4_ddr", "sdhci-tegra.3",	"ddr",	15,	0x164,	102000000, mux_pllp_clk_m_pllc4_out2_out1_out0_lj,	MUX | DIV_U71 | DIV_U71_INT | PERIPH_ON_APB, 0, &tegra_sdmmc24_clk_ops),
-	PERIPH_CLK("sdmmc_legacy", "sdmmc_legacy",	NULL,	193,	0x694,	208000000, mux_pllp_out3_clkm_pllp_pllc4, MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, 0),
+	PERIPH_CLK("sdmmc_legacy", "sdmmc_legacy",	NULL,	193,	0x694,	208000000, mux_pllp_out3_clkm_pllp_pllc4, MUX | DIV_U71 | PERIPH_NO_RESET | PERIPH_ON_APB, TEGRA210_CLK_ID_SDMMC_LEGACY),
 
 	PERIPH_CLK("vcp",	"nvavp",		"vcp",	29,	0,	250000000, mux_clk_m, 			0, TEGRA210_CLK_ID_VCP),
 	PERIPH_CLK("bsev",	"tegra-aes",		"bsev",	63,	0,	250000000, mux_clk_m, 			0, TEGRA210_CLK_ID_BSEV),
@@ -9348,7 +9425,7 @@ static struct clk tegra_list_clks[] = {
 	PERIPH_CLK("vii2c",	"546c0000.i2c",   "vii2c",	208,	0x6c8, 136000000, mux_pllp_pllc_clkm,	MUX | DIV_U16 | PERIPH_ON_APB, TEGRA210_CLK_ID_VII2C),
 	PERIPH_CLK("i2cslow",	"546c0000.i2c",   "i2cslow",	81,	0x3fc,	50000000,  mux_pllp_pllc_clk32_clkm,	MUX | DIV_U71 | PERIPH_ON_APB, TEGRA210_CLK_ID_I2CSLOW),
 	PERIPH_CLK("mipibif",	"mipibif",		NULL,	173,	0x660,	408000000,  mux_pllp_clkm,	MUX | DIV_U71 | PERIPH_ON_APB, TEGRA210_CLK_ID_MIPIIF),
-	PERIPH_CLK("mipi-cal",	"mipi-cal",		NULL,	56,	0,	102000000,  mux_clk_m, PERIPH_ON_APB, 0),
+	PERIPH_CLK("mipi-cal",	"mipi-cal",		NULL,	56,	0,	102000000,  mux_clk_m, PERIPH_ON_APB, TEGRA210_CLK_ID_MIPI_CAL),
 	PERIPH_CLK("uarta",	"70006000.serial",	NULL,	6,	0x178, 1190400000, mux_pllp_pllc_pllc4_out0_pllc4_out1_clkm_pllc4_out2,	MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB, TEGRA210_CLK_ID_UARTA),
 	PERIPH_CLK("uartb",	"70006040.serial",	NULL,	7,	0x17c, 1190400000, mux_pllp_pllc_pllc4_out0_pllc4_out1_clkm_pllc4_out2,	MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB, TEGRA210_CLK_ID_UARTB),
 	PERIPH_CLK("uartc",	"70006200.serial",	NULL,	55,	0x1a0, 1190400000, mux_pllp_pllc_pllc4_out0_pllc4_out1_clkm_pllc4_out2,	MUX | DIV_U151 | DIV_U151_UART | PERIPH_ON_APB, TEGRA210_CLK_ID_UARTC),
@@ -9370,13 +9447,13 @@ static struct clk tegra_list_clks[] = {
 	PERIPH_CLK("hsic_trk",	NULL,		  "hsic_trk",	209,	0,	38400000, mux_clk_usb2_hsic_trk,	PERIPH_NO_RESET, TEGRA210_CLK_ID_HSIC_TRK),
 	PERIPH_CLK("usb2_trk",	NULL,		  "usb2_trk",	210,	0,	38400000, mux_clk_usb2_hsic_trk,	PERIPH_NO_RESET, TEGRA210_CLK_ID_USB2_TRK),
 
-	PERIPH_CLK_EX("dsia",	"tegradc.0",	      "dsia",	48,	0xd0,   750000000, mux_plld_out0,		PLLD,	TEGRA210_CLK_ID_DSIA, &tegra_dsi_clk_ops),
-	PERIPH_CLK_EX("dsib",	"tegradc.1",	      "dsib",	82,	0x4b8,  750000000, mux_plld_out0,		PLLD,	TEGRA210_CLK_ID_DSIB, &tegra_dsi_clk_ops),
+	PERIPH_CLK("dsia",	"tegradc.0",	      "dsia",	48,	0xd0,   750000000, mux_plld_out0,		PLLD,	TEGRA210_CLK_ID_DSIA),
+	PERIPH_CLK("dsib",	"tegradc.1",	      "dsib",	82,	0x4b8,  750000000, mux_plld_out0,		PLLD,	TEGRA210_CLK_ID_DSIB),
 	PERIPH_CLK("dsi1-fixed", "tegradc.0",    "dsi-fixed",	0,	0,	108000000, mux_pllp_out3,		PERIPH_NO_ENB | PERIPH_NO_RESET, 0),
 	PERIPH_CLK("dsi2-fixed", "tegradc.1",    "dsi-fixed",	0,	0,	108000000, mux_pllp_out3,		PERIPH_NO_ENB | PERIPH_NO_RESET, 0),
 	PERIPH_CLK("csi",	"vi",		       "csi",	52,	0,      750000000, mux_plld_out0,		PLLD, TEGRA210_CLK_ID_CSI),
-	PERIPH_CLK("csus",	"vi",		      "csus",	92,	0,	150000000, mux_clk_m,			PERIPH_NO_RESET, 0),
-	PERIPH_CLK("vim2_clk",	"vi",		  "vim2_clk",	171,	0,	150000000, mux_clk_m,			PERIPH_NO_RESET, 0),
+	PERIPH_CLK("csus",	"vi",		      "csus",	92,	0,	150000000, mux_clk_m,			PERIPH_NO_RESET, TEGRA210_CLK_ID_CSUS),
+	PERIPH_CLK("vim2_clk",	"vi",		  "vim2_clk",	171,	0,	150000000, mux_clk_m,			PERIPH_NO_RESET, TEGRA210_CLK_ID_VIM2_CLK),
 	PERIPH_CLK("cilab",	"vi",		     "cilab",	144,	0x614,	102000000, mux_pllp_pllc_clkm,		MUX | DIV_U71 | PERIPH_NO_RESET, TEGRA210_CLK_ID_CILAB),
 	PERIPH_CLK("cilcd",	"vi",		     "cilcd", 	145,	0x618,	102000000, mux_pllp_pllc_clkm,		MUX | DIV_U71 | PERIPH_NO_RESET, TEGRA210_CLK_ID_CILCD),
 	PERIPH_CLK("cile",	"vi",		      "cile",	146,	0x61c,	102000000, mux_pllp_pllc_clkm,		MUX | DIV_U71 | PERIPH_NO_RESET, TEGRA210_CLK_ID_CILE),
@@ -9459,11 +9536,15 @@ static struct clk tegra_list_clks[] = {
 	SHARED_EMC_CLK("nvdec.emc",	"tegra_nvdec",	"emc",	&tegra_clk_emc, NULL, 0, 0, 0, 0),
 	SHARED_EMC_CLK("tsec.emc",	"tegra_tsec",	"emc",	&tegra_clk_emc, NULL, 0, 0, 0, 0),
 	SHARED_EMC_CLK("tsecb.emc",	"tegra_tsecb",	"emc",	&tegra_clk_emc, NULL, 0, 0, 0, 0),
-	SHARED_EMC_CLK("camera.emc", "vi",		"emc",	&tegra_clk_emc, NULL, 0, SHARED_ISO_BW,	BIT(EMC_USER_VI), 0),
+#ifdef CONFIG_VI_ONE_DEVICE
+	SHARED_EMC_CLK("vi.emc",	"tegra_vi",	"emc",	&tegra_clk_emc, NULL, 0, SHARED_ISO_BW,	BIT(EMC_USER_VI), 0),
+#else
 	SHARED_EMC_CLK("via.emc",	"tegra_vi.0",	"emc",	&tegra_clk_emc, NULL, 0, SHARED_ISO_BW,	BIT(EMC_USER_VI), 0),
 	SHARED_EMC_CLK("vib.emc",	"tegra_vi.1",	"emc",	&tegra_clk_emc, NULL, 0, SHARED_ISO_BW,	BIT(EMC_USER_VI2), 0),
+#endif
 	SHARED_EMC_CLK("ispa.emc",	"tegra_isp.0",	"emc",	&tegra_clk_emc, NULL, 0, SHARED_ISO_BW,	BIT(EMC_USER_ISP1), 0),
 	SHARED_EMC_CLK("ispb.emc",	"tegra_isp.1",	"emc",	&tegra_clk_emc, NULL, 0, SHARED_ISO_BW,	BIT(EMC_USER_ISP2), 0),
+	SHARED_EMC_CLK("camera.emc", "tegra_camera_ctrl",	"emc",	&tegra_clk_emc, NULL, 0, SHARED_BW, 0, 0),
 	SHARED_EMC_CLK("iso.emc",	"iso",		"emc",	&tegra_clk_emc, NULL, 0, 0, 0, 0),
 	SHARED_EMC_CLK("floor.emc",	"floor.emc",	NULL,	&tegra_clk_emc, NULL, 0, 0, 0, 0),
 	SHARED_EMC_CLK("override.emc", "override.emc",	NULL,	&tegra_clk_emc, NULL, 0, SHARED_OVERRIDE, 0, 0),
@@ -9557,6 +9638,7 @@ static struct clk_ops tegra_xusb_gate_clk_ops = {
 
 static struct clk tegra_clk_xusb_gate = {
 	.name      = "xusb_gate",
+	.clk_id    = TEGRA210_CLK_ID_XUSB_GATE,
 	.flags     = ENABLE_ON_INIT | PERIPH_NO_RESET,
 	.ops       = &tegra_xusb_gate_clk_ops,
 	.parent    = &tegra_clk_osc,
@@ -9792,7 +9874,6 @@ static struct clk_duplicate tegra_clk_duplicates[] = {
 	CLK_DUPLICATE("cilab", "tegra_vi", "cilab"),
 	CLK_DUPLICATE("cilcd", "tegra_vi", "cilcd"),
 	CLK_DUPLICATE("cile", "tegra_vi", "cile"),
-	CLK_DUPLICATE("camera.emc", "tegra_vi", "emc"),
 #else
 	CLK_DUPLICATE("via.vi.cbus", "tegra_vi", "vi"),
 	CLK_DUPLICATE("vib.vi.cbus", "tegra_vi.1", "vi"),
@@ -9803,6 +9884,7 @@ static struct clk_duplicate tegra_clk_duplicates[] = {
 	CLK_DUPLICATE("cilab", "tegra_vi", "cilab"),
 	CLK_DUPLICATE("cilcd", "tegra_vi.1", "cilcd"),
 	CLK_DUPLICATE("cile", "tegra_vi.1", "cile"),
+	CLK_DUPLICATE("via.emc", "tegra_vi", "emc"),
 #endif
 	CLK_DUPLICATE("spdif_in", NULL, "spdif_in"),
 	CLK_DUPLICATE("dmic1", "tegra-dmic.0", NULL),
@@ -9843,7 +9925,9 @@ static struct clk *tegra_ptr_clks[] = {
 	&tegra_pll_p_out5,
 	&tegra_pll_p_out_sor,
 	&tegra_pll_a,
+	&tegra_pll_a_out_adsp,
 	&tegra_pll_a_out0,
+	&tegra_pll_a_out0_out_adsp,
 	&tegra_pll_d,
 	&tegra_pll_d_out0,
 	&tegra_clk_xusb_gate,
@@ -9867,6 +9951,7 @@ static struct clk *tegra_ptr_clks[] = {
 	&tegra_pll_re_out,
 	&tegra_pll_re_out1,
 	&tegra_pll_e,
+	&tegra_pll_e_gate,
 	&tegra_cml0_clk,
 	&tegra_cml1_clk,
 	&tegra_pciex_clk,
@@ -9970,16 +10055,51 @@ static void __init tegra21_dfll_cpu_late_init(struct clk *c)
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 	int ret;
 	struct clk *cpu = &tegra_clk_virtual_cpu_g;
+	unsigned long int dfll_boot_req_khz = tegra_dfll_boot_req_khz();
 
 	if (!cpu || !cpu->dvfs) {
 		pr_err("%s: CPU dvfs is not present\n", __func__);
 		return;
 	}
 
-	/* release dfll clock source reset, init cl_dvfs control logic, and
-	   move dfll to initialized state, so it can be used as CPU source */
+	/* release dfll clock source reset */
 	tegra_periph_reset_deassert(c);
+
+	/*
+	 * Init DFLL control logic (cl_dvfs):
+	 * - if CPU is already set on DFLL by boot-loader, this call would sync
+	 *   cl_dvfs driver with cl_dvfs h/w state.
+	 * - if CPU booted on PLLX this call initializes cl_dvfs h/w, so DFLL
+	 *   can be used as CPU source.
+	 */
 	ret = tegra_init_cl_dvfs();
+
+	/*
+	 * Boot on DFLL.
+	 * cl_dvfs device may not be present in DT for virtualized platform.
+	 */
+	if (dfll_boot_req_khz) {
+		if (!ret || (ret == -ENODEV)) {
+			c->u.dfll.consumer = cpu;
+			c->state = ON;
+			use_dfll = DFLL_RANGE_ALL_RATES;
+			tegra_dvfs_set_dfll_range(cpu->dvfs, use_dfll);
+
+			/* To read regulator (not cache), set volatile mode */
+			tegra_dvfs_rail_set_reg_volatile(tegra_cpu_rail, true);
+
+			if (!ret)
+				tegra_cl_dvfs_debug_init(c);
+
+			pr_info("Tegra CPU DFLL booted with use_dfll = %d\n",
+				use_dfll);
+			return;
+		}
+		pr_err("Tegra CPU DFLL failed to sync boot state\n");
+		return;
+	}
+
+	/* Boot on PLLX */
 	if (!ret) {
 		c->u.dfll.consumer = cpu;
 		c->state = OFF;

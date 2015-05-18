@@ -568,9 +568,14 @@ static void tegra_dc_ext_flip_worker(struct work_struct *work)
 			continue;
 		ext_win = &ext->win[index];
 
+#ifdef CONFIG_ANDROID
+		if (!atomic_dec_and_test(&ext_win->nr_pending_flips))
+			skip_flip = true;
+#else
 		if (!(atomic_dec_and_test(&ext_win->nr_pending_flips)) &&
 			(flip_win->attr.flags & TEGRA_DC_EXT_FLIP_FLAG_CURSOR))
 			skip_flip = true;
+#endif
 
 		mutex_lock(&ext_win->queue_lock);
 		list_for_each_entry(temp, &ext_win->timestamp_queue,
@@ -654,6 +659,8 @@ static void tegra_dc_ext_flip_worker(struct work_struct *work)
 		wins[nr_win++] = win;
 	}
 
+	trace_sync_wt_ovr_syncpt_upd((data->win[win_num-1]).syncpt_max);
+
 	if (dc->enabled && !skip_flip) {
 		dc->blanked = false;
 		if (dc->out_ops && dc->out_ops->vrr_enable)
@@ -666,6 +673,10 @@ static void tegra_dc_ext_flip_worker(struct work_struct *work)
 			wait_for_vblank);
 		/* TODO: implement swapinterval here */
 		tegra_dc_sync_windows(wins, nr_win);
+		trace_scanout_syncpt_upd((data->win[win_num-1]).syncpt_max);
+		if (dc->out->vrr)
+			trace_scanout_vrr_stats((data->win[win_num-1]).syncpt_max
+							, dc->out->vrr->dc_balance);
 		tegra_dc_program_bandwidth(dc, true);
 		if (!tegra_dc_has_multiple_dc())
 			tegra_dc_call_flip_callback();
@@ -683,7 +694,6 @@ static void tegra_dc_ext_flip_worker(struct work_struct *work)
 			tegra_dc_incr_syncpt_min(dc, index,
 					flip_win->syncpt_max);
 		}
-		trace_scanout_syncpt_upd((data->win[win_num-1]).syncpt_max);
 	}
 
 	/* unpin and deref previous front buffers */
@@ -1242,8 +1252,8 @@ static int tegra_dc_ext_get_cmu_v2(struct tegra_dc_ext_user *user,
 {
 	int i;
 	struct tegra_dc *dc = user->ext->dc;
-	struct tegra_dc_cmu *cmu;
-	struct tegra_dc_lut *cmu_lut;
+	struct tegra_dc_cmu *cmu = dc->pdata->cmu;
+	struct tegra_dc_lut *cmu_lut = &dc->cmu;
 
 	if (custom_value && dc->pdata->cmu) {
 		cmu = dc->pdata->cmu;
@@ -1660,6 +1670,41 @@ static long tegra_dc_ioctl(struct file *filp, unsigned int cmd,
 
 		return ret;
 	}
+	case TEGRA_DC_EXT_SET_PROPOSED_BW_3:
+	{
+		int ret;
+		int win_num;
+		struct tegra_dc_ext_flip_3 args;
+		struct tegra_dc_ext_flip_windowattr *win;
+
+		if (copy_from_user(&args, user_arg, sizeof(args)))
+			return -EFAULT;
+
+		win_num = args.win_num;
+		win = kzalloc(sizeof(*win) * win_num, GFP_KERNEL);
+
+		if (copy_from_user(win, (void *)(uintptr_t)args.win,
+				   sizeof(*win) * win_num)) {
+			kfree(win);
+			return -EFAULT;
+		}
+
+		ret = tegra_dc_ext_negotiate_bw(user, win, win_num);
+
+		kfree(win);
+
+		return ret;
+	}
+#else
+/* if isomgr is not present, allow any request to pass. */
+#ifdef CONFIG_COMPAT
+	case TEGRA_DC_EXT_SET_PROPOSED_BW32:
+		return 0;
+#endif
+	case TEGRA_DC_EXT_SET_PROPOSED_BW:
+		return 0;
+	case TEGRA_DC_EXT_SET_PROPOSED_BW_3:
+		return 0;
 #endif
 	case TEGRA_DC_EXT_GET_CURSOR:
 		return tegra_dc_ext_get_cursor(user);

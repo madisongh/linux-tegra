@@ -48,6 +48,12 @@
 #include <linux/platform/tegra/common.h>
 #include "../nvdumper/nvdumper-footprint.h"
 
+#define DEVSIZE768M	0xC
+#define DEVSIZE384M	0xD
+
+#define SZ_768M		(768 << 20)
+#define SZ_384M		(384 << 20)
+
 #ifdef EMC_CC_DBG
 unsigned int emc_dbg_mask = INFO | STEPS | SUB_STEPS | PRELOCK |
 	PRELOCK_STEPS | ACTIVE_EN | PRAMP_UP | PRAMP_DN | EMC_REGISTERS |
@@ -532,6 +538,7 @@ static void emc_set_clock(struct tegra21_emc_table *next_timing,
 		tegra_emc_timer_training_stop();
 
 	/* EMC freq dependent MR4 polling. */
+	tegra_emc_mr4_freq_check(next_timing->rate);
 }
 
 static inline void emc_get_timing(struct tegra21_emc_table *timing)
@@ -1224,7 +1231,7 @@ static int tegra21_pasr_enable(const char *arg, const struct kernel_param *kp)
 	void *cookie;
 	int num_devices;
 	u32 regval;
-	u64 device_size;
+	u32 device_size;
 	u64 subp_addr_mode;
 	u64 dram_width;
 	u64 num_channels;
@@ -1240,9 +1247,16 @@ static int tegra21_pasr_enable(const char *arg, const struct kernel_param *kp)
 	regval = emc_readl(EMC_FBIO_CFG5);
 	dram_width = (regval & (0x1 << 4)) == 0 ? 32 : 64;
 
-	device_size = 1 << ((mc_readl(MC_EMEM_ADR_CFG_DEV0) >>
+	device_size = ((mc_readl(MC_EMEM_ADR_CFG_DEV0) >>
 				MC_EMEM_DEV_SIZE_SHIFT) &
 				MC_EMEM_DEV_SIZE_MASK);
+
+	if (device_size == DEVSIZE768M)
+		device_size = SZ_768M;
+	else if (device_size == DEVSIZE384M)
+		device_size = SZ_384M;
+	else
+		device_size = device_size << 23;
 
 	device_size = device_size * (dram_width/subp_addr_mode);
 	device_size = device_size * num_channels;
@@ -1295,7 +1309,7 @@ static struct kernel_param_ops tegra21_pasr_enable_ops = {
 };
 module_param_cb(pasr_enable, &tegra21_pasr_enable_ops, &pasr_enable, 0644);
 
-static int tegra21_pasr_init(struct device *dev)
+int tegra21_pasr_init(struct device *dev)
 {
 	dma_addr_t phys;
 	void *shared_virt;
@@ -1317,8 +1331,6 @@ static int tegra21_pasr_init(struct device *dev)
 
 	return 0;
 }
-#else
-static inline int tegra21_pasr_init(struct device *dev) { return 0; };
 #endif
 
 /* FIXME: add to clock resume */
@@ -2023,9 +2035,6 @@ out:
 		if (!IS_ERR_VALUE(rate))
 			tegra_clk_preset_emc_monitor(rate);
 	}
-
-	if (tegra21_pasr_init(&pdev->dev))
-		dev_err(&pdev->dev, "PASR init failed\n");
 
 	return err;
 }

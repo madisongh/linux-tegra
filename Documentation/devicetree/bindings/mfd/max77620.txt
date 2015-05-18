@@ -82,7 +82,8 @@ is required:
 				gpio6, gpio7
 
 		Optional properties:
-			function, drive-push-pull, drive-open-drain.
+			function, drive-push-pull, drive-open-drain,
+			bias-pull-up, bias-pull-down.
 				Definitions are in the pinmux dt binding
 			devicetree/bindings/pinctrl/pinctrl-bindings.txt
 			Absense of properties will leave the configuration
@@ -137,6 +138,8 @@ Following are properties of regulator subnode.
 	Additional optional custom properties  are listed below.
 		maxim,fps-source: FPS source. The macros are defined at
 				dt-bindings/mfd/max77620.h
+		maxim,shutdown-fps-source: Same as maxim,fps-source, but it
+				will apply during shutdown of system.
 		maxim,fps-power-up-period: Power up slot for rail on given FPS.
 		maxim,fps-power-down-period: Power down slot for rail on given
 				FPS.
@@ -149,7 +152,6 @@ Following are properties of regulator subnode.
 			remote sense on suspend and re-enable on resume.
 			If this property is not there then no change on
 			configuration.
-		maxim,disable-on-shutdown: boolean, Disable rail on shutdown.
 
 Backup Battery:
 ==============

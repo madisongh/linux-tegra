@@ -18,6 +18,10 @@
 #define CAM_I2C_BUS	6
 
 / {
+	tegra-camera-platform {
+		compatible = "nvidia, tegra-camera-platform";
+	};
+
 	camera-pcl {
 		compatible = "nvidia,tegra210-camera", "simple-bus";
 		configuration = <0xAA55AA55>;
@@ -91,7 +95,7 @@
 				cap-identifier = "OV5693.0";
 				cap-sensor_nvc_interface = <5>;
 				cap-pixel_types = <0x2101>;
-				cap-orientation = <0>;
+				cap-orientation = <1>;
 				cap-direction = <0>;
 				cap-initial_clock_rate_khz = <6000>;
 				cap-h_sync_edge = <0>;
@@ -154,7 +158,7 @@
 				cap-identifier = "IMX132";
 				cap-sensor_nvc_interface = <3>;
 				cap-pixel_types = <0x101>;
-				cap-orientation = <0>;
+				cap-orientation = <3>;
 				cap-direction = <1>;
 				cap-initial_clock_rate_khz = <6000>;
 				cap-h_sync_edge = <0>;

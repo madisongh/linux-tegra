@@ -4,7 +4,7 @@
  * Serial Debugger Interface accessed through an FIQ interrupt.
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -35,6 +35,7 @@
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/wakelock.h>
+#include <linux/pstore_ram.h>
 
 #ifdef CONFIG_FIQ_GLUE
 #include <linux/fiq_glue.h>
@@ -237,14 +238,22 @@ static void fiq_debugger_printf(struct fiq_debugger_output *output,
 {
 	struct fiq_debugger_state *state;
 	char buf[256];
+	unsigned long rem_nsec;
+	u64 ts = local_clock();
 	va_list ap;
+	int len = 0;
+
+	rem_nsec = do_div(ts, 1000000000);
+	len = snprintf(buf, sizeof(buf), "[%5lu.%06lu] ",
+			(unsigned long)ts, rem_nsec / 1000);
 
 	state = container_of(output, struct fiq_debugger_state, output);
 	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);
+	len += vsnprintf(buf + len, sizeof(buf) - len, fmt, ap);
 	va_end(ap);
 
 	fiq_debugger_puts(state, buf);
+	ramoops_console_write_buf(buf, len);
 }
 
 /* Safe outside fiq context */
@@ -1069,6 +1078,11 @@ static int fiq_debugger_probe(struct platform_device *pdev)
 	 * is required */
 	if ((uart_irq < 0 && fiq < 0) || (uart_irq >= 0 && fiq >= 0))
 		return -EINVAL;
+#ifndef CONFIG_FIQ_GLUE
+	/* FIQ glue is required for fiq mode */
+	if (fiq >= 0)
+		return -EINVAL;
+#endif
 	if (fiq >= 0 && !pdata->fiq_enable)
 		return -EINVAL;
 

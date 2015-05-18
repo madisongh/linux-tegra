@@ -27,7 +27,7 @@
 #include "vrr.h"
 
 /* Elements for sysfs access */
-#define VRR_ATTR(__name) struct kobj_attribute vrr_attr_##__name = \
+#define VRR_ATTR(__name) static struct kobj_attribute vrr_attr_##__name = \
 	__ATTR(__name, S_IRUGO|S_IWUSR, vrr_settings_show, vrr_settings_store)
 #define VRR_ATTRS_ENTRY(__name) (&vrr_attr_##__name.attr)
 #define IS_VRR_ATTR(__name) (attr == &vrr_attr_##__name)
@@ -74,7 +74,7 @@ static ssize_t vrr_settings_show(struct kobject *kobj,
 	ssize_t res = 0;
 
 	if (!vrr)
-		res = -EINVAL;
+		return -EINVAL;
 
 	if (IS_VRR_ATTR(capability))
 		res = snprintf(buf, PAGE_SIZE, "%d\n", vrr->capability);
@@ -113,7 +113,7 @@ static ssize_t vrr_settings_store(struct kobject *kobj,
 	ssize_t res = count;
 
 	if (!vrr)
-		res = -EINVAL;
+		return -EINVAL;
 
 	if (IS_VRR_ATTR(capability))
 		vrr_check_and_update(0, 1, capability)

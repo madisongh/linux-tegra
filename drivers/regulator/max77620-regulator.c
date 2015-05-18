@@ -62,9 +62,9 @@ struct max77620_regulator_pdata {
 	bool en2_ctrl_sd0;
 	bool sd_fsrade_disable;
 	bool disable_remote_sense_on_suspend;
-	bool disable_on_shutdown;
 	struct regulator_init_data *reg_idata;
 	int fps_src;
+	int shutdown_fps_src;
 	int fps_pd_period;
 	int fps_pu_period;
 	int sleep_mode;
@@ -751,14 +751,18 @@ static int max77620_get_regulator_dt_data(struct platform_device *pdev,
 				of_property_read_bool(reg_node,
 				"maxim,disable-remote-sense-on-suspend");
 
-		reg_pdata->disable_on_shutdown = of_property_read_bool(reg_node,
-						"maxim,disable-on-shutdown");
-
 		ret = of_property_read_u32(reg_node, "maxim,fps-source", &prop);
 		if (!ret)
 			reg_pdata->fps_src = prop;
 		else
 			reg_pdata->fps_src = FPS_SRC_NONE;
+
+		reg_pdata->shutdown_fps_src = FPS_SRC_DEF;
+		ret = of_property_read_u32(reg_node,
+				"maxim,shutdown-fps-source", &prop);
+		if (!ret)
+			reg_pdata->shutdown_fps_src = prop;
+
 
 		ret = of_property_read_u32(reg_node,
 					"maxim,fps-power-up-period", &prop);
@@ -833,17 +837,33 @@ static int max77620_regulator_probe(struct platform_device *pdev)
 static void max77620_regulator_shutdown(struct platform_device *pdev)
 {
 	struct max77620_regulator *pmic = platform_get_drvdata(pdev);
+	struct max77620_regulator_pdata *rpdata;
+	struct regulator_init_data *ridata;
 	int id;
 	int ret;
 
 	for (id = 0; id < MAX77620_NUM_REGS; ++id) {
-		if (pmic->reg_pdata[id].disable_on_shutdown &&
+		rpdata = &pmic->reg_pdata[id];
+		ridata = rpdata->reg_idata;
+
+		if (!ridata)
+			continue;
+
+		if (ridata->constraints.disable_on_shutdown &&
 			max77620_regulator_is_enabled(pmic->rdev[id])) {
 			dev_info(&pdev->dev, "Disabling Regulator %d\n", id);
 			ret = max77620_regulator_disable(pmic->rdev[id]);
 			if (ret < 0)
 				dev_info(&pdev->dev,
 				"Disabling Regulator %d failed: %d\n", id, ret);
+		}
+		if (rpdata->shutdown_fps_src != FPS_SRC_DEF) {
+			ret = max77620_regulator_set_fps_src(pmic,
+					rpdata->shutdown_fps_src, id);
+			if (ret < 0)
+				dev_err(&pdev->dev,
+					"regulator %d FPDSRC set Failed %d\n",
+					id, ret);
 		}
 	}
 }

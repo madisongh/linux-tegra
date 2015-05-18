@@ -85,8 +85,9 @@ static void gr_gm20b_cb_size_default(struct gk20a *g)
 {
 	struct gr_gk20a *gr = &g->gr;
 
-	gr->attrib_cb_default_size =
-		gr_gpc0_ppc0_cbm_beta_cb_size_v_default_v();
+	if (!gr->attrib_cb_default_size)
+		gr->attrib_cb_default_size =
+			gr_gpc0_ppc0_cbm_beta_cb_size_v_default_v();
 	gr->alpha_cb_default_size =
 		gr_gpc0_ppc0_cbm_alpha_cb_size_v_default_v();
 }
@@ -324,7 +325,8 @@ static void gr_gm20b_set_alpha_circular_buffer_size(struct gk20a *g, u32 data)
 		gr_pd_ab_dist_cfg1_max_output_granularity_v();
 
 	gk20a_writel(g, gr_pd_ab_dist_cfg1_r(),
-		gr_pd_ab_dist_cfg1_max_output_f(pd_ab_max_output));
+		gr_pd_ab_dist_cfg1_max_output_f(pd_ab_max_output) |
+		gr_pd_ab_dist_cfg1_max_batches_init_f());
 
 	for (gpc_index = 0; gpc_index < gr->gpc_count; gpc_index++) {
 		stride = proj_gpc_stride_v() * gpc_index;
@@ -708,6 +710,10 @@ static int gr_gm20b_ctx_wait_lsf_ready(struct gk20a *g, u32 timeout, u32 val)
 static int gr_gm20b_load_ctxsw_ucode(struct gk20a *g)
 {
 	u32 err;
+	unsigned long timeout = gk20a_get_gr_idle_timeout(g);
+	u32 reg_offset = gr_gpcs_gpccs_falcon_hwcfg_r() -
+	  gr_fecs_falcon_hwcfg_r();
+
 	gk20a_dbg_fn("");
 
 	if (tegra_platform_is_linsim()) {
@@ -717,50 +723,68 @@ static int gr_gm20b_load_ctxsw_ucode(struct gk20a *g)
 			gr_gpccs_ctxsw_mailbox_value_f(0xc0de7777));
 	}
 
-	gk20a_writel(g, gr_fecs_ctxsw_mailbox_clear_r(0), ~0x0);
-	gm20b_pmu_load_lsf(g, LSF_FALCON_ID_FECS);
-
-	gr_gm20b_load_gpccs_with_bootloader(g);
-
-	if (g->ops.pmu.fecsrecoveryinprogress) {
-		unsigned long timeout = gk20a_get_gr_idle_timeout(g);
+	if (g->ops.pmu.fecsbootstrapdone) {
+		gk20a_writel(g, gr_fecs_ctxsw_mailbox_clear_r(0), ~0x0);
+		gm20b_pmu_load_lsf(g, LSF_FALCON_ID_FECS);
 		err = gr_gm20b_ctx_wait_lsf_ready(g, timeout, 0x55AA55AA);
 		if (err) {
 			gk20a_err(dev_from_gk20a(g), "Unable to recover FECS");
 			return err;
 		} else {
-			g->ops.pmu.fecsrecoveryinprogress = 0;
-			gk20a_writel(g, gr_fecs_ctxsw_mailbox_clear_r(0), ~0x0);
-			gk20a_writel(g, gr_fecs_ctxsw_mailbox_r(1), 0x1);
-			gk20a_writel(g, gr_fecs_ctxsw_mailbox_clear_r(6),
-					0xffffffff);
-
-			gk20a_writel(g, gr_gpccs_dmactl_r(),
+			if (!g->ops.securegpccs) {
+				gr_gm20b_load_gpccs_with_bootloader(g);
+				gk20a_writel(g, gr_gpccs_dmactl_r(),
 					gr_gpccs_dmactl_require_ctx_f(0));
-			gk20a_writel(g, gr_gpccs_cpuctl_r(),
+				gk20a_writel(g, gr_gpccs_cpuctl_r(),
 					gr_gpccs_cpuctl_startcpu_f(1));
-
-			gk20a_writel(g, gr_fecs_cpuctl_alias_r(),
-					gr_fecs_cpuctl_startcpu_f(1));
+			} else {
+				gk20a_writel(g,
+					gr_fecs_ctxsw_mailbox_clear_r(0), ~0x0);
+				gm20b_pmu_load_lsf(g, LSF_FALCON_ID_GPCCS);
+				err = gr_gm20b_ctx_wait_lsf_ready(g, timeout,
+						0x55AA55AA);
+				gk20a_writel(g, reg_offset +
+					gr_fecs_cpuctl_alias_r(),
+					gr_gpccs_cpuctl_startcpu_f(1));
+			}
+		}
+	} else {
+		g->ops.pmu.fecsbootstrapdone = true;
+		if (!g->ops.securegpccs) {
+			gr_gm20b_load_gpccs_with_bootloader(g);
+			gk20a_writel(g, gr_gpccs_dmactl_r(),
+			       gr_gpccs_dmactl_require_ctx_f(0));
+			gk20a_writel(g, gr_gpccs_cpuctl_r(),
+			       gr_gpccs_cpuctl_startcpu_f(1));
+		} else {
+			pmu_wait_message_cond(&g->pmu,
+					gk20a_get_gr_idle_timeout(g),
+					&g->ops.pmu.lspmuwprinitdone, 1);
+			if (!g->ops.pmu.lspmuwprinitdone) {
+				gk20a_err(dev_from_gk20a(g),
+					"PMU WPR needed but not ready yet");
+				return -ETIMEDOUT;
+			}
+			gk20a_writel(g, gr_fecs_ctxsw_mailbox_clear_r(0), ~0x0);
+			gm20b_pmu_load_lsf(g, LSF_FALCON_ID_GPCCS);
+			err = gr_gm20b_ctx_wait_lsf_ready(g, timeout,
+							0x55AA55AA);
+			if (err) {
+				gk20a_err(dev_from_gk20a(g),
+						"Unable to boot GPCCS\n");
+				return err;
+			}
+			gk20a_writel(g, reg_offset +
+				gr_fecs_cpuctl_alias_r(),
+				gr_gpccs_cpuctl_startcpu_f(1));
 		}
 	}
 
-
-	if (!g->ops.pmu.fecsbootstrapdone) {
-		g->ops.pmu.fecsbootstrapdone = true;
-		gk20a_writel(g, gr_fecs_ctxsw_mailbox_clear_r(0), ~0x0);
-		gk20a_writel(g, gr_fecs_ctxsw_mailbox_r(1), 0x1);
-		gk20a_writel(g, gr_fecs_ctxsw_mailbox_clear_r(6), 0xffffffff);
-
-		gk20a_writel(g, gr_gpccs_dmactl_r(),
-				gr_gpccs_dmactl_require_ctx_f(0));
-		gk20a_writel(g, gr_gpccs_cpuctl_r(),
-				gr_gpccs_cpuctl_startcpu_f(1));
-
-		gk20a_writel(g, gr_fecs_cpuctl_alias_r(),
-				gr_fecs_cpuctl_startcpu_f(1));
-	}
-
+	gk20a_writel(g, gr_fecs_ctxsw_mailbox_clear_r(0), ~0x0);
+	gk20a_writel(g, gr_fecs_ctxsw_mailbox_r(1), 0x1);
+	gk20a_writel(g, gr_fecs_ctxsw_mailbox_clear_r(6), 0xffffffff);
+	gk20a_writel(g, gr_fecs_cpuctl_alias_r(),
+			gr_fecs_cpuctl_startcpu_f(1));
 	gk20a_dbg_fn("done");
 
 	return 0;

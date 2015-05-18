@@ -33,6 +33,7 @@
 #include "tegra210-platforms/tegra210-vcm31-power-tree-e2580-0631-a00.dtsi"
 #include "tegra210-platforms/tegra210-ers-hdmi-e2190-1100-a00.dtsi"
 #include "tegra210-platforms/tegra210-vcm31t210-emc.dtsi"
+#include "tegra210-platforms/tegra210-ers-clk-init.dtsi"
 
 #include <dt-bindings/iio/meter/ina3221x.h>
 #include <dt-bindings/sound/tegra-asoc-alt.h>
@@ -54,12 +55,6 @@
 	};
 
 	spi@7000d400 {
-	earSmart: earSmart-codec@0 {
-		adnc,gpiob-gpio = <&gpio TEGRA_GPIO(BB, 4) GPIO_ACTIVE_HIGH>;
-	  };
-	};
-
-	spi@7000d600 {
 		status = "okay";
 		spi@0 {
 			compatible = "spidev";
@@ -73,7 +68,7 @@
 		};
 	};
 
-	spi@7000d800 {
+	spi@7000d600 {
 		compatible = "nvidia,tegra210-spi-slave";
 		status = "okay";
 		spi@0 {
@@ -83,8 +78,18 @@
 		};
 	};
 
+	spi@7000d800 {
+		compatible = "nvidia,tegra210-spi-slave";
+		status = "disabled";
+		spi@0 {
+			compatible = "spidev";
+			reg = <0>;
+			spi-max-frequency = <13000000>;
+		};
+	};
+
 	spi@7000da00 {
-		status = "okay";
+		status = "disabled";
 		spi@0 {
 			compatible = "spidev";
 			reg = <0>;
@@ -132,9 +137,10 @@
 		};
 	};
 
-	sdhci@700b0400 {
-		cd-gpios = <&gpio TEGRA_GPIO_PZ2 0>;
+	sdhci@700b0000 {
+		cd-gpios = <&gpio TEGRA_GPIO_PZ1 0>;
 		nvidia,sd-device;
+		status = "okay";
 	};
 
 	sdhci@700b0600 { /* SDMMC4 for EMMC */

@@ -277,7 +277,7 @@ extern int (*__tegra_smmu_suspend) (struct device *dev);
 extern int (*__tegra_smmu_resume) (struct device *dev);
 extern int (*__tegra_smmu_probe)(struct platform_device *pdev,
 						struct smmu_device *smmu);
-extern const struct iommu_ops *smmu_iommu_ops;
+extern struct iommu_ops *smmu_iommu_ops;
 extern const struct file_operations *smmu_debugfs_stats_fops;
 
 extern int (*__smmu_iommu_map_pfn)(struct smmu_as *as, dma_addr_t iova, unsigned long pfn, unsigned long prot);

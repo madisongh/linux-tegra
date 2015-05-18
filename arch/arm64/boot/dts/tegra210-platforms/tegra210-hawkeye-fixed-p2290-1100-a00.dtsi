@@ -37,8 +37,11 @@
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
 			regulator-always-on;
+			regulator-boot-on;
+			regulator-disable-on-suspend;
 			gpio = <&max77620 1 0>;
 			enable-active-high;
+			regulator-disable-on-shutdown;
 		};
 
 		vdd_3v3: regulator@2 {
@@ -67,29 +70,32 @@
 			regulator-boot-on;
 			gpio = <&max77620 7 0>;
 			enable-active-high;
+			regulator-disable-on-shutdown;
 			vin-supply = <&max77620_ldo0>;
 		};
 
 		vdd_lcd_3v0: regulator@4 {
-			compatible = "regulator-fixed-sync";
+			compatible = "regulator-pinmux-fixed";
 			reg = <4>;
 			regulator-name = "vdd_lcd_3v0";
 			regulator-min-microvolt = <3000000>;
 			regulator-max-microvolt = <3000000>;
-			regulator-boot-on;
 			gpio = <&gpio TEGRA_GPIO(K, 0) 0>;
 			enable-active-high;
+			pinctrl-names = "enable";
+			pinctrl-0 = <&enable_vdd_lcd_3v0_switch>;
 		};
 
 		vdd_lcd_1v8: regulator@5 {
-			compatible = "regulator-fixed-sync";
+			compatible = "regulator-pinmux-fixed";
 			reg = <5>;
 			regulator-name = "vdd_lcd_1v8";
 			regulator-min-microvolt = <1800000>;
 			regulator-max-microvolt = <1800000>;
-			regulator-boot-on;
 			gpio = <&gpio TEGRA_GPIO(K, 1) 0>;
 			enable-active-high;
+			pinctrl-names = "enable";
+			pinctrl-0 = <&enable_vdd_lcd_1v8_switch>;
 		};
 
 

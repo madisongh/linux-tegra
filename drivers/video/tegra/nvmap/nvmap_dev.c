@@ -55,9 +55,11 @@
 
 #define NVMAP_CARVEOUT_KILLER_RETRY_TIME 100 /* msecs */
 
-/* this is basically the L2 cache size */
-#ifdef CONFIG_DENVER_CPU
+/* this is basically the L2 cache size but may be tuned as per requirement */
+#if defined(CONFIG_DENVER_CPU)
 size_t cache_maint_inner_threshold = SZ_2M * 8;
+#elif defined(CONFIG_ARCH_TEGRA_12x_SOC)
+size_t cache_maint_inner_threshold = SZ_1M;
 #else
 size_t cache_maint_inner_threshold = SZ_2M;
 #endif
@@ -583,11 +585,12 @@ int __nvmap_map(struct nvmap_handle *h, struct vm_area_struct *vma)
 
 static int nvmap_map(struct file *filp, struct vm_area_struct *vma)
 {
-	BUG_ON(vma->vm_private_data != NULL);
-	vma->vm_flags |= (VM_SHARED | VM_DONTEXPAND |
-			  VM_DONTDUMP | VM_DONTCOPY);
-	vma->vm_ops = &nvmap_vma_ops;
-	return 0;
+	char task_comm[TASK_COMM_LEN];
+
+	get_task_comm(task_comm, current);
+	pr_err("error: mmap not supported on nvmap file, pid=%d, %s\n",
+		task_tgid_nr(current), task_comm);
+	return -EPERM;
 }
 
 static long nvmap_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
@@ -678,13 +681,10 @@ static long nvmap_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 #ifdef CONFIG_COMPAT
 	case NVMAP_IOC_MMAP_32:
-		err = nvmap_map_into_caller_ptr(filp, uarg, true);
-		break;
 #endif
-
 	case NVMAP_IOC_MMAP:
-		err = nvmap_map_into_caller_ptr(filp, uarg, false);
-		break;
+		pr_warn("nvmap: unsupported MMAP IOCTL used.\n");
+		return -ENOTTY;
 
 #ifdef CONFIG_COMPAT
 	case NVMAP_IOC_WRITE_32:
@@ -1117,6 +1117,44 @@ static int nvmap_debug_allocations_show(struct seq_file *s, void *unused)
 }
 
 DEBUGFS_OPEN_FOPS(allocations);
+
+static int nvmap_debug_all_allocations_show(struct seq_file *s, void *unused)
+{
+	u32 heap_type = (u32)(uintptr_t)s->private;
+	struct rb_node *n;
+
+
+	spin_lock(&nvmap_dev->handle_lock);
+	seq_printf(s, "%8s %11s %9s %6s %6s %6s %6s %8s\n",
+			"BASE", "SIZE", "USERFLAGS", "REFS",
+			"KMAPS", "UMAPS", "SHARE", "UID");
+
+	/* for each handle */
+	n = rb_first(&nvmap_dev->handles);
+	for (; n != NULL; n = rb_next(n)) {
+		struct nvmap_handle *handle =
+			rb_entry(n, struct nvmap_handle, node);
+		if (handle->alloc && handle->heap_type == heap_type) {
+			phys_addr_t base = heap_type == NVMAP_HEAP_IOVMM ? 0 :
+					   (handle->carveout->base);
+			seq_printf(s,
+				"%8llx %10zuK %9x %6u %6u %6u %6u %8p\n",
+				(unsigned long long)base, K(handle->size),
+				handle->userflags,
+				atomic_read(&handle->ref),
+				atomic_read(&handle->kmap_count),
+				atomic_read(&handle->umap_count),
+				atomic_read(&handle->share_count),
+				handle);
+		}
+	}
+
+	spin_unlock(&nvmap_dev->handle_lock);
+
+	return 0;
+}
+
+DEBUGFS_OPEN_FOPS(all_allocations);
 
 static int nvmap_debug_maps_show(struct seq_file *s, void *unused)
 {
@@ -1711,6 +1749,7 @@ int nvmap_probe(struct platform_device *pdev)
 	debugfs_create_u32("max_handle_count", S_IRUGO,
 			nvmap_debug_root, &nvmap_max_handle_count);
 
+	nvmap_dev->dynamic_dma_map_mask = ~0;
 	for (i = 0; i < plat->nr_carveouts; i++) {
 		struct nvmap_carveout_node *node = &dev->heaps[dev->nr_carveouts];
 		const struct nvmap_platform_carveout *co = &plat->carveouts[i];
@@ -1745,6 +1784,10 @@ int nvmap_probe(struct platform_device *pdev)
 					heap_root,
 					(void *)(uintptr_t)node->heap_bit,
 					&debug_allocations_fops);
+				debugfs_create_file("all_allocations", S_IRUGO,
+					heap_root,
+					(void *)(uintptr_t)node->heap_bit,
+					&debug_all_allocations_fops);
 				debugfs_create_file("maps", S_IRUGO,
 					heap_root,
 					(void *)(uintptr_t)node->heap_bit,
@@ -1764,6 +1807,9 @@ int nvmap_probe(struct platform_device *pdev)
 			debugfs_create_file("allocations", S_IRUGO, iovmm_root,
 				(void *)(uintptr_t)NVMAP_HEAP_IOVMM,
 				&debug_allocations_fops);
+			debugfs_create_file("all_allocations", S_IRUGO,
+				iovmm_root, (void *)(uintptr_t)NVMAP_HEAP_IOVMM,
+				&debug_all_allocations_fops);
 			debugfs_create_file("maps", S_IRUGO, iovmm_root,
 				(void *)(uintptr_t)NVMAP_HEAP_IOVMM,
 				&debug_maps_fops);

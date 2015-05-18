@@ -53,7 +53,10 @@ enum tegra_cl_dvfs_pwm_bus {
 /* set if calibration should be deferred for voltage matching force value */
 #define TEGRA_CL_DVFS_DEFER_FORCE_CALIBRATE	(0x1UL << 4)
 /* set if request scale is applied in open loop (not set: enforce 1:1 scale) */
-#define TEGRA_CL_DVFS_SCALE_IN_OPEN_LOOP		(0x1UL << 5)
+#define TEGRA_CL_DVFS_SCALE_IN_OPEN_LOOP	(0x1UL << 5)
+/* set if min output is forced during calibration */
+#define TEGRA_CL_DVFS_CALIBRATE_FORCE_VMIN	(0x1UL << 6)
+
 
 
 struct tegra_cl_dvfs_cfg_param {
@@ -111,6 +114,8 @@ struct tegra_cl_dvfs_platform_data {
 	struct voltage_reg_map	*vdd_map;
 	int			vdd_map_size;
 	int			pmu_undershoot_gb;
+	int			resume_ramp_delay;
+	int			tune_ramp_delay;
 
 	struct tegra_cl_dvfs_cfg_param		*cfg_param;
 };
@@ -120,12 +125,6 @@ int tegra_init_cl_dvfs(void);
 int tegra_cl_dvfs_debug_init(struct clk *dfll_clk);
 void tegra_cl_dvfs_resume(struct tegra_cl_dvfs *cld);
 
-int tegra_cl_dvfs_vmin_read_begin(struct tegra_cl_dvfs *cld, uint *start);
-int tegra_cl_dvfs_vmin_read_retry(struct tegra_cl_dvfs *cld, uint start);
-int tegra_cl_dvfs_vmax_read_begin(struct tegra_cl_dvfs *cld, uint *start);
-int tegra_cl_dvfs_vmax_read_retry(struct tegra_cl_dvfs *cld, uint start);
-int tegra_cl_dvfs_vmin_cmp_needed(struct tegra_cl_dvfs *cld, int *needed_mv);
-
 /* functions below are called only within DFLL clock interface DFLL lock held */
 void tegra_cl_dvfs_disable(struct tegra_cl_dvfs *cld);
 int tegra_cl_dvfs_enable(struct tegra_cl_dvfs *cld);
@@ -133,7 +132,7 @@ int tegra_cl_dvfs_lock(struct tegra_cl_dvfs *cld);
 int tegra_cl_dvfs_unlock(struct tegra_cl_dvfs *cld);
 int tegra_cl_dvfs_request_rate(struct tegra_cl_dvfs *cld, unsigned long rate);
 unsigned long tegra_cl_dvfs_request_get(struct tegra_cl_dvfs *cld);
-int tegra_cl_dvfs_clamp_at_vmin(struct tegra_cl_dvfs *cld, bool clamp);
+
 #else
 static inline int tegra_init_cl_dvfs(void)
 { return -ENOSYS; }
@@ -141,22 +140,6 @@ static inline int tegra_cl_dvfs_debug_init(struct clk *dfll_clk)
 { return -ENOSYS; }
 static inline void tegra_cl_dvfs_resume(struct tegra_cl_dvfs *cld)
 {}
-
-static inline int tegra_cl_dvfs_vmin_read_begin(struct tegra_cl_dvfs *cld,
-						uint *start)
-{ return -ENOSYS; }
-static inline int tegra_cl_dvfs_vmin_read_retry(struct tegra_cl_dvfs *cld,
-						uint start)
-{ return -ENOSYS; }
-static inline int tegra_cl_dvfs_vmax_read_begin(struct tegra_cl_dvfs *cld,
-						uint *start)
-{ return -ENOSYS; }
-static inline int tegra_cl_dvfs_vmax_read_retry(struct tegra_cl_dvfs *cld,
-						uint start)
-{ return -ENOSYS; }
-static inline int tegra_cl_dvfs_vmin_cmp_needed(struct tegra_cl_dvfs *cld,
-						int *needed_mv)
-{ return 0; }
 
 static inline void tegra_cl_dvfs_disable(struct tegra_cl_dvfs *cld)
 {}
@@ -170,9 +153,6 @@ static inline int tegra_cl_dvfs_request_rate(
 	struct tegra_cl_dvfs *cld, unsigned long rate)
 { return -ENOSYS; }
 static inline unsigned long tegra_cl_dvfs_request_get(struct tegra_cl_dvfs *cld)
-{ return 0; }
-static inline int tegra_cl_dvfs_clamp_at_vmin(struct tegra_cl_dvfs *cld,
-	bool clamp)
 { return 0; }
 #endif
 

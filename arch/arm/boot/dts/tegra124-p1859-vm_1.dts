@@ -44,6 +44,13 @@
 		nvidia,tegra124-virt-audio-master;
 	};
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "p1859";
+		};
+	};
+
 	ahub {
 		status = "disabled";
 	};
@@ -325,6 +332,22 @@
 			compatible = "nvidia,tegra124-vhost-vic";
 		};
 
+		vi {
+			compatible = "nvidia,tegra124-vhost-vi";
+		};
+
+		isp@54600000 {
+			compatible = "nvidia,tegra124-vhost-isp";
+		};
+
+		isp@54680000 {
+			compatible = "nvidia,tegra124-vhost-isp";
+		};
+
+		msenc {
+			compatible = "nvidia,tegra124-vhost-msenc";
+		};
+
 		/delete-node/ dpaux;
 		/delete-node/ sor;
 
@@ -424,8 +447,8 @@
 		status = "okay";
 	};
 
-	tegra_carveouts {
-		compatible = "nvidia,carveouts";
+	tegra-carveouts {
+		iommus = <&smmu TEGRA_SWGROUP_HC>;
 		status = "okay";
 		ivm_carveouts {
 			carveout0 {

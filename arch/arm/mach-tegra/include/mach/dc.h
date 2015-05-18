@@ -332,6 +332,7 @@ struct tegra_dsi_out {
 	u16		dsi_panel_rst_gpio;
 	u16		dsi_panel_bl_en_gpio;
 	u16		dsi_panel_bl_pwm_gpio;
+	u16		even_odd_split_width;
 	u8		controller_vs;
 
 	bool		panel_has_frame_buffer;	/* required*/
@@ -372,6 +373,7 @@ struct tegra_dsi_out {
 					 * most panels. */
 	bool		te_polarity_low;
 	bool		power_saving_suspend;
+	bool		suspend_stop_stream_late;
 	bool		dsi2lvds_bridge_enable;
 	bool		dsi2edp_bridge_enable;
 
@@ -637,6 +639,13 @@ struct tegra_vrr {
 	s32	dc_balance;
 	s32	frame_avg_pct;
 	s32	fluct_avg_pct;
+
+	s32	fe_intr_req;
+	s32	db_tolerance;
+	s32	frame2flip_us;
+	s32	adjust_vfp;
+	s32     adjust_db;
+	s32     vfp;
 };
 
 struct tegra_dc_out {

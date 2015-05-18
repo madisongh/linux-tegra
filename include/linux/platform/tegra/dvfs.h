@@ -162,10 +162,14 @@ struct dvfs_dfll_data {
 	u32		tune0_simon_mask;
 	u32		tune1;
 	bool		tune0_low_at_cold;
+
 	unsigned long	droop_rate_min;
 	unsigned long	use_dfll_rate_min;
 	unsigned long	out_rate_min;
 	unsigned long	max_rate_boost;
+	/* Boot frequency if DFLL is enabled by boot-loader; zero otherwise */
+	unsigned long	dfll_boot_khz;
+
 	int tune_high_min_millivolts;
 	int tune_high_margin_mv;
 	int min_millivolts;
@@ -261,6 +265,9 @@ struct cvb_dvfs {
 
 	/* dvfs Max voltage */
 	int max_mv;
+
+	/* dvfs Max frequency */
+	unsigned long max_freq;
 	int freqs_mult;
 
 	/* scaling values for voltage calculation */

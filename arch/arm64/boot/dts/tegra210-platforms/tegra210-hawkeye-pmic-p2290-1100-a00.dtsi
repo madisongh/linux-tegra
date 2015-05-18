@@ -56,11 +56,13 @@
 			regulator-min-microvolt = <606250>;
 			regulator-max-microvolt = <1400000>;
 			regulator-init-microvolt = <1000000>;
-			regulator-enable-ramp-delay = <1000>;
+			regulator-enable-ramp-delay = <200>;
 			regulator-disable-ramp-delay = <60000>;
+			regulator-boot-off;
 			regulator-ramp-delay = <12000>;
 			#thermal-sensor-cells = <0>;
 			maxim,enable-active-discharge;
+			maxim,enable-bias;
 			maxim,dvs-default-state = <1>;
 			maxim,external-enable-gpio = <&max77620 6 0>;
 		};
@@ -209,9 +211,10 @@
 					regulator-max-microvolt = <1350000>;
 					regulator-always-on;
 					regulator-boot-on;
-					maxim,fps-source = <FPS_SRC_1>;
+					maxim,fps-source = <FPS_SRC_NONE>;
 					maxim,fps-power-up-period = <2>;
 					maxim,fps-power-down-period = <5>;
+					maxim,shutdown-fps-source = <FPS_SRC_1>;
 				};
 
 				max77620_sd3: sd3 {
@@ -232,9 +235,11 @@
 					regulator-min-microvolt = <1200000>;
 					regulator-max-microvolt = <1200000>;
 					regulator-boot-on;
+					regulator-always-on;
 					maxim,fps-source = <FPS_SRC_NONE>;
 					maxim,fps-power-up-period = <0>;
 					maxim,fps-power-down-period = <7>;
+					regulator-disable-on-shutdown;
 					consumers {
 						c1 {
 							regulator-consumer-supply = "vddio_hsic";
@@ -250,6 +255,7 @@
 					maxim,fps-source = <FPS_SRC_NONE>;
 					maxim,fps-power-up-period = <0>;
 					maxim,fps-power-down-period = <7>;
+					regulator-disable-on-shutdown;
 				};
 
 				max77620_ldo2: ldo2 {
@@ -259,6 +265,7 @@
 					maxim,fps-source = <FPS_SRC_NONE>;
 					maxim,fps-power-up-period = <0>;
 					maxim,fps-power-down-period = <7>;
+					regulator-disable-on-shutdown;
 				};
 
 				max77620_ldo3: ldo3 {
@@ -268,6 +275,7 @@
 					maxim,fps-source = <FPS_SRC_NONE>;
 					maxim,fps-power-up-period = <0>;
 					maxim,fps-power-down-period = <7>;
+					regulator-disable-on-shutdown;
 				};
 
 				max77620_ldo4: ldo4 {
@@ -279,6 +287,7 @@
 					maxim,fps-source = <FPS_SRC_0>;
 					maxim,fps-power-up-period = <1>;
 					maxim,fps-power-down-period = <6>;
+					regulator-disable-on-shutdown;
 				};
 
 				max77620_ldo5: ldo5 {
@@ -288,6 +297,7 @@
 					maxim,fps-source = <FPS_SRC_NONE>;
 					maxim,fps-power-up-period = <0>;
 					maxim,fps-power-down-period = <7>;
+					regulator-disable-on-shutdown;
 				};
 
 				max77620_ldo6: ldo6 {
@@ -298,6 +308,7 @@
 					maxim,fps-source = <FPS_SRC_NONE>;
 					maxim,fps-power-up-period = <0>;
 					maxim,fps-power-down-period = <7>;
+					regulator-disable-on-shutdown;
 				};
 
 				max77620_ldo7: ldo7 {
@@ -357,9 +368,6 @@
 				regulator-name = "outp";
 				regulator-min-microvolt = <4000000>;
 				regulator-max-microvolt = <6000000>;
-				regulator-init-microvolt = <5500000>;
-				regulator-boot-on;
-				regulator-always-on;
 				ti,enable-gpio = <&gpio TEGRA_GPIO(E, 2) 0>;
 			};
 
@@ -367,9 +375,6 @@
 				regulator-name = "outn";
 				regulator-min-microvolt = <4000000>;
 				regulator-max-microvolt = <6000000>;
-				regulator-init-microvolt = <5500000>;
-				regulator-boot-on;
-				regulator-always-on;
 				ti,enable-gpio = <&gpio TEGRA_GPIO(E, 3) 0>;
 			};
 		};
@@ -398,6 +403,11 @@
 				ti,ir-comp-resister-ohm = <1>;
 				ti,pre-charge-current-limit-milliamp = <256>;
 				ti,thermal-regulation-threshold-degc = <120>;
+				ti,soc-range = <50 60 70 80 85 90 95 101>;
+				ti,input-voltage-soc-limit = <4200 4280 4360 4440 4520 4600 4680 4760>;
+				ti,temp-range = <10 15 25 45 50 60>;
+				ti,charge-thermal-voltage-limit = <4352 4352 4352 4352 4200 4200>;
+				ti,charge-current-limit = <520 1040 2600 2600 2600 520>;
 			};
 
 			usb0_vbus: vbus {

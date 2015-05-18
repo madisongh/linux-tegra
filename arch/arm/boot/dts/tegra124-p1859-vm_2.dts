@@ -41,6 +41,13 @@
 	compatible = "nvidia,p1859", "nvidia,tegra124";
 	nvidia,dtsfilename = __FILE__;
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "p1859";
+		};
+	};
+
 	i2c@7000c400 {
 		status = "disabled";
 	};
@@ -311,7 +318,7 @@
 		};
 
 		msenc {
-			status = "disabled";
+			compatible = "nvidia,tegra124-vhost-msenc";
 		};
 
 		tsec {
@@ -367,8 +374,8 @@
 		nvidia,tegra_dvfs_gpu_enable = <0>;
 	};
 
-	tegra_carveouts {
-		compatible = "nvidia,carveouts";
+	tegra-carveouts {
+		iommus = <&smmu TEGRA_SWGROUP_HC>;
 		status = "okay";
 		ivm_carveouts {
 			carveout0 {

@@ -171,6 +171,13 @@
 		status = "disabled";
 	};
 
+	tegra-carveouts {
+		compatible = "nvidia,carveouts";
+		iommus = <&smmu TEGRA_SWGROUP_HC>,
+			 <&smmu TEGRA_SWGROUP_AVPC>;
+		status = "okay";
+	};
+
 	smmu: iommu {
 		compatible = "nvidia,tegra210-smmu";
 		reg = <0x0 0x70019000 0x0 0x1000
@@ -1384,6 +1391,18 @@
 			gpu  = <1085800  (-1097500)>;
 			pllx = <1078800  (-890700)>;
 		};
+		fuse_war@fuse_rev_2 {
+			device_type = "fuse_war";
+			match_fuse_rev = <2>;
+			cpu0 = <1085000  3244200 >;
+			cpu1 = <1126200  (-67500) >;
+			cpu2 = <1098400  2251100 >;
+			cpu3 = <1108000  602700>;
+			mem0 = <1069200  3549900>;
+			mem1 = <1173700  (-6263600)>;
+			gpu  = <1074300  2734900>;
+			pllx = <1039700  6829100>;
+		};
 		/* thermctl - groups of sensors */
 		therm_cpu {
 			device_type = "thermctl";
@@ -1396,6 +1415,7 @@
 			hotspot-offset = <5000>;
 		};
 		therm_mem {
+			status = "disabled";
 			device_type = "thermctl";
 			thermal-sensor-id = <2>;
 		};

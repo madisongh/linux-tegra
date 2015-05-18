@@ -72,7 +72,7 @@
 					pin_gpio1 {
 						pins = "gpio1";
 						function = "gpio";
-						bias-disable;
+						bias-pull-up;
 					};
 
 					pin_gpio6 {
@@ -93,6 +93,14 @@
 				#extcon-cells = <1>;
 				ti,enable-id-detection;
 				ti,enable-vbus-detection;
+			};
+
+			watchdog {
+				compatible = "ti,palmas-watchdog";
+				ti,watchdog-init-timeout = <600>;
+				ti,watchdog-interrupt-mode;
+				dt-override-status-odm-data = <0x80000000 0x80000000>;
+				status = "disabled";
 			};
 
 			power_pm {
@@ -184,6 +192,20 @@
 						regulator-name = "vdd-1v8";
 						regulator-always-on;
 						regulator-boot-on;
+						consumers {
+							c1 {
+								regulator-consumer-supply = "vddio_sdmmc";
+								regulator-consumer-device = "sdhci-tegra.0";
+							};
+							c2 {
+								regulator-consumer-supply = "vddio_sdmmc";
+								regulator-consumer-device = "sdhci-tegra.3";
+							};
+							c3 {
+								regulator-consumer-supply = "avdd_pll_utmip";
+								regulator-consumer-device = "tegra-ehci.0";
+							};
+						};
 					};
 
 					palmas_smps9: smps9 {
@@ -192,6 +214,17 @@
 						regulator-max-microvolt = <2800000>;
 						regulator-always-on;
 						regulator-boot-on;
+						ti,roof-floor = <PALMAS_EXT_CONTROL_NSLEEP>;
+						consumers {
+							c1 {
+								regulator-consumer-supply = "vddio_sd_slot";
+								regulator-consumer-device = "sdhci-tegra.3";
+							};
+							c2 {
+								regulator-consumer-supply = "vddio_sd_slot";
+								regulator-consumer-device = "sdhci-tegra.2";
+							};
+						};
 					};
 
 					palmas_smps10_out1: smps10_out1 {
@@ -204,6 +237,9 @@
 						regulator-name = "vdd-out2-5v0";
 						regulator-min-microvolt = <3750000>;
 						regulator-max-microvolt = <3750000>;
+						regulator-always-on;
+						regulator-boot-on;
+						regulator-disable-on-suspend;
 					};
 
 					ldo1 {
@@ -261,18 +297,32 @@
 						regulator-name = "vddio-sdmmc-2";
 						regulator-min-microvolt = <1800000>;
 						regulator-max-microvolt = <3300000>;
+						ti,bypass-voltage = <2700000>;
+						consumers {
+							c1 {
+								regulator-consumer-supply = "vddio_sdmmc";
+								regulator-consumer-device = "sdhci-tegra.2";
+							};
+						};
 					};
 
 					ldoln_reg: ldoln {
 						regulator-name = "vddio-hv";
 						regulator-always-on;
 						regulator-boot-on;
+						ti,roof-floor = <PALMAS_EXT_CONTROL_NSLEEP>;
 					};
 
 					ldousb_reg: ldousb {
 						regulator-name = "avdd-usb";
 						regulator-always-on;
 						regulator-boot-on;
+						consumers {
+							c1 {
+								regulator-consumer-supply = "avdd_usb";
+								regulator-consumer-device = "tegra-ehci.0";
+							};
+						};
 					};
 				};
 			};

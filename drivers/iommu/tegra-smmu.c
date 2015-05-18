@@ -275,6 +275,10 @@ static u64 tegra_smmu_get_swgids(struct device *dev)
 	struct iommu_linear_map *area = NULL;
 	struct smmu_map_prop *prop;
 
+	swgids = tegra_smmu_of_get_swgids(dev, tegra_smmu_of_match, &area);
+	if (swgids_is_error(swgids))
+		return SWGIDS_ERROR_CODE;
+
 	if (!smmu_handle) {
 		dev_info(dev, "SMMU isn't ready yet\n");
 		return SWGIDS_ERROR_CODE;
@@ -283,10 +287,6 @@ static u64 tegra_smmu_get_swgids(struct device *dev)
 	client = tegra_smmu_find_client(smmu_handle, dev);
 	if (client)
 		return client->swgids;
-
-	swgids = tegra_smmu_of_get_swgids(dev, tegra_smmu_of_match, &area);
-	if (swgids_is_error(swgids))
-		return SWGIDS_ERROR_CODE;
 
 	list_for_each_entry(prop, &smmu_handle->asprops, list)
 		if (swgids & prop->swgid_mask)
@@ -1602,7 +1602,7 @@ static int smmu_iommu_add_device(struct device *dev)
 	return 0;
 }
 
-static const struct iommu_ops smmu_iommu_ops_default = {
+static struct iommu_ops smmu_iommu_ops_default = {
 	.capable	= smmu_iommu_capable,
 	.domain_init	= smmu_iommu_domain_init,
 	.domain_destroy	= smmu_iommu_domain_destroy,
@@ -2309,7 +2309,7 @@ void (*flush_ptc_and_tlb_range)(struct smmu_device *smmu, struct smmu_as *as, dm
 void (*flush_ptc_and_tlb_as)(struct smmu_as *as, dma_addr_t start, dma_addr_t end) = flush_ptc_and_tlb_as_default;
 void (*free_pdir)(struct smmu_as *as) = free_pdir_default;
 
-const struct iommu_ops *smmu_iommu_ops = &smmu_iommu_ops_default;
+struct iommu_ops *smmu_iommu_ops = &smmu_iommu_ops_default;
 const struct file_operations *smmu_debugfs_stats_fops = &smmu_debugfs_stats_fops_default;
 
 static int tegra_smmu_device_notifier(struct notifier_block *nb,

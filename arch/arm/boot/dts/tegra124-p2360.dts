@@ -33,6 +33,13 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "p2360";
+		};
+	};
+
 	host1x {
 		sor {
 			status = "okay";
@@ -241,7 +248,7 @@
 
 	isc-mgr.1 {
 		compatible = "nvidia,isc-mgr";
-		i2c-bus = <3>;
+		i2c-bus = <0>;
 		csi-port = <2>;
 		/* default-power-on; */
 		interrupt-parent = <&gpio>;

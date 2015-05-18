@@ -123,6 +123,12 @@ static void of_get_regulation_constraints(struct device_node *np,
 
 	if (of_property_read_bool(np, "regulator-allow-bypass"))
 		constraints->valid_ops_mask |= REGULATOR_CHANGE_BYPASS;
+	if (constraints->always_on)
+		constraints->disable_on_suspend = of_property_read_bool(np,
+					"regulator-disable-on-suspend");
+
+	constraints->disable_on_shutdown = of_property_read_bool(np,
+					"regulator-disable-on-shutdown");
 
 	if (of_find_property(np, "regulator-bypass-on", NULL))
 		constraints->bypass_on = true;

@@ -2948,11 +2948,12 @@ static void tegra_dsi_ganged(struct tegra_dc *dc,
 			DSI_GANGED_MODE_START, dsi_instances[0]);
 		/* DSI 1 */
 		tegra_dsi_controller_writel(dsi,
-			DSI_GANGED_MODE_START_POINTER(1),
+			DSI_GANGED_MODE_START_POINTER(
+				dsi->info.even_odd_split_width),
 			DSI_GANGED_MODE_START, dsi_instances[1]);
 
-		low_width = 0x1;
-		high_width = 0x1;
+		low_width = dsi->info.even_odd_split_width;
+		high_width = dsi->info.even_odd_split_width;
 		val = DSI_GANGED_MODE_SIZE_VALID_LOW_WIDTH(low_width) |
 			DSI_GANGED_MODE_SIZE_VALID_HIGH_WIDTH(high_width);
 	}
@@ -5152,8 +5153,9 @@ static void tegra_dc_dsi_disable(struct tegra_dc *dc)
 	mutex_lock(&dsi->lock);
 	tegra_dc_io_start(dc);
 
-	if (dsi->status.dc_stream == DSI_DC_STREAM_ENABLE)
-		tegra_dsi_stop_dc_stream_at_frame_end(dc, dsi, 2);
+	if (!dsi->info.suspend_stop_stream_late)
+		if (dsi->status.dc_stream == DSI_DC_STREAM_ENABLE)
+			tegra_dsi_stop_dc_stream_at_frame_end(dc, dsi, 2);
 
 	if (dsi->out_ops && dsi->out_ops->disable)
 		dsi->out_ops->disable(dsi);
@@ -5184,6 +5186,10 @@ static void tegra_dc_dsi_disable(struct tegra_dc *dc)
 			}
 		}
 	}
+
+	if (dsi->status.dc_stream == DSI_DC_STREAM_ENABLE)
+		tegra_dsi_stop_dc_stream_at_frame_end(dc, dsi, 2);
+
 fail:
 	mutex_unlock(&dsi->lock);
 	tegra_dc_io_end(dc);

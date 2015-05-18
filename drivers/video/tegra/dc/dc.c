@@ -1316,8 +1316,10 @@ static int dbg_edid_show(struct seq_file *s, void *unused)
 	buf = data->buf;
 
 	for (i = 0; i < data->len; i++) {
+#ifdef DEBUG
 		if (i % 16 == 0)
 			seq_printf(s, "edid[%03x] =", i);
+#endif
 
 		seq_printf(s, " %02x", buf[i]);
 
@@ -1686,15 +1688,16 @@ static s32 tegra_dc_calc_v_front_porch(struct tegra_dc_mode *mode,
 	return vfp;
 }
 
-void tegra_dc_setup_vrr(struct tegra_dc *dc)
+static void tegra_dc_setup_vrr(struct tegra_dc *dc)
 {
 	int lines_per_frame_max, lines_per_frame_min;
 
-	struct tegra_dc_mode *m = &dc->mode;
+	struct tegra_dc_mode *m;
 	struct tegra_vrr *vrr  = dc->out->vrr;
 
 	if (!vrr) return;
 
+	m = &dc->out->modes[VRR_NATIVE_MODE_IDX];
 	vrr->v_front_porch = m->v_front_porch;
 	vrr->v_back_porch = m->v_back_porch;
 	vrr->pclk = m->pclk;
@@ -1703,9 +1706,10 @@ void tegra_dc_setup_vrr(struct tegra_dc *dc)
 		vrr->v_front_porch_max = tegra_dc_calc_v_front_porch(m,
 				vrr->vrr_min_fps);
 
-	if (vrr->vrr_max_fps > 0)
-		vrr->v_front_porch_min = tegra_dc_calc_v_front_porch(m,
-				vrr->vrr_max_fps);
+	vrr->vrr_max_fps =
+		(s32)div_s64(NSEC_PER_SEC, dc->frametime_ns);
+
+	vrr->v_front_porch_min = m->v_front_porch;
 
 	vrr->line_width = m->h_sync_width + m->h_back_porch +
 			m->h_active + m->h_front_porch;
@@ -1725,8 +1729,6 @@ void tegra_dc_setup_vrr(struct tegra_dc *dc)
 					(m->pclk / 1000000);
 	vrr->frame_len_min = vrr->line_width * lines_per_frame_min /
 					(m->pclk / 1000000);
-	if(vrr->v_front_porch_min < vrr->v_front_porch)
-		vrr->v_front_porch_min = vrr->v_front_porch;
 	vrr->vfp_extend = vrr->v_front_porch_max;
 	vrr->vfp_shrink = vrr->v_front_porch_min;
 
@@ -1736,12 +1738,13 @@ void tegra_dc_setup_vrr(struct tegra_dc *dc)
 
 	vrr->max_adj_pct = 50;
 	vrr->max_flip_pct = 20;
-	vrr->max_dc_balance = 16667;
+	vrr->max_dc_balance = 20000;
 	vrr->max_inc_pct = 5;
 
 	vrr->dc_balance = 0;
 	vrr->frame_avg_pct = 75;
 	vrr->fluct_avg_pct = 75;
+	vrr->db_tolerance = 5000;
 }
 
 unsigned long tegra_dc_poll_register(struct tegra_dc *dc, u32 reg, u32 mask,
@@ -1991,7 +1994,7 @@ void tegra_dc_cmu_enable(struct tegra_dc *dc, bool cmu_enable)
 #endif
 
 #ifdef CONFIG_TEGRA_DC_CMU
-void tegra_dc_cache_cmu(struct tegra_dc *dc,
+static void tegra_dc_cache_cmu(struct tegra_dc *dc,
 				struct tegra_dc_cmu *src_cmu)
 {
 	if (&dc->cmu != src_cmu) /* ignore if it would require memmove() */
@@ -2386,8 +2389,17 @@ static int tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 				dc->out->h_size, dc->out->v_size,
 				dc->mode.pclk);
 		dc->initialized = true;
-	} else if (out->n_modes > 0)
-		tegra_dc_set_mode(dc, &dc->out->modes[0]);
+	} else if (out->n_modes > 0) {
+		/* For VRR panels, default mode is first in the list,
+		 * and native panel mode is at index VRR_NATIVE_MODE_IDX.
+		 * Initialization must occur using the native panel mode. */
+		if (dc->out->vrr) {
+			tegra_dc_set_mode(dc,
+				&dc->out->modes[VRR_NATIVE_MODE_IDX]);
+			tegra_dc_setup_vrr(dc);
+		} else
+			tegra_dc_set_mode(dc, &dc->out->modes[0]);
+	}
 
 	switch (out->type) {
 	case TEGRA_DC_OUT_RGB:
@@ -2796,12 +2808,23 @@ static void tegra_dc_vrr_sec(struct tegra_dc *dc)
 {
 	struct tegra_vrr *vrr  = dc->out->vrr;
 
-	if (!vrr || !vrr->enable)
+	if (!vrr || (!vrr->enable && !vrr->fe_intr_req))
 		return;
+
+	/* Decrement frame end interrupt refcount previously
+	   requested by secure library */
+	if (vrr->fe_intr_req) {
+		_tegra_dc_config_frame_end_intr(dc, false);
+		vrr->fe_intr_req = 0;
+	}
 
 #ifdef CONFIG_TRUSTED_LITTLE_KERNEL
 	te_vrr_sec();
 #endif
+	/* Increment frame end interrupt refcount requested
+	   by secure library */
+	if (vrr->fe_intr_req)
+		_tegra_dc_config_frame_end_intr(dc, true);
 }
 
 static void tegra_dc_vblank(struct work_struct *work)
@@ -3901,6 +3924,53 @@ void tegra_dc_blank(struct tegra_dc *dc, unsigned windows)
 	unsigned i;
 	unsigned long int blank_windows;
 	int nr_win = 0;
+	int yuv_flag = dc->mode.vmode & FB_VMODE_SET_YUV_MASK;
+
+	if (dc->yuv_bypass && yuv_flag == (FB_VMODE_Y420 | FB_VMODE_Y30)) {
+		u32 active_width = dc->mode.h_active;
+		u32 active_height = dc->mode.v_active;
+		u32 orig_h_full, orig_w_full;
+		u32 orig_fmt;
+		u32 orig_out_w, orig_out_h;
+
+		tegra_fb_frame_update(dc->fb);
+
+		dcwins[0] = tegra_fb_get_win(dc->fb);
+		nr_win = 1;
+
+		orig_h_full = dcwins[0]->h.full;
+		orig_w_full = dcwins[0]->w.full;
+		orig_fmt = dcwins[0]->fmt;
+		orig_out_w = dcwins[0]->out_w;
+		orig_out_h = dcwins[0]->out_h;
+
+		dcwins[0]->h.full = dfixed_const(active_height);
+		dcwins[0]->w.full = dfixed_const(active_width);
+
+		/*
+		 * 420 10bpc blank frame statically
+		 * created for this pixel format
+		 */
+		dcwins[0]->fmt = TEGRA_WIN_FMT_B8G8R8A8;
+
+		dcwins[0]->out_w = active_width;
+		dcwins[0]->out_h = active_height;
+
+		if (!tegra_platform_is_linsim()) {
+			tegra_dc_update_windows(dcwins, nr_win, NULL, true);
+			tegra_dc_sync_windows(dcwins, nr_win);
+		}
+		tegra_dc_program_bandwidth(dc, true);
+
+		/* reinstate window config */
+		dcwins[0]->h.full = orig_h_full;
+		dcwins[0]->w.full = orig_w_full;
+		dcwins[0]->fmt = orig_fmt;
+		dcwins[0]->out_w = orig_out_w;
+		dcwins[0]->out_h = orig_out_h;
+
+		return;
+	}
 
 	blank_windows = windows & dc->valid_windows;
 
@@ -3920,6 +3990,7 @@ void tegra_dc_blank(struct tegra_dc *dc, unsigned windows)
 		tegra_dc_sync_windows(dcwins, nr_win);
 	}
 	tegra_dc_program_bandwidth(dc, true);
+
 	for_each_set_bit(i, &blank_windows, DC_N_WINDOWS) {
 		/* Advance pending syncpoints */
 		tegra_dc_disable_window(dc, i);

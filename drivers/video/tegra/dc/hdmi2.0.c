@@ -147,6 +147,9 @@ static inline bool tegra_hdmi_hpd_asserted(struct tegra_hdmi *hdmi)
 
 static inline void tegra_hdmi_reset(struct tegra_hdmi *hdmi)
 {
+	if (tegra_platform_is_linsim())
+		return;
+
 	tegra_periph_reset_assert(hdmi->sor->sor_clk);
 	mdelay(20);
 	tegra_periph_reset_deassert(hdmi->sor->sor_clk);
@@ -340,6 +343,7 @@ static int tegra_hdmi_ddc_init(struct tegra_hdmi *hdmi, int edid_src)
 		err = -EBUSY;
 		goto fail_edid_free;
 	}
+	hdmi->ddc_i2c_original_rate = i2c_get_adapter_bus_clk_rate(i2c_adap);
 
 	hdmi->ddc_i2c_client = i2c_new_device(i2c_adap, &i2c_dev_info);
 	i2c_put_adapter(i2c_adap);
@@ -468,6 +472,18 @@ static bool tegra_hdmi_check_dc_constraint(const struct fb_videomode *mode)
 		(mode->xres >= 16) && (mode->yres >= 16);
 }
 
+/*  does not return precise tmds character rate */
+static u32 tegra_hdmi_mode_min_tmds_rate(const struct fb_videomode *mode)
+{
+	u32 tmds_csc_8bpc_khz = PICOS2KHZ(mode->pixclock);
+
+	if (mode->vmode & (FB_VMODE_Y420 | FB_VMODE_Y420_ONLY))
+		tmds_csc_8bpc_khz /= 2;
+
+	return tmds_csc_8bpc_khz;
+}
+
+__maybe_unused
 static bool tegra_hdmi_fb_mode_filter(const struct tegra_dc *dc,
 					struct fb_videomode *mode)
 {
@@ -479,9 +495,17 @@ static bool tegra_hdmi_fb_mode_filter(const struct tegra_dc *dc,
 	if (mode->xres > 4096)
 		return false;
 
-	if (!tegra_edid_is_hfvsdb_present(hdmi->edid) &&
-		KHZ2PICOS(340000) >= mode->pixclock &&
-		!(mode->vmode & FB_VMODE_Y420_ONLY))
+	/* some non-compliant edids list 420vdb modes in vdb */
+	if ((mode->vmode & FB_VMODE_Y420) &&
+		!(tegra_edid_is_hfvsdb_present(hdmi->edid) &&
+		tegra_edid_is_scdc_present(hdmi->edid)) &&
+		tegra_edid_is_420db_present(hdmi->edid)) {
+		mode->vmode &= ~FB_VMODE_Y420;
+		mode->vmode |= FB_VMODE_Y420_ONLY;
+	}
+
+	if (!hdmi->dvi && (tegra_hdmi_mode_min_tmds_rate(mode) / 1000 >
+		tegra_edid_get_max_clk_rate(hdmi->edid)))
 		return false;
 
 	if (mode->pixclock && tegra_dc_get_out_max_pixclock(dc) &&
@@ -527,11 +551,14 @@ static int tegra_hdmi_get_mon_spec(struct tegra_hdmi *hdmi)
 
 	size_t attempt_cnt = 0;
 	int err = 0;
+	struct i2c_adapter *i2c_adap = i2c_get_adapter(hdmi->dc->out->ddc_bus);
 
 	if (IS_ERR_OR_NULL(hdmi->edid)) {
 		dev_err(&hdmi->dc->ndev->dev, "hdmi: edid not initialized\n");
 		return PTR_ERR(hdmi->edid);
 	}
+
+	tegra_edid_i2c_adap_change_rate(i2c_adap, hdmi->ddc_i2c_original_rate);
 
 	hdmi->mon_spec_valid = false;
 	if (hdmi->mon_spec_valid)
@@ -1123,19 +1150,55 @@ static u32 tegra_hdmi_get_cea_modedb_size(struct tegra_hdmi *hdmi)
 		CEA_861_F_MODEDB_SIZE : CEA_861_D_MODEDB_SIZE;
 }
 
+static void tegra_hdmi_get_cea_fb_videomode(struct fb_videomode *m,
+						struct tegra_hdmi *hdmi)
+{
+	struct tegra_dc *dc = hdmi->dc;
+	struct tegra_dc_mode dc_mode;
+	int yuv_flag;
+
+	memcpy(&dc_mode, &dc->mode, sizeof(dc->mode));
+
+	/* get CEA video timings */
+	yuv_flag = dc_mode.vmode & FB_VMODE_SET_YUV_MASK;
+	if (yuv_flag == (FB_VMODE_Y420 | FB_VMODE_Y24)) {
+		dc_mode.h_back_porch *= 2;
+		dc_mode.h_front_porch *= 2;
+		dc_mode.h_sync_width *= 2;
+		dc_mode.h_active *= 2;
+		dc_mode.pclk *= 2;
+	} else if (yuv_flag == (FB_VMODE_Y420 | FB_VMODE_Y30)) {
+		dc_mode.h_back_porch = (dc_mode.h_back_porch * 8) / 5;
+		dc_mode.h_front_porch = (dc_mode.h_front_porch * 8) / 5;
+		dc_mode.h_sync_width = (dc_mode.h_sync_width * 8) / 5;
+		dc_mode.h_active = (dc_mode.h_active * 8) / 5;
+		dc_mode.pclk = (dc_mode.pclk / 5) * 8;
+	}
+
+	tegra_dc_to_fb_videomode(m, &dc_mode);
+
+	/* only interlaced required for VIC identification */
+	m->vmode &= FB_VMODE_INTERLACED;
+}
+
 __maybe_unused
 static int tegra_hdmi_find_cea_vic(struct tegra_hdmi *hdmi)
 {
 	struct fb_videomode m;
+	struct tegra_dc *dc = hdmi->dc;
 	unsigned i;
 	unsigned best = 0;
 	u32 modedb_size = tegra_hdmi_get_cea_modedb_size(hdmi);
-	const struct tegra_dc_mode *mode = &hdmi->dc->mode;
 
-	tegra_dc_to_fb_videomode(&m, mode);
+	if (dc->initialized) {
+		u32 vic = tegra_sor_readl(hdmi->sor,
+			NV_SOR_HDMI_AVI_INFOFRAME_SUBPACK0_HIGH) & 0xff;
+		if (!vic)
+			dev_warn(&dc->ndev->dev, "hdmi: BL set VIC 0\n");
+		return vic;
+	}
 
-	/* only interlaced required for VIC identification */
-	m.vmode &= FB_VMODE_INTERLACED;
+	tegra_hdmi_get_cea_fb_videomode(&m, hdmi);
 
 	for (i = 1; i < modedb_size; i++) {
 		const struct fb_videomode *curr = &cea_modes[i];
@@ -1189,7 +1252,7 @@ static u32 tegra_hdmi_get_aspect_ratio(struct tegra_hdmi *hdmi)
 	 * set AVI Infoframe parameters
 	 */
 	if ((aspect_ratio == HDMI_AVI_ASPECT_RATIO_NO_DATA) &&
-		tegra_is_bl_display_initialized(hdmi->dc->ndev->id)) {
+					(hdmi->dc->initialized)) {
 		u32 temp = 0;
 		temp = tegra_sor_readl(hdmi->sor,
 			NV_SOR_HDMI_AVI_INFOFRAME_SUBPACK0_LOW);
@@ -1220,6 +1283,20 @@ static u32 tegra_hdmi_get_rgb_ycc(struct tegra_hdmi *hdmi)
 	return HDMI_AVI_RGB;
 }
 
+static bool tegra_hdmi_is_ex_colorimetry(struct tegra_hdmi *hdmi)
+{
+	return !!(hdmi->dc->mode.vmode & FB_VMODE_EC_ENABLE);
+}
+
+static u32 tegra_hdmi_get_ex_colorimetry(struct tegra_hdmi *hdmi)
+{
+	u32 vmode = hdmi->dc->mode.vmode;
+
+	return tegra_hdmi_is_ex_colorimetry(hdmi) ?
+		((vmode & FB_VMODE_EC_MASK) >> FB_VMODE_EC_SHIFT) :
+		HDMI_AVI_EXT_COLORIMETRY_INVALID;
+}
+
 static void tegra_hdmi_avi_infoframe_update(struct tegra_hdmi *hdmi)
 {
 	struct hdmi_avi_infoframe *avi = &hdmi->avi;
@@ -1236,11 +1313,13 @@ static void tegra_hdmi_avi_infoframe_update(struct tegra_hdmi *hdmi)
 
 	avi->act_format = HDMI_AVI_ACTIVE_FORMAT_SAME;
 	avi->aspect_ratio = tegra_hdmi_get_aspect_ratio(hdmi);
-	avi->colorimetry = HDMI_AVI_COLORIMETRY_DEFAULT;
+	avi->colorimetry = tegra_hdmi_is_ex_colorimetry(hdmi) ?
+			HDMI_AVI_COLORIMETRY_EXTENDED_VALID :
+			HDMI_AVI_COLORIMETRY_DEFAULT;
 
 	avi->scaling = HDMI_AVI_SCALING_UNKNOWN;
 	avi->rgb_quant = HDMI_AVI_RGB_QUANT_DEFAULT;
-	avi->ext_colorimetry = HDMI_AVI_EXT_COLORIMETRY_INVALID;
+	avi->ext_colorimetry = tegra_hdmi_get_ex_colorimetry(hdmi);
 	avi->it_content = HDMI_AVI_IT_CONTENT_FALSE;
 
 	/* set correct vic if video format is cea defined else set 0 */
@@ -1457,6 +1536,11 @@ static void tegra_hdmi_audio_config(struct tegra_hdmi *hdmi,
 		val |= NV_SOR_AUDIO_CTRL_NULL_SAMPLE_EN;
 	tegra_sor_writel(sor, NV_SOR_AUDIO_CTRL, val);
 
+	/* override to advertise HBR capability */
+	tegra_sor_writel(sor, NV_PDISP_SOR_AUDIO_SPARE0_0,
+		(1 << HDMI_AUDIO_HBR_ENABLE_SHIFT) |
+		tegra_sor_readl(sor, NV_PDISP_SOR_AUDIO_SPARE0_0));
+
 	tegra_hdmi_audio_acr(hdmi, audio_freq);
 	tegra_hdmi_audio_infoframe(hdmi);
 }
@@ -1623,7 +1707,7 @@ static int _tegra_hdmi_v2_x_config(struct tegra_hdmi *hdmi)
 	/* disable hdmi2.x config on host and monitor only
 	 * if bootloader didn't initialize hdmi
 	 */
-	if (!tegra_is_bl_display_initialized(hdmi->dc->ndev->id)) {
+	if (!hdmi->dc->initialized) {
 		tegra_hdmi_v2_x_mon_config(hdmi, false);
 		tegra_hdmi_v2_x_host_config(hdmi, false);
 	}
@@ -1655,7 +1739,7 @@ static void tegra_hdmi_scdc_worker(struct work_struct *work)
 		{HDMI_SCDC_TMDS_CONFIG_OFFSET, 0x0}
 	};
 
-	if (!hdmi->enabled)
+	if (!hdmi->enabled || hdmi->dc->mode.pclk <= 340000000)
 		return;
 
 	mutex_lock(&hdmi->ddc_lock);

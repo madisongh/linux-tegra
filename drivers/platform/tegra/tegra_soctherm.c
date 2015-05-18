@@ -2481,6 +2481,18 @@ static void soctherm_tsense_program(enum soctherm_sense sensor,
 				    struct soctherm_sensor_common_params *scp)
 {
 	u32 r;
+	int tz_id;
+	struct soctherm_therm *therm;
+
+	tz_id = tsensor2therm_map[sensor];
+	if (tz_id >= THERM_SIZE)
+		return;
+
+	therm = &pp->therm[tz_id];
+	if (!therm->tz) {
+		pr_info("soctherm: skipping sensor %d programming\n", sensor);
+		return;
+	}
 
 	r = REG_SET(0, TS_CPU0_CONFIG0_TALL, scp->tall);
 	soctherm_writel(r, TS_TSENSE_REG_OFFSET(TS_CPU0_CONFIG0, sensor));
@@ -3583,9 +3595,9 @@ static int regs_show(struct seq_file *s, void *data)
 		seq_printf(s, "Therm_A/B(%d/", state);
 		state = REG_GET(r, TS_CPU0_CONFIG2_THERM_B);
 		seq_printf(s, "%d) ", (s16)state);
-
 		seq_printf(s, "HW offsetting %d\n",
-				pp->therm[i].en_hw_pllx_offsetting);
+				pp->therm[tsensor2therm_map[i]].
+				en_hw_pllx_offsetting);
 	}
 
 	r = soctherm_readl(TS_PDIV);

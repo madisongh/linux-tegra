@@ -1,7 +1,5 @@
 /*
- * GM20B MC registers used by ACR
- *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -11,12 +9,18 @@
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _MC_CARVEOUT_REG_H_
-#define  _MC_CARVEOUT_REG_H_
+#ifndef _LINUX_SOC_TEGRA_PASR_H
+#define _LINUX_SOC_TEGRA_PASR_H
 
-#define MC_SECURITY_CARVEOUT2_BOM_0		0xc5c
-#define MC_SECURITY_CARVEOUT3_BOM_0		0xcac
-#define MC_ERR_GENERALIZED_CARVEOUT_STATUS_0		0xc00
-#endif /*_MC_CARVEOUT_REG_H_*/
+#ifdef CONFIG_PASR
+int tegra21_pasr_init(struct device *dev);
+#else
+static inline int tegra21_pasr_init(struct device *dev) { return 0; };
+#endif
+
+#endif

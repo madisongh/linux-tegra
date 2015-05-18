@@ -1,6 +1,6 @@
 /* Keytable for NVIDIA Remote Controller
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -19,28 +19,25 @@
 #include <linux/module.h>
 
 static struct rc_map_table foster_table[] = {
-	{ 0x310c, KEY_0 },
-	{ 0x3103, KEY_1 },
-	{ 0x3104, KEY_2 },
-	{ 0x3105, KEY_3 },
-	{ 0x3106, KEY_4 },
-	{ 0x3107, KEY_5 },
-	{ 0x3108, KEY_6 },
-	{ 0x3109, KEY_7 },
-	{ 0x310a, KEY_8 },
-	{ 0x310b, KEY_9 },
-	{ 0x311f, KEY_VOLUMEUP },
-	{ 0x3140, KEY_VOLUMEDOWN },
-	{ 0x3149, KEY_CHANNELUP },
-	{ 0x314a, KEY_CHANNELDOWN },
-	{ 0x3111, KEY_UP },
-	{ 0x3115, KEY_DOWN },
-	{ 0x3112, KEY_LEFT },
-	{ 0x3114, KEY_RIGHT },
-	{ 0x310e, KEY_HOMEPAGE },
-	{ 0x3100, KEY_POWER },
-	{ 0x3113, KEY_ENTER },
-	{ 0x3141, KEY_BACK },
+	{ 0x807e12, KEY_VOLUMEUP },
+	{ 0x807e15, KEY_VOLUMEDOWN },
+	{ 0x807e0c, KEY_UP },
+	{ 0x807e0e, KEY_DOWN },
+	{ 0x807e0b, KEY_LEFT },
+	{ 0x807e0d, KEY_RIGHT },
+	{ 0x807e09, KEY_HOMEPAGE },
+	{ 0x807e06, KEY_POWER },
+	{ 0x807e03, KEY_SELECT },
+	{ 0x807e02, KEY_BACK },
+	{ 0x807e14, KEY_MUTE },
+	{ 0x807e20, KEY_PLAYPAUSE },
+	{ 0x807e11, KEY_PLAYCD },
+	{ 0x807e08, KEY_PAUSECD },
+	{ 0x807e07, KEY_STOP },
+	{ 0x807e0f, KEY_FASTFORWARD },
+	{ 0x807e0a, KEY_REWIND },
+	{ 0x807e41, KEY_SLEEP },
+	{ 0x807e45, KEY_WAKEUP },
 };
 
 static struct rc_map_list nvidia_map = {

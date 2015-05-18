@@ -21,6 +21,7 @@
 #include <linux/mm.h>		/* for totalram_pages */
 #include <linux/scatterlist.h>
 #include <linux/tegra-soc.h>
+#include <linux/debugfs.h>
 #include <uapi/linux/nvgpu.h>
 #include <linux/vmalloc.h>
 #include <linux/dma-mapping.h>
@@ -54,6 +55,7 @@
 #include "dbg_gpu_gk20a.h"
 #include "debug_gk20a.h"
 #include "semaphore_gk20a.h"
+#include "platform_gk20a.h"
 
 #define BLK_SIZE (256)
 
@@ -644,8 +646,7 @@ int gr_gk20a_ctx_patch_write(struct gk20a *g,
 		 * but be defensive still... */
 		if (!ch_ctx->patch_ctx.mem.cpu_va) {
 			int err;
-			gk20a_err(dev_from_gk20a(g),
-				   "per-write ctx patch begin?");
+			gk20a_dbg_info("per-write ctx patch begin?");
 			/* yes, gr_gk20a_ctx_patch_smpc causes this one */
 			err = gr_gk20a_ctx_patch_write_begin(g, ch_ctx);
 			if (err)
@@ -3390,26 +3391,7 @@ static void gr_gk20a_detect_sm_arch(struct gk20a *g)
 int gr_gk20a_add_zbc_color(struct gk20a *g, struct gr_gk20a *gr,
 			   struct zbc_entry *color_val, u32 index)
 {
-	struct fifo_gk20a *f = &g->fifo;
-	struct fifo_engine_info_gk20a *gr_info = f->engine_info + ENGINE_GR_GK20A;
 	u32 i;
-	unsigned long end_jiffies = jiffies +
-		msecs_to_jiffies(gk20a_get_gr_idle_timeout(g));
-	u32 ret;
-
-	ret = gk20a_fifo_disable_engine_activity(g, gr_info, true);
-	if (ret) {
-		gk20a_err(dev_from_gk20a(g),
-			"failed to disable gr engine activity\n");
-		return ret;
-	}
-
-	ret = gr_gk20a_wait_idle(g, end_jiffies, GR_IDLE_CHECK_DEFAULT);
-	if (ret) {
-		gk20a_err(dev_from_gk20a(g),
-			"failed to idle graphics\n");
-		goto clean_up;
-	}
 
 	/* update l2 table */
 	g->ops.ltc.set_zbc_color_entry(g, color_val, index);
@@ -3444,39 +3426,12 @@ int gr_gk20a_add_zbc_color(struct gk20a *g, struct gr_gk20a *gr,
 	gr->zbc_col_tbl[index].format = color_val->format;
 	gr->zbc_col_tbl[index].ref_cnt++;
 
-clean_up:
-	ret = gk20a_fifo_enable_engine_activity(g, gr_info);
-	if (ret) {
-		gk20a_err(dev_from_gk20a(g),
-			"failed to enable gr engine activity\n");
-	}
-
-	return ret;
+	return 0;
 }
 
 int gr_gk20a_add_zbc_depth(struct gk20a *g, struct gr_gk20a *gr,
 			   struct zbc_entry *depth_val, u32 index)
 {
-	struct fifo_gk20a *f = &g->fifo;
-	struct fifo_engine_info_gk20a *gr_info = f->engine_info + ENGINE_GR_GK20A;
-	unsigned long end_jiffies = jiffies +
-		msecs_to_jiffies(gk20a_get_gr_idle_timeout(g));
-	u32 ret;
-
-	ret = gk20a_fifo_disable_engine_activity(g, gr_info, true);
-	if (ret) {
-		gk20a_err(dev_from_gk20a(g),
-			"failed to disable gr engine activity\n");
-		return ret;
-	}
-
-	ret = gr_gk20a_wait_idle(g, end_jiffies, GR_IDLE_CHECK_DEFAULT);
-	if (ret) {
-		gk20a_err(dev_from_gk20a(g),
-			"failed to idle graphics\n");
-		goto clean_up;
-	}
-
 	/* update l2 table */
 	g->ops.ltc.set_zbc_depth_entry(g, depth_val, index);
 
@@ -3501,14 +3456,7 @@ int gr_gk20a_add_zbc_depth(struct gk20a *g, struct gr_gk20a *gr,
 	gr->zbc_dep_tbl[index].format = depth_val->format;
 	gr->zbc_dep_tbl[index].ref_cnt++;
 
-clean_up:
-	ret = gk20a_fifo_enable_engine_activity(g, gr_info);
-	if (ret) {
-		gk20a_err(dev_from_gk20a(g),
-			"failed to enable gr engine activity\n");
-	}
-
-	return ret;
+	return 0;
 }
 
 void gr_gk20a_pmu_save_zbc(struct gk20a *g, u32 entries)
@@ -3794,13 +3742,47 @@ int gr_gk20a_load_zbc_default_table(struct gk20a *g, struct gr_gk20a *gr)
 	return 0;
 }
 
+static int _gk20a_gr_zbc_set_table(struct gk20a *g, struct gr_gk20a *gr,
+			struct zbc_entry *zbc_val)
+{
+	struct fifo_gk20a *f = &g->fifo;
+	struct fifo_engine_info_gk20a *gr_info = f->engine_info + ENGINE_GR_GK20A;
+	unsigned long end_jiffies;
+	int ret;
+
+	ret = gk20a_fifo_disable_engine_activity(g, gr_info, true);
+	if (ret) {
+		gk20a_err(dev_from_gk20a(g),
+			"failed to disable gr engine activity\n");
+		return ret;
+	}
+
+	end_jiffies = jiffies + msecs_to_jiffies(gk20a_get_gr_idle_timeout(g));
+	ret = gr_gk20a_wait_idle(g, end_jiffies, GR_IDLE_CHECK_DEFAULT);
+	if (ret) {
+		gk20a_err(dev_from_gk20a(g),
+			"failed to idle graphics\n");
+		goto clean_up;
+	}
+
+	ret = gr_gk20a_add_zbc(g, gr, zbc_val);
+
+clean_up:
+	if (gk20a_fifo_enable_engine_activity(g, gr_info)) {
+		gk20a_err(dev_from_gk20a(g),
+			"failed to enable gr engine activity\n");
+	}
+
+	return ret;
+}
+
 int gk20a_gr_zbc_set_table(struct gk20a *g, struct gr_gk20a *gr,
 			struct zbc_entry *zbc_val)
 {
 	gk20a_dbg_fn("");
 
 	return gr_gk20a_elpg_protected_call(g,
-		gr_gk20a_add_zbc(g, gr, zbc_val));
+		_gk20a_gr_zbc_set_table(g, gr, zbc_val));
 }
 
 void gr_gk20a_init_blcg_mode(struct gk20a *g, u32 mode, u32 engine)
@@ -4712,7 +4694,8 @@ static void gk20a_gr_set_alpha_circular_buffer_size(struct gk20a *g, u32 data)
 		gr_pd_ab_dist_cfg1_max_output_granularity_v();
 
 	gk20a_writel(g, gr_pd_ab_dist_cfg1_r(),
-		gr_pd_ab_dist_cfg1_max_output_f(pd_ab_max_output));
+		gr_pd_ab_dist_cfg1_max_output_f(pd_ab_max_output) |
+		gr_pd_ab_dist_cfg1_max_batches_init_f());
 
 	for (gpc_index = 0; gpc_index < gr->gpc_count; gpc_index++) {
 		stride = proj_gpc_stride_v() * gpc_index;
@@ -6928,8 +6911,9 @@ static void gr_gk20a_cb_size_default(struct gk20a *g)
 {
 	struct gr_gk20a *gr = &g->gr;
 
-	gr->attrib_cb_default_size =
-		gr_gpc0_ppc0_cbm_cfg_size_default_v();
+	if (!gr->attrib_cb_default_size)
+		gr->attrib_cb_default_size =
+			gr_gpc0_ppc0_cbm_cfg_size_default_v();
 	gr->alpha_cb_default_size =
 		gr_gpc0_ppc0_cbm_cfg2_size_default_v();
 }
@@ -7283,6 +7267,18 @@ static int gr_gk20a_dump_gr_status_regs(struct gk20a *g,
 		gk20a_readl(g, gr_pri_gpc0_tpc0_tpccs_tpc_exception_r()));
 	gk20a_debug_output(o, "NV_PGRAPH_PRI_GPC0_TPC0_TPCCS_TPC_EXCEPTION_EN: 0x%x\n",
 		gk20a_readl(g, gr_pri_gpc0_tpc0_tpccs_tpc_exception_en_r()));
+	return 0;
+}
+
+int gr_gk20a_debugfs_init(struct gk20a *g)
+{
+	struct gk20a_platform *platform = platform_get_drvdata(g->dev);
+
+	g->debugfs_gr_default_attrib_cb_size =
+		debugfs_create_u32("gr_default_attrib_cb_size",
+				   S_IRUGO|S_IWUSR, platform->debugfs,
+				   &g->gr.attrib_cb_default_size);
+
 	return 0;
 }
 

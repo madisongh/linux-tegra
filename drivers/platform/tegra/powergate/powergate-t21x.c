@@ -18,6 +18,7 @@
 #include <linux/tegra-powergate.h>
 #include <linux/tegra-soc.h>
 #include <linux/platform/tegra/dvfs.h>
+#include <linux/tegra_soctherm.h>
 
 #include "powergate-priv.h"
 #include "powergate-ops-t1xx.h"
@@ -449,6 +450,21 @@ static struct dvfs_rail *gpu_rail;
 
 #define HOTRESET_READ_COUNTS		5
 
+static bool tegra210_pg_is_hotreset_asserted(enum mc_client mc_client_bit)
+{
+	int reg_idx, reg_bit;
+	u32 rst_control_reg;
+
+	if (mc_client_bit == MC_CLIENT_LAST)
+		return false;
+
+	reg_idx = mc_client_bit / 32;
+	reg_bit = mc_client_bit % 32;
+	rst_control_reg = tegra210_mc_reg[reg_idx].control_reg;
+
+	return mc_read(rst_control_reg) & (1 << reg_bit);
+}
+
 static bool tegra210_pg_hotreset_check(u32 status_reg, u32 *status)
 {
 	int i;
@@ -615,6 +631,8 @@ static int tegra210_pg_gpu_powergate(int id)
 
 	udelay(10);
 
+	tegra_soctherm_gpu_tsens_invalidate(1);
+
 	if (gpu_rail) {
 		ret = tegra_dvfs_rail_power_down(gpu_rail);
 		if (ret) {
@@ -656,6 +674,8 @@ static int tegra210_pg_gpu_unpowergate(int id)
 	if (ret)
 		goto err_power;
 
+	tegra_soctherm_gpu_tsens_invalidate(0);
+
 	if (!partition->clk_info[0].clk_ptr)
 		get_clk_info(partition);
 
@@ -683,6 +703,10 @@ static int tegra210_pg_gpu_unpowergate(int id)
 	tegra_clk_disable_unprepare(partition->clk_info[0].clk_ptr);
 	powergate_partition_deassert_reset(partition);
 	tegra_clk_prepare_enable(partition->clk_info[0].clk_ptr);
+
+	/* Flush MC 1st time after boot or SC7 */
+	if (first || !tegra210_pg_is_hotreset_asserted(MC_CLIENT_GPU))
+		tegra_powergate_mc_flush(id);
 
 	udelay(10);
 
@@ -923,11 +947,11 @@ static int __init tegra210_disable_boot_partitions(void)
 {
 	int i;
 
-	pr_err("Disable partitions left on by BL\n");
+	pr_info("Disable partitions left on by BL\n");
 	for (i = 0; i < TEGRA_NUM_POWERGATE; i++)
 		if (tegra210_pg_partition_info[i].disable_after_boot &&
 			(i != TEGRA_POWERGATE_GPU)) {
-			pr_err("    %s\n", tegra210_pg_partition_info[i].name);
+			pr_info("    %s\n", tegra210_pg_partition_info[i].name);
 			tegra_powergate_partition(i);
 		}
 

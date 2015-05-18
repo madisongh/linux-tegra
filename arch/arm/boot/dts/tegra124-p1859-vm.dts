@@ -41,6 +41,13 @@
 	compatible = "nvidia,p1859", "nvidia,tegra124";
 	nvidia,dtsfilename = __FILE__;
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "p1859";
+		};
+	};
+
 	tegra_hv_wdt {
 		compatible = "nvidia,tegra-hv-wdt";
 		status = "okay";
@@ -143,6 +150,22 @@
 		vic {
 			compatible = "nvidia,tegra124-vhost-vic";
 		};
+
+		vi {
+			compatible = "nvidia,tegra124-vhost-vi";
+		};
+
+		isp@54600000 {
+			compatible = "nvidia,tegra124-vhost-isp";
+		};
+
+		isp@54680000 {
+			compatible = "nvidia,tegra124-vhost-isp";
+		};
+
+		msenc {
+			compatible = "nvidia,tegra124-vhost-msenc";
+		};
 	};
 
 	gk20a {
@@ -157,5 +180,13 @@
 
 		ivc-queue3 = <&tegra_hv 6>;
 		ivc-queue4 = <&tegra_hv 7>;
+	};
+
+	sdhci@700b0200 {
+		status = "disabled";
+	};
+
+	tegra-carveouts {
+		iommus = <&smmu TEGRA_SWGROUP_HC>;
 	};
 };

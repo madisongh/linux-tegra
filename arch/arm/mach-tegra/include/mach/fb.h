@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@google.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -42,9 +42,12 @@ void tegra_fb_update_monspecs(struct tegra_fb_info *fb_info,
 						  struct fb_videomode *mode));
 void tegra_fb_update_fix(struct tegra_fb_info *fb_info,
 				struct fb_monspecs *specs);
+struct fb_var_screeninfo *tegra_fb_get_var(struct tegra_fb_info *fb_info);
 int tegra_fb_create_sysfs(struct device *dev);
 void tegra_fb_remove_sysfs(struct device *dev);
 int tegra_fb_update_modelist(struct tegra_dc *dc, int fblistindex);
+struct tegra_dc_win *tegra_fb_get_win(struct tegra_fb_info *tegra_fb);
+void tegra_fb_frame_update(struct tegra_fb_info *tegra_fb);
 #else
 static inline struct tegra_fb_info *tegra_fb_register(
 	struct platform_device *ndev, struct tegra_dc *dc,
@@ -72,6 +75,11 @@ static inline void tegra_fb_update_fix(struct tegra_fb_info *fb_info,
 {
 }
 
+static struct fb_var_screeninfo *tegra_fb_get_var(struct tegra_fb_info *fb_info)
+{
+	return NULL;
+}
+
 static inline int tegra_fb_create_sysfs(struct device *dev)
 {
 	return -ENOENT;
@@ -80,6 +88,15 @@ static inline int tegra_fb_create_sysfs(struct device *dev)
 static inline void tegra_fb_remove_sysfs(struct device *dev)
 {
 }
-#endif
 
+static inline struct tegra_dc_win *tegra_fb_get_win(
+				struct tegra_fb_info *tegra_fb)
+{
+	return NULL;
+}
+
+static inline void tegra_fb_frame_update(struct tegra_fb_info *tegra_fb)
+{
+}
+#endif
 #endif

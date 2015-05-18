@@ -49,6 +49,13 @@
 	compatible = "nvidia,loki-e", "nvidia,tegra210";
 	nvidia,fastboot-usb-pid = <0xb420>;
 
+	firmware {
+		android {
+			compatible = "android,firmware";
+			hardware = "loki_e";
+		};
+	};
+
 	i2c@7000c500 {
 		battery-charger@6b {
 			charger {
@@ -60,6 +67,7 @@
 			interrupt-parent = <&gpio>;
 			interrupts = <TEGRA_GPIO(V, 3) 0x0>;
 			dt-override-status-odm-data = <0x00C00000 0x00400000>;
+			ti,full-charge-capacity = <6500>;
 		};
 	};
 
@@ -202,21 +210,32 @@
 
 	adsp_audio {
 		compr-ops = <1>;
-		num-plugin = <3>;
+		num-plugin = <5>;
 		plugin-info-1 {
 			plugin-name = "mp3-dec1";
 			firmware-name = "nvmp3dec.elf";
 			widget-name = "MP3-DEC1";
 		};
 		plugin-info-2 {
-			plugin-name = "mp3-dec2";
-			firmware-name = "nvmp3dec.elf";
-			widget-name = "MP3-DEC2";
-		};
-		plugin-info-3 {
 			plugin-name = "spkprot";
 			firmware-name = "nvspkprot.elf";
 			widget-name = "SPKPROT-SW";
+		};
+		plugin-info-3 {
+			plugin-name = "src";
+			firmware-name = "nvsrc.elf";
+			widget-name = "SRC";
+		};
+		plugin-info-4 {
+			plugin-name = "aac-dec1";
+			firmware-name = "nvaacdec.elf";
+			widget-name = "AAC-DEC1";
+		};
+		plugin-info-5 {
+			plugin-name = "aec";
+			firmware-name = "libnvaecfx.elf";
+			widget-name = "AEC";
+			param-type = <2>; /* SNDRV_CTL_ELEM_TYPE_INTEGER */
 		};
 	};
 
@@ -642,5 +661,9 @@
 		status = "okay";
 		edp-consumer-name = "shieldled";
 		disable-on-kernel-charging;
+	};
+
+	serial@70006300 {
+		dma-names = "tx";
 	};
 };

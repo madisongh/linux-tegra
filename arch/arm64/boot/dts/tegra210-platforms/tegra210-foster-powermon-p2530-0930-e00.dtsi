@@ -28,7 +28,7 @@
 			#io-channel-cells = <1>;
 			channel@0 {
 				reg = <0x0>;
-				ti,rail-name = "VDD_BATT";
+				ti,rail-name = "VDD_MAIN_BOARD";
 				ti,shunt-resistor-mohm = <5>;
 				ti,current-critical-limit-ma = <8000>;
 			};
@@ -42,7 +42,7 @@
 
 			channel@2 {
 				reg = <0x2>;
-				ti,rail-name = "VDD_MODEM";
+				ti,rail-name = "VDD_CPU";
 				ti,shunt-resistor-mohm = <5>;
 			};
 		};

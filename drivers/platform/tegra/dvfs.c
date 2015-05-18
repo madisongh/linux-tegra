@@ -471,7 +471,8 @@ static int dvfs_rail_set_voltage(struct dvfs_rail *rail, int millivolts)
 	jmp_to_zero = rail->jmp_to_zero &&
 			((millivolts == 0) || (rail->millivolts == 0));
 
-	if (jmp_to_zero || rail->dfll_mode)
+	if (jmp_to_zero || rail->dfll_mode ||
+	    (rail->in_band_pm && rail->stats.off))
 		steps = 1;
 	else
 		steps = DIV_ROUND_UP(abs(millivolts - rail->millivolts), step);
@@ -1705,7 +1706,8 @@ static bool __init can_skip_dvfs_on_clk(struct clk *c, struct dvfs *d,
 	 * to maximum rate, and it is not a shared bus (the latter condition is
 	 * added, because shared buses may define possible rates based on DVFS)
 	 */
-	if (!c->ops->shared_bus_update && max_rate_updated &&
+	if (max_rate_updated &&
+	    !c->ops->shared_bus_update && !(c->flags & PERIPH_ON_CBUS) &&
 	    (d->dvfs_rail->min_millivolts == d->dvfs_rail->nominal_millivolts))
 		return true;
 
@@ -2197,8 +2199,13 @@ static int __init of_rail_get_cdev(struct dvfs_rail *rail, char *phandle_name,
 	struct device_node *cdev_dn =
 		 of_parse_phandle(rail->dt_node, phandle_name, 0);
 
+	if (cdev_dn && !of_device_is_available(cdev_dn)) {
+		pr_info("tegra_dvfs: %s: %s is disabled in DT\n",
+		       rail->reg_id, phandle_name);
+		return -ENOSYS;
+	}
+
 	if (!cdev_dn || !tegra_cdev->compatible ||
-	    !of_device_is_available(cdev_dn) ||
 	    !of_device_is_compatible(cdev_dn, tegra_cdev->compatible)) {
 		pr_err("tegra_dvfs: %s: no compatible %s is available in DT\n",
 		       rail->reg_id, phandle_name);
@@ -2215,18 +2222,32 @@ static int __init of_rail_get_cdev(struct dvfs_rail *rail, char *phandle_name,
 
 static int __init of_rail_init_cdev_nodes(struct dvfs_rail *rail)
 {
-	if (rail->vts_cdev)
-		of_rail_get_cdev(rail, "scaling-cdev", rail->vts_cdev);
+	int ret;
 
-	if (rail->vmin_cdev)
-		of_rail_get_cdev(rail, "vmin-cdev", rail->vmin_cdev);
+	if (rail->vts_cdev) {
+		ret = of_rail_get_cdev(rail, "scaling-cdev", rail->vts_cdev);
+		if (ret == -ENOSYS)
+			rail->vts_cdev = NULL;
+	}
 
-	if (rail->vmax_cdev)
-		of_rail_get_cdev(rail, "vmax-cdev", rail->vmax_cdev);
+	if (rail->vmin_cdev) {
+		ret = of_rail_get_cdev(rail, "vmin-cdev", rail->vmin_cdev);
+		if (ret == -ENOSYS)
+			rail->vmin_cdev = NULL;
+	}
 
-	if (rail->clk_switch_cdev)
-		of_rail_get_cdev(rail, "clk-switch-cdev",
-				 rail->clk_switch_cdev);
+	if (rail->vmax_cdev) {
+		ret = of_rail_get_cdev(rail, "vmax-cdev", rail->vmax_cdev);
+		if (ret == -ENOSYS)
+			rail->vmax_cdev = NULL;
+	}
+
+	if (rail->clk_switch_cdev) {
+		ret = of_rail_get_cdev(rail, "clk-switch-cdev",
+				       rail->clk_switch_cdev);
+		if (ret == -ENOSYS)
+			rail->clk_switch_cdev = NULL;
+	}
 
 	return 0;
 }
@@ -3048,8 +3069,7 @@ int tegra_dvfs_rail_dfll_mode_set_cold(struct dvfs_rail *rail,
 	mutex_lock(&dvfs_lock);
 	if (rail->dfll_mode) {
 		int mv, cmp;
-		cmp = tegra_cl_dvfs_vmin_cmp_needed(
-			tegra_dfll_get_cl_dvfs_data(dfll_clk), &mv);
+		cmp = tegra_dvfs_cmp_dfll_vmin_tfloor(dfll_clk, &mv);
 		if (cmp < 0)
 			ret = dvfs_rail_set_voltage_reg(rail, mv);
 	}
