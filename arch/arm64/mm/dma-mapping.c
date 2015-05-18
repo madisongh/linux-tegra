@@ -101,6 +101,9 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page, gfp_t flags)
 
 static bool __in_atomic_pool(void *start, size_t size)
 {
+	if (!atomic_pool)
+		return false;
+
 	return addr_in_gen_pool(atomic_pool, (unsigned long)start, size);
 }
 
@@ -401,6 +404,7 @@ static int __init atomic_pool_init(void)
 	pgprot_t prot = __pgprot(PROT_NORMAL_NC);
 	unsigned long nr_pages = atomic_pool_size >> PAGE_SHIFT;
 	struct page *page;
+	struct page **pages = NULL;
 	void *addr;
 	unsigned int pool_size_order = get_order(atomic_pool_size);
 
@@ -411,7 +415,7 @@ static int __init atomic_pool_init(void)
 		page = alloc_pages(GFP_DMA, pool_size_order);
 
 	if (page) {
-		int ret;
+		int ret, i = 0;
 		void *page_addr = page_address(page);
 
 		memset(page_addr, 0, atomic_pool_size);
@@ -421,8 +425,17 @@ static int __init atomic_pool_init(void)
 		if (!atomic_pool)
 			goto free_page;
 
-		addr = dma_common_contiguous_remap(page, atomic_pool_size,
-					VM_USERMAP, prot, atomic_pool_init);
+		pages = kmalloc(sizeof(struct page *) << pool_size_order,
+				GFP_KERNEL);
+		if (!pages)
+			goto free_page;
+
+		for (; i < nr_pages; i++)
+			pages[i] = page + i;
+
+		addr = dma_common_pages_remap(pages, atomic_pool_size,
+					VM_ARM_DMA_CONSISTENT | VM_USERMAP,
+					prot, atomic_pool_init);
 
 		if (!addr)
 			goto destroy_genpool;
@@ -444,10 +457,12 @@ static int __init atomic_pool_init(void)
 	goto out;
 
 remove_mapping:
-	dma_common_free_remap(addr, atomic_pool_size, VM_USERMAP);
+	dma_common_free_remap(addr, atomic_pool_size,
+			      VM_ARM_DMA_CONSISTENT | VM_USERMAP);
 destroy_genpool:
 	gen_pool_destroy(atomic_pool);
 	atomic_pool = NULL;
+	kfree(pages);
 free_page:
 	if (!dma_release_from_contiguous(NULL, page, nr_pages))
 		__free_pages(page, pool_size_order);
@@ -1962,20 +1977,31 @@ static int __iommu_remove_mapping(struct device *dev, dma_addr_t iova,
 static struct page **__iommu_get_pages(void *cpu_addr, struct dma_attrs *attrs)
 {
 	struct vm_struct *area;
+	int offset = 0;
 
-	if (__in_atomic_pool(cpu_addr, PAGE_SIZE))
-#if 1
-		BUG(); /* TODO: find implementation for gen_pool */
-#else
-		return __atomic_get_pages(cpu_addr);
-#endif
+	if (__in_atomic_pool(cpu_addr, PAGE_SIZE)) {
+		phys_addr_t phys = gen_pool_virt_to_phys(atomic_pool,
+						(unsigned long)cpu_addr);
+		struct gen_pool_chunk *chunk;
+
+		rcu_read_lock();
+		/* NOTE: this works as only a single chunk is present
+		 * for atomic pool
+		 */
+		chunk = list_first_or_null_rcu(&atomic_pool->chunks,
+					       struct gen_pool_chunk,
+					       next_chunk);
+		phys -= chunk->phys_addr;
+		rcu_read_unlock();
+		offset = phys >> PAGE_SHIFT;
+	}
 
 	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
 		return cpu_addr;
 
 	area = find_vm_area(cpu_addr);
 	if (area && (area->flags & VM_ARM_DMA_CONSISTENT))
-		return area->pages;
+		return &area->pages[offset];
 	return NULL;
 }
 
