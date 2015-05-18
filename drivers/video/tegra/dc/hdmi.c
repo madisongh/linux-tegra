@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (c) 2010-2014, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -749,6 +749,9 @@ static inline void tegra_dc_hdmi_debug_create(struct tegra_dc_hdmi_data *hdmi)
 
 #define PIXCLOCK_TOLERANCE	200
 
+static unsigned long  tegra12x_hdmi_determine_parent(
+	const struct tegra_dc *dc, struct clk *parent_clk, int pclk);
+
 static int tegra_dc_calc_clock_per_frame(const struct fb_videomode *mode)
 {
 	return (mode->left_margin + mode->xres +
@@ -808,6 +811,12 @@ bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
 					struct fb_videomode *mode)
 {
 	long total_clocks;
+	unsigned long rate; /* Parent Rate */
+	unsigned long pclk; /* Requested Rate */
+	unsigned long div;
+	int pixclock;
+	struct clk *parent_clk = clk_get_sys(NULL,
+			dc->out->parent_clk ? : "pll_d_out0");
 
 #ifndef CONFIG_ARCH_TEGRA_12x_SOC
 	if (mode->vmode & FB_VMODE_INTERLACED)
@@ -846,6 +855,26 @@ bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
 		mode->lower_margin++;
 		mode->upper_margin--;
 	}
+
+	/* Eleminate all pclk which does not qualify [-1, +9] % range of
+	 * requested pixel clock.
+	 */
+	pixclock = PICOS2KHZ(mode->pixclock) * 1000;
+#if defined(CONFIG_ARCH_TEGRA_12x_SOC)
+	rate = tegra12x_hdmi_determine_parent(dc, parent_clk, pixclock);
+#else
+	rate = pixclock * 2;
+	while (rate < 500000000)
+		rate *= 2;
+#endif
+	div = DIV_ROUND_UP(rate * 2, pixclock);
+	if (div < 2)
+		pclk = 0;
+	else
+		pclk = rate * 2 / div;
+	if (!pclk || pclk < (pixclock / 100 * 99) ||
+			pclk > (pixclock / 100 * 109))
+		return false;
 
 	/* even after fix-ups the mode still isn't supported */
 	if (!tegra_dc_check_constraint(mode))
@@ -2164,7 +2193,7 @@ static void tegra_dc_hdmi_disable(struct tegra_dc *dc)
  *  - return: best parent clock rate in Hz
  */
 static unsigned long  tegra12x_hdmi_determine_parent(
-	struct tegra_dc *dc, struct clk *parent_clk, int pclk)
+	const struct tegra_dc *dc, struct clk *parent_clk, int pclk)
 {
 	/* T124 hdmi pclk:
 	 *   parentClk = pclk * m  (m=1,1.5,2,2.5,...,128.5)
@@ -2180,16 +2209,13 @@ static unsigned long  tegra12x_hdmi_determine_parent(
 	/* following parameters should come from parent clock */
 	const int  ref  = 12000000;   /* reference clock to parent */
 	const int  pmax = 600000000;  /* max freq of parent clock */
-	const int  pmin = 200000000;  /* min freq of parent clock */
 
 	b = 0;
 	fr = 1000;
 	for (n = 4; (ref / 2 * n) <= pmax; n++) {
-		if ((ref / 2 * n) < pmin)  /* too low */
+		if ((ref / 2 * n) < pclk)  /* too low */
 			continue;
 		m = DIV_ROUND_UP((ref / 2 * n), (pclk / 1000));
-		if (m <= 1700)  /* for 2 <= m */
-			continue;
 		f = m % 1000;  /* fractional parts */
 		f = (0 == f) ? f : (1000 - f);  /* round-up */
 		if (0 == f) {  /* exact match */
