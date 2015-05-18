@@ -53,7 +53,7 @@
 	#size-cells = <2>;
 
 	chosen {
-		bootargs = "earlycon=uart8250,mmio32,0x70006000 androidboot.hardware=e2190";
+		bootargs = "earlycon=uart8250,mmio32,0x70006000";
 	};
 
 	firmware {

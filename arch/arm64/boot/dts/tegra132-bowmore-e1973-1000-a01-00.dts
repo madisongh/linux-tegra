@@ -41,7 +41,7 @@
 	#size-cells = <2>;
 
 	chosen {
-		bootargs = "tegraid=40.0.0.00.00 vmalloc=256M video=tegrafb earlycon=uart8250,mmio32,0x70006300 androidboot.hardware=bowmore";
+		bootargs = "tegraid=40.0.0.00.00 vmalloc=256M video=tegrafb earlycon=uart8250,mmio32,0x70006300";
 		stdout-path = &uartd;
 		linux,initrd-start = <0x85000000>;
 		linux,initrd-end = <0x851bc400>;

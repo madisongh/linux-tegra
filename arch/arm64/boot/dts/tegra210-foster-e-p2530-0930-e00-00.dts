@@ -30,7 +30,7 @@
 	nvidia,fastboot-usb-pid = <0xb421>;
 
 	chosen {
-		bootargs = "earlycon=uart8250,mmio32,0x70006000 androidboot.hardware=foster_e";
+		bootargs = "earlycon=uart8250,mmio32,0x70006000";
 	};
 
 	firmware {

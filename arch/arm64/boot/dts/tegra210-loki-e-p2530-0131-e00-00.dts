@@ -28,7 +28,7 @@
 	nvidia,dtsfilename = __FILE__;
 
 	chosen {
-		bootargs = "earlycon=uart8250,mmio32,0x70006000 androidboot.hardware=loki_e_base";
+		bootargs = "earlycon=uart8250,mmio32,0x70006000";
 	};
 
 	firmware {
