@@ -11037,6 +11037,8 @@ static int __init tegra21x_clk_late_init(void)
 {
 	tegra_clk_disable_unprepare(&tegra_pll_re_vco);
 	tegra_clk_disable_unprepare(tegra_get_clock_by_name("boot.apb.sclk"));
+	if (of_property_read_bool(of_chosen, "nvidia,gpu_clk_to_max_on_boot"))
+		clk_set_rate(tegra_get_clock_by_name("gm20b.gbus"), UINT_MAX);
 	return 0;
 }
 late_initcall(tegra21x_clk_late_init);
