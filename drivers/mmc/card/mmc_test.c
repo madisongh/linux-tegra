@@ -23,6 +23,7 @@
 #include <linux/uaccess.h>
 #include <linux/seq_file.h>
 #include <linux/module.h>
+#include <linux/kernel.h>
 
 #define RESULT_OK		0
 #define RESULT_FAIL		1
@@ -2973,7 +2974,7 @@ static int mmc_test_extract_parameters(char *data_buf)
 	*/
 
 	while ((token = strsep(&running, delimiters))) {
-		if (strict_strtol(token, 10, &value)) {
+		if (kstrtol(token, 10, &value)) {
 			/* [Param1 value1] combination
 			 * Compare with available param list
 			 */
@@ -2984,7 +2985,7 @@ static int mmc_test_extract_parameters(char *data_buf)
 					 * value and save it
 					 */
 					token = strsep(&running, delimiters);
-					if (strict_strtol(token, 10,
+					if (kstrtol(token, 10,
 					    &(mmc_test_parameter[i].value))) {
 
 						printk(KERN_ERR "wrong parameter value\n");

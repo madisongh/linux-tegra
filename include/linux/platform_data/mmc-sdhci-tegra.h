@@ -63,6 +63,7 @@ struct tegra_sdhci_platform_data {
 	int nominal_vcore_mv;
 	int min_vcore_override_mv;
 	int boot_vcore_mv;
+	u32 cpu_speedo;
 	unsigned int max_clk_limit;
 	unsigned int ddr_clk_limit;
 	unsigned int tap_delay;
