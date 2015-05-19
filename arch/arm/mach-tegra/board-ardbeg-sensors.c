@@ -302,6 +302,45 @@ static struct platform_device ardbeg_ar0261_soc_camera_device = {
 };
 #endif
 
+#if IS_ENABLED(CONFIG_SOC_CAMERA_AR0330)
+static int ardbeg_ar0330_power(struct device *dev, int enable)
+{
+	return 0;
+}
+
+struct ar0330_platform_data ardbeg_ar0330_data;
+
+static struct i2c_board_info ardbeg_ar0330_camera_i2c_device = {
+	I2C_BOARD_INFO("ar0330_v4l2", 0x18),
+	.platform_data = &ardbeg_ar0330_data,
+};
+
+static struct tegra_camera_platform_data ardbeg_ar0330_camera_platform_data = {
+	.flip_v			= 0,
+	.flip_h			= 0,
+	.port			= TEGRA_CAMERA_PORT_CSI_A,
+	.lanes			= 1,
+	.continuous_clk		= 0,
+};
+
+static struct soc_camera_link ar0330_iclink = {
+	.bus_id		= 0, /* This must match the .id of tegra_vi01_device */
+	.board_info	= &ardbeg_ar0330_camera_i2c_device,
+	.module_name	= "ar0330_v4l2",
+	.i2c_adapter_id	= 2,
+	.power		= ardbeg_ar0330_power,
+	.priv		= &ardbeg_ar0330_camera_platform_data,
+};
+
+static struct platform_device ardbeg_ar0330_soc_camera_device = {
+	.name	= "soc-camera-pdrv",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &ar0330_iclink,
+	},
+};
+#endif
+
 static struct regulator *ardbeg_vcmvdd;
 
 static int ardbeg_get_extra_regulators(void)
@@ -1516,6 +1555,9 @@ static int ardbeg_camera_init(void)
 
 #if IS_ENABLED(CONFIG_SOC_CAMERA_AR0261)
 	platform_device_register(&ardbeg_ar0261_soc_camera_device);
+#endif
+#if IS_ENABLED(CONFIG_SOC_CAMERA_AR0330)
+	platform_device_register(&ardbeg_ar0330_soc_camera_device);
 #endif
 	return 0;
 }
