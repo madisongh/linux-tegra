@@ -199,6 +199,8 @@
 	};
 
 	chosen {
+		nvidia,t210-vcm31-sku;
+		nvidia,gpu_clk_to_max_on_boot;
 	};
 
 	pmc@7000e400 {
