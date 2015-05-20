@@ -2603,7 +2603,7 @@ char *sk_get_waiting_task_cmdline(struct sock *sk, char *cmdline)
 	char *program_name = cmdline;
 	struct task_struct *task = NULL;
 	struct mm_struct *mm = NULL;
-	char *apk_path_prefix = "/data/data";
+	char *apk_path_prefix = "/data/data/";
 	wait_queue_t *wq = NULL;
 	struct list_head *lh = NULL;
 	struct socket_wq *sk_wq = NULL;
@@ -2662,7 +2662,7 @@ char *sk_get_waiting_task_cmdline(struct sock *sk, char *cmdline)
 		task = SOCK_INODE(sk->sk_socket)->i_private;
 
 	if (!task) {
-		pr_err("Can't find a process for this sock.\n");
+		pr_warning("Can't find a process for this sock.\n");
 		goto out;
 	}
 
@@ -2678,10 +2678,6 @@ char *sk_get_waiting_task_cmdline(struct sock *sk, char *cmdline)
 		if (len > APK_NAME_MAX_LEN)
 			len = APK_NAME_MAX_LEN;
 
-		if (softirq_count()) {
-			softirq_enabled = true;
-			local_bh_enable();
-		}
 		res = access_process_vm(task, mm->arg_start, cmdline, len, 0);
 
 		if (res > 0 && cmdline[res-1] != '\0' && len < APK_NAME_MAX_LEN) {
@@ -2689,8 +2685,6 @@ char *sk_get_waiting_task_cmdline(struct sock *sk, char *cmdline)
 			if (len < res)
 				res = len;
 		}
-		if (softirq_enabled)
-			local_bh_disable();
 
 		if (res > APK_NAME_MAX_LEN)
 			cmdline[APK_NAME_MAX_LEN-1] = '\0';
