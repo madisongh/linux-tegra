@@ -1,6 +1,8 @@
 /*
  *  linux/include/linux/mmc/host.h
  *
+ *  Copyright (c) 2013-2015, NVIDIA CORPORATION. All Rights Reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -19,6 +21,10 @@
 #include <linux/mmc/core.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/pm.h>
+
+#define SAVE_TUNED_TAP	0
+#define SET_DEFAULT_TAP	1
+#define SET_TUNED_TAP	2
 
 struct mmc_ios {
 	unsigned int	clock;			/* clock rate */
@@ -63,6 +69,7 @@ struct mmc_ios {
 #define MMC_TIMING_MMC_DDR52	8
 #define MMC_TIMING_MMC_HS200	9
 #define MMC_TIMING_MMC_HS400	10
+#define MMC_TIMINGS_MAX_MODES  (MMC_TIMING_MMC_HS400 + 1)
 
 	unsigned char	signal_voltage;		/* signalling voltage (1.8V or 3.3V) */
 
@@ -137,7 +144,10 @@ struct mmc_host_ops {
 
 	/* Prepare HS400 target operating frequency depending host driver */
 	int	(*prepare_hs400_tuning)(struct mmc_host *host, struct mmc_ios *ios);
-	int	(*select_drive_strength)(unsigned int max_dtr, int host_drv, int card_drv);
+	int	(*validate_sd2_0)(struct mmc_host *host);
+	int	(*select_drive_strength)(struct mmc_host *host,
+					 unsigned int max_dtr,
+					 int host_drv, int card_drv);
 	void	(*hw_reset)(struct mmc_host *host);
 	void	(*card_event)(struct mmc_host *host);
 
@@ -147,6 +157,8 @@ struct mmc_host_ops {
 	 */
 	int	(*multi_io_quirk)(struct mmc_card *card,
 				  unsigned int direction, int blk_size);
+	void	(*post_init)(struct mmc_host *host);
+	void	(*en_strobe)(struct mmc_host *host);
 };
 
 struct mmc_card;
@@ -154,7 +166,18 @@ struct device;
 
 struct mmc_async_req {
 	/* active mmc request */
+	struct mmc_request	*mrq_que;
 	struct mmc_request	*mrq;
+#define MMC_QUEUE_BEFORE_ENQ			(0)	/* mrq is entered in driver */
+#define MMC_QUEUE_ENQ					(1)	/* mrq is enqueued in device */
+#define MMC_QUEUE_BEFORE_QRDY			(2)	/* mrq is 44/45 issue & wait for qrdy */
+#define MMC_QUEUE_BEFORE_TRAN			(3)	/* mrq is checking qrdy & ready to transfer */
+#define MMC_QUEUE_TRAN					(4)	/* mrq is transfer */
+#define MMC_QUEUE_BUSY					(5) /* mrq is transfer done & cheking busy in case of write */
+#define MMC_QUEUE_WAIT_DONE				(6) /* mrq is transfer done & cheking busy in case of write */
+#define MMC_QUEUE_BEFORE_POST			(7) /* mrq is terminated transfer including busy check & ready to post process */
+	unsigned long		state;
+	unsigned int		prio;
 	/*
 	 * Check error status of completed mmc request.
 	 * Returns 0 if success otherwise non zero.
@@ -196,6 +219,30 @@ struct mmc_context_info {
 	spinlock_t		lock;
 };
 
+#define EMMC_MAX_QUEUE_DEPTH		(16)
+#define EMMC_MIN_RT_CLASS_TAG_COUNT	(14)
+
+#ifdef CONFIG_CMD_DUMP
+#define dbg_max_cnt (400)
+struct dbg_run_host_log {
+	unsigned long long time_sec;
+	unsigned long long time_usec;
+	int type;
+	int cmd;
+	int arg;
+};
+#endif
+enum transfer_flags {
+	MMC_QUEUE_WRITE_NORMAL,
+	MMC_QUEUE_READ_NORMAL,
+#ifdef CONFIG_SKIP_QUEUE_CHECK
+	MMC_QUEUE_WRITE_SKIP,
+	MMC_QUEUE_READ_SKIP,
+#endif
+	MMC_QUEUE_ALL
+};
+#define MMC_QUEUE_WRITE		0
+#define MMC_QUEUE_READ		1
 struct regulator;
 
 struct mmc_supply {
@@ -290,6 +337,11 @@ struct mmc_host {
 #define MMC_CAP2_HS400		(MMC_CAP2_HS400_1_8V | \
 				 MMC_CAP2_HS400_1_2V)
 #define MMC_CAP2_SDIO_IRQ_NOTHREAD (1 << 17)
+#define MMC_CAP2_EN_STROBE	(1 << 18)       /* can support enhanced strobe*/
+#define MMC_CAP2_HS533		(1 << 19)       /* can support HS533*/
+#define MMC_CAP2_CQ		(1 << 20)       /* can support CQ*/
+#define MMC_CAP2_NO_SLEEP_CMD	(1 << 21)	/* cannot support sleep mode */
+#define MMC_CAP2_SINGLE_POWERON (1 << 22)	/* Host can power up in single step */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
@@ -304,6 +356,7 @@ struct mmc_host {
 	struct device_attribute clkgate_delay_attr;
 	unsigned long           clkgate_delay;
 #endif
+	bool			skip_host_clkgate;
 
 	/* host specific block data */
 	unsigned int		max_seg_size;	/* see blk_queue_max_segment_size */
@@ -331,6 +384,7 @@ struct mmc_host {
 	int			rescan_entered;	/* used with nonremovable devices */
 
 	bool			trigger_card_event; /* card_event necessary */
+	bool			rem_card_present; /* Removable card presence status */
 
 	struct mmc_card		*card;		/* device attached to this host */
 
@@ -364,6 +418,31 @@ struct mmc_host {
 	struct mmc_async_req	*areq;		/* active async req */
 	struct mmc_context_info	context_info;	/* async synchronization info */
 
+	struct mmc_async_req	*areq_que[EMMC_MAX_QUEUE_DEPTH];
+	struct mmc_async_req	*areq_cur;
+	atomic_t		areq_cnt;
+	atomic_t		read_cnt;
+	spinlock_t		que_lock;
+#define GC_NOT_OPERATE	0
+#define GC_OPERATE		1
+#define GC_UNKNOWN		2
+#ifdef CONFIG_GC_SEPERATE
+	atomic_t		gc_status;
+#endif
+	spinlock_t		cmd_dump_lock;
+	unsigned long		state;
+#define MMC_CMDQ_IDLE		(0)
+#define MMC_CMDQ_CMD		(1 << 0)
+#define MMC_CMDQ_DAT		(1 << 1)
+#define MMC_CMDQ_QRDY		(1 << 2)
+	wait_queue_head_t	cmp_que;
+	struct mmc_command	chk_cmd;
+	struct mmc_request	chk_mrq;
+	struct mmc_command	que_cmd;
+	struct mmc_request	que_mrq;
+#define MMC_QUEUE_STATE_MAX		8
+	unsigned int mmc_queue_state_sum[2][MMC_QUEUE_STATE_MAX];
+
 #ifdef CONFIG_FAIL_MMC_REQUEST
 	struct fault_attr	fail_mmc_request;
 #endif
@@ -375,6 +454,18 @@ struct mmc_host {
 	int			dsr_req;	/* DSR value is valid */
 	u32			dsr;	/* optional driver stage (DSR) value */
 
+	int				need_tuning;
+	int				ready_tuning;
+#ifdef CONFIG_GC_SEPERATE
+	atomic_t		cmd13p_count;
+	atomic_t		cmd13p_write_first;
+	struct delayed_work poll_ready;
+#endif
+#ifdef CONFIG_CMD_DUMP
+	struct dbg_run_host_log dbg_run_host_log_dat[dbg_max_cnt];
+	int dbg_host_cnt;
+#endif
+
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
 	struct {
 		struct sdio_cis			*cis;
@@ -383,7 +474,11 @@ struct mmc_host {
 		int				num_funcs;
 	} embedded_sdio_data;
 #endif
-
+#ifdef CONFIG_EMMC_BLKTRACE
+	struct mmc_queue	*mq;
+	struct mmc_queue_req	*mqrq_cur;	/* for mmc trace */
+	struct mmc_queue_req	*mqrq_prev;	/* for mmc trace */
+#endif
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
@@ -417,6 +512,14 @@ int mmc_power_restore_host(struct mmc_host *host);
 
 void mmc_detect_change(struct mmc_host *, unsigned long delay);
 void mmc_request_done(struct mmc_host *, struct mmc_request *);
+#define MMC_HANDLE_QUE_READY	(0)
+#define MMC_HANDLE_SET_CMD	(1)
+#define MMC_HANDLE_CLR_CMD	(2)
+#define MMC_HANDLE_SET_DAT	(3)
+#define MMC_HANDLE_CLR_DAT	(4)
+extern void mmc_handle_queued_request(struct mmc_host *host, int flag);
+extern int mmc_blk_end_queued_req(struct mmc_host *host,
+			struct mmc_async_req *areq, int index, int status);
 
 static inline void mmc_signal_sdio_irq(struct mmc_host *host)
 {
@@ -449,6 +552,9 @@ static inline int mmc_regulator_set_ocr(struct mmc_host *mmc,
 int mmc_regulator_get_supply(struct mmc_host *mmc);
 
 int mmc_pm_notify(struct notifier_block *notify_block, unsigned long, void *);
+int mmc_speed_class_control(struct mmc_host *host,
+	unsigned int speed_class_ctrl_arg);
+
 
 static inline int mmc_card_is_removable(struct mmc_host *host)
 {
@@ -533,6 +639,12 @@ static inline bool mmc_card_ddr52(struct mmc_card *card)
 static inline bool mmc_card_hs400(struct mmc_card *card)
 {
 	return card->host->ios.timing == MMC_TIMING_MMC_HS400;
+}
+
+static inline bool mmc_card_hs533(struct mmc_card *card)
+{
+	return ((card->host->ios.timing == MMC_TIMING_MMC_HS400) &&
+		(card->host->caps2 & MMC_CAP2_HS533));
 }
 
 #endif /* LINUX_MMC_HOST_H */

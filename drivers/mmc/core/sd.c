@@ -5,6 +5,8 @@
  *  SD support Copyright (C) 2004 Ian Molton, All Rights Reserved.
  *  Copyright (C) 2005-2007 Pierre Ossman, All Rights Reserved.
  *
+ *  Copyright (c) 2013-2015, NVIDIA CORPORATION. All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -192,7 +194,6 @@ static int mmc_decode_scr(struct mmc_card *card)
 	struct sd_scr *scr = &card->scr;
 	unsigned int scr_struct;
 	u32 resp[4];
-
 	resp[3] = card->raw_scr[1];
 	resp[2] = card->raw_scr[0];
 
@@ -216,6 +217,7 @@ static int mmc_decode_scr(struct mmc_card *card)
 
 	if (scr->sda_spec3)
 		scr->cmds = UNSTUFF_BITS(resp, 32, 2);
+
 	return 0;
 }
 
@@ -264,6 +266,7 @@ static int mmc_read_ssr(struct mmc_card *card)
 				card->ssr.erase_timeout = (et * 1000) / es;
 				card->ssr.erase_offset = eo * 1000;
 			}
+			card->speed_class = UNSTUFF_BITS(ssr, 440 - 384, 8);
 		} else {
 			pr_warn("%s: SD Status: Invalid Allocation Unit size\n",
 				mmc_hostname(card->host));
@@ -429,7 +432,7 @@ static int sd_select_driver_type(struct mmc_card *card, u8 *status)
 	 */
 	mmc_host_clk_hold(card->host);
 	drive_strength = card->host->ops->select_drive_strength(
-		card->sw_caps.uhs_max_dtr,
+		card->host, card->sw_caps.uhs_max_dtr,
 		host_drv_type, card_drv_type);
 	mmc_host_clk_release(card->host);
 
@@ -715,7 +718,7 @@ struct device_type sd_type = {
 /*
  * Fetch CID from card.
  */
-int mmc_sd_get_cid(struct mmc_host *host, u32 ocr, u32 *cid, u32 *rocr)
+int mmc_sd_get_cid(struct mmc_host *host, u32 ocr, u32 *cid, u32 *rocr, u8 enable_uhs)
 {
 	int err;
 	u32 max_current;
@@ -751,7 +754,7 @@ try_again:
 	 * to switch to 1.8V signaling level. If the card has failed
 	 * repeatedly to switch however, skip this.
 	 */
-	if (retries && mmc_host_uhs(host))
+	if (retries && mmc_host_uhs(host) && enable_uhs)
 		ocr |= SD_OCR_S18R;
 
 	/*
@@ -780,6 +783,12 @@ try_again:
 		} else if (err) {
 			retries = 0;
 			goto try_again;
+		}
+	} else {
+		if (host->ops->validate_sd2_0) {
+			err = host->ops->validate_sd2_0(host);
+			if (err)
+				return err;
 		}
 	}
 
@@ -928,11 +937,12 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 	int err;
 	u32 cid[4];
 	u32 rocr = 0;
-
+	u8 enable_uhs = 1;
 	BUG_ON(!host);
 	WARN_ON(!host->claimed);
 
-	err = mmc_sd_get_cid(host, ocr, cid, &rocr);
+retry:
+	err = mmc_sd_get_cid(host, ocr, cid, &rocr, enable_uhs);
 	if (err)
 		return err;
 
@@ -953,6 +963,10 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 		card->type = MMC_TYPE_SD;
 		memcpy(card->raw_cid, cid, sizeof(card->raw_cid));
 	}
+
+	/* Call the optional init_card for HC quirks */
+	if (host->ops->init_card)
+		host->ops->init_card(host, card);
 
 	/*
 	 * For native busses:  get card RCA and quit open drain mode.
@@ -994,8 +1008,19 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 	/* Initialization sequence for UHS-I cards */
 	if (rocr & SD_ROCR_S18A) {
 		err = mmc_sd_init_uhs_card(card);
-		if (err)
-			goto free_card;
+		if (err) {
+			if(enable_uhs) {
+				dev_info(mmc_dev(host),
+					"Initialization of UHS-1 card failed,"
+					"falling back to HS mode%d\n",
+					err);
+				mmc_power_cycle(host, host->ocr_avail);
+				enable_uhs = 0;
+				ocr &= ~SD_OCR_S18R;
+				goto retry;
+			} else
+				goto free_card;
+		}
 	} else {
 		/*
 		 * Attempt to change to high-speed (if supported)

@@ -4,6 +4,7 @@
  * Header file for Host Controller registers and I/O accessors.
  *
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
+ *  Copyright (c) 2011-2014, NVIDIA CORPORATION. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,6 +42,9 @@
 #define  SDHCI_TRNS_AUTO_CMD23	0x08
 #define  SDHCI_TRNS_READ	0x10
 #define  SDHCI_TRNS_MULTI	0x20
+#define  SDHCI_TRNS_RESP_TYPE	0x40
+#define  SDHCI_TRNS_ERR_CHECK	0x80
+#define  SDHCI_TRNS_RES_INT_DIS	0x100
 
 #define SDHCI_COMMAND		0x0E
 #define  SDHCI_CMD_RESP_MASK	0x03
@@ -64,6 +68,8 @@
 #define SDHCI_PRESENT_STATE	0x24
 #define  SDHCI_CMD_INHIBIT	0x00000001
 #define  SDHCI_DATA_INHIBIT	0x00000002
+#define  SDHCI_DATA_7_4_LVL	0x00000010
+#define   SDHCI_DATA_7_4_LVL_SHIFT	4
 #define  SDHCI_DOING_WRITE	0x00000100
 #define  SDHCI_DOING_READ	0x00000200
 #define  SDHCI_SPACE_AVAILABLE	0x00000400
@@ -128,6 +134,7 @@
 #define  SDHCI_INT_CARD_INSERT	0x00000040
 #define  SDHCI_INT_CARD_REMOVE	0x00000080
 #define  SDHCI_INT_CARD_INT	0x00000100
+#define  SDHCI_INT_RETUNING_EVENT	0x00001000
 #define  SDHCI_INT_ERROR	0x00008000
 #define  SDHCI_INT_TIMEOUT	0x00010000
 #define  SDHCI_INT_CRC		0x00020000
@@ -161,7 +168,8 @@
 #define   SDHCI_CTRL_UHS_SDR50		0x0002
 #define   SDHCI_CTRL_UHS_SDR104		0x0003
 #define   SDHCI_CTRL_UHS_DDR50		0x0004
-#define   SDHCI_CTRL_HS_SDR200		0x0005 /* reserved value in SDIO spec */
+#define   SDHCI_CTRL_UHS_HS400		0x0005
+#define   SDHCI_CTRL_HS_SDR200		0x0006 /* reserved value in SDIO spec */
 #define  SDHCI_CTRL_VDD_180		0x0008
 #define  SDHCI_CTRL_DRV_TYPE_MASK	0x0030
 #define   SDHCI_CTRL_DRV_TYPE_B		0x0000
@@ -170,6 +178,8 @@
 #define   SDHCI_CTRL_DRV_TYPE_D		0x0030
 #define  SDHCI_CTRL_EXEC_TUNING		0x0040
 #define  SDHCI_CTRL_TUNED_CLK		0x0080
+#define  SDHCI_HOST_VERSION_4_EN	0x1000
+#define  SDHCI_ADDRESSING_64BIT_EN	0x2000
 #define  SDHCI_CTRL_PRESET_VAL_ENABLE	0x8000
 
 #define SDHCI_CAPABILITIES	0x40
@@ -226,7 +236,8 @@
 
 /* 55-57 reserved */
 
-#define SDHCI_ADMA_ADDRESS	0x58
+#define SDHCI_ADMA_ADDRESS		0x58
+#define SDHCI_UPPER_ADMA_ADDRESS	0x5C
 
 /* 60-FB reserved */
 
@@ -252,13 +263,13 @@
 #define   SDHCI_SPEC_100	0
 #define   SDHCI_SPEC_200	1
 #define   SDHCI_SPEC_300	2
-
-/*
- * End of controller registers.
- */
+#define   SDHCI_SPEC_400	3
 
 #define SDHCI_MAX_DIV_SPEC_200	256
 #define SDHCI_MAX_DIV_SPEC_300	2046
+
+/* Time (in milli sec) interval to run auto calibration */
+#define SDHCI_PERIODIC_CALIB_TIMEOUT	100
 
 /*
  * Host SDMA buffer boundary. Valid values from 4K to 512K in powers of 2.
@@ -295,7 +306,28 @@ struct sdhci_ops {
 	void	(*hw_reset)(struct sdhci_host *host);
 	void    (*adma_workaround)(struct sdhci_host *host, u32 intmask);
 	void	(*platform_init)(struct sdhci_host *host);
+	void	(*platform_resume)(struct sdhci_host *host);
 	void    (*card_event)(struct sdhci_host *host);
+	int	(*switch_signal_voltage)(struct sdhci_host *host,
+		unsigned int signal_voltage);
+	void	(*switch_signal_voltage_enter)(struct sdhci_host *host,
+				unsigned char signal_voltage);
+	void	(*switch_signal_voltage_exit)(struct sdhci_host *host,
+				unsigned char signal_voltage);
+	int	(*suspend)(struct sdhci_host *host);
+	int	(*resume)(struct sdhci_host *host);
+	int	(*get_tuning_counter)(struct sdhci_host *sdhci);
+	int	(*sd_error_stats)(struct sdhci_host *host, u32 int_status);
+	int	(*get_drive_strength)(struct sdhci_host *host,
+		unsigned int max_dtr, int host_drv, int card_drv);
+	void	(*post_init)(struct sdhci_host *host);
+	void	(*en_strobe)(struct sdhci_host *host);
+	void	(*dump_host_cust_regs)(struct sdhci_host *host);
+	int	(*get_max_tuning_loop_counter)(struct sdhci_host *sdhci);
+	void	(*config_tap_delay)(struct sdhci_host *host, u8 option);
+	bool	(*is_tuning_done)(struct sdhci_host *sdhci);
+	int	(*validate_sd2_0)(struct sdhci_host *sdhci);
+	void	(*get_max_pio_transfer_limits)(struct sdhci_host *sdhci);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
