@@ -1,7 +1,7 @@
 /*
  * xhci-tegra.c - Nvidia xHCI host controller driver
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -4281,9 +4281,6 @@ static int hsic_power_create_file(struct tegra_xhci_hcd *tegra)
 static int tegra_xhci_probe(struct platform_device *pdev)
 {
 	struct tegra_xhci_hcd *tegra;
-	struct resource	*res;
-	unsigned pad;
-	u32 val;
 	int ret;
 	int irq;
 	const struct tegra_xusb_soc_config *soc_config;
@@ -4371,6 +4368,35 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to map ipfs\n");
 		return ret;
 	}
+
+	fw_log_init(tegra);
+	ret = init_firmware(tegra);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "failed to init firmware\n");
+		ret = -ENODEV;
+		goto err_deinit_firmware_log;
+	}
+
+	return 0;
+
+err_deinit_firmware_log:
+	fw_log_deinit(tegra);
+
+	return ret;
+}
+
+static int tegra_xhci_probe2(struct tegra_xhci_hcd *tegra)
+{
+	struct platform_device *pdev = tegra->pdev;
+	const struct hc_driver *driver;
+	int ret;
+	struct resource	*res;
+	int irq;
+	struct xhci_hcd	*xhci;
+	struct usb_hcd	*hcd;
+	unsigned port;
+	unsigned pad;
+	u32 val;
 
 	ret = tegra_xusb_partitions_clk_init(tegra);
 	if (ret) {
@@ -4481,42 +4507,6 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	tegra_periph_reset_deassert(tegra->ss_clk);
 
 	platform_set_drvdata(pdev, tegra);
-	fw_log_init(tegra);
-	ret = init_firmware(tegra);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "failed to init firmware\n");
-		ret = -ENODEV;
-		goto err_deinit_firmware_log;
-	}
-
-	return 0;
-
-err_deinit_firmware_log:
-	fw_log_deinit(tegra);
-err_deinit_usb2_clocks:
-	tegra_usb2_clocks_deinit(tegra);
-err_deinit_tegra_xusb_regulator:
-	tegra_xusb_regulator_deinit(tegra);
-err_deinit_xusb_partition_clk:
-	if (tegra->transceiver)
-		usb_unregister_notifier(tegra->transceiver, &tegra->otgnb);
-
-	tegra_xusb_partitions_clk_deinit(tegra);
-
-	return ret;
-}
-
-static int tegra_xhci_probe2(struct tegra_xhci_hcd *tegra)
-{
-	struct platform_device *pdev = tegra->pdev;
-	const struct hc_driver *driver;
-	int ret;
-	struct resource	*res;
-	int irq;
-	struct xhci_hcd	*xhci;
-	struct usb_hcd	*hcd;
-	unsigned port;
-
 
 	ret = load_firmware(tegra, false /* do reset ARU */);
 	if (ret < 0) {
@@ -4668,6 +4658,15 @@ err_remove_usb2_hcd:
 	usb_remove_hcd(hcd);
 err_put_usb2_hcd:
 	usb_put_hcd(hcd);
+err_deinit_usb2_clocks:
+	tegra_usb2_clocks_deinit(tegra);
+err_deinit_tegra_xusb_regulator:
+	tegra_xusb_regulator_deinit(tegra);
+err_deinit_xusb_partition_clk:
+	if (tegra->transceiver)
+		usb_unregister_notifier(tegra->transceiver, &tegra->otgnb);
+
+	tegra_xusb_partitions_clk_deinit(tegra);
 
 	return ret;
 }
