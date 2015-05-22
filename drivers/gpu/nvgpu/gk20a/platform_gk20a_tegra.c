@@ -39,6 +39,7 @@
 #define TEGRA_GK20A_SIM_SIZE 0x1000     /*tbd: this is a high-side guess */
 
 extern struct device tegra_vpr_dev;
+extern phys_addr_t tegra_vpr_size;
 struct gk20a_platform t132_gk20a_tegra_platform;
 
 struct gk20a_emc_params {
@@ -457,6 +458,8 @@ static int gk20a_tegra_probe(struct platform_device *dev)
 		*platform = t132_gk20a_tegra_platform;
 	}
 
+	if (tegra_vpr_size == 0)
+		platform->secure_page_alloc = NULL;
 	gk20a_tegra_get_clocks(dev);
 
 	return 0;

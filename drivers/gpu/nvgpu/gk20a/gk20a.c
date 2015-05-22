@@ -1310,10 +1310,9 @@ int gk20a_secure_page_alloc(struct platform_device *pdev)
 		udelay(10);
 		err = platform->secure_page_alloc(pdev);
 		tegra_periph_reset_deassert(platform->clk[0]);
+		if (!err)
+			platform->secure_alloc_ready = true;
 	}
-
-	if (!err)
-		platform->secure_alloc_ready = true;
 
 	return err;
 }
