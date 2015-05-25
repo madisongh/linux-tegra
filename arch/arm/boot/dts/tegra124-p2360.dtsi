@@ -66,6 +66,40 @@
 					       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10
 					       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 07];
 				nvidia,hdmi-fpd-bridge = <TEGRA_HDMI_ENABLE>;
+				tmds-config {
+					tmds-cfg@0 {
+						pclk = <27000000>;
+						pll0 = <0x01003010>;
+						pll1 = <0x00301B00>;
+						pe-current = <0x0>;
+						drive-current = <0x1f1f1f1f>;
+						peak-current = <0x03030303>;
+						pad-ctls0-mask = <0xffffffff>;
+						pad-ctls0-setting = <0x800034BB>;
+					};
+					tmds-cfg@1 {
+						pclk = <74250000>;
+						pll0 = <0x01003110>;
+						pll1 = <0x00301500>;
+						pe-current = <0x0>;
+						drive-current = <0x2c2c2c2c>;
+						peak-current = <0x07070707>;
+						pad-ctls0-mask = <0xffffffff>;
+						pad-ctls0-setting = <0x800034BB>;
+					};
+					tmds-cfg@2 {
+						pclk = <148500000>;
+						pll0 = <0x01003310>;
+						pll1 = <0x00301500>;
+						pe-current = <0x0>;
+						drive-current = <0x30303030>;
+						peak-current = <0x0c0c0c0c>;
+						pad-ctls0-mask = <0xffffffff>;
+						pad-ctls0-setting = <0x800034BB>;
+					};
+					/delete-node/ tmds-cfg@3;
+					/delete-node/ tmds-cfg@4;
+				};
 			};
 		};
 		csi {
