@@ -44,17 +44,11 @@ struct clk *of_clk_get_by_clkspec(struct of_phandle_args *clkspec)
 	if (!clkspec)
 		return ERR_PTR(-EINVAL);
 
-#ifndef CONFIG_TEGRA_CLK_FRAMEWORK
-	of_clk_lock();
-#endif
 	clk = of_clk_get_from_provider(clkspec);
 
 	if (!IS_ERR(clk) && !__clk_get(clk))
 		clk = ERR_PTR(-ENOENT);
 
-#ifndef CONFIG_TEGRA_CLK_FRAMEWORK
-	of_clk_unlock();
-#endif
 	return clk;
 }
 
