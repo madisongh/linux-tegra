@@ -393,6 +393,8 @@ static const char * const mode_name[] = {
 	[DFLL_CLOSED_LOOP] = "closed_loop",
 };
 
+static void dfll_set_output_limits(struct tegra_dfll *td,
+			u32 out_min, u32 out_max);
 static void dfll_load_i2c_lut(struct tegra_dfll *td);
 static u8 find_mv_out_cap(struct tegra_dfll *td, int mv);
 static u8 find_mv_out_floor(struct tegra_dfll *td, int mv);
@@ -561,7 +563,8 @@ static void dfll_tune_low(struct tegra_dfll *td)
 		td->soc->set_clock_trimmers_low();
 
 	if (td->lut_min != td->thermal_floor_output) {
-		td->lut_min = td->thermal_floor_output;
+		dfll_set_output_limits(td, td->thermal_floor_output,
+				td->lut_max);
 		dfll_load_i2c_lut(td);
 	}
 }
@@ -658,8 +661,7 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 		out_max = out_min + DFLL_CAP_GUARD_BAND_STEPS;
 
 	if ((td->lut_min != out_min) || (td->lut_max != out_max)) {
-		td->lut_min = out_min;
-		td->lut_max = out_max;
+		dfll_set_output_limits(td, out_min, out_max);
 		dfll_load_i2c_lut(td);
 	}
 }
@@ -818,6 +820,43 @@ static int dfll_i2c_set_output_enabled(struct tegra_dfll *td, bool enable)
 	dfll_i2c_wmb(td);
 
 	return 0;
+}
+
+/**
+ * dfll_set_output_limits - set DFLL output min and max limits
+ * @td: DFLL instance
+ * @out_min: min lut index
+ * @out_max: max lut index
+ *
+ * Set the minimum and maximum lut index into DFLL output config
+ * register.
+ */
+static void dfll_set_output_limits(struct tegra_dfll *td,
+			u32 out_min, u32 out_max)
+{
+	u32 val;
+
+	td->lut_min = out_min;
+	td->lut_max = out_max;
+
+	if (td->pmu_if == TEGRA_DFLL_PMU_PWM)
+		val = dfll_readl(td, DFLL_OUTPUT_CFG);
+	else
+		val = dfll_i2c_readl(td, DFLL_OUTPUT_CFG);
+
+	val &= ~DFLL_OUTPUT_CFG_MAX_MASK &
+		~DFLL_OUTPUT_CFG_MIN_MASK;
+
+	val |= (td->lut_max << DFLL_OUTPUT_CFG_MAX_SHIFT) |
+		(td->lut_min << DFLL_OUTPUT_CFG_MIN_SHIFT);
+
+	if (td->pmu_if == TEGRA_DFLL_PMU_PWM) {
+		dfll_writel(td, val, DFLL_OUTPUT_CFG);
+		dfll_wmb(td);
+	} else {
+		dfll_i2c_writel(td, val, DFLL_OUTPUT_CFG);
+		dfll_i2c_wmb(td);
+	}
 }
 
 /**
