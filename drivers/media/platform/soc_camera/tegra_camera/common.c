@@ -179,7 +179,6 @@ static void tegra_camera_deactivate(struct tegra_camera_dev *cam)
 {
 	struct tegra_camera_ops *cam_ops = cam->ops;
 
-
 	if (cam_ops->clks_disable)
 		cam_ops->clks_disable(cam);
 
@@ -227,8 +226,6 @@ static int tegra_camera_capture_frame(struct tegra_camera_dev *cam)
 
 	while (retry) {
 		err = cam->ops->capture_start(cam, buf);
-		/* Capturing succeed, stop capturing */
-		cam->ops->capture_stop(cam, port);
 		if (err) {
 			retry--;
 
@@ -533,27 +530,12 @@ static int tegra_camera_stop_streaming(struct vb2_queue *q)
 						     vb2_vidq);
 	struct soc_camera_host *ici = to_soc_camera_host(icd->parent);
 	struct tegra_camera_dev *cam = ici->priv;
-	struct list_head *buf_head, *tmp;
-
+	struct soc_camera_subdev_desc *ssdesc = &icd->sdesc->subdev_desc;
+	struct tegra_camera_platform_data *pdata = ssdesc->drv_priv;
+	int port = pdata->port;
 
 	mutex_lock(&cam->work_mutex);
-
-	spin_lock_irq(&cam->videobuf_queue_lock);
-	list_for_each_safe(buf_head, tmp, &cam->capture) {
-		struct tegra_camera_buffer *buf = container_of(buf_head,
-				struct tegra_camera_buffer,
-				queue);
-		if (buf->icd == icd)
-			list_del_init(buf_head);
-	}
-	spin_unlock_irq(&cam->videobuf_queue_lock);
-
-	if (cam->active) {
-		struct tegra_camera_buffer *buf = to_tegra_vb(cam->active);
-		if (buf->icd == icd)
-			cam->active = NULL;
-	}
-
+	cam->ops->capture_stop(cam, port);
 	mutex_unlock(&cam->work_mutex);
 
 	return 0;

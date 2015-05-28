@@ -31,6 +31,16 @@
 #define TEGRA_SYNCPT_CSI_WAIT_TIMEOUT                   200
 
 #define TEGRA_VI_CFG_VI_INCR_SYNCPT			0x000
+#define		VI_MWA_REQ_DONE				(4 << 8)
+#define		VI_MWB_REQ_DONE				(5 << 8)
+#define		VI_MWA_ACK_DONE				(6 << 8)
+#define		VI_MWB_ACK_DONE				(7 << 8)
+#define		VI_ISPA_DONE				(8 << 8)
+#define		VI_CSI_PPA_FRAME_START			(9 << 8)
+#define		VI_CSI_PPB_FRAME_START			(10 << 8)
+#define		VI_CSI_PPA_LINE_START			(11 << 8)
+#define		VI_CSI_PPB_LINE_START			(12 << 8)
+
 #define TEGRA_VI_CFG_VI_INCR_SYNCPT_CNTRL		0x004
 #define TEGRA_VI_CFG_VI_INCR_SYNCPT_ERROR		0x008
 #define TEGRA_VI_CFG_CTXSW				0x020
@@ -663,6 +673,9 @@ static int vi2_capture_setup_csi_0(struct tegra_camera_dev *cam,
 	TC_VI_REG_WT(cam, TEGRA_VI_CSI_0_CSI_IMAGE_SIZE,
 			(icd->user_height << 16) | icd->user_width);
 
+	/* Start pixel parser in single shot mode at beginning */
+	TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_PPA_COMMAND, 0xf005);
+
 	return 0;
 }
 
@@ -765,6 +778,9 @@ static int vi2_capture_setup_csi_1(struct tegra_camera_dev *cam,
 
 	TC_VI_REG_WT(cam, TEGRA_VI_CSI_1_CSI_IMAGE_SIZE,
 			(icd->user_height << 16) | icd->user_width);
+
+	/* Start pixel parser in single shot mode at beginning */
+	TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_PPB_COMMAND, 0xf005);
 
 	return 0;
 }
@@ -954,10 +970,9 @@ static int vi2_capture_start(struct tegra_camera_dev *cam,
 						cam->syncpt_id_csi_a, 1);
 
 		TC_VI_REG_WT(cam, TEGRA_VI_CFG_VI_INCR_SYNCPT,
-				(6 << 8) | cam->syncpt_id_csi_a);
-		TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_PPA_COMMAND,
-				0x0000f005);
+			     VI_CSI_PPA_FRAME_START | cam->syncpt_id_csi_a);
 		TC_VI_REG_WT(cam, TEGRA_VI_CSI_0_SINGLE_SHOT, 0x1);
+
 		err = nvhost_syncpt_wait_timeout_ext(cam->ndev,
 				cam->syncpt_id_csi_a,
 				cam->syncpt_csi_a,
@@ -973,10 +988,9 @@ static int vi2_capture_start(struct tegra_camera_dev *cam,
 						cam->syncpt_id_csi_b, 1);
 
 		TC_VI_REG_WT(cam, TEGRA_VI_CFG_VI_INCR_SYNCPT,
-				(7 << 8) | cam->syncpt_id_csi_b);
-		TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_PPB_COMMAND,
-				0x0000f005);
+			     VI_CSI_PPB_FRAME_START | cam->syncpt_id_csi_b);
 		TC_VI_REG_WT(cam, TEGRA_VI_CSI_1_SINGLE_SHOT, 0x1);
+
 		err = nvhost_syncpt_wait_timeout_ext(cam->ndev,
 				cam->syncpt_id_csi_b,
 				cam->syncpt_csi_b,
@@ -1008,15 +1022,65 @@ static int vi2_capture_start(struct tegra_camera_dev *cam,
 
 static int vi2_capture_stop(struct tegra_camera_dev *cam, int port)
 {
-	if (port == TEGRA_CAMERA_PORT_CSI_A)
-		TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_PPA_COMMAND,
-			     0x0000f002);
-	else if (port == TEGRA_CAMERA_PORT_CSI_B ||
-			port == TEGRA_CAMERA_PORT_CSI_C)
-		TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_PPB_COMMAND,
-			     0x0000f002);
+	u32 val;
+	int err = 0;
 
-	return 0;
+	if (port == TEGRA_CAMERA_PORT_CSI_A) {
+		if (!nvhost_syncpt_read_ext_check(cam->ndev,
+						  cam->syncpt_id_csi_a, &val))
+			cam->syncpt_csi_a = nvhost_syncpt_incr_max_ext(
+						cam->ndev,
+						cam->syncpt_id_csi_a, 1);
+
+		/*
+		 * Make sure recieve VI_MWA_ACK_DONE of the last frame before
+		 * stop and dequeue buffer, otherwise MC error will shows up
+		 * for the last frame.
+		 */
+		TC_VI_REG_WT(cam, TEGRA_VI_CFG_VI_INCR_SYNCPT,
+			     VI_MWA_ACK_DONE | cam->syncpt_id_csi_a);
+
+		/*
+		 * Ignore error here and just stop pixel parser after waiting,
+		 * even if it's timeout
+		 */
+		err = nvhost_syncpt_wait_timeout_ext(cam->ndev,
+				cam->syncpt_id_csi_a,
+				cam->syncpt_csi_a,
+				TEGRA_SYNCPT_CSI_WAIT_TIMEOUT,
+				NULL,
+				NULL);
+		TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_PPA_COMMAND, 0xf002);
+	} else if (port == TEGRA_CAMERA_PORT_CSI_B ||
+			port == TEGRA_CAMERA_PORT_CSI_C) {
+		if (!nvhost_syncpt_read_ext_check(cam->ndev,
+						  cam->syncpt_id_csi_b, &val))
+			cam->syncpt_csi_b = nvhost_syncpt_incr_max_ext(
+						cam->ndev,
+						cam->syncpt_id_csi_b, 1);
+
+		/*
+		 * Make sure recieve VI_MWB_ACK_DONE of the last frame before
+		 * stop and dequeue buffer, otherwise MC error will shows up
+		 * for the last frame.
+		 */
+		TC_VI_REG_WT(cam, TEGRA_VI_CFG_VI_INCR_SYNCPT,
+			     VI_MWB_ACK_DONE | cam->syncpt_id_csi_b);
+
+		/*
+		 * Ignore error here and just stop pixel parser after waiting,
+		 * even if it's timeout
+		 */
+		err = nvhost_syncpt_wait_timeout_ext(cam->ndev,
+				cam->syncpt_id_csi_b,
+				cam->syncpt_csi_b,
+				TEGRA_SYNCPT_CSI_WAIT_TIMEOUT,
+				NULL,
+				NULL);
+		TC_VI_REG_WT(cam, TEGRA_CSI_PIXEL_STREAM_PPB_COMMAND, 0xf002);
+	}
+
+	return err;
 }
 
 /* Reset VI2/CSI2 when activating, no sepecial ops for deactiving  */
