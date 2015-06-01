@@ -31,6 +31,7 @@
 
 #include <linux/tegra-powergate.h>
 #include <linux/tegra-soc.h>
+#include <linux/tegra_pm_domains.h>
 #include <soc/tegra/xusb.h>
 
 #include "xhci.h"
@@ -125,6 +126,14 @@
 
 #define FW_MAJOR_VERSION(x)		(((x) >> 24) & 0xff)
 #define FW_MINOR_VERSION(x)		(((x) >> 16) & 0xff)
+
+static struct of_device_id tegra_xusba_pd[] = {
+	{ .compatible = "nvidia, tegra186-xusba-pd", },
+};
+
+static struct of_device_id tegra_xusbc_pd[] = {
+	{ .compatible = "nvidia, tegra186-xusbc-pd", },
+};
 
 enum build_info_log {
 	LOG_NONE = 0,
@@ -1308,8 +1317,17 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	struct phy *phy;
 	unsigned int i, j, k;
 	int ret;
+	int partition_id_xusba, partition_id_xusbc;
 
 	BUILD_BUG_ON(sizeof(struct tegra_xhci_fw_cfgtbl) != 256);
+
+	partition_id_xusbc = tegra_pd_get_powergate_id(tegra_xusbc_pd);
+	if (partition_id_xusbc < 0)
+		return -EINVAL;
+
+	partition_id_xusba = tegra_pd_get_powergate_id(tegra_xusba_pd);
+	if (partition_id_xusba < 0)
+		return -EINVAL;
 
 	if (!pdev->dev.dma_mask)
 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
@@ -1503,13 +1521,13 @@ skip_clocks:
 	}
 
 	if (tegra_platform_is_silicon()) {
-		ret = tegra_unpowergate_partition(TEGRA_POWERGATE_XUSBA);
+		ret = tegra_unpowergate_partition(partition_id_xusba);
 		if (ret) {
 			dev_warn(&pdev->dev, "can't unpowergate SS partition\n");
 			goto put_mbox;
 		}
 
-		ret = tegra_unpowergate_partition(TEGRA_POWERGATE_XUSBC);
+		ret = tegra_unpowergate_partition(partition_id_xusbc);
 		if (ret) {
 			dev_warn(&pdev->dev, "can't unpowergate Host partition\n");
 			goto powergate_ss;
@@ -1543,10 +1561,10 @@ disable_phy:
 	tegra_xhci_phy_disable(tegra);
 powergate_host:
 	if (tegra_platform_is_silicon())
-		tegra_powergate_partition(TEGRA_POWERGATE_XUSBC);
+		tegra_powergate_partition(partition_id_xusbc);
 powergate_ss:
 	if (tegra_platform_is_silicon())
-		tegra_powergate_partition(TEGRA_POWERGATE_XUSBA);
+		tegra_powergate_partition(partition_id_xusba);
 put_mbox:
 	mbox_free_channel(tegra->mbox_chan);
 disable_regulator:
@@ -1567,6 +1585,15 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	struct tegra_xhci_hcd *tegra = platform_get_drvdata(pdev);
 	struct usb_hcd *hcd = tegra->hcd;
 	struct xhci_hcd *xhci;
+	int partition_id_xusba, partition_id_xusbc;
+
+	partition_id_xusbc = tegra_pd_get_powergate_id(tegra_xusbc_pd);
+	if (partition_id_xusbc < 0)
+		return -EINVAL;
+
+	partition_id_xusba = tegra_pd_get_powergate_id(tegra_xusba_pd);
+	if (partition_id_xusba < 0)
+		return -EINVAL;
 
 	fw_log_deinit(tegra);
 	tegra_xhci_debugfs_deinit(tegra);
@@ -1591,8 +1618,8 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	tegra_xhci_phy_disable(tegra);
 	regulator_bulk_disable(tegra->num_supplies, tegra->supplies);
 	tegra_xhci_clk_disable(tegra);
-	tegra_powergate_partition(TEGRA_POWERGATE_XUSBC);
-	tegra_powergate_partition(TEGRA_POWERGATE_XUSBA);
+	tegra_powergate_partition(partition_id_xusbc);
+	tegra_powergate_partition(partition_id_xusba);
 
 	return 0;
 }
