@@ -199,6 +199,7 @@ static void tegra_camera_deactivate(struct tegra_camera_dev *cam)
 	nvhost_module_idle_ext(cam->ndev);
 
 	cam->sof = 0;
+	cam->cal_done = 0;
 }
 
 static int tegra_camera_capture_frame(struct tegra_camera_dev *cam)

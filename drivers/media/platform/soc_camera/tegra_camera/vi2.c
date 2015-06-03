@@ -1100,7 +1100,7 @@ static int vi2_mipi_calibration(struct tegra_camera_dev *cam)
 	regmap_update_bits(regs, CILC_MIPI_CAL_CONFIG_2, CLKSELC, 0);
 	regmap_update_bits(regs, CILD_MIPI_CAL_CONFIG, SELD, 0);
 	regmap_update_bits(regs, CILD_MIPI_CAL_CONFIG_2, CLKSELD, 0);
-	regmap_update_bits(regs, CILC_MIPI_CAL_CONFIG, SELE, 0);
+	regmap_update_bits(regs, CILE_MIPI_CAL_CONFIG, SELE, 0);
 	regmap_update_bits(regs, CSIE_MIPI_CAL_CONFIG_2, CLKSELE, 0);
 
 	/* Select the CIL pad for auto calibration */
