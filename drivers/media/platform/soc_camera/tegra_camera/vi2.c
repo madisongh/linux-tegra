@@ -1168,7 +1168,7 @@ static int vi2_mipi_calibration(struct tegra_camera_dev *cam)
 		return -EBUSY;
 	}
 
-	dev_info(&pdev->dev, "MIPI calibration for CSI is done\n");
+	dev_dbg(&pdev->dev, "MIPI calibration for CSI is done\n");
 	return 0;
 }
 
