@@ -73,9 +73,13 @@
 #define RWAR_SR1V				0x00800000
 #define RWAR_CR1V				0x00800002
 #define RWAR_CR2V				0x00800003
+#define RWAR_CR3V				0x00800004
 #define WRAR					0x71
 #define SR1NV_WRITE_DIS				(1<<7)
 #define SR1NV_BLOCK_PROT			(0x7<<2)
+#define CR3V_512PAGE_SIZE			(1<<4)
+
+#define JEDEC_ID_S25FL512S	0x010220
 
 static int qspi_write_en(struct qspi *flash,
 		uint8_t is_enable, uint8_t is_sleep);
@@ -526,7 +530,7 @@ static int wait_till_ready(struct qspi *flash, uint8_t is_sleep)
 			return FAIL;
 		}
 		if ((tried % 20) == 0)
-			pr_info("Waiting in WIP iter: %d\n", tried);
+			pr_debug("Waiting in WIP iter: %d\n", tried);
 
 		if (is_sleep)
 			msleep(WIP_ENABLE_SLEEP_TIME);
@@ -1319,6 +1323,22 @@ static int qspi_probe(struct spi_device *spi)
 		regval = regval & ~(SR1NV_WRITE_DIS | SR1NV_BLOCK_PROT);
 		qspi_write_any_reg(flash, RWAR_SR1NV, regval);
 		wait_till_ready(flash, FALSE);
+	}
+
+	/* Set 512 page size when s25fl512s */
+	if ((info->jedec_id == JEDEC_ID_S25FL512S) && (info->page_size == 512)) {
+		status = qspi_read_any_reg(flash, RWAR_CR3V, &regval);
+		if (status) {
+			pr_err("error: %s RWAR_CR3V read failed: Status: x%x ",
+				__func__, status);
+			return status;
+		}
+
+		if ((regval & CR3V_512PAGE_SIZE) == 0) {
+			regval = regval | CR3V_512PAGE_SIZE;
+			qspi_write_any_reg(flash, RWAR_CR3V, regval);
+			wait_till_ready(flash, FALSE);
+		}
 	}
 
 	/* partitions should match sector boundaries; and it may be good to
