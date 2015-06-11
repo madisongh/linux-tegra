@@ -3,7 +3,7 @@
  *
  * GK20A Graphics
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -136,6 +136,9 @@ struct gpu_ops {
 		void (*bind_channel)(struct channel_gk20a *ch_gk20a);
 		void (*trigger_mmu_fault)(struct gk20a *g,
 				unsigned long engine_ids);
+		void (*disable_channel)(struct channel_gk20a *ch);
+		void (*enable_channel)(struct channel_gk20a *ch);
+		int (*preempt_channel)(struct gk20a *g, u32 hw_chid);
 	} fifo;
 	struct pmu_v {
 		/*used for change of enum zbc update cmd id from ver 0 to ver1*/

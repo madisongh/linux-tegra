@@ -3,7 +3,7 @@
  *
  * GK20A Graphics FIFO (gr host)
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1898,4 +1898,5 @@ void gk20a_init_fifo(struct gpu_ops *gops)
 {
 	gk20a_init_channel(gops);
 	gops->fifo.trigger_mmu_fault = gk20a_fifo_trigger_mmu_fault;
+	gops->fifo.preempt_channel = gk20a_fifo_preempt_channel;
 }

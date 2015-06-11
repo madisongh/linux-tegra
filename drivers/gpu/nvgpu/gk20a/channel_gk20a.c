@@ -3,7 +3,7 @@
  *
  * GK20A Graphics channel
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -416,6 +416,23 @@ void gk20a_disable_channel_no_update(struct channel_gk20a *ch)
 		     gk20a_readl(ch->g,
 		     ccsr_channel_r(ch->hw_chid)) |
 		     ccsr_channel_enable_clr_true_f());
+}
+
+static void channel_gk20a_enable(struct channel_gk20a *ch)
+{
+	/* enable channel */
+	gk20a_writel(ch->g, ccsr_channel_r(ch->hw_chid),
+		gk20a_readl(ch->g, ccsr_channel_r(ch->hw_chid)) |
+		ccsr_channel_enable_set_true_f());
+}
+
+static void channel_gk20a_disable(struct channel_gk20a *ch)
+{
+	/* disable channel */
+	gk20a_writel(ch->g, ccsr_channel_r(ch->hw_chid),
+		gk20a_readl(ch->g,
+			ccsr_channel_r(ch->hw_chid)) |
+			ccsr_channel_enable_clr_true_f());
 }
 
 int gk20a_wait_channel_idle(struct channel_gk20a *ch)
@@ -1939,6 +1956,8 @@ clean_up:
 void gk20a_init_channel(struct gpu_ops *gops)
 {
 	gops->fifo.bind_channel = channel_gk20a_bind;
+	gops->fifo.disable_channel = channel_gk20a_disable;
+	gops->fifo.enable_channel = channel_gk20a_enable;
 }
 
 long gk20a_channel_ioctl(struct file *filp,

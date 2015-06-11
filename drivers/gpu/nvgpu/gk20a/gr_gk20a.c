@@ -1629,6 +1629,15 @@ int gr_gk20a_update_smpc_ctxsw_mode(struct gk20a *g,
 	struct channel_ctx_gk20a *ch_ctx = &c->ch_ctx;
 	void *ctx_ptr = NULL;
 	u32 data;
+	int ret;
+
+	c->g->ops.fifo.disable_channel(c);
+	ret = c->g->ops.fifo.preempt_channel(c->g, c->hw_chid);
+	if (ret) {
+		gk20a_err(dev_from_gk20a(g),
+			"failed to preempt channel\n");
+		return ret;
+	}
 
 	/* Channel gr_ctx buffer is gpu cacheable.
 	   Flush and invalidate before cpu update. */
@@ -1649,6 +1658,9 @@ int gr_gk20a_update_smpc_ctxsw_mode(struct gk20a *g,
 		 data);
 
 	vunmap(ctx_ptr);
+
+	/* enable channel */
+	c->g->ops.fifo.enable_channel(c);
 
 	return 0;
 }
