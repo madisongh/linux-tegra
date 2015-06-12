@@ -55,6 +55,7 @@ int trusty_call_notifier_register(struct device *dev,
 				  struct notifier_block *n);
 int trusty_call_notifier_unregister(struct device *dev,
 				    struct notifier_block *n);
+u32 trusty_get_api_version(struct device *dev);
 
 struct ns_mem_page_info {
 	uint64_t attr;
