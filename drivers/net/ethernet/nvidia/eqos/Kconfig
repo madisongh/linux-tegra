@@ -9,27 +9,16 @@
 # FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
 # more details.
 
-ccflags-y += -DHWA_NV_1617267
-ccflags-y += -DHWA_NV_1618922
-ccflags-y += -DHWA_NV_1640420
-ccflags-y += -DHWA_NV_1637630
-ccflags-y += -DHWA_NV_1650337
-ccflags-y += -DHWA_FPGA_ONLY
+config EQOS
+	tristate "NVIDIA Tegra Ethernet QOS driver"
+	default n
 
-## default build settings.
-ccflags-y += -DCONFIG_DEBUGFS_OBJ
-##ccflags-y += -DCONFIG_PTPSUPPORT_OBJ
+	---help---
+	  If you have a network (Ethernet) card belonging to this class, say Y
+	  and read the Ethernet-HOWTO, available from
+	  <http://www.tldp.org/docs.html#howto>.
 
-obj-m  += eqos.o
-
-eqos-y += dev.o
-eqos-y += drv.o
-eqos-y += desc.o
-eqos-y += ethtool.o
-eqos-y += init.o
-eqos-y += mdio.o
-eqos-y += nvidia_test.o
-eqos-y += eee.o
-eqos-y += debug_operation.o
-##eqos-y += ptp.o
-
+	  Note that the answer to this question doesn't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about NVIDIA cards. If you say Y, you will be asked for
+	  your specific card in the following questions.
