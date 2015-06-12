@@ -499,16 +499,67 @@ static struct ar0330_reg mode_1280x960[] = {
 	{AR0330_TABLE_END, 0x00}
 };
 
+static struct ar0330_reg mode_2048x1296[] = {
+	{0x3052, 0xa114},
+	{0x304A, 0x0070},
+	{AR0330_TABLE_WAIT_MS, AR0330_WAIT_MS},
+	{0x301A, 0x0058},
+	{0x302A, 0x0005},
+	{0x302C, 0x0001},
+	{0x302E, 0x0002},
+	{0x3030, 0x0029},
+	{0x3036, 0x000A},
+	{0x3038, 0x0001},
+	{0x31AC, 0x0A0A},
+	{0x31AE, 0x0204},
+	{0x31B0, 0x002F},
+	{0x31B2, 0x0013},
+	{0x31B4, 0x3C44},
+	{0x31B6, 0x314D},
+	{0x31B8, 0x208A},
+	{0x31BA, 0x0207},
+	{0x31BC, 0x8005},
+	{0x3002, 0x007E},
+	{0x3004, 0x0086},
+	{0x3006, 0x058D},
+	{0x3008, 0x0885},
+	{0x300A, 0x05BB},
+	{0x300C, 0x045E},
+	{0x3012, 0x05BA},
+	{0x3014, 0x0000},
+	{0x30A2, 0x0001},
+	{0x30A6, 0x0001},
+	{0x3040, 0x0000},
+	{0x3042, 0x0000},
+	{0x30BA, 0x002C},
+	{0x31E0, 0x0303},
+	{0x3064, 0x1802},
+	{0x3ED2, 0x0146},
+	{0x3ED4, 0x8F6C},
+	{0x3ED6, 0x66CC},
+	{0x3ED8, 0x8C42},
+	{0x3EDA, 0x88BC},
+	{0x3EDC, 0xAA63},
+	{0x305E, 0x00A0},
+	{0x3088, 0x80BA},
+	{0x3086, 0x0253},
+	{0x30CE, 0x0010},
+	{0x301A, 0x035C},
+	{AR0330_TABLE_END, 0x00}
+};
+
 enum {
 	AR0330_MODE_2304X1536,
 	AR0330_MODE_1280X720,
 	AR0330_MODE_1280X960,
+	AR0330_MODE_2048X1296,
 };
 
 static struct ar0330_reg *mode_table[] = {
 	[AR0330_MODE_2304X1536] = mode_2304x1536,
 	[AR0330_MODE_1280X720] = mode_1280x720,
 	[AR0330_MODE_1280X960] = mode_1280x960,
+	[AR0330_MODE_2048X1296] = mode_2048x1296,
 };
 
 static inline void
@@ -641,6 +692,8 @@ ar0330_set_mode(struct ar0330_info *info, struct ar0330_mode *mode)
 		sensor_mode = AR0330_MODE_1280X720;
 	} else if (mode->xres == 1280 && mode->yres == 960) {
 		sensor_mode = AR0330_MODE_1280X960;
+	} else if (mode->xres == 2048 && mode->yres == 1296) {
+		sensor_mode = AR0330_MODE_2048X1296;
 	} else {
 		pr_err("%s: invalid resolution supplied to set mode %d %d\n",
 			 __func__, mode->xres, mode->yres);
