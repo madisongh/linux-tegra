@@ -49,6 +49,18 @@ config USB_XHCI_MVEBU
 	  Say 'Y' to enable the support for the xHCI host controller
 	  found in Marvell Armada 375/38x ARM SOCs.
 
+config USB_XHCI_TEGRA
+	tristate "Enable NVIDIA's Tegra XHCI host controller"
+        depends on ARCH_TEGRA_18x_SOC || COMPILE_TEST
+        depends on MAILBOX
+        select FW_LOADER
+        ---help---
+          Say 'Y' to enable the support for the xHCI host controller
+          found in NVIDIA Tegra18x SoC.
+
+	  This will enable USB3.0 functionality on the USB3.0 ports.
+	  If unsure, say N.
+
 config USB_XHCI_RCAR
 	tristate "xHCI support for Renesas R-Car SoCs"
 	select USB_XHCI_PLATFORM
