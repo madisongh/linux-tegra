@@ -2794,7 +2794,7 @@ static int _ffs_func_bind(struct usb_configuration *c,
 		struct ffs_ep *ptr;
 
 		ptr = vla_ptr(vlabuf, d, eps);
-		ptr[ret].num = -1;
+		ptr[ret - 1].num = -1;
 	}
 
 	/* Save pointers
