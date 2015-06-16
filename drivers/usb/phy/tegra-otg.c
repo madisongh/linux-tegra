@@ -113,6 +113,7 @@ struct tegra_otg {
 	bool support_usb_id;
 	bool support_pmu_id;
 	bool support_pmu_rid;
+	bool support_hp_trans;
 	enum tegra_usb_id_detection id_det_type;
 	struct extcon_dev *id_extcon_dev;
 	struct extcon_dev *vbus_extcon_dev;
@@ -592,10 +593,22 @@ static void tegra_change_otg_state(struct tegra_otg *tegra,
 				tegra_otg_start_gadget(tegra, 1);
 			else if (to == OTG_STATE_A_HOST)
 				tegra_otg_start_host(tegra, 1);
-		} else if (from == OTG_STATE_A_HOST && to == OTG_STATE_A_SUSPEND) {
-			tegra_otg_start_host(tegra, 0);
-		} else if (from == OTG_STATE_B_PERIPHERAL && otg->gadget && to == OTG_STATE_A_SUSPEND) {
-			tegra_otg_start_gadget(tegra, 0);
+		} else if (from == OTG_STATE_A_HOST) {
+			if (to == OTG_STATE_A_SUSPEND)
+				tegra_otg_start_host(tegra, 0);
+			else if (to == OTG_STATE_B_PERIPHERAL && otg->gadget
+					&& tegra->support_hp_trans) {
+				tegra_otg_start_host(tegra, 0);
+				tegra_otg_start_gadget(tegra, 1);
+			}
+		} else if (from == OTG_STATE_B_PERIPHERAL && otg->gadget) {
+			if (to == OTG_STATE_A_SUSPEND)
+				tegra_otg_start_gadget(tegra, 0);
+			else if (to == OTG_STATE_A_HOST
+					&& tegra->support_hp_trans) {
+				tegra_otg_start_gadget(tegra, 0);
+				tegra_otg_start_host(tegra, 1);
+			}
 		}
 	}
 
@@ -647,7 +660,8 @@ static void irq_work(struct work_struct *work)
 
 	if (!(status & USB_ID_STATUS) && (status & USB_ID_INT_EN))
 		to = OTG_STATE_A_HOST;
-	else if (status & USB_VBUS_STATUS && from != OTG_STATE_A_HOST)
+	else if (status & USB_VBUS_STATUS &&
+			(from != OTG_STATE_A_HOST || tegra->support_hp_trans))
 		to = OTG_STATE_B_PERIPHERAL;
 	else
 		to = OTG_STATE_A_SUSPEND;
@@ -1066,6 +1080,9 @@ static int tegra_otg_conf(struct platform_device *pdev)
 		tegra->support_pmu_rid =
 				of_property_read_bool(pdev->dev.of_node,
 					"nvidia,enable-aca-rid-detection");
+		tegra->support_hp_trans =
+				of_property_read_bool(pdev->dev.of_node,
+				"nvidia,enable-host-peripheral-transitions");
 	} else {
 		pdata = dev_get_platdata(&pdev->dev);
 	}
