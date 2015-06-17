@@ -9,12 +9,4 @@
 # FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
 # more details.
 
-#
-# Makefile for the NVIDIA network device drivers.
-#
-
-ifeq ($(CONFIG_NET_VENDOR_NVIDIA),y)
-obj-$(CONFIG_FORCEDETH) += forcedeth.o
-endif
-
-obj-$(CONFIG_EQOS) += ../../../../../kernel-t18x/drivers/net/ethernet/nvidia/eqos/
+trysource "../kernel-t18x/drivers/net/ethernet/nvidia/eqos/Kconfig"

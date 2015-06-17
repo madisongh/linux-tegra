@@ -12,6 +12,18 @@
  * option) any later version.
  *
  */
+/*
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -34,6 +46,7 @@
 #include <linux/mdio.h>
 #include <linux/io.h>
 #include <linux/uaccess.h>
+#include <linux/brcmphy.h>
 #include <linux/atomic.h>
 
 #include <asm/irq.h>
@@ -559,6 +572,21 @@ static void phy_error(struct phy_device *phydev)
 	mutex_unlock(&phydev->lock);
 }
 
+#ifdef T18X_FPGA
+static bool t18x_eqos_fpga_got_phy_intr(struct net_device *ndev)
+{
+	bool ret = false;
+
+	if (readl((void *)ndev->base_addr + EQOS_CLOCK_CONTROL) & BIT(31)) {
+		pr_info("phy_intr received\n");
+		ret = true;
+	} else {
+		pr_info("power_intr received\n");
+	}
+	return ret;
+}
+#endif
+
 /**
  * phy_interrupt - PHY interrupt handler
  * @irq: interrupt line
@@ -573,6 +601,19 @@ static irqreturn_t phy_interrupt(int irq, void *phy_dat)
 
 	if (PHY_HALTED == phydev->state)
 		return IRQ_NONE;		/* It can't be ours.  */
+
+#ifdef T18X_FPGA
+	/* check if this is PHY interrupt on FPGA system where phy_int
+	 * is shared with power_intr
+	 * PHY_ID_BCM89610 has lower 4bit `0` and phy_id holds rev_id in it
+	 */
+	if (PHY_ID_BCM89610 == (phydev->phy_id & ~0xf)) {
+		struct mii_bus *bus = phydev->bus;
+		struct net_device *ndev = bus->priv;
+		if (!t18x_eqos_fpga_got_phy_intr(ndev))
+			return IRQ_NONE;
+	}
+#endif
 
 	/* The MDIO bus is not allowed to be written in interrupt
 	 * context, so we need to disable the irq here.  A work
@@ -998,8 +1039,9 @@ void phy_state_machine(struct work_struct *work)
 	dev_dbg(&phydev->dev, "PHY state change %s -> %s\n",
 		phy_state_to_str(old_state), phy_state_to_str(phydev->state));
 
-	queue_delayed_work(system_power_efficient_wq, &phydev->state_queue,
-			   PHY_STATE_TIME * HZ);
+	if (phydev->irq == PHY_POLL)
+		queue_delayed_work(system_power_efficient_wq, &phydev->state_queue,
+			   		PHY_STATE_TIME * HZ);
 }
 
 void phy_mac_interrupt(struct phy_device *phydev, int new_link)
