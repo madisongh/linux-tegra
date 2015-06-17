@@ -2418,6 +2418,46 @@ exit:
 	return 0;
 }
 
+static char *genpd_get_status(enum gpd_status status)
+{
+	switch (status) {
+	case GPD_STATE_ACTIVE:
+		return "on";
+	case GPD_STATE_POWER_OFF:
+		return "off";
+	default:
+		return "invalid";
+	}
+	return NULL;
+}
+
+#ifdef CONFIG_PM
+static char *genpd_get_device_status(struct device *dev)
+{
+	enum rpm_status status = dev->power.runtime_status;
+
+	if (dev->power.runtime_error) {
+		return "error";
+	} else if (dev->power.disable_depth) {
+		return "unsupported";
+	} else {
+		switch (status) {
+		case RPM_ACTIVE:
+			return "active";
+		case RPM_RESUMING:
+			return "resuming";
+		case RPM_SUSPENDED:
+			return "suspended";
+		case RPM_SUSPENDING:
+			return "suspending";
+		default:
+			return "invalid";
+		}
+	}
+	return NULL;
+}
+#endif
+
 static int pm_genpd_summary_show(struct seq_file *s, void *data)
 {
 	struct generic_pm_domain *genpd;
@@ -2552,7 +2592,7 @@ static int __init pm_genpd_debug_init(void)
 	mutex_lock(&gpd_list_lock);
 
 	list_for_each_entry_reverse(gpd, &gpd_list, gpd_list_node) {
-		domain_dir = debugfs_create_dir(gpd->name, rootdir);
+		domain_dir = debugfs_create_dir(gpd->name, pm_genpd_debugfs_dir);
 		if (!domain_dir)
 			goto error;
 
