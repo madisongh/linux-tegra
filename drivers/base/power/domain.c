@@ -2460,25 +2460,59 @@ static char *genpd_get_device_status(struct device *dev)
 
 static int pm_genpd_summary_show(struct seq_file *s, void *data)
 {
-	struct generic_pm_domain *genpd;
-	int ret = 0;
+	struct generic_pm_domain *gpd, *slave;
+#ifdef CONFIG_PM_RUNTIME
+	struct pm_domain_data *pdd;
+#endif
+	struct gpd_link *link;
 
-	seq_puts(s, "domain                          status          slaves\n");
-	seq_puts(s, "    /device                                             runtime status\n");
-	seq_puts(s, "----------------------------------------------------------------------\n");
+	seq_puts(s, " device/domain                   state      ref count     suspend time     \n");
+	seq_puts(s, "---------------------------------------------------------------------------\n");
+	mutex_lock(&gpd_list_lock);
+	list_for_each_entry_reverse(gpd, &gpd_list, gpd_list_node) {
 
-	ret = mutex_lock_interruptible(&gpd_list_lock);
-	if (ret)
-		return -ERESTARTSYS;
+		mutex_lock(&gpd->lock);
 
-	list_for_each_entry(genpd, &gpd_list, gpd_list_node) {
-		ret = pm_genpd_summary_one(s, genpd);
-		if (ret)
-			break;
+		update_genpd_accounting(gpd);
+		seq_printf(s, "%*s%-*s %-11s %-13s %-17u\n", 1, "", 31,
+		gpd->name, genpd_get_status(gpd->status), "",
+			jiffies_to_msecs(gpd->power_off_jiffies));
+
+		mutex_unlock(&gpd->lock);
+
+		list_for_each_entry(link, &gpd->master_links, master_node) {
+			slave = link->slave;
+
+			mutex_lock(&slave->lock);
+
+			update_genpd_accounting(slave);
+			seq_printf(s, "%*s%-*s %-11s %-13s %-17u\n", 7, "", 25,
+				slave->name, genpd_get_status(slave->status),
+				"", jiffies_to_msecs(slave->power_off_jiffies));
+
+				mutex_unlock(&slave->lock);
+		}
+#ifdef CONFIG_PM_RUNTIME
+		list_for_each_entry(pdd, &gpd->dev_list, list_node) {
+			struct device *dev = pdd->dev;
+			struct dev_pm_info *power = &dev->power;
+
+			spin_lock_irq(&power->lock);
+			update_pm_runtime_accounting(dev);
+			seq_printf(s, "%*s%-*s %-11s %-13d %-17u\n", 7, "", 25,
+				dev_name(dev),
+				genpd_get_device_status(dev),
+				atomic_read(&power->usage_count),
+				jiffies_to_msecs(power->suspended_jiffies));
+			spin_unlock_irq(&power->lock);
+		}
+#endif
 	}
+
 	mutex_unlock(&gpd_list_lock);
 
-	return ret;
+	return 0;
+
 }
 
 static int pm_genpd_summary_open(struct inode *inode, struct file *file)
