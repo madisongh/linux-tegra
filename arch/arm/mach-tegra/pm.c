@@ -707,6 +707,8 @@ static void tegra_sleep_core(enum tegra_suspend_mode mode,
 			if (psci_ops.cpu_suspend) {
 				pps.id = TEGRA_ID_CPU_SUSPEND_LP1;
 				pps.type = PSCI_POWER_STATE_TYPE_POWER_DOWN;
+				pps.affinity_level =
+					TEGRA_PWR_DN_AFFINITY_CPU;
 
 				psci_ops.cpu_suspend(pps,
 					(TEGRA_RESET_HANDLER_BASE +
