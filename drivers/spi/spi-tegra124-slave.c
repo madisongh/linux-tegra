@@ -337,6 +337,8 @@ struct tegra_spi_data {
 	atomic_t			isr_expected;
 	u32				words_to_transfer;
 	int				curr_rx_pos;
+	/* common variable for tx and rx to update the actual length */
+	int				curr_pos;
 	int				rx_dma_len;
 	int				rem_len;
 	int				rx_trig_words;
@@ -669,8 +671,7 @@ static unsigned int tegra_spi_copy_spi_rxbuf_to_client_rxbuf(
 	dma_sync_single_for_cpu(tspi->dev, tspi->rx_dma_phys,
 		tspi->dma_buf_size, DMA_FROM_DEVICE);
 
-
-	dma_bytes = tspi->rx_dma_len;
+	dma_bytes = tspi->words_to_transfer * tspi->bytes_per_word;
 	npackets = fifo_bytes_to_packets(tspi, dma_bytes);
 	npackets = min(npackets, tspi->words_to_transfer);
 	if (tspi->is_packed) {
@@ -1183,6 +1184,7 @@ static int tegra_spi_start_transfer_one(struct spi_device *spi,
 	tspi->cur_spi = spi;
 	tspi->curr_xfer = t;
 	tspi->curr_rx_pos = 0;
+	tspi->curr_pos = 0;
 	tspi->tx_status = 0;
 	tspi->rx_status = 0;
 	total_fifo_words = tegra_spi_calculate_curr_xfer_param(spi, tspi, t);
@@ -1473,47 +1475,113 @@ static int tegra_spi_handle_message(struct tegra_spi_data *tspi,
 {
 	int ret = 0;
 	long wait_status;
+	unsigned pending_rx_word_count;
+	unsigned long fifo_status;
+	unsigned long word_tfr_status;
+	unsigned long actual_words_xferrd;
 
 	/* we are here, so no io-error and received the expected num bytes
 	 * expect in variable length case where received <= expected
 	 */
-	/* TODO: handle variable length */
 	if (!tspi->is_curr_dma_xfer) {
 		if (tspi->cur_direction & DATA_DIR_RX)
 			tegra_spi_read_rx_fifo_to_client_rxbuf(tspi, xfer);
+
 	} else {
 		if (tspi->cur_direction & DATA_DIR_TX) {
-			wait_status =
-				wait_for_completion_interruptible_timeout(
-					&tspi->tx_dma_complete,
-					SPI_DMA_TIMEOUT);
-			if (wait_status <= 0) {
+			if ((IS_SPI_CS_INACTIVE(tspi->status_reg)) &&
+				tspi->variable_length_transfer) {
 				dmaengine_terminate_all(tspi->tx_dma_chan);
-				dump_regs(dbg, tspi,
-					"tx-dma-timeout [wait:%ld]",
-					wait_status);
+				async_tx_ack(tspi->tx_dma_desc);
 				reset_controller(tspi);
-				ret = -EIO;
-				return ret;
+			} else {
+				wait_status =
+				      wait_for_completion_interruptible_timeout(
+						&tspi->tx_dma_complete,
+						SPI_DMA_TIMEOUT);
+				if (wait_status <= 0) {
+					dmaengine_terminate_all(
+							tspi->tx_dma_chan);
+					dump_regs(dbg, tspi,
+						"tx-dma-timeout [wait:%ld]",
+						wait_status);
+					reset_controller(tspi);
+					ret = -EIO;
+					return ret;
+				}
 			}
 		}
 		if (tspi->cur_direction & DATA_DIR_RX) {
-			wait_status = wait_for_completion_interruptible_timeout(
-					&tspi->rx_dma_complete,
-					SPI_DMA_TIMEOUT);
-			if (wait_status <= 0) {
+			if ((IS_SPI_CS_INACTIVE(tspi->status_reg)) &&
+				tspi->variable_length_transfer) {
+
 				dmaengine_terminate_all(tspi->rx_dma_chan);
-				dump_regs(dbg, tspi,
+				async_tx_ack(tspi->rx_dma_desc);
+
+				fifo_status =
+					tegra_spi_readl(tspi, SPI_FIFO_STATUS);
+
+				pending_rx_word_count =
+					SPI_RX_FIFO_FULL_COUNT(fifo_status);
+
+				word_tfr_status =
+					DIV_ROUND_UP(tspi->words_to_transfer ,
+						tspi->words_per_32bit);
+
+				actual_words_xferrd =
+					word_tfr_status - pending_rx_word_count;
+
+				while (pending_rx_word_count > 0) {
+
+					tspi->rx_dma_buf[actual_words_xferrd] =
+						tegra_spi_readl(tspi,
+							SPI_RX_FIFO);
+
+					actual_words_xferrd++;
+					pending_rx_word_count--;
+				}
+			} else {
+				wait_status =
+				      wait_for_completion_interruptible_timeout(
+						&tspi->rx_dma_complete,
+						SPI_DMA_TIMEOUT);
+				if (wait_status <= 0) {
+					dmaengine_terminate_all(
+							tspi->rx_dma_chan);
+					dump_regs(dbg, tspi,
 						"rx-dma-timeout [wait:%ld]",
 						wait_status);
-				reset_controller(tspi);
-				ret = -EIO;
-				return ret;
+					reset_controller(tspi);
+					ret = -EIO;
+					return ret;
+				}
 			}
-		}
-		if (tspi->cur_direction & DATA_DIR_RX)
 			tegra_spi_copy_spi_rxbuf_to_client_rxbuf(tspi, xfer);
+		}
 	}
+
+	/* For TX direction, It might be possible that CS deassert happens
+	 * before the tranfer completion(variable length case). In this scenario
+	 * actual transferred data is less than the requested data. So to update
+	 * the curr_pos(and finally xfer->len) read the data transfer count from
+	 * SPI_TRANS_STATUS and update the xfer->len accordingly.
+	 *
+	 * In case of RX direction, tspi->curr_rx_pos contains actual received
+	 * data. We can directly use it to update the xfer->len.
+	 */
+	if (tspi->cur_direction & DATA_DIR_TX) {
+		tspi->curr_pos += tspi->words_to_transfer * tspi->bytes_per_word;
+		tspi->rem_len -= tspi->curr_pos;
+	} else {
+		tspi->curr_pos = tspi->curr_rx_pos;
+	}
+
+	if (tspi->curr_pos == xfer->len ||
+				(IS_SPI_CS_INACTIVE(tspi->status_reg) &&
+				tspi->variable_length_transfer))
+		xfer->len = tspi->curr_pos;
+
+
 	return ret;
 }
 
@@ -1564,7 +1632,10 @@ static int tegra_spi_transfer_one_message(struct spi_master *master,
 		if (ret < 0)
 			goto exit;
 
-		msg->actual_length += (xfer->len - tspi->rem_len);
+		if (tspi->variable_length_transfer)
+			msg->actual_length += xfer->len;
+		else
+			msg->actual_length += (xfer->len - tspi->rem_len);
 
 #ifdef PROFILE_SPI_SLAVE
 		{
