@@ -1380,7 +1380,7 @@ static void handle_dma_based_err_xfer(struct tegra_spi_data *tspi)
 
 static int tegra_spi_wait_on_message_xfer(struct tegra_spi_data *tspi)
 {
-	int ret;
+	long ret;
 	unsigned long timeout;
 
 	/* delay_usecs is used as timeout for slave, value of 0 is inf wait.
@@ -1402,7 +1402,7 @@ static int tegra_spi_wait_on_message_xfer(struct tegra_spi_data *tspi)
 		}
 		if (ret == 0)
 			dev_info(tspi->dev, "Timeout waiting for master\n");
-		dump_regs(dbg, tspi, "spi-int-timeout [ret:%d]", ret);
+		dump_regs(dbg, tspi, "spi-int-timeout [ret:%ld]", ret);
 		if (tspi->is_curr_dma_xfer &&
 				(tspi->cur_direction & DATA_DIR_TX))
 			dmaengine_terminate_all(tspi->tx_dma_chan);
@@ -1685,15 +1685,24 @@ static struct tegra_spi_platform_data *tegra_spi_parse_dt(
 	return pdata;
 }
 
+/* Work around for HW bug 1317495  */
 static struct tegra_spi_chip_data tegra124_spi_chip_data = {
 	.intr_mask_reg = false,
 	.mask_cs_inactive_intr = true,
+};
+
+static struct tegra_spi_chip_data tegra210_spi_chip_data = {
+	.intr_mask_reg = true,
+	.mask_cs_inactive_intr = false,
 };
 
 static struct of_device_id tegra_spi_of_match[] = {
 	{
 		.compatible = "nvidia,tegra124-spi-slave",
 		.data       = &tegra124_spi_chip_data,
+	}, {
+		.compatible = "nvidia,tegra210-spi-slave",
+		.data       = &tegra210_spi_chip_data,
 	},
 	{}
 };
@@ -1705,6 +1714,7 @@ static int tegra_spi_probe(struct platform_device *pdev)
 	struct tegra_spi_data	*tspi;
 	struct resource		*r;
 	struct tegra_spi_platform_data *pdata = pdev->dev.platform_data;
+	struct device_node *np;
 	const struct of_device_id *match;
 	const struct tegra_spi_chip_data *chip_data = &tegra124_spi_chip_data;
 	int ret, spi_irq;
@@ -1762,8 +1772,13 @@ static int tegra_spi_probe(struct platform_device *pdev)
 	tspi->clk_pin = (char *)pdata->clk_pin;
 	if (tspi->clk_pin) {
 		tspi->clk_pin_state_enabled = true;
-		tspi->pctl_dev = pinctrl_get_dev_from_of_compatible
-			("nvidia,tegra124-pinmux");
+		np = of_find_node_by_name(NULL, "pinmux");
+		if (!np) {
+			ret = -EINVAL;
+			dev_err(&pdev->dev, "no pinmux found\n");
+			goto exit_free_master;
+		}
+		tspi->pctl_dev = pinctrl_get_dev_from_of_node(np);
 		if (!tspi->pctl_dev) {
 			ret = -EINVAL;
 			dev_err(&pdev->dev, "invalid pinctrl\n");
@@ -1771,6 +1786,7 @@ static int tegra_spi_probe(struct platform_device *pdev)
 		}
 		tspi->clk_pin_group = pinctrl_get_group_from_group_name
 			(tspi->pctl_dev, tspi->clk_pin);
+
 		if (tspi->clk_pin_group < 0) {
 			ret = tspi->clk_pin_group;
 			dev_err(&pdev->dev, "invalid clk_pin group\n");
