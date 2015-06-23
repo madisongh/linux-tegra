@@ -1963,6 +1963,7 @@ static int find_best_tap_value(struct tegra_tuning_data *tuning_data,
 	u8 i = 0, sel_win = 0;
 	int pref_win = 0, curr_win_size = 0;
 	int best_tap_value = 0;
+	static int prev_best_tap;
 
 	for (i = 0; i < tuning_data->num_of_valid_tap_wins; i++) {
 		tap_data = &temp_tap_data[i];
@@ -1999,9 +2000,16 @@ static int find_best_tap_value(struct tegra_tuning_data *tuning_data,
 			tuning_data->calc_values.t2t_vmax);
 	}
 
-	pr_info("best tap win - (%d-%d), best tap value %d\n",
-		tap_data->win_start, tap_data->win_end, best_tap_value);
-	return best_tap_value;
+	pr_info("best tap win - (%d-%d), best tap value %d prev_best_tap %d\n",
+			tap_data->win_start, tap_data->win_end,
+			best_tap_value, prev_best_tap);
+	if (prev_best_tap >= tap_data->win_start &&
+			prev_best_tap <= tap_data->win_end)
+		return best_tap_value;
+	else {
+		prev_best_tap = best_tap_value;
+		return -EAGAIN;
+	}
 }
 
 static int sdhci_tegra_calculate_best_tap(struct sdhci_host *sdhci,
@@ -2053,6 +2061,10 @@ static int sdhci_tegra_calculate_best_tap(struct sdhci_host *sdhci,
 		best_tap_value = find_best_tap_value(tuning_data,
 			temp_tap_data, vmin);
 
+		if (best_tap_value == -EAGAIN) {
+			err = -EAGAIN;
+			break;
+		}
 		if (best_tap_value < 0)
 			vmin += 50;
 	} while (best_tap_value < 0);
@@ -3120,7 +3132,7 @@ static int sdhci_tegra_execute_tuning(struct sdhci_host *sdhci, u32 opcode)
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	struct tegra_tuning_data *tuning_data;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
-	int err;
+	int err = 0;
 	u16 ctrl_2;
 	u32 misc_ctrl;
 	u32 ier;
@@ -3188,49 +3200,56 @@ static int sdhci_tegra_execute_tuning(struct sdhci_host *sdhci, u32 opcode)
 		force_retuning = true;
 		tegra_host->force_retune = false;
 	}
-
-	tegra_host->tuning_status = 0;
-	err = sdhci_tegra_get_tuning_constraints(sdhci, force_retuning);
-	if (err) {
-		dev_err(mmc_dev(sdhci->mmc),
-			"Failed to get tuning constraints\n");
-		goto out;
-	}
-
-	for (i = 0; i < tegra_host->tuning_freq_count; i++) {
-		tuning_data = &tegra_host->tuning_data[i];
-		if (tuning_data->tuning_done && !force_retuning)
-			continue;
-
-		SDHCI_TEGRA_DBG("%s: Setting tuning freq%d\n",
-			mmc_hostname(sdhci->mmc), tuning_data->freq_hz);
-		tegra_sdhci_set_clock(sdhci, tuning_data->freq_hz);
-
-		SDHCI_TEGRA_DBG("%s: Calculating estimated tuning values\n",
-			mmc_hostname(sdhci->mmc));
-		err = calculate_estimated_tuning_values(tegra_host->speedo,
-			tuning_data, tegra_host->boot_vcore_mv);
-		if (err)
+	do {
+		tegra_host->tuning_status = 0;
+		err = sdhci_tegra_get_tuning_constraints(sdhci, force_retuning);
+		if (err) {
+			dev_err(mmc_dev(sdhci->mmc),
+					"Failed to get tuning constraints\n");
 			goto out;
-
-		SDHCI_TEGRA_DBG("Running tuning...\n");
-		err = sdhci_tegra_run_tuning(sdhci, tuning_data);
-		if (err)
-			goto out;
-
-		SDHCI_TEGRA_DBG("calculating best tap value\n");
-		err = sdhci_tegra_calculate_best_tap(sdhci, tuning_data);
-		if (err)
-			goto out;
-
-		err = sdhci_tegra_verify_best_tap(sdhci);
-		if (!err && !set_retuning) {
-			tuning_data->tuning_done = true;
-			tegra_host->tuning_status |= TUNING_STATUS_DONE;
-		} else {
-			tegra_host->tuning_status |= TUNING_STATUS_RETUNE;
 		}
-	}
+
+		for (i = 0; i < tegra_host->tuning_freq_count; i++) {
+			tuning_data = &tegra_host->tuning_data[i];
+			if (tuning_data->tuning_done && !force_retuning)
+				continue;
+
+			SDHCI_TEGRA_DBG("%s: Setting tuning freq%d\n",
+				mmc_hostname(sdhci->mmc), tuning_data->freq_hz);
+			tegra_sdhci_set_clock(sdhci, tuning_data->freq_hz);
+
+			SDHCI_TEGRA_DBG(
+				"%s: Calculating estimated tuning values\n",
+				mmc_hostname(sdhci->mmc));
+			err = calculate_estimated_tuning_values(
+					tegra_host->speedo, tuning_data,
+					tegra_host->boot_vcore_mv);
+			if (err)
+				goto out;
+
+			SDHCI_TEGRA_DBG("Running tuning...\n");
+			err = sdhci_tegra_run_tuning(sdhci, tuning_data);
+			if (err)
+				goto out;
+
+			SDHCI_TEGRA_DBG("calculating best tap value\n");
+			err = sdhci_tegra_calculate_best_tap(sdhci,
+					tuning_data);
+			if (err == -EAGAIN)
+				break;
+			else if (err)
+				goto out;
+
+			err = sdhci_tegra_verify_best_tap(sdhci);
+			if (!err && !set_retuning) {
+				tuning_data->tuning_done = true;
+				tegra_host->tuning_status |= TUNING_STATUS_DONE;
+			} else {
+				tegra_host->tuning_status |=
+					TUNING_STATUS_RETUNE;
+			}
+		}
+	} while (err == -EAGAIN);
 out:
 	/* Release any override core voltages set */
 	sdhci_tegra_set_tuning_voltage(sdhci, 0);
