@@ -770,6 +770,12 @@ static int qspi_read(struct mtd_info *mtd, loff_t from, size_t len,
 	spi_message_init(&m);
 	memset(t, 0, sizeof(t));
 
+	/* take lock here to protect race condition
+	 * in case of concurrent read and write with
+	 * different cmd_mode selection.
+	 */
+	mutex_lock(&flash->lock);
+
 	/* Set Controller data Parameters
 	 * Set DDR/SDR, X1/X4 and Dummy Cycles from DT
 	 */
@@ -869,7 +875,6 @@ static int qspi_read(struct mtd_info *mtd, loff_t from, size_t len,
 		spi_message_add_tail(&t[2], &m);
 	}
 
-	mutex_lock(&flash->lock);
 #if defined(QMODE_SWITCH_OPTIMIZED)
 	qspi_qpi_flag_set(flash, FALSE);
 #endif
@@ -896,12 +901,12 @@ static int qspi_read(struct mtd_info *mtd, loff_t from, size_t len,
 	}
 
 #endif
-	mutex_unlock(&flash->lock);
 
 	*retlen = m.actual_length -
 		(flash->cmd_table.qaddr.len + 1 +
 		(flash->cmd_table.qaddr.dummy_cycles/8));
 
+	mutex_unlock(&flash->lock);
 	return 0;
 }
 
@@ -921,6 +926,8 @@ static int qspi_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 	pr_debug("%s: %s to 0x%08x, len %zd\n", dev_name(&flash->spi->dev),
 			__func__, (u32)to, len);
+
+	mutex_lock(&flash->lock);
 
 	/* Set Controller data Parameters
 	 * Set DDR/SDR, X1/X4 and Dummy Cycles from DT
@@ -969,8 +976,6 @@ static int qspi_write(struct mtd_info *mtd, loff_t to, size_t len,
 		t[1].cs_change = TRUE;
 		spi_message_add_tail(&t[1], &m);
 		/* Wait until finished previous write command. */
-
-		mutex_lock(&flash->lock);
 
 		if ((flash->cmd_table.qcmd.bus_width == X4)
 			&& !err)
@@ -1037,8 +1042,6 @@ clear_qmode:
 
 		t[1].cs_change = TRUE;
 		spi_message_add_tail(&t[1], &m);
-
-		mutex_lock(&flash->lock);
 
 		if ((flash->cmd_table.qcmd.bus_width == X4) && !err)
 			err = qspi_qpi_flag_set(flash, TRUE);
