@@ -35,6 +35,10 @@
 		fastboot-instructions = "Tap on power button to navigate menu options.\nHold down power button for 2 sec and release for selecting an option.\nOem unlock may take upto 2 hours.\n";
 	};
 
+	xusb_padctl {
+		nvidia,enable-sata-port;
+	};
+
 	sata@70020000 {
 		status = "okay";
 		nvidia,enable-sata-port;
