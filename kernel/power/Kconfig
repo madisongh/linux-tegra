@@ -288,7 +288,7 @@ config PM_CLK
 	depends on PM && HAVE_CLK
 
 config PM_GENERIC_DOMAINS
-	bool
+	bool "Generic power domains for runtime power management"
 	depends on PM
 
 config WQ_POWER_EFFICIENT_DEFAULT
