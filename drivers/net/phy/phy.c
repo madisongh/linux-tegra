@@ -48,6 +48,7 @@
 #include <linux/uaccess.h>
 #include <linux/brcmphy.h>
 #include <linux/atomic.h>
+#include <linux/tegra-soc.h>
 
 #include <asm/irq.h>
 
@@ -681,7 +682,10 @@ phy_err:
 int phy_start_interrupts(struct phy_device *phydev)
 {
 	atomic_set(&phydev->irq_disable, 0);
-	if (request_irq(phydev->irq, phy_interrupt, 0, "phy_interrupt",
+	/* phy intr is shared with power_intr on FPGA system */
+	if (request_irq(phydev->irq, phy_interrupt,
+			tegra_platform_is_unit_fpga() ? IRQF_SHARED : 0,
+			"phy_interrupt",
 			phydev) < 0) {
 		pr_warn("%s: Can't get IRQ %d (PHY)\n",
 			phydev->bus->name, phydev->irq);
