@@ -3,7 +3,7 @@
  *
  * Author: Mike Lavender, mike@steroidmicros.com
  * Copyright (c) 2005, Intec Automation Inc.
- * Copyright (C) 2013-2014 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2013-2015 NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -281,6 +281,9 @@ static const struct spi_device_id qspi_ids[] = {
 	 */
 	{	"s25fl128s",
 		INFO(0x012018, 0, 64 * 1024, 256, 4 * 1024, 8, 0, 0x21, 256, 0)
+	},
+	{	"s25fs256s",
+		INFO(0x010219, 0, 256 * 1024, 128, 4 * 1024, 8, 0, 0x21, 256, 0)
 	},
 	{	"s25fl512s",
 		INFO(0x010220, 0, 256 * 1024, 256, 4 * 1024, 8, 0, 0x21, 512, 0)

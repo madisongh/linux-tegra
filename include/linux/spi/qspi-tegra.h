@@ -44,6 +44,7 @@ struct tegra_qspi_device_controller_data {
 	u32 x4_dymmy_cycle;
 	bool x4_is_ddr;
 	bool ifddr_div2_sdr;
+	bool is_combined_seq_mode_en;
 };
 
 enum qspi_bus_width {
