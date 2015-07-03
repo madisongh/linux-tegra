@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2005 Ben Gardner <bgardner@wabtec.com>
  *  Copyright (C) 2007 Marvell International Ltd.
- *  Copyright (C) 2014 - 2015 NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (C) 2014-2016 NVIDIA CORPORATION.  All rights reserved.
  *
  *  Derived from drivers/i2c/chips/pca9539.c
  *
@@ -19,6 +19,7 @@
 #include <linux/i2c.h>
 #include <linux/platform_data/pca953x.h>
 #include <linux/slab.h>
+#include <linux/regulator/consumer.h>
 #ifdef CONFIG_OF_GPIO
 #include <linux/of_platform.h>
 #endif
@@ -102,7 +103,7 @@ struct pca953x_chip {
 	u8 irq_trig_raise[MAX_BANK];
 	u8 irq_trig_fall[MAX_BANK];
 #endif
-
+	struct regulator *vcc_reg;
 	struct i2c_client *client;
 	struct gpio_chip gpio_chip;
 	const char *const *names;
@@ -702,6 +703,26 @@ static int pca953x_probe(struct i2c_client *client,
 
 	chip->chip_type = PCA_CHIP_TYPE(chip->driver_data);
 
+	chip->vcc_reg = devm_regulator_get(&client->dev, "vcc");
+	if (PTR_ERR(chip->vcc_reg) == -ENODEV) {
+		dev_info(&client->dev,
+			"no regulator found for vcc, Assuming vcc is always powered");
+		chip->vcc_reg = NULL;
+	} else if (IS_ERR(chip->vcc_reg)) {
+		ret = PTR_ERR(chip->vcc_reg);
+		dev_err(&client->dev,
+			"vcc regulator get failed, err %ld\n", ret);
+		return ret;
+	}
+
+	if (chip->vcc_reg) {
+		ret = regulator_enable(chip->vcc_reg);
+		if (ret < 0) {
+			dev_err(&client->dev, "failed to enable vcc\n");
+			return ret;
+		}
+	}
+
 	mutex_init(&chip->i2c_lock);
 
 	/* initialize cached registers from their original values.
@@ -714,15 +735,15 @@ static int pca953x_probe(struct i2c_client *client,
 	else
 		ret = device_pca957x_init(chip, invert);
 	if (ret)
-		return ret;
+		goto fail;
 
 	ret = gpiochip_add(&chip->gpio_chip);
 	if (ret)
-		return ret;
+		goto fail;
 
 	ret = pca953x_irq_setup(chip, irq_base);
 	if (ret)
-		return ret;
+		goto fail;
 
 	if (pdata && pdata->setup) {
 		ret = pdata->setup(client, chip->gpio_chip.base,
@@ -733,6 +754,12 @@ static int pca953x_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, chip);
 	return 0;
+
+fail:
+	if (chip->vcc_reg)
+		regulator_disable(chip->vcc_reg);
+
+	return ret;
 }
 
 static int pca953x_remove(struct i2c_client *client)
@@ -750,6 +777,9 @@ static int pca953x_remove(struct i2c_client *client)
 			return ret;
 		}
 	}
+
+	if (chip->vcc_reg)
+		regulator_disable(chip->vcc_reg);
 
 	gpiochip_remove(&chip->gpio_chip);
 
@@ -800,6 +830,10 @@ MODULE_DEVICE_TABLE(of, pca953x_dt_ids);
 #ifdef CONFIG_PM_SLEEP
 static int pca953x_suspend(struct device *dev)
 {
+	struct pca953x_chip *chip = i2c_get_clientdata(to_i2c_client(dev));
+
+	if (chip->vcc_reg)
+		regulator_disable(chip->vcc_reg);
 	return 0;
 }
 
@@ -810,6 +844,14 @@ static int pca953x_resume(struct device *dev)
 	int reg_count = NBANK(chip);
 	int i, reg_out, reg_dir;
 	int ret = 0;
+
+	if (chip->vcc_reg) {
+		ret = regulator_enable(chip->vcc_reg);
+		if (ret < 0) {
+			dev_err(&client->dev, "failed to enable vcc\n");
+			return ret;
+		}
+	}
 
 	switch (chip->chip_type) {
 	case PCA953X_TYPE:
