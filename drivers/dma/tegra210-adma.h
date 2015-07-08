@@ -42,22 +42,22 @@
 #define ADMA_CH_LOWER_DESC_ADDR					0x48
 #define ADMA_CH_TRANSFER_STATUS					0x54
 
-#define ADMA_GLOBAL_CMD						0xc00
-#define ADMA_GLOBAL_SOFT_RESET					0xc04
-#define ADMA_GLOBAL_CG						0xc08
-#define ADMA_GLOBAL_STATUS					0xc10
-#define ADMA_GLOBAL_INT_STATUS					0xc14
-#define ADMA_GLOBAL_INT_MASK					0xc18
-#define ADMA_GLOBAL_INT_SET					0xc1c
-#define ADMA_GLOBAL_INT_CLEAR					0xc20
-#define ADMA_GLOBAL_CTRL					0xc24
-#define ADMA_GLOBAL_CH_INT_STATUS				0xc28
-#define ADMA_GLOBAL_CH_ENABLE_STATUS				0xc2c
-#define ADMA_GLOBAL_TX_REQUESTORS				0xc30
-#define ADMA_GLOBAL_RX_REQUESTORS				0xc34
-#define ADMA_GLOBAL_TRIGGERS					0xc38
-#define ADMA_GLOBAL_TRANSFER_ERROR_LOG				0xc3c
-#define ADMA_LAST_REG						0xc44
+#define ADMA_GLOBAL_CMD						0x00
+#define ADMA_GLOBAL_SOFT_RESET					0x04
+#define ADMA_GLOBAL_CG						0x08
+#define ADMA_GLOBAL_STATUS					0x10
+#define ADMA_GLOBAL_INT_STATUS					0x14
+#define ADMA_GLOBAL_INT_MASK					0x18
+#define ADMA_GLOBAL_INT_SET					0x1c
+#define ADMA_GLOBAL_INT_CLEAR					0x20
+#define ADMA_GLOBAL_CTRL					0x24
+#define ADMA_GLOBAL_CH_INT_STATUS				0x28
+#define ADMA_GLOBAL_CH_ENABLE_STATUS				0x2c
+#define ADMA_GLOBAL_TX_REQUESTORS				0x30
+#define ADMA_GLOBAL_RX_REQUESTORS				0x34
+#define ADMA_GLOBAL_TRIGGERS					0x38
+#define ADMA_GLOBAL_TRANSFER_ERROR_LOG				0x3c
+#define ADMA_LAST_REG						0x44
 
 /* Fields in ADMA_CH_STATUS */
 #define ADMA_CH_STATUS_CURRENT_SOURCE_MEMORY_BUFFER_SHIFT	20
@@ -155,9 +155,9 @@ enum tegra_adma_fetching_policy {
 	THRESHOLD_BASED = 1,
 };
 
-enum {
-	GLOBAL_REG,
+enum tegra_adma_addr {
 	ADDR1,
+	GLOBAL_REG,
 	ADMA_MAX_ADDR,
 };
 enum tegra_adma_burst_size {
