@@ -59,6 +59,10 @@
 		nvidia,is-emmc;
 	};
 
+        sdhci@700b0000 {
+		status = "disabled";
+	};
+
 	i2c@7000c000 {
 		pca9546@71 {
 			i2c@3 {
