@@ -299,6 +299,7 @@ struct mmc_host {
 #define MMC_CAP2_SDIO_IRQ_NOTHREAD (1 << 17)
 #define MMC_CAP2_NO_WRITE_PROTECT (1 << 18)	/* No physical write protect pin, assume that card is always read-write */
 #define MMC_CAP2_EN_STROBE (1 << 19)
+#define MMC_CAP2_HW_CQ		(1 << 23)	/* support eMMC command queue */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
