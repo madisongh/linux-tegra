@@ -87,6 +87,15 @@ struct mmc_ios {
 #define MMC_SET_DRIVER_TYPE_D	3
 };
 
+struct mmc_cmdq_host_ops {
+	int (*enable)(struct mmc_host *host);
+	void (*disable)(struct mmc_host *host, bool soft);
+	int (*request)(struct mmc_host *host, struct mmc_request *mrq);
+	int (*halt)(struct mmc_host *host, bool halt);
+	void (*post_req)(struct mmc_host *host, struct mmc_request *mrq,
+			int err);
+};
+
 struct mmc_host_ops {
 	/*
 	 * It is optional for the host to implement pre_req and post_req in
@@ -158,6 +167,26 @@ struct mmc_host_ops {
 struct mmc_card;
 struct device;
 
+struct mmc_cmdq_req {
+	unsigned int cmd_flags;
+	u32 blk_addr;
+	/* active mmc request */
+	struct mmc_request	mrq;
+	struct mmc_command	task_mgmt;
+	struct mmc_data		data;
+	struct mmc_command	cmd;
+#define DCMD	(1 << 0)
+#define QBR	(1 << 1)
+#define DIR	(1 << 2)
+#define PRIO	(1 << 3)
+#define REL_WR	(1 << 4)
+#define DAT_TAG	(1 << 5)
+#define FORCED_PRG (1 << 6)
+	unsigned int		cmdq_req_flags;
+	int			tag; /* used for command queuing */
+	u8			ctx_id;
+};
+
 struct mmc_async_req {
 	/* active mmc request */
 	struct mmc_request	*mrq;
@@ -200,6 +229,33 @@ struct mmc_context_info {
 	spinlock_t		lock;
 };
 
+enum cmdq_states {
+		CMDQ_STATE_HALT,
+		CMDQ_STATE_ERR,
+};
+
+/**
+ * mmc_cmdq_context_info - describes the contexts of cmdq
+ * @active_reqs		requests being processed
+ * @active_dcmd		dcmd in progress, don't issue any
+ *			more dcmd requests
+ * @rpmb_in_wait	do not pull any more reqs till rpmb is handled
+ * @cmdq_state		state of cmdq engine
+ * @req_starved		completion should invoke the request_fn since
+ *			no tags were available
+ * @cmdq_ctx_lock	acquire this before accessing this structure
+ */
+struct mmc_cmdq_context_info {
+	unsigned long	active_reqs; /* in-flight requests */
+	bool		active_dcmd;
+	bool		rpmb_in_wait;
+	enum cmdq_states curr_state;
+
+	/* no free tag available */
+	unsigned long	req_starved;
+	spinlock_t	cmdq_ctx_lock;
+};
+
 struct regulator;
 struct mmc_pwrseq;
 
@@ -214,6 +270,7 @@ struct mmc_host {
 	int			index;
 	const struct mmc_host_ops *ops;
 	struct mmc_pwrseq	*pwrseq;
+	const struct mmc_cmdq_host_ops *cmdq_ops;
 	unsigned int		f_min;
 	unsigned int		f_max;
 	unsigned int		f_init;
@@ -378,6 +435,16 @@ struct mmc_host {
 
 	unsigned int		slotno;	/* used for sdio acpi binding */
 
+	unsigned int	cmdq_slots;
+	struct mmc_cmdq_context_info	cmdq_ctx;
+	/*
+	 * several cmdq supporting host controllers are extensions
+	 * of legacy controllers. This variable can be used to store
+	 * a reference to the cmdq extension of the existing host
+	 * controller.
+	 */
+	void *cmdq_private;
+
 	int			dsr_req;	/* DSR value is valid */
 	u32			dsr;	/* optional driver stage (DSR) value */
 
@@ -398,6 +465,11 @@ int mmc_add_host(struct mmc_host *);
 void mmc_remove_host(struct mmc_host *);
 void mmc_free_host(struct mmc_host *);
 int mmc_of_parse(struct mmc_host *host);
+
+static inline void *mmc_cmdq_private(struct mmc_host *host)
+{
+	return host->cmdq_private;
+}
 
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
 extern void mmc_set_embedded_sdio_data(struct mmc_host *host,

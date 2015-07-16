@@ -16,6 +16,7 @@
 #include <linux/mmc/core.h>
 #include <linux/mod_devicetable.h>
 
+#define MMC_CARD_CMDQ_BLK_SIZE 512
 struct mmc_cid {
 	unsigned int		manfid;
 	char			prod_name[8];
@@ -542,5 +543,4 @@ extern void mmc_unregister_driver(struct mmc_driver *);
 
 extern void mmc_fixup_device(struct mmc_card *card,
 			     const struct mmc_fixup *table);
-extern void mmc_blk_cmdq_req_done(struct mmc_request *mrq);
 #endif /* LINUX_MMC_CARD_H */

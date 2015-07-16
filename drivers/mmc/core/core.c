@@ -306,6 +306,38 @@ static int mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 	return 0;
 }
 
+static void mmc_start_cmdq_request(struct mmc_host *host,
+		struct mmc_request *mrq)
+{
+	if (mrq->data) {
+		pr_debug("%s:     blksz %d blocks %d flags %08x tsac %lu ms nsac %d\n",
+			mmc_hostname(host), mrq->data->blksz,
+			mrq->data->blocks, mrq->data->flags,
+			mrq->data->timeout_ns / NSEC_PER_MSEC,
+			mrq->data->timeout_clks);
+	}
+
+	if (mrq->cmd) {
+		mrq->cmd->error = 0;
+		mrq->cmd->mrq = mrq;
+	}
+	if (mrq->data) {
+		BUG_ON(mrq->data->blksz > host->max_blk_size);
+		BUG_ON(mrq->data->blocks > host->max_blk_count);
+		BUG_ON(mrq->data->blocks * mrq->data->blksz >
+			host->max_req_size);
+
+		if (mrq->cmd)
+			mrq->cmd->data = mrq->data;
+		mrq->data->error = 0;
+		mrq->data->mrq = mrq;
+	}
+
+	led_trigger_event(host->led, LED_FULL);
+
+	host->cmdq_ops->request(host, mrq);
+}
+
 /**
  *	mmc_start_bkops - start BKOPS for supported cards
  *	@card: MMC card to start BKOPS
@@ -568,6 +600,63 @@ static void mmc_post_req(struct mmc_host *host, struct mmc_request *mrq,
 	if (host->ops->post_req)
 		host->ops->post_req(host, mrq, err);
 }
+
+/**
+  *	mmc_cmdq_post_req - post process of a completed request
+  *	@host: host instance
+  *	@mrq: the request to be processed
+  *	@err: non-zero is error, success otherwise
+  */
+void mmc_cmdq_post_req(struct mmc_host *host, struct mmc_request *mrq, int err)
+{
+	if (host->cmdq_ops->post_req)
+		host->cmdq_ops->post_req(host, mrq, err);
+}
+EXPORT_SYMBOL(mmc_cmdq_post_req);
+
+/**
+ *	mmc_cmdq_halt - halt/un-halt the command queue engine
+ *	@host: host instance
+ *	@halt: true - halt, un-halt otherwise
+ *
+ *	Host halts the command queue engine. It should complete
+ *	the ongoing transfer and release the SD bus.
+ *	All legacy SD commands can be sent upon successful
+ *	completion of this function.
+ *	Returns 0 on success, negative otherwise
+ */
+int mmc_cmdq_halt(struct mmc_host *host, bool halt)
+{
+	int err = 0;
+
+	if ((halt && (host->cmdq_ctx.curr_state & CMDQ_STATE_HALT)) ||
+	    (!halt && !(host->cmdq_ctx.curr_state & CMDQ_STATE_HALT)))
+		return 1;
+
+	if (host->cmdq_ops->halt) {
+		err = host->cmdq_ops->halt(host, halt);
+		if (!err && halt)
+			host->cmdq_ctx.curr_state |= CMDQ_STATE_HALT;
+		else if (!err && !halt)
+			host->cmdq_ctx.curr_state &= ~CMDQ_STATE_HALT;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(mmc_cmdq_halt);
+
+int mmc_cmdq_start_req(struct mmc_host *host, struct mmc_cmdq_req *cmdq_req)
+{
+	struct mmc_request *mrq = &cmdq_req->mrq;
+
+	mrq->host = host;
+	if (mmc_card_removed(host->card)) {
+		mrq->cmd->error = -ENOMEDIUM;
+		return -ENOMEDIUM;
+	}
+	mmc_start_cmdq_request(host, mrq);
+	return 0;
+}
+EXPORT_SYMBOL(mmc_cmdq_start_req);
 
 /**
  *	mmc_start_req - start a non-blocking request
