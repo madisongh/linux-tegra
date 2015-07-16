@@ -13,6 +13,9 @@
 #define LINUX_MMC_CQ_HCI_H
 #include <linux/mmc/core.h>
 
+#define CQE_BASE	0xF000
+#define CQE_RES_SZ	0x100
+
 /* registers */
 #define CQVER		0x00
 #define CQCAP		0x04
@@ -137,6 +140,9 @@ struct cmdq_host {
 	struct completion halt_comp;
 	spinlock_t cmdq_lock;
 	struct mmc_request **mrq_slot;
+	struct mmc_data *data;	/* Current data request */
+	size_t desc_size;
+	size_t data_size;
 	void *private;
 };
 

@@ -583,20 +583,6 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		card->ext_csd.data_sector_size = 512;
 	}
 
-	if (card->ext_csd.rev >= 7) {
-		card->ext_csd.cmdq_support = ext_csd[EXT_CSD_CMDQ_SUPPORT];
-		if (card->ext_csd.cmdq_support) {
-			pr_info("%s: %s: CMDQ supported: depth: %d, cmdq_support: %d\n",
-					mmc_hostname(card->host), __func__,
-					card->ext_csd.cmdq_depth,
-					card->ext_csd.cmdq_support);
-			card->ext_csd.cmdq_depth = ext_csd[EXT_CSD_CMDQ_DEPTH];
-		}
-	} else {
-		card->ext_csd.cmdq_support = 0;
-		card->ext_csd.cmdq_depth = 0;
-	}
-
 	/* eMMC v5 or later */
 	if (card->ext_csd.rev >= 7) {
 		memcpy(card->ext_csd.fwrev, &ext_csd[EXT_CSD_FIRMWARE_VERSION],
@@ -604,6 +590,23 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		card->ext_csd.ffu_capable =
 			(ext_csd[EXT_CSD_SUPPORTED_MODE] & 0x1) &&
 			!(ext_csd[EXT_CSD_FW_CONFIG] & 0x1);
+		/*
+		 * Set card->ext_csd.cmdq_support to 0 to disable CQ.
+		 */
+		card->ext_csd.cmdq_support = ext_csd[EXT_CSD_CMDQ_SUPPORT];
+		if (card->ext_csd.cmdq_support)
+			card->ext_csd.cmdq_depth = ext_csd[EXT_CSD_CMDQ_DEPTH];
+
+		if ((card->host->caps2 & MMC_CAP2_HW_CQ) &&
+				(card->ext_csd.cmdq_support)) {
+			pr_info("%s: %s: CMDQ supported: depth: %d, cmdq_support: %d\n",
+				mmc_hostname(card->host), __func__,
+				card->ext_csd.cmdq_depth,
+				card->ext_csd.cmdq_support);
+		} else {
+			card->ext_csd.cmdq_support = 0;
+			card->ext_csd.cmdq_depth = 0;
+		}
 	}
 out:
 	return err;

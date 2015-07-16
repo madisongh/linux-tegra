@@ -162,6 +162,7 @@ struct mmc_host_ops {
 	int	(*multi_io_quirk)(struct mmc_card *card,
 				  unsigned int direction, int blk_size);
 	void	(*post_init)(struct mmc_host *host);
+	void	(*clear_cqe_intr)(struct mmc_host *host, u32 intmask);
 };
 
 struct mmc_card;
