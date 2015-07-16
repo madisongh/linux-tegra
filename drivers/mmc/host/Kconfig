@@ -784,3 +784,16 @@ config MMC_MTK
 	  If you have a machine with a integrated SD/MMC card reader, say Y or M here.
 	  This is needed if support for any SD/SDIO/MMC devices is required.
 	  If unsure, say N.
+
+config MMC_CQ_HCI
+	tristate "Command Queue Support"
+	depends on HAS_DMA
+	help
+		This selects the Command Queue Host Controller Interface (CQHCI)
+		support present in host controllers of Qualcomm Technologies, Inc
+		amongst others.
+		This controller supports eMMC devices with command queue support.
+
+		If you have a controller with this interface, say Y or M here.
+
+		If unsure, say N.
