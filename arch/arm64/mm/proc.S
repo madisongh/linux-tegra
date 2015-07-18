@@ -117,13 +117,14 @@ ENTRY(cpu_do_suspend)
 	mrs	x9, vbar_el1
 	mrs	x10, mdscr_el1
 	mrs	x11, oslsr_el1
-	mrs	x12, sctlr_el1
+	mrs	x12, s3_1_c15_c2_0
+	mrs	x13, sctlr_el1
 	stp	x2, x3, [x0]
 	stp	x4, x5, [x0, #16]
 	stp	x6, x7, [x0, #32]
 	stp	x8, x9, [x0, #48]
 	stp	x10, x11, [x0, #64]
-	str	x12, [x0, #80]
+	stp	x12, x13, [x0, #80]
 	ret
 ENDPROC(cpu_do_suspend)
 
@@ -146,7 +147,7 @@ ENTRY(cpu_do_resume)
 	ldp	x6, x7, [x0, #32]
 	ldp	x8, x9, [x0, #48]
 	ldp	x10, x11, [x0, #64]
-	ldr	x12, [x0, #80]
+	ldp	x12, x13, [x0, #80]
 	msr	tpidr_el0, x2
 	msr	tpidrro_el0, x3
 	msr	contextidr_el1, x4
@@ -163,7 +164,20 @@ ENTRY(cpu_do_resume)
 	 */
 	ubfx	x11, x11, #1, #1
 	msr	oslar_el1, x11
-	mov	x0, x12
+	mrs	x2, midr_el1
+	/*
+	 * cpuactlr_el1 is an implementation defined register
+	 * and Denver uses it to indicate the power state to enter.
+	 * If restored same value on restore then it is possible
+	 * that CPU would enter unexpected power state on next WFI.
+	 * Hence skip restoring this register for Denver.
+	 */
+	lsr	x2, x2, #24
+	cmp	x2, #0x4e
+	beq	skip_actlr_restore
+	msr	s3_1_c15_c2_0, x12
+skip_actlr_restore:
+	mov	x0, x13
 	dsb	nsh		// Make sure local tlb invalidation completed
 	isb
 	ret
