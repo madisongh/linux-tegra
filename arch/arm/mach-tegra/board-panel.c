@@ -100,7 +100,7 @@ int tegra_panel_gpio_get_dt(const char *comp_str,
 				struct tegra_panel_of *panel)
 {
 	int cnt = 0;
-	char *label;
+	char *label = NULL;
 	const char *node_status;
 	int err = 0;
 	struct device_node *node =
