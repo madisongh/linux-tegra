@@ -1036,7 +1036,10 @@ void __init tegra11x_init_early(void)
 #ifdef CONFIG_ARCH_TEGRA_12x_SOC
 void __init tegra12x_init_early(void)
 {
-	if (of_find_compatible_node(NULL, NULL, "arm,psci"))
+	struct device_node *np =
+		of_find_compatible_node(NULL, NULL, "arm,psci");
+
+	if (np && of_device_is_available(np))
 		tegra_with_secure_firmware = 1;
 
 	display_tegra_dt_info();
