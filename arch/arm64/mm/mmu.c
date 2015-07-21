@@ -470,12 +470,61 @@ static void __init fixup_executable(void)
 }
 
 #ifdef CONFIG_DEBUG_RODATA
+#ifdef CONFIG_DEBUG_RODATA_TEST
+static const int rodata_test_data = 0xC3;
+
+static noinline void rodata_test(void)
+{
+	int result;
+
+	pr_info("%s: attempting to write to read-only section:\n", __func__);
+
+	if (*(volatile int *)&rodata_test_data != 0xC3) {
+		pr_err("read only data changed before test\n");
+		return;
+	}
+
+	/*
+	 * Attempt to write to rodata_test_data, trappint the expected
+	 * data abort. If the trap executer, result will be 1. If it didn't,
+	 * result will be oxFF.
+	 */
+	asm volatile(
+		"0:	str	%[zero], [%[rodata_test_data]]\n"
+		"	mov	%[result], #0xFF\n"
+		"	b 	2f\n"
+		"1:	mov	%[result], #1\n"
+		"2:\n"
+
+		/* Exception fixup - if store at label 0 faults, jumps to 1 */
+		".pushsection __ex_table,\"a\"\n"
+		"	.quad 0b, 1b\n"
+		".popsection\n"
+
+		: [result] "=r" (result)
+		: [rodata_test_data] "r" (&rodata_test_data), [zero] "r" (0)
+		: "memory"
+	);
+
+	if (result == 1)
+		pr_info("write to read-only section trapped, success\n");
+	else
+		pr_err("write to read-only section NOT trapped, test failed\n");
+
+	if (*(volatile int *)&rodata_test_data != 0xC3)
+		pr_err("read only data changed during write\n");
+}
+#else
+static inline void rodata_test(void) { }
+#endif
+
 void mark_rodata_ro(void)
 {
 	create_mapping_late(__pa(_stext), (unsigned long)_stext,
 				(unsigned long)_etext - (unsigned long)_stext,
 				PAGE_KERNEL_ROX);
 
+	rodata_test();
 }
 #endif
 
