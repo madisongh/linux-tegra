@@ -167,10 +167,13 @@ static inline bool vbus_enabled(struct tegra_udc *udc)
 		 * of VBUS status.*/
 		status = (udc_readl(udc, VBUS_SENSOR_REG_OFFSET)
 						& USB_SYS_VBUS_ASESSION);
-	} else if (!udc->support_pmu_vbus) {
+	} else if (udc->support_pmu_vbus) {
+		if (udc->vbus_extcon_dev != NULL &&
+			extcon_get_cable_state(udc->vbus_extcon_dev, "USB"))
+			status = true;
+	} else
 		status = (udc_readl(udc, VBUS_WAKEUP_REG_OFFSET)
 						& USB_SYS_VBUS_STATUS);
-	}
 
 	return status;
 }
