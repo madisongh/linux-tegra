@@ -501,6 +501,7 @@ static void tegra_stop_host(struct tegra_otg *tegra)
 			platform_device_unregister(pdev);
 		else {
 			of_device_unregister(pdev);
+			of_node_clear_flag(tegra->ehci_node, OF_POPULATED);
 			of_node_put(tegra->ehci_node);
 		}
 		tegra->pdev = NULL;
