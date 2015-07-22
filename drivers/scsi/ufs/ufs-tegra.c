@@ -59,6 +59,46 @@ static int ufs_tegra_host_clk_enable(struct device *dev,
 	return err;
 }
 
+/**
+ * ufs_tegra_mphy_receiver_calibration
+ * @ufs_tegra: ufs_tegra_host controller instance
+ *
+ * Implements MPhy Receiver Calibration Sequence
+ *
+ * Returns -1 if receiver calibration fails
+ * and returns zero on success.
+ */
+static int ufs_tegra_mphy_receiver_calibration(struct ufs_tegra_host *ufs_tegra)
+{
+	struct device *dev = ufs_tegra->hba->dev;
+	u32 mphy_rx_vendor2;
+
+	mphy_update(ufs_tegra->mphy_l0_base, MPHY_RX_APB_VENDOR2_0_RX_CAL_EN,
+			MPHY_RX_APB_VENDOR2_0);
+	/*Wait 100 us, to complete receiver calibration*/
+	udelay(100);
+	mphy_rx_vendor2 = mphy_readl(ufs_tegra->mphy_l0_base,
+				MPHY_RX_APB_VENDOR2_0);
+	if (!(mphy_rx_vendor2 & MPHY_RX_APB_VENDOR2_0_RX_CAL_DONE)) {
+		dev_err(dev, "Receiver Calibration failed for Lane0\n");
+		return -1;
+	}
+
+	if (ufs_tegra->x2config) {
+		mphy_update(ufs_tegra->mphy_l1_base,
+			MPHY_RX_APB_VENDOR2_0_RX_CAL_EN, MPHY_RX_APB_VENDOR2_0);
+		/*Wait 100 us, to complete receiver calibration*/
+		udelay(100);
+		mphy_rx_vendor2 = mphy_readl(ufs_tegra->mphy_l1_base,
+					MPHY_RX_APB_VENDOR2_0);
+		if (!(mphy_rx_vendor2 & MPHY_RX_APB_VENDOR2_0_RX_CAL_DONE)) {
+			dev_err(dev, "Receiver Calibration failed for Lane1\n");
+			return -1;
+		}
+	}
+	return 0;
+}
+
 static void ufs_tegra_disable_mphylane_clks(struct ufs_tegra_host *host)
 {
 	if (!host->is_lane_clks_enabled)
@@ -463,12 +503,18 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 		goto out_mphy_exit;
 
 	ufs_tegra_mphy_deassert_reset(ufs_tegra);
+	ret = ufs_tegra_mphy_receiver_calibration(ufs_tegra);
+	if (ret)
+		goto out_disable_mphylane_clks;
 	ufs_tegra_ufs_aux_prog(ufs_tegra);
 	ufs_tegra_disable_mphy_slcg(ufs_tegra);
 	ufs_tegra_context_restore(ufs_tegra);
 	ufs_tegra_mphy_advgran(ufs_tegra);
 
 	return ret;
+
+out_disable_mphylane_clks:
+	ufs_tegra_disable_mphylane_clks(ufs_tegra);
 out_mphy_exit:
 	phy_power_off(ufs_tegra->u_phy);
 out:
@@ -590,10 +636,16 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 		if (err)
 			goto out_disable_uphy;
 		ufs_tegra_mphy_deassert_reset(ufs_tegra);
+		err = ufs_tegra_mphy_receiver_calibration(ufs_tegra);
+		if (err)
+			goto out_disable_mphylane_clks;
 
 	}
 	return err;
 
+out_disable_mphylane_clks:
+	if (tegra_platform_is_silicon())
+		ufs_tegra_disable_mphylane_clks(ufs_tegra);
 out_disable_uphy:
 	if (tegra_platform_is_silicon())
 		phy_power_off(ufs_tegra->u_phy);

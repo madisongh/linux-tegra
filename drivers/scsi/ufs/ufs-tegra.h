@@ -42,6 +42,11 @@
 #define MPHY_GO_BIT	1
 
 #define MPHY_TX_APB_TX_VENDOR0_0	0x100
+
+#define MPHY_RX_APB_VENDOR2_0		0x184
+#define MPHY_RX_APB_VENDOR2_0_RX_CAL_EN		(1 << 15)
+#define MPHY_RX_APB_VENDOR2_0_RX_CAL_DONE	(1 << 19)
+
 #define MPHY_ADDR_RANGE		400
 
 enum ufs_state {
