@@ -2640,6 +2640,22 @@ void tegra_clk_pllre_vco_resume(struct clk *c, unsigned long rate)
 	clk_pll_iddq_enable(hw);
 }
 
+void tegra_clk_pllu_resume(struct clk *c, unsigned long rate)
+{
+	struct clk *parent = clk_get_parent(c);
+	struct clk_hw *hw = __clk_get_hw(c);
+	unsigned long parent_rate;
+
+	if (IS_ERR(parent)) {
+		WARN_ON(1);
+		return;
+	}
+
+	parent_rate = clk_get_rate(parent);
+	clk_pllre_set_rate(hw, rate, parent_rate);
+	__clk_hw_enable(hw);
+}
+
 void tegra_clk_plle_tegra210_resume(struct clk *c)
 {
 	struct clk_hw *hw = __clk_get_hw(c);
