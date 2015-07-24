@@ -34,10 +34,7 @@
 #define PHY_ID_BCM57780			0x03625d90
 #define PHY_ID_BCM89610			0x03625cd0
 
-#define T18X_FPGA
-#ifdef T18X_FPGA
 #define EQOS_CLOCK_CONTROL	0x8000
-#endif
 
 #define PHY_ID_BCM7250			0xae025280
 #define PHY_ID_BCM7364			0xae025260

@@ -31,6 +31,7 @@
 #include <linux/phy.h>
 #include <linux/brcmphy.h>
 #include <linux/netdevice.h>
+#include <linux/tegra-soc.h>
 
 
 #define BRCM_PHY_MODEL(phydev) \
@@ -591,9 +592,9 @@ static int bcm54xx_ack_interrupt(struct phy_device *phydev)
 	if (reg < 0)
 		return reg;
 
-#ifdef T18X_FPGA
 	/* make sure D31 is cleared in EQOS_CLOCK_CONTROL */
-	if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM89610) {
+	if (tegra_platform_is_unit_fpga()
+		&& BRCM_PHY_MODEL(phydev) == PHY_ID_BCM89610) {
 		struct mii_bus *bus = phydev->bus;
 		struct net_device *ndev = bus->priv;
 
@@ -602,7 +603,6 @@ static int bcm54xx_ack_interrupt(struct phy_device *phydev)
 				& BIT(31))
 			pr_info("D31 of CLOCK_CONTROL still set ?\n");
 	}
-#endif
 
 	return 0;
 }
