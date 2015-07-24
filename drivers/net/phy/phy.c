@@ -681,7 +681,8 @@ int phy_start_interrupts(struct phy_device *phydev)
 	atomic_set(&phydev->irq_disable, 0);
 	/* phy intr is shared with power_intr on FPGA system */
 	if (request_irq(phydev->irq, phy_interrupt,
-			tegra_platform_is_unit_fpga() ? IRQF_SHARED : 0,
+			tegra_platform_is_unit_fpga() ?
+			IRQF_SHARED : IRQF_TRIGGER_LOW,
 			"phy_interrupt",
 			phydev) < 0) {
 		pr_warn("%s: Can't get IRQ %d (PHY)\n",
