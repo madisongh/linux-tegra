@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015, NVIDIA Corporation.
+ * Copyright (C) 2012-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -39,6 +39,7 @@ struct host1x_channel_ops {
 	int (*init)(struct host1x_channel *channel, struct host1x *host,
 		    unsigned int id);
 	int (*submit)(struct host1x_job *job);
+	void (*push_wait)(struct host1x_channel *ch, u32 id, u32 thresh);
 };
 
 struct host1x_cdma_ops {
@@ -222,6 +223,13 @@ static inline int host1x_hw_channel_submit(struct host1x *host,
 					   struct host1x_job *job)
 {
 	return host->channel_op->submit(job);
+}
+
+static inline void host1x_hw_channel_push_wait(struct host1x *host,
+					       struct host1x_channel *channel,
+					       u32 id, u32 thresh)
+{
+	host->channel_op->push_wait(channel, id, thresh);
 }
 
 static inline void host1x_hw_cdma_start(struct host1x *host,

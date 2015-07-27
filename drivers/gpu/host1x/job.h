@@ -1,7 +1,7 @@
 /*
  * Tegra host1x Job
  *
- * Copyright (c) 2011-2013, NVIDIA Corporation.
+ * Copyright (C) 2010-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -19,12 +19,15 @@
 #ifndef __HOST1X_JOB_H
 #define __HOST1X_JOB_H
 
+struct sync_fence;
+
 struct host1x_job_gather {
 	u32 words;
 	dma_addr_t base;
 	struct host1x_bo *bo;
 	u32 offset;
 	bool handled;
+	struct sync_fence *pre_fence;
 };
 
 struct host1x_cmdbuf {

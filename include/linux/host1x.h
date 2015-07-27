@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2013, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2009-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -54,6 +54,7 @@ struct host1x_client {
  * host1x buffer objects
  */
 
+struct sync_fence;
 struct host1x_bo;
 struct sg_table;
 
@@ -176,6 +177,12 @@ struct host1x_reloc {
 	unsigned long shift;
 };
 
+
+struct host1x_syncpt_fence {
+	u32 id;
+	u32 threshold;
+};
+
 struct host1x_job {
 	/* When refcount goes to zero, job can be freed */
 	struct kref ref;
@@ -238,7 +245,8 @@ struct host1x_job *host1x_job_alloc(struct host1x_channel *ch,
 				    u32 num_cmdbufs, u32 num_relocs,
 				    u32 num_waitchks);
 void host1x_job_add_gather(struct host1x_job *job, struct host1x_bo *mem_id,
-			   u32 words, u32 offset);
+			   u32 words, u32 offset,
+			   struct sync_fence *pre_fence);
 struct host1x_job *host1x_job_get(struct host1x_job *job);
 void host1x_job_put(struct host1x_job *job);
 int host1x_job_pin(struct host1x_job *job, struct device *dev);
@@ -307,5 +315,112 @@ void tegra_mipi_free(struct tegra_mipi_device *device);
 int tegra_mipi_enable(struct tegra_mipi_device *device);
 int tegra_mipi_disable(struct tegra_mipi_device *device);
 int tegra_mipi_calibrate(struct tegra_mipi_device *device);
+
+struct host1x_sync_pt;
+struct sync_pt;
+struct sync_fence;
+
+#ifdef CONFIG_SYNC
+
+/*
+ * Creates a new sync framework syncpoint based on host1x syncpoint id and
+ * threshold.
+ */
+struct host1x_sync_pt *host1x_sync_pt_create(struct host1x *host,
+				      struct host1x_syncpt *syncpt,
+				      u32 threshold);
+/*
+ * Extracts host1x syncpoint and threshold from a sync framework syncpoint.
+ * If `pt` is not a sync framework syncpoint created using
+ * host1x_sync_pt_create, returns false. Otherwise, returns true and fills
+ * output parameters `syncpt` and `threshold`.
+ */
+bool host1x_sync_pt_extract(struct sync_pt *pt, struct host1x_syncpt **syncpt,
+			    u32 *threshold);
+
+/*
+ * Adds host1x waits to the command pushbuffer for any host1x syncpoint backed
+ * non-expired syncpoints in `fence`. Returns true if the fence contains
+ * non-host1x-backed sync points.
+ */
+bool host1x_sync_fence_wait(struct sync_fence *fence,
+			    struct host1x *host,
+			    struct host1x_channel *ch);
+
+int host1x_sync_fence_set_name(int fence_fd, const char *name);
+u32 host1x_sync_pt_thresh(struct sync_pt *__pt);
+u32 host1x_sync_pt_id(struct sync_pt *__pt);
+int host1x_sync_num_fences(struct sync_fence *fence);
+struct sync_fence *host1x_sync_fdget(int fd);
+struct sync_fence *host1x_sync_create_fence(struct host1x *host,
+				    struct host1x_syncpt_fence *syncpt_fences,
+				    u32 num_fences, const char *name);
+int host1x_sync_create_fence_fd(struct host1x *host,
+				struct host1x_syncpt_fence *syncpt_fences,
+				u32 num_fences, const char *name,
+				int *fence_fd);
+int host1x_sync_create_fence_single(struct host1x *host,
+				    u32 id, u32 thresh,
+				    const char *name,
+				    int *fence_fd);
+
+#else
+
+static inline bool host1x_sync_fence_wait(struct sync_fence *fence,
+			    struct host1x *host,
+			    struct host1x_channel *ch)
+{
+	return false;
+}
+
+static inline int host1x_sync_fence_set_name(int fence_fd, const char *name)
+{
+	return -ENOSYS;
+}
+
+static inline u32 host1x_sync_pt_thresh(struct sync_pt *__pt)
+{
+	return 0;
+}
+
+static inline u32 host1x_sync_pt_id(struct sync_pt *__pt)
+{
+	return 0;
+}
+
+static inline int host1x_sync_num_fences(struct sync_fence *fence)
+{
+	return -EINVAL;
+}
+
+static inline struct sync_fence *host1x_sync_fdget(int fd)
+{
+	return NULL;
+}
+
+static inline struct sync_fence *host1x_sync_create_fence(struct host1x *host,
+				    struct host1x_syncpt_fence *syncpt_fences,
+				    u32 num_fences, const char *name)
+{
+	return NULL;
+}
+
+static inline int host1x_sync_create_fence_fd(struct host1x *host,
+				struct host1x_syncpt_fence *syncpt_fences,
+				u32 num_fences, const char *name,
+				int *fence_fd)
+{
+	return -EINVAL;
+}
+
+static inline int host1x_sync_create_fence_single(struct host1x *host,
+						  u32 id, u32 thresh,
+						  const char *name,
+						  int *fence_fd)
+{
+	return -EINVAL;
+}
+
+#endif /* CONFIG_SYNC */
 
 #endif

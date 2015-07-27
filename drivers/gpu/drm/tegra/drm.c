@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2012 Avionic Design GmbH
- * Copyright (C) 2012-2013 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2012-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -368,7 +368,8 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 			goto fail;
 		}
 
-		host1x_job_add_gather(job, bo, cmdbuf.words, cmdbuf.offset);
+		host1x_job_add_gather(job, bo, cmdbuf.words, cmdbuf.offset,
+				      NULL);
 		num_cmdbufs--;
 		cmdbufs++;
 	}

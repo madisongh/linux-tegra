@@ -13,4 +13,6 @@ host1x-y = \
 	hw/host1x04.o \
 	hw/host1x05.o
 
+host1x-$(CONFIG_SYNC) += fence.o
+
 obj-$(CONFIG_TEGRA_HOST1X) += host1x.o
