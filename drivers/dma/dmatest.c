@@ -74,6 +74,10 @@ static bool verbose;
 module_param(verbose, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(verbose, "Enable \"success\" result messages (default: off)");
 
+static int error;
+module_param(error, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(error, "Keep error count");
+
 /**
  * struct dmatest_params - test parameters.
  * @buf_size:		size of the memcpy test buffer
@@ -342,6 +346,8 @@ static void result(const char *err, unsigned int n, unsigned int src_off,
 {
 	pr_info("%s: result #%u: '%s' with src_off=0x%x dst_off=0x%x len=0x%x (%lu)\n",
 		current->comm, n, err, src_off, dst_off, len, data);
+	if (err)
+		error++;
 }
 
 static void dbg_result(const char *err, unsigned int n, unsigned int src_off,
