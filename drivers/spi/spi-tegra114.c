@@ -30,6 +30,7 @@
 #include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/pinctrl/consumer.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -265,6 +266,8 @@ struct tegra_spi_data {
 	struct dma_async_tx_descriptor		*tx_dma_desc;
 	const struct tegra_spi_chip_data	*chip_data;
 	struct tegra_prod_list			*prod_list;
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *enable_interface;
 };
 
 static int tegra_spi_runtime_suspend(struct device *dev);
@@ -1807,6 +1810,21 @@ static int tegra_spi_probe(struct platform_device *pdev)
 		goto exit_free_master;
 	}
 
+	tspi->pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (IS_ERR(tspi->pinctrl)) {
+		dev_info(&pdev->dev, "Pincontrol not found\n");
+		tspi->pinctrl = NULL;
+	}
+
+	if (tspi->pinctrl) {
+		tspi->enable_interface = pinctrl_lookup_state(tspi->pinctrl,
+						"interface-enable");
+		if (IS_ERR(tspi->enable_interface)) {
+			dev_info(&pdev->dev, "Static pin configuration used\n");
+			tspi->enable_interface = NULL;
+		}
+	}
+
 	tspi->max_buf_size = SPI_FIFO_DEPTH << 2;
 	tspi->min_div = 0;
 
@@ -1870,11 +1888,24 @@ static int tegra_spi_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "can not register to master err %d\n", ret);
 		goto exit_free_irq;
 	}
+
+	if (tspi->enable_interface) {
+		ret = pinctrl_select_state(tspi->pinctrl,
+				tspi->enable_interface);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "Enable pin interface failed: %d\n",
+				ret);
+			goto exit_master_unreg;
+		}
+	}
+
 	tspi->last_used_cs = master->num_chipselect + 1;
 	tegra_spi_debugfs_init(tspi);
 
 	return ret;
 
+exit_master_unreg:
+	spi_unregister_master(master);
 exit_free_irq:
 	free_irq(spi_irq, tspi);
 exit_pm_disable:
