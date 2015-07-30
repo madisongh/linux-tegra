@@ -432,14 +432,51 @@ const char *esr_get_class_string(u32 esr)
 	return esr_class_str[esr >> ESR_ELx_EC_SHIFT];
 }
 
+#ifdef CONFIG_SERROR_HANDLER
+static LIST_HEAD(serr_hook);
+static DEFINE_RAW_SPINLOCK(serr_lock);
+
+void register_serr_hook(struct serr_hook *hook)
+{
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&serr_lock, flags);
+	list_add(&hook->node, &serr_hook);
+	raw_spin_unlock_irqrestore(&serr_lock, flags);
+}
+EXPORT_SYMBOL(register_serr_hook);
+
+void unregister_serr_hook(struct serr_hook *hook)
+{
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&serr_lock, flags);
+	list_del(&hook->node);
+	raw_spin_unlock_irqrestore(&serr_lock, flags);
+}
+EXPORT_SYMBOL(unregister_serr_hook);
+#endif
+
 /*
  * bad_mode handles the impossible case in the exception vector.
  */
 asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 {
 	siginfo_t info;
+#ifdef CONFIG_SERROR_HANDLER
+	struct serr_hook *hook;
+	unsigned long flags;
+#endif
 	void __user *pc = (void __user *)instruction_pointer(regs);
 	console_verbose();
+
+#ifdef CONFIG_SERROR_HANDLER
+	raw_spin_lock_irqsave(&serr_lock, flags);
+	list_for_each_entry(hook, &serr_hook, node)
+		if (hook->fn(regs, reason, esr))
+			return;
+	raw_spin_unlock_irqrestore(&serr_lock, flags);
+#endif
 
 	pr_crit("Bad mode in %s handler detected, code 0x%08x -- %s\n",
 		handler[reason], esr, esr_get_class_string(esr));

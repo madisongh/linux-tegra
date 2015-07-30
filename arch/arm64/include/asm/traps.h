@@ -50,6 +50,16 @@ static inline int __in_irqentry_text(unsigned long ptr)
 }
 #endif
 
+#ifdef CONFIG_SERROR_HANDLER
+struct serr_hook {
+	struct list_head node;
+	int (*fn)(struct pt_regs *regs, int reason, unsigned int esr);
+};
+
+void register_serr_hook(struct serr_hook *hook);
+void unregister_serr_hook(struct serr_hook *hook);
+#endif
+
 static inline int in_exception_text(unsigned long ptr)
 {
 	extern char __exception_text_start[];
