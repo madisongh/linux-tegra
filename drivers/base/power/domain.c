@@ -86,13 +86,14 @@ static void update_genpd_accounting(struct generic_pm_domain *genpd)
  * This should only be used where we are certain that the pm_domain
  * attached to the device is a genpd domain.
  */
-static struct generic_pm_domain *dev_to_genpd(struct device *dev)
+struct generic_pm_domain *dev_to_genpd(struct device *dev)
 {
 	if (IS_ERR_OR_NULL(dev->pm_domain))
 		return ERR_PTR(-EINVAL);
 
 	return pd_to_genpd(dev->pm_domain);
 }
+EXPORT_SYMBOL(dev_to_genpd);
 
 struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
 {

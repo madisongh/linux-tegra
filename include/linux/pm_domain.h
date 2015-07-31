@@ -139,6 +139,7 @@ static inline void pm_genpd_set_poweroff_delay(struct generic_pm_domain *genpd,
 	genpd->power_off_delay = delay;
 }
 
+extern struct generic_pm_domain *dev_to_genpd(struct device *dev);
 extern int __pm_genpd_add_device(struct generic_pm_domain *genpd,
 				 struct device *dev,
 				 struct gpd_timing_data *td);
@@ -176,6 +177,10 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
 static inline struct generic_pm_domain *pm_genpd_lookup_dev(struct device *dev)
 {
 	return NULL;
+}
+static inline struct generic_pm_domain *dev_to_genpd(struct device *dev)
+{
+	return ERR_PTR(-ENOSYS);
 }
 static inline int __pm_genpd_add_device(struct generic_pm_domain *genpd,
 					struct device *dev,
