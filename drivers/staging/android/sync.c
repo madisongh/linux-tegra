@@ -768,6 +768,7 @@ struct sync_pt *sync_pt_from_fence(struct fence *fence)
 
 	return container_of(fence, struct sync_pt, base);
 }
+EXPORT_SYMBOL(sync_pt_from_fence);
 
 static const struct file_operations sync_fence_fops = {
 	.release = sync_fence_release,
