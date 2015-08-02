@@ -186,6 +186,15 @@ int host1x_syncpt_incr(struct host1x_syncpt *sp)
 }
 EXPORT_SYMBOL(host1x_syncpt_incr);
 
+void host1x_syncpt_reset(struct host1x_syncpt *sp)
+{
+	struct host1x *host = sp->host;
+
+	atomic_set(&sp->min_val, atomic_read(&sp->max_val));
+	host1x_hw_syncpt_restore(host, sp);
+}
+EXPORT_SYMBOL(host1x_syncpt_reset);
+
 /*
  * Updated sync point form hardware, and returns true if syncpoint is expired,
  * false if we may need to wait
@@ -490,7 +499,12 @@ int host1x_syncpt_init(struct host1x *host)
 struct host1x_syncpt *host1x_syncpt_request(struct device *dev,
 					    unsigned long flags)
 {
-	struct host1x *host = dev_get_drvdata(dev->parent);
+	struct host1x *host;
+
+	if (dev->parent && dev->parent != &platform_bus)
+		dev = dev->parent;
+
+	host = dev_get_drvdata(dev);
 
 	return host1x_syncpt_alloc(host, dev, flags);
 }
@@ -536,6 +550,12 @@ u32 host1x_syncpt_read_max(struct host1x_syncpt *sp)
 	return (u32)atomic_read(&sp->max_val);
 }
 EXPORT_SYMBOL(host1x_syncpt_read_max);
+
+void host1x_syncpt_update_min(struct host1x_syncpt *sp)
+{
+	host1x_hw_syncpt_load(sp->host, sp);
+}
+EXPORT_SYMBOL(host1x_syncpt_update_min);
 
 /*
  * Read min, which is a shadow of the current sync point value in hardware.

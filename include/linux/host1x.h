@@ -137,6 +137,7 @@ u32 host1x_syncpt_id(struct host1x_syncpt *sp);
 u32 host1x_syncpt_read_min(struct host1x_syncpt *sp);
 u32 host1x_syncpt_read_max(struct host1x_syncpt *sp);
 u32 host1x_syncpt_read(struct host1x_syncpt *sp);
+void host1x_syncpt_update_min(struct host1x_syncpt *sp);
 int host1x_syncpt_incr(struct host1x_syncpt *sp);
 u32 host1x_syncpt_incr_max(struct host1x_syncpt *sp, u32 incrs);
 int host1x_syncpt_wait(struct host1x_syncpt *sp, u32 thresh, long timeout,
@@ -144,6 +145,8 @@ int host1x_syncpt_wait(struct host1x_syncpt *sp, u32 thresh, long timeout,
 struct host1x_syncpt *host1x_syncpt_request(struct device *dev,
 					    unsigned long flags);
 void host1x_syncpt_free(struct host1x_syncpt *sp);
+bool host1x_syncpt_is_expired(struct host1x_syncpt *sp, u32 thresh);
+void host1x_syncpt_reset(struct host1x_syncpt *sp);
 
 struct host1x_syncpt_base *host1x_syncpt_get_base(struct host1x_syncpt *sp);
 u32 host1x_syncpt_base_id(struct host1x_syncpt_base *base);
