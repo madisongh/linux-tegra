@@ -148,6 +148,10 @@ void host1x_syncpt_free(struct host1x_syncpt *sp);
 struct host1x_syncpt_base *host1x_syncpt_get_base(struct host1x_syncpt *sp);
 u32 host1x_syncpt_base_id(struct host1x_syncpt_base *base);
 
+int host1x_intr_register_notifier(struct host1x_syncpt *sp,
+				  u32 thresh,
+				  void (*callback)(void *, int),
+				  void *private_data);
 /*
  * host1x channel
  */

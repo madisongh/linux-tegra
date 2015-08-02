@@ -28,6 +28,11 @@
 
 /* Wait list management */
 
+struct host1x_waitlist_external_notifier {
+	void (*callback)(void *, int);
+	void *private_data;
+};
+
 enum waitlist_state {
 	WLS_PENDING,
 	WLS_REMOVED,
@@ -140,13 +145,24 @@ static void action_signal_timeline(struct host1x_waitlist *waiter)
 	host1x_sync_timeline_signal(tl);
 }
 
+static void action_notify(struct host1x_waitlist *waiter)
+{
+	struct host1x_waitlist_external_notifier *notifier = waiter->data;
+
+	notifier->callback(notifier->private_data, waiter->count);
+
+	kfree(notifier);
+	waiter->data = NULL;
+}
+
 typedef void (*action_handler)(struct host1x_waitlist *waiter);
 
 static const action_handler action_handlers[HOST1X_INTR_ACTION_COUNT] = {
 	action_submit_complete,
 	action_wakeup,
 	action_wakeup_interruptible,
-	action_signal_timeline
+	action_signal_timeline,
+	action_notify,
 };
 
 static void run_handlers(struct list_head completed[HOST1X_INTR_ACTION_COUNT])
@@ -358,3 +374,46 @@ void host1x_intr_stop(struct host1x *host)
 
 	mutex_unlock(&host->intr_mutex);
 }
+
+int host1x_intr_register_notifier(struct host1x_syncpt *sp,
+				  u32 thresh,
+				  void (*callback)(void *, int),
+				  void *private_data)
+{
+	struct host1x *host = sp->host;
+	struct host1x_waitlist *waiter;
+	struct host1x_waitlist_external_notifier *notifier;
+	int err = 0;
+
+	if (!callback)
+		return -EINVAL;
+
+	waiter = kzalloc(sizeof(*waiter), GFP_KERNEL | __GFP_REPEAT);
+	if (!waiter) {
+		err = -ENOMEM;
+		goto err_alloc_waiter;
+	}
+	notifier = kzalloc(sizeof(*notifier), GFP_KERNEL | __GFP_REPEAT);
+	if (!notifier) {
+		err = -ENOMEM;
+		goto err_alloc_notifier;
+	}
+
+	notifier->callback = callback;
+	notifier->private_data = private_data;
+
+	err = host1x_intr_add_action(host,
+				     host1x_syncpt_id(sp), thresh,
+				     HOST1X_INTR_ACTION_NOTIFY,
+				     notifier,
+				     waiter,
+				     NULL);
+
+	return err;
+
+err_alloc_notifier:
+	kfree(waiter);
+err_alloc_waiter:
+	return err;
+}
+EXPORT_SYMBOL(host1x_intr_register_notifier);
