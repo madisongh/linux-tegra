@@ -1,7 +1,7 @@
 /*
  * Tegra host1x driver
  *
- * Copyright (c) 2010-2013, NVIDIA Corporation.
+ * Copyright (C) 2010-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -249,7 +249,7 @@ static int __init tegra_host1x_init(void)
 
 	return err;
 }
-module_init(tegra_host1x_init);
+rootfs_initcall(tegra_host1x_init);
 
 static void __exit tegra_host1x_exit(void)
 {
