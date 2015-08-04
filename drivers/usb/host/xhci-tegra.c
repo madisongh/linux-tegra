@@ -51,9 +51,6 @@
 #define TEGRA_XHCI_SS_CLK_HIGH_SPEED 120000000
 #define TEGRA_XHCI_SS_CLK_LOW_SPEED 12000000
 
-#define IPFS_XUSB_HOST_INTR_MASK_0			0x188
-#define IPFS_IP_INT_MASK				(1 << 16)
-
 /* FPCI CFG registers */
 #define XUSB_CFG_1				0x004
 #define  XUSB_IO_SPACE_EN			BIT(0)
@@ -224,7 +221,6 @@ struct tegra_xhci_hcd {
 	int irq;
 
 	void __iomem *fpci_base;
-	void __iomem *ipfs_base;
 
 	const struct tegra_xhci_soc_config *soc_config;
 
@@ -711,23 +707,9 @@ static void fw_log_deinit(struct tegra_xhci_hcd *tegra)
 	}
 }
 
-
-#define FORCE_NONCHOHERENT
-#define XUSB_CFG_AXI_CFG			(0xF8)
-#define   AR_FORCE_NONCOH			(1 << 1)
-#define   AW_FORCE_NONCOH			(1 << 3)
-
 static void tegra_xhci_cfg(struct tegra_xhci_hcd *tegra)
 {
 	u32 reg;
-
-#ifdef FORCE_NONCHOHERENT
-	reg_dump(tegra->dev, tegra->fpci_base, XUSB_CFG_AXI_CFG);
-	reg = fpci_readl(tegra, XUSB_CFG_AXI_CFG);
-	reg |= (AW_FORCE_NONCOH | AR_FORCE_NONCOH);
-	fpci_writel(tegra, reg, XUSB_CFG_AXI_CFG);
-	reg_dump(tegra->dev, tegra->fpci_base, XUSB_CFG_AXI_CFG);
-#endif
 
 	reg_dump(tegra->dev, tegra->fpci_base, XUSB_CFG_4);
 	/* Program Bar0 Space */
@@ -745,11 +727,6 @@ static void tegra_xhci_cfg(struct tegra_xhci_hcd *tegra)
 	reg |= XUSB_MEM_SPACE_EN | XUSB_BUS_MASTER_EN;
 	fpci_writel(tegra, reg, XUSB_CFG_1);
 	reg_dump(tegra->dev, tegra->fpci_base, XUSB_CFG_1);
-
-	/* Set intr mask to enable intr assertion */
-	reg = readl(tegra->ipfs_base + IPFS_XUSB_HOST_INTR_MASK_0);
-	reg |= IPFS_IP_INT_MASK;
-	writel(reg, tegra->ipfs_base + IPFS_XUSB_HOST_INTR_MASK_0);
 }
 
 static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
@@ -1387,14 +1364,6 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		goto put_hcd;
 	}
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-	tegra->ipfs_base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(tegra->ipfs_base)) {
-		ret = PTR_ERR(tegra->ipfs_base);
-		dev_warn(&pdev->dev, "can't map ipfs mmio (%d)\n", ret);
-		goto put_hcd;
-	}
-
 	tegra->irq = platform_get_irq(pdev, 0);
 	if (tegra->irq < 0) {
 		ret = tegra->irq;
@@ -1534,7 +1503,6 @@ skip_clocks:
 		}
 	}
 
-	/* Setup IPFS access and BAR0 space. */
 	tegra_xhci_cfg(tegra);
 
 	ret = tegra_xhci_phy_enable(tegra);
