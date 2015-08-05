@@ -215,13 +215,15 @@ struct tegra_qspi_data {
 	u32					*tx_dma_buf;
 	dma_addr_t				tx_dma_phys;
 	struct dma_async_tx_descriptor		*tx_dma_desc;
+	struct tegra_qspi_device_controller_data cdata[MAX_CHIP_SELECT];
 };
 
 
 static int tegra_qspi_runtime_suspend(struct device *dev);
 static int tegra_qspi_runtime_resume(struct device *dev);
 static struct tegra_qspi_device_controller_data
-	*tegra_qspi_get_cdata_dt(struct spi_device *spi);
+	*tegra_qspi_get_cdata_dt(struct spi_device *spi,
+			struct tegra_qspi_data *tqspi);
 
 static inline unsigned long tegra_qspi_readl(struct tegra_qspi_data *tqspi,
 		unsigned long reg)
@@ -948,7 +950,7 @@ static int tegra_qspi_setup(struct spi_device *spi)
 	}
 
 	if (!cdata) {
-		cdata = tegra_qspi_get_cdata_dt(spi);
+		cdata = tegra_qspi_get_cdata_dt(spi, tqspi);
 		spi->controller_data = cdata;
 	}
 
@@ -1226,7 +1228,8 @@ static irqreturn_t tegra_qspi_isr(int irq, void *context_data)
 }
 
 static struct tegra_qspi_device_controller_data
-	*tegra_qspi_get_cdata_dt(struct spi_device *spi)
+	*tegra_qspi_get_cdata_dt(struct spi_device *spi,
+			struct tegra_qspi_data *tqspi)
 {
 	struct tegra_qspi_device_controller_data *cdata = NULL;
 	const unsigned int *prop;
@@ -1243,12 +1246,8 @@ static struct tegra_qspi_device_controller_data
 		return NULL;
 	}
 
-	cdata = devm_kzalloc(&spi->dev, sizeof(*cdata),
-			GFP_KERNEL);
-	if (!cdata) {
-		dev_err(&spi->dev, "Memory alloc for cdata failed\n");
-		return NULL;
-	}
+	cdata = &tqspi->cdata[spi->chip_select];
+	memset(cdata, 0, sizeof(*cdata));
 
 	prop = of_get_property(data_np, "nvidia,rx-clk-tap-delay", NULL);
 	if (prop)
@@ -1286,6 +1285,7 @@ static struct tegra_qspi_device_controller_data
 	if (prop)
 		cdata->ifddr_div2_sdr = be32_to_cpup(prop);
 
+	of_node_put(data_np);
 	return cdata;
 }
 
