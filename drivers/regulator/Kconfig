@@ -36,6 +36,16 @@ config REGULATOR_PMIC_OTP
 	  is required to use the PMCI OTP configuration and do not want
 	  to register PMIC.
 
+config REGULATOR_DUMMY
+	bool "Provide a dummy regulator if regulator lookups fail"
+	help
+	  If this option is enabled then when a regulator lookup fails
+	  and the board has not specified that it has provided full
+	  constraints the regulator core will provide an always
+	  enabled dummy regulator, allowing consumer drivers to continue.
+
+	  A warning will be generated when this substitution is done.
+
 config REGULATOR_FIXED_VOLTAGE
 	tristate "Fixed voltage regulator support"
 	help
