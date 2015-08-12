@@ -91,6 +91,8 @@ NVIDIA TEGRA186 Display Serial Interface
    to master DSI controller IC), 1 for true and 0 for false.
  - nvidia,dsi-ganged-write-to-all-links: write DSI host and panel commands to both links, with exception of
    setting up per-link ganged mode start address and range, 1 for true and 0 for false.
+ - nvidia,dsi-split-link-type: specifies the type of Split Link supported by panel.
+   1 for TEGRA_DSI_SPLIT_LINK_A_B, 2 for TEGRA_DSI_SPLIT_LINK_C_D, 3 for TEGRA_DSI_SPLIT_LINK_A_B_C_D
 
  - Child nodes represent node of modes, output settings,
    smart dimmer settings, color management unit settings.
