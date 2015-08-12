@@ -376,6 +376,8 @@ EXPORT_SYMBOL(sync_fence_cancel_async);
 
 static void sync_fence_dump(struct sync_fence *fence)
 {
+	struct sync_pt *__pt = NULL;
+	struct sync_timeline *__obj = NULL;
 	char val[32];
 	char current_val[32];
 	int i;
@@ -397,8 +399,13 @@ static void sync_fence_dump(struct sync_fence *fence)
 		pr_info("name=[%s:%s], current value=%s waiting value=%s\n",
 			pt->ops->get_driver_name(pt),
 			pt->ops->get_timeline_name(pt), current_val, val);
+
+		__pt = container_of(pt, struct sync_pt, base);
+		__obj = sync_pt_parent(__pt);
 	}
 
+	if (__obj && __obj->ops->platform_debug_dump)
+		__obj->ops->platform_debug_dump(__pt);
 }
 
 int sync_fence_wait(struct sync_fence *fence, long timeout)
