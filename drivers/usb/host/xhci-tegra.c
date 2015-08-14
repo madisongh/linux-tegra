@@ -1599,7 +1599,7 @@ static int tegra_xhci_suspend(struct device *dev)
 	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
 
 	/* TODO: Powergate controller across suspend/resume. */
-	return xhci_suspend(xhci);
+	return xhci_suspend(xhci, device_may_wakeup(dev));
 }
 
 static int tegra_xhci_resume(struct device *dev)
