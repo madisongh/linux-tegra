@@ -140,6 +140,7 @@ static int tegra_chan_to_id(struct tegra_xusb_mbox *mbox,
 			return i;
 	}
 
+	WARN(1, "invalid chan 0x%p\n", chan);
 	return -EINVAL;
 }
 
@@ -154,6 +155,11 @@ static int tegra_xusb_mbox_send_data(struct mbox_chan *chan, void *data)
 	u32 reg;
 
 	dev_dbg(dev, "TX message %#x:%#x @0x%p\n", msg->cmd, msg->data, msg);
+
+	id = tegra_chan_to_id(mbox, chan);
+	if (id < 0)
+		return -EINVAL;
+
 	spin_lock_irqsave(&mbox->lock, flags);
 
 	/* Driver doesn't have to acquire mailbox while sending (N)ACK
@@ -182,7 +188,6 @@ static int tegra_xusb_mbox_send_data(struct mbox_chan *chan, void *data)
 
 	tegra_send_message(mbox, msg);
 exit:
-	id = tegra_chan_to_id(mbox, chan);
 	mbox->last_tx_done[id] = (rc == 0);
 	spin_unlock_irqrestore(&mbox->lock, flags);
 	return rc;
@@ -203,6 +208,9 @@ static bool tegra_xusb_mbox_last_tx_done(struct mbox_chan *chan)
 	unsigned long flags;
 	int id = tegra_chan_to_id(mbox, chan);
 	bool last_tx_done;
+
+	if (id < 0)
+		return false;
 
 	spin_lock_irqsave(&mbox->lock, flags);
 	last_tx_done = mbox->last_tx_done[id];
