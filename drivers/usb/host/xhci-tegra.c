@@ -741,17 +741,6 @@ static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
 	time_t fw_time;
 	unsigned long timeout;
 
-#ifdef FORCE_NONCHOHERENT
-#define XUSB_PADCTL_HOST_AXI_SEC2_0	(0x1368)
-#define   AWCACHE_RANGE(x)		(((x) & 0xf) << 8)
-	reg_dump(dev, padctl_base, XUSB_PADCTL_HOST_AXI_SEC2_0);
-	val = ioread32(padctl_base + XUSB_PADCTL_HOST_AXI_SEC2_0);
-	val &= ~AWCACHE_RANGE(~0);
-	val |= AWCACHE_RANGE(0x3);
-	iowrite32(val, padctl_base + XUSB_PADCTL_HOST_AXI_SEC2_0);
-	reg_dump(dev, padctl_base, XUSB_PADCTL_HOST_AXI_SEC2_0);
-#endif
-
 	if (csb_readl(tegra, XUSB_CSB_MP_ILOAD_BASE_LO) != 0) {
 		dev_info(dev, "Firmware already loaded, Falcon state 0x%x\n",
 			 csb_readl(tegra, XUSB_FALC_CPUCTL));
@@ -1043,17 +1032,18 @@ static void tegra_xhci_mbox_work(struct work_struct *work)
 #if 0
 		ret = tegra_xhci_set_ss_clk(tegra, msg->data * 1000);
 		resp.data = clk_get_rate(tegra->ss_src_clk) / 1000;
+		if (ret)
+			resp.cmd = MBOX_CMD_NAK;
+		else
+			resp.cmd = MBOX_CMD_ACK;
 #else
 		dev_info(tegra->dev, "%s ignore firmware %s request\n",
 			__func__, (msg->cmd == MBOX_CMD_INC_SSPI_CLOCK) ?
 			"MBOX_CMD_INC_SSPI_CLOCK" : "MBOX_CMD_DEC_SSPI_CLOCK");
 		resp.data = msg->data;
 		ret = 0;
+		resp.cmd = MBOX_CMD_ACK;
 #endif
-		if (ret)
-			resp.cmd = MBOX_CMD_NAK;
-		else
-			resp.cmd = MBOX_CMD_ACK;
 		break;
 	case MBOX_CMD_INC_FALC_CLOCK:
 	case MBOX_CMD_DEC_FALC_CLOCK:
@@ -1146,7 +1136,6 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	ret = tegra_xhci_load_firmware(tegra);
 	if (ret < 0) {
 		dev_warn(dev, "can't load firmware (%d)\n", ret);
-		return;
 		goto put_usb2_hcd;
 	}
 
@@ -1177,25 +1166,26 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	if (ret < 0)
 		goto put_usb3_hcd;
 
+#if 0 /* TODO: enable when bitfiles has mailbox fix */
 	/* Enable firmware messages from controller. */
 	msg.cmd = MBOX_CMD_MSG_ENABLED;
 	msg.data = 0;
-#if 0
-	/* TODO: enable when bitfiles has mailbox fix */
 	ret = mbox_send_message(tegra->mbox_chan, &msg);
-#endif
 	if (ret < 0) {
 		dev_warn(dev, "can't send message to firmware (%d)\n", ret);
 		goto dealloc_usb3_hcd;
 	}
+#endif
 
 	tegra->fw_loaded = true;
 	release_firmware(fw);
 	return;
 
 	/* Free up as much as we can and wait to be unbound. */
+#if 0 /* TODO: enable when bitfiles has mailbox fix */
 dealloc_usb3_hcd:
 	usb_remove_hcd(xhci->shared_hcd);
+#endif
 put_usb3_hcd:
 	usb_put_hcd(xhci->shared_hcd);
 dealloc_usb2_hcd:
@@ -1347,6 +1337,11 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	tegra->hcd = hcd;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "failed to get host mmio resources\n");
+		ret = -ENXIO;
+		goto put_hcd;
+	}
 	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(hcd->regs)) {
 		ret = PTR_ERR(hcd->regs);
@@ -1357,6 +1352,11 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	hcd->rsrc_len = resource_size(res);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res) {
+		dev_err(&pdev->dev, "failed to get fpci mmio resources\n");
+		ret = -ENXIO;
+		goto put_hcd;
+	}
 	tegra->fpci_base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(tegra->fpci_base)) {
 		ret = PTR_ERR(tegra->fpci_base);
