@@ -60,6 +60,7 @@ obj-$(CONFIG_UID_CPUTIME) += uid_cputime.o
 obj-$(CONFIG_TEGRA_FUSE)    += tegra-fuse/
 obj-$(CONFIG_TEGRA_CRYPTO_DEV)  += tegra-cryptodev.o
 obj-$(CONFIG_BLUEDROID_PM)      += bluedroid_pm.o
+obj-$(CONFIG_GPS_HWGEOFENCING)  += gps_wake.o
 obj-$(CONFIG_MODS) 		+= mods/
 obj-$(CONFIG_SENSORS_NCT1008)	+= nct1008.o
 obj-$(CONFIG_TEGRA_CEC_SUPPORT)	+= tegra-cec/
