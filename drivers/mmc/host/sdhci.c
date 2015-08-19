@@ -1391,6 +1391,31 @@ static void sdhci_post_init(struct mmc_host *mmc)
 	sdhci_runtime_pm_put(host);
 }
 
+static void sdhci_cqe_task_discard_rq(struct mmc_host *mmc, u8 tag, bool all)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+	unsigned int command;
+	unsigned int arg;
+	int flags;
+	u16 mode;
+
+	arg = tag << SDHCI_ARGUMENT_CMDQ_TASKID_SHIFT;
+	if (all)
+		arg |= SDHCI_ARGUMENT_CMDQ_TM_OPCODE_ALL;
+	else
+		arg |= SDHCI_ARGUMENT_CMDQ_TM_OPCODE_TASK;
+
+	flags = MMC_RSP_R1B_CQ;
+	command = SDHCI_MAKE_CMD(MMC_CMDQ_TASK_MGMT, flags);
+	sdhci_writel(host, arg, SDHCI_ARGUMENT);
+
+	mode = sdhci_readw(host, SDHCI_TRANSFER_MODE);
+	sdhci_writew(host, mode & ~(SDHCI_TRNS_AUTO_CMD12 |
+			SDHCI_TRNS_AUTO_CMD23), SDHCI_TRANSFER_MODE);
+
+	sdhci_writew(host, command, SDHCI_COMMAND);
+}
+
 static void sdhci_clear_cqe_interrupt(struct mmc_host *mmc, u32 intmask)
 {
 	struct sdhci_host *host;
@@ -1401,7 +1426,7 @@ static void sdhci_clear_cqe_interrupt(struct mmc_host *mmc, u32 intmask)
 
 	/* Clear selected interrupts. */
 	mask = intmask & (SDHCI_INT_CMD_MASK | SDHCI_INT_DATA_MASK |
-			SDHCI_INT_BUS_POWER | SDHCI_INT_CMDQ);
+			SDHCI_INT_CMDQ);
 	sdhci_writel(host, mask, SDHCI_INT_STATUS);
 
 	if (!cq_host->data) {
@@ -1414,16 +1439,19 @@ static void sdhci_clear_cqe_interrupt(struct mmc_host *mmc, u32 intmask)
 		cq_host->data->error = -ETIMEDOUT;
 		pr_err("%s: Data Timeout error, intmask: %x Interface clock = %uHz\n",
 			mmc_hostname(host->mmc), intmask, host->max_clk);
+		sdhci_dumpregs(host);
 	} else if (intmask & SDHCI_INT_DATA_END_BIT) {
 		cq_host->data->error = -EILSEQ;
 		pr_err("%s: Data END Bit error, intmask: %x Interface clock = %uHz\n",
 			mmc_hostname(host->mmc), intmask, host->max_clk);
+		sdhci_dumpregs(host);
 	} else if ((intmask & SDHCI_INT_DATA_CRC) &&
 		SDHCI_GET_CMD(sdhci_readw(host, SDHCI_COMMAND))
 			!= MMC_BUS_TEST_R) {
 		cq_host->data->error = -EILSEQ;
 		pr_err("%s: Data CRC error, intmask: %x Interface clock = %uHz\n",
 			mmc_hostname(host->mmc), intmask, host->max_clk);
+		sdhci_dumpregs(host);
 	} else if (intmask & SDHCI_INT_ADMA_ERROR) {
 		pr_err("%s: ADMA error\n", mmc_hostname(host->mmc));
 		pr_err("%s: ADMA Err[0x%03x]: 0x%08x | ADMA Ptr[0x%03x]: 0x%08x\n",
@@ -1432,7 +1460,19 @@ static void sdhci_clear_cqe_interrupt(struct mmc_host *mmc, u32 intmask)
 			SDHCI_ADMA_ADDRESS, readl(host->ioaddr +
 			SDHCI_ADMA_ADDRESS));
 		cq_host->data->error = -EIO;
+	} else if (intmask & SDHCI_INT_CRC) {
+		pr_err("%s: Command CRC error, intmask: %x Interface clock = %uHz\n",
+			mmc_hostname(host->mmc), intmask, host->max_clk);
+		sdhci_dumpregs(host);
 	}
+
+	if (cq_host->data->error)
+		sdhci_do_reset(host, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
+
+	intmask &= ~(SDHCI_INT_CMD_MASK | SDHCI_INT_DATA_MASK |
+		     SDHCI_INT_CMDQ | SDHCI_INT_ERROR);
+	if (intmask)
+		sdhci_writel(host, intmask, SDHCI_INT_STATUS);
 }
 
 /*****************************************************************************\
@@ -2340,6 +2380,7 @@ static const struct mmc_host_ops sdhci_ops = {
 	.card_busy	= sdhci_card_busy,
 	.post_init	= sdhci_post_init,
 	.clear_cqe_intr	= sdhci_clear_cqe_interrupt,
+	.discard_cqe_task	= sdhci_cqe_task_discard_rq,
 };
 
 /*****************************************************************************\

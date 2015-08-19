@@ -1,6 +1,8 @@
 /*
  *  linux/include/linux/mmc/core.h
  *
+ * Copyright (C) 2015, NVIDIA CORPORATION.  All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -48,6 +50,7 @@ struct mmc_command {
 #define MMC_RSP_NONE	(0)
 #define MMC_RSP_R1	(MMC_RSP_PRESENT|MMC_RSP_CRC|MMC_RSP_OPCODE)
 #define MMC_RSP_R1B	(MMC_RSP_PRESENT|MMC_RSP_CRC|MMC_RSP_OPCODE|MMC_RSP_BUSY)
+#define MMC_RSP_R1B_CQ	(MMC_RSP_PRESENT|MMC_RSP_136)
 #define MMC_RSP_R2	(MMC_RSP_PRESENT|MMC_RSP_136|MMC_RSP_CRC)
 #define MMC_RSP_R3	(MMC_RSP_PRESENT)
 #define MMC_RSP_R4	(MMC_RSP_PRESENT)
@@ -168,6 +171,7 @@ extern int __mmc_switch_cmdq_mode(struct mmc_command *cmd, u8 set, u8 index,
 extern int mmc_cmdq_halt(struct mmc_host *host, bool enable);
 extern void mmc_cmdq_post_req(struct mmc_host *host, struct mmc_request *mrq,
 		int err);
+extern int mmc_cmdq_discard(struct mmc_host *host, u32 tag, bool all);
 
 #define MMC_ERASE_ARG		0x00000000
 #define MMC_SECURE_ERASE_ARG	0x80000000

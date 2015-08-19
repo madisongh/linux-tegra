@@ -1,4 +1,5 @@
 /* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,6 +30,7 @@
 
 /* 1 sec FIXME: optimize it */
 #define HALT_TIMEOUT_MS 1000
+#define TASK_CLEAR_TIMEOUT_MS 10
 
 static inline u64 *get_desc(struct cmdq_host *cq_host, u8 tag)
 {
@@ -583,6 +585,80 @@ irqreturn_t cmdq_irq(struct mmc_host *mmc, u32 intmask)
 }
 EXPORT_SYMBOL(cmdq_irq);
 
+static unsigned int cmdq_poll_clear(struct cmdq_host *cq_host, u32 reg, u32 bit,
+		unsigned timeout)
+{
+	do {
+		if (!(cmdq_readl(cq_host, reg) & bit))
+			break;
+		udelay(1);
+		--timeout;
+	} while (timeout);
+
+	return timeout;
+}
+
+static int cmdq_discard_task(struct mmc_host *mmc, u32 tag, bool all)
+{
+	struct cmdq_host *cq_host = (struct cmdq_host *)mmc_cmdq_private(mmc);
+	u32 task = 1 << tag;
+	int err = 0;
+
+	if (all) {
+		/* Discard entire queue in the device */
+		if (mmc->ops->discard_cqe_task)
+			mmc->ops->discard_cqe_task(mmc, tag, true);
+
+		/* Write '1' to 8th bit of CQCTL to clear all tasks sent
+		 * to the device.
+		 */
+		cmdq_writel(cq_host, cmdq_readl(cq_host, CQCTL) |
+				CLEAR_ALL_TASKS, CQCTL);
+
+		/* Poll on CQCTL until 8th bit is set to 0 */
+		err = cmdq_poll_clear(cq_host, CQCTL, CLEAR_ALL_TASKS,
+				TASK_CLEAR_TIMEOUT_MS);
+		if (!err) {
+			pr_err("%s: timeout(%dms) reached to clear all cqe task\n",
+				mmc_hostname(mmc), TASK_CLEAR_TIMEOUT_MS);
+			cmdq_dumpregs(cq_host);
+			return -ETIMEDOUT;
+		} else {
+			pr_debug("%s: all cmdq task are cleared from cqe\n",
+				mmc_hostname(mmc));
+			goto cqe_resume;
+		}
+	} else if (cmdq_readl(cq_host, CQDPT) & task) {
+		/* CQDPT[tag] == 1, Task queued in the device.
+		 * Send CMD48 to discard the task.
+		 * If CQDPT[tag] == 0 then clear the task from CQTCLR only
+		 */
+		if (mmc->ops->discard_cqe_task)
+			mmc->ops->discard_cqe_task(mmc, tag, false);
+	}
+
+	/* Write '1' to CQTCLR[tag] to clear task in CQE */
+	cmdq_writel(cq_host, cmdq_readl(cq_host, CQTCLR) | task, CQTCLR);
+
+	/* Poll on CQTCLR[tag] until it is '0' */
+	err = cmdq_poll_clear(cq_host, CQTCLR, task, TASK_CLEAR_TIMEOUT_MS);
+
+	if (!err) {
+		pr_err("%s: timeout(%dms) reached to clear the cqe task: %u\n",
+			mmc_hostname(mmc), TASK_CLEAR_TIMEOUT_MS, tag);
+		cmdq_dumpregs(cq_host);
+		return -ETIMEDOUT;
+	} else {
+		pr_debug("%s: cmdq task %d is cleared from cqe\n",
+			mmc_hostname(mmc), tag);
+	}
+
+cqe_resume:
+	/* Resume CQE operations by writing '0' to 0th bit in CQCTL */
+	cmdq_writel(cq_host, cmdq_readl(cq_host, CQCTL) & ~HALT, CQCTL);
+	return 0;
+}
+
 /* May sleep */
 static int cmdq_halt(struct mmc_host *mmc, bool halt)
 {
@@ -639,6 +715,7 @@ static const struct mmc_cmdq_host_ops cmdq_host_ops = {
 	.request = cmdq_request,
 	.halt = cmdq_halt,
 	.post_req = cmdq_post_req,
+	.discard_task = cmdq_discard_task,
 };
 
 struct cmdq_host *cmdq_pltfm_init(struct platform_device *pdev)

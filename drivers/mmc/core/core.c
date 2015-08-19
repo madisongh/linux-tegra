@@ -644,6 +644,33 @@ int mmc_cmdq_halt(struct mmc_host *host, bool halt)
 }
 EXPORT_SYMBOL(mmc_cmdq_halt);
 
+/**
+ *	mmc_cmdq_discard - discard the tasks in command queue engine
+ *	@host: host instance
+ *	@tag: task ID that to be discarded
+ *	@all:	true - discard all tasks in command queue engine and
+ *		       tag vaue is ignored
+ *		false - Only one task (@tag) will be discarded.
+ *
+ *	Host discards the task specified by tag or all the tasks in
+ *	command queue engine.
+ *	Returns 0 on success, error otherwise
+ */
+int mmc_cmdq_discard(struct mmc_host *host, u32 tag, bool all)
+{
+	int err = 0;
+
+	if (host->cmdq_ops->discard_task) {
+		err = host->cmdq_ops->discard_task(host, tag, all);
+		if (err)
+			return err;
+		host->cmdq_ctx.curr_state &= ~CMDQ_STATE_HALT;
+		host->cmdq_ctx.curr_state &= ~CMDQ_STATE_ERR;
+	}
+	return err;
+}
+EXPORT_SYMBOL(mmc_cmdq_discard);
+
 int mmc_cmdq_start_req(struct mmc_host *host, struct mmc_cmdq_req *cmdq_req)
 {
 	struct mmc_request *mrq = &cmdq_req->mrq;

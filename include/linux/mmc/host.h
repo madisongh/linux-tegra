@@ -94,6 +94,7 @@ struct mmc_cmdq_host_ops {
 	int (*halt)(struct mmc_host *host, bool halt);
 	void (*post_req)(struct mmc_host *host, struct mmc_request *mrq,
 			int err);
+	int (*discard_task)(struct mmc_host *mmc, u32 tag, bool all);
 };
 
 struct mmc_host_ops {
@@ -163,6 +164,7 @@ struct mmc_host_ops {
 				  unsigned int direction, int blk_size);
 	void	(*post_init)(struct mmc_host *host);
 	void	(*clear_cqe_intr)(struct mmc_host *host, u32 intmask);
+	void	(*discard_cqe_task)(struct mmc_host *host, u8 tag, bool all);
 };
 
 struct mmc_card;

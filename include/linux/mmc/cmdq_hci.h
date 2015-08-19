@@ -1,4 +1,5 @@
 /* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -50,6 +51,10 @@
 
 #define CQRMEM		0x50
 #define CQTERRI		0x54
+#define CQTERRI_DATA_XFER_ERR_TASK_ID_SHIFT	24
+#define CQTERRI_DATA_XFER_ERR_TASK_ID_MASK	0x1F000000
+#define CQTERRI_RESP_ERR_TASK_ID_SHIFT	8
+#define CQTERRI_RESP_ERR_TASK_ID_MASK	0x1F00
 #define CQCRI		0x58
 #define CQCRA		0x5C
 

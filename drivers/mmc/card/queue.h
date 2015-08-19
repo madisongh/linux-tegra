@@ -55,7 +55,7 @@ struct mmc_queue {
 
 	int			(*issue_fn)(struct mmc_queue *, struct request *);
 	int	(*cmdq_issue_fn)(struct mmc_queue *, struct request *);
-	void	(*cmdq_complete_fn)(struct request *);
+	int	(*cmdq_complete_fn)(struct request *);
 	void			*data;
 	struct request_queue	*queue;
 	struct mmc_queue_req	mqrq[2];

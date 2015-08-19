@@ -2458,7 +2458,7 @@ int mmc_blk_cmdq_issue_flush_rq(struct mmc_queue *mq, struct request *req)
 EXPORT_SYMBOL(mmc_blk_cmdq_issue_flush_rq);
 
 /* invoked by block layer in softirq context */
-void mmc_blk_cmdq_complete_rq(struct request *rq)
+int mmc_blk_cmdq_complete_rq(struct request *rq)
 {
 	struct mmc_queue_req *mq_rq = rq->special;
 	struct mmc_request *mrq = &mq_rq->mmc_cmdq_req.mrq;
@@ -2480,8 +2480,16 @@ void mmc_blk_cmdq_complete_rq(struct request *rq)
 
 		if (mmc_cmdq_halt(host, true))
 			BUG();
+
 		ctx_info->curr_state |= CMDQ_STATE_ERR;
-		/* TODO: wake-up kernel thread to handle error */
+
+		/* Discard task for which the error is seen */
+		err = mmc_cmdq_discard(host, mrq->cmdq_req->tag, false);
+		if (err)
+			pr_err("%s: cq: error occurred during task discard\n",
+					mmc_hostname(host));
+		spin_unlock(&ctx_info->cmdq_ctx_lock);
+		return err;
 	}
 
 	BUG_ON(!test_and_clear_bit(cmdq_req->tag,
@@ -2490,7 +2498,7 @@ void mmc_blk_cmdq_complete_rq(struct request *rq)
 		ctx_info->active_dcmd = false;
 		spin_unlock(&ctx_info->cmdq_ctx_lock);
 		blk_end_request_all(rq, 0);
-		return;
+		return 0;
 	}
 
 	spin_unlock(&ctx_info->cmdq_ctx_lock);
@@ -2499,6 +2507,7 @@ void mmc_blk_cmdq_complete_rq(struct request *rq)
 
 	if (test_and_clear_bit(0, &ctx_info->req_starved))
 		blk_run_queue(rq->q);
+	return 0;
 }
 
 /*
