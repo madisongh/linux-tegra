@@ -27,11 +27,6 @@
 #include <linux/irqchip/tegra-t210-agic.h>
 #endif /* CONFIG_ARCH_TEGRA_18x_SOC */
 
-enum tegra_agic_cpu {
-	TEGRA_AGIC_APE_HOST = 0,
-	TEGRA_AGIC_ADSP
-};
-
 #ifdef CONFIG_TEGRA_APE_AGIC
 extern int tegra_agic_route_interrupt(int irq, enum tegra_agic_cpu cpu);
 extern bool tegra_agic_irq_is_active(int irq);

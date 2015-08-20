@@ -21,6 +21,11 @@
 
 #define TEGRA_AGIC_COMPAT "nvidia,tegra210-agic"
 
+enum tegra_agic_cpu {
+	TEGRA_AGIC_APE_HOST = 0,
+	TEGRA_AGIC_ADSP,
+};
+
 /* AMISC Mailbox Full Interrupts */
 #define INT_AMISC_MBOX_FULL0		32
 #define INT_AMISC_MBOX_FULL1		33
