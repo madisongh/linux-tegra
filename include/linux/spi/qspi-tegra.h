@@ -37,6 +37,8 @@ struct tegra_qspi_device_controller_data {
 	int cs_hold_clk_count;
 	int rx_clk_tap_delay;
 	int tx_clk_tap_delay;
+	bool rx_tap_delay;
+	bool tx_tap_delay;
 	u32 x1_len_limit;
 	u32 x1_bus_speed;
 	u32 x1_dymmy_cycle;
