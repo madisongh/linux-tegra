@@ -22,12 +22,33 @@
 #include <linux/phy/phy.h>
 #include <linux/tegra-soc.h>
 #include <linux/reset.h>
+#include <linux/tegra-pmc.h>
 
 #include "ufshcd.h"
 #include "unipro.h"
 #include "ufs-tegra.h"
 #include "ufshci.h"
 
+
+
+/*
+ * ufs_tegra_ufs_pwrcntrl_update - To config UFSHC_PWR_CNTRL_0
+ */
+
+static void ufs_tegra_ufs_pwrcntrl_update(bool psw_on)
+{
+	if (psw_on) {
+		tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_ISOL_EN_MASK,
+			UFSHC_PWR_CNTRL_0_LP_ISOL_EN_ENABLE);
+		tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_PWR_RDY_MASK,
+			UFSHC_PWR_CNTRL_0_LP_PWR_RDY_DISABLE);
+	} else {
+		tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_PWR_RDY_MASK,
+			UFSHC_PWR_CNTRL_0_LP_PWR_RDY_ENABLE);
+		tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_ISOL_EN_MASK,
+			UFSHC_PWR_CNTRL_0_LP_ISOL_EN_DISABLE);
+	}
+}
 
 static int ufs_tegra_host_clk_get(struct device *dev,
 		const char *name, struct clk **clk_out)
@@ -455,10 +476,8 @@ static int ufs_tegra_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 		 * Save all armphy_rx_apb and armphy_tx_apb registers
 		 */
 		ufs_tegra_context_save(ufs_tegra);
-		/*
-		 * Call PMC driver functions which sets LP_ISOL_EN and clears
-		 * LP_PWR_READY bits in PMC_IMPL_UFSHC_PWR_CNTRL_0
-		 */
+
+		ufs_tegra_ufs_pwrcntrl_update(true);
 	}
 
 	/*
@@ -506,6 +525,8 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	ret = ufs_tegra_mphy_receiver_calibration(ufs_tegra);
 	if (ret)
 		goto out_disable_mphylane_clks;
+
+	ufs_tegra_ufs_pwrcntrl_update(false);
 	ufs_tegra_ufs_aux_prog(ufs_tegra);
 	ufs_tegra_disable_mphy_slcg(ufs_tegra);
 	ufs_tegra_context_restore(ufs_tegra);
@@ -621,6 +642,8 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 		if (err)
 			goto out_phy_exit;
 	}
+
+	ufs_tegra_ufs_pwrcntrl_update(false);
 
 	ufs_tegra_ufs_aux_prog(ufs_tegra);
 
