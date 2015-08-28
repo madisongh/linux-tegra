@@ -1,0 +1,43 @@
+TI SN65DSI86 MIPI DSI to EDP Bridge
+===================================
+
+The sn65dsi86 node:
+sn65dsi86 node must be contained in i2c parent node. This node represents
+TI SN65DSI86 MIPI DSI to EDP Bridge.
+
+Required properties:
+- compatible: Should contain "ti,sn65dsi86".
+- reg: I2C address for chip.
+
+Optional properties:
+- ti,enable-gpio: gpio to enable and reset chip.
+- ti,pll-refclk-cfg: is the value for SN65DSI86_PLL_REFCLK_CFG register.
+- ti,dsi-cha-clk-range: is the value for SN65DSI86_DSI_CHA_CLK_RANGE register.
+- ti,disable-assr: can be 0 or 1 to enable or disable ASSR support.
+  Default is set to zero.
+- ti,dp-ssc-cfg: is the value for SN65DSI86_DP_SSC_CFG register.
+- ti,h-pulse-width-low: is the value for SN65DSI86_CHA_HSYNC_PULSE_WIDTH_LOW
+  register.
+- ti,h-pulse-width-high: is the value for SN65DSI86_CHA_HSYNC_PULSE_WIDTH_HEIGH
+  register.
+- ti,v-pulse-width-low: is the value for SN65DSI86_CHA_VSYNC_PULSE_WIDTH_LOW
+  register.
+- ti,v-pulse-width-high: is the value for SN65DSI86_CHA_VSYNC_PULSE_WIDTH_HIGH
+  register.
+- ti,h-back-porch: is the value for SN65DSI86_CHA_HORIZONTAL_BACK_PORCH
+  register.
+- ti,v-back-porch: is the value for SN65DSI86_CHA_VERTICAL_BACK_PORCH register.
+- ti,h-front-porch: is the value for SN65DSI86_CHA_HORIZONTAL_FRONT_PORCH
+  register.
+- ti,v-front-porch: is the value for SN65DSI86_CHA_VERTICAL_FRONT_PORCH
+  register.
+
+Example:
+
+i2c@7000c000 {
+	sn65dsi86@2d {
+		compatible = "ti,sn65dsi86";
+		reg = <0x2d>;
+		status = "okay";
+	};
+}:
