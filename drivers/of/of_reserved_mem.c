@@ -300,7 +300,7 @@ int of_reserved_mem_device_init(struct device *dev)
 	struct of_phandle_iter iter;
 
 	of_property_for_each_phandle_with_args(iter, dev->of_node, "memory-region",
-					       NULL, 1) {
+					       NULL, 0) {
 		struct of_phandle_args *ret = &iter.out_args;
 
 		if (!ret->np)
@@ -314,9 +314,12 @@ int of_reserved_mem_device_init(struct device *dev)
 			return err;
 
 		err = rmem->ops->device_init(rmem, dev);
-		if (err == 0)
-			dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
+		if (err)
+			break;
+		dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
 	}
+
+	return err;
 }
 EXPORT_SYMBOL_GPL(of_reserved_mem_device_init);
 
