@@ -1278,7 +1278,11 @@ static int tegra_adma_probe(struct platform_device *pdev)
 			return PTR_ERR(tdma->dma_clk);
 		}
 
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 		tdma->ape_clk = clk_get_sys(NULL, "adma.ape");
+#else
+		tdma->ape_clk = devm_clk_get(&pdev->dev, "adma.ape");
+#endif
 		if (IS_ERR(tdma->ape_clk)) {
 			dev_err(&pdev->dev, "Error: Missing APE clock\n");
 			return PTR_ERR(tdma->ape_clk);
