@@ -44,4 +44,7 @@ struct tegra_xusb_mbox_msg {
 	u32 data;
 };
 
+int tegra_phy_xusb_set_vbus_override(struct phy *phy);
+int tegra_phy_xusb_clear_vbus_override(struct phy *phy);
+
 #endif /* __SOC_TEGRA_XUSB_H__ */
