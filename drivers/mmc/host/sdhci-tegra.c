@@ -31,6 +31,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
+#include <linux/platform/tegra/emc_bwmgr.h>
 #include <linux/clk/tegra.h>
 #include <linux/tegra_prod.h>
 #include <linux/dma-mapping.h>
@@ -131,6 +132,7 @@
 #define MAX_DIVISOR_VALUE		128
 #define DEFAULT_SDHOST_FREQ		50000000
 #define SDHOST_MIN_FREQ			6000000
+#define SDMMC_EMC_MAX_FREQ		150000000
 #define TEGRA_SDHCI_MAX_PLL_SOURCE 2
 
 /* Interface voltages */
@@ -144,6 +146,12 @@
 #define SDHOST_HIGH_VOLT_3V3	3300000
 #define SDHOST_MAX_VOLT_SUPPORT	3000000
 
+static unsigned int sdmmc_emc_clinet_id[] = {
+	TEGRA_BWMGR_CLIENT_SDMMC1,
+	TEGRA_BWMGR_CLIENT_SDMMC2,
+	TEGRA_BWMGR_CLIENT_SDMMC3,
+	TEGRA_BWMGR_CLIENT_SDMMC4
+};
 
 enum tegra_regulator_config_ops {
 	CONFIG_REG_GET,
@@ -168,6 +176,7 @@ struct sdhci_tegra {
 	const struct sdhci_tegra_soc_data *soc_data;
 	struct gpio_desc *power_gpio;
 	const struct tegra_sdhci_platform_data *plat;
+	struct tegra_bwmgr_client *emc_clk;
 	bool	clk_enabled;
 	/* ensure atomic set clock calls */
 	struct mutex	set_clock_mutex;
@@ -611,6 +620,9 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 			vendor_ctrl = sdhci_readb(sdhci, SDHCI_VNDR_CLK_CTRL);
 			vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_SDMMC_CLK;
 			sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
+			if (tegra_host->emc_clk)
+				tegra_bwmgr_set_emc(tegra_host->emc_clk,
+				SDMMC_EMC_MAX_FREQ, TEGRA_BWMGR_SET_EMC_SHARED_BW);
 		}
 		tegra_sdhci_set_clk_rate(sdhci, clock);
 		sdhci_set_clock(sdhci, clock);
@@ -621,6 +633,9 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 		sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 		clk_disable_unprepare(pltfm_host->clk);
 		tegra_host->clk_enabled = false;
+		if (tegra_host->emc_clk)
+			tegra_bwmgr_set_emc(tegra_host->emc_clk, 0,
+				TEGRA_BWMGR_SET_EMC_SHARED_BW);
 	}
 	mutex_unlock(&tegra_host->set_clock_mutex);
 }
@@ -1306,6 +1321,7 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	of_property_read_u32(np, "nvidia,ddr-tap-delay", &plat->ddr_tap_delay);
 	of_property_read_u32(np, "nvidia,ddr-trim-delay", &plat->ddr_trim_delay);
 	plat->pwrdet_support = of_property_read_bool(np, "pwrdet-support");
+	plat->instance = of_alias_get_id(np, "sdhci");
 	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
 	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
 	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
@@ -1438,6 +1454,17 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		rc = PTR_ERR(clk);
 		goto err_clk_get;
 	}
+
+	tegra_host->emc_clk =
+		tegra_bwmgr_register(sdmmc_emc_clinet_id[plat->instance]);
+
+	if (IS_ERR_OR_NULL(tegra_host->emc_clk))
+		dev_err(mmc_dev(host->mmc),
+			"Client registration for eMC failed\n");
+	else
+		dev_info(mmc_dev(host->mmc),
+			"Client registration for eMC Successful\n");
+
 	pltfm_host->clk = clk;
 	/* enable clocks first time */
 	rc = clk_prepare_enable(pltfm_host->clk);

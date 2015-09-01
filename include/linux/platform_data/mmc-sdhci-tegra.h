@@ -37,6 +37,7 @@
 #define MMC_MASK_HS400		0x40
 
 struct tegra_sdhci_platform_data {
+	unsigned int instance;
 	unsigned int max_clk_limit;
 	unsigned int uhs_mask;
 	unsigned int ddr_tap_delay;
