@@ -93,12 +93,6 @@ static void p2360_panel_init(void)
 	bus_register_notifier(&platform_bus_type, &platform_nb);
 }
 
-static struct platform_device *p2360_devices[] __initdata = {
-#if defined(CONFIG_TEGRA_WATCHDOG)
-	&tegra_wdt0_device,
-#endif
-};
-
 static __initdata struct tegra_clk_init_table p2360_fixed_rate_clk_table[] = {
 	{ "gk20a.gbus",	NULL,	600000000,	false},
 	{ NULL,		NULL,	0,		0},
@@ -136,8 +130,6 @@ static void __init tegra_p2360_late_init(void)
 	tegra_vcm30_t124_therm_mon_init();
 	tegra_vcm30_t124_soctherm_init();
 	tegra_vcm30_t124_usb_init();
-
-	platform_add_devices(p2360_devices, ARRAY_SIZE(p2360_devices));
 
 	tegra_vcm30_t124_suspend_init();
 
