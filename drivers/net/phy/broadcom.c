@@ -449,7 +449,8 @@ static int bcm54xx_config_init(struct phy_device *phydev)
 		MII_BCM54XX_INT_LINK);
 
 	/* unmask energy detect interrupt */
-	if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM89610)
+	if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM89610 ||
+	    BRCM_PHY_MODEL(phydev) == PHY_ID_BCM50610)
 		reg &= ~MII_BCM54XX_INT_EDETECT;
 
 	err = phy_write(phydev, MII_BCM54XX_IMR, reg);
@@ -467,7 +468,8 @@ static int bcm54xx_config_init(struct phy_device *phydev)
 		bcm54xx_adjust_rxrefclk(phydev);
 
 	/* enable energy detect interrupt status update */
-	if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM89610) {
+	if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM89610 ||
+	    BRCM_PHY_MODEL(phydev) == PHY_ID_BCM50610) {
 		reg = bcm54xx_shadow_read(phydev, BCM54XX_SHD_SCR3);
 		reg |= BCM54XX_SHD_SCR3_EDETECT_EN;
 		bcm54xx_shadow_write(phydev, BCM54XX_SHD_SCR3, reg);
