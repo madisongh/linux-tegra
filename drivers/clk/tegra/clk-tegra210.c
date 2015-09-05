@@ -168,6 +168,11 @@
 #define PLLDP_SS_CTRL1	0x59c
 #define PLLDP_SS_CTRL2	0x5a0
 
+#define LVL2_CLK_GATE_OVRA 0xf8
+#define LVL2_CLK_GATE_OVRC 0x3a0
+#define LVL2_CLK_GATE_OVRD 0x3a4
+#define LVL2_CLK_GATE_OVRE 0x554
+
 #define PMC_PLLM_WB0_OVERRIDE 0x1dc
 #define PMC_PLLM_WB0_OVERRIDE_2 0x2b0
 
@@ -2412,6 +2417,29 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_vcm_apb_sclk] = { .dt_id = TEGRA210_CLK_VCM_APB_SCLK, .present = true },
 	[tegra_clk_pll_a1] = { .dt_id = TEGRA210_CLK_PLL_A1, .present = true },
 	[tegra_clk_sclk_skipper] = { .dt_id = TEGRA210_CLK_SCLK_SKIPPER, .present = true },
+	[tegra_clk_adsp_cpu_abus] = { .dt_id = TEGRA210_CLK_ADSP_CPU_ABUS, .present = true },
+	[tegra_clk_cap_vcore_abus] = { .dt_id = TEGRA210_CLK_CAP_VCORE_ABUS, .present = true },
+	[tegra_clk_override_abus] = { .dt_id = TEGRA210_CLK_OVERRIDE_ABUS, .present = true },
+	[tegra_clk_mc_capa] = { .dt_id = TEGRA210_CLK_MC_CAPA, .present = true },
+	[tegra_clk_mc_cbpa] = { .dt_id = TEGRA210_CLK_MC_CBPA, .present = true },
+	[tegra_clk_mc_ccpa] = { .dt_id = TEGRA210_CLK_MC_CCPA, .present = true },
+	[tegra_clk_mc_cdpa] = { .dt_id = TEGRA210_CLK_MC_CDPA, .present = true },
+	[tegra_clk_disp1_slcg_ovr] = { .dt_id = TEGRA210_CLK_DISP1_SLCG_OVR, .present = true },
+	[tegra_clk_disp2_slcg_ovr] = { .dt_id = TEGRA210_CLK_DISP2_SLCG_OVR, .present = true },
+	[tegra_clk_vi_slcg_ovr] = { .dt_id = TEGRA210_CLK_VI_SLCG_OVR, .present = true },
+	[tegra_clk_ispa_slcg_ovr] = { .dt_id = TEGRA210_CLK_ISPA_SLCG_OVR, .present = true },
+	[tegra_clk_ispb_slcg_ovr] = { .dt_id = TEGRA210_CLK_ISPB_SLCG_OVR, .present = true },
+	[tegra_clk_nvdec_slcg_ovr] = { .dt_id = TEGRA210_CLK_NVDEC_SLCG_OVR, .present = true },
+	[tegra_clk_msenc_slcg_ovr] = { .dt_id = TEGRA210_CLK_MSENC_SLCG_OVR, .present = true },
+	[tegra_clk_nvjpg_slcg_ovr] = { .dt_id = TEGRA210_CLK_NVJPG_SLCG_OVR, .present = true },
+	[tegra_clk_vic03_slcg_ovr] = { .dt_id = TEGRA210_CLK_VIC03_SLCG_OVR, .present = true },
+	[tegra_clk_xusb_dev_slcg_ovr] = { .dt_id = TEGRA210_CLK_XUSB_DEV_SLCG_OVR, .present = true },
+	[tegra_clk_xusb_host_slcg_ovr] = { .dt_id = TEGRA210_CLK_XUSB_HOST_SLCG_OVR, .present = true },
+	[tegra_clk_d_audio_slcg_ovr] = { .dt_id = TEGRA210_CLK_D_AUDIO_SLCG_OVR, .present = true },
+	[tegra_clk_ape_slcg_ovr] = { .dt_id = TEGRA210_CLK_APE_SLCG_OVR, .present = true },
+	[tegra_clk_sata_slcg_ovr] = { .dt_id = TEGRA210_CLK_SATA_SLCG_OVR, .present = true },
+	[tegra_clk_sata_slcg_ovr_ipfs] = { .dt_id = TEGRA210_CLK_SATA_SLCG_OVR_IPFS, .present = true },
+	[tegra_clk_sata_slcg_ovr_fpci] = { .dt_id = TEGRA210_CLK_SATA_SLCG_OVR_FPCI, .present = true },
 };
 
 static struct tegra_devclk devclks[] __initdata = {
@@ -3623,6 +3651,75 @@ static int tegra210_reset_deassert(unsigned long id)
 	return 0;
 }
 
+static void __init tegra210_ovr_clk_init(void __iomem *clk_base)
+{
+	struct clk *clk;
+
+	clk = clk_register_gate(NULL, "disp1_slcg_ovr", "disp1", 0,
+			clk_base + LVL2_CLK_GATE_OVRA, 1, 0, NULL);
+	clks[TEGRA210_CLK_DISP1_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "disp2_slcg_ovr", "disp2", 0,
+			clk_base + LVL2_CLK_GATE_OVRA, 2, 0, NULL);
+	clks[TEGRA210_CLK_DISP2_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "vi_slcg_ovr", "vi", 0,
+			clk_base + LVL2_CLK_GATE_OVRA, 15, 0, NULL);
+	clks[TEGRA210_CLK_VI_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "ispa_slcg_ovr", "isp", 0,
+			clk_base + LVL2_CLK_GATE_OVRE, 3, 0, NULL);
+	clks[TEGRA210_CLK_ISPA_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "ispb_slcg_ovr", "ispb", 0,
+			clk_base + LVL2_CLK_GATE_OVRD, 22, 0, NULL);
+	clks[TEGRA210_CLK_ISPB_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "nvdec_slcg_ovr", "nvdec", 0,
+			clk_base + LVL2_CLK_GATE_OVRE, 31, 0, NULL);
+	clks[TEGRA210_CLK_NVDEC_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "msenc_slcg_ovr", "msenc", 0,
+			clk_base + LVL2_CLK_GATE_OVRE, 29, 0, NULL);
+	clks[TEGRA210_CLK_MSENC_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "nvjpg_slcg_ovr", "nvjpg", 0,
+			clk_base + LVL2_CLK_GATE_OVRE, 9, 0, NULL);
+	clks[TEGRA210_CLK_NVJPG_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "vic03_slcg_ovr", "vic03", 0,
+			clk_base + LVL2_CLK_GATE_OVRE, 5, 0, NULL);
+	clks[TEGRA210_CLK_VIC03_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "xusb_dev_slcg_ovr", "xusb_dev", 0,
+			clk_base + LVL2_CLK_GATE_OVRC, 31, 0, NULL);
+	clks[TEGRA210_CLK_XUSB_DEV_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "xusb_host_slcg_ovr", "xusb_host", 0,
+			clk_base + LVL2_CLK_GATE_OVRC, 30, 0, NULL);
+	clks[TEGRA210_CLK_XUSB_HOST_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "d_audio_slcg_ovr", "d_audio", 0,
+			clk_base + LVL2_CLK_GATE_OVRC, 1, 0, NULL);
+	clks[TEGRA210_CLK_D_AUDIO_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "ape_slcg_ovr", "ape", 0,
+			clk_base + LVL2_CLK_GATE_OVRE, 10, 0, NULL);
+	clks[TEGRA210_CLK_APE_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "sata_slcg_ovr", "sata", 0,
+			clk_base + LVL2_CLK_GATE_OVRC, 0, 0, NULL);
+	clks[TEGRA210_CLK_SATA_SLCG_OVR] = clk;
+
+	clk = clk_register_gate(NULL, "sata_slcg_ovr_ipfs", "sata", 0,
+			clk_base + LVL2_CLK_GATE_OVRC, 17, 0, NULL);
+	clks[TEGRA210_CLK_SATA_SLCG_OVR_IPFS] = clk;
+
+	clk = clk_register_gate(NULL, "sata_slcg_ovr_fpci", "sata", 0,
+			clk_base + LVL2_CLK_GATE_OVRC, 19, 0, NULL);
+	clks[TEGRA210_CLK_SATA_SLCG_OVR_FPCI] = clk;
+}
+
 /**
  * tegra210_clock_init - Tegra210-specific clock initialization
  * @np: struct device_node * of the DT node for the SoC CAR IP block
@@ -3676,6 +3773,7 @@ static void __init tegra210_clock_init(struct device_node *np)
 	tegra_fixed_clk_init(tegra210_clks);
 	tegra210_pll_init(clk_base, pmc_base);
 	tegra210_periph_clk_init(clk_base, pmc_base);
+	tegra210_ovr_clk_init(clk_base);
 	tegra_audio_clk_init(clk_base, pmc_base, tegra210_clks,
 			     tegra210_audio_plls,
 			     ARRAY_SIZE(tegra210_audio_plls));
