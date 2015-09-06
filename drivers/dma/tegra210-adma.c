@@ -1448,8 +1448,8 @@ static int tegra_adma_runtime_suspend(struct device *dev)
 	struct tegra_adma *tdma = platform_get_drvdata(pdev);
 
 	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
-		clk_disable(tdma->dma_clk);
-		clk_disable(tdma->ape_clk);
+		clk_disable_unprepare(tdma->dma_clk);
+		clk_disable_unprepare(tdma->ape_clk);
 	}
 
 	return 0;
@@ -1462,13 +1462,13 @@ static int tegra_adma_runtime_resume(struct device *dev)
 	int ret;
 
 	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
-		ret = clk_enable(tdma->ape_clk);
+		ret = clk_prepare_enable(tdma->ape_clk);
 		if (ret < 0) {
 			dev_err(dev, "clk_enable failed: %d\n", ret);
 			return ret;
 		}
 
-		ret = clk_enable(tdma->dma_clk);
+		ret = clk_prepare_enable(tdma->dma_clk);
 		if (ret < 0) {
 			dev_err(dev, "clk_enable failed: %d\n", ret);
 			return ret;
