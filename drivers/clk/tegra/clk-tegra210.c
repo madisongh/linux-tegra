@@ -319,6 +319,8 @@ static const char *mux_pllmcp_clkm[] = {
 #define PLLA_MISC2_WRITE_MASK		0x06ffffff
 
 /* PLLD */
+#define PLLD_BASE_CSI_CLKSOURCE		(1 << 23)
+
 #define PLLD_MISC0_EN_SDM		(1 << 16)
 #define PLLD_MISC0_LOCK_OVERRIDE	(1 << 17)
 #define PLLD_MISC0_LOCK_ENABLE		(1 << 18)
@@ -501,6 +503,26 @@ void tegra210_sata_pll_hw_sequence_start(void)
 	writel_relaxed(val, clk_base + SATA_PLL_CFG0);
 }
 EXPORT_SYMBOL_GPL(tegra210_sata_pll_hw_sequence_start);
+
+void tegra210_csi_source_from_brick(void)
+{
+	u32 val;
+
+	val = readl_relaxed(clk_base + PLLD_BASE);
+	val &= ~PLLD_BASE_CSI_CLKSOURCE;
+	writel_relaxed(val, clk_base + PLLD_BASE);
+}
+EXPORT_SYMBOL_GPL(tegra210_csi_source_from_brick);
+
+void tegra210_csi_source_from_plld(void)
+{
+	u32 val;
+
+	val = readl_relaxed(clk_base + PLLD_BASE);
+	val |= PLLD_BASE_CSI_CLKSOURCE;
+	writel_relaxed(val, clk_base + PLLD_BASE);
+}
+EXPORT_SYMBOL_GPL(tegra210_csi_source_from_plld);
 
 static inline void _pll_misc_chk_default(void __iomem *base,
 					struct tegra_clk_pll_params *params,
