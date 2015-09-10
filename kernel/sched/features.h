@@ -69,3 +69,8 @@ SCHED_FEAT(RT_RUNTIME_SHARE, true)
 SCHED_FEAT(LB_MIN, false)
 SCHED_FEAT(ATTACH_AGE_LOAD, true)
 
+/*
+ * Make load balance and wake paths capacity aware to optimize
+ * throughput for heterogenous multi-processor systems (ex: big.LITTLE)
+ */
+SCHED_FEAT(CAPACITY_AWARE, false)

@@ -4703,6 +4703,11 @@ static long effective_load(struct task_group *tg, int cpu, long wl, long wg)
 
 #endif
 
+static inline bool capacity_aware(void)
+{
+	return sched_feat(CAPACITY_AWARE);
+}
+
 /*
  * Detect M:N waker/wakee relationships via a switching-frequency heuristic.
  * A waker of many should wake a different task than the one last awakened
