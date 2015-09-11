@@ -6914,6 +6914,12 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 	if (!sds.busiest || busiest->sum_nr_running == 0)
 		goto out_balanced;
 
+	/* Skip balancing at top level sd in case CPUs have spare cap */
+	if (capacity_aware() && env->sd->level) {
+		if (!env->dst_rq->rd->overutilized)
+			goto out_balanced;
+	}
+
 	sds.avg_load = (SCHED_CAPACITY_SCALE * sds.total_load)
 						/ sds.total_capacity;
 
