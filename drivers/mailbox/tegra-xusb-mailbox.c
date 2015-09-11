@@ -50,7 +50,7 @@ struct tegra_xusb_mbox {
 	bool last_tx_done[XUSB_MBOX_NUM_CHANS];
 };
 
-/* #define DEBUG */
+#define DEBUG
 #ifndef DEBUG
 static inline u32 mbox_readl(struct tegra_xusb_mbox *mbox, unsigned long offset)
 {
@@ -66,7 +66,7 @@ static inline void mbox_writel(struct tegra_xusb_mbox *mbox, u32 val,
 #define mbox_writel(_mbox, _value, _offset)				\
 {									\
 	unsigned long v = _value, o = _offset;				\
-	pr_info("%s mbox_write %s(@0x%lx) with 0x%lx\n", __func__,	\
+	pr_debug("%s mbox_write %s(@0x%lx) with 0x%lx\n", __func__,	\
 		#_offset, o, v);					\
 	writel(v, _mbox->regs + o);					\
 }
@@ -74,8 +74,8 @@ static inline void mbox_writel(struct tegra_xusb_mbox *mbox, u32 val,
 #define mbox_readl(_mbox, _offset)					\
 ({									\
 	unsigned long v, o = _offset;					\
-	v = readl(_mbox->regs + o);				\
-	pr_info("%s mbox_read %s(@0x%lx) = 0x%lx\n", __func__,	\
+	v = readl(_mbox->regs + o);					\
+	pr_debug("%s mbox_read %s(@0x%lx) = 0x%lx\n", __func__,		\
 		#_offset, o, v);					\
 	v;								\
 })
@@ -256,6 +256,14 @@ static irqreturn_t tegra_xusb_mbox_irq(int irq, void *p)
 				mbox_chan_received_data(&mbox->mbox.chans[i],
 							&msg);
 			}
+		}
+
+		if ((msg.cmd == MBOX_CMD_ACK) || (msg.cmd == MBOX_CMD_NAK)) {
+			reg = mbox_readl(mbox, XUSB_CFG_ARU_MBOX_CMD);
+			reg &= ~MBOX_DEST_SMI;
+			mbox_writel(mbox, reg, XUSB_CFG_ARU_MBOX_CMD);
+
+			mbox_writel(mbox, 0, XUSB_CFG_ARU_MBOX_OWNER);
 		}
 	}
 exit:
