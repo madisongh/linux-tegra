@@ -240,6 +240,7 @@ struct tegra_xhci_hcd {
 	int num_phys;
 	struct phy **phys;
 	unsigned enabled_ss_ports; /* bitmap */
+	unsigned num_hsic_port; /* count */
 
 	struct work_struct mbox_req_work;
 	struct tegra_xusb_mbox_msg mbox_req;
@@ -750,7 +751,10 @@ static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
 	cfg_tbl = (struct tegra_xhci_fw_cfgtbl *)tegra->fw_data;
 
 	cfg_tbl->ss_portmap = tegra->enabled_ss_ports;
-	dev_info(dev, "%s ss_portmap 0x%x\n", __func__, cfg_tbl->ss_portmap);
+	dev_dbg(dev, "%s ss_portmap 0x%x\n", __func__, cfg_tbl->ss_portmap);
+
+	cfg_tbl->num_hsic_port = tegra->num_hsic_port;
+	dev_dbg(dev, "%s num_hsic_port %d\n", __func__, cfg_tbl->num_hsic_port);
 
 	if (cfg_tbl->build_log == LOG_MEMORY)
 		fw_log_init(tegra);
@@ -1166,7 +1170,6 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	if (ret < 0)
 		goto put_usb3_hcd;
 
-#if 0 /* TODO: enable when bitfiles has mailbox fix */
 	/* Enable firmware messages from controller. */
 	msg.cmd = MBOX_CMD_MSG_ENABLED;
 	msg.data = 0;
@@ -1175,17 +1178,14 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 		dev_warn(dev, "can't send message to firmware (%d)\n", ret);
 		goto dealloc_usb3_hcd;
 	}
-#endif
 
 	tegra->fw_loaded = true;
 	release_firmware(fw);
 	return;
 
 	/* Free up as much as we can and wait to be unbound. */
-#if 0 /* TODO: enable when bitfiles has mailbox fix */
 dealloc_usb3_hcd:
 	usb_remove_hcd(xhci->shared_hcd);
-#endif
 put_usb3_hcd:
 	usb_put_hcd(xhci->shared_hcd);
 dealloc_usb2_hcd:
@@ -1485,6 +1485,8 @@ skip_clocks:
 				tegra->phys[k++] = phy;
 				if (phy && strstr(prop, "usb3"))
 					tegra->enabled_ss_ports |= BIT(j);
+				if (phy && strstr(prop, "hsic"))
+					tegra->num_hsic_port++;
 			}
 		}
 	}
