@@ -4965,6 +4965,86 @@ done:
 	return target;
 }
 
+static inline unsigned long task_utilization(struct task_struct *p)
+{
+	return p->se.avg.util_avg;
+}
+
+static bool task_fits_capacity(struct task_struct *p, int cpu)
+{
+	unsigned long capacity = capacity_orig_of(cpu);
+	unsigned long max_capacity = cpu_rq(cpu)->rd->max_cpu_capacity;
+	int usage = task_utilization(p);
+
+	if (capacity == max_capacity)
+		return true;
+
+	if (capacity * capacity_margin > max_capacity * 1024)
+		return true;
+
+	return (capacity * 1024) > (usage * capacity_margin);
+}
+
+static int capacity_aware_wake(struct task_struct *p, int target)
+{
+	struct sched_domain *sd;
+	struct sched_group *sg, *sg_target;
+	int target_max_cap = INT_MAX;
+	int min_usage = INT_MAX;
+	int target_cpu = target;
+	int i;
+
+	/* XXX: Remove this iteration? */
+	sd = highest_flag_domain(target, SD_LOAD_BALANCE);
+
+	if (!sd)
+		return select_idle_sibling(p, target);
+
+	/* All cpus in this solo sd should have the same capacity (SMP) */
+	if (!sd->level)
+		return select_idle_sibling(p, target);
+
+	sg = sd->groups;
+	sg_target = sg;
+
+	/*
+	 * Pick the right type of CPU for the task assuming no other
+	 * tasks are present on it.
+	 */
+	do {
+		int cap_cpu = group_first_cpu(sg);
+
+		if (capacity_orig_of(cap_cpu) < target_max_cap &&
+		    task_fits_capacity(p, cap_cpu)) {
+			sg_target = sg;
+			target_max_cap = capacity_orig_of(cap_cpu);
+		}
+	} while (sg = sg->next, sg != sd->groups);
+
+	/* The previous CPU the task was on is valid */
+	if (cpumask_test_cpu(task_cpu(p), sched_group_cpus(sg_target)))
+		return select_idle_sibling(p, task_cpu(p));
+
+	/* Find the least used cpu in sg_target with enough spare capacity */
+	for_each_cpu_and(i, tsk_cpus_allowed(p), sched_group_cpus(sg_target)) {
+		int new_usage = cpu_util(i) + task_utilization(p);
+
+		if (new_usage * capacity_margin >= 1024 * capacity_of(i))
+			continue;
+
+		if (new_usage < min_usage) {
+			min_usage = new_usage;
+			target_cpu = i;
+		}
+	}
+
+	if (target != target_cpu)
+		return target_cpu;
+
+	/* Didn't find any better CPU */
+	return select_idle_sibling(p, target);
+}
+
 /*
  * cpu_util returns the amount of capacity of a CPU that is used by CFS
  * tasks. The unit of the return value must be the one of capacity so we can
@@ -5051,9 +5131,12 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 	}
 
 	if (!sd) {
-		if (sd_flag & SD_BALANCE_WAKE) /* XXX always ? */
-			new_cpu = select_idle_sibling(p, new_cpu);
-
+		if (sd_flag & SD_BALANCE_WAKE) { /* XXX always ? */
+			if (capacity_aware())
+				new_cpu = capacity_aware_wake(p, new_cpu);
+			else
+				new_cpu = select_idle_sibling(p, new_cpu);
+		}
 	} else while (sd) {
 		struct sched_group *group;
 		int weight;
