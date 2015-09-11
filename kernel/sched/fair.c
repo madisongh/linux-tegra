@@ -4716,6 +4716,20 @@ static unsigned int capacity_margin = 1280; /* ~20% margin */
 
 static int cpu_util(int cpu);
 
+/*
+ * Gets the spare capacity available to fair tasks.
+ */
+static unsigned int get_spare_capacity(int cpu)
+{
+	unsigned int util = cpu_util(cpu);
+	unsigned int capacity = capacity_of(cpu);
+
+	if (util >= capacity)
+		return 0;
+
+	return capacity - util;
+}
+
 static bool cpu_overutilized(int cpu)
 {
 	return (capacity_of(cpu) * 1024) <
@@ -7089,6 +7103,18 @@ static int need_active_balance(struct lb_env *env)
 		if ((check_cpu_capacity(env->src_rq, sd)) &&
 		    (capacity_of(env->src_cpu)*sd->imbalance_pct < capacity_of(env->dst_cpu)*100))
 			return 1;
+
+		if (capacity_aware()) {
+			/* src_cpu has more capacity than dst_cpu, dont pull */
+			if (capacity_orig_of(env->src_cpu) * 1024 >=
+			    capacity_orig_of(env->dst_cpu) * capacity_margin)
+				return 0;
+
+			/* dst_cpu has more spare capacity */
+			if (get_spare_capacity(env->dst_cpu) * 1024 >=
+			    capacity_orig_of(env->src_cpu) * capacity_margin)
+				return 1;
+		}
 	}
 
 	return unlikely(sd->nr_balance_failed > sd->cache_nice_tries+2);
