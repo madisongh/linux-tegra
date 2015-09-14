@@ -160,9 +160,24 @@
 		};
 
 		spiflash@1 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+
 			compatible = "s25fl512s";
 			reg = <1>;
 			spi-max-frequency = <25000000>;
+
+			persistency@0 {
+				label = "Persistency";
+				reg = <0 0x3fc0000>;	/* 65280k@0k */
+			};
+
+			dataset@3fc0000 {
+				label = "Dataset";
+				reg = <0x3fc0000 0x0>;	/* 256k@65280k */
+				read-only;
+			};
+
 		};
 	};
 
