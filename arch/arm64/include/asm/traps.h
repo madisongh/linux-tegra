@@ -53,7 +53,9 @@ static inline int __in_irqentry_text(unsigned long ptr)
 #ifdef CONFIG_SERROR_HANDLER
 struct serr_hook {
 	struct list_head node;
-	int (*fn)(struct pt_regs *regs, int reason, unsigned int esr);
+	void *priv;
+	int (*fn)(struct pt_regs *regs, int reason,
+		unsigned int esr, void *priv);
 };
 
 void register_serr_hook(struct serr_hook *hook);

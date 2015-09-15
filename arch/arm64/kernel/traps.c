@@ -473,7 +473,7 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 #ifdef CONFIG_SERROR_HANDLER
 	raw_spin_lock_irqsave(&serr_lock, flags);
 	list_for_each_entry(hook, &serr_hook, node)
-		if (hook->fn(regs, reason, esr))
+		if (hook->fn(regs, reason, esr, hook->priv))
 			return;
 	raw_spin_unlock_irqrestore(&serr_lock, flags);
 #endif
