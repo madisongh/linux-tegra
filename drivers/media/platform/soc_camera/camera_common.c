@@ -17,6 +17,7 @@
  */
 
 #include <media/camera_common.h>
+#include <mach/io_dpd.h>
 
 #define has_s_op(master, op) \
 	(master->ops && master->ops->op)
@@ -32,23 +33,55 @@ static const struct camera_common_colorfmt camera_common_color_fmts[] = {
 	{V4L2_MBUS_FMT_SRGGB8_1X8, V4L2_COLORSPACE_SRGB},
 };
 
-int camera_common_to_gain(u32 rep, int shift)
+static struct tegra_io_dpd camera_common_csi_io[] = {
+	{
+		.name			= "CSIA",
+		.io_dpd_reg_index	= 0,
+		.io_dpd_bit		= 0x0,
+	},
+	{
+		.name			= "CSIB",
+		.io_dpd_reg_index	= 0,
+		.io_dpd_bit		= 0x1,
+	},
+	{
+		.name			= "CSIC",
+		.io_dpd_reg_index	= 1,
+		.io_dpd_bit		= 0xa,
+	},
+	{
+		.name			= "CSID",
+		.io_dpd_reg_index	= 1,
+		.io_dpd_bit		= 0xb,
+	},
+	{
+		.name			= "CSIE",
+		.io_dpd_reg_index	= 1,
+		.io_dpd_bit		= 0xc,
+	},
+	{
+		.name			= "CSIF",
+		.io_dpd_reg_index	= 1,
+		.io_dpd_bit		= 0xd,
+	},
+};
+
+int camera_common_g_ctrl(struct camera_common_data *s_data,
+			 struct v4l2_control *control)
 {
-	int gain;
-	int gain_int;
-	int gain_dec;
-	int min_int = (1 << shift);
-	int denom;
+	int i;
 
-	/* last 4 bit of rep is
-	 * decimal representation of gain */
-	gain_int = (int)(rep >> shift);
-	gain_dec = (int)(rep & ~(0xffff << shift));
+	for (i = 0; i < s_data->numctrls; i++) {
+		if (s_data->ctrls[i]->id == control->id) {
+			control->value = s_data->ctrls[i]->val;
+			dev_dbg(&s_data->i2c_client->dev,
+				 "%s: found control %s\n", __func__,
+				 s_data->ctrls[i]->name);
+			return 0;
+		}
+	}
 
-	denom = gain_int * min_int + gain_dec;
-	gain = 512 - ((512 * min_int + (denom - 1)) / denom);
-
-	return gain;
+	return -EFAULT;
 }
 
 int camera_common_regulator_get(struct i2c_client *client,
@@ -227,7 +260,7 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 	int err;
 	int i;
 
-	dev_dbg(&client->dev, "%s: szie %i x %i\n", __func__,
+	dev_dbg(&client->dev, "%s: size %i x %i\n", __func__,
 		 mf->width, mf->height);
 
 	/* check hdr enable ctrl */
@@ -328,6 +361,13 @@ int camera_common_g_chip_ident(struct v4l2_subdev *sd,
 static void camera_common_mclk_disable(struct camera_common_data *s_data)
 {
 	struct camera_common_power_rail *pw = s_data->power;
+
+	if (!pw) {
+		dev_err(&s_data->i2c_client->dev, "%s: no device power rail\n",
+			__func__);
+		return;
+	}
+
 	dev_dbg(&s_data->i2c_client->dev, "%s: disable MCLK\n", __func__);
 	clk_disable_unprepare(pw->mclk);
 }
@@ -338,6 +378,12 @@ static int camera_common_mclk_enable(struct camera_common_data *s_data)
 	struct camera_common_power_rail *pw = s_data->power;
 	unsigned long mclk_init_rate = s_data->def_clk_freq;
 
+	if (!pw) {
+		dev_err(&s_data->i2c_client->dev, "%s: no device power rail\n",
+			__func__);
+		return -EFAULT;
+	}
+
 	dev_dbg(&s_data->i2c_client->dev, "%s: enable MCLK with %lu Hz\n",
 		__func__, mclk_init_rate);
 
@@ -345,6 +391,28 @@ static int camera_common_mclk_enable(struct camera_common_data *s_data)
 	if (!err)
 		err = clk_prepare_enable(pw->mclk);
 	return err;
+}
+
+static void camera_common_dpd_disable(struct camera_common_data *s_data)
+{
+	int i;
+
+	/* disable CSI IOs DPD mode to turn on camera */
+	for (i = 0; i < ARRAY_SIZE(s_data->csi_io); i++) {
+		if (s_data->csi_io[i])
+			tegra_io_dpd_disable(&camera_common_csi_io[i]);
+	}
+}
+
+static void camera_common_dpd_enable(struct camera_common_data *s_data)
+{
+	int i;
+
+	/* disable CSI IOs DPD mode to turn on camera */
+	for (i = 0; i < ARRAY_SIZE(s_data->csi_io); i++) {
+		if (s_data->csi_io[i])
+			tegra_io_dpd_enable(&camera_common_csi_io[i]);
+	}
 }
 
 int camera_common_s_power(struct v4l2_subdev *sd, int on)
@@ -355,13 +423,17 @@ int camera_common_s_power(struct v4l2_subdev *sd, int on)
 
 	if (on) {
 		err = camera_common_mclk_enable(s_data);
+		camera_common_dpd_disable(s_data);
 		if (!err)
 			err = call_s_op(s_data, power_on);
-		if (err)
+		if (err) {
+			camera_common_dpd_enable(s_data);
 			camera_common_mclk_disable(s_data);
+		}
 		return err;
 	} else if (!on) {
 		call_s_op(s_data, power_off);
+		camera_common_dpd_enable(s_data);
 		camera_common_mclk_disable(s_data);
 		return 0;
 	} else
@@ -378,3 +450,4 @@ int camera_common_g_mbus_config(struct v4l2_subdev *sd,
 
 	return 0;
 }
+

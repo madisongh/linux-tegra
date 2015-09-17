@@ -26,9 +26,8 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 
-#include <mach/io_dpd.h>
-
 #include <media/v4l2-chip-ident.h>
+#include <media/tegra_v4l2_camera.h>
 #include <media/camera_common.h>
 #include <media/ov23850.h>
 
@@ -40,7 +39,7 @@
 #define OV23850_MIN_GAIN		(1 << OV23850_GAIN_SHIFT)
 #define OV23850_MAX_GAIN		(16 << OV23850_GAIN_SHIFT)
 #define OV23850_MIN_FRAME_LENGTH	(0x0)
-#define OV23850_MAX_FRAME_LENGTH	(0xffff)
+#define OV23850_MAX_FRAME_LENGTH	(0x7fff)
 #define OV23850_MIN_EXPOSURE_COARSE	(0x0001)
 #define OV23850_MAX_EXPOSURE_COARSE	\
 	(OV23850_MAX_FRAME_LENGTH-OV23850_MAX_COARSE_DIFF)
@@ -56,35 +55,10 @@
 #define OV23850_DEFAULT_DATAFMT	V4L2_MBUS_FMT_SRGGB10_1X10
 #define OV23850_DEFAULT_CLK_FREQ	24000000
 
-static struct tegra_io_dpd csia_io = {
-	.name			= "CSIA",
-	.io_dpd_reg_index	= 0,
-	.io_dpd_bit		= 0x0,
-};
-
-static struct tegra_io_dpd csib_io = {
-	.name			= "CSIB",
-	.io_dpd_reg_index	= 0,
-	.io_dpd_bit		= 0x1,
-};
-
-static struct tegra_io_dpd csic_io = {
-	.name			= "CSIC",
-	.io_dpd_reg_index	= 1,
-	.io_dpd_bit		= 0xa,
-};
-
-static struct tegra_io_dpd csid_io = {
-	.name			= "CSID",
-	.io_dpd_reg_index	= 1,
-	.io_dpd_bit		= 0xb,
-};
-
-
 struct ov23850 {
 	struct mutex			ov23850_camera_lock;
 	struct camera_common_power_rail	power;
-	int				num_ctrls;
+	int				numctrls;
 	struct v4l2_ctrl_handler	ctrl_handler;
 #if 0
 	struct camera_common_eeprom_data eeprom[OV23850_EEPROM_NUM_BLOCKS];
@@ -93,8 +67,8 @@ struct ov23850 {
 	struct i2c_client		*i2c_client;
 	struct v4l2_subdev		*subdev;
 
-	s32 group_hold_prev;
-	bool group_hold_en;
+	s32				group_hold_prev;
+	bool				group_hold_en;
 	struct regmap			*regmap;
 	struct camera_common_data	*s_data;
 	struct camera_common_pdata	*pdata;
@@ -332,21 +306,10 @@ static int ov23850_power_on(struct camera_common_data *s_data)
 	struct camera_common_power_rail *pw = &priv->power;
 
 	dev_dbg(&priv->i2c_client->dev, "%s: power on\n", __func__);
-	if (priv->i2c_client->addr == 0x10) {
-			/* disable CSIA/B IOs DPD mode to turn on camera A*/
-			tegra_io_dpd_disable(&csia_io);
-			tegra_io_dpd_disable(&csib_io);
-	} else if (priv->i2c_client->addr == 0x36) {
-			/* disable CSIC/D IOs DPD mode to turn on camera B*/
-			tegra_io_dpd_disable(&csic_io);
-			tegra_io_dpd_disable(&csid_io);
-	}
 
 	if (priv->pdata->power_on) {
 		err = priv->pdata->power_on(pw);
 		if (err) {
-			tegra_io_dpd_enable(&csia_io);
-			tegra_io_dpd_enable(&csib_io);
 			pr_err("%s failed.\n", __func__);
 		} else {
 			pw->state = SWITCH_ON;
@@ -399,14 +362,6 @@ ov23850_dvdd_fail:
 	regulator_disable(pw->avdd);
 
 ov23850_avdd_fail:
-	if (priv->i2c_client->addr == 0x10) {
-			tegra_io_dpd_enable(&csia_io);
-			tegra_io_dpd_enable(&csib_io);
-	} else if (priv->i2c_client->addr == 0x36) {
-			tegra_io_dpd_enable(&csic_io);
-			tegra_io_dpd_enable(&csid_io);
-	}
-
 	pr_err("%s failed.\n", __func__);
 	return -ENODEV;
 }
@@ -446,18 +401,6 @@ static int ov23850_power_off(struct camera_common_data *s_data)
 		regulator_disable(pw->avdd);
 
 power_off_done:
-	if (priv->i2c_client->addr == 0x10) {
-			/* put CSIA/B IOs into DPD mode
-			 * to save additional power*/
-			tegra_io_dpd_enable(&csia_io);
-			tegra_io_dpd_enable(&csib_io);
-	} else if (priv->i2c_client->addr == 0x36) {
-			/* put CSIC/D IOs into DPD mode
-			 * to save additional power*/
-			tegra_io_dpd_enable(&csic_io);
-			tegra_io_dpd_enable(&csid_io);
-	}
-
 	pw->state = SWITCH_OFF;
 	return 0;
 }
@@ -664,6 +607,7 @@ static int ov23850_set_gain(struct ov23850 *priv, s32 val)
 		 "%s: val: %d\n", __func__, gain);
 
 	ov23850_get_gain_reg(reg_list, gain);
+	ov23850_get_gain_short_reg(reg_list_short, gain);
 	ov23850_set_group_hold(priv);
 
 	/* writing long gain */
@@ -761,7 +705,7 @@ static int ov23850_set_coarse_time_short(struct ov23850 *priv, s32 val)
 	/* check hdr enable ctrl */
 	hdr_control.id = V4L2_CID_HDR_EN;
 
-	err = v4l2_g_ctrl(&priv->ctrl_handler, &hdr_control);
+	err = camera_common_g_ctrl(priv->s_data, &hdr_control);
 	if (err < 0) {
 		dev_err(&priv->i2c_client->dev,
 			"could not find device ctrl.\n");
@@ -890,39 +834,94 @@ static int ov23850_write_eeprom(struct ov23850 *priv,
 	}
 	return 0;
 }
+#endif
 
-static int ov23850_read_otp_page(struct ov23850 *priv,
-				u8 *buf, int page, u16 addr, int size)
+static int ov23850_read_otp_manual(struct ov23850 *priv,
+				u8 *buf, u16 addr_start, u16 addr_end)
 {
 	u8 status;
+	int i;
 	int err;
+	int size = addr_end - addr_start + 1;
+	u8 isp;
+	u16 addr_start_capped = addr_start;
 
-	err = ov23850_write_reg(priv->s_data, OV23850_OTP_PAGE_NUM_ADDR, page);
+	if (addr_start > 0x6A00)
+		addr_start_capped = 0x69FF;
+
+	usleep_range(10000, 11000);
+	err = ov23850_write_table(priv, mode_table[OV23850_MODE_START_STREAM]);
 	if (err)
 		return err;
-	err = ov23850_write_reg(priv->s_data, OV23850_OTP_CTRL_ADDR, 0x01);
+
+	err = ov23850_read_reg(priv->s_data, OV23850_OTP_ISP_CTRL_ADDR, &isp);
 	if (err)
 		return err;
-	err = ov23850_read_reg(priv->s_data, OV23850_OTP_STATUS_ADDR, &status);
+	err = ov23850_write_reg(priv->s_data, OV23850_OTP_ISP_CTRL_ADDR,
+				isp & 0xfe);
 	if (err)
 		return err;
-	if (status == OV23850_OTP_STATUS_IN_PROGRESS) {
-		dev_err(&priv->i2c_client->dev,
-			"another OTP read in progress\n");
+
+	err = ov23850_write_reg(priv->s_data, OV23850_OTP_MODE_CTRL_ADDR, 0x40);
+	if (err)
 		return err;
+
+
+	err = ov23850_write_reg(priv->s_data, OV23850_OTP_START_REG_ADDR_MSB,
+				(addr_start_capped >> 8) & 0xff);
+	if (err)
+		return err;
+	err = ov23850_write_reg(priv->s_data, OV23850_OTP_START_REG_ADDR_LSB,
+				addr_start_capped & 0xff);
+	if (err)
+		return err;
+
+	err = ov23850_write_reg(priv->s_data, OV23850_OTP_END_REG_ADDR_MSB,
+				(addr_end >> 8) & 0xff);
+	if (err)
+		return err;
+	err = ov23850_write_reg(priv->s_data, OV23850_OTP_END_REG_ADDR_LSB,
+				addr_end & 0xff);
+	if (err)
+		return err;
+
+	err = ov23850_write_reg(priv->s_data, OV23850_OTP_LOAD_CTRL_ADDR, 0x01);
+	if (err)
+		return err;
+
+	usleep_range(10000, 11000);
+	for (i = 0; i < size; i++) {
+		err = ov23850_read_reg(priv->s_data, addr_start + i, &buf[i]);
+		if (err)
+			return err;
+
+		err = ov23850_read_reg(priv->s_data,
+				       OV23850_OTP_LOAD_CTRL_ADDR, &status);
+		if (err)
+			return err;
+
+		if (status & OV23850_OTP_RD_BUSY_MASK) {
+			dev_err(&priv->i2c_client->dev,
+				"another OTP read in progress\n");
+			return err;
+		} else if (status & OV23850_OTP_BIST_ERROR_MASK) {
+			dev_err(&priv->i2c_client->dev, "fuse id read error\n");
+			return err;
+		}
 	}
 
-	err = regmap_bulk_read(priv->regmap, addr, buf, size);
+	err = ov23850_write_table(priv,
+			mode_table[OV23850_MODE_STOP_STREAM]);
 	if (err)
 		return err;
 
-	err = ov23850_read_reg(priv->s_data, OV23850_OTP_STATUS_ADDR, &status);
+	err = ov23850_read_reg(priv->s_data, OV23850_OTP_ISP_CTRL_ADDR, &isp);
 	if (err)
 		return err;
-	if (status == OV23850_OTP_STATUS_READ_FAIL) {
-		dev_err(&priv->i2c_client->dev, "fuse id read error\n");
+	err = ov23850_write_reg(priv->s_data, OV23850_OTP_ISP_CTRL_ADDR,
+				isp | 0x01);
+	if (err)
 		return err;
-	}
 
 	return 0;
 }
@@ -938,13 +937,10 @@ static int ov23850_otp_setup(struct ov23850 *priv)
 	if (err)
 		return -ENODEV;
 
-	for (i = 0; i < OV23850_OTP_NUM_PAGES; i++) {
-		ov23850_read_otp_page(priv,
-				   &otp_buf[i * OV23850_OTP_PAGE_SIZE],
-				   i,
-				   OV23850_OTP_PAGE_START_ADDR,
-				   OV23850_OTP_PAGE_SIZE);
-	}
+	ov23850_read_otp_manual(priv,
+				otp_buf,
+				OV23850_OTP_START_ADDR,
+				OV23850_OTP_END_ADDR);
 
 	ctrl = v4l2_ctrl_find(&priv->ctrl_handler, V4L2_CID_OTP_DATA);
 	if (!ctrl) {
@@ -976,11 +972,10 @@ static int ov23850_fuse_id_setup(struct ov23850 *priv)
 	if (err)
 		return -ENODEV;
 
-	ov23850_read_otp_page(priv,
-			   &fuse_id[0],
-			   OV23850_FUSE_ID_OTP_PAGE,
-			   OV23850_FUSE_ID_OTP_ROW_ADDR,
-			   OV23850_FUSE_ID_SIZE);
+	ov23850_read_otp_manual(priv,
+				fuse_id,
+				OV23850_FUSE_ID_OTP_START_ADDR,
+				OV23850_FUSE_ID_OTP_END_ADDR);
 
 	ctrl = v4l2_ctrl_find(&priv->ctrl_handler, V4L2_CID_FUSE_ID);
 	if (!ctrl) {
@@ -1000,7 +995,6 @@ static int ov23850_fuse_id_setup(struct ov23850 *priv)
 
 	return 0;
 }
-#endif
 
 static int ov23850_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 {
@@ -1080,16 +1074,16 @@ static int ov23850_ctrls_init(struct ov23850 *priv)
 {
 	struct i2c_client *client = priv->i2c_client;
 	struct v4l2_ctrl *ctrl;
-	int num_ctrls;
+	int numctrls;
 	int err;
 	int i;
 
 	dev_dbg(&client->dev, "%s++\n", __func__);
 
-	num_ctrls = ARRAY_SIZE(ctrl_config_list);
-	v4l2_ctrl_handler_init(&priv->ctrl_handler, num_ctrls);
+	numctrls = ARRAY_SIZE(ctrl_config_list);
+	v4l2_ctrl_handler_init(&priv->ctrl_handler, numctrls);
 
-	for (i = 0; i < num_ctrls; i++) {
+	for (i = 0; i < numctrls; i++) {
 		ctrl = v4l2_ctrl_new_custom(&priv->ctrl_handler,
 			&ctrl_config_list[i], NULL);
 		if (ctrl == NULL) {
@@ -1106,7 +1100,7 @@ static int ov23850_ctrls_init(struct ov23850 *priv)
 		priv->ctrls[i] = ctrl;
 	}
 
-	priv->num_ctrls = num_ctrls;
+	priv->numctrls = numctrls;
 	priv->subdev->ctrl_handler = &priv->ctrl_handler;
 	if (priv->ctrl_handler.error) {
 		dev_err(&client->dev, "Error %d adding controls\n",
@@ -1122,7 +1116,6 @@ static int ov23850_ctrls_init(struct ov23850 *priv)
 		goto error;
 	}
 
-#if 0
 	err = ov23850_otp_setup(priv);
 	if (err) {
 		dev_err(&client->dev,
@@ -1136,7 +1129,6 @@ static int ov23850_ctrls_init(struct ov23850 *priv)
 			"Error %d reading fuse id data\n", err);
 		goto error;
 	}
-#endif
 
 	return 0;
 
@@ -1222,8 +1214,10 @@ static int ov23850_probe(struct i2c_client *client,
 {
 	struct camera_common_data *common_data;
 	struct ov23850 *priv;
-	int err;
+	struct soc_camera_subdev_desc *ssdd;
+	struct tegra_camera_platform_data *ov23850_camera_data;
 	char node_name[10];
+	int err;
 
 	pr_info("[OV23850]: probing v4l2 sensor at addr 0x%0x.\n",
 		client->addr);
@@ -1242,16 +1236,39 @@ static int ov23850_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 
-	if (client->addr == 0x10)
-		sprintf(node_name, "%s", "ov23850_a");
-	else if (client->addr == 0x36)
-		sprintf(node_name, "%s", "ov23850_c");
-	else {
-		dev_err(&client->dev, "unsupported i2c addr %u\n",
-			client->addr);
+	ssdd = soc_camera_i2c_to_desc(client);
+	ov23850_camera_data = (struct tegra_camera_platform_data *)
+			     ssdd->drv_priv;
+	if (!ov23850_camera_data) {
+		dev_err(&client->dev, "unable to find iclink module name\n");
 		return -EFAULT;
 	}
 
+	switch (ov23850_camera_data->port) {
+	case TEGRA_CAMERA_PORT_CSI_A:
+	case TEGRA_CAMERA_PORT_CSI_B:
+	  sprintf(node_name, "%s", "ov23850_a");
+		common_data->csi_io[0] = true;
+		common_data->csi_io[1] = true;
+		break;
+	case TEGRA_CAMERA_PORT_CSI_C:
+	case TEGRA_CAMERA_PORT_CSI_D:
+	  sprintf(node_name, "%s", "ov23850_c");
+		common_data->csi_io[2] = true;
+		common_data->csi_io[3] = true;
+		break;
+	case TEGRA_CAMERA_PORT_CSI_E:
+	case TEGRA_CAMERA_PORT_CSI_F:
+	  sprintf(node_name, "%s", "ov23850_e");
+		common_data->csi_io[4] = true;
+		common_data->csi_io[5] = true;
+		break;
+	default:
+	  dev_err(&client->dev, "unsupported device port\n");
+	  return -EFAULT;
+	}
+
+	dev_dbg(&client->dev, "%s: dt node name %s\n", __func__, node_name);
 	client->dev.of_node = of_find_node_by_name(NULL, node_name);
 
 	if (client->dev.of_node) {
@@ -1274,7 +1291,9 @@ static int ov23850_probe(struct i2c_client *client,
 	common_data->colorfmt		= camera_common_find_datafmt(
 					  OV23850_DEFAULT_DATAFMT);
 	common_data->power		= &priv->power;
+	common_data->ctrls		= priv->ctrls;
 	common_data->priv		= (void *)priv;
+	common_data->numctrls		= ARRAY_SIZE(ctrl_config_list);
 	common_data->numfmts		= ARRAY_SIZE(ov23850_frmfmt);
 	common_data->def_mode		= OV23850_DEFAULT_MODE;
 	common_data->def_width		= OV23850_DEFAULT_WIDTH;
@@ -1350,3 +1369,4 @@ module_i2c_driver(ov23850_i2c_driver);
 MODULE_DESCRIPTION("SoC Camera driver for OmniVision OV23850");
 MODULE_AUTHOR("David Wang <davidw@nvidia.com>");
 MODULE_LICENSE("GPL v2");
+
