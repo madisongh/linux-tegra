@@ -154,6 +154,11 @@ struct tegra_adma {
 	/* number of channels available in the controller */
 	unsigned int			nr_channels;
 
+	/* Index of the first physical adma channel to be used.
+	 * Index counting starts from zero
+	 */
+	unsigned int			dma_start_index;
+
 	/* global register need to be cache before suspend */
 	u32				global_reg;
 
@@ -1206,6 +1211,7 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	struct resource	*res;
 	struct tegra_adma *tdma;
 	unsigned int nr_channels = 0;
+	unsigned int dma_start_index = 0;
 	int ret, i;
 
 	const struct tegra_adma_chip_data *cdata = NULL;
@@ -1231,6 +1237,13 @@ static int tegra_adma_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	ret = of_property_read_u32(pdev->dev.of_node, "dma-start-index",
+			&dma_start_index);
+	if (ret) {
+		/* Optional DT property. Assume to be zero and continue */
+		dma_start_index = 0;
+	}
+
 	tdma = devm_kzalloc(&pdev->dev, sizeof(*tdma) + nr_channels *
 			sizeof(struct tegra_adma_chan), GFP_KERNEL);
 	if (!tdma) {
@@ -1241,6 +1254,7 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	tdma->dev = &pdev->dev;
 	tdma->chip_data = cdata;
 	tdma->nr_channels = nr_channels;
+	tdma->dma_start_index = dma_start_index;
 	platform_set_drvdata(pdev, tdma);
 
 	for (i = 0; i < ADMA_MAX_ADDR; i++) {
@@ -1299,9 +1313,11 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	for (i = 0; i < tdma->nr_channels; i++) {
 		struct tegra_adma_chan *tdc = &tdma->channels[i];
 
-		tdc->chan_base_offset = cdata->channel_reg_size * i;
+		tdc->chan_base_offset = cdata->channel_reg_size *
+					(i + tdma->dma_start_index);
 
-		res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
+		res = platform_get_resource(pdev, IORESOURCE_IRQ,
+						(i + dma_start_index));
 		if (!res) {
 			ret = -EINVAL;
 			dev_err(&pdev->dev, "No irq resource for chan %d\n", i);
