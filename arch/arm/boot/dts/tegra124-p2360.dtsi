@@ -199,11 +199,8 @@
 	pcie-controller {
 		status = "okay";
 
-		pci@1,0 {
-			status = "okay";
-		};
-
 		pci@2,0 {
+			nvidia,clk-portnum = <0>;
 			status = "okay";
 		};
 		prod-settings {
