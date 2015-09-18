@@ -415,6 +415,7 @@ struct tegra_pcie_port {
 	struct resource regs;
 	void __iomem *base;
 	unsigned int index;
+	unsigned int clk_portnum;
 	unsigned int lanes;
 	int gpio_presence_detection;
 	bool disable_clock_request;
@@ -1599,7 +1600,7 @@ static unsigned long tegra_pcie_port_get_pex_ctrl(struct tegra_pcie_port *port)
 {
 	unsigned long ret = 0;
 
-	switch (port->index) {
+	switch (port->clk_portnum) {
 	case 0:
 		ret = AFI_PEX0_CTRL;
 		break;
@@ -3015,6 +3016,12 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
 			return -EADDRNOTAVAIL;
 		rp->disable_clock_request = of_property_read_bool(port,
 			"nvidia,disable-clock-request");
+
+		err = of_property_read_u32(port, "nvidia,clk-portnum", &value);
+		if ((err < 0) || (value > 1))
+			rp->clk_portnum = rp->index;
+		else
+			rp->clk_portnum = value;
 
 		list_add_tail(&rp->list, &pcie->ports);
 	}

@@ -80,6 +80,9 @@ Optional Properties:
   during boot after PCIe power and clock are stable. This is useful when the
   attached devices do not conform to the PCIe specification, and do not respond
   to enumeration within the time mandated by the PCIe specification.
+- nvidia,clk-portnum: port number for sideband signals. Use this if the
+  platform uses lane from root port 1 and sideband signals from port 0.
+  (Default: Root port N corresponds to sideband signals of port N)
 
 Example:
 
