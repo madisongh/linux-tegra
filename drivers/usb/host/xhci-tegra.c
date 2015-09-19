@@ -28,6 +28,7 @@
 #include <linux/uaccess.h>
 #include <linux/kthread.h>
 #include <linux/circ_buf.h>
+#include <linux/extcon.h>
 
 #include <linux/tegra-powergate.h>
 #include <linux/tegra-soc.h>
@@ -175,13 +176,22 @@ struct tegra_xhci_fw_cfgtbl {
 	u8 padding[137]; /* Padding to make 256-bytes cfgtbl */
 };
 
+enum tegra_xhci_phy_type {
+	USB3_PHY,
+	UTMI_PHY,
+	HSIC_PHY,
+	MAX_PHY_TYPES,
+};
+
+static const char * const tegra_phy_names[] = {
+	[USB3_PHY] = "usb3",
+	[UTMI_PHY] = "utmi",
+	[HSIC_PHY] = "hsic",
+};
+
 struct tegra_xhci_soc_config {
 	const char *firmware_file;
-	struct {
-		const char *name;
-		unsigned int num;
-	} phy_types[3]; /* 0: SS, 1: UTMI, 2: HSIC */
-
+	unsigned int num_phys[MAX_PHY_TYPES];
 	int num_supplies;
 	const char *supply_names[];
 };
@@ -220,6 +230,8 @@ struct tegra_xhci_hcd {
 	struct device *dev;
 	struct usb_hcd *hcd;
 
+	struct mutex lock;
+
 	int irq;
 
 	void __iomem *fpci_base;
@@ -239,7 +251,7 @@ struct tegra_xhci_hcd {
 	struct clk *pll_e;
 
 	int num_phys;
-	struct phy **phys;
+	struct phy **phys[MAX_PHY_TYPES];
 	unsigned enabled_ss_ports; /* bitmap */
 	unsigned num_hsic_port; /* count */
 
@@ -257,6 +269,14 @@ struct tegra_xhci_hcd {
 	struct dentry *debugfs_dir;
 	struct dentry *dump_ring_file;
 	struct tegra_xhci_firmware_log log;
+
+	int utmi_otg_port_base_1; /* one based utmi port number */
+	int usb3_otg_port_base_1; /* one based usb3 port number */
+	struct extcon_dev *id_extcon;
+	struct notifier_block id_extcon_nb;
+	struct work_struct id_extcon_work;
+
+	bool host_mode;
 };
 
 static struct hc_driver __read_mostly tegra_xhci_hc_driver;
@@ -861,6 +881,7 @@ static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
 	return 0;
 }
 
+#if 0 /* TODO: dynamic SS clock */
 static int tegra_xhci_set_ss_clk(struct tegra_xhci_hcd *tegra,
 				 unsigned long rate)
 {
@@ -915,6 +936,7 @@ static int tegra_xhci_set_ss_clk(struct tegra_xhci_hcd *tegra,
 
 	return 0;
 }
+#endif
 
 static int tegra_xhci_clk_enable(struct tegra_xhci_hcd *tegra)
 {
@@ -959,40 +981,46 @@ static void tegra_xhci_clk_disable(struct tegra_xhci_hcd *tegra)
 
 static int tegra_xhci_phy_enable(struct tegra_xhci_hcd *tegra)
 {
-	unsigned int i;
+	unsigned int i, j;
 	int ret;
 
-	for (i = 0; i < tegra->num_phys; i++) {
-		if (!tegra->phys[i])
-			continue;
-		ret = phy_init(tegra->phys[i]);
-		if (ret)
-			goto disable_phy;
-		ret = phy_power_on(tegra->phys[i]);
-		if (ret) {
-			phy_exit(tegra->phys[i]);
-			goto disable_phy;
+	for (i = 0; i < ARRAY_SIZE(tegra->phys); i++) {
+		for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
+			ret = phy_init(tegra->phys[i][j]);
+			if (ret)
+				goto disable_phy;
+			ret = phy_power_on(tegra->phys[i][j]);
+			if (ret) {
+				phy_exit(tegra->phys[i][j]);
+				goto disable_phy;
+			}
 		}
 	}
 
 	return 0;
 disable_phy:
+	for (; j > 0; j--) {
+		phy_power_off(tegra->phys[i][j - 1]);
+		phy_exit(tegra->phys[i][j - 1]);
+	}
 	for (; i > 0; i--) {
-		phy_power_off(tegra->phys[i - 1]);
-		phy_exit(tegra->phys[i - 1]);
+		for (j = 0; j < tegra->soc_config->num_phys[i - 1]; j++) {
+			phy_power_off(tegra->phys[i - 1][j]);
+			phy_exit(tegra->phys[i - 1][j]);
+		}
 	}
 	return ret;
 }
 
 static void tegra_xhci_phy_disable(struct tegra_xhci_hcd *tegra)
 {
-	unsigned int i;
+	unsigned int i, j;
 
-	for (i = 0; i < tegra->num_phys; i++) {
-		if (!tegra->phys[i])
-			continue;
-		phy_power_off(tegra->phys[i]);
-		phy_exit(tegra->phys[i]);
+	for (i = 0; i < ARRAY_SIZE(tegra->phys); i++) {
+		for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
+			phy_power_off(tegra->phys[i][j]);
+			phy_exit(tegra->phys[i][j]);
+		}
 	}
 }
 
@@ -1022,7 +1050,7 @@ static void tegra_xhci_mbox_work(struct work_struct *work)
 	switch (msg->cmd) {
 	case MBOX_CMD_INC_SSPI_CLOCK:
 	case MBOX_CMD_DEC_SSPI_CLOCK:
-#if 0
+#if 0 /* TODO: dynamic SS clock */
 		ret = tegra_xhci_set_ss_clk(tegra, msg->data * 1000);
 		resp.data = clk_get_rate(tegra->ss_src_clk) / 1000;
 		if (ret)
@@ -1087,17 +1115,104 @@ static const struct tegra_xhci_soc_config tegra186_soc_config = {
 	.supply_names[1] = "avdd_pll_utmip",
 	.supply_names[2] = "hvdd_usb",
 
-	.phy_types[0] = {"usb3", 3},
-	.phy_types[1] = {"utmi", 3},
-	.phy_types[2] = {"hsic", 1},
+	.num_phys[USB3_PHY] = 3,
+	.num_phys[UTMI_PHY] = 3,
+	.num_phys[HSIC_PHY] = 1,
 };
-MODULE_FIRMWARE("nvidia/tegra124/xusb.bin");
+MODULE_FIRMWARE("tegra18x_xusb_firmware");
 
 static const struct of_device_id tegra_xhci_of_match[] = {
 	{ .compatible = "nvidia,tegra186-xhci", .data = &tegra186_soc_config },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, tegra_xhci_of_match);
+
+static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
+{
+	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
+	int port = tegra->utmi_otg_port_base_1 - 1;
+
+	if (!tegra->utmi_otg_port_base_1)
+		return;
+
+	mutex_lock(&tegra->lock);
+	if ((tegra->host_mode && on) || (!tegra->host_mode && !on)) {
+		mutex_unlock(&tegra->lock);
+		return;
+	}
+
+	dev_dbg(tegra->dev, "host mode %s\n", on ? "on" : "off");
+
+	if (on) {
+		/* switch to host mode */
+		tegra_phy_xusb_set_id_override(tegra->phys[UTMI_PHY][port]);
+		tegra->host_mode = true;
+	} else {
+		tegra_phy_xusb_clear_id_override(tegra->phys[UTMI_PHY][port]);
+		tegra->host_mode = false;
+	}
+	mutex_unlock(&tegra->lock);
+
+	pm_runtime_get_sync(tegra->dev);
+	if (on) {
+		xhci_hub_control(xhci->shared_hcd, ClearPortFeature,
+			USB_PORT_FEAT_POWER, tegra->usb3_otg_port_base_1,
+			NULL, 0);
+		xhci_hub_control(xhci->main_hcd, ClearPortFeature,
+			USB_PORT_FEAT_POWER, tegra->utmi_otg_port_base_1,
+			NULL, 0);
+		/* switch to host mode */
+		xhci_hub_control(xhci->shared_hcd, SetPortFeature,
+			USB_PORT_FEAT_POWER, tegra->usb3_otg_port_base_1,
+			NULL, 0);
+		xhci_hub_control(xhci->main_hcd, SetPortFeature,
+			USB_PORT_FEAT_POWER, tegra->utmi_otg_port_base_1,
+			NULL, 0);
+	} else {
+		xhci_hub_control(xhci->shared_hcd, ClearPortFeature,
+			USB_PORT_FEAT_POWER, tegra->usb3_otg_port_base_1,
+			NULL, 0);
+		xhci_hub_control(xhci->main_hcd, ClearPortFeature,
+			USB_PORT_FEAT_POWER, tegra->utmi_otg_port_base_1,
+			NULL, 0);
+	}
+	pm_runtime_put_autosuspend(tegra->dev);
+
+}
+
+static void tegra_xhci_update_otg_role(struct tegra_xhci_hcd *tegra)
+{
+	if (IS_ERR(tegra->id_extcon))
+		return;
+
+	if (extcon_get_cable_state(tegra->id_extcon, "USB-Host"))
+		tegra_xhci_set_host_mode(tegra, true);
+	else
+		tegra_xhci_set_host_mode(tegra, false);
+}
+
+static void tegra_xhci_id_extcon_work(struct work_struct *work)
+{
+	struct tegra_xhci_hcd *tegra = container_of(work, struct tegra_xhci_hcd,
+						    id_extcon_work);
+
+	tegra_xhci_update_otg_role(tegra);
+}
+
+static int tegra_xhci_id_notifier(struct notifier_block *nb,
+					 unsigned long action, void *data)
+{
+	struct tegra_xhci_hcd *tegra = container_of(nb, struct tegra_xhci_hcd,
+						    id_extcon_nb);
+
+	/* nothing to do if there is no UTMI otg_cap port */
+	if (tegra->utmi_otg_port_base_1 == 0)
+		return NOTIFY_OK;
+
+	schedule_work(&tegra->id_extcon_work);
+
+	return NOTIFY_OK;
+}
 
 static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 {
@@ -1169,6 +1284,9 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	}
 
 	tegra->fw_loaded = true;
+
+	tegra_xhci_update_otg_role(tegra);
+
 	release_firmware(fw);
 	return;
 
@@ -1271,7 +1389,7 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct usb_hcd *hcd;
 	struct phy *phy;
-	unsigned int i, j, k;
+	unsigned int i, j;
 	int ret;
 	int partition_id_xusba, partition_id_xusbc;
 
@@ -1303,6 +1421,7 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	if (!tegra)
 		return -ENOMEM;
 	tegra->dev = &pdev->dev;
+	mutex_init(&tegra->lock);
 	platform_set_drvdata(pdev, tegra);
 
 	match = of_match_device(tegra_xhci_of_match, &pdev->dev);
@@ -1311,13 +1430,6 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 	tegra->soc_config = match->data;
-	for (i = 0; i < ARRAY_SIZE(tegra->soc_config->phy_types); i++)
-		tegra->num_phys += tegra->soc_config->phy_types[i].num;
-
-	tegra->phys = devm_kzalloc(&pdev->dev,
-				   sizeof(phy)*tegra->num_phys, GFP_KERNEL);
-	if (!tegra->phys)
-		return -ENOMEM;
 
 	hcd = usb_create_hcd(&tegra_xhci_hc_driver, &pdev->dev,
 				    dev_name(&pdev->dev));
@@ -1452,12 +1564,19 @@ skip_clocks:
 		goto disable_regulator;
 	}
 
-	for (i = 0, k = 0; i < ARRAY_SIZE(tegra->soc_config->phy_types); i++) {
-		char prop[8];
+	for (i = 0; i < ARRAY_SIZE(tegra->phys); i++) {
+		tegra->phys[i] = devm_kcalloc(&pdev->dev,
+					      tegra->soc_config->num_phys[i],
+					      sizeof(*tegra->phys[i]),
+					      GFP_KERNEL);
+		if (!tegra->phys[i])
+			goto put_mbox;
 
-		for (j = 0; j < tegra->soc_config->phy_types[i].num; j++) {
+		for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
+			char prop[8];
+
 			snprintf(prop, sizeof(prop), "%s-%d",
-				tegra->soc_config->phy_types[i].name, j);
+				 tegra_phy_names[i], j);
 			phy = devm_phy_optional_get(&pdev->dev, prop);
 			if (IS_ERR(phy)) {
 				ret = PTR_ERR(phy);
@@ -1465,14 +1584,41 @@ skip_clocks:
 					prop, ret);
 				goto put_mbox;
 			} else {
-				tegra->phys[k++] = phy;
-				if (phy && strstr(prop, "usb3"))
+				if (phy && strstr(prop, "usb3")) {
 					tegra->enabled_ss_ports |= BIT(j);
+
+					if (tegra_phy_xusb_has_otg_cap(phy)) {
+						tegra->usb3_otg_port_base_1 =
+									  j + 1;
+					}
+				}
+
+				if (phy && strstr(prop, "utmi")) {
+					if (tegra_phy_xusb_has_otg_cap(phy)) {
+						tegra->utmi_otg_port_base_1 =
+									  j + 1;
+					}
+				}
+
 				if (phy && strstr(prop, "hsic"))
 					tegra->num_hsic_port++;
 			}
+
+			tegra->phys[i][j] = phy;
 		}
 	}
+
+	if (tegra->utmi_otg_port_base_1) {
+		dev_info(&pdev->dev, "UTMI port %d has OTG_CAP\n",
+			tegra->utmi_otg_port_base_1 - 1);
+	} else
+		dev_info(&pdev->dev, "No UTMI port has OTG_CAP\n");
+
+	if (tegra->usb3_otg_port_base_1) {
+		dev_info(&pdev->dev, "USB3 port %d has OTG_CAP\n",
+			tegra->usb3_otg_port_base_1 - 1);
+	} else
+		dev_info(&pdev->dev, "No USB3 port has OTG_CAP\n");
 
 	if (tegra_platform_is_silicon()) {
 		ret = tegra_unpowergate_partition(partition_id_xusba);
@@ -1498,17 +1644,36 @@ skip_clocks:
 
 	tegra_xhci_debugfs_init(tegra);
 
+	INIT_WORK(&tegra->id_extcon_work, tegra_xhci_id_extcon_work);
+	tegra->id_extcon = extcon_get_extcon_dev_by_cable(&pdev->dev, "id");
+	if (!IS_ERR(tegra->id_extcon)) {
+		tegra->id_extcon_nb.notifier_call = tegra_xhci_id_notifier;
+		extcon_register_notifier(tegra->id_extcon,
+					 &tegra->id_extcon_nb);
+	} else if (PTR_ERR(tegra->id_extcon) == -EPROBE_DEFER) {
+		ret = -EPROBE_DEFER;
+		goto disable_phy;
+	} else
+		dev_info(&pdev->dev, "no USB ID extcon found\n");
+
+
 	ret = request_firmware_nowait(THIS_MODULE, true,
 				      tegra->soc_config->firmware_file,
 				      tegra->dev, GFP_KERNEL, tegra,
 				      tegra_xhci_probe_finish);
 	if (ret < 0) {
 		dev_warn(&pdev->dev, "can't request firmware(%d)\n", ret);
-		goto disable_phy;
+		goto unregister_extcon;
 	}
 
 		return 0;
 
+unregister_extcon:
+	cancel_work_sync(&tegra->id_extcon_work);
+	if (!IS_ERR(tegra->id_extcon)) {
+		extcon_unregister_notifier(tegra->id_extcon,
+					   &tegra->id_extcon_nb);
+	}
 disable_phy:
 	tegra_xhci_debugfs_deinit(tegra);
 	tegra_xhci_phy_disable(tegra);
@@ -1560,6 +1725,12 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	} else if (hcd) {
 		/* Unbound after probe(), but before firmware loading. */
 		usb_put_hcd(hcd);
+	}
+
+	cancel_work_sync(&tegra->id_extcon_work);
+	if (!IS_ERR(tegra->id_extcon)) {
+		extcon_unregister_notifier(tegra->id_extcon,
+					   &tegra->id_extcon_nb);
 	}
 
 	if (tegra->fw_data)
