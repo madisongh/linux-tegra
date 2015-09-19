@@ -47,4 +47,8 @@ struct tegra_xusb_mbox_msg {
 int tegra_phy_xusb_set_vbus_override(struct phy *phy);
 int tegra_phy_xusb_clear_vbus_override(struct phy *phy);
 
+int tegra_phy_xusb_set_id_override(struct phy *phy);
+int tegra_phy_xusb_clear_id_override(struct phy *phy);
+bool tegra_phy_xusb_has_otg_cap(struct phy *phy);
+
 #endif /* __SOC_TEGRA_XUSB_H__ */
