@@ -233,7 +233,6 @@ struct tegra_xhci_hcd {
 	struct clk *falc_clk;
 	struct clk *ss_clk;
 	struct clk *ss_src_clk;
-	struct clk *hs_src_clk;
 	struct clk *fs_src_clk;
 	struct clk *pll_u_480m;
 	struct clk *clk_m;
@@ -936,19 +935,8 @@ static int tegra_xhci_clk_enable(struct tegra_xhci_hcd *tegra)
 	ret = clk_prepare_enable(tegra->fs_src_clk);
 	if (ret < 0)
 		goto disable_falc;
-	ret = clk_prepare_enable(tegra->hs_src_clk);
-	if (ret < 0)
-		goto disable_fs_src;
-	ret = tegra_xhci_set_ss_clk(tegra, TEGRA_XHCI_SS_CLK_HIGH_SPEED);
-	if (ret < 0)
-		goto disable_hs_src;
-
 	return 0;
 
-disable_hs_src:
-	clk_disable_unprepare(tegra->hs_src_clk);
-disable_fs_src:
-	clk_disable_unprepare(tegra->fs_src_clk);
 disable_falc:
 	clk_disable_unprepare(tegra->falc_clk);
 disable_ss:
@@ -967,7 +955,6 @@ static void tegra_xhci_clk_disable(struct tegra_xhci_hcd *tegra)
 	clk_disable_unprepare(tegra->ss_clk);
 	clk_disable_unprepare(tegra->falc_clk);
 	clk_disable_unprepare(tegra->fs_src_clk);
-	clk_disable_unprepare(tegra->hs_src_clk);
 }
 
 static int tegra_xhci_phy_enable(struct tegra_xhci_hcd *tegra)
@@ -1402,12 +1389,6 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	if (IS_ERR(tegra->ss_src_clk)) {
 		ret = PTR_ERR(tegra->ss_src_clk);
 		dev_warn(&pdev->dev, "can't get ss_src_clk (%d)\n", ret);
-		goto put_hcd;
-	}
-	tegra->hs_src_clk = devm_clk_get(&pdev->dev, "hs_src");
-	if (IS_ERR(tegra->hs_src_clk)) {
-		ret = PTR_ERR(tegra->hs_src_clk);
-		dev_warn(&pdev->dev, "can't get hs_src_clk (%d)\n", ret);
 		goto put_hcd;
 	}
 	tegra->fs_src_clk = devm_clk_get(&pdev->dev, "fs_src");
