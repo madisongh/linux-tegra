@@ -126,10 +126,12 @@
 
 static struct of_device_id tegra_xusba_pd[] = {
 	{ .compatible = "nvidia, tegra186-xusba-pd", },
+	{},
 };
 
 static struct of_device_id tegra_xusbc_pd[] = {
 	{ .compatible = "nvidia, tegra186-xusbc-pd", },
+	{},
 };
 
 enum build_info_log {
