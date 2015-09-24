@@ -10,6 +10,8 @@
 #ifndef __SOC_TEGRA_XUSB_H__
 #define __SOC_TEGRA_XUSB_H__
 
+#include <linux/usb/ch9.h>
+
 /* Command requests from the firmware */
 enum tegra_xusb_mbox_cmd {
 	MBOX_CMD_MSG_ENABLED = 1,
@@ -51,4 +53,19 @@ int tegra_phy_xusb_set_id_override(struct phy *phy);
 int tegra_phy_xusb_clear_id_override(struct phy *phy);
 bool tegra_phy_xusb_has_otg_cap(struct phy *phy);
 
+int tegra_phy_xusb_enable_sleepwalk(struct phy *phy,
+				    enum usb_device_speed speed);
+int tegra_phy_xusb_disable_sleepwalk(struct phy *phy);
+
+int tegra_phy_xusb_enable_wake(struct phy *phy);
+int tegra_phy_xusb_disable_wake(struct phy *phy);
+
+/* tegra_phy_xusb_remote_wake_detected()
+ *   check if a XUSB phy has detected remote wake.
+ *   return values:
+ *         0: no
+ *       > 0: yes
+ *       < 0: error
+ */
+int tegra_phy_xusb_remote_wake_detected(struct phy *phy);
 #endif /* __SOC_TEGRA_XUSB_H__ */
