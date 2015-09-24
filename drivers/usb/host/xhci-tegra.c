@@ -60,7 +60,15 @@
 #define XUSB_CFG_4				0x010
 #define  XUSB_BASE_ADDR_SHIFT			15
 #define  XUSB_BASE_ADDR_MASK			0x1ffff
+#define XUSB_CFG_16				0x040
+#define XUSB_CFG_24				0x060
+#define XUSB_CFG_AXI_CFG			0x0f8
 #define XUSB_CFG_ARU_C11_CSBRANGE		0x41c
+#define XUSB_CFG_ARU_CONTEXT			0x43c
+#define XUSB_CFG_ARU_CONTEXT_HS_PLS		0x478
+#define XUSB_CFG_ARU_CONTEXT_FS_PLS		0x47c
+#define XUSB_CFG_ARU_CONTEXT_HSFS_SPEED		0x480
+#define XUSB_CFG_ARU_CONTEXT_HSFS_PP		0x484
 #define XUSB_CFG_ARU_FW_SCRATCH			0x00000440
 #define XUSB_CFG_CSB_BASE_ADDR			0x800
 
@@ -176,6 +184,17 @@ struct tegra_xhci_fw_cfgtbl {
 	u8 padding[137]; /* Padding to make 256-bytes cfgtbl */
 };
 
+struct tegra_xhci_fpci_context {
+	u32 hs_pls;
+	u32 fs_pls;
+	u32 hsfs_speed;
+	u32 hsfs_pp;
+	u32 cfg_aru;
+	u32 cfg_order;
+	u32 cfg_fladj;
+	u32 cfg_sid;
+};
+
 enum tegra_xhci_phy_type {
 	USB3_PHY,
 	UTMI_PHY,
@@ -192,6 +211,9 @@ static const char * const tegra_phy_names[] = {
 struct tegra_xhci_soc_config {
 	const char *firmware_file;
 	unsigned int num_phys[MAX_PHY_TYPES];
+	unsigned int utmi_port_offset;
+	unsigned int hsic_port_offset;
+
 	int num_supplies;
 	const char *supply_names[];
 };
@@ -233,6 +255,7 @@ struct tegra_xhci_hcd {
 	struct mutex lock;
 
 	int irq;
+	int padctl_irq;
 
 	void __iomem *fpci_base;
 
@@ -259,6 +282,8 @@ struct tegra_xhci_hcd {
 	struct tegra_xusb_mbox_msg mbox_req;
 	struct mbox_client mbox_client;
 	struct mbox_chan *mbox_chan;
+
+	struct tegra_xhci_fpci_context fpci_ctx;
 
 	/* Firmware loading related */
 	void *fw_data;
@@ -411,11 +436,16 @@ static inline bool fw_log_wait_empty_timeout(struct tegra_xhci_hcd *tegra,
 		unsigned timeout)
 {
 	unsigned long target = jiffies + msecs_to_jiffies(timeout);
+	struct circ_buf *circ = &tegra->log.circ;
 	bool ret;
 
 	mutex_lock(&tegra->log.mutex);
 
 	while (fw_log_available(tegra) && time_is_after_jiffies(target)) {
+		if (circ_buffer_full(circ) &&
+			!test_bit(FW_LOG_FILE_OPENED, &tegra->log.flags))
+			break; /* buffer is full but nobody is reading log */
+
 		mutex_unlock(&tegra->log.mutex);
 		usleep_range(1000, 2000);
 		mutex_lock(&tegra->log.mutex);
@@ -643,6 +673,9 @@ static int fw_log_init(struct tegra_xhci_hcd *tegra)
 
 	if (!tegra->debugfs_dir)
 		return -ENODEV; /* no debugfs support */
+
+	if (test_bit(FW_LOG_CONTEXT_VALID, &tegra->log.flags))
+		return 0; /* already done */
 
 	/* allocate buffer to be shared between driver and firmware */
 	tegra->log.virt_addr = dma_alloc_writecombine(dev,
@@ -1118,6 +1151,9 @@ static const struct tegra_xhci_soc_config tegra186_soc_config = {
 	.num_phys[USB3_PHY] = 3,
 	.num_phys[UTMI_PHY] = 3,
 	.num_phys[HSIC_PHY] = 1,
+
+	.utmi_port_offset = 3,
+	.hsic_port_offset = 6,
 };
 MODULE_FIRMWARE("tegra18x_xusb_firmware");
 
@@ -1288,6 +1324,12 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	tegra_xhci_update_otg_role(tegra);
 
 	release_firmware(fw);
+
+	pm_runtime_use_autosuspend(dev);
+	pm_runtime_set_autosuspend_delay(dev, 2000);
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
+
 	return;
 
 	/* Free up as much as we can and wait to be unbound. */
@@ -1382,6 +1424,15 @@ static void tegra_xhci_debugfs_deinit(struct tegra_xhci_hcd *tegra)
 	tegra->debugfs_dir = NULL;
 }
 
+static irqreturn_t tegra_xhci_padctl_irq(int irq, void *dev_id)
+{
+	struct tegra_xhci_hcd *tegra = dev_id;
+
+	pm_runtime_resume(tegra->dev);
+
+	return IRQ_HANDLED;
+}
+
 static int tegra_xhci_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
@@ -1471,6 +1522,19 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		dev_warn(&pdev->dev, "can't get irq (%d)\n", ret);
 		goto put_hcd;
 	}
+
+	tegra->padctl_irq = platform_get_irq(pdev, 1);
+	if (tegra->padctl_irq < 0) {
+		ret = tegra->padctl_irq;
+		dev_warn(&pdev->dev, "can't get padctl_irq (%d)\n", ret);
+		goto put_hcd;
+	}
+	ret = devm_request_threaded_irq(&pdev->dev, tegra->padctl_irq, NULL,
+				tegra_xhci_padctl_irq,
+				IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+				dev_name(&pdev->dev), tegra);
+	if (ret < 0)
+		goto put_hcd;
 
 	if (tegra_platform_is_fpga()) {
 		fpga_hacks_init(pdev);
@@ -1748,6 +1812,284 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_PM_SLEEP) || IS_ENABLED(CONFIG_PM_RUNTIME)
+static inline u32 read_portsc(struct tegra_xhci_hcd *tegra, unsigned int port)
+{
+	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
+
+	return readl(&xhci->op_regs->port_status_base + NUM_PORT_REGS * port);
+}
+
+static enum usb_device_speed port_speed(struct tegra_xhci_hcd *tegra,
+					unsigned int port)
+{
+	u32 portsc = read_portsc(tegra, port);
+
+	if (DEV_FULLSPEED(portsc))
+		return USB_SPEED_FULL;
+	else if (DEV_HIGHSPEED(portsc))
+		return USB_SPEED_HIGH;
+	else if (DEV_LOWSPEED(portsc))
+		return USB_SPEED_LOW;
+	else if (DEV_SUPERSPEED(portsc))
+		return USB_SPEED_SUPER;
+	else
+		return USB_SPEED_UNKNOWN;
+}
+
+static bool port_connected(struct tegra_xhci_hcd *tegra, unsigned int port)
+{
+	u32 portsc = read_portsc(tegra, port);
+
+	return !!(portsc & PORT_CONNECT);
+}
+
+static void tegra_xhci_save_fpci_context(struct tegra_xhci_hcd *tegra)
+{
+	tegra->fpci_ctx.hs_pls =
+		fpci_readl(tegra, XUSB_CFG_ARU_CONTEXT_HS_PLS);
+	tegra->fpci_ctx.fs_pls =
+		fpci_readl(tegra, XUSB_CFG_ARU_CONTEXT_FS_PLS);
+	tegra->fpci_ctx.hsfs_speed =
+		fpci_readl(tegra, XUSB_CFG_ARU_CONTEXT_HSFS_SPEED);
+	tegra->fpci_ctx.hsfs_pp =
+		fpci_readl(tegra, XUSB_CFG_ARU_CONTEXT_HSFS_PP);
+	tegra->fpci_ctx.cfg_aru = fpci_readl(tegra, XUSB_CFG_ARU_CONTEXT);
+	tegra->fpci_ctx.cfg_order = fpci_readl(tegra, XUSB_CFG_AXI_CFG);
+	tegra->fpci_ctx.cfg_fladj = fpci_readl(tegra, XUSB_CFG_24);
+	tegra->fpci_ctx.cfg_sid = fpci_readl(tegra, XUSB_CFG_16);
+}
+
+static void tegra_xhci_restore_fpci_context(struct tegra_xhci_hcd *tegra)
+{
+	fpci_writel(tegra, tegra->fpci_ctx.hs_pls, XUSB_CFG_ARU_CONTEXT_HS_PLS);
+	fpci_writel(tegra, tegra->fpci_ctx.fs_pls, XUSB_CFG_ARU_CONTEXT_FS_PLS);
+	fpci_writel(tegra, tegra->fpci_ctx.hsfs_speed,
+		    XUSB_CFG_ARU_CONTEXT_HSFS_SPEED);
+	fpci_writel(tegra, tegra->fpci_ctx.hsfs_pp,
+		    XUSB_CFG_ARU_CONTEXT_HSFS_PP);
+	fpci_writel(tegra, tegra->fpci_ctx.cfg_aru, XUSB_CFG_ARU_CONTEXT);
+	fpci_writel(tegra, tegra->fpci_ctx.cfg_order, XUSB_CFG_AXI_CFG);
+	fpci_writel(tegra, tegra->fpci_ctx.cfg_fladj, XUSB_CFG_24);
+	fpci_writel(tegra, tegra->fpci_ctx.cfg_sid, XUSB_CFG_16);
+}
+
+static int tegra_xhci_powergate(struct tegra_xhci_hcd *tegra, bool runtime)
+{
+	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
+	struct device *dev = tegra->dev;
+	unsigned int i;
+	int ret;
+
+	dev_info(dev, "entering ELPG\n");
+	mutex_lock(&tegra->lock);
+
+	/* Wait for ports to enter U3. */
+	usleep_range(10000, 11000);
+
+	ret = xhci_suspend(xhci, runtime ? true :
+			   device_may_wakeup(tegra->dev));
+	if (ret) {
+		dev_warn(dev, "xhci_suspend() failed %d\n", ret);
+		goto unlock;
+	}
+
+	/* Save FPCI context. */
+	tegra_xhci_save_fpci_context(tegra);
+
+	/* Hand over UTMI and HSIC ports to the XUSB AO. */
+	for (i = 0; i < tegra->soc_config->num_phys[UTMI_PHY]; i++) {
+		int port_array_offset = tegra->soc_config->utmi_port_offset;
+		struct phy *phy = tegra->phys[UTMI_PHY][i];
+		enum usb_device_speed speed;
+
+		if (!phy)
+			continue;
+
+		if (i == (tegra->utmi_otg_port_base_1 - 1) && !tegra->host_mode)
+			continue;
+
+		speed = port_speed(tegra, port_array_offset + i);
+		ret = tegra_phy_xusb_enable_sleepwalk(phy, speed);
+		if (ret) {
+			dev_info(dev, "failed to enable sleepwalk for UTMI %d\n"
+				, i);
+		}
+		ret = tegra_phy_xusb_enable_wake(phy);
+		if (ret)
+			dev_info(dev, "failed to enable wake for UTMI %d\n", i);
+	}
+	for (i = 0; i < tegra->soc_config->num_phys[HSIC_PHY]; i++) {
+		int port_array_offset = tegra->soc_config->hsic_port_offset;
+		struct phy *phy = tegra->phys[HSIC_PHY][i];
+
+		if (!phy)
+			continue;
+
+		if (!port_connected(tegra, port_array_offset + i))
+			continue;
+
+		ret = tegra_phy_xusb_enable_sleepwalk(phy, USB_SPEED_HIGH);
+		if (ret) {
+			dev_info(dev, "failed to enable sleepwalk for HSIC %d\n"
+				, i);
+		}
+
+		ret = tegra_phy_xusb_enable_wake(phy);
+		if (ret)
+			dev_info(dev, "failed to enable wake for HSIC %d\n", i);
+	}
+
+	/*
+	 * Wake events must be set before starting the XUSB_SS power-down
+	 * sequence.
+	 */
+	for (i = 0; i < tegra->soc_config->num_phys[USB3_PHY]; i++) {
+		struct phy *phy = tegra->phys[USB3_PHY][i];
+
+		if (!phy)
+			continue;
+
+		if (i == (tegra->usb3_otg_port_base_1 - 1) && !tegra->host_mode)
+			continue;
+
+		ret = tegra_phy_xusb_enable_sleepwalk(phy, USB_SPEED_SUPER);
+		if (ret) {
+			dev_info(dev, "failed to enable sleepwalk for USB3 %d\n"
+				, i);
+		}
+
+		ret = tegra_phy_xusb_enable_wake(phy);
+		if (ret)
+			dev_info(dev, "failed to enable wake for USB3 %d\n", i);
+	}
+
+	/*
+	 * XUSB_SS power-off sequence:
+	 *  - enable clamps for the USB3 PHYs
+	 *  - powergate XUSBA partition
+	 *  - turn off VCORE for USB3 PHYs
+	 */
+	for (i = 0; i < tegra->soc_config->num_phys[USB3_PHY]; i++)
+		phy_power_off(tegra->phys[USB3_PHY][i]);
+
+	/* Power off XUSB_SS partition. */
+	ret = tegra_powergate_partition_with_clk_off(TEGRA_POWERGATE_XUSBA);
+	if (ret) {
+		dev_warn(dev, "failed to powergate SS partition %d\n", ret);
+		goto unlock;
+	}
+
+	/* Power off XUSB_HOST partition. */
+	tegra_powergate_partition_with_clk_off(TEGRA_POWERGATE_XUSBC);
+	if (ret) {
+		dev_warn(dev, "failed to powergate Host partition %d\n", ret);
+		goto unlock;
+	}
+
+	/* In ELPG, firmware log context is gone. Rewind shared log buffer. */
+	if (test_bit(FW_LOG_CONTEXT_VALID, &tegra->log.flags)) {
+		if (!circ_buffer_full(&tegra->log.circ)) {
+			if (fw_log_wait_empty_timeout(tegra, 500))
+				dev_info(dev, "%s still has logs\n", __func__);
+		}
+
+		tegra->log.dequeue = tegra->log.virt_addr;
+		tegra->log.seq = 0;
+	}
+
+unlock:
+	mutex_unlock(&tegra->lock);
+	dev_info(tegra->dev, "entering ELPG done\n");
+	return ret;
+}
+
+static int tegra_xhci_unpowergate(struct tegra_xhci_hcd *tegra)
+{
+	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
+	struct tegra_xusb_mbox_msg msg;
+	struct device *dev = tegra->dev;
+	unsigned int i, j;
+	int ret;
+
+	dev_info(dev, "exiting ELPG\n");
+
+	mutex_lock(&tegra->lock);
+	ret = tegra_unpowergate_partition_with_clk_on(TEGRA_POWERGATE_XUSBC);
+	if (ret < 0) {
+		dev_warn(dev, "failed to unpowergate Host partition %d\n", ret);
+		goto unlock;
+	}
+
+	/* Power on XUSB_SS partition. */
+	ret = tegra_unpowergate_partition_with_clk_on(TEGRA_POWERGATE_XUSBA);
+	if (ret < 0) {
+		dev_warn(dev, "failed to unpowergate Host partition %d\n", ret);
+		goto unlock;
+	}
+
+	/* Clear XUSB wake events and disable wake interrupts. */
+	for (i = 0; i < MAX_PHY_TYPES; i++) {
+		for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
+			struct phy *phy = tegra->phys[i][j];
+
+			if (tegra_phy_xusb_remote_wake_detected(phy) > 0) {
+				dev_dbg(dev, "%s port %d remote wake detected\n"
+					, tegra_phy_names[i], j);
+			}
+			tegra_phy_xusb_disable_wake(phy);
+		}
+	}
+
+	/* Power on USB3 PHYs. */
+	for (i = 0; i < tegra->soc_config->num_phys[USB3_PHY]; i++) {
+		ret = phy_power_on(tegra->phys[USB3_PHY][i]);
+		if (ret < 0)
+			goto unlock;
+	}
+
+	tegra_xhci_cfg(tegra);
+
+	/* Restore host context. */
+	tegra_xhci_restore_fpci_context(tegra);
+
+	/* TODO HSIC restore */
+
+	/* Load firmware and restart controller. */
+	ret = tegra_xhci_load_firmware(tegra);
+	if (ret < 0)
+		goto unlock;
+
+	/* Enable firmware messages. */
+	msg.cmd = MBOX_CMD_MSG_ENABLED;
+	msg.data = 0;
+	ret = mbox_send_message(tegra->mbox_chan, &msg);
+	if (ret < 0)
+		goto unlock;
+
+	for (i = 0; i < MAX_PHY_TYPES; i++) {
+		for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
+			struct phy *phy = tegra->phys[i][j];
+
+			if (!phy)
+				continue;
+
+			tegra_phy_xusb_disable_sleepwalk(phy);
+		}
+	}
+
+	ret = xhci_resume(xhci, 0);
+	pm_runtime_mark_last_busy(tegra->dev);
+
+unlock:
+	mutex_unlock(&tegra->lock);
+	if (!ret)
+		dev_info(dev, "exiting ELPG done\n");
+
+	return ret;
+}
+#endif
+
 #ifdef CONFIG_PM_SLEEP
 static int tegra_xhci_suspend(struct device *dev)
 {
@@ -1767,8 +2109,25 @@ static int tegra_xhci_resume(struct device *dev)
 }
 #endif
 
+#ifdef CONFIG_PM_RUNTIME
+static int tegra_xhci_runtime_suspend(struct device *dev)
+{
+	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
+
+	return tegra_xhci_powergate(tegra, true);
+}
+
+static int tegra_xhci_runtime_resume(struct device *dev)
+{
+	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
+
+	return tegra_xhci_unpowergate(tegra);
+}
+#endif
 static const struct dev_pm_ops tegra_xhci_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(tegra_xhci_suspend, tegra_xhci_resume)
+	SET_RUNTIME_PM_OPS(tegra_xhci_runtime_suspend,
+				tegra_xhci_runtime_resume, NULL)
 };
 
 static struct platform_driver tegra_xhci_driver = {
