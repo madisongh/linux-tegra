@@ -1,7 +1,7 @@
 /*
  * Tegra host1x Interrupt Management
  *
- * Copyright (C) 2010-2015 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2010-2016 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -296,12 +296,14 @@ void host1x_intr_put_ref(struct host1x *host, unsigned int id, void *ref)
 	kref_put(&waiter->refcount, waiter_release);
 }
 
-int host1x_intr_init(struct host1x *host, unsigned int irq_sync)
+int host1x_intr_init(struct host1x *host, unsigned int irq_gen,
+		     unsigned int irq_sync)
 {
 	unsigned int id;
 	u32 nb_pts = host1x_syncpt_nb_pts(host);
 
 	mutex_init(&host->intr_mutex);
+	host->intr_general_irq = irq_gen;
 	host->intr_syncpt_irq = irq_sync;
 
 	for (id = 0; id < nb_pts; ++id) {
@@ -336,6 +338,9 @@ void host1x_intr_start(struct host1x *host)
 		mutex_unlock(&host->intr_mutex);
 		return;
 	}
+
+	host1x_hw_intr_request_host_general_irq(host);
+
 	mutex_unlock(&host->intr_mutex);
 }
 
@@ -370,6 +375,7 @@ void host1x_intr_stop(struct host1x *host)
 		}
 	}
 
+	host1x_hw_intr_free_host_general_irq(host);
 	host1x_hw_intr_free_syncpt_irq(host);
 
 	mutex_unlock(&host->intr_mutex);

@@ -1,7 +1,7 @@
 /*
  * Tegra host1x Interrupt Management
  *
- * Copyright (C) 2010-2015 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2010-2016 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -94,10 +94,11 @@ int host1x_intr_add_action(struct host1x *host, unsigned int id, u32 thresh,
  */
 void host1x_intr_put_ref(struct host1x *host, unsigned int id, void *ref);
 
-/* Initialize host1x sync point interrupt */
-int host1x_intr_init(struct host1x *host, unsigned int irq_sync);
+/* Initialize host1x general and sync point interrupts */
+int host1x_intr_init(struct host1x *host, unsigned int irq_gen,
+		     unsigned int irq_sync);
 
-/* Deinitialize host1x sync point interrupt */
+/* Deinitialize host1x general and sync point interrupts */
 void host1x_intr_deinit(struct host1x *host);
 
 /* Enable host1x sync point interrupt */

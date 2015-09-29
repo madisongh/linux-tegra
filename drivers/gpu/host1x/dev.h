@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2015 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2012-2016 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -88,6 +88,8 @@ struct host1x_intr_ops {
 	void (*disable_syncpt_intr)(struct host1x *host, unsigned int id);
 	void (*disable_all_syncpt_intrs)(struct host1x *host);
 	int (*free_syncpt_irq)(struct host1x *host);
+	int (*request_host_general_irq)(struct host1x *host);
+	void (*free_host_general_irq)(struct host1x *host);
 };
 
 struct host1x_info {
@@ -111,6 +113,9 @@ struct host1x {
 
 	struct mutex intr_mutex;
 	int intr_syncpt_irq;
+
+	/* For general interrupts */
+	int intr_general_irq;
 
 	const struct host1x_syncpt_ops *syncpt_op;
 	const struct host1x_intr_ops *intr_op;
@@ -211,6 +216,16 @@ static inline void host1x_hw_intr_disable_all_syncpt_intrs(struct host1x *host)
 static inline int host1x_hw_intr_free_syncpt_irq(struct host1x *host)
 {
 	return host->intr_op->free_syncpt_irq(host);
+}
+
+static inline int host1x_hw_intr_request_host_general_irq(struct host1x *host)
+{
+	return host->intr_op->request_host_general_irq(host);
+}
+
+static inline void host1x_hw_intr_free_host_general_irq(struct host1x *host)
+{
+	host->intr_op->free_host_general_irq(host);
 }
 
 static inline int host1x_hw_channel_init(struct host1x *host,
