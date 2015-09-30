@@ -22,6 +22,10 @@ void init_cpu_topology(void);
 void store_cpu_topology(unsigned int cpuid);
 const struct cpumask *cpu_coregroup_mask(int cpu);
 
+#define arch_scale_cpu_capacity arm64_arch_scale_cpu_capacity
+struct sched_domain;
+extern unsigned long arm64_arch_scale_cpu_capacity(struct sched_domain *sd,
+							int cpu);
 #include <asm-generic/topology.h>
 
 #endif /* _ASM_ARM_TOPOLOGY_H */

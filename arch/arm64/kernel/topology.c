@@ -161,6 +161,53 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
 	return 0;
 }
 
+static DEFINE_PER_CPU(unsigned long, cpu_capacity);
+
+unsigned long arm64_arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+{
+	unsigned long cap = per_cpu(cpu_capacity, cpu);
+
+	if (!cap)
+		return 1024;
+
+	return cap;
+}
+
+static void update_cpu_capacity(int cpu, unsigned long cap)
+{
+	if (cap > 1024)
+		cap = 1024;
+
+	per_cpu(cpu_capacity, cpu) = cap;
+}
+
+static void __init init_cpu_capacity(void)
+{
+	int cpu;
+	struct device_node *cn;
+
+	for_each_possible_cpu(cpu) {
+		u32 val;
+
+		cn = of_get_cpu_node(cpu, NULL);
+		if (!cn) {
+			pr_err("%s: CPU%d device node missing\n",
+				__func__, cpu);
+			return;
+		}
+
+		if (of_property_read_u32(cn, "cpu-capacity", &val)) {
+			pr_err("%s: Missing cpu-capacity property\n",
+				cn->full_name);
+			continue;
+		}
+
+		pr_info("CPU%d capacity=%u\n", cpu, val);
+
+		update_cpu_capacity(cpu, val);
+	}
+}
+
 static int __init parse_dt_topology(void)
 {
 	struct device_node *cn, *map;
@@ -302,4 +349,6 @@ void __init init_cpu_topology(void)
 	 */
 	if (of_have_populated_dt() && parse_dt_topology())
 		reset_cpu_topology();
+
+	init_cpu_capacity();
 }
