@@ -167,7 +167,7 @@ static int ufs_tegra_enable_mphylane_clks(struct ufs_tegra_host *host)
 	if (err)
 		goto disable_l0_rx_ana;
 
-	err = ufs_tegra_host_clk_enable(dev, "mphy_lo_rx_symb",
+	err = ufs_tegra_host_clk_enable(dev, "mphy_l0_rx_symb",
 		host->mphy_l0_rx_symb);
 	if (err)
 		goto disable_l0_rx_symb;
@@ -210,7 +210,7 @@ out:
 	return err;
 }
 
-static int ufs_tegra_init_lane_clks(struct ufs_tegra_host *host)
+static int ufs_tegra_init_mphy_lane_clks(struct ufs_tegra_host *host)
 {
 	int err = 0;
 	struct device *dev = host->hba->dev;
@@ -252,6 +252,39 @@ out:
 	return err;
 }
 
+static int ufs_tegra_ufs_reset_init(struct ufs_tegra_host *ufs_tegra)
+{
+	struct device *dev = ufs_tegra->hba->dev;
+	int ret = 0;
+
+	ufs_tegra->ufs_rst = devm_reset_control_get(dev, "ufs_rst");
+	if (IS_ERR(ufs_tegra->ufs_rst)) {
+		ret = PTR_ERR(ufs_tegra->ufs_rst);
+		dev_err(dev,
+			"Reset control for ufs_rst not found: %d\n", ret);
+	}
+	ufs_tegra->ufs_axi_m_rst = devm_reset_control_get(dev, "ufs_axi_m_rst");
+	if (IS_ERR(ufs_tegra->ufs_axi_m_rst)) {
+		ret = PTR_ERR(ufs_tegra->ufs_axi_m_rst);
+		dev_err(dev,
+			"Reset control for ufs_axi_m_rst not found: %d\n", ret);
+	}
+	ufs_tegra->ufshc_lp_rst = devm_reset_control_get(dev, "ufshc_lp_rst");
+	if (IS_ERR(ufs_tegra->ufshc_lp_rst)) {
+		ret = PTR_ERR(ufs_tegra->ufshc_lp_rst);
+		dev_err(dev,
+			"Reset control for ufshc_lp_rst not found: %d\n", ret);
+	}
+	return ret;
+}
+
+static void ufs_tegra_ufs_deassert_reset(struct ufs_tegra_host *ufs_tegra)
+{
+	reset_control_deassert(ufs_tegra->ufs_rst);
+	reset_control_deassert(ufs_tegra->ufs_axi_m_rst);
+	reset_control_deassert(ufs_tegra->ufshc_lp_rst);
+}
+
 static int ufs_tegra_mphy_reset_init(struct ufs_tegra_host *ufs_tegra)
 {
 	struct device *dev = ufs_tegra->hba->dev;
@@ -272,6 +305,15 @@ static int ufs_tegra_mphy_reset_init(struct ufs_tegra_host *ufs_tegra)
 		ret = PTR_ERR(ufs_tegra->mphy_l0_tx_rst);
 		dev_err(dev,
 			"Reset control for mphy_l0_tx_rst not found: %d\n",
+									ret);
+	}
+
+	ufs_tegra->mphy_clk_ctl_rst =
+				devm_reset_control_get(dev, "mphy_clk_ctl_rst");
+	if (IS_ERR(ufs_tegra->mphy_clk_ctl_rst)) {
+		ret = PTR_ERR(ufs_tegra->mphy_clk_ctl_rst);
+		dev_err(dev,
+			"Reset control for mphy_clk_ctl_rst not found: %d\n",
 									ret);
 	}
 
@@ -302,6 +344,7 @@ static void ufs_tegra_mphy_assert_reset(struct ufs_tegra_host *ufs_tegra)
 {
 	reset_control_assert(ufs_tegra->mphy_l0_rx_rst);
 	reset_control_assert(ufs_tegra->mphy_l0_tx_rst);
+	reset_control_assert(ufs_tegra->mphy_clk_ctl_rst);
 	if (ufs_tegra->x2config) {
 		reset_control_assert(ufs_tegra->mphy_l1_rx_rst);
 		reset_control_assert(ufs_tegra->mphy_l1_tx_rst);
@@ -312,6 +355,7 @@ static void ufs_tegra_mphy_deassert_reset(struct ufs_tegra_host *ufs_tegra)
 {
 	reset_control_deassert(ufs_tegra->mphy_l0_rx_rst);
 	reset_control_deassert(ufs_tegra->mphy_l0_tx_rst);
+	reset_control_deassert(ufs_tegra->mphy_clk_ctl_rst);
 	if (ufs_tegra->x2config) {
 		reset_control_deassert(ufs_tegra->mphy_l1_rx_rst);
 		reset_control_deassert(ufs_tegra->mphy_l1_tx_rst);
@@ -523,7 +567,7 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 
 	ufs_tegra_mphy_deassert_reset(ufs_tegra);
 	ret = ufs_tegra_mphy_receiver_calibration(ufs_tegra);
-	if (ret)
+	if (ret < 0)
 		goto out_disable_mphylane_clks;
 
 	ufs_tegra_ufs_pwrcntrl_update(false);
@@ -587,8 +631,6 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 	struct device *dev = hba->dev;
 	int err = 0;
 
-	ufs_tegra_cfg_vendor_registers(hba);
-
 	ufs_tegra = devm_kzalloc(dev, sizeof(*ufs_tegra), GFP_KERNEL);
 	if (!ufs_tegra) {
 		err = -ENOMEM;
@@ -598,7 +640,7 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 	ufs_tegra->ufshc_state = UFSHC_INIT;
 
 	ufs_tegra->ufs_aux_base = devm_ioremap(dev,
-			NV_ADDRESS_MAP_UFSHC_AUX_BASE, MPHY_ADDR_RANGE);
+			NV_ADDRESS_MAP_UFSHC_AUX_BASE, UFS_AUX_ADDR_RANGE);
 	if (!ufs_tegra->ufs_aux_base) {
 		err = -ENOMEM;
 		dev_err(dev, "ufs_aux_base ioremap failed\n");
@@ -643,12 +685,8 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 			goto out_phy_exit;
 	}
 
-	ufs_tegra_ufs_pwrcntrl_update(false);
-
-	ufs_tegra_ufs_aux_prog(ufs_tegra);
-
 	if (tegra_platform_is_silicon()) {
-		err = ufs_tegra_init_lane_clks(ufs_tegra);
+		err = ufs_tegra_init_mphy_lane_clks(ufs_tegra);
 		if (err)
 			goto out_disable_uphy;
 		err = ufs_tegra_enable_mphylane_clks(ufs_tegra);
@@ -660,9 +698,16 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 			goto out_disable_uphy;
 		ufs_tegra_mphy_deassert_reset(ufs_tegra);
 		err = ufs_tegra_mphy_receiver_calibration(ufs_tegra);
+		if (err < 0)
+			goto out_disable_mphylane_clks;
+		err = ufs_tegra_ufs_reset_init(ufs_tegra);
 		if (err)
 			goto out_disable_mphylane_clks;
-
+		ufs_tegra_ufs_deassert_reset(ufs_tegra);
+		ufs_tegra_ufs_pwrcntrl_update(false);
+		ufs_tegra_disable_mphy_slcg(ufs_tegra);
+		ufs_tegra_ufs_aux_prog(ufs_tegra);
+		ufs_tegra_cfg_vendor_registers(hba);
 	}
 	return err;
 
