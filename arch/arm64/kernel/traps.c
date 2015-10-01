@@ -51,6 +51,7 @@ static const char *handler[]= {
 
 int show_unhandled_signals = 1;
 
+#ifdef CONFIG_DEBUG_VERBOSE_OOPS
 /*
  * Dump out the contents of some memory nicely...
  */
@@ -102,6 +103,7 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
 
 	set_fs(fs);
 }
+#endif
 
 static void dump_backtrace_entry(unsigned long where)
 {
@@ -109,6 +111,11 @@ static void dump_backtrace_entry(unsigned long where)
 	 * Note that 'where' can have a physical address, but it's not handled.
 	 */
 	print_ip_sym(where);
+#ifdef CONFIG_DEBUG_VERBOSE_OOPS
+	if (in_exception_text(where))
+		dump_mem("", "Exception stack", stack,
+			 stack + sizeof(struct pt_regs));
+#endif
 }
 
 static void dump_instr(const char *lvl, struct pt_regs *regs)
@@ -180,9 +187,11 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 		if (ret < 0)
 			break;
 		stack = frame.sp;
+#ifdef CONFIG_DEBUG_VERBOSE_OOPS
 		if (in_exception_text(where))
 			dump_mem("", "Exception stack", stack,
 				 stack + sizeof(struct pt_regs), false);
+#endif
 	}
 }
 
@@ -220,11 +229,16 @@ static int __die(const char *str, int err, struct thread_info *thread,
 		 TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
 
 	if (!user_mode(regs) || in_interrupt()) {
+#ifdef CONFIG_DEBUG_VERBOSE_OOPS
 		dump_mem(KERN_EMERG, "Stack: ", regs->sp,
 			 THREAD_SIZE + (unsigned long)task_stack_page(tsk),
 			 compat_user_mode(regs));
+#endif
 		dump_backtrace(regs, tsk);
+
+#ifdef CONFIG_DEBUG_VERBOSE_OOPS
 		dump_instr(KERN_EMERG, regs);
+#endif
 	}
 
 	return ret;
@@ -239,10 +253,13 @@ void die(const char *str, struct pt_regs *regs, int err)
 {
 	struct thread_info *thread = current_thread_info();
 	int ret;
+	unsigned long flags;
+
+	local_irq_save(flags);
 
 	oops_enter();
 
-	raw_spin_lock_irq(&die_lock);
+	raw_spin_lock(&die_lock);
 	console_verbose();
 	bust_spinlocks(1);
 	ret = __die(str, err, thread, regs);
@@ -252,13 +269,16 @@ void die(const char *str, struct pt_regs *regs, int err)
 
 	bust_spinlocks(0);
 	add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
-	raw_spin_unlock_irq(&die_lock);
+	raw_spin_unlock(&die_lock);
 	oops_exit();
 
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 	if (panic_on_oops)
 		panic("Fatal exception");
+
+	local_irq_restore(flags);
+
 	if (ret != NOTIFY_STOP)
 		do_exit(SIGSEGV);
 }
@@ -468,19 +488,32 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 	unsigned long flags;
 #endif
 	void __user *pc = (void __user *)instruction_pointer(regs);
+
 	console_verbose();
 
 #ifdef CONFIG_SERROR_HANDLER
 	raw_spin_lock_irqsave(&serr_lock, flags);
 	list_for_each_entry(hook, &serr_hook, node)
-		if (hook->fn(regs, reason, esr, hook->priv))
+		if (hook->fn(regs, reason, esr, hook->priv)) {
+			raw_spin_unlock_irqrestore(&serr_lock, flags);
 			return;
+		}
+#endif
+
+
+	pr_crit("CPU%d: Bad mode in %s handler detected, code 0x%08x\n",
+		smp_processor_id(), handler[reason], esr);
+
+#ifdef CONFIG_SERROR_HANDLER
 	raw_spin_unlock_irqrestore(&serr_lock, flags);
 #endif
 
 	pr_crit("Bad mode in %s handler detected, code 0x%08x -- %s\n",
 		handler[reason], esr, esr_get_class_string(esr));
+
+#ifdef CONFIG_DEBUG_VERBOSE_OOPS
 	__show_regs(regs);
+#endif
 
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
@@ -488,6 +521,7 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 	info.si_addr  = pc;
 
 	arm64_notify_die("Oops - bad mode", regs, &info, 0);
+
 }
 
 void __pte_error(const char *file, int line, unsigned long val)
