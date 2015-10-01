@@ -242,11 +242,11 @@ void sync_dump(void)
 			char c = s.buf[i + DUMP_CHUNK];
 
 			s.buf[i + DUMP_CHUNK] = 0;
-			pr_cont("%s", s.buf + i);
+			pr_debug("%s", s.buf + i);
 			s.buf[i + DUMP_CHUNK] = c;
 		} else {
 			s.buf[s.count] = 0;
-			pr_cont("%s", s.buf + i);
+			pr_debug("%s", s.buf + i);
 		}
 	}
 }
