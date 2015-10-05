@@ -63,6 +63,8 @@ MODULE_PARM_DESC(static_hdmi_pcm, "Don't restrict PCM parameters per ELD info");
 #define is_valleyview_plus(codec) (is_valleyview(codec) || is_cherryview(codec))
 
 #define is_tegra21x(codec)  ((codec)->vendor_id == 0x10de0029)
+#define is_tegra_18x_sor0(codec)  ((codec)->vendor_id == 0x10de002d)
+#define is_tegra_18x_sor1(codec)  ((codec)->vendor_id == 0x10de002e)
 
 struct hdmi_spec_per_cvt {
 	hda_nid_t cvt_nid;
@@ -1289,6 +1291,8 @@ static int hdmi_pin_hbr_setup(struct hda_codec *codec, hda_nid_t pin_nid,
 	/* Assuming the HW supports HBR for Tegra21x/Tegra12x HDMI */
 	if ((snd_hda_query_pin_caps(codec, pin_nid) & AC_PINCAP_HBR) ||
 		(codec->preset->id == 0x10de0029) ||
+		(codec->preset->id == 0x10de002d) ||
+		(codec->preset->id == 0x10de002e) ||
 		(codec->preset->id == 0x10de0028)) {
 		pinctl = snd_hda_codec_read(codec, pin_nid, 0,
 					    AC_VERB_GET_PIN_WIDGET_CONTROL, 0);
@@ -1469,7 +1473,8 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 	eld = &per_pin->sink_eld;
 
 #ifdef CONFIG_SND_HDA_TEGRA
-	if (is_tegra21x(codec) &&
+	if ((is_tegra21x(codec) || is_tegra_18x_sor0(codec)
+		|| is_tegra_18x_sor1(codec)) &&
 		(!eld->monitor_present || !eld->info.lpcm_sad_ready)) {
 		if (!eld->monitor_present) {
 			if (tegra_hdmi_setup_hda_presence() < 0) {
@@ -1867,7 +1872,8 @@ static int generic_hdmi_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 	per_pin->setup = true;
 
 #ifdef CONFIG_SND_HDA_TEGRA
-	if (is_tegra21x(codec)) {
+	if ((is_tegra21x(codec) || is_tegra_18x_sor0(codec)
+		|| is_tegra_18x_sor1(codec))) {
 		int err = 0;
 
 		if (substream->runtime->channels == 2)
@@ -2230,7 +2236,8 @@ static int generic_hdmi_init_per_pins(struct hda_codec *codec)
 	struct hdmi_spec *spec = codec->spec;
 	int pin_idx;
 
-	if (is_tegra21x(codec))
+	if ((is_tegra21x(codec) || is_tegra_18x_sor0(codec)
+			|| is_tegra_18x_sor1(codec)))
 		snd_hda_codec_write(codec, 4, 0,
 				    AC_VERB_SET_DIGI_CONVERT_1, 0x11);
 

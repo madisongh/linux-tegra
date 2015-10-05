@@ -23,7 +23,7 @@ config SND_HDA_INTEL
 
 config SND_HDA_TEGRA
 	tristate "NVIDIA Tegra HD Audio"
-	depends on ARCH_TEGRA
+	depends on ARCH_TEGRA ||  ARCH_TEGRA_18x_SOC
 	select SND_HDA
 	help
 	  Say Y here to support the HDA controller present in NVIDIA
