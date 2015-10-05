@@ -1658,7 +1658,22 @@ struct regulator *regulator_get(struct device *dev, const char *id)
 #ifdef CONFIG_REGULATOR_DUMMY
 	return _regulator_get(dev, id, false, true);
 #else
-	return _regulator_get(dev, id, false, false);
+	struct regulator *regulator;
+	const char *devname = NULL;
+	int ret;
+
+	regulator = _regulator_get(dev, id, false, false);
+	if (IS_ERR(regulator)) {
+		ret = PTR_ERR(regulator);
+		if (ret != -EPROBE_DEFER) {
+			if (dev)
+				devname = dev_name(dev);
+			pr_err("regulator_get() failed for (%s,%s), %d\n",
+				(devname) ? devname : "NULL", id, ret);
+		}
+	}
+
+	return regulator;
 #endif
 }
 EXPORT_SYMBOL_GPL(regulator_get);
@@ -1686,7 +1701,22 @@ EXPORT_SYMBOL_GPL(regulator_get);
  */
 struct regulator *regulator_get_exclusive(struct device *dev, const char *id)
 {
-	return _regulator_get(dev, id, true, false);
+	struct regulator *regulator;
+	const char *devname = NULL;
+	int ret;
+
+	regulator = _regulator_get(dev, id, true, false);
+	if (IS_ERR(regulator)) {
+		ret = PTR_ERR(regulator);
+		if (ret != -EPROBE_DEFER) {
+			if (dev)
+				devname = dev_name(dev);
+			pr_err("regulator_get() failed for (%s,%s), %d\n",
+				(devname) ? devname : "NULL", id, ret);
+		}
+	}
+
+	return regulator;
 }
 EXPORT_SYMBOL_GPL(regulator_get_exclusive);
 
