@@ -179,6 +179,7 @@ static inline int tegra_dc_fmt_bpp(int fmt)
 	case TEGRA_WIN_FMT_B4G4R4A4:
 	case TEGRA_WIN_FMT_B5G5R5A:
 	case TEGRA_WIN_FMT_B5G6R5:
+	case TEGRA_WIN_FMT_R5G6B5:
 	case TEGRA_WIN_FMT_AB5G5R5:
 	case TEGRA_WIN_FMT_T_R4G4B4A4:
 		return 16;
