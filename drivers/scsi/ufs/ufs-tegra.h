@@ -50,6 +50,10 @@
 #define MPHY_ADDR_RANGE		0x1fc
 #define UFS_AUX_ADDR_RANGE	0x18
 
+/*UFS Clock Defines*/
+#define UFSHC_CLK_FREQ		51000000
+#define UFSDEV_CLK_FREQ		38400000
+
 enum ufs_state {
 	UFSHC_INIT,
 	UFSHC_SUSPEND,
@@ -239,6 +243,13 @@ struct ufs_tegra_host {
 	struct clk *mphy_l0_tx_ls_3xbit;
 	struct clk *mphy_l0_rx_ls_bit;
 	struct clk *mphy_l1_rx_ana;
+	struct clk *ufshc_parent;
+	struct clk *ufsdev_parent;
+	struct clk *ufshc_clk;
+	struct clk *ufsdev_ref_clk;
+	struct regulator *vddio_ufs;
+	struct regulator *vddio_ufs_ap;
+
 };
 
 extern struct ufs_hba_variant_ops ufs_hba_tegra_vops;

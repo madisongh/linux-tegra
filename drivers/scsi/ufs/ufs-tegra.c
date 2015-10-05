@@ -50,6 +50,93 @@ static void ufs_tegra_ufs_pwrcntrl_update(bool psw_on)
 	}
 }
 
+static int ufs_tegra_host_regulator_get(struct device *dev,
+		const char *name, struct regulator **regulator_out)
+{
+	int err = 0;
+	struct regulator *regulator;
+
+	regulator = devm_regulator_get(dev, name);
+	if (IS_ERR(regulator)) {
+		err = PTR_ERR(regulator);
+		dev_err(dev, "%s: failed to get %s err %d",
+				__func__, name, err);
+	} else {
+		*regulator_out = regulator;
+	}
+
+	return err;
+}
+
+static int ufs_tegra_init_regulators(struct ufs_tegra_host *ufs_tegra)
+{
+	int err = 0;
+	struct device *dev = ufs_tegra->hba->dev;
+
+	err = ufs_tegra_host_regulator_get(dev, "vddio-ufs",
+			&ufs_tegra->vddio_ufs);
+	if (err)
+		return err;
+
+	ufs_tegra_host_regulator_get(dev, "vddio-ufs-ap",
+			&ufs_tegra->vddio_ufs_ap);
+
+	return err;
+}
+
+static int ufs_tegra_enable_regulators(struct ufs_tegra_host *ufs_tegra)
+{
+	int err = 0;
+	struct device *dev = ufs_tegra->hba->dev;
+
+	if (ufs_tegra->vddio_ufs) {
+		err = regulator_enable(ufs_tegra->vddio_ufs);
+		if (err) {
+			dev_err(dev, "%s: vddio-ufs enable failed, err=%d\n",
+					__func__, err);
+			goto out;
+		}
+	}
+	if (ufs_tegra->vddio_ufs_ap) {
+		err = regulator_enable(ufs_tegra->vddio_ufs_ap);
+		if (err) {
+			dev_err(dev, "%s: vddio-ufs-ap enable failed err = %d\n",
+					__func__, err);
+			goto disable_vddio_ufs;
+		}
+	}
+	return err;
+
+disable_vddio_ufs:
+	regulator_disable(ufs_tegra->vddio_ufs);
+out:
+	return err;
+}
+
+static int ufs_tegra_disable_regulators(struct ufs_tegra_host *ufs_tegra)
+{
+	int err = 0;
+	struct device *dev = ufs_tegra->hba->dev;
+
+	if (ufs_tegra->vddio_ufs) {
+		err = regulator_disable(ufs_tegra->vddio_ufs);
+		if (err) {
+			dev_err(dev, "%s: vddio-ufs disable failed, err=%d\n",
+					__func__, err);
+			return err;
+		}
+	}
+	if (ufs_tegra->vddio_ufs_ap) {
+		err = regulator_disable(ufs_tegra->vddio_ufs_ap);
+		if (err) {
+			dev_err(dev, "%s: vddio-ufs-ap disable failed err = %d\n",
+					__func__, err);
+			return err;
+		}
+	}
+	return err;
+}
+
 static int ufs_tegra_host_clk_get(struct device *dev,
 		const char *name, struct clk **clk_out)
 {
@@ -251,6 +338,84 @@ static int ufs_tegra_init_mphy_lane_clks(struct ufs_tegra_host *host)
 out:
 	return err;
 }
+
+static int ufs_tegra_init_ufs_clks(struct ufs_tegra_host *ufs_tegra)
+{
+	int err = 0;
+	struct device *dev = ufs_tegra->hba->dev;
+
+	err = ufs_tegra_host_clk_get(dev,
+		"pll_p", &ufs_tegra->ufshc_parent);
+	if (err)
+		goto out;
+	err = ufs_tegra_host_clk_get(dev,
+		"ufshc", &ufs_tegra->ufshc_clk);
+	if (err)
+		goto out;
+
+	err = ufs_tegra_host_clk_get(dev,
+		"clk_m", &ufs_tegra->ufsdev_parent);
+	if (err)
+		goto out;
+	err = ufs_tegra_host_clk_get(dev,
+		"ufsdev_ref", &ufs_tegra->ufsdev_ref_clk);
+	if (err)
+		goto out;
+
+out:
+	return err;
+}
+
+static int ufs_tegra_enable_ufs_clks(struct ufs_tegra_host *ufs_tegra)
+{
+	struct device *dev = ufs_tegra->hba->dev;
+	int err = 0;
+
+	err = ufs_tegra_host_clk_enable(dev, "ufshc",
+		ufs_tegra->ufshc_clk);
+	if (err)
+		goto out;
+	err = clk_set_parent(ufs_tegra->ufshc_clk,
+				ufs_tegra->ufshc_parent);
+	if (err)
+		goto out;
+	err = clk_set_rate(ufs_tegra->ufshc_clk, UFSHC_CLK_FREQ);
+	if (err)
+		goto out;
+
+	err = ufs_tegra_host_clk_enable(dev, "ufsdev_ref",
+		ufs_tegra->ufsdev_ref_clk);
+	if (err)
+		goto disable_ufshc;
+	err = clk_set_parent(ufs_tegra->ufsdev_ref_clk,
+				ufs_tegra->ufsdev_parent);
+	if (err)
+		goto disable_ufshc;
+	err = clk_set_rate(ufs_tegra->ufsdev_ref_clk, UFSDEV_CLK_FREQ);
+	if (err)
+		goto disable_ufshc;
+
+	ufs_tegra->hba->clk_gating.state = CLKS_ON;
+
+	return err;
+
+disable_ufshc:
+	clk_disable_unprepare(ufs_tegra->ufshc_clk);
+out:
+	return err;
+}
+
+static void ufs_tegra_disable_ufs_clks(struct ufs_tegra_host *ufs_tegra)
+{
+	if (ufs_tegra->hba->clk_gating.state == CLKS_OFF)
+		return;
+
+	clk_disable_unprepare(ufs_tegra->ufshc_clk);
+	clk_disable_unprepare(ufs_tegra->ufsdev_ref_clk);
+
+	ufs_tegra->hba->clk_gating.state = CLKS_OFF;
+}
+
 
 static int ufs_tegra_ufs_reset_init(struct ufs_tegra_host *ufs_tegra)
 {
@@ -638,6 +803,8 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 		goto out;
 	}
 	ufs_tegra->ufshc_state = UFSHC_INIT;
+	ufs_tegra->hba = hba;
+	hba->priv = (void *)ufs_tegra;
 
 	ufs_tegra->ufs_aux_base = devm_ioremap(dev,
 			NV_ADDRESS_MAP_UFSHC_AUX_BASE, UFS_AUX_ADDR_RANGE);
@@ -667,8 +834,6 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 		if (err)
 			goto out;
 
-		ufs_tegra->hba = hba;
-		hba->priv = (void *)ufs_tegra;
 		ufs_tegra->u_phy = devm_phy_get(dev, "uphy");
 
 		if (IS_ERR(ufs_tegra->u_phy)) {
@@ -686,16 +851,33 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 	}
 
 	if (tegra_platform_is_silicon()) {
+		err = ufs_tegra_init_regulators(ufs_tegra);
+		if (err) {
+			goto out_disable_uphy;
+		} else {
+			err = ufs_tegra_enable_regulators(ufs_tegra);
+			if (err)
+				goto out_disable_uphy;
+		}
+		err = ufs_tegra_init_ufs_clks(ufs_tegra);
+		if (err)
+			goto out_disable_regulators;
+
+		err = ufs_tegra_enable_ufs_clks(ufs_tegra);
+		if (err)
+			goto out_disable_regulators;
+
 		err = ufs_tegra_init_mphy_lane_clks(ufs_tegra);
 		if (err)
-			goto out_disable_uphy;
+			goto out_disable_ufs_clks;
+
 		err = ufs_tegra_enable_mphylane_clks(ufs_tegra);
 		if (err)
-			goto out_disable_uphy;
+			goto out_disable_ufs_clks;
 
 		err = ufs_tegra_mphy_reset_init(ufs_tegra);
 		if (err)
-			goto out_disable_uphy;
+			goto out_disable_mphylane_clks;
 		ufs_tegra_mphy_deassert_reset(ufs_tegra);
 		err = ufs_tegra_mphy_receiver_calibration(ufs_tegra);
 		if (err < 0)
@@ -714,6 +896,11 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 out_disable_mphylane_clks:
 	if (tegra_platform_is_silicon())
 		ufs_tegra_disable_mphylane_clks(ufs_tegra);
+out_disable_ufs_clks:
+	ufs_tegra_disable_ufs_clks(ufs_tegra);
+out_disable_regulators:
+	if (tegra_platform_is_silicon())
+		ufs_tegra_disable_regulators(ufs_tegra);
 out_disable_uphy:
 	if (tegra_platform_is_silicon())
 		phy_power_off(ufs_tegra->u_phy);
