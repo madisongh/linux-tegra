@@ -93,6 +93,14 @@ NVIDIA TEGRA186 Display Serial Interface
    setting up per-link ganged mode start address and range, 1 for true and 0 for false.
  - nvidia,dsi-split-link-type: specifies the type of Split Link supported by panel.
    1 for TEGRA_DSI_SPLIT_LINK_A_B, 2 for TEGRA_DSI_SPLIT_LINK_C_D, 3 for TEGRA_DSI_SPLIT_LINK_A_B_C_D
+ - nvidia,enable-link-compression: enables link compression mode(DSC).
+ - nvidia,enable-block-pred: Enable block prediction feature in DSC if panel supports the feature.
+ - nvidia,slice-height: Link compression panels can support different slice height options. Set the
+   option intended to be used for the corresponding panel.
+ - nvidia,num-of-slices: 1,2,3 and 4 slices are supported. Depending on the panel support, configure the
+   number of slices to one of the above options.
+ - nvidia,comp-rate: Three compression rates are supported - 8 bpc, 12 bpc, 16 bpc.(bpc stands for bits per
+   component). Select the compression rate supported by the panel.
 
  - Child nodes represent node of modes, output settings,
    smart dimmer settings, color management unit settings.
@@ -231,6 +239,11 @@ Example
 				nvidia,dsi-panel-reset = <TEGRA_DSI_ENABLE>;
 				nvidia,dsi-power-saving-suspend = <TEGRA_DSI_ENABLE>;
 				nvidia,panel-bl-pwm-gpio = <&gpio TEGRA_GPIO(H, 1) 0>; /* PH1 */
+				nvidia,enable-link-compression;
+				nvidia,enable-block-pred;
+				nvidia,slice-height = <32>;
+				nvidia,num-of-slices = <2>;
+				nvidia,comp-rate = <8>;
 				nvidia,dsi-pkt-seq =
 					 <CMD_VS LEN_SHORT CMD_BLNK LEN_HSYNC CMD_HE LEN_SHORT PKT_LP LINE_STOP>,
 					 <CMD_VE LEN_SHORT CMD_BLNK LEN_HSYNC CMD_HE LEN_SHORT PKT_LP LINE_STOP>,
