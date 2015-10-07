@@ -6555,7 +6555,8 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 
 		if (cpu_overutilized(i)) {
 			*overutilized = true;
-			if (!sgs->group_misfit_task && rq->misfit_task)
+			if (capacity_aware() && !sgs->group_misfit_task &&
+			    rq->misfit_task)
 				sgs->group_misfit_task = capacity_of(i);
 		}
 	}
@@ -6603,7 +6604,7 @@ static bool update_sd_pick_busiest(struct lb_env *env,
 	 * Candidate sg doesn't face any serious load-balance probelms
 	 * so don't pick it if the local sg is already filled up.
 	 */
-	if (sgs->group_type == group_other &&
+	if (capacity_aware() && sgs->group_type == group_other &&
 	    !group_has_capacity(env, &sds->local_stat))
 		return false;
 
@@ -6614,7 +6615,7 @@ static bool update_sd_pick_busiest(struct lb_env *env,
 	 * Candidate sg has no more than one task per cpu and has higher
 	 * per-cpu capacity. No reason to pull tasks to less capable cpus.
 	 */
-	if (sgs->sum_nr_running <= sgs->group_weight &&
+	if (capacity_aware() && sgs->sum_nr_running <= sgs->group_weight &&
 	    group_smaller_cpu_capacity(sds->local, sg))
 		return false;
 
@@ -6916,7 +6917,8 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
 		 * Busiest group is overloaded, local is not, use the spare
 		 * cycles to maximize throughput
 		 */
-		if (busiest->group_type == group_overloaded &&
+		if (capacity_aware() &&
+		    busiest->group_type == group_overloaded &&
 		    local->group_type <= group_misfit_task) {
 			env->imbalance = busiest->load_per_task;
 			return;
@@ -7060,9 +7062,13 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 		 * might end up to just move the imbalance on another group
 		 */
 		if ((busiest->group_type != group_overloaded) &&
-		    (local->idle_cpus <= (busiest->idle_cpus + 1)) &&
-		    !group_smaller_cpu_capacity(sds.busiest, sds.local))
-			goto out_balanced;
+		    (local->idle_cpus <= (busiest->idle_cpus + 1))) {
+			if (!capacity_aware())
+				goto out_balanced;
+
+			if (!group_smaller_cpu_capacity(sds.busiest, sds.local))
+				goto out_balanced;
+		}
 	} else {
 		/*
 		 * In the CPU_NEWLY_IDLE, CPU_NOT_IDLE cases, use
