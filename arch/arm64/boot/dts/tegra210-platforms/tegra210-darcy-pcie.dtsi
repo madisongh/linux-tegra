@@ -48,4 +48,8 @@
 			status = "okay";
 		};
 	};
+
+	xusb_padctl {
+		nvidia,lane-map = <0x14>;
+	};
 };
