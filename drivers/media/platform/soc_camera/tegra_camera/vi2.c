@@ -808,12 +808,22 @@ static int vi2_capture_setup(struct tegra_camera_dev *cam)
 		return -ENODEV;
 }
 
+static s32 vi2_bytes_per_line(u32 width, const struct soc_mbus_pixelfmt *mf)
+{
+	s32 bytes_per_line = soc_mbus_bytes_per_line(width, mf);
+
+	if (bytes_per_line % 64)
+		bytes_per_line = bytes_per_line + (64 - (bytes_per_line % 64));
+
+	return bytes_per_line;
+}
+
 static int vi2_capture_buffer_setup(struct tegra_camera_dev *cam,
 			struct tegra_camera_buffer *buf)
 {
 	struct soc_camera_device *icd = buf->icd;
-	int bytes_per_line = soc_mbus_bytes_per_line(icd->user_width,
-			icd->current_fmt->host_fmt);
+	int bytes_per_line = vi2_bytes_per_line(icd->user_width,
+						icd->current_fmt->host_fmt);
 	struct soc_camera_subdev_desc *ssdesc = &icd->sdesc->subdev_desc;
 	struct tegra_camera_platform_data *pdata = ssdesc->drv_priv;
 	int port = pdata->port;
