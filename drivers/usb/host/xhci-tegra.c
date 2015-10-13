@@ -302,6 +302,7 @@ struct tegra_xhci_hcd {
 	struct work_struct id_extcon_work;
 
 	bool host_mode;
+	bool otg_role_initialized;
 };
 
 static struct hc_driver __read_mostly tegra_xhci_hc_driver;
@@ -1167,16 +1168,28 @@ static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 {
 	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
 	int port = tegra->utmi_otg_port_base_1 - 1;
+	u32 status;
+	int wait;
 
 	if (!tegra->utmi_otg_port_base_1)
 		return;
 
+	if (!tegra->fw_loaded)
+		return;
+
 	mutex_lock(&tegra->lock);
+
+	if (!tegra->otg_role_initialized) {
+		tegra->otg_role_initialized = true;
+		goto role_update;
+	}
+
 	if ((tegra->host_mode && on) || (!tegra->host_mode && !on)) {
 		mutex_unlock(&tegra->lock);
 		return;
 	}
 
+role_update:
 	dev_dbg(tegra->dev, "host mode %s\n", on ? "on" : "off");
 
 	if (on) {
@@ -1191,26 +1204,81 @@ static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 
 	pm_runtime_get_sync(tegra->dev);
 	if (on) {
-		xhci_hub_control(xhci->shared_hcd, ClearPortFeature,
-			USB_PORT_FEAT_POWER, tegra->usb3_otg_port_base_1,
-			NULL, 0);
-		xhci_hub_control(xhci->main_hcd, ClearPortFeature,
-			USB_PORT_FEAT_POWER, tegra->utmi_otg_port_base_1,
-			NULL, 0);
 		/* switch to host mode */
-		xhci_hub_control(xhci->shared_hcd, SetPortFeature,
-			USB_PORT_FEAT_POWER, tegra->usb3_otg_port_base_1,
-			NULL, 0);
+		if (tegra->usb3_otg_port_base_1) {
+			xhci_hub_control(xhci->shared_hcd, SetPortFeature,
+				USB_PORT_FEAT_POWER, tegra->usb3_otg_port_base_1
+				, NULL, 0);
+
+			wait = 10;
+			do {
+				xhci_hub_control(xhci->shared_hcd, GetPortStatus
+					, 0, tegra->usb3_otg_port_base_1
+					, (char *) &status, sizeof(status));
+				if (status & USB_SS_PORT_STAT_POWER)
+					break;
+				usleep_range(10, 20);
+			} while (--wait > 0);
+
+			if (!(status & USB_SS_PORT_STAT_POWER))
+				dev_info(tegra->dev, "failed to set SS PP\n");
+		}
+
 		xhci_hub_control(xhci->main_hcd, SetPortFeature,
 			USB_PORT_FEAT_POWER, tegra->utmi_otg_port_base_1,
 			NULL, 0);
+
+		wait = 10;
+		do {
+			xhci_hub_control(xhci->main_hcd, GetPortStatus
+				, 0, tegra->utmi_otg_port_base_1
+				, (char *) &status, sizeof(status));
+			if (status & USB_PORT_STAT_POWER)
+				break;
+			usleep_range(10, 20);
+		} while (--wait > 0);
+
+		if (!(status & USB_PORT_STAT_POWER))
+			dev_info(tegra->dev, "failed to set HS PP\n");
+
+		pm_runtime_mark_last_busy(tegra->dev);
 	} else {
-		xhci_hub_control(xhci->shared_hcd, ClearPortFeature,
-			USB_PORT_FEAT_POWER, tegra->usb3_otg_port_base_1,
-			NULL, 0);
+		if (tegra->usb3_otg_port_base_1) {
+			xhci_hub_control(xhci->shared_hcd, ClearPortFeature,
+				USB_PORT_FEAT_POWER, tegra->usb3_otg_port_base_1
+				, NULL, 0);
+
+			wait = 10;
+			do {
+				xhci_hub_control(xhci->shared_hcd, GetPortStatus
+					, 0, tegra->usb3_otg_port_base_1
+					, (char *) &status, sizeof(status));
+				if (!(status & USB_SS_PORT_STAT_POWER))
+					break;
+				usleep_range(10, 20);
+			} while (--wait > 0);
+
+			if (status & USB_SS_PORT_STAT_POWER)
+				dev_info(tegra->dev, "failed to clear SS PP\n");
+		}
+
 		xhci_hub_control(xhci->main_hcd, ClearPortFeature,
 			USB_PORT_FEAT_POWER, tegra->utmi_otg_port_base_1,
 			NULL, 0);
+
+		wait = 10;
+		do {
+			xhci_hub_control(xhci->main_hcd, GetPortStatus
+				, 0, tegra->utmi_otg_port_base_1
+				, (char *) &status, sizeof(status));
+			if (!(status & USB_PORT_STAT_POWER))
+				break;
+			usleep_range(10, 20);
+		} while (--wait > 0);
+
+		if (status & USB_PORT_STAT_POWER)
+			dev_info(tegra->dev, "failed to clear HS PP\n");
+
 	}
 	pm_runtime_put_autosuspend(tegra->dev);
 
