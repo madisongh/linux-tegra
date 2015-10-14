@@ -101,8 +101,8 @@ struct tegra_camera_dev {
 	int				sequence_a;
 	int				sequence_b;
 
-	struct work_struct		work;
-	struct mutex			work_mutex;
+	struct task_struct		*kthread_capture;
+	wait_queue_head_t		wait;
 
 	/* syncpt ids */
 	u32				syncpt_id_csi_a;

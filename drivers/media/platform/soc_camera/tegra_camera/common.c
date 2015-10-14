@@ -16,6 +16,8 @@
 
 #include <linux/delay.h>
 #include <linux/kernel.h>
+#include <linux/kthread.h>
+#include <linux/freezer.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/nvhost.h>
@@ -247,7 +249,7 @@ static int tegra_camera_capture_frame(struct tegra_camera_dev *cam)
 			cam->ops->capture_setup(cam);
 	}
 
-	spin_lock_irq(&cam->videobuf_queue_lock);
+	spin_lock(&cam->videobuf_queue_lock);
 
 	vb = cam->active;
 	do_gettimeofday(&vb->v4l2_buf.timestamp);
@@ -262,37 +264,41 @@ static int tegra_camera_capture_frame(struct tegra_camera_dev *cam)
 
 	cam->num_frames++;
 
-	spin_unlock_irq(&cam->videobuf_queue_lock);
+	spin_unlock(&cam->videobuf_queue_lock);
 
 	return err;
 }
 
-static void tegra_camera_work(struct work_struct *work)
+static int tegra_camera_kthread_capture(void *data)
 {
-	struct tegra_camera_dev *cam =
-		container_of(work, struct tegra_camera_dev, work);
+	struct tegra_camera_dev *cam = data;
 	struct tegra_camera_buffer *buf;
 
 	while (1) {
-		mutex_lock(&cam->work_mutex);
+		try_to_freeze();
 
-		spin_lock_irq(&cam->videobuf_queue_lock);
+		wait_event_interruptible(cam->wait,
+					 !list_empty(&cam->capture) ||
+					 kthread_should_stop());
+		if (kthread_should_stop())
+			break;
+
+		spin_lock(&cam->videobuf_queue_lock);
 		if (list_empty(&cam->capture)) {
 			cam->active = NULL;
-			spin_unlock_irq(&cam->videobuf_queue_lock);
-			mutex_unlock(&cam->work_mutex);
-			return;
+			spin_unlock(&cam->videobuf_queue_lock);
+			continue;
 		}
 
 		buf = list_entry(cam->capture.next, struct tegra_camera_buffer,
-				queue);
+				 queue);
 		cam->active = &buf->vb;
-		spin_unlock_irq(&cam->videobuf_queue_lock);
+		spin_unlock(&cam->videobuf_queue_lock);
 
 		tegra_camera_capture_frame(cam);
-
-		mutex_unlock(&cam->work_mutex);
 	}
+
+	return 0;
 }
 
 static int tegra_camera_init_buffer(struct tegra_camera_buffer *buf)
@@ -481,12 +487,12 @@ static void tegra_camera_videobuf_queue(struct vb2_buffer *vb)
 	struct tegra_camera_dev *cam = ici->priv;
 	struct tegra_camera_buffer *buf = to_tegra_vb(vb);
 
-	spin_lock_irq(&cam->videobuf_queue_lock);
+	spin_lock(&cam->videobuf_queue_lock);
 	list_add_tail(&buf->queue, &cam->capture);
-	spin_unlock_irq(&cam->videobuf_queue_lock);
+	spin_unlock(&cam->videobuf_queue_lock);
 
-	if (vb2_is_streaming(vb->vb2_queue))
-		schedule_work(&cam->work);
+	/* Wait up kthread for capture */
+	wake_up_interruptible(&cam->wait);
 }
 
 static void tegra_camera_videobuf_release(struct vb2_buffer *vb)
@@ -498,9 +504,7 @@ static void tegra_camera_videobuf_release(struct vb2_buffer *vb)
 	struct tegra_camera_buffer *buf = to_tegra_vb(vb);
 	struct tegra_camera_dev *cam = ici->priv;
 
-	mutex_lock(&cam->work_mutex);
-
-	spin_lock_irq(&cam->videobuf_queue_lock);
+	spin_lock(&cam->videobuf_queue_lock);
 
 	if (cam->active == vb)
 		cam->active = NULL;
@@ -512,9 +516,7 @@ static void tegra_camera_videobuf_release(struct vb2_buffer *vb)
 	if (buf->queue.next)
 		list_del_init(&buf->queue);
 
-	spin_unlock_irq(&cam->videobuf_queue_lock);
-
-	mutex_unlock(&cam->work_mutex);
+	spin_unlock(&cam->videobuf_queue_lock);
 }
 
 static int tegra_camera_videobuf_init(struct vb2_buffer *vb)
@@ -533,8 +535,9 @@ static int tegra_camera_start_streaming(struct vb2_queue *q, unsigned int count)
 	struct soc_camera_host *ici = to_soc_camera_host(icd->parent);
 	struct tegra_camera_dev *cam = ici->priv;
 
-	schedule_work(&cam->work);
-
+	/* Start kthread to capture data to buffer */
+	cam->kthread_capture = kthread_run(tegra_camera_kthread_capture, cam,
+					   dev_name(&cam->ndev->dev));
 	return 0;
 }
 
@@ -547,11 +550,14 @@ static int tegra_camera_stop_streaming(struct vb2_queue *q)
 	struct tegra_camera_dev *cam = ici->priv;
 	struct soc_camera_subdev_desc *ssdesc = &icd->sdesc->subdev_desc;
 	struct tegra_camera_platform_data *pdata = ssdesc->drv_priv;
+	struct tegra_camera_buffer *buf, *nbuf;
 	int port = pdata->port;
 
-	mutex_lock(&cam->work_mutex);
+	/* Stop the kthread for capture */
+	kthread_stop(cam->kthread_capture);
+	cam->kthread_capture = NULL;
+
 	cam->ops->capture_stop(cam, port);
-	mutex_unlock(&cam->work_mutex);
 
 	return 0;
 }
@@ -612,10 +618,8 @@ static void tegra_camera_remove_device(struct soc_camera_device *icd)
 	struct tegra_camera_dev *cam = ici->priv;
 
 	cam->enable_refcnt--;
-	if (!cam->enable_refcnt) {
-		cancel_work_sync(&cam->work);
+	if (!cam->enable_refcnt)
 		tegra_camera_deactivate(cam);
-	}
 }
 
 static int tegra_camera_set_bus_param(struct soc_camera_device *icd)
@@ -909,9 +913,8 @@ static int tegra_camera_probe(struct platform_device *pdev)
 	cam->tpg_mode = tpg_mode;
 
 	INIT_LIST_HEAD(&cam->capture);
-	INIT_WORK(&cam->work, tegra_camera_work);
 	spin_lock_init(&cam->videobuf_queue_lock);
-	mutex_init(&cam->work_mutex);
+	init_waitqueue_head(&cam->wait);
 
 	if (pdev->dev.of_node) {
 		int cplen;

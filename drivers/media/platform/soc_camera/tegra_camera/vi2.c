@@ -1104,8 +1104,6 @@ static void vi2_sw_reset(struct tegra_camera_dev *cam)
 	udelay(10);
 }
 
-
-
 static int vi2_mipi_calibration(struct tegra_camera_dev *cam)
 {
 	void __iomem *mipi_cal;
