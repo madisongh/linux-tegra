@@ -46,8 +46,6 @@ module_param(tpg_mode, int, 0644);
 #define TEGRA_CAM_DRV_NAME "vi"
 #define TEGRA_CAM_VERSION_CODE KERNEL_VERSION(0, 0, 5)
 
-#define TEGRA_SYNCPT_RETRY_COUNT	10
-
 static const struct soc_mbus_pixelfmt tegra_camera_yuv_formats[] = {
 	{
 		.fourcc			= V4L2_PIX_FMT_UYVY,
@@ -203,73 +201,39 @@ static void tegra_camera_deactivate(struct tegra_camera_dev *cam)
 	cam->cal_done = 0;
 }
 
-static int tegra_camera_capture_frame(struct tegra_camera_dev *cam)
+static int tegra_camera_capture_frame(struct tegra_camera_dev *cam,
+				      struct tegra_camera_buffer *buf)
 {
-	struct vb2_buffer *vb = cam->active;
-	struct tegra_camera_buffer *buf = to_tegra_vb(vb);
-	struct soc_camera_device *icd = buf->icd;
-	struct soc_camera_subdev_desc *ssdesc = &icd->sdesc->subdev_desc;
-	struct tegra_camera_platform_data *pdata = ssdesc->drv_priv;
-	int port = pdata->port;
-	int retry = TEGRA_SYNCPT_RETRY_COUNT;
 	int err;
 
 	/* Setup capture registers */
-	cam->ops->capture_setup(cam);
+	cam->ops->capture_setup(cam, buf);
 
 	cam->ops->incr_syncpts(cam);
 
 	/* MIPI CSI pads calibration after starting capture */
 	if (cam->ops->mipi_calibration && !cam->cal_done) {
-		err = cam->ops->mipi_calibration(cam);
+		err = cam->ops->mipi_calibration(cam, buf);
 		if (!err)
 			cam->cal_done = 1;
 	}
 
-	while (retry) {
-		err = cam->ops->capture_start(cam, buf);
-		if (err) {
-			retry--;
+	/* Issue start capture */
+	cam->ops->capture_start(cam, buf);
 
-			cam->ops->incr_syncpts(cam);
-			if (cam->ops->save_syncpts)
-				cam->ops->save_syncpts(cam);
+	/* Move buffer to capture done queue */
+	spin_lock(&cam->done_lock);
+	list_add_tail(&buf->queue, &cam->done);
+	spin_unlock(&cam->done_lock);
 
-			continue;
-		}
-		break;
-	}
+	/* Wait up kthread for capture done */
+	wake_up_interruptible(&cam->capture_done_wait);
 
-	/* Reset hardware for too many errors */
-	if (!retry) {
-		tegra_camera_deactivate(cam);
-		mdelay(5);
-		tegra_camera_activate(cam, icd);
-		if (cam->active)
-			cam->ops->capture_setup(cam);
-	}
-
-	spin_lock(&cam->videobuf_queue_lock);
-
-	vb = cam->active;
-	do_gettimeofday(&vb->v4l2_buf.timestamp);
-	vb->v4l2_buf.field = cam->field;
-	if (port == TEGRA_CAMERA_PORT_CSI_A)
-		vb->v4l2_buf.sequence = cam->sequence_a++;
-	else if (port == TEGRA_CAMERA_PORT_CSI_B)
-		vb->v4l2_buf.sequence = cam->sequence_b++;
-
-	vb2_buffer_done(vb, err < 0 ? VB2_BUF_STATE_ERROR : VB2_BUF_STATE_DONE);
-	list_del_init(&buf->queue);
-
-	cam->num_frames++;
-
-	spin_unlock(&cam->videobuf_queue_lock);
-
-	return err;
+	/* Wait for next frame start */
+	return cam->ops->capture_wait(cam, buf);
 }
 
-static int tegra_camera_kthread_capture(void *data)
+static int tegra_camera_kthread_capture_start(void *data)
 {
 	struct tegra_camera_dev *cam = data;
 	struct tegra_camera_buffer *buf;
@@ -277,25 +241,81 @@ static int tegra_camera_kthread_capture(void *data)
 	while (1) {
 		try_to_freeze();
 
-		wait_event_interruptible(cam->wait,
+		wait_event_interruptible(cam->capture_start_wait,
 					 !list_empty(&cam->capture) ||
 					 kthread_should_stop());
 		if (kthread_should_stop())
 			break;
 
-		spin_lock(&cam->videobuf_queue_lock);
+		spin_lock(&cam->capture_lock);
 		if (list_empty(&cam->capture)) {
-			cam->active = NULL;
-			spin_unlock(&cam->videobuf_queue_lock);
+			spin_unlock(&cam->capture_lock);
 			continue;
 		}
 
 		buf = list_entry(cam->capture.next, struct tegra_camera_buffer,
 				 queue);
-		cam->active = &buf->vb;
-		spin_unlock(&cam->videobuf_queue_lock);
+		list_del_init(&buf->queue);
+		spin_unlock(&cam->capture_lock);
 
-		tegra_camera_capture_frame(cam);
+		tegra_camera_capture_frame(cam, buf);
+	}
+
+	return 0;
+}
+
+static int tegra_camera_capture_done(struct tegra_camera_dev *cam,
+				     struct tegra_camera_buffer *buf)
+{
+	struct vb2_buffer *vb = &buf->vb;
+	struct soc_camera_device *icd = buf->icd;
+	struct soc_camera_subdev_desc *ssdesc = &icd->sdesc->subdev_desc;
+	struct tegra_camera_platform_data *pdata = ssdesc->drv_priv;
+	int port = pdata->port;
+	int err;
+
+	/* Wait for buffer is output to memeory  */
+	err = cam->ops->capture_done(cam, port);
+
+	/* Buffer is done */
+	do_gettimeofday(&vb->v4l2_buf.timestamp);
+	vb->v4l2_buf.field = cam->field;
+	if (port == TEGRA_CAMERA_PORT_CSI_A)
+		vb->v4l2_buf.sequence = cam->sequence_a++;
+	else if (port == TEGRA_CAMERA_PORT_CSI_B)
+		vb->v4l2_buf.sequence = cam->sequence_b++;
+	vb2_buffer_done(vb, err < 0 ? VB2_BUF_STATE_ERROR : VB2_BUF_STATE_DONE);
+	cam->num_frames++;
+
+	return err;
+}
+
+static int tegra_camera_kthread_capture_done(void *data)
+{
+	struct tegra_camera_dev *cam = data;
+	struct tegra_camera_buffer *buf;
+
+	while (1) {
+		try_to_freeze();
+
+		wait_event_interruptible(cam->capture_done_wait,
+					 !list_empty(&cam->done) ||
+					 kthread_should_stop());
+		if (kthread_should_stop() && list_empty(&cam->done))
+			break;
+
+		spin_lock(&cam->done_lock);
+		if (list_empty(&cam->done)) {
+			spin_unlock(&cam->done_lock);
+			continue;
+		}
+
+		buf = list_entry(cam->done.next, struct tegra_camera_buffer,
+				 queue);
+		list_del_init(&buf->queue);
+		spin_unlock(&cam->done_lock);
+
+		tegra_camera_capture_done(cam, buf);
 	}
 
 	return 0;
@@ -487,12 +507,12 @@ static void tegra_camera_videobuf_queue(struct vb2_buffer *vb)
 	struct tegra_camera_dev *cam = ici->priv;
 	struct tegra_camera_buffer *buf = to_tegra_vb(vb);
 
-	spin_lock(&cam->videobuf_queue_lock);
+	spin_lock(&cam->capture_lock);
 	list_add_tail(&buf->queue, &cam->capture);
-	spin_unlock(&cam->videobuf_queue_lock);
+	spin_unlock(&cam->capture_lock);
 
 	/* Wait up kthread for capture */
-	wake_up_interruptible(&cam->wait);
+	wake_up_interruptible(&cam->capture_start_wait);
 }
 
 static void tegra_camera_videobuf_release(struct vb2_buffer *vb)
@@ -504,10 +524,7 @@ static void tegra_camera_videobuf_release(struct vb2_buffer *vb)
 	struct tegra_camera_buffer *buf = to_tegra_vb(vb);
 	struct tegra_camera_dev *cam = ici->priv;
 
-	spin_lock(&cam->videobuf_queue_lock);
-
-	if (cam->active == vb)
-		cam->active = NULL;
+	spin_lock(&cam->done_lock);
 
 	/*
 	 * Doesn't hurt also if the list is empty, but it hurts, if queuing the
@@ -516,7 +533,7 @@ static void tegra_camera_videobuf_release(struct vb2_buffer *vb)
 	if (buf->queue.next)
 		list_del_init(&buf->queue);
 
-	spin_unlock(&cam->videobuf_queue_lock);
+	spin_unlock(&cam->done_lock);
 }
 
 static int tegra_camera_videobuf_init(struct vb2_buffer *vb)
@@ -535,9 +552,15 @@ static int tegra_camera_start_streaming(struct vb2_queue *q, unsigned int count)
 	struct soc_camera_host *ici = to_soc_camera_host(icd->parent);
 	struct tegra_camera_dev *cam = ici->priv;
 
-	/* Start kthread to capture data to buffer */
-	cam->kthread_capture = kthread_run(tegra_camera_kthread_capture, cam,
-					   dev_name(&cam->ndev->dev));
+	/* Start kthread to capture frame */
+	cam->kthread_capture_start = kthread_run(
+					tegra_camera_kthread_capture_start, cam,
+					"tegra-vi/capture-start");
+
+	/* Start kthread to wait data output to buffer */
+	cam->kthread_capture_done = kthread_run(
+					tegra_camera_kthread_capture_done, cam,
+					"tegra-vi/capture-done");
 	return 0;
 }
 
@@ -550,12 +573,13 @@ static int tegra_camera_stop_streaming(struct vb2_queue *q)
 	struct tegra_camera_dev *cam = ici->priv;
 	struct soc_camera_subdev_desc *ssdesc = &icd->sdesc->subdev_desc;
 	struct tegra_camera_platform_data *pdata = ssdesc->drv_priv;
-	struct tegra_camera_buffer *buf, *nbuf;
 	int port = pdata->port;
 
 	/* Stop the kthread for capture */
-	kthread_stop(cam->kthread_capture);
-	cam->kthread_capture = NULL;
+	kthread_stop(cam->kthread_capture_start);
+	cam->kthread_capture_start = NULL;
+	kthread_stop(cam->kthread_capture_done);
+	cam->kthread_capture_done = NULL;
 
 	cam->ops->capture_stop(cam, port);
 
@@ -913,8 +937,11 @@ static int tegra_camera_probe(struct platform_device *pdev)
 	cam->tpg_mode = tpg_mode;
 
 	INIT_LIST_HEAD(&cam->capture);
-	spin_lock_init(&cam->videobuf_queue_lock);
-	init_waitqueue_head(&cam->wait);
+	INIT_LIST_HEAD(&cam->done);
+	spin_lock_init(&cam->capture_lock);
+	spin_lock_init(&cam->done_lock);
+	init_waitqueue_head(&cam->capture_start_wait);
+	init_waitqueue_head(&cam->capture_done_wait);
 
 	if (pdev->dev.of_node) {
 		int cplen;

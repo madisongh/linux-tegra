@@ -62,9 +62,13 @@ struct tegra_camera_ops {
 	void (*clks_disable)(struct tegra_camera_dev *cam);
 
 	void (*capture_clean)(struct tegra_camera_dev *vi2_cam);
-	int (*capture_setup)(struct tegra_camera_dev *vi2_cam);
+	int (*capture_setup)(struct tegra_camera_dev *vi2_cam,
+			     struct tegra_camera_buffer *buf);
 	int (*capture_start)(struct tegra_camera_dev *vi2_cam,
 			     struct tegra_camera_buffer *buf);
+	int (*capture_wait)(struct tegra_camera_dev *vi2_cam,
+			     struct tegra_camera_buffer *buf);
+	int (*capture_done)(struct tegra_camera_dev *vi2_cam, int port);
 	int (*capture_stop)(struct tegra_camera_dev *vi2_cam, int port);
 
 	void (*init_syncpts)(struct tegra_camera_dev *vi2_cam);
@@ -76,7 +80,8 @@ struct tegra_camera_ops {
 	void (*deactivate)(struct tegra_camera_dev *vi2_cam);
 	int (*port_is_valid)(int port);
 
-	int (*mipi_calibration)(struct tegra_camera_dev *vi2_cam);
+	int (*mipi_calibration)(struct tegra_camera_dev *vi2_cam,
+			        struct tegra_camera_buffer *buf);
 };
 
 struct tegra_camera_dev {
@@ -93,16 +98,20 @@ struct tegra_camera_dev {
 	struct tegra_camera_ops		*ops;
 
 	void __iomem			*reg_base;
-	spinlock_t			videobuf_queue_lock;
 	struct list_head		capture;
+	spinlock_t			capture_lock;
+	struct list_head		done;
+	spinlock_t			done_lock;
 	struct vb2_buffer		*active;
 	struct vb2_alloc_ctx		*alloc_ctx;
 	enum v4l2_field			field;
 	int				sequence_a;
 	int				sequence_b;
 
-	struct task_struct		*kthread_capture;
-	wait_queue_head_t		wait;
+	struct task_struct		*kthread_capture_start;
+	struct task_struct		*kthread_capture_done;
+	wait_queue_head_t		capture_start_wait;
+	wait_queue_head_t		capture_done_wait;
 
 	/* syncpt ids */
 	u32				syncpt_id_csi_a;
