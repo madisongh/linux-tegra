@@ -121,6 +121,13 @@ static void __init tegra_p2360_early_init(void)
 	tegra_soc_device_init("p2360");
 }
 
+/* ina220 is @0x40 on i2c-1 */
+struct i2c_board_info __initdata p2360_ina220_info = {
+	.type = "ina220",
+	.addr = 0x40,
+	.platform_data = NULL,
+};
+
 static void __init tegra_p2360_late_init(void)
 {
 	/* Create procfs entries for board_serial, skuinfo etc */
@@ -135,6 +142,7 @@ static void __init tegra_p2360_late_init(void)
 
 	isomgr_init();
 	p2360_panel_init();
+	i2c_register_board_info(1, &p2360_ina220_info, 1);
 }
 
 static void __init tegra_p2360_dt_init(void)
