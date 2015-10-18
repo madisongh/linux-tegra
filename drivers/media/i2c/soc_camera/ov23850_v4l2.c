@@ -1244,30 +1244,7 @@ static int ov23850_probe(struct i2c_client *client,
 		return -EFAULT;
 	}
 
-	switch (ov23850_camera_data->port) {
-	case TEGRA_CAMERA_PORT_CSI_A:
-	case TEGRA_CAMERA_PORT_CSI_B:
-	  sprintf(node_name, "%s", "ov23850_a");
-		common_data->csi_io[0] = true;
-		common_data->csi_io[1] = true;
-		break;
-	case TEGRA_CAMERA_PORT_CSI_C:
-	case TEGRA_CAMERA_PORT_CSI_D:
-	  sprintf(node_name, "%s", "ov23850_c");
-		common_data->csi_io[2] = true;
-		common_data->csi_io[3] = true;
-		break;
-	case TEGRA_CAMERA_PORT_CSI_E:
-	case TEGRA_CAMERA_PORT_CSI_F:
-	  sprintf(node_name, "%s", "ov23850_e");
-		common_data->csi_io[4] = true;
-		common_data->csi_io[5] = true;
-		break;
-	default:
-	  dev_err(&client->dev, "unsupported device port\n");
-	  return -EFAULT;
-	}
-
+	sprintf(node_name, "ov23850_%c", ov23850_camera_data->port + 'a');
 	dev_dbg(&client->dev, "%s: dt node name %s\n", __func__, node_name);
 	client->dev.of_node = of_find_node_by_name(NULL, node_name);
 
@@ -1299,6 +1276,8 @@ static int ov23850_probe(struct i2c_client *client,
 	common_data->def_width		= OV23850_DEFAULT_WIDTH;
 	common_data->def_height		= OV23850_DEFAULT_HEIGHT;
 	common_data->def_clk_freq	= OV23850_DEFAULT_CLK_FREQ;
+	common_data->csi_port		= (int)ov23850_camera_data->port;
+	common_data->numlanes		= ov23850_camera_data->lanes;
 
 	priv->i2c_client		= client;
 	priv->s_data			= common_data;

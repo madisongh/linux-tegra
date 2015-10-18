@@ -1,5 +1,5 @@
 /*
- * imx214.c - imx214 sensor driver
+ * imx214_v4l2.c - imx214 sensor driver
  *
  * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
@@ -26,9 +26,8 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 
-#include <mach/io_dpd.h>
-
 #include <media/v4l2-chip-ident.h>
+#include <media/tegra_v4l2_camera.h>
 #include <media/camera_common.h>
 #include <media/imx214.h>
 
@@ -57,28 +56,18 @@
 #define IMX214_DEFAULT_DATAFMT	V4L2_MBUS_FMT_SRGGB10_1X10
 #define IMX214_DEFAULT_CLK_FREQ	24000000
 
-static struct tegra_io_dpd csia_io = {
-	.name			= "CSIA",
-	.io_dpd_reg_index	= 0,
-	.io_dpd_bit		= 0,
-};
-
-static struct tegra_io_dpd csib_io = {
-	.name			= "CSIB",
-	.io_dpd_reg_index	= 0,
-	.io_dpd_bit		= 1,
-};
-
 struct imx214 {
 	struct mutex			imx214_camera_lock;
 	struct camera_common_power_rail	power;
-	int				num_ctrls;
+	int				numctrls;
 	struct v4l2_ctrl_handler	ctrl_handler;
 	struct camera_common_eeprom_data eeprom[IMX214_EEPROM_NUM_BLOCKS];
 	u8				eeprom_buf[IMX214_EEPROM_SIZE];
 	struct i2c_client		*i2c_client;
 	struct v4l2_subdev		*subdev;
 
+	s32				group_hold_prev;
+	bool				group_hold_en;
 	struct regmap			*regmap;
 	struct camera_common_data	*s_data;
 	struct camera_common_pdata	*pdata;
@@ -226,7 +215,7 @@ static inline void imx214_get_coarse_time_short_regs(imx214_reg *regs,
 	(regs + 1)->val = (coarse_time) & 0xff;
 }
 
-static inline void imx214_get_gain_reg(imx214_reg *regs,
+static inline void imx214_get_gain_regs(imx214_reg *regs,
 				u16 gain)
 {
 	regs->addr = IMX214_GAIN_ADDR_MSB;
@@ -251,6 +240,7 @@ static inline int imx214_read_reg(struct camera_common_data *s_data,
 				u16 addr, u8 *val)
 {
 	struct imx214 *priv = (struct imx214 *)s_data->priv;
+
 	return regmap_read(priv->regmap, addr, (unsigned int *) val);
 }
 
@@ -284,15 +274,10 @@ static int imx214_power_on(struct camera_common_data *s_data)
 	struct camera_common_power_rail *pw = &priv->power;
 
 	dev_dbg(&priv->i2c_client->dev, "%s: power on\n", __func__);
-	/* disable CSIA/B IOs DPD mode to turn on camera for ardbeg */
-	tegra_io_dpd_disable(&csia_io);
-	tegra_io_dpd_disable(&csib_io);
 
 	if (priv->pdata->power_on) {
 		err = priv->pdata->power_on(pw);
 		if (err) {
-			tegra_io_dpd_enable(&csia_io);
-			tegra_io_dpd_enable(&csib_io);
 			pr_err("%s failed.\n", __func__);
 		} else {
 			pw->state = SWITCH_ON;
@@ -353,9 +338,6 @@ imx214_ext_reg2_fail:
 		gpio_set_value(pw->af_gpio, 0);
 
 imx214_ext_reg1_fail:
-	tegra_io_dpd_enable(&csia_io);
-	tegra_io_dpd_enable(&csib_io);
-
 	pr_err("%s failed.\n", __func__);
 	return -ENODEV;
 }
@@ -398,10 +380,6 @@ static int imx214_power_off(struct camera_common_data *s_data)
 		regulator_disable(pw->ext_reg2);
 
 power_off_done:
-	/* put CSIA/B IOs into DPD mode to save additional power for ardbeg */
-	tegra_io_dpd_enable(&csia_io);
-	tegra_io_dpd_enable(&csib_io);
-
 	pw->state = SWITCH_OFF;
 	return 0;
 }
@@ -603,21 +581,23 @@ static struct camera_common_sensor_ops imx214_common_ops = {
 	.read_reg = imx214_read_reg,
 };
 
-static int imx214_set_group_hold(struct imx214 *priv, s32 val)
+static int imx214_set_group_hold(struct imx214 *priv)
 {
 	int err;
-	int gh_en = switch_ctrl_qmenu[val];
+	int gh_prev = switch_ctrl_qmenu[priv->group_hold_prev];
 
-	if (gh_en == SWITCH_ON) {
+	if (priv->group_hold_en == true && gh_prev == SWITCH_OFF) {
 		err = imx214_write_reg(priv->s_data,
 				       IMX214_GROUP_HOLD_ADDR, 0x1);
 		if (err)
 			goto fail;
-	} else if (gh_en == SWITCH_OFF) {
+		priv->group_hold_prev = 1;
+	} else if (priv->group_hold_en == false && gh_prev == SWITCH_ON) {
 		err = imx214_write_reg(priv->s_data,
 				       IMX214_GROUP_HOLD_ADDR, 0x0);
 		if (err)
 			goto fail;
+		priv->group_hold_prev = 0;
 	}
 
 	return 0;
@@ -661,8 +641,9 @@ static int imx214_set_gain(struct imx214 *priv, s32 val)
 	dev_dbg(&priv->i2c_client->dev,
 		 "%s: val: %d\n", __func__, gain);
 
-	imx214_get_gain_reg(reg_list, gain);
+	imx214_get_gain_regs(reg_list, gain);
 	imx214_get_gain_short_reg(reg_list_short, gain);
+	imx214_set_group_hold(priv);
 
 	/* writing long gain */
 	for (i = 0; i < 2; i++) {
@@ -700,6 +681,7 @@ static int imx214_set_frame_length(struct imx214 *priv, s32 val)
 		 "%s: val: %d\n", __func__, frame_length);
 
 	imx214_get_frame_length_regs(reg_list, frame_length);
+	imx214_set_group_hold(priv);
 
 	for (i = 0; i < 2; i++) {
 		err = imx214_write_reg(priv->s_data, reg_list[i].addr,
@@ -729,6 +711,7 @@ static int imx214_set_coarse_time(struct imx214 *priv, s32 val)
 		 "%s: val: %d\n", __func__, coarse_time);
 
 	imx214_get_coarse_time_regs(reg_list, coarse_time);
+	imx214_set_group_hold(priv);
 
 	for (i = 0; i < 2; i++) {
 		err = imx214_write_reg(priv->s_data, reg_list[i].addr,
@@ -757,7 +740,7 @@ static int imx214_set_coarse_time_short(struct imx214 *priv, s32 val)
 	/* check hdr enable ctrl */
 	hdr_control.id = V4L2_CID_HDR_EN;
 
-	err = v4l2_g_ctrl(&priv->ctrl_handler, &hdr_control);
+	err = camera_common_g_ctrl(priv->s_data, &hdr_control);
 	if (err < 0) {
 		dev_err(&priv->i2c_client->dev,
 			"could not find device ctrl.\n");
@@ -774,6 +757,7 @@ static int imx214_set_coarse_time_short(struct imx214 *priv, s32 val)
 		 "%s: val: %d\n", __func__, coarse_time_short);
 
 	imx214_get_coarse_time_short_regs(reg_list, coarse_time_short);
+	imx214_set_group_hold(priv);
 
 	for (i = 0; i < 2; i++) {
 		err  = imx214_write_reg(priv->s_data, reg_list[i].addr,
@@ -813,6 +797,14 @@ static int imx214_eeprom_device_init(struct imx214 *priv)
 	};
 	int i;
 	int err;
+	struct v4l2_ctrl *ctrl;
+
+	ctrl = v4l2_ctrl_find(&priv->ctrl_handler, V4L2_CID_EEPROM_DATA);
+	if (!ctrl) {
+		dev_err(&priv->i2c_client->dev,
+			"could not find device ctrl.\n");
+		return -EINVAL;
+	}
 
 	for (i = 0; i < IMX214_EEPROM_NUM_BLOCKS; i++) {
 		priv->eeprom[i].adap = i2c_get_adapter(
@@ -829,6 +821,7 @@ static int imx214_eeprom_device_init(struct imx214 *priv)
 		if (IS_ERR(priv->eeprom[i].regmap)) {
 			err = PTR_ERR(priv->eeprom[i].regmap);
 			imx214_eeprom_device_release(priv);
+			ctrl->flags = V4L2_CTRL_FLAG_DISABLED;
 			return err;
 		}
 	}
@@ -1041,7 +1034,12 @@ static int imx214_s_ctrl(struct v4l2_ctrl *ctrl)
 		err = imx214_set_coarse_time_short(priv, ctrl->val);
 		break;
 	case V4L2_CID_GROUP_HOLD:
-		err = imx214_set_group_hold(priv, ctrl->val);
+		if (switch_ctrl_qmenu[ctrl->val] == SWITCH_ON) {
+			priv->group_hold_en = true;
+		} else {
+			priv->group_hold_en = false;
+			err = imx214_set_group_hold(priv);
+		}
 		break;
 	case V4L2_CID_EEPROM_DATA:
 		if (!ctrl->string[0])
@@ -1064,16 +1062,16 @@ static int imx214_ctrls_init(struct imx214 *priv)
 {
 	struct i2c_client *client = priv->i2c_client;
 	struct v4l2_ctrl *ctrl;
-	int num_ctrls;
+	int numctrls;
 	int err;
 	int i;
 
 	dev_dbg(&client->dev, "%s++\n", __func__);
 
-	num_ctrls = ARRAY_SIZE(ctrl_config_list);
-	v4l2_ctrl_handler_init(&priv->ctrl_handler, num_ctrls);
+	numctrls = ARRAY_SIZE(ctrl_config_list);
+	v4l2_ctrl_handler_init(&priv->ctrl_handler, numctrls);
 
-	for (i = 0; i < num_ctrls; i++) {
+	for (i = 0; i < numctrls; i++) {
 		ctrl = v4l2_ctrl_new_custom(&priv->ctrl_handler,
 			&ctrl_config_list[i], NULL);
 		if (ctrl == NULL) {
@@ -1095,7 +1093,7 @@ static int imx214_ctrls_init(struct imx214 *priv)
 		priv->ctrls[i] = ctrl;
 	}
 
-	priv->num_ctrls = num_ctrls;
+	priv->numctrls = numctrls;
 	priv->subdev->ctrl_handler = &priv->ctrl_handler;
 	if (priv->ctrl_handler.error) {
 		dev_err(&client->dev, "Error %d adding controls\n",
@@ -1175,6 +1173,8 @@ static int imx214_probe(struct i2c_client *client,
 {
 	struct camera_common_data *common_data;
 	struct imx214 *priv;
+	struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
+	struct tegra_camera_platform_data *imx214_camera_data;
 	int err;
 
 	pr_info("[IMX214]: probing v4l2 sensor.\n");
@@ -1202,13 +1202,21 @@ static int imx214_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 
+	ssdd = soc_camera_i2c_to_desc(client);
+	imx214_camera_data = (struct tegra_camera_platform_data *)
+			     ssdd->drv_priv;
+	if (!imx214_camera_data) {
+		dev_err(&client->dev, "unable to find iclink module name\n");
+		return -EFAULT;
+	}
+
 	client->dev.of_node = of_find_node_by_name(NULL, "imx214");
 
 	if (client->dev.of_node)
 		priv->pdata = imx214_parse_dt(client);
-	else
-		priv->pdata = (struct camera_common_pdata *)
-				client->dev.platform_data;
+	else {
+		priv->pdata = ssdd->dev_priv;
+	}
 
 	if (!priv->pdata) {
 		dev_err(&client->dev, "unable to get platform data\n");
@@ -1221,14 +1229,18 @@ static int imx214_probe(struct i2c_client *client,
 	common_data->frmfmt		= &imx214_frmfmt[0];
 	common_data->colorfmt		= camera_common_find_datafmt(
 					  IMX214_DEFAULT_DATAFMT);
+	common_data->ctrls		= priv->ctrls;
 	common_data->power		= &priv->power;
 	common_data->priv		= (void *)priv;
 	common_data->ident		= V4L2_IDENT_IMX214;
+	common_data->numctrls		= ARRAY_SIZE(ctrl_config_list);
 	common_data->numfmts		= ARRAY_SIZE(imx214_frmfmt);
 	common_data->def_mode		= IMX214_DEFAULT_MODE;
 	common_data->def_width		= IMX214_DEFAULT_WIDTH;
 	common_data->def_height		= IMX214_DEFAULT_HEIGHT;
 	common_data->def_clk_freq	= IMX214_DEFAULT_CLK_FREQ;
+	common_data->csi_port		= (int)imx214_camera_data->port;
+	common_data->numlanes		= imx214_camera_data->lanes;
 
 	priv->i2c_client		= client;
 	priv->s_data			= common_data;
@@ -1293,5 +1305,6 @@ static struct i2c_driver imx214_i2c_driver = {
 module_i2c_driver(imx214_i2c_driver);
 
 MODULE_DESCRIPTION("SoC Camera driver for Sony IMX214");
-MODULE_AUTHOR("Bryan Wu <pengw@nvidia.com>");
+MODULE_AUTHOR("David Wang <davidw@nvidia.com>");
 MODULE_LICENSE("GPL v2");
+

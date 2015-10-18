@@ -30,7 +30,6 @@
 #include <linux/kernel.h>
 #include <linux/debugfs.h>
 
-#include <media/tegra_v4l2_camera.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-ctrls.h>
@@ -91,6 +90,8 @@ struct camera_common_pdata {
 	int (*power_on)(struct camera_common_power_rail *pw);
 	int (*power_off)(struct camera_common_power_rail *pw);
 	struct camera_common_regulators regulators;
+	bool use_cam_gpio;
+	bool has_eeprom;
 };
 
 struct camera_common_eeprom_data {
@@ -160,7 +161,8 @@ struct camera_common_data {
 	void	*priv;
 	int	ident;
 	int	numctrls;
-	bool	csi_io[TEGRA_CAMERA_NUM_CSI_PORT];
+	int csi_port;
+	int numlanes;
 	int	mode;
 	int	numfmts;
 	int	def_mode, def_width, def_height;
