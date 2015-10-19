@@ -161,14 +161,6 @@ static bool tegra_agic_suspended;
 static int gic_notifier(struct notifier_block *, unsigned long, void *);
 #endif
 
-int tegra_agic_irq_get_virq(int irq)
-{
-	BUG_ON(!tegra_agic);
-
-	return irq_create_mapping(tegra_agic->domain, irq);
-}
-EXPORT_SYMBOL_GPL(tegra_agic_irq_get_virq);
-
 bool tegra_agic_irq_is_pending(int irq)
 {
 	int value;
