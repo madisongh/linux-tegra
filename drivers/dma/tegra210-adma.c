@@ -37,7 +37,6 @@
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <linux/clk/tegra.h>
-#include <linux/irqchip/tegra-agic.h>
 #include <linux/tegra_pm_domains.h>
 #include <linux/tegra-soc.h>
 
@@ -1330,8 +1329,7 @@ static int tegra_adma_probe(struct platform_device *pdev)
 
 		tdc->irq = res->start;
 		snprintf(tdc->name, sizeof(tdc->name), "adma.%d", i);
-		ret = devm_request_irq(&pdev->dev,
-				tegra_agic_irq_get_virq(tdc->irq),
+		ret = devm_request_irq(&pdev->dev, tdc->irq,
 				tegra_adma_isr, 0, tdc->name, tdc);
 		if (ret) {
 			dev_err(&pdev->dev,
