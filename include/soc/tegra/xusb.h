@@ -60,6 +60,8 @@ int tegra_phy_xusb_disable_sleepwalk(struct phy *phy);
 int tegra_phy_xusb_enable_wake(struct phy *phy);
 int tegra_phy_xusb_disable_wake(struct phy *phy);
 
+int tegra_phy_xusb_pretend_connected(struct phy *phy);
+
 /* tegra_phy_xusb_remote_wake_detected()
  *   check if a XUSB phy has detected remote wake.
  *   return values:

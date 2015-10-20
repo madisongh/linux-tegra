@@ -1258,6 +1258,7 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	struct tegra_xhci_fw_cfgtbl *cfg_tbl;
 	struct tegra_xusb_mbox_msg msg;
 	int ret;
+	int i;
 
 	if (!fw) {
 		dev_warn(dev, "can't find firmware\n");
@@ -1322,6 +1323,10 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	tegra->fw_loaded = true;
 
 	tegra_xhci_update_otg_role(tegra);
+
+	/* set pretend connected per HSIC PHY DTB */
+	for (i = 0; i < tegra->soc_config->num_phys[HSIC_PHY]; i++)
+		tegra_phy_xusb_pretend_connected(tegra->phys[HSIC_PHY][i]);
 
 	release_firmware(fw);
 
