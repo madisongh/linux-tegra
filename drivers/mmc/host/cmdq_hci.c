@@ -444,13 +444,15 @@ static void cmdq_prep_dcmd_desc(struct mmc_host *mmc,
 	u8 *desc;
 	__le64 *dataddr;
 	struct cmdq_host *cq_host = mmc_cmdq_private(mmc);
+	int r1b = 0;
 
 	if (!(mrq->cmd->flags & MMC_RSP_PRESENT)) {
 		resp_type = 0;
-	} else if (mrq->cmd->flags & (MMC_RSP_R1 | MMC_RSP_R4 | MMC_RSP_R5)) {
-		resp_type = 2;
 	} else if (mrq->cmd->flags & MMC_RSP_R1B) {
 		resp_type = 3;
+		r1b = 1;
+	} else if (mrq->cmd->flags & (MMC_RSP_R1 | MMC_RSP_R4 | MMC_RSP_R5)) {
+		resp_type = 2;
 	} else {
 		pr_err("%s: weird response: 0x%x\n", mmc_hostname(mmc),
 			mrq->cmd->flags);
@@ -462,10 +464,10 @@ static void cmdq_prep_dcmd_desc(struct mmc_host *mmc,
 	data |= (VALID(1) |
 		 END(1) |
 		 INT(1) |
-		 QBAR(1) |
+		 QBAR(r1b) |
 		 ACT(0x5) |
 		 CMD_INDEX(mrq->cmd->opcode) |
-		 CMD_TIMING(0) | RESP_TYPE(resp_type));
+		 CMD_TIMING(r1b) | RESP_TYPE(resp_type));
 	*task_desc |= data;
 	desc = (u8 *)task_desc;
 
@@ -473,7 +475,7 @@ static void cmdq_prep_dcmd_desc(struct mmc_host *mmc,
 	dataddr[0] = cpu_to_le64((u64)mrq->cmd->arg);
 
 	if (cq_host->ops->set_data_timeout)
-		cq_host->ops->set_data_timeout(mmc, 0xf);
+		cq_host->ops->set_data_timeout(mmc, 0xe);
 }
 
 static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
@@ -522,7 +524,7 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		cq_host->ops->set_tranfer_params(mmc);
 
 	if (cq_host->ops->set_data_timeout)
-		cq_host->ops->set_data_timeout(mmc, 0xf);
+		cq_host->ops->set_data_timeout(mmc, 0xe);
 
 	cmdq_writel(cq_host, 1 << tag, CQTDBR);
 	spin_unlock_irqrestore(&cq_host->cmdq_lock, flags);
@@ -542,7 +544,7 @@ static void cmdq_finish_data(struct mmc_host *mmc, unsigned int tag)
 
 irqreturn_t cmdq_irq(struct mmc_host *mmc, u32 intmask)
 {
-	u32 status;
+	u32 status, cqtdbr, cqtcn;
 	unsigned long tag = 0, comp_status;
 	struct cmdq_host *cq_host = (struct cmdq_host *)mmc_cmdq_private(mmc);
 
@@ -550,6 +552,9 @@ irqreturn_t cmdq_irq(struct mmc_host *mmc, u32 intmask)
 
 	status = cmdq_readl(cq_host, CQIS);
 	cmdq_writel(cq_host, status, CQIS);
+
+	cqtcn = cmdq_readl(cq_host, CQTCN);
+	cqtdbr = cmdq_readl(cq_host, CQTDBR);
 	pr_debug("%s: %s: CQIS: %x, intmask: %x\n", mmc_hostname(mmc),
 			__func__, status, intmask);
 
@@ -561,7 +566,7 @@ irqreturn_t cmdq_irq(struct mmc_host *mmc, u32 intmask)
 		complete(&cq_host->halt_comp);
 	} else if (status & CQIS_TCC) {
 		/* read QCTCN and complete the request */
-		comp_status = cmdq_readl(cq_host, CQTCN);
+		comp_status = cqtcn & ~cqtdbr;
 		if (!comp_status)
 			pr_debug("%s: bogus comp-stat\n", __func__);
 
@@ -767,6 +772,13 @@ int cmdq_init(struct cmdq_host *cq_host, struct mmc_host *mmc,
 		cq_host->quirks |= CMDQ_QUIRK_SHORT_TXFR_DESC_SZ;
 
 	cq_host->caps |= CMDQ_TASK_DESC_SZ_128;
+
+	/* Set mmc caps */
+	/*
+	 * Fix me: Add option to disable QBR support through platform data or
+	 * quirks.
+	 */
+	mmc->caps2 |= MMC_CAP2_CMDQ_QBR;
 
 	mmc->cmdq_ops = &cmdq_host_ops;
 
