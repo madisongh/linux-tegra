@@ -1981,7 +1981,7 @@ static int tegra_xhci_powergate(struct tegra_xhci_hcd *tegra, bool runtime)
 	}
 
 	/* Power off XUSB_HOST partition. */
-	tegra_powergate_partition_with_clk_off(TEGRA_POWERGATE_XUSBC);
+	ret = tegra_powergate_partition_with_clk_off(TEGRA_POWERGATE_XUSBC);
 	if (ret) {
 		dev_warn(dev, "failed to powergate Host partition %d\n", ret);
 		goto unlock;
@@ -2024,7 +2024,7 @@ static int tegra_xhci_unpowergate(struct tegra_xhci_hcd *tegra)
 	/* Power on XUSB_SS partition. */
 	ret = tegra_unpowergate_partition_with_clk_on(TEGRA_POWERGATE_XUSBA);
 	if (ret < 0) {
-		dev_warn(dev, "failed to unpowergate Host partition %d\n", ret);
+		dev_warn(dev, "failed to unpowergate SS partition %d\n", ret);
 		goto unlock;
 	}
 
