@@ -673,8 +673,7 @@ static unsigned int tegra_spi_copy_spi_rxbuf_to_client_rxbuf(
 		tspi->dma_buf_size, DMA_FROM_DEVICE);
 
 	dma_bytes = tspi->words_to_transfer * tspi->bytes_per_word;
-	npackets = fifo_bytes_to_packets(tspi, dma_bytes);
-	npackets = min(npackets, tspi->words_to_transfer);
+	npackets = tspi->words_to_transfer;
 	if (tspi->is_packed) {
 		memcpy(t->rx_buf, tspi->rx_dma_buf, dma_bytes);
 	} else {
@@ -1590,9 +1589,9 @@ static int tegra_spi_handle_message(struct tegra_spi_data *tspi,
 	if (tspi->cur_direction & DATA_DIR_TX) {
 		tspi->curr_pos += tspi->words_to_transfer * tspi->bytes_per_word;
 		tspi->rem_len -= tspi->curr_pos;
-	} else {
-		tspi->curr_pos = tspi->curr_rx_pos;
 	}
+	if (tspi->cur_direction & DATA_DIR_RX)
+		tspi->curr_pos = tspi->curr_rx_pos;
 
 	if (tspi->curr_pos == xfer->len ||
 				(IS_SPI_CS_INACTIVE(tspi->status_reg) &&
