@@ -2049,6 +2049,9 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 	tegra_hdmi_controller_enable(hdmi);
 
 	hdmi->enabled = true;
+
+	tegra_hdmi_setup_hda_presence();
+
 #ifdef CONFIG_SWITCH
 	if (!hdmi->dvi)
 		switch_set_state(&hdmi->audio_switch, 1);
