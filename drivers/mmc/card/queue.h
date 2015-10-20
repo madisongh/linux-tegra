@@ -48,6 +48,7 @@ struct mmc_queue_req {
 struct mmc_queue {
 	struct mmc_card		*card;
 	struct task_struct	*thread;
+	struct task_struct	*cq_thread;
 	struct semaphore	thread_sem;
 	unsigned int		flags;
 #define MMC_QUEUE_SUSPENDED	(1 << 0)

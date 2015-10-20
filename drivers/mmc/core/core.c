@@ -338,6 +338,20 @@ static void mmc_start_cmdq_request(struct mmc_host *host,
 	host->cmdq_ops->request(host, mrq);
 }
 
+/*
+ * Check if the host can support QBR to handle order between requests
+ * where required. If not, block driver should not issue any new cmds
+ * while a dcmd is in progress.
+ */
+int mmc_cmdq_support_qbr(struct mmc_host *host)
+{
+	if (host->caps2 & MMC_CAP2_CMDQ_QBR)
+		return 1;
+	else
+		return 0;
+}
+EXPORT_SYMBOL(mmc_cmdq_support_qbr);
+
 /**
  *	mmc_start_bkops - start BKOPS for supported cards
  *	@card: MMC card to start BKOPS

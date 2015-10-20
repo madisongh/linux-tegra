@@ -172,6 +172,7 @@ extern int mmc_cmdq_halt(struct mmc_host *host, bool enable);
 extern void mmc_cmdq_post_req(struct mmc_host *host, struct mmc_request *mrq,
 		int err);
 extern int mmc_cmdq_discard(struct mmc_host *host, u32 tag, bool all);
+extern int mmc_cmdq_support_qbr(struct mmc_host *host);
 
 #define MMC_ERASE_ARG		0x00000000
 #define MMC_SECURE_ERASE_ARG	0x80000000

@@ -24,6 +24,56 @@
 
 #define MMC_QUEUE_BOUNCESZ	65536
 
+static inline bool mmc_cmdq_should_pull_reqs(struct mmc_host *host,
+			struct mmc_cmdq_context_info *ctx);
+
+static int mmc_cmdq_thread(void *d)
+{
+	struct mmc_queue *mq = d;
+	struct request_queue *q = mq->queue;
+	struct mmc_card *card = mq->card;
+	struct mmc_host *host = card->host;
+	struct mmc_cmdq_context_info *ctx = &host->cmdq_ctx;
+	struct request *req;
+
+	down(&mq->thread_sem);
+	do {
+		spin_lock_irq(q->queue_lock);
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (!mmc_cmdq_should_pull_reqs(host, ctx)) {
+			test_and_set_bit(0, &ctx->req_starved);
+			spin_unlock_irq(q->queue_lock);
+			continue;
+		}
+
+		req = blk_peek_request(q);
+		if (!req) {
+			if (kthread_should_stop()) {
+				set_current_state(TASK_RUNNING);
+				break;
+			}
+			spin_unlock_irq(q->queue_lock);
+			up(&mq->thread_sem);
+			schedule();
+			down(&mq->thread_sem);
+			continue;
+		}
+
+		if (blk_queue_start_tag(q, req)) {
+			test_and_set_bit(0, &ctx->req_starved);
+			spin_unlock_irq(q->queue_lock);
+			continue;
+		}
+
+		spin_unlock_irq(q->queue_lock);
+		set_current_state(TASK_RUNNING);
+		mq->cmdq_issue_fn(mq, req);
+	} while (1);
+
+	up(&mq->thread_sem);
+	return 0;
+}
+
 /*
  * Prepare a MMC request. This just filters out odd stuff.
  */
@@ -111,8 +161,13 @@ static int mmc_queue_thread(void *d)
 static inline bool mmc_cmdq_should_pull_reqs(struct mmc_host *host,
 			struct mmc_cmdq_context_info *ctx)
 {
+	int blocking_dcmd = 1;
+
+	if (mmc_cmdq_support_qbr(host))
+		blocking_dcmd = 0;
+
 	spin_lock_bh(&ctx->cmdq_ctx_lock);
-	if (ctx->active_dcmd || ctx->rpmb_in_wait) {
+	if ((blocking_dcmd && ctx->active_dcmd) || ctx->rpmb_in_wait) {
 		if ((ctx->curr_state != CMDQ_STATE_HALT) ||
 			(ctx->curr_state != CMDQ_STATE_ERR)) {
 			pr_debug("%s: %s: skip pulling reqs: dcmd: %d rpmb: %d state: %d\n",
@@ -129,31 +184,9 @@ static inline bool mmc_cmdq_should_pull_reqs(struct mmc_host *host,
 
 static void mmc_cmdq_dispatch_req(struct request_queue *q)
 {
-	struct request *req;
 	struct mmc_queue *mq = q->queuedata;
-	struct mmc_card *card = mq->card;
-	struct mmc_host *host = card->host;
-	struct mmc_cmdq_context_info *ctx = &host->cmdq_ctx;
 
-	while (1) {
-		if (!mmc_cmdq_should_pull_reqs(host, ctx)) {
-			test_and_set_bit(0, &ctx->req_starved);
-			return;
-		}
-
-		req = blk_peek_request(q);
-		if (!req)
-			return;
-
-		if (blk_queue_start_tag(q, req)) {
-			test_and_set_bit(0, &ctx->req_starved);
-			return;
-		}
-
-		spin_unlock_irq(q->queue_lock);
-		mq->cmdq_issue_fn(mq, req);
-		spin_lock_irq(q->queue_lock);
-	}
+	wake_up_process(mq->cq_thread);
 }
 
 /*
@@ -289,6 +322,15 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 			blk_cleanup_queue(mq->queue);
 		} else {
 			mq->queue->queuedata = mq;
+			sema_init(&mq->thread_sem, 1);
+			mq->cq_thread = kthread_run(mmc_cmdq_thread, mq,
+				"mmc_cmdq_d/%d%s", host->index,
+				subname ? subname : "");
+			if (IS_ERR(mq->cq_thread)) {
+				ret = PTR_ERR(mq->cq_thread);
+				pr_err("%s: %d: cmdq: unable to create thread\n",
+						mmc_hostname(card->host), ret);
+			}
 			return ret;
 		}
 	}
