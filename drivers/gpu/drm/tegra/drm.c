@@ -124,7 +124,8 @@ static int tegra_drm_load(struct drm_device *drm, unsigned long flags)
 	if (!tegra)
 		return -ENOMEM;
 
-	if (iommu_present(&platform_bus_type)) {
+	if (!IS_ENABLED(CONFIG_DRM_TEGRA_DOWNSTREAM) &&
+	    iommu_present(&platform_bus_type)) {
 		struct iommu_domain_geometry *geometry;
 		u64 start, end;
 
@@ -1133,6 +1134,7 @@ static SIMPLE_DEV_PM_OPS(host1x_drm_pm_ops, host1x_drm_suspend,
 			 host1x_drm_resume);
 
 static const struct of_device_id host1x_drm_subdevs[] = {
+#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	{ .compatible = "nvidia,tegra20-dc", },
 	{ .compatible = "nvidia,tegra20-hdmi", },
 	{ .compatible = "nvidia,tegra20-gr2d", },
@@ -1153,6 +1155,7 @@ static const struct of_device_id host1x_drm_subdevs[] = {
 	{ .compatible = "nvidia,tegra210-dsi", },
 	{ .compatible = "nvidia,tegra210-sor", },
 	{ .compatible = "nvidia,tegra210-sor1", },
+#endif
 	{ /* sentinel */ }
 };
 

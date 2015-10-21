@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2013 Avionic Design GmbH
- * Copyright (C) 2013 NVIDIA Corporation
+ * Copyright (C) 2013-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -281,6 +281,7 @@ static int gr3d_probe(struct platform_device *pdev)
 		}
 	}
 
+#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_3D, gr3d->clk,
 						gr3d->rst);
 	if (err < 0) {
@@ -298,6 +299,7 @@ static int gr3d_probe(struct platform_device *pdev)
 			return err;
 		}
 	}
+#endif
 
 	INIT_LIST_HEAD(&gr3d->client.base.list);
 	gr3d->client.base.ops = &gr3d_client_ops;
@@ -337,6 +339,7 @@ static int gr3d_remove(struct platform_device *pdev)
 		return err;
 	}
 
+#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	if (gr3d->clk_secondary) {
 		tegra_powergate_power_off(TEGRA_POWERGATE_3D1);
 		clk_disable_unprepare(gr3d->clk_secondary);
@@ -344,6 +347,7 @@ static int gr3d_remove(struct platform_device *pdev)
 
 	tegra_powergate_power_off(TEGRA_POWERGATE_3D);
 	clk_disable_unprepare(gr3d->clk);
+#endif
 
 	return 0;
 }
