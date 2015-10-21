@@ -836,7 +836,7 @@ static inline int tegra_spi_ext_clk_enable(bool enable,
 		if (enable)
 			misc_reg |= SPI_MISC_EXT_CLK_EN;
 		else
-			misc_reg &= SPI_MISC_EXT_CLK_EN;
+			misc_reg &= (~SPI_MISC_EXT_CLK_EN);
 
 		tegra_spi_writel(tspi, misc_reg, SPI_MISC_REG);
 	} else {
