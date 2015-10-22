@@ -146,6 +146,9 @@ static int host1x_probe(struct platform_device *pdev)
 	host->dev = &pdev->dev;
 	host->info = id->data;
 
+	pdev->dev.dma_parms = &host->dma_parms;
+	dma_set_max_seg_size(&pdev->dev, UINT_MAX);
+
 	/* set common host1x device data */
 	platform_set_drvdata(pdev, host);
 
