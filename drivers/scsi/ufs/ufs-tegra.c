@@ -868,6 +868,78 @@ out:
 }
 
 
+static int ufs_tegra_pwr_change_notify(struct ufs_hba *hba,
+		enum ufs_notify_change_status status,
+		struct ufs_pa_layer_attr *dev_max_params,
+		struct ufs_pa_layer_attr *dev_req_params)
+{
+	struct ufs_tegra_host *ufs_tegra = hba->priv;
+	int ret = 0;
+
+	if (!dev_req_params) {
+		pr_err("%s: incoming dev_req_params is NULL\n", __func__);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	switch (status) {
+	case PRE_CHANGE:
+		memcpy(dev_req_params, dev_max_params,
+			sizeof(struct ufs_pa_layer_attr));
+		if ((ufs_tegra->enable_hs_mode) && (dev_max_params->hs_rate)) {
+			if (ufs_tegra->max_hs_gear) {
+				if (dev_max_params->gear_rx >
+						ufs_tegra->max_hs_gear)
+					dev_req_params->gear_rx =
+						ufs_tegra->max_hs_gear;
+				if (dev_max_params->gear_tx >
+						ufs_tegra->max_hs_gear)
+					dev_req_params->gear_tx =
+						ufs_tegra->max_hs_gear;
+			} else {
+				dev_req_params->gear_rx = UFS_HS_G1;
+				dev_req_params->gear_tx = UFS_HS_G1;
+			}
+			if (ufs_tegra->mask_fast_auto_mode) {
+				dev_req_params->pwr_rx = FAST_MODE;
+				dev_req_params->pwr_tx = FAST_MODE;
+			}
+			if (ufs_tegra->mask_hs_mode_b)
+				dev_req_params->hs_rate = PA_HS_MODE_A;
+		} else {
+			if (ufs_tegra->max_pwm_gear) {
+				ufshcd_dme_get(hba,
+					UIC_ARG_MIB(PA_MAXRXPWMGEAR),
+					&dev_req_params->gear_rx);
+				ufshcd_dme_peer_get(hba,
+					UIC_ARG_MIB(PA_MAXRXPWMGEAR),
+					&dev_req_params->gear_tx);
+				if (dev_req_params->gear_rx >
+						ufs_tegra->max_pwm_gear)
+					dev_req_params->gear_rx =
+						ufs_tegra->max_pwm_gear;
+				if (dev_req_params->gear_tx >
+						ufs_tegra->max_pwm_gear)
+					dev_req_params->gear_tx =
+						ufs_tegra->max_pwm_gear;
+			} else {
+				dev_req_params->gear_rx = UFS_PWM_G1;
+				dev_req_params->gear_tx = UFS_PWM_G1;
+			}
+			dev_req_params->pwr_rx = SLOWAUTO_MODE;
+			dev_req_params->pwr_tx = SLOWAUTO_MODE;
+			dev_req_params->hs_rate = 0;
+		}
+		break;
+	case POST_CHANGE:
+		break;
+	default:
+		break;
+	}
+out:
+	return ret;
+}
+
 static void ufs_tegra_unipro_post_linkup(struct ufs_hba *hba)
 {
 	/* set cport connection status = 1 */
@@ -944,6 +1016,19 @@ static void ufs_tegra_config_soc_data(struct ufs_tegra_host *ufs_tegra)
 
 	ufs_tegra->x2config =
 		of_property_read_bool(np, "nvidia,enable-x2-config");
+
+	ufs_tegra->enable_hs_mode =
+		of_property_read_bool(np, "nvidia,enable-hs-mode");
+
+	ufs_tegra->mask_fast_auto_mode =
+		of_property_read_bool(np, "nvidia,mask-fast-auto-mode");
+
+	ufs_tegra->mask_hs_mode_b =
+		of_property_read_bool(np, "nvidia,mask-hs-mode-b");
+
+	of_property_read_u32(np, "nvidia,max-hs-gear", &ufs_tegra->max_hs_gear);
+	of_property_read_u32(np, "nvidia,max-pwm-gear",
+					&ufs_tegra->max_pwm_gear);
 
 }
 
@@ -1109,4 +1194,5 @@ struct ufs_hba_variant_ops ufs_hba_tegra_vops = {
 	.suspend		= ufs_tegra_suspend,
 	.resume			= ufs_tegra_resume,
 	.link_startup_notify	= ufs_tegra_link_startup_notify,
+	.pwr_change_notify      = ufs_tegra_pwr_change_notify,
 };

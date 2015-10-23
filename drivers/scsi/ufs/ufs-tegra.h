@@ -244,6 +244,11 @@ struct ufs_tegra_host {
 	bool is_lane_clks_enabled;
 	bool x2config;
 	bool enable_mphy_rx_calib;
+	bool enable_hs_mode;
+	u32 max_hs_gear;
+	bool mask_fast_auto_mode;
+	bool mask_hs_mode_b;
+	u32 max_pwm_gear;
 	enum ufs_state ufshc_state;
 	void *mphy_context;
 	void __iomem *mphy_l0_base;
