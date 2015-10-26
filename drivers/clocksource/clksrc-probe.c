@@ -35,6 +35,8 @@ void __init clocksource_probe(void)
 		if (!of_device_is_available(np))
 			continue;
 
+		of_node_get(np);
+
 		init_func = match->data;
 		init_func(np);
 		clocksources++;
