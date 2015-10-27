@@ -337,6 +337,7 @@ static struct {
 } tegra_gk20a_clocks[] = {
 	{"PLLG_ref", UINT_MAX},
 	{"pwr", 204000000},
+	{"gpu.sclk", UINT_MAX},
 	{"emc", UINT_MAX} };
 
 /*
@@ -352,6 +353,8 @@ static int gk20a_tegra_get_clocks(struct platform_device *pdev)
 	char devname[16];
 	int i;
 	int ret = 0;
+
+	BUG_ON(GK20A_CLKS_MAX < ARRAY_SIZE(tegra_gk20a_clocks));
 
 	snprintf(devname, sizeof(devname),
 		 (pdev->id <= 0) ? "tegra_%s" : "tegra_%s.%d\n",

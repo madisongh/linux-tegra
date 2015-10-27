@@ -9605,6 +9605,7 @@ static struct clk tegra_list_clks[] = {
 	SHARED_SCLK("cap.vcore.sclk", "cap.vcore.sclk",	NULL,	&tegra_clk_sbus_cmplx, NULL, 0, SHARED_CEILING, 0),
 	SHARED_SCLK("cap.throttle.sclk", "cap_throttle", NULL,	&tegra_clk_sbus_cmplx, NULL, 0, SHARED_CEILING, 0),
 	SHARED_SCLK("floor.sclk", "floor_sclk",		NULL,	&tegra_clk_sbus_cmplx, NULL, 0, 0, 0),
+	SHARED_SCLK("gpu.sclk", "tegra_gpu.0",		NULL,	&tegra_clk_sbus_cmplx, NULL, 0, 0, TEGRA210_CLK_ID_GBUS_GM20B_USER),
 	SHARED_SCLK("override.sclk", "override_sclk",	NULL,   &tegra_clk_sbus_cmplx, NULL, 0, SHARED_OVERRIDE, 0),
 	SHARED_SCLK("sbc1.sclk", "7000d400.spi",	"sclk", &tegra_clk_apb,        NULL, 0, 0, TEGRA210_CLK_ID_SBUS_SBC1_USER),
 	SHARED_SCLK("sbc2.sclk", "7000d600.spi",	"sclk", &tegra_clk_apb,        NULL, 0, 0, TEGRA210_CLK_ID_SBUS_SBC2_USER),

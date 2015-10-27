@@ -22,6 +22,8 @@
 #include <linux/pm_domain.h>
 #include <linux/dma-attrs.h>
 
+#define GK20A_CLKS_MAX		4
+
 struct gk20a;
 struct channel_gk20a;
 struct gr_ctx_buffer_desc;
@@ -55,7 +57,7 @@ struct gk20a_platform {
 
 	/* Clock configuration is stored here. Platform probe is responsible
 	 * for filling this data. */
-	struct clk *clk[3];
+	struct clk *clk[GK20A_CLKS_MAX];
 	int num_clks;
 
 	/* Delay before rail gated */
