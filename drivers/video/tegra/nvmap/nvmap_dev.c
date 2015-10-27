@@ -1573,6 +1573,16 @@ static int nvmap_debug_compress_show(struct seq_file *s, void *unused)
 		if (!n)
 			nvmap_handle_put(h_put);
 	}
+
+	/* if num_non_zero_pages is zero then there will not be
+	 * any compression.
+	 * It avoids divide by zero
+	 */
+	if (!num_non_zero_pages) {
+		seq_puts(s, "No pages to compress\n");
+		goto finish;
+	}
+
 	seq_puts(s, "compression algo: \tlzo\n");
 	seq_printf(s, "uncompressed bytes: \t%lld\n", total_uncompressed_mem);
 	seq_printf(s, "compressed bytes: \t%lld\n", total_compressed_mem);
@@ -1594,6 +1604,7 @@ static int nvmap_debug_compress_show(struct seq_file *s, void *unused)
 	seq_printf(s, "min compress bytes: \t%zu\n", min_clen);
 	seq_printf(s, "max compress bytes: \t%zu\n", max_clen);
 	seq_printf(s, "average compress bytes: \t%d\n", all_clen / num_pages);
+finish:
 	spin_unlock(&dev->handle_lock);
 	return 0;
 }
