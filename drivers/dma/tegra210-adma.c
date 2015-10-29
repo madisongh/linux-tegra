@@ -1212,6 +1212,7 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	struct tegra_adma *tdma;
 	unsigned int nr_channels = 0;
 	unsigned int dma_start_index = 0;
+	unsigned int adma_page = 1;
 	int ret, i;
 
 	const struct tegra_adma_chip_data *cdata = NULL;
@@ -1244,6 +1245,13 @@ static int tegra_adma_probe(struct platform_device *pdev)
 		dma_start_index = 0;
 	}
 
+	ret = of_property_read_u32(pdev->dev.of_node, "adma-page",
+			&adma_page);
+	if (ret) {
+		/* Optional DT property. Assume to be one and continue */
+		adma_page = 1;
+	}
+
 	tdma = devm_kzalloc(&pdev->dev, sizeof(*tdma) + nr_channels *
 			sizeof(struct tegra_adma_chan), GFP_KERNEL);
 	if (!tdma) {
@@ -1269,7 +1277,12 @@ static int tegra_adma_probe(struct platform_device *pdev)
 			return PTR_ERR(tdma->adma_addr[i]);
 	}
 
-	tdma->base_addr = tdma->adma_addr[ADDR1];
+	/* Select Appropriate Base address for T18x */
+#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
+		tdma->base_addr = tdma->adma_addr[adma_page];
+#else
+		tdma->base_addr = tdma->adma_addr[ADDR1];
+#endif
 
 	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
 		tdma->dma_clk = devm_clk_get(&pdev->dev, NULL);
