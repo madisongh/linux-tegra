@@ -35,6 +35,9 @@
 #include <linux/tegra_pm_domains.h>
 #include <soc/tegra/xusb.h>
 
+#include <linux/platform/tegra/emc_bwmgr.h>
+#include <linux/platform/tegra/bwmgr_mc.h>
+
 #include "xhci.h"
 
 #ifdef DEBUG
@@ -272,6 +275,9 @@ struct tegra_xhci_hcd {
 	struct clk *pll_u_480m;
 	struct clk *clk_m;
 	struct clk *pll_e;
+
+	/* bandwidth manager handle */
+	struct tegra_bwmgr_client *bwmgr_handle;
 
 	int num_phys;
 	struct phy **phys[MAX_PHY_TYPES];
@@ -1109,8 +1115,20 @@ static void tegra_xhci_mbox_work(struct work_struct *work)
 			resp.cmd = MBOX_CMD_ACK;
 		break;
 	case MBOX_CMD_SET_BW:
-		resp.cmd = MBOX_CMD_COMPL;
-		/* TODO: Request bandwidth once EMC scaling is supported. */
+		{
+			/* fw sends bw request in MByte/sec, convert to HZ */
+			unsigned long freq_khz;
+
+			freq_khz = bwmgr_bw_to_freq(msg->data << 10);
+			ret = tegra_bwmgr_set_emc(tegra->bwmgr_handle,
+				freq_khz * 1000, TEGRA_BWMGR_SET_EMC_SHARED_BW);
+			if (ret)
+				dev_warn(tegra->dev,
+					"failed to set EMC khz=%lu errno=%d\n",
+					freq_khz, ret);
+
+			resp.cmd = MBOX_CMD_COMPL;
+		}
 		break;
 	default:
 		break;
@@ -1670,6 +1688,14 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		goto put_hcd;
 	}
 
+	tegra->bwmgr_handle = tegra_bwmgr_register(TEGRA_BWMGR_CLIENT_XHCI);
+	if (IS_ERR_OR_NULL(tegra->bwmgr_handle)) {
+		ret = IS_ERR(tegra->bwmgr_handle) ?
+				PTR_ERR(tegra->bwmgr_handle) : -ENODEV;
+		dev_warn(&pdev->dev, "can't register EMC bwmgr (%d)\n", ret);
+		goto put_hcd;
+	}
+
 skip_clocks:
 	tegra->num_supplies = tegra->soc_config->num_supplies;
 	tegra->supplies = devm_kzalloc(&pdev->dev,
@@ -1832,6 +1858,10 @@ put_hcd:
 	usb_put_hcd(hcd);
 	if (tegra_platform_is_fpga())
 		fpga_hacks_partition_reset(pdev, true);
+
+	if (!IS_ERR_OR_NULL(tegra->bwmgr_handle))
+		tegra_bwmgr_unregister(tegra->bwmgr_handle);
+
 	return ret;
 }
 
@@ -1881,6 +1911,10 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	tegra_xhci_clk_disable(tegra);
 	tegra_powergate_partition(partition_id_xusbc);
 	tegra_powergate_partition(partition_id_xusba);
+
+	tegra_bwmgr_set_emc(tegra->bwmgr_handle, 0,
+		TEGRA_BWMGR_SET_EMC_SHARED_BW);
+	tegra_bwmgr_unregister(tegra->bwmgr_handle);
 
 	return 0;
 }
@@ -2070,6 +2104,10 @@ static int tegra_xhci_powergate(struct tegra_xhci_hcd *tegra, bool runtime)
 		tegra->log.dequeue = tegra->log.virt_addr;
 		tegra->log.seq = 0;
 	}
+
+	/* Clear EMC bandwidth request */
+	tegra_bwmgr_set_emc(tegra->bwmgr_handle, 0,
+		TEGRA_BWMGR_SET_EMC_SHARED_BW);
 
 unlock:
 	mutex_unlock(&tegra->lock);
