@@ -503,7 +503,7 @@ static void xhci_clear_port_change_bit(struct xhci_hcd *xhci, u16 wValue,
 			port_change_bit, wIndex, port_status);
 }
 
-static int xhci_get_ports(struct usb_hcd *hcd, __le32 __iomem ***port_array)
+int xhci_get_ports(struct usb_hcd *hcd, __le32 __iomem ***port_array)
 {
 	int max_ports;
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
