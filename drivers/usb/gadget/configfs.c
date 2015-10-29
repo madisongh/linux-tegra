@@ -1536,7 +1536,6 @@ static int android_setup(struct usb_gadget *gadget,
 	unsigned long flags;
 	struct gadget_info *gi = container_of(cdev, struct gadget_info, cdev);
 	int value = -EOPNOTSUPP;
-	struct usb_function_instance *fi;
 
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (!gi->connected) {
@@ -1544,13 +1543,6 @@ static int android_setup(struct usb_gadget *gadget,
 		schedule_work(&gi->work);
 	}
 	spin_unlock_irqrestore(&cdev->lock, flags);
-	list_for_each_entry(fi, &gi->available_func, cfs_list) {
-		if (fi != NULL && fi->f != NULL && fi->f->setup != NULL) {
-			value = fi->f->setup(fi->f, c);
-			if (value >= 0)
-				break;
-		}
-	}
 
 #ifdef CONFIG_USB_CONFIGFS_F_ACC
 	if (value < 0)
