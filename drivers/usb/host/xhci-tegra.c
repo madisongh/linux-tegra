@@ -2223,10 +2223,47 @@ static irqreturn_t tegra_xhci_irq(struct usb_hcd *hcd)
 	return xhci_irq(hcd);
 }
 
+static int tegra_xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
+{
+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+	struct xhci_bus_state *bus_state = &xhci->bus_state[hcd_index(hcd)];
+
+	if (bus_state->resuming_ports) {
+		__le32 __iomem **port_array;
+		int max_ports;
+		u32 portsc;
+		int i;
+
+		max_ports = xhci_get_ports(hcd, &port_array);
+		for (i = 0; i < max_ports; i++) {
+			const char *hub;
+
+			if (hcd->speed == HCD_USB3)
+				hub = "SS";
+			else
+				hub = "HS";
+
+			if (!test_bit(i , &bus_state->resuming_ports))
+				continue;
+
+			portsc = readl(port_array[i]);
+			if (!(portsc & PORT_CONNECT)) {
+				bus_state->resume_done[i] = 0;
+				clear_bit(i, &bus_state->resuming_ports);
+				pr_debug("%s port disconnected, clear %s hub resuming_ports for port %d\n",
+					__func__, hub, i);
+			}
+		}
+	}
+
+	return xhci_hub_status_data(hcd, buf);
+}
+
 static int __init tegra_xhci_init(void)
 {
 	xhci_init_driver(&tegra_xhci_hc_driver, tegra_xhci_setup);
 	tegra_xhci_hc_driver.irq = tegra_xhci_irq;
+	tegra_xhci_hc_driver.hub_status_data = tegra_xhci_hub_status_data;
 	return platform_driver_register(&tegra_xhci_driver);
 }
 module_init(tegra_xhci_init);
