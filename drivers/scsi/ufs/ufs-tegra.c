@@ -689,7 +689,6 @@ void ufs_tegra_ufs_aux_ref_clk_disable(struct ufs_tegra_host *ufs_tegra)
 
 void ufs_tegra_ufs_aux_prog(struct ufs_tegra_host *ufs_tegra)
 {
-	u32 val;
 
 	/*
 	 * Release the reset to UFS device on pin ufs_rst_n
@@ -705,28 +704,13 @@ void ufs_tegra_ufs_aux_prog(struct ufs_tegra_host *ufs_tegra)
 		 * Disable reference clock to Device
 		 */
 		ufs_tegra_ufs_aux_ref_clk_disable(ufs_tegra);
-		/*
-		 * UFSHC clock gating control register programing
-		 */
-		val = 0;
 
 	} else {
 		/*
 		 * Enable reference clock to Device
 		 */
 		ufs_tegra_ufs_aux_ref_clk_enable(ufs_tegra);
-		/*
-		 * UFSHC clock gating control register programing
-		 */
-		val = (UFSHC_CLK_OVR_ON | UFSHC_HCLK_OVR_ON |
-			UFSHC_LP_CLK_T_CLK_OVR_ON | UFSHC_CLK_T_CLK_OVR_ON |
-			UFSHC_CG_SYS_CLK_OVR_ON | UFSHC_TX_SYMBOL_CLK_OVR_ON |
-			UFSHC_RX_SYMBOLCLKSELECTED_CLK_OVR_ON |
-							UFSHC_PCLK_OVR_ON);
 	}
-
-	ufs_aux_writel(ufs_tegra->ufs_aux_base, val,
-				UFSHC_AUX_UFSHC_SW_EN_CLK_SLCG_0);
 }
 
 static void ufs_tegra_context_save(struct ufs_tegra_host *ufs_tegra)
@@ -849,7 +833,6 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 
 	ufs_tegra_ufs_pwrcntrl_update(false);
 	ufs_tegra_ufs_aux_prog(ufs_tegra);
-	ufs_tegra_disable_mphy_slcg(ufs_tegra);
 	ufs_tegra_context_restore(ufs_tegra);
 	ufs_tegra_mphy_tx_advgran(ufs_tegra);
 	ret = ufs_tegra_mphy_receiver_calibration(ufs_tegra);
@@ -874,6 +857,7 @@ static int ufs_tegra_pwr_change_notify(struct ufs_hba *hba,
 		struct ufs_pa_layer_attr *dev_req_params)
 {
 	struct ufs_tegra_host *ufs_tegra = hba->priv;
+	u32 vs_save_config;
 	int ret = 0;
 
 	if (!dev_req_params) {
@@ -884,6 +868,14 @@ static int ufs_tegra_pwr_change_notify(struct ufs_hba *hba,
 
 	switch (status) {
 	case PRE_CHANGE:
+		/* Update VS_DebugSaveConfigTime Tref */
+		ufshcd_dme_get(hba, UIC_ARG_MIB(VS_DEBUGSAVECONFIGTIME),
+			&vs_save_config);
+		vs_save_config &= ~SET_TREF(~0);
+		vs_save_config |= SET_TREF(VS_DEBUGSAVECONFIGTIME_TREF);
+		ufshcd_dme_set(hba, UIC_ARG_MIB(VS_DEBUGSAVECONFIGTIME),
+				vs_save_config);
+
 		memcpy(dev_req_params, dev_max_params,
 			sizeof(struct ufs_pa_layer_attr));
 		if ((ufs_tegra->enable_hs_mode) && (dev_max_params->hs_rate)) {
@@ -949,6 +941,17 @@ static void ufs_tegra_unipro_post_linkup(struct ufs_hba *hba)
 	ufshcd_dme_set(hba, UIC_ARG_MIB(PA_TxHsG1SyncLength), 0x4f);
 	ufshcd_dme_set(hba, UIC_ARG_MIB(PA_TxHsG2SyncLength), 0x4f);
 	ufshcd_dme_set(hba, UIC_ARG_MIB(PA_TxHsG3SyncLength), 0x4f);
+
+	/* Local Timer Value Changes */
+	ufshcd_dme_set(hba, UIC_ARG_MIB(DME_FC0PROTECTIONTIMEOUTVAL), 0x1fff);
+	ufshcd_dme_set(hba, UIC_ARG_MIB(DME_TC0REPLAYTIMEOUTVAL), 0xffff);
+	ufshcd_dme_set(hba, UIC_ARG_MIB(DME_AFC0REQTIMEOUTVAL), 0x7fff);
+
+	/* PEER TIMER values changes - PA_PWRModeUserData */
+	ufshcd_dme_set(hba, UIC_ARG_MIB(PA_PWRMODEUSERDATA0), 0x1fff);
+	ufshcd_dme_set(hba, UIC_ARG_MIB(PA_PWRMODEUSERDATA1), 0xffff);
+	ufshcd_dme_set(hba, UIC_ARG_MIB(PA_PWRMODEUSERDATA2), 0x7fff);
+
 }
 
 static void ufs_tegra_unipro_pre_linkup(struct ufs_hba *hba)
