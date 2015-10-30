@@ -36,8 +36,6 @@
 #include <linux/platform/tegra/isomgr.h>
 #endif
 
-#include <tegra/mc.h>
-
 #include <video/tegra_camera.h>
 
 
