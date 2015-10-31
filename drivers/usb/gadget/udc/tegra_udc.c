@@ -168,9 +168,24 @@ static inline bool vbus_enabled(struct tegra_udc *udc)
 		status = (udc_readl(udc, VBUS_SENSOR_REG_OFFSET)
 						& USB_SYS_VBUS_ASESSION);
 	} else if (udc->support_pmu_vbus) {
-		if (udc->vbus_extcon_dev != NULL &&
+		if (udc->vbus_extcon_dev &&
 			extcon_get_cable_state(udc->vbus_extcon_dev, "USB"))
-			status = true;
+			return true;
+
+		if (udc->aca_nv_extcon_cable &&
+			extcon_get_cable_state_(udc->aca_nv_extcon_dev,
+			udc->aca_nv_extcon_cable->cable_index))
+			return true;
+
+		if (udc->aca_rid_b_ecable &&
+			extcon_get_cable_state_(udc->aca_rid_b_ecable->edev,
+			udc->aca_rid_b_ecable->cable_index))
+			return true;
+
+		if (udc->aca_rid_c_ecable &&
+			extcon_get_cable_state_(udc->aca_rid_c_ecable->edev,
+			udc->aca_rid_c_ecable->cable_index))
+			return true;
 	} else
 		status = (udc_readl(udc, VBUS_WAKEUP_REG_OFFSET)
 						& USB_SYS_VBUS_STATUS);
