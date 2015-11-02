@@ -48,8 +48,7 @@ static inline dma_addr_t get_trans_desc_dma(struct cmdq_host *cq_host, u8 tag)
 {
 	u8 mul = sizeof(u64)/sizeof(dma_addr_t);
 	return cq_host->trans_desc_dma_base +
-		(mul * cq_host->mmc->max_segs * tag *
-		 sizeof(*cq_host->trans_desc_base));
+		(mul * cq_host->mmc->max_segs * tag * cq_host->trans_desc_len);
 }
 
 static inline u64 *get_trans_desc(struct cmdq_host *cq_host, u8 tag)
@@ -58,23 +57,16 @@ static inline u64 *get_trans_desc(struct cmdq_host *cq_host, u8 tag)
 
 	return cq_host->trans_desc_base +
 		(mul * cq_host->mmc->max_segs * tag *
-		 sizeof(*cq_host->trans_desc_base));
+		(cq_host->trans_desc_len / sizeof(*cq_host->trans_desc_base)));
 }
 
 static void setup_trans_desc(struct cmdq_host *cq_host, u8 tag)
 {
 	u64 *link_temp;
-	u64 *trans_desc;
 	dma_addr_t trans_temp;
 
 	link_temp = get_link_desc(cq_host, tag);
-	/*
-	 * Wrong physical address is getting populated with
-	 * get_trans_desc_dma() api. Hence, using virt_to_phys() for
-	 * physical address.
-	 */
-	trans_desc = get_trans_desc(cq_host, tag);
-	trans_temp = virt_to_phys(trans_desc);
+	trans_temp = get_trans_desc_dma(cq_host, tag);
 
 	memset(link_temp, 0, sizeof(*link_temp));
 	if (cq_host->link_desc_len > 1)
@@ -203,8 +195,7 @@ static int cmdq_host_alloc_tdl(struct cmdq_host *cq_host)
 		cq_host->slot_sz * cq_host->num_slots;
 
 	/* FIXME: consider allocating smaller chunks iteratively */
-	cq_host->data_size = (sizeof(*cq_host->trans_desc_base)) *
-		cq_host->trans_desc_len * cq_host->mmc->max_segs *
+	cq_host->data_size = cq_host->trans_desc_len * cq_host->mmc->max_segs *
 		(cq_host->num_slots - 1);
 
 	/*
