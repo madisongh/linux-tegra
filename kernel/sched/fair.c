@@ -8083,7 +8083,7 @@ static inline bool nohz_kick_needed(struct rq *rq)
 	if (time_before(now, nohz.next_balance))
 		return false;
 
-	if (rq->nr_running >= 2)
+	if (rq->nr_running >= 2 || (capacity_aware() && rq->misfit_task))
 		return true;
 
 	rcu_read_lock();
