@@ -344,6 +344,12 @@ static int ufs_tegra_init_mphy_lane_clks(struct ufs_tegra_host *host)
 		&host->mphy_l0_tx_ls_3xbit);
 	if (err)
 		goto out;
+
+	err = ufs_tegra_host_clk_get(dev, "mphy_l0_rx_ls_bit",
+		&host->mphy_l0_rx_ls_bit);
+	if (err)
+		goto out;
+
 	if (host->x2config)
 		err = ufs_tegra_host_clk_get(dev, "mphy_l1_rx_ana",
 			&host->mphy_l1_rx_ana);
@@ -434,23 +440,23 @@ static int ufs_tegra_ufs_reset_init(struct ufs_tegra_host *ufs_tegra)
 	struct device *dev = ufs_tegra->hba->dev;
 	int ret = 0;
 
-	ufs_tegra->ufs_rst = devm_reset_control_get(dev, "ufs_rst");
+	ufs_tegra->ufs_rst = devm_reset_control_get(dev, "ufs-rst");
 	if (IS_ERR(ufs_tegra->ufs_rst)) {
 		ret = PTR_ERR(ufs_tegra->ufs_rst);
 		dev_err(dev,
-			"Reset control for ufs_rst not found: %d\n", ret);
+			"Reset control for ufs-rst not found: %d\n", ret);
 	}
-	ufs_tegra->ufs_axi_m_rst = devm_reset_control_get(dev, "ufs_axi_m_rst");
+	ufs_tegra->ufs_axi_m_rst = devm_reset_control_get(dev, "ufs-axi-m-rst");
 	if (IS_ERR(ufs_tegra->ufs_axi_m_rst)) {
 		ret = PTR_ERR(ufs_tegra->ufs_axi_m_rst);
 		dev_err(dev,
-			"Reset control for ufs_axi_m_rst not found: %d\n", ret);
+			"Reset control for ufs-axi-m-rst not found: %d\n", ret);
 	}
-	ufs_tegra->ufshc_lp_rst = devm_reset_control_get(dev, "ufshc_lp_rst");
+	ufs_tegra->ufshc_lp_rst = devm_reset_control_get(dev, "ufshc-lp-rst");
 	if (IS_ERR(ufs_tegra->ufshc_lp_rst)) {
 		ret = PTR_ERR(ufs_tegra->ufshc_lp_rst);
 		dev_err(dev,
-			"Reset control for ufshc_lp_rst not found: %d\n", ret);
+			"Reset control for ufshc-lp-rst not found: %d\n", ret);
 	}
 	return ret;
 }
@@ -468,48 +474,48 @@ static int ufs_tegra_mphy_reset_init(struct ufs_tegra_host *ufs_tegra)
 	int ret = 0;
 
 	ufs_tegra->mphy_l0_rx_rst =
-				devm_reset_control_get(dev, "mphy_l0_rx_rst");
+				devm_reset_control_get(dev, "mphy-l0-rx-rst");
 	if (IS_ERR(ufs_tegra->mphy_l0_rx_rst)) {
 		ret = PTR_ERR(ufs_tegra->mphy_l0_rx_rst);
 		dev_err(dev,
-			"Reset control for mphy_l0_rx_rst not found: %d\n",
+			"Reset control for mphy-l0-rx-rst not found: %d\n",
 									ret);
 	}
 
 	ufs_tegra->mphy_l0_tx_rst =
-				devm_reset_control_get(dev, "mphy_l0_tx_rst");
+				devm_reset_control_get(dev, "mphy-l0-tx-rst");
 	if (IS_ERR(ufs_tegra->mphy_l0_tx_rst)) {
 		ret = PTR_ERR(ufs_tegra->mphy_l0_tx_rst);
 		dev_err(dev,
-			"Reset control for mphy_l0_tx_rst not found: %d\n",
+			"Reset control for mphy-l0-tx-rst not found: %d\n",
 									ret);
 	}
 
 	ufs_tegra->mphy_clk_ctl_rst =
-				devm_reset_control_get(dev, "mphy_clk_ctl_rst");
+				devm_reset_control_get(dev, "mphy-clk-ctl-rst");
 	if (IS_ERR(ufs_tegra->mphy_clk_ctl_rst)) {
 		ret = PTR_ERR(ufs_tegra->mphy_clk_ctl_rst);
 		dev_err(dev,
-			"Reset control for mphy_clk_ctl_rst not found: %d\n",
+			"Reset control for mphy-clk-ctl-rst not found: %d\n",
 									ret);
 	}
 
 	if (ufs_tegra->x2config) {
 		ufs_tegra->mphy_l1_rx_rst =
-				devm_reset_control_get(dev, "mphy_l1_rx_rst");
+				devm_reset_control_get(dev, "mphy-l1-rx-rst");
 		if (IS_ERR(ufs_tegra->mphy_l1_rx_rst)) {
 			ret = PTR_ERR(ufs_tegra->mphy_l1_rx_rst);
 			dev_err(dev,
-			"Reset control for mphy_l1_rx_rst not found: %d\n",
+			"Reset control for mphy-l1-rx-rst not found: %d\n",
 									ret);
 		}
 
 		ufs_tegra->mphy_l1_tx_rst =
-				devm_reset_control_get(dev, "mphy_l1_tx_rst");
+				devm_reset_control_get(dev, "mphy-l1-tx-rst");
 		if (IS_ERR(ufs_tegra->mphy_l1_tx_rst)) {
 			ret = PTR_ERR(ufs_tegra->mphy_l1_tx_rst);
 			dev_err(dev,
-			"Reset control for mphy_l0_tx_rst not found: %d\n",
+			"Reset control for mphy_l1_tx_rst not found: %d\n",
 									ret);
 		}
 	}
