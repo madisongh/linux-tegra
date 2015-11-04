@@ -4,6 +4,7 @@
  * Copyright (C) 2010 Samsung Electronics Co.Ltd
  * Copyright (C) 2011-2014 Atmel Corporation
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Joonyoung Shim <jy0922.shim@samsung.com>
  *
@@ -480,7 +481,7 @@ static ssize_t mxt_debug_msg_read(struct file *filp, struct kobject *kobj,
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
 	struct mxt_data *data = dev_get_drvdata(dev);
-	int count;
+	size_t count;
 	size_t bytes_read;
 
 	if (!data->debug_msg_data) {
@@ -1487,10 +1488,10 @@ static irqreturn_t mxt_interrupt(int irq, void *dev_id)
 	complete(&data->chg_completion);
 
 	if (data->in_bootloader) {
-		if (data->flash && &data->flash->work)
+		if (data->flash)
 			cancel_delayed_work_sync(&data->flash->work);
 
-		return IRQ_RETVAL(mxt_check_bootloader(data));
+		return IRQ_RETVAL(data->flash ? mxt_check_bootloader(data) : 0);
 	}
 
 	if (!data->object_table)
@@ -1658,7 +1659,7 @@ static int mxt_prepare_cfg_mem(struct mxt_data *data, struct mxt_cfg *cfg)
 
 	while (cfg->raw_pos < cfg->raw_size) {
 		/* Read type, instance, length */
-		ret = sscanf(cfg->raw + cfg->raw_pos, "%x %x %x%n",
+		ret = sscanf(cfg->raw + cfg->raw_pos, "%4x %4x %4x%n",
 			     &type, &instance, &size, &offset);
 		if (ret == 0) {
 			/* EOF */
@@ -1673,7 +1674,7 @@ static int mxt_prepare_cfg_mem(struct mxt_data *data, struct mxt_cfg *cfg)
 		if (!object) {
 			/* Skip object */
 			for (i = 0; i < size; i++) {
-				ret = sscanf(cfg->raw + cfg->raw_pos, "%hhx%n",
+				ret = sscanf(cfg->raw + cfg->raw_pos, "%2hhx%n",
 					     &val, &offset);
 				if (ret != 1) {
 					dev_err(dev, "Bad format in T%d at %d\n",
@@ -1715,7 +1716,7 @@ static int mxt_prepare_cfg_mem(struct mxt_data *data, struct mxt_cfg *cfg)
 		reg = object->start_address + mxt_obj_size(object) * instance;
 
 		for (i = 0; i < size; i++) {
-			ret = sscanf(cfg->raw + cfg->raw_pos, "%hhx%n",
+			ret = sscanf(cfg->raw + cfg->raw_pos, "%2hhx%n",
 				     &val,
 				     &offset);
 			if (ret != 1) {
@@ -1730,7 +1731,7 @@ static int mxt_prepare_cfg_mem(struct mxt_data *data, struct mxt_cfg *cfg)
 
 			byte_offset = reg + i - cfg->start_ofs;
 
-			if (byte_offset >= 0 && byte_offset < cfg->mem_size) {
+			if (byte_offset < cfg->mem_size) {
 				*(cfg->mem + byte_offset) = val;
 			} else {
 				dev_err(dev, "Bad object: reg:%d, T%d, ofs=%d\n",
@@ -1822,7 +1823,7 @@ static int mxt_update_cfg(struct mxt_data *data, const struct firmware *fw)
 
 	/* Load information block and check */
 	for (i = 0; i < sizeof(struct mxt_info); i++) {
-		ret = sscanf(cfg.raw + cfg.raw_pos, "%hhx%n",
+		ret = sscanf(cfg.raw + cfg.raw_pos, "%2hhx%n",
 			     (unsigned char *)&cfg.info + i,
 			     &offset);
 		if (ret != 1) {
@@ -1847,7 +1848,7 @@ static int mxt_update_cfg(struct mxt_data *data, const struct firmware *fw)
 	}
 
 	/* Read CRCs */
-	ret = sscanf(cfg.raw + cfg.raw_pos, "%x%n", &info_crc, &offset);
+	ret = sscanf(cfg.raw + cfg.raw_pos, "%6x%n", &info_crc, &offset);
 	if (ret != 1) {
 		dev_err(dev, "Bad format: failed to parse Info CRC\n");
 		ret = -EINVAL;
@@ -1855,7 +1856,7 @@ static int mxt_update_cfg(struct mxt_data *data, const struct firmware *fw)
 	}
 	cfg.raw_pos += offset;
 
-	ret = sscanf(cfg.raw + cfg.raw_pos, "%x%n", &config_crc, &offset);
+	ret = sscanf(cfg.raw + cfg.raw_pos, "%6x%n", &config_crc, &offset);
 	if (ret != 1) {
 		dev_err(dev, "Bad format: failed to parse Config CRC\n");
 		ret = -EINVAL;
@@ -3033,6 +3034,7 @@ release_firmware:
 	release_firmware(data->flash->fw);
 free:
 	devm_kfree(dev, data->flash);
+	data->flash = NULL;
 	return ret;
 }
 
@@ -3074,10 +3076,15 @@ static ssize_t mxt_update_fw_store(struct device *dev,
 	if (error)
 		return error;
 
+	if (data->irq)
+		disable_irq(data->irq);
+
 	error = mxt_load_fw(dev);
 	if (error) {
 		dev_err(dev, "The firmware update failed(%d)\n", error);
 		count = error;
+		if (data->irq)
+			enable_irq(data->irq);
 	} else {
 		dev_info(dev, "The firmware update succeeded\n");
 
@@ -3122,7 +3129,9 @@ static ssize_t mxt_update_cfg_store(struct device *dev,
 			mxt_regulator_enable(data);
 		} else if (pdata->suspend_mode == MXT_SUSPEND_DEEP_SLEEP) {
 			mxt_set_t7_power_cfg(data, MXT_POWER_CFG_RUN);
-			mxt_acquire_irq(data);
+			ret = mxt_acquire_irq(data);
+			if (ret)
+				goto release;
 		}
 
 		data->suspended = false;
@@ -3154,7 +3163,7 @@ static ssize_t mxt_debug_enable_show(struct device *dev,
 static ssize_t mxt_debug_notify_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "0\n");
+	return snprintf(buf, 3, "0\n");
 }
 
 static ssize_t mxt_debug_v2_enable_store(struct device *dev,
@@ -3468,6 +3477,7 @@ static const struct mxt_platform_data *mxt_parse_dt(struct i2c_client *client)
 	struct mxt_platform_data *pdata;
 	struct device_node *np = client->dev.of_node;
 	u32 *keymap;
+	u32 irqflags;
 	int proplen, ret;
 
 	if (!np)
@@ -3479,6 +3489,14 @@ static const struct mxt_platform_data *mxt_parse_dt(struct i2c_client *client)
 
 	pdata->gpio_reset = of_get_named_gpio_flags(np, "atmel,reset-gpio",
 						    0, NULL);
+
+	ret = of_property_read_u32(client->dev.of_node, "atmel,irq_flags",
+					&irqflags);
+	if (ret) {
+		dev_warn(&client->dev, "Using default irq_flags");
+		pdata->irqflags = IRQF_TRIGGER_FALLING;
+	} else
+		pdata->irqflags = irqflags;
 
 	of_property_read_string(np, "atmel,cfg_name", &pdata->cfg_name);
 
@@ -3727,8 +3745,12 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	error = mxt_initialize(data);
-	if (error)
+	if (error) {
+		mxt_regulator_disable(data);
+		regulator_put(data->reg_avdd);
+		regulator_put(data->reg_vdd);
 		goto err_free_irq;
+	}
 
 	return 0;
 
