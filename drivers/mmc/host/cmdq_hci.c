@@ -305,6 +305,11 @@ static int cmdq_enable(struct mmc_host *mmc)
 				CQTDLBAU);
 	}
 
+	/* Enable Interrupt Coalescing feature */
+	if (cq_host->quirks & CMDQ_QUIRK_CQIC_SUPPORT)
+		cmdq_writel(cq_host, (CQIC_ENABLE | CQIC_ICTOVALWEN |
+				CQIC_DEFAULT_ICTOVAL), CQIC);
+
 	/* leave send queue status timer configs to reset values */
 
 	/* configure interrupt coalescing */
@@ -332,9 +337,6 @@ static int cmdq_enable(struct mmc_host *mmc)
 	/* enable CQ_HOST */
 	cmdq_writel(cq_host, cmdq_readl(cq_host, CQCFG) | CQ_ENABLE,
 		    CQCFG);
-	/* Optional: Enable Interrupt Coalescing feature
-	 * cmdq_writel(cq_host, (0x1F00 | CQIC_ENABLE | CQIC_ICCTHWEN), CQIC);
-	 */
 	cq_host->enabled = true;
 out:
 	return err;
@@ -512,6 +514,7 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	u64 data = 0;
 	u64 *task_desc = NULL;
 	u32 tag = mrq->cmdq_req->tag;
+	bool intr = true;
 	struct cmdq_host *cq_host = (struct cmdq_host *)mmc_cmdq_private(mmc);
 	unsigned long flags;
 
@@ -537,7 +540,10 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	task_desc = get_desc(cq_host, tag);
 
-	cmdq_prep_task_desc(mrq, &data, 1,
+	if (cq_host->quirks & CMDQ_QUIRK_CQIC_SUPPORT)
+		intr = false;
+
+	cmdq_prep_task_desc(mrq, &data, intr,
 			    (mrq->cmdq_req->cmdq_req_flags & QBR));
 	*task_desc = cpu_to_le64(data);
 
@@ -579,6 +585,7 @@ irqreturn_t cmdq_irq(struct mmc_host *mmc, u32 intmask)
 {
 	u32 status, cqtdbr, cqtcn;
 	unsigned long tag = 0, comp_status;
+	unsigned long cqic;
 	struct cmdq_host *cq_host = (struct cmdq_host *)mmc_cmdq_private(mmc);
 
 	spin_lock(&cq_host->cmdq_lock);
@@ -588,6 +595,12 @@ irqreturn_t cmdq_irq(struct mmc_host *mmc, u32 intmask)
 
 	cqtcn = cmdq_readl(cq_host, CQTCN);
 	cqtdbr = cmdq_readl(cq_host, CQTDBR);
+
+	if (cq_host->quirks & CMDQ_QUIRK_CQIC_SUPPORT) {
+		cqic = cmdq_readl(cq_host, CQIC);
+		cmdq_writel(cq_host, cqic | CQIC_RESET, CQIC);
+	}
+
 	pr_debug("%s: %s: CQIS: %x, intmask: %x\n", mmc_hostname(mmc),
 			__func__, status, intmask);
 

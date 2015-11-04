@@ -1,5 +1,5 @@
 /* Copyright (c) 2014, The Linux Foundation. All rights reserved.
- * Copyright (C) 2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -74,7 +74,7 @@
 #define CQ_INT_EN	(0x3 << 14)
 #define CQ_INT_ALL	0xF
 #define CQIC_DEFAULT_ICCTH 31
-#define CQIC_DEFAULT_ICTOVAL 1
+#define CQIC_DEFAULT_ICTOVAL 0x7F
 
 /* attribute fields */
 #define VALID(x)	((x & 1) << 0)
@@ -119,6 +119,7 @@ struct cmdq_host {
 	u32 quirks;
 #define CMDQ_QUIRK_SHORT_TXFR_DESC_SZ 0x1
 #define CMDQ_QUIRK_NO_DCMD	0x2
+#define CMDQ_QUIRK_CQIC_SUPPORT	0x4
 
 	bool enabled;
 	bool halted;
