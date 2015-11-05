@@ -56,6 +56,8 @@
 #define IMX214_DEFAULT_DATAFMT	V4L2_MBUS_FMT_SRGGB10_1X10
 #define IMX214_DEFAULT_CLK_FREQ	24000000
 
+#define IMX214_NUM_CROP_REGS	8
+
 struct imx214 {
 	struct mutex			imx214_camera_lock;
 	struct camera_common_power_rail	power;
@@ -231,6 +233,37 @@ static inline void imx214_get_gain_short_reg(imx214_reg *regs,
 	regs->val = (gain >> 8) & 0xff;
 	(regs + 1)->addr = IMX214_GAIN_SHORT_ADDR_LSB;
 	(regs + 1)->val = (gain) & 0xff;
+}
+
+static void imx214_get_crop_regs(imx214_reg *regs,
+				struct v4l2_rect *rect)
+{
+	u32 x_start, y_start;
+	u32 x_end, y_end;
+	x_start = rect->left;
+	y_start = rect->top;
+	x_end = x_start + rect->width - 1;
+	y_end = y_start + rect->height - 1;
+
+	regs->addr = IMX214_CROP_X_START_ADDR_MSB;
+	regs->val = (x_start >> 8) & 0xff;
+	(regs + 1)->addr = IMX214_CROP_X_START_ADDR_LSB;
+	(regs + 1)->val = (x_start) & 0xff;
+
+	(regs + 2)->addr = IMX214_CROP_Y_START_ADDR_MSB;
+	(regs + 2)->val = (y_start >> 8) & 0xff;
+	(regs + 3)->addr = IMX214_CROP_Y_START_ADDR_LSB;
+	(regs + 3)->val = (y_start) & 0xff;
+
+	(regs + 4)->addr = IMX214_CROP_X_END_ADDR_MSB;
+	(regs + 4)->val = (x_end >> 8) & 0xff;
+	(regs + 5)->addr = IMX214_CROP_X_END_ADDR_LSB;
+	(regs + 5)->val = (x_end) & 0xff;
+
+	(regs + 6)->addr = IMX214_CROP_Y_END_ADDR_MSB;
+	(regs + 6)->val = (y_end >> 8) & 0xff;
+	(regs + 7)->addr = IMX214_CROP_Y_END_ADDR_LSB;
+	(regs + 7)->val = (y_end) & 0xff;
 }
 
 static int test_mode;
@@ -450,7 +483,7 @@ static int imx214_power_get(struct imx214 *priv)
 	int err = 0;
 
 	mclk_name = priv->pdata->mclk_name ?
-		    priv->pdata->mclk_name : "cam_mclk1";
+			priv->pdata->mclk_name : "cam_mclk1";
 	pw->mclk = devm_clk_get(&priv->i2c_client->dev, mclk_name);
 	if (IS_ERR(pw->mclk)) {
 		dev_err(&priv->i2c_client->dev,
@@ -485,6 +518,8 @@ static int imx214_set_gain(struct imx214 *priv, s32 val);
 static int imx214_set_frame_length(struct imx214 *priv, s32 val);
 static int imx214_set_coarse_time(struct imx214 *priv, s32 val);
 static int imx214_set_coarse_time_short(struct imx214 *priv, s32 val);
+static int imx214_set_crop_data(struct imx214 *priv, struct v4l2_rect *rect);
+static int imx214_get_crop_data(struct imx214 *priv, struct v4l2_rect *rect);
 
 static int imx214_s_stream(struct v4l2_subdev *sd, int enable)
 {
@@ -550,8 +585,69 @@ exit:
 	return err;
 }
 
+static int imx214_s_crop(struct v4l2_subdev *sd, const struct v4l2_crop *crop)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct imx214 *priv = (struct imx214 *)s_data->priv;
+	struct v4l2_rect *rect = &crop->c;
+	int err;
+
+	u32 width, height;
+	u32 bottom, right;
+
+	width = s_data->fmt_width;
+	height = s_data->fmt_height;
+
+	if (crop->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+		return -EINVAL;
+
+	if ((width != rect->width) || (height != rect->height)) {
+		dev_err(&client->dev,
+			"%s: CROP Resolution Mismatch: %dx%d\n",
+			__func__, rect->width, rect->height);
+		return -EINVAL;
+	}
+	if (rect->top < 0 || rect->left < 0) {
+		dev_err(&client->dev,
+			"%s: CROP Bound Error: left:%d, top:%d\n",
+			__func__, rect->left, rect->top);
+		return -EINVAL;
+	}
+	right = rect->left + width - 1;
+	bottom = rect->top + height - 1;
+	if ((right > IMX214_DEFAULT_WIDTH) ||
+		(bottom > IMX214_DEFAULT_HEIGHT)) {
+		dev_err(&client->dev,
+			"%s: CROP Bound Error: right:%d, bottom:%d)\n",
+			__func__, right, bottom);
+		return -EINVAL;
+	}
+	err = imx214_set_crop_data(priv, rect);
+
+	return err;
+}
+
+static int imx214_g_crop(struct v4l2_subdev *sd, struct v4l2_crop *crop)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct imx214 *priv = (struct imx214 *)s_data->priv;
+	struct v4l2_rect *rect = &crop->c;
+	int err;
+
+	if (crop->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+		return -EINVAL;
+
+	err = imx214_get_crop_data(priv, rect);
+
+	return err;
+}
+
 static struct v4l2_subdev_video_ops imx214_subdev_video_ops = {
 	.s_stream	= imx214_s_stream,
+	.s_crop		= imx214_s_crop,
+	.g_crop		= imx214_g_crop,
 	.s_mbus_fmt	= camera_common_s_fmt,
 	.g_mbus_fmt	= camera_common_g_fmt,
 	.try_mbus_fmt	= camera_common_try_fmt,
@@ -588,13 +684,13 @@ static int imx214_set_group_hold(struct imx214 *priv)
 
 	if (priv->group_hold_en == true && gh_prev == SWITCH_OFF) {
 		err = imx214_write_reg(priv->s_data,
-				       IMX214_GROUP_HOLD_ADDR, 0x1);
+					   IMX214_GROUP_HOLD_ADDR, 0x1);
 		if (err)
 			goto fail;
 		priv->group_hold_prev = 1;
 	} else if (priv->group_hold_en == false && gh_prev == SWITCH_ON) {
 		err = imx214_write_reg(priv->s_data,
-				       IMX214_GROUP_HOLD_ADDR, 0x0);
+					   IMX214_GROUP_HOLD_ADDR, 0x0);
 		if (err)
 			goto fail;
 		priv->group_hold_prev = 0;
@@ -772,6 +868,70 @@ fail:
 	dev_dbg(&priv->i2c_client->dev,
 		 "%s: COARSE_TIME_SHORT control error\n", __func__);
 	return err;
+}
+
+static int imx214_set_crop_data(struct imx214 *priv, struct v4l2_rect *rect)
+{
+	imx214_reg reg_list_crop[IMX214_NUM_CROP_REGS];
+	int err;
+	int i = 0;
+
+	dev_dbg(&priv->i2c_client->dev,
+		 "%s:  crop->left:%d, crop->top:%d, crop->res: %dx%d\n",
+		 __func__, rect->left, rect->top, rect->width, rect->height);
+
+	imx214_get_crop_regs(reg_list_crop, rect);
+
+	for (i = 0; i < IMX214_NUM_CROP_REGS; i++) {
+		err = imx214_write_reg(priv->s_data, reg_list_crop[i].addr,
+			 reg_list_crop[i].val);
+		if (err) {
+			dev_dbg(&priv->i2c_client->dev,
+				"%s: SENSOR_CROP control error\n", __func__);
+			return err;
+		}
+	}
+
+	return 0;
+}
+
+static int imx214_get_crop_data(struct imx214 *priv, struct v4l2_rect *rect)
+{
+	imx214_reg reg_list_crop[IMX214_NUM_CROP_REGS];
+	int i, err;
+	int a, b;
+	int right, bottom;
+
+	for (i = 0; i < IMX214_NUM_CROP_REGS; i++) {
+		reg_list_crop[i].addr = (IMX214_CROP_X_START_ADDR_MSB + i);
+		err = imx214_read_reg(priv->s_data, reg_list_crop[i].addr,
+			&reg_list_crop[i].val);
+		if (err) {
+			dev_dbg(&priv->i2c_client->dev,
+				"%s: SENSOR_CROP control error\n", __func__);
+			return err;
+		}
+	}
+
+	a = reg_list_crop[0].val & 0x00ff;
+	b = reg_list_crop[1].val & 0x00ff;
+	rect->left = (a << 8) | b;
+
+	a = reg_list_crop[2].val & 0x00ff;
+	b = reg_list_crop[3].val & 0x00ff;
+	rect->top = (a << 8) | b;
+
+	a = reg_list_crop[4].val & 0x00ff;
+	b = reg_list_crop[5].val & 0x00ff;
+	right = (a << 8) | b;
+	rect->width = right - rect->left + 1;
+
+	a = reg_list_crop[6].val & 0x00ff;
+	b = reg_list_crop[7].val & 0x00ff;
+	bottom = (a << 8) | b;
+	rect->height = bottom - rect->top + 1;
+
+	return 0;
 }
 
 static int imx214_eeprom_device_release(struct imx214 *priv)
@@ -1180,16 +1340,16 @@ static int imx214_probe(struct i2c_client *client,
 	pr_info("[IMX214]: probing v4l2 sensor.\n");
 
 	common_data = devm_kzalloc(&client->dev,
-			    sizeof(struct camera_common_data), GFP_KERNEL);
+				sizeof(struct camera_common_data), GFP_KERNEL);
 	if (!common_data) {
 		dev_err(&client->dev, "unable to allocate memory!\n");
 		return -ENOMEM;
 	}
 
 	priv = devm_kzalloc(&client->dev,
-			    sizeof(struct imx214) + sizeof(struct v4l2_ctrl *) *
-			    ARRAY_SIZE(ctrl_config_list),
-			    GFP_KERNEL);
+			sizeof(struct imx214) + sizeof(struct v4l2_ctrl *) *
+			ARRAY_SIZE(ctrl_config_list),
+			GFP_KERNEL);
 	if (!priv) {
 		dev_err(&client->dev, "unable to allocate memory!\n");
 		return -ENOMEM;
@@ -1204,7 +1364,7 @@ static int imx214_probe(struct i2c_client *client,
 
 	ssdd = soc_camera_i2c_to_desc(client);
 	imx214_camera_data = (struct tegra_camera_platform_data *)
-			     ssdd->drv_priv;
+				 ssdd->drv_priv;
 	if (!imx214_camera_data) {
 		dev_err(&client->dev, "unable to find iclink module name\n");
 		return -EFAULT;
