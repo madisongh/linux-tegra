@@ -201,7 +201,9 @@ static int dbg_sor_show(struct seq_file *s, void *unused)
 	DUMP_REG(NV_SOR_DC(0));
 	DUMP_REG(NV_SOR_DC(1));
 	DUMP_REG(NV_SOR_LANE_DRIVE_CURRENT(0));
+	DUMP_REG(NV_SOR_LANE4_DRIVE_CURRENT(0));
 	DUMP_REG(NV_SOR_PR(0));
+	DUMP_REG(NV_SOR_LANE_PREEMPHASIS(0));
 	DUMP_REG(NV_SOR_LANE4_PREEMPHASIS(0));
 	DUMP_REG(NV_SOR_POSTCURSOR(0));
 	DUMP_REG(NV_SOR_DP_CONFIG(0));
@@ -1756,8 +1758,10 @@ void tegra_dc_sor_enable_lvds(struct tegra_dc_sor_data *sor,
 		NV_SOR_PLL3_PLLVDD_MODE_MASK,
 		NV_SOR_PLL3_PLLVDD_MODE_V1_8);
 
-	tegra_sor_writel(sor, NV_SOR_PLL1,
-		NV_SOR_PLL1_TERM_COMPOUT_HIGH | NV_SOR_PLL1_TMDS_TERM_ENABLE);
+	tegra_sor_writel(sor, NV_SOR_PLL1, 
+			 (NV_SOR_PLL1_TMDS_TERMADJ_OHM500 |
+			  (2 << NV_SOR_PLL1_LVDSCM_SHIFT) |
+			  (2 << NV_SOR_PLL1_LOADADJ_SHIFT)));
 	tegra_sor_write_field(sor, NV_SOR_PLL2,
 		NV_SOR_PLL2_AUX1_SEQ_MASK |
 		NV_SOR_PLL2_AUX8_SEQ_PLLCAPPD_ENFORCE_MASK,
@@ -1781,7 +1785,26 @@ void tegra_dc_sor_enable_lvds(struct tegra_dc_sor_data *sor,
 
 	tegra_sor_writel(sor, NV_SOR_LVDS, reg_val);
 	tegra_sor_writel(sor, NV_SOR_LANE_DRIVE_CURRENT(sor->portnum),
-		0x40404040);
+		(NV_SOR_DC_LANE0_DP_LANE2_P1_LEVEL0 |
+		 NV_SOR_DC_LANE1_DP_LANE1_P1_LEVEL0 |
+		 NV_SOR_DC_LANE2_DP_LANE0_P1_LEVEL0 |
+		 NV_SOR_DC_LANE3_DP_LANE3_P1_LEVEL0));
+	reg_val = tegra_sor_readl(sor,
+				  NV_SOR_LANE4_DRIVE_CURRENT(sor->portnum));
+	reg_val &= ~NV_SOR_PR_LANE0_DP_LANE2_MASK;
+	tegra_sor_writel(sor, NV_SOR_LANE4_DRIVE_CURRENT(sor->portnum),
+		 reg_val | NV_SOR_DC_LANE0_DP_LANE2_P1_LEVEL0);
+
+	tegra_sor_writel(sor, NV_SOR_LANE_PREEMPHASIS(sor->portnum),
+			 (NV_SOR_DC_LANE3_DP_LANE3_P0_LEVEL4 |
+			  NV_SOR_DC_LANE2_DP_LANE0_P0_LEVEL4 |
+			  NV_SOR_DC_LANE1_DP_LANE1_P0_LEVEL4 |
+			  NV_SOR_DC_LANE0_DP_LANE2_P0_LEVEL4));
+	reg_val = tegra_sor_readl(sor,
+		 NV_SOR_LANE4_PREEMPHASIS(sor->portnum));
+	reg_val &= ~NV_SOR_PR_LANE0_DP_LANE2_MASK;
+	tegra_sor_writel(sor, NV_SOR_LANE4_PREEMPHASIS(sor->portnum),
+			 reg_val | NV_SOR_DC_LANE0_DP_LANE2_P0_LEVEL4);
 
 #if 0
 	tegra_sor_write_field(sor, NV_SOR_LVDS,
