@@ -267,14 +267,8 @@ struct tegra_xhci_hcd {
 	int num_supplies;
 	struct regulator_bulk_data *supplies;
 
-	struct clk *host_clk;
-	struct clk *falc_clk;
-	struct clk *ss_clk;
-	struct clk *ss_src_clk;
-	struct clk *fs_src_clk;
-	struct clk *pll_u_480m;
-	struct clk *clk_m;
-	struct clk *pll_e;
+	int pgid_ss;
+	int pgid_host;
 
 	/* bandwidth manager handle */
 	struct tegra_bwmgr_client *bwmgr_handle;
@@ -290,6 +284,8 @@ struct tegra_xhci_hcd {
 	struct mbox_chan *mbox_chan;
 
 	struct tegra_xhci_fpci_context fpci_ctx;
+
+	bool suspended;
 
 	/* Firmware loading related */
 	void *fw_data;
@@ -921,104 +917,6 @@ static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
 	return 0;
 }
 
-#if 0 /* TODO: dynamic SS clock */
-static int tegra_xhci_set_ss_clk(struct tegra_xhci_hcd *tegra,
-				 unsigned long rate)
-{
-	struct clk *clk = tegra->ss_src_clk;
-	unsigned long new_parent_rate, old_parent_rate;
-	int ret, div;
-
-	if (clk_get_rate(clk) == rate)
-		return 0;
-
-	switch (rate) {
-	case TEGRA_XHCI_SS_CLK_HIGH_SPEED:
-		/*
-		 * Reparent to PLLU_480M. Set divider first to avoid
-		 * overclocking.
-		 */
-		old_parent_rate = clk_get_rate(clk_get_parent(clk));
-		new_parent_rate = clk_get_rate(tegra->pll_u_480m);
-		div = new_parent_rate / rate;
-		ret = clk_set_rate(clk, old_parent_rate / div);
-		if (ret)
-			return ret;
-		ret = clk_set_parent(clk, tegra->pll_u_480m);
-		if (ret)
-			return ret;
-		/*
-		 * The rate should already be correct, but set it again just
-		 * to be sure.
-		 */
-		ret = clk_set_rate(clk, rate);
-		if (ret)
-			return ret;
-		break;
-	case TEGRA_XHCI_SS_CLK_LOW_SPEED:
-		/* Reparent to CLK_M */
-		ret = clk_set_parent(clk, tegra->clk_m);
-		if (ret)
-			return ret;
-		ret = clk_set_rate(clk, rate);
-		if (ret)
-			return ret;
-		break;
-	default:
-		dev_err(tegra->dev, "Invalid SS rate: %lu\n", rate);
-		return -EINVAL;
-	}
-
-	if (clk_get_rate(clk) != rate) {
-		dev_err(tegra->dev, "SS clock doesn't match requested rate\n");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-#endif
-
-static int tegra_xhci_clk_enable(struct tegra_xhci_hcd *tegra)
-{
-	int ret;
-
-	ret = clk_prepare_enable(tegra->pll_e);
-	if (ret < 0)
-		return ret;
-	ret = clk_prepare_enable(tegra->host_clk);
-	if (ret < 0)
-		goto disable_plle;
-	ret = clk_prepare_enable(tegra->ss_clk);
-	if (ret < 0)
-		goto disable_host;
-	ret = clk_prepare_enable(tegra->falc_clk);
-	if (ret < 0)
-		goto disable_ss;
-	ret = clk_prepare_enable(tegra->fs_src_clk);
-	if (ret < 0)
-		goto disable_falc;
-	return 0;
-
-disable_falc:
-	clk_disable_unprepare(tegra->falc_clk);
-disable_ss:
-	clk_disable_unprepare(tegra->ss_clk);
-disable_host:
-	clk_disable_unprepare(tegra->host_clk);
-disable_plle:
-	clk_disable_unprepare(tegra->pll_e);
-	return ret;
-}
-
-static void tegra_xhci_clk_disable(struct tegra_xhci_hcd *tegra)
-{
-	clk_disable_unprepare(tegra->pll_e);
-	clk_disable_unprepare(tegra->host_clk);
-	clk_disable_unprepare(tegra->ss_clk);
-	clk_disable_unprepare(tegra->falc_clk);
-	clk_disable_unprepare(tegra->fs_src_clk);
-}
-
 static int tegra_xhci_phy_enable(struct tegra_xhci_hcd *tegra)
 {
 	unsigned int i, j;
@@ -1090,29 +988,21 @@ static void tegra_xhci_mbox_work(struct work_struct *work)
 	switch (msg->cmd) {
 	case MBOX_CMD_INC_SSPI_CLOCK:
 	case MBOX_CMD_DEC_SSPI_CLOCK:
-#if 0 /* TODO: dynamic SS clock */
-		ret = tegra_xhci_set_ss_clk(tegra, msg->data * 1000);
-		resp.data = clk_get_rate(tegra->ss_src_clk) / 1000;
-		if (ret)
-			resp.cmd = MBOX_CMD_NAK;
-		else
-			resp.cmd = MBOX_CMD_ACK;
-#else
+		/* TODO: implement dynamic SS clock */
 		dev_info(tegra->dev, "%s ignore firmware %s request\n",
 			__func__, (msg->cmd == MBOX_CMD_INC_SSPI_CLOCK) ?
 			"MBOX_CMD_INC_SSPI_CLOCK" : "MBOX_CMD_DEC_SSPI_CLOCK");
 		resp.data = msg->data;
-		ret = 0;
 		resp.cmd = MBOX_CMD_ACK;
-#endif
 		break;
 	case MBOX_CMD_INC_FALC_CLOCK:
 	case MBOX_CMD_DEC_FALC_CLOCK:
-		resp.data = clk_get_rate(tegra->falc_clk) / 1000;
-		if (resp.data != msg->data)
-			resp.cmd = MBOX_CMD_NAK;
-		else
-			resp.cmd = MBOX_CMD_ACK;
+		/* TODO: implement dynamic falcon clock */
+		dev_info(tegra->dev, "%s ignore firmware %s request\n",
+			__func__, (msg->cmd == MBOX_CMD_INC_FALC_CLOCK) ?
+			"MBOX_CMD_INC_FALC_CLOCK" : "MBOX_CMD_DEC_FALC_CLOCK");
+		resp.data = msg->data;
+		resp.cmd = MBOX_CMD_ACK;
 		break;
 	case MBOX_CMD_SET_BW:
 		{
@@ -1197,6 +1087,16 @@ static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 
 	mutex_lock(&tegra->lock);
 
+	if (tegra->suspended) {
+		mutex_unlock(&tegra->lock);
+		return;
+	}
+
+	if (on)
+		tegra_phy_xusb_set_id_override(tegra->phys[UTMI_PHY][port]);
+	else
+		tegra_phy_xusb_clear_id_override(tegra->phys[UTMI_PHY][port]);
+
 	if (!tegra->otg_role_initialized) {
 		tegra->otg_role_initialized = true;
 		goto role_update;
@@ -1208,16 +1108,9 @@ static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 	}
 
 role_update:
+	tegra->host_mode = on;
 	dev_dbg(tegra->dev, "host mode %s\n", on ? "on" : "off");
 
-	if (on) {
-		/* switch to host mode */
-		tegra_phy_xusb_set_id_override(tegra->phys[UTMI_PHY][port]);
-		tegra->host_mode = true;
-	} else {
-		tegra_phy_xusb_clear_id_override(tegra->phys[UTMI_PHY][port]);
-		tegra->host_mode = false;
-	}
 	mutex_unlock(&tegra->lock);
 
 	pm_runtime_get_sync(tegra->dev);
@@ -1370,6 +1263,8 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 		goto put_usb2_hcd;
 	}
 
+	device_init_wakeup(tegra->dev, true);
+
 	ret = usb_add_hcd(tegra->hcd, tegra->irq, IRQF_SHARED);
 	if (ret < 0)
 		goto put_usb2_hcd;
@@ -1396,6 +1291,10 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	ret = usb_add_hcd(xhci->shared_hcd, tegra->irq, IRQF_SHARED);
 	if (ret < 0)
 		goto put_usb3_hcd;
+
+	/* Enable wake for both USB2.0 and USB3.0 hub */
+	device_init_wakeup(&tegra->hcd->self.root_hub->dev, true);
+	device_init_wakeup(&xhci->shared_hcd->self.root_hub->dev, true);
 
 	/* Enable firmware messages from controller. */
 	msg.cmd = MBOX_CMD_MSG_ENABLED;
@@ -1562,6 +1461,9 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	tegra = devm_kzalloc(&pdev->dev, sizeof(*tegra), GFP_KERNEL);
 	if (!tegra)
 		return -ENOMEM;
+
+	tegra->pgid_host = partition_id_xusbc;
+	tegra->pgid_ss = partition_id_xusba;
 	tegra->dev = &pdev->dev;
 	mutex_init(&tegra->lock);
 	platform_set_drvdata(pdev, tegra);
@@ -1633,61 +1535,6 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		goto skip_clocks;
 	}
 
-	/* TODO: review clocks */
-	tegra->host_clk = devm_clk_get(&pdev->dev, "host");
-	if (IS_ERR(tegra->host_clk)) {
-		ret = PTR_ERR(tegra->host_clk);
-		dev_warn(&pdev->dev, "can't get host_clk (%d)\n", ret);
-		goto put_hcd;
-	}
-	tegra->falc_clk = devm_clk_get(&pdev->dev, "falcon_src");
-	if (IS_ERR(tegra->falc_clk)) {
-		ret = PTR_ERR(tegra->falc_clk);
-		dev_warn(&pdev->dev, "can't get falcon_clk (%d)\n", ret);
-		goto put_hcd;
-	}
-	tegra->ss_clk = devm_clk_get(&pdev->dev, "ss");
-	if (IS_ERR(tegra->ss_clk)) {
-		ret = PTR_ERR(tegra->ss_clk);
-		dev_warn(&pdev->dev, "can't get ss_clk (%d)\n", ret);
-		goto put_hcd;
-	}
-	tegra->ss_src_clk = devm_clk_get(&pdev->dev, "ss_src");
-	if (IS_ERR(tegra->ss_src_clk)) {
-		ret = PTR_ERR(tegra->ss_src_clk);
-		dev_warn(&pdev->dev, "can't get ss_src_clk (%d)\n", ret);
-		goto put_hcd;
-	}
-	tegra->fs_src_clk = devm_clk_get(&pdev->dev, "fs_src");
-	if (IS_ERR(tegra->fs_src_clk)) {
-		ret = PTR_ERR(tegra->fs_src_clk);
-		dev_warn(&pdev->dev, "can't get fs_src_clk (%d)\n", ret);
-		goto put_hcd;
-	}
-	tegra->pll_u_480m = devm_clk_get(&pdev->dev, "pll_u_480M");
-	if (IS_ERR(tegra->pll_u_480m)) {
-		ret = PTR_ERR(tegra->pll_u_480m);
-		dev_warn(&pdev->dev, "can't get pll_u_480m (%d)\n", ret);
-		goto put_hcd;
-	}
-	tegra->clk_m = devm_clk_get(&pdev->dev, "clk_m");
-	if (IS_ERR(tegra->clk_m)) {
-		ret = PTR_ERR(tegra->clk_m);
-		dev_warn(&pdev->dev, "can't get clk_m (%d)\n", ret);
-		goto put_hcd;
-	}
-	tegra->pll_e = devm_clk_get(&pdev->dev, "pll_e");
-	if (IS_ERR(tegra->pll_e)) {
-		ret = PTR_ERR(tegra->pll_e);
-		dev_warn(&pdev->dev, "can't get pll_e (%d)\n", ret);
-		goto put_hcd;
-	}
-	ret = tegra_xhci_clk_enable(tegra);
-	if (ret) {
-		dev_warn(&pdev->dev, "can't enable clocks (%d)\n", ret);
-		goto put_hcd;
-	}
-
 	tegra->bwmgr_handle = tegra_bwmgr_register(TEGRA_BWMGR_CLIENT_XHCI);
 	if (IS_ERR_OR_NULL(tegra->bwmgr_handle)) {
 		ret = IS_ERR(tegra->bwmgr_handle) ?
@@ -1709,11 +1556,11 @@ skip_clocks:
 				      tegra->num_supplies,
 				      tegra->supplies);
 	if (ret)
-		goto disable_clk;
+		goto put_hcd;
 	ret = regulator_bulk_enable(tegra->num_supplies,
 				    tegra->supplies);
 	if (ret)
-		goto disable_clk;
+		goto put_hcd;
 
 	INIT_WORK(&tegra->mbox_req_work, tegra_xhci_mbox_work);
 	tegra->mbox_client.dev = &pdev->dev;
@@ -1784,13 +1631,13 @@ skip_clocks:
 		dev_info(&pdev->dev, "No USB3 port has OTG_CAP\n");
 
 	if (tegra_platform_is_silicon()) {
-		ret = tegra_unpowergate_partition(partition_id_xusba);
+		ret = tegra_unpowergate_partition_with_clk_on(tegra->pgid_ss);
 		if (ret) {
 			dev_warn(&pdev->dev, "can't unpowergate SS partition\n");
 			goto put_mbox;
 		}
 
-		ret = tegra_unpowergate_partition(partition_id_xusbc);
+		ret = tegra_unpowergate_partition_with_clk_on(tegra->pgid_host);
 		if (ret) {
 			dev_warn(&pdev->dev, "can't unpowergate Host partition\n");
 			goto powergate_ss;
@@ -1842,18 +1689,15 @@ disable_phy:
 	tegra_xhci_phy_disable(tegra);
 powergate_host:
 	if (tegra_platform_is_silicon())
-		tegra_powergate_partition(partition_id_xusbc);
+		tegra_powergate_partition_with_clk_off(tegra->pgid_host);
 powergate_ss:
 	if (tegra_platform_is_silicon())
-		tegra_powergate_partition(partition_id_xusba);
+		tegra_powergate_partition_with_clk_off(tegra->pgid_ss);
 put_mbox:
 	mbox_free_channel(tegra->mbox_chan);
 disable_regulator:
 	if (tegra_platform_is_silicon())
 		regulator_bulk_disable(tegra->num_supplies, tegra->supplies);
-disable_clk:
-	if (tegra_platform_is_silicon())
-		tegra_xhci_clk_disable(tegra);
 put_hcd:
 	usb_put_hcd(hcd);
 	if (tegra_platform_is_fpga())
@@ -1870,15 +1714,6 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	struct tegra_xhci_hcd *tegra = platform_get_drvdata(pdev);
 	struct usb_hcd *hcd = tegra->hcd;
 	struct xhci_hcd *xhci;
-	int partition_id_xusba, partition_id_xusbc;
-
-	partition_id_xusbc = tegra_pd_get_powergate_id(tegra_xusbc_pd);
-	if (partition_id_xusbc < 0)
-		return -EINVAL;
-
-	partition_id_xusba = tegra_pd_get_powergate_id(tegra_xusba_pd);
-	if (partition_id_xusba < 0)
-		return -EINVAL;
 
 	fw_log_deinit(tegra);
 	tegra_xhci_debugfs_deinit(tegra);
@@ -1908,9 +1743,8 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	mbox_free_channel(tegra->mbox_chan);
 	tegra_xhci_phy_disable(tegra);
 	regulator_bulk_disable(tegra->num_supplies, tegra->supplies);
-	tegra_xhci_clk_disable(tegra);
-	tegra_powergate_partition(partition_id_xusbc);
-	tegra_powergate_partition(partition_id_xusba);
+	tegra_powergate_partition_with_clk_off(tegra->pgid_host);
+	tegra_powergate_partition_with_clk_off(tegra->pgid_ss);
 
 	tegra_bwmgr_set_emc(tegra->bwmgr_handle, 0,
 		TEGRA_BWMGR_SET_EMC_SHARED_BW);
@@ -1985,7 +1819,7 @@ static int tegra_xhci_powergate(struct tegra_xhci_hcd *tegra, bool runtime)
 {
 	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
 	struct device *dev = tegra->dev;
-	unsigned int i;
+	unsigned int i, j;
 	int ret;
 
 	dev_info(dev, "entering ELPG\n");
@@ -2077,18 +1911,23 @@ static int tegra_xhci_powergate(struct tegra_xhci_hcd *tegra, bool runtime)
 	 *  - powergate XUSBA partition
 	 *  - turn off VCORE for USB3 PHYs
 	 */
-	for (i = 0; i < tegra->soc_config->num_phys[USB3_PHY]; i++)
-		phy_power_off(tegra->phys[USB3_PHY][i]);
+	for (i = 0; i < MAX_PHY_TYPES; i++) {
+		for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
+			struct phy *phy = tegra->phys[i][j];
+
+			phy_power_off(phy);
+		}
+	}
 
 	/* Power off XUSB_SS partition. */
-	ret = tegra_powergate_partition_with_clk_off(TEGRA_POWERGATE_XUSBA);
+	ret = tegra_powergate_partition_with_clk_off(tegra->pgid_ss);
 	if (ret) {
 		dev_warn(dev, "failed to powergate SS partition %d\n", ret);
 		goto unlock;
 	}
 
 	/* Power off XUSB_HOST partition. */
-	ret = tegra_powergate_partition_with_clk_off(TEGRA_POWERGATE_XUSBC);
+	ret = tegra_powergate_partition_with_clk_off(tegra->pgid_host);
 	if (ret) {
 		dev_warn(dev, "failed to powergate Host partition %d\n", ret);
 		goto unlock;
@@ -2126,14 +1965,14 @@ static int tegra_xhci_unpowergate(struct tegra_xhci_hcd *tegra)
 	dev_info(dev, "exiting ELPG\n");
 
 	mutex_lock(&tegra->lock);
-	ret = tegra_unpowergate_partition_with_clk_on(TEGRA_POWERGATE_XUSBC);
+	ret = tegra_unpowergate_partition_with_clk_on(tegra->pgid_host);
 	if (ret < 0) {
 		dev_warn(dev, "failed to unpowergate Host partition %d\n", ret);
 		goto unlock;
 	}
 
 	/* Power on XUSB_SS partition. */
-	ret = tegra_unpowergate_partition_with_clk_on(TEGRA_POWERGATE_XUSBA);
+	ret = tegra_unpowergate_partition_with_clk_on(tegra->pgid_ss);
 	if (ret < 0) {
 		dev_warn(dev, "failed to unpowergate SS partition %d\n", ret);
 		goto unlock;
@@ -2149,14 +1988,8 @@ static int tegra_xhci_unpowergate(struct tegra_xhci_hcd *tegra)
 					, tegra_phy_names[i], j);
 			}
 			tegra_phy_xusb_disable_wake(phy);
+			phy_power_on(phy);
 		}
-	}
-
-	/* Power on USB3 PHYs. */
-	for (i = 0; i < tegra->soc_config->num_phys[USB3_PHY]; i++) {
-		ret = phy_power_on(tegra->phys[USB3_PHY][i]);
-		if (ret < 0)
-			goto unlock;
 	}
 
 	tegra_xhci_cfg(tegra);
@@ -2205,18 +2038,50 @@ unlock:
 static int tegra_xhci_suspend(struct device *dev)
 {
 	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
-	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
+	int ret = 0;
 
-	/* TODO: Powergate controller across suspend/resume. */
-	return xhci_suspend(xhci, device_may_wakeup(dev));
+	mutex_lock(&tegra->lock);
+	tegra->suspended = true;
+	mutex_unlock(&tegra->lock);
+
+	flush_work(&tegra->id_extcon_work);
+
+	if (!pm_runtime_suspended(dev)) {
+		ret = tegra_xhci_powergate(tegra, false);
+		if (ret < 0)
+			return ret;
+	}
+
+	pm_runtime_disable(dev);
+
+	ret = enable_irq_wake(tegra->padctl_irq);
+	if (ret)
+		dev_err(tegra->dev, "failed to enable padctl wakes %d\n", ret);
+
+	return ret;
 }
 
 static int tegra_xhci_resume(struct device *dev)
 {
 	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
-	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
+	int ret;
 
-	return xhci_resume(xhci, 0);
+	ret = tegra_xhci_unpowergate(tegra);
+	if (ret < 0)
+		return ret;
+
+	mutex_lock(&tegra->lock);
+	tegra->suspended = false;
+	mutex_unlock(&tegra->lock);
+
+	tegra_xhci_update_otg_role(tegra);
+
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
+
+	disable_irq_wake(tegra->padctl_irq);
+
+	return 0;
 }
 #endif
 
