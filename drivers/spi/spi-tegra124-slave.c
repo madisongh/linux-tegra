@@ -2123,7 +2123,15 @@ static int tegra_spi_probe(struct platform_device *pdev)
 	if (pdata->dma_req_sel) {
 		ret = tegra_spi_init_dma_param(tspi, true);
 		if (ret < 0) {
-			dev_err(&pdev->dev, "RxDma Init failed, err %d\n", ret);
+			if (ret == -EPROBE_DEFER)
+				/* GPCDMA is not available at this point.
+				 * probe will be deferred */
+				dev_info(&pdev->dev,
+					"Probe Deferred, ret %d\n", ret);
+			else
+				dev_err(&pdev->dev,
+					"RxDma Init failed, err %d\n", ret);
+
 			goto exit_free_irq;
 		}
 
