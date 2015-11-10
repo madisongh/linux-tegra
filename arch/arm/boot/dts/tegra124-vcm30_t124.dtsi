@@ -320,6 +320,7 @@
 
 	otg@7d000000 {
 		nvidia,id-detection-type = <2>;
+		nvidia,enable-host-peripheral-transitions;
 		status = "okay";
 	};
 
