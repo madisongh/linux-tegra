@@ -174,6 +174,7 @@
 #define SPI_SPEED_TAP_DELAY_MARGIN 35000000
 #define SPI_DEFAULT_RX_TAP_DELAY 10
 #endif
+#define SPI_POLL_TIMEOUT 10000
 
 struct tegra_spi_data {
 	struct device				*dev;
@@ -185,6 +186,7 @@ struct tegra_spi_data {
 	phys_addr_t				phys;
 	unsigned				irq;
 	bool					clock_always_on;
+	bool					polling_mode;
 	bool					boost_reg_access;
 	u32					spi_max_frequency;
 	u32					cur_speed;
@@ -236,6 +238,7 @@ struct tegra_spi_data {
 
 static int tegra_spi_runtime_suspend(struct device *dev);
 static int tegra_spi_runtime_resume(struct device *dev);
+static int tegra_spi_status_poll(struct tegra_spi_data *tspi);
 static int tegra_spi_set_clock_rate(struct tegra_spi_data *tspi, u32 speed);
 
 static inline unsigned long tegra_spi_readl(struct tegra_spi_data *tspi,
@@ -554,11 +557,12 @@ static int tegra_spi_start_dma_based_transfer(
 	else
 		val |= SPI_TX_TRIG_8 | SPI_RX_TRIG_8;
 
-	if (tspi->cur_direction & DATA_DIR_TX)
-		val |= SPI_IE_TX;
-
-	if (tspi->cur_direction & DATA_DIR_RX)
-		val |= SPI_IE_RX;
+	if (!tspi->polling_mode) {
+		if (tspi->cur_direction & DATA_DIR_TX)
+			val |= SPI_IE_TX;
+		if (tspi->cur_direction & DATA_DIR_RX)
+			val |= SPI_IE_RX;
+	}
 
 	tegra_spi_writel(tspi, val, SPI_DMA_CTL);
 	tspi->dma_control_reg = val;
@@ -622,11 +626,12 @@ static int tegra_spi_start_cpu_based_transfer(
 	tegra_spi_writel(tspi, val, SPI_DMA_BLK);
 
 	val = 0;
-	if (tspi->cur_direction & DATA_DIR_TX)
-		val |= SPI_IE_TX;
-
-	if (tspi->cur_direction & DATA_DIR_RX)
-		val |= SPI_IE_RX;
+	if (!tspi->polling_mode) {
+		if (tspi->cur_direction & DATA_DIR_TX)
+			val |= SPI_IE_TX;
+		if (tspi->cur_direction & DATA_DIR_RX)
+			val |= SPI_IE_RX;
+	}
 
 	tegra_spi_writel(tspi, val, SPI_DMA_CTL);
 	tspi->dma_control_reg = val;
@@ -1042,8 +1047,11 @@ static int tegra_spi_wait_on_message_xfer(struct tegra_spi_data *tspi)
 {
 	int ret;
 
-	ret = wait_for_completion_timeout(&tspi->xfer_completion,
-			SPI_DMA_TIMEOUT);
+	if (tspi->polling_mode)
+		ret = tegra_spi_status_poll(tspi);
+	else
+		ret = wait_for_completion_timeout(&tspi->xfer_completion,
+				SPI_DMA_TIMEOUT);
 	if (WARN_ON(ret == 0)) {
 		dev_err(tspi->dev,
 				"spi trasfer timeout, err %d\n", ret);
@@ -1278,6 +1286,9 @@ static irqreturn_t tegra_spi_isr(int irq, void *context_data)
 {
 	struct tegra_spi_data *tspi = context_data;
 
+	if (tspi->polling_mode)
+		dev_warn(tspi->dev, "interrupt raised in polling mode\n");
+
 	tegra_spi_clear_status(tspi);
 	if (tspi->cur_direction & DATA_DIR_TX)
 		tspi->tx_status = tspi->status_reg &
@@ -1301,6 +1312,51 @@ static irqreturn_t tegra_spi_isr(int irq, void *context_data)
 	return IRQ_HANDLED;
 }
 
+static int tegra_spi_status_poll(struct tegra_spi_data *tspi)
+{
+	unsigned int status;
+	unsigned long timeout;
+
+	timeout = SPI_POLL_TIMEOUT;
+	/*
+	 * Read register would take between 1~3us and 1us delay added in loop
+	 * Calculate timeout taking this into consideration
+	 */
+	do {
+		status = tegra_spi_readl(tspi, SPI_TRANS_STATUS);
+		if (status & SPI_RDY)
+			break;
+		timeout--;
+		udelay(1);
+	} while (timeout);
+
+	if (!timeout) {
+		dev_err(tspi->dev, "transfer timeout (polling)\n");
+		return 0;
+	}
+
+	tegra_spi_clear_status(tspi);
+	if (tspi->cur_direction & DATA_DIR_TX)
+		tspi->tx_status = tspi->status_reg &
+					(SPI_TX_FIFO_UNF | SPI_TX_FIFO_OVF);
+
+	if (tspi->cur_direction & DATA_DIR_RX)
+		tspi->rx_status = tspi->status_reg &
+					(SPI_RX_FIFO_OVF | SPI_RX_FIFO_UNF);
+
+	if (!(tspi->cur_direction & DATA_DIR_TX) &&
+			!(tspi->cur_direction & DATA_DIR_RX))
+		dev_err(tspi->dev, "spurious interrupt, status_reg = 0x%x\n",
+				tspi->status_reg);
+
+	if (!tspi->is_curr_dma_xfer)
+		handle_cpu_based_err_xfer(tspi);
+	else
+		handle_dma_based_err_xfer(tspi);
+
+	return timeout;
+}
+
 static struct tegra_spi_platform_data *tegra_spi_parse_dt(
 		struct platform_device *pdev)
 {
@@ -1320,6 +1376,9 @@ static struct tegra_spi_platform_data *tegra_spi_parse_dt(
 
 	if (of_find_property(np, "nvidia,clock-always-on", NULL))
 		pdata->is_clkon_always = true;
+
+	if (of_find_property(np, "nvidia,polling-mode", NULL))
+		pdata->is_polling_mode = true;
 
 	if (of_find_property(np, "nvidia,boost-reg-access", NULL))
 		pdata->boost_reg_access = true;
@@ -1382,6 +1441,7 @@ static int tegra_spi_probe(struct platform_device *pdev)
 	tspi = spi_master_get_devdata(master);
 	tspi->master = master;
 	tspi->clock_always_on = pdata->is_clkon_always;
+	tspi->polling_mode = pdata->is_polling_mode;
 	tspi->boost_reg_access = pdata->boost_reg_access;
 	tspi->dev = &pdev->dev;
 	spin_lock_init(&tspi->lock);
