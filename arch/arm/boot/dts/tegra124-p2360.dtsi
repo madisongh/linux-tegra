@@ -168,6 +168,15 @@
 				};
 			};
 		};
+
+		max20024@68 {
+			/* Max20024 and Max77620 are identical in register map
+			 * and interpretation of all fields. So compatible with
+			 * max77620
+			 */
+			compatible = "maxim,max77620";
+			reg = <0x68>;
+		};
 	};
 
 
