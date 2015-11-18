@@ -146,6 +146,7 @@ struct tegra_adma {
 	struct device			*dev;
 	struct clk			*dma_clk;
 	struct clk			*ape_clk;
+	struct clk			*apb2ape_clk;
 	spinlock_t			global_lock;
 	void __iomem			*adma_addr[ADMA_MAX_ADDR];
 	void __iomem			*base_addr;
@@ -1279,13 +1280,23 @@ static int tegra_adma_probe(struct platform_device *pdev)
 
 #if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 		tdma->ape_clk = clk_get_sys(NULL, "adma.ape");
-#else
-		tdma->ape_clk = devm_clk_get(&pdev->dev, "adma.ape");
-#endif
 		if (IS_ERR(tdma->ape_clk)) {
 			dev_err(&pdev->dev, "Error: Missing APE clock\n");
 			return PTR_ERR(tdma->ape_clk);
 		}
+#else
+		tdma->ape_clk = devm_clk_get(&pdev->dev, "adma.ape");
+		if (IS_ERR(tdma->ape_clk)) {
+			dev_err(&pdev->dev, "Error: Missing APE clock\n");
+			return PTR_ERR(tdma->ape_clk);
+		}
+
+		tdma->apb2ape_clk = devm_clk_get(&pdev->dev, "apb2ape");
+		if (IS_ERR(tdma->apb2ape_clk)) {
+			dev_err(&pdev->dev, "Error: Missing APB2APE clock\n");
+			return PTR_ERR(tdma->apb2ape_clk);
+		}
+#endif
 	}
 
 	spin_lock_init(&tdma->global_lock);
@@ -1410,6 +1421,7 @@ err_pm_disable:
 	clk_put(tdma->ape_clk);
 #else
 	devm_clk_put(&pdev->dev, tdma->ape_clk);
+	devm_clk_put(&pdev->dev, tdma->apb2ape_clk);
 #endif
 	return ret;
 }
@@ -1431,6 +1443,7 @@ static int tegra_adma_remove(struct platform_device *pdev)
 	clk_put(tdma->ape_clk);
 #else
 	devm_clk_put(&pdev->dev, tdma->ape_clk);
+	devm_clk_put(&pdev->dev, tdma->apb2ape_clk);
 #endif
 	pm_runtime_disable(&pdev->dev);
 	if (!pm_runtime_status_suspended(&pdev->dev))
@@ -1448,6 +1461,9 @@ static int tegra_adma_runtime_suspend(struct device *dev)
 	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
 		clk_disable_unprepare(tdma->dma_clk);
 		clk_disable_unprepare(tdma->ape_clk);
+#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
+		clk_disable_unprepare(tdma->apb2ape_clk);
+#endif
 	}
 
 	return 0;
@@ -1465,7 +1481,13 @@ static int tegra_adma_runtime_resume(struct device *dev)
 			dev_err(dev, "clk_enable failed: %d\n", ret);
 			return ret;
 		}
-
+#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
+		ret = clk_prepare_enable(tdma->apb2ape_clk);
+		if (ret < 0) {
+			dev_err(dev, "clk_enable failed: %d\n", ret);
+			return ret;
+		}
+#endif
 		ret = clk_prepare_enable(tdma->dma_clk);
 		if (ret < 0) {
 			dev_err(dev, "clk_enable failed: %d\n", ret);
