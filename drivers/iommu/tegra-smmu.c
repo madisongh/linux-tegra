@@ -1911,9 +1911,7 @@ void smmu_dump_pagetable(int swgid, dma_addr_t fault)
 }
 
 static dma_addr_t tegra_smmu_inquired_iova;
-static phys_addr_t tegra_smmu_inquired_phys;
-static size_t tegra_smmu_inquired_bytes;
-static int tegra_smmu_inquired_npte;
+static struct smmu_as *tegra_smmu_inquired_as;
 
 static void smmu_dump_phys_page(struct seq_file *m, phys_addr_t phys)
 {
@@ -1947,6 +1945,18 @@ static void smmu_dump_phys_page(struct seq_file *m, phys_addr_t phys)
 
 static int smmu_iova2pa_show(struct seq_file *m, void *v)
 {
+	struct smmu_as *as = m->private;
+	phys_addr_t tegra_smmu_inquired_phys;
+	size_t tegra_smmu_inquired_bytes;
+	int tegra_smmu_inquired_npte;
+
+	if (tegra_smmu_inquired_as != as)
+		return -EINVAL;
+
+	tegra_smmu_inquired_bytes =
+		__smmu_iommu_iova_to_phys(as, tegra_smmu_inquired_iova,
+					  &tegra_smmu_inquired_phys,
+					  &tegra_smmu_inquired_npte);
 	seq_printf(m, "iova=%pa pa=%pa bytes=%zx npte=%d\n",
 		   &tegra_smmu_inquired_iova,
 		   &tegra_smmu_inquired_phys,
@@ -1983,14 +1993,10 @@ static ssize_t smmu_debugfs_iova2pa_write(struct file *file,
 	if (ret != 1)
 		return -EINVAL;
 
-	tegra_smmu_inquired_bytes =
-		__smmu_iommu_iova_to_phys(as, tegra_smmu_inquired_iova,
-					  &tegra_smmu_inquired_phys,
-					  &tegra_smmu_inquired_npte);
+	tegra_smmu_inquired_as = as;
 
-	pr_info("iova=%pa pa=%pa bytes=%zx npte=%d\n",
-		&tegra_smmu_inquired_iova, &tegra_smmu_inquired_phys,
-		tegra_smmu_inquired_bytes, tegra_smmu_inquired_npte);
+	pr_info("requested iova=%pa in as%03d\n", &tegra_smmu_inquired_iova,
+		as->asid);
 
 	return count;
 }
