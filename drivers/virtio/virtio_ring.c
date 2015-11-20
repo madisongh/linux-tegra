@@ -25,6 +25,10 @@
 #include <linux/hrtimer.h>
 #include <linux/kmemleak.h>
 
+#ifdef CONFIG_TEGRA_VIRTUALIZATION
+#include <linux/trusty/trusty.h>
+#endif
+
 #ifdef DEBUG
 /* For development, we want to crash whenever the ring is screwed. */
 #define BAD_RING(_vq, fmt, args...)				\
@@ -213,6 +217,9 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 		for (sg = sgs[n]; sg; sg = sg_next(sg)) {
 			desc[i].flags = cpu_to_virtio16(_vq->vdev, VRING_DESC_F_NEXT);
 			desc[i].addr = cpu_to_virtio64(_vq->vdev, sg_phys(sg));
+#ifdef CONFIG_TEGRA_VIRTUALIZATION
+			hyp_ipa_translate(&desc[i].addr);
+#endif
 			desc[i].len = cpu_to_virtio32(_vq->vdev, sg->length);
 			prev = i;
 			i = virtio16_to_cpu(_vq->vdev, desc[i].next);
@@ -222,6 +229,9 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 		for (sg = sgs[n]; sg; sg = sg_next(sg)) {
 			desc[i].flags = cpu_to_virtio16(_vq->vdev, VRING_DESC_F_NEXT | VRING_DESC_F_WRITE);
 			desc[i].addr = cpu_to_virtio64(_vq->vdev, sg_phys(sg));
+#ifdef CONFIG_TEGRA_VIRTUALIZATION
+			hyp_ipa_translate(&desc[i].addr);
+#endif
 			desc[i].len = cpu_to_virtio32(_vq->vdev, sg->length);
 			prev = i;
 			i = virtio16_to_cpu(_vq->vdev, desc[i].next);
