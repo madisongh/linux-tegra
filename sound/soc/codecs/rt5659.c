@@ -4035,7 +4035,7 @@ static int rt5659_remove(struct snd_soc_codec *codec)
 }
 
 #ifdef CONFIG_PM
-static int rt5659_suspend(struct snd_soc_codec *codec)
+static int __maybe_unused rt5659_suspend(struct snd_soc_codec *codec)
 {
 	struct rt5659_priv *rt5659 = snd_soc_codec_get_drvdata(codec);
 
@@ -4044,7 +4044,7 @@ static int rt5659_suspend(struct snd_soc_codec *codec)
 	return 0;
 }
 
-static int rt5659_resume(struct snd_soc_codec *codec)
+static int  __maybe_unused rt5659_resume(struct snd_soc_codec *codec)
 {
 	struct rt5659_priv *rt5659 = snd_soc_codec_get_drvdata(codec);
 
@@ -4135,8 +4135,10 @@ struct snd_soc_dai_driver rt5659_dai[] = {
 static struct snd_soc_codec_driver soc_codec_dev_rt5659 = {
 	.probe = rt5659_probe,
 	.remove = rt5659_remove,
+#if 0
 	.suspend = rt5659_suspend,
 	.resume = rt5659_resume,
+#endif
 	.set_bias_level = rt5659_set_bias_level,
 	.idle_bias_off = true,
 	.controls = rt5659_snd_controls,
