@@ -64,6 +64,17 @@
 	};
 
 	regulators {
+		en_vdd_cam_1v2: regulator@209 {
+			compatible = "regulator-fixed-sync";
+			reg = <209>;
+			regulator-name = "en-vdd-cam-1v2";
+			regulator-min-microvol = <1200000>;
+			regulator-max-microvol = <1200000>;
+			vin-supply = <&vdd_3v3>;
+			gpio = <&tca9539_77 3 1>;
+			enable-active-high;
+		};
+
 		en_vdd_vcm_2v8: regulator@210 {
 			compatible = "regulator-fixed-sync";
 			reg = <210>;
