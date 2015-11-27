@@ -73,9 +73,9 @@ static inline void mbox_writel(struct tegra_xusb_mbox *mbox, u32 val,
 
 #define mbox_readl(_mbox, _offset)					\
 ({									\
-	unsigned long v, o = _offset;					\
+	unsigned int v, o = _offset;					\
 	v = readl(_mbox->regs + o);					\
-	pr_debug("%s mbox_read %s(@0x%lx) = 0x%lx\n", __func__,		\
+	pr_debug("%s mbox_read %s(@0x%x) = 0x%x\n", __func__,		\
 		#_offset, o, v);					\
 	v;								\
 })
@@ -219,7 +219,7 @@ static bool tegra_xusb_mbox_last_tx_done(struct mbox_chan *chan)
 	return last_tx_done;
 }
 
-static const struct mbox_chan_ops tegra_xusb_mbox_chan_ops = {
+static struct mbox_chan_ops tegra_xusb_mbox_chan_ops = {
 	.send_data = tegra_xusb_mbox_send_data,
 	.startup = tegra_xusb_mbox_startup,
 	.shutdown = tegra_xusb_mbox_shutdown,
