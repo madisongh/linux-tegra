@@ -2027,24 +2027,23 @@ fail:
 int composite_os_desc_req_prepare(struct usb_composite_dev *cdev,
 				  struct usb_ep *ep0)
 {
-	int ret = 0;
+	struct usb_gadget *gadget = cdev->gadget;
+	int ret = -ENOMEM;
 
 	cdev->os_desc_req = usb_ep_alloc_request(ep0, GFP_KERNEL);
-	if (!cdev->os_desc_req) {
-		ret = PTR_ERR(cdev->os_desc_req);
-		goto end;
-	}
+	if (!cdev->os_desc_req)
+		return -ENOMEM;
 
 	/* OS feature descriptor length <= 4kB */
 	cdev->os_desc_req->buf = kmalloc(4096, GFP_KERNEL);
-	if (!cdev->os_desc_req->buf) {
-		ret = PTR_ERR(cdev->os_desc_req->buf);
-		kfree(cdev->os_desc_req);
-		goto end;
-	}
+	if (!cdev->os_desc_req->buf)
+		goto fail;
 	cdev->os_desc_req->context = cdev;
 	cdev->os_desc_req->complete = composite_setup_complete;
-end:
+	return 0;
+fail:
+	usb_ep_free_request(gadget->ep0, cdev->os_desc_req);
+	cdev->os_desc_req = NULL;
 	return ret;
 }
 
