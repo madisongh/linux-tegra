@@ -2910,10 +2910,18 @@ __alloc_pages_high_priority(gfp_t gfp_mask, unsigned int order,
 	return page;
 }
 
-static void wake_all_kswapds(unsigned int order, const struct alloc_context *ac)
+static void wake_all_kswapds(unsigned int order, struct alloc_context *ac)
 {
 	struct zoneref *z;
 	struct zone *zone;
+
+	/* Have this condition only on tegra and when ZRAM is disabled. */
+	if (config_enabled(CONFIG_ARCH_TEGRA) && !total_swap_pages)
+		/* Avoid kswapd for all higher zones */
+		for_each_zone_zonelist_nodemask(zone, z, ac->zonelist,
+						ac->high_zoneidx, ac->nodemask)
+			if (ac->high_zoneidx > zone_idx(zone) + 1)
+				ac->high_zoneidx = zone_idx(zone) + 1;
 
 	for_each_zone_zonelist_nodemask(zone, z, ac->zonelist,
 						ac->high_zoneidx, ac->nodemask)
