@@ -102,10 +102,10 @@ static int tps65132_post_disable(struct regulator_dev *rdev)
 	unsigned int act_dis_time_us = tps->reg_pdata[id].active_discharge_time;
 
 	if (gpio_is_valid(act_dis_gpio)) {
-		gpio_set_value(act_dis_gpio, 1);
+		gpio_set_value_cansleep(act_dis_gpio, 1);
 		usleep_range(act_dis_time_us,
 			act_dis_time_us + TPS65132_ACT_DIS_TIME_SLACK);
-		gpio_set_value(act_dis_gpio, 0);
+		gpio_set_value_cansleep(act_dis_gpio, 0);
 	}
 
 	return 0;
