@@ -1157,12 +1157,12 @@
 #define RT5659_I2S_BP_SFT			8
 #define RT5659_I2S_BP_NOR			(0x0 << 8)
 #define RT5659_I2S_BP_INV			(0x1 << 8)
-#define RT5659_I2S_DL_MASK			(0x3 << 2)
-#define RT5659_I2S_DL_SFT			2
-#define RT5659_I2S_DL_16			(0x0 << 2)
-#define RT5659_I2S_DL_20			(0x1 << 2)
-#define RT5659_I2S_DL_24			(0x2 << 2)
-#define RT5659_I2S_DL_8				(0x3 << 2)
+#define RT5659_I2S_DL_MASK			(0x3 << 4)
+#define RT5659_I2S_DL_SFT			4
+#define RT5659_I2S_DL_16			(0x0 << 4)
+#define RT5659_I2S_DL_20			(0x1 << 4)
+#define RT5659_I2S_DL_24			(0x2 << 4)
+#define RT5659_I2S_DL_8				(0x3 << 4)
 #define RT5659_I2S_DF_MASK			(0x3)
 #define RT5659_I2S_DF_SFT			0
 #define RT5659_I2S_DF_I2S			(0x0)
