@@ -2742,9 +2742,14 @@ static void ov5693_gpio_init(struct ov5693_info *info)
 			 info->pdata->num, ov5693_gpio[i].label);
 		err = gpio_request_one(info->gpio[type].gpio, flags, label);
 		if (err) {
-			dev_err(&info->i2c_client->dev,
-				"%s ERR %s %u\n", __func__, label,
-				info->gpio[type].gpio);
+			if (type == OV5693_GPIO_TYPE_PWRDN)
+				dev_err(&info->i2c_client->dev,
+					"%s ERR %s %u\n", __func__, label,
+					info->gpio[type].gpio);
+			else
+				dev_dbg(&info->i2c_client->dev,
+					"%s WARNING %s %u\n", __func__, label,
+					info->gpio[type].gpio);
 		} else {
 			info->gpio[type].own = true;
 			dev_dbg(&info->i2c_client->dev,
