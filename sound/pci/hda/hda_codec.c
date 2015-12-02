@@ -1545,6 +1545,8 @@ int snd_hda_ctl_add(struct hda_codec *codec, hda_nid_t nid,
 	int err;
 	unsigned short flags = 0;
 	struct hda_nid_item *item;
+	int pcmdev = codec->pcm_info->device;
+	char prefixed_ctl[50];
 
 	if (kctl->id.subdevice & HDA_SUBDEV_AMP_FLAG) {
 		flags |= HDA_NID_ITEM_AMP;
@@ -1555,6 +1557,12 @@ int snd_hda_ctl_add(struct hda_codec *codec, hda_nid_t nid,
 		nid = kctl->id.subdevice & 0xffff;
 	if (kctl->id.subdevice & (HDA_SUBDEV_NID_FLAG|HDA_SUBDEV_AMP_FLAG))
 		kctl->id.subdevice = 0;
+
+	/* Add prefix for mixer controls for handling multiple codec case*/
+	snprintf(prefixed_ctl, sizeof(prefixed_ctl), "%c %s", 'a' + pcmdev,
+			kctl->id.name);
+	strncpy(kctl->id.name, prefixed_ctl, sizeof(kctl->id.name));
+
 	err = snd_ctl_add(codec->card, kctl);
 	if (err < 0)
 		return err;
