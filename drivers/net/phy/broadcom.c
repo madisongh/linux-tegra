@@ -164,6 +164,8 @@
 #define  MII_BCM54XX_EXP_EXP96_MYST		0x0010
 #define MII_BCM54XX_EXP_EXP97			0x0f97
 #define  MII_BCM54XX_EXP_EXP97_MYST		0x0c0c
+#define MII_BCM54XX_TOPL_EXP_EXP40		0x0d40
+#define  MII_BCM54XX_TOPL_EXP_EXP40_AUTOGREEE	BIT(0)
 
 /*
  * BCM5482: Secondary SerDes registers
@@ -488,6 +490,12 @@ static int bcm54xx_config_init(struct phy_device *phydev)
 		reg |= BIT(14); /* Enable rx of extended pkts */
 		bcm89xx_shadow_write(phydev, MII_BCM89XX_SHD_AUX_CONTROL, reg);
 
+		/* disable AUTOEEEgr in TOP level expansion register 0x40
+		 * as needed for Native EEE to work.
+		 */
+		reg = bcm54xx_exp_read(phydev, MII_BCM54XX_TOPL_EXP_EXP40);
+		reg &= ~MII_BCM54XX_TOPL_EXP_EXP40_AUTOGREEE;
+		bcm54xx_exp_write(phydev, MII_BCM54XX_TOPL_EXP_EXP40, reg);
 	}
 
 	bcm54xx_phydsp_config(phydev);
