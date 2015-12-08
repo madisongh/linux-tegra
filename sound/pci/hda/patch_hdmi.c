@@ -65,6 +65,7 @@ MODULE_PARM_DESC(static_hdmi_pcm, "Don't restrict PCM parameters per ELD info");
 #define is_tegra21x(codec)  ((codec)->vendor_id == 0x10de0029)
 #define is_tegra_18x_sor0(codec)  ((codec)->vendor_id == 0x10de002d)
 #define is_tegra_18x_sor1(codec)  ((codec)->vendor_id == 0x10de002e)
+#define get_sor_num(codec)  (is_tegra_18x_sor0(codec) ? 0 : 1)
 
 struct hdmi_spec_per_cvt {
 	hda_nid_t cvt_nid;
@@ -1476,8 +1477,12 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 	if ((is_tegra21x(codec) || is_tegra_18x_sor0(codec)
 		|| is_tegra_18x_sor1(codec)) &&
 		(!eld->monitor_present || !eld->info.lpcm_sad_ready)) {
+		int sor_num;
+
+		sor_num = get_sor_num(codec);
+
 		if (!eld->monitor_present) {
-			if (tegra_hdmi_setup_hda_presence() < 0) {
+			if (tegra_hdmi_setup_hda_presence(sor_num) < 0) {
 				codec_warn(codec,
 					"HDMI: No HDMI device connected\n");
 				return -ENODEV;
@@ -1874,19 +1879,21 @@ static int generic_hdmi_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 #ifdef CONFIG_SND_HDA_TEGRA
 	if ((is_tegra21x(codec) || is_tegra_18x_sor0(codec)
 		|| is_tegra_18x_sor1(codec))) {
+		int sor_num;
 		int err = 0;
 
-		if (substream->runtime->channels == 2)
-			tegra_hdmi_audio_null_sample_inject(true);
-		else
-			tegra_hdmi_audio_null_sample_inject(false);
+		sor_num = get_sor_num(codec);
 
+		if (substream->runtime->channels == 2)
+			tegra_hdmi_audio_null_sample_inject(true, sor_num);
+		else
+			tegra_hdmi_audio_null_sample_inject(false, sor_num);
 		/* Set hdmi:audio freq and source selection*/
 		err = tegra_hdmi_setup_audio_freq_source(
-					substream->runtime->rate, HDA);
+				substream->runtime->rate, HDA, sor_num);
 		if ( err < 0 ) {
 			codec_err(codec,
-				"Unable to set hdmi audio freq to %d \n",
+				"Unable to set hdmi audio freq to %d\n",
 						substream->runtime->rate);
 			return err;
 		}
