@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,6 +40,7 @@
 #define MSELECT_TIMEOUT_TIMER_0                                     0x5c
 #define MSELECT_ERROR_STATUS_0                                      0x60
 #define MSELECT_DEFAULT_TIMEOUT                                 0xFFFFFF
+#define MSELECT_ERROR_STATUS_CLEAR				0x3FF
 
 static irqreturn_t tegra_hier_ictlr_irq_handler(int irq, void *data)
 {
@@ -126,6 +127,9 @@ static int tegra_hier_ictlr_mselect_init(struct platform_device *pdev,
 
 	tegra_hier_ictlr_set_mselect_timeout(ictlr, MSELECT_DEFAULT_TIMEOUT);
 
+	/*clear error status register */
+	writel(MSELECT_ERROR_STATUS_CLEAR,
+			ictlr->mselect_base + MSELECT_ERROR_STATUS_0);
 	reg = readl(ictlr->mselect_base + MSELECT_CONFIG_0);
 	writel(reg |
 		((1 << MSELECT_CONFIG_0_READ_TIMEOUT_EN_SLAVE0_SHIFT)  |
