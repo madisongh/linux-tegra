@@ -872,7 +872,7 @@ static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
 
 	fw_time = le32_to_cpu(cfg_tbl->fwimg_created_time);
 	time_to_tm(fw_time, 0, &fw_tm);
-	dev_info(dev, "Firmware timestamp: %ld-%02d-%02d %02d:%02d:%02d UTC, Version: %d.%d %s\n",
+	dev_info(dev, "Firmware timestamp: %ld-%02d-%02d %02d:%02d:%02d UTC, Version: %2x.%02x %s\n",
 		fw_tm.tm_year + 1900, fw_tm.tm_mon + 1,
 		fw_tm.tm_mday, fw_tm.tm_hour,
 		fw_tm.tm_min, fw_tm.tm_sec,
