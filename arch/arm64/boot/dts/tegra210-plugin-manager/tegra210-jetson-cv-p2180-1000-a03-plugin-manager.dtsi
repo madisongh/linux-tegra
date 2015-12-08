@@ -1,0 +1,28 @@
+/*
+ * tegra210-jetson-cv-p2180-1000-a03-plugin-manager.dtsi: P2180 plugin manager
+ *
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ */
+
+/ {
+	plugin-manager {
+		p2180-1000-a03@0 {
+			ids = "2180-1000-a03";
+			override@0 {
+				target = <&ina3221x_40>;
+				_overlay_ {
+					status = "okay";
+				};
+			};
+		};
+	};
+};
