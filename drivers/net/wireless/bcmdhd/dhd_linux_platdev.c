@@ -50,6 +50,7 @@
 #include <linux/irq.h>
 #include <mach/nct.h>
 #include <linux/gpio.h>
+#include <linux/sysedp.h>
 
 #if !defined(CONFIG_WIFI_CONTROL_FUNC)
 struct wifi_platform_data {
