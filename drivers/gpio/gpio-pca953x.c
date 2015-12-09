@@ -20,9 +20,7 @@
 #include <linux/platform_data/pca953x.h>
 #include <linux/slab.h>
 #include <linux/regulator/consumer.h>
-#ifdef CONFIG_OF_GPIO
 #include <linux/of_platform.h>
-#endif
 #include <linux/acpi.h>
 
 #define PCA953X_INPUT		0
