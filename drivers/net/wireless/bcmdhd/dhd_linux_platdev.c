@@ -57,6 +57,7 @@
 #ifdef CONFIG_BCMDHD_CUSTOM_SYSFS_TEGRA
 #include "dhd_custom_sysfs_tegra.h"
 #endif
+#include <linux/sysedp.h>
 
 #if !defined(CONFIG_WIFI_CONTROL_FUNC)
 struct wifi_platform_data {
