@@ -2573,6 +2573,19 @@ static u32 __compute_runnable_contrib(u64 n)
 	return contrib + runnable_avg_yN_sum[n];
 }
 
+static inline bool capacity_aware(void)
+{
+	return sched_feat(CAPACITY_AWARE);
+}
+
+static unsigned long scale_cpu_capacity(struct sched_domain *sd, int cpu)
+{
+	if (capacity_aware())
+		return arch_scale_cpu_capacity(sd, cpu);
+
+	return SCHED_CAPACITY_SCALE;
+}
+
 #if (SCHED_LOAD_SHIFT - SCHED_LOAD_RESOLUTION) != 10 || SCHED_CAPACITY_SHIFT != 10
 #error "load tracking assumes 2^10 as unit"
 #endif
@@ -2636,7 +2649,7 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 	sa->last_update_time = now;
 
 	scale_freq = arch_scale_freq_capacity(NULL, cpu);
-	scale_cpu = arch_scale_cpu_capacity(NULL, cpu);
+	scale_cpu = scale_cpu_capacity(NULL, cpu);
 
 	/* delta_w is the amount already accumulated against our next period */
 	delta_w = sa->period_contrib;
@@ -4707,11 +4720,6 @@ static long effective_load(struct task_group *tg, int cpu, long wl, long wg)
 
 #endif
 
-static inline bool capacity_aware(void)
-{
-	return sched_feat(CAPACITY_AWARE);
-}
-
 static unsigned int capacity_margin = 1280; /* ~20% margin */
 
 static int cpu_util(int cpu);
@@ -6305,7 +6313,7 @@ static unsigned long scale_rt_capacity(int cpu)
 
 static void update_cpu_capacity(struct sched_domain *sd, int cpu)
 {
-	unsigned long capacity = arch_scale_cpu_capacity(sd, cpu);
+	unsigned long capacity = scale_cpu_capacity(sd, cpu);
 	struct sched_group *sdg = sd->groups;
 
 	cpu_rq(cpu)->cpu_capacity_orig = capacity;
