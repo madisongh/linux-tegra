@@ -530,7 +530,9 @@ static inline int tegra_vi_i2c_power_enable(struct tegra_vi_i2c_dev *i2c_dev)
 static inline int tegra_vi_i2c_power_disable(struct tegra_vi_i2c_dev *i2c_dev)
 {
 	int ret = 0;
-	tegra_powergate_partition(TEGRA_POWERGATE_VE);
+
+	if (tegra_powergate_is_powered(TEGRA_POWERGATE_VE))
+		tegra_powergate_partition(TEGRA_POWERGATE_VE);
 
 	ret = regulator_disable(i2c_dev->reg);
 	if (ret)
