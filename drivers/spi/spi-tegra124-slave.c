@@ -1784,8 +1784,10 @@ static int tegra_spi_transfer_one_message(struct spi_master *master,
 		is_first_msg = false;
 		/* wait for spi-interrupt and handle transfer error */
 		ret = tegra_spi_wait_on_message_xfer(tspi);
-		if (ret)
+		if (ret) {
+			tegra_spi_slave_busy(tspi);
 			goto exit;
+		}
 
 		/* unpack and copy data to client */
 		ret = tegra_spi_handle_message(tspi, xfer);
