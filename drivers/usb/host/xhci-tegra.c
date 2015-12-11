@@ -1074,7 +1074,7 @@ MODULE_DEVICE_TABLE(of, tegra_xhci_of_match);
 
 static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 {
-	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
+	struct xhci_hcd *xhci;
 	int port = tegra->utmi_otg_port_base_1 - 1;
 	u32 status;
 	int wait;
@@ -1113,6 +1113,7 @@ role_update:
 
 	mutex_unlock(&tegra->lock);
 
+	xhci = hcd_to_xhci(tegra->hcd);
 	pm_runtime_get_sync(tegra->dev);
 	if (on) {
 		/* switch to host mode */
