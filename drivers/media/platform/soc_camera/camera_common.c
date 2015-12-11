@@ -268,8 +268,8 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 
 	err = v4l2_g_ctrl(s_data->ctrl_handler, &hdr_control);
 	if (err < 0) {
-		dev_err(&client->dev, "could not find device ctrl.\n");
-		return err;
+		dev_dbg(&client->dev, "could not find device ctrl.\n");
+		hdr_control.value = 0;
 	}
 
 	hdr_en = switch_ctrl_qmenu[hdr_control.value];
