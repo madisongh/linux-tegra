@@ -31,6 +31,8 @@
 static const struct camera_common_colorfmt camera_common_color_fmts[] = {
 	{V4L2_MBUS_FMT_SRGGB10_1X10, V4L2_COLORSPACE_SRGB},
 	{V4L2_MBUS_FMT_SRGGB8_1X8, V4L2_COLORSPACE_SRGB},
+	{V4L2_MBUS_FMT_UYVY8_2X8, V4L2_COLORSPACE_SRGB},
+	{V4L2_MBUS_FMT_RGBA8888_4X8_LE, V4L2_COLORSPACE_SRGB},
 };
 
 static struct tegra_io_dpd camera_common_csi_io[] = {
@@ -297,7 +299,9 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 			__func__, mf->width, mf->height);
 
 	if (mf->code != V4L2_MBUS_FMT_SRGGB8_1X8 &&
-		mf->code != V4L2_MBUS_FMT_SRGGB10_1X10)
+		mf->code != V4L2_MBUS_FMT_SRGGB10_1X10 &&
+		mf->code != V4L2_MBUS_FMT_RGBA8888_4X8_LE &&
+		mf->code != V4L2_MBUS_FMT_UYVY8_2X8)
 		mf->code = V4L2_MBUS_FMT_SRGGB10_1X10;
 
 	if (!fmt_match) {

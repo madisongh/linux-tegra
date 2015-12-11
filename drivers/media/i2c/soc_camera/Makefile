@@ -21,6 +21,7 @@ obj-$(CONFIG_SOC_CAMERA_OV9740)		+= ov9740.o
 obj-$(CONFIG_SOC_CAMERA_OV13860)		+= ov13860_v4l2.o
 obj-$(CONFIG_SOC_CAMERA_RJ54N1)		+= rj54n1cb0c.o
 obj-$(CONFIG_SOC_CAMERA_TW9910)		+= tw9910.o
+obj-$(CONFIG_SOC_CAMERA_TC358840)	+= tc358840_v4l2.o
 
 ifneq (,$(filter $(CONFIG_SOC_CAMERA_OV5693),y m))
 	ccflags-y += -I$(srctree)/drivers/media/platform/tegra

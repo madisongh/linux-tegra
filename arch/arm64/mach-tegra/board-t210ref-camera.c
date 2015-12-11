@@ -476,6 +476,43 @@ static struct platform_device t210ref_ov5693_f_soc_camera_device = {
 };
 #endif
 
+#if IS_ENABLED(CONFIG_SOC_CAMERA_TC358840)
+static int t210ref_tc358840_power(struct device *dev, int enable)
+{
+	return 0;
+}
+
+static struct i2c_board_info t210ref_tc358840_camera_i2c_device = {
+	I2C_BOARD_INFO("tc358840_v4l2", 0x1f),
+};
+
+static struct tegra_camera_platform_data
+t210ref_tc358840_camera_platform_data = {
+	.flip_v			= 0,
+	.flip_h			= 0,
+	.port			= TEGRA_CAMERA_PORT_CSI_C,
+	.lanes			= 4,
+	.continuous_clk		= 1,
+};
+
+static struct soc_camera_link tc358840_iclink = {
+	.bus_id		= 0, /* This must match the .id of tegra_vi01_device */
+	.board_info	= &t210ref_tc358840_camera_i2c_device,
+	.module_name	= "tc358840_v4l2",
+	.i2c_adapter_id	= 6, /* CAM I2C controller */
+	.power		= t210ref_tc358840_power,
+	.priv		= &t210ref_tc358840_camera_platform_data,
+};
+
+static struct platform_device t210ref_tc358840_soc_camera_device = {
+	.name	= "soc-camera-pdrv",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &tc358840_iclink,
+	},
+};
+#endif
+
 int t210ref_camera_init(void)
 {
 	pr_debug("%s: ++\n", __func__);
@@ -509,6 +546,11 @@ int t210ref_camera_init(void)
 		platform_device_register(&t210ref_ov5693_e_soc_camera_device);
 		platform_device_register(&t210ref_ov5693_f_soc_camera_device);
 	}
+#endif
+
+#if IS_ENABLED(CONFIG_SOC_CAMERA_TC358840)
+	if (of_machine_is_compatible("nvidia,jetson-cv"))
+		platform_device_register(&t210ref_tc358840_soc_camera_device);
 #endif
 
 	return 0;

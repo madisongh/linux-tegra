@@ -1,0 +1,54 @@
+/*
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include <dt-bindings/media/camera.h>
+#include <dt-bindings/platform/t210/t210.h>
+
+#define CAM_I2C_BUS	6
+
+#define CAM0_RST_L	TEGRA_GPIO(S, 4)
+#define CAM0_PWDN		TEGRA_GPIO(S, 7)
+#define CAM1_RST_L	TEGRA_GPIO(S, 5)
+#define CAM1_PWDN		TEGRA_GPIO(T, 0)
+
+/ {
+	tegra-camera-platform {
+		compatible = "nvidia, tegra-camera-platform";
+	};
+
+	tc358840@0f {
+		rst = <&gpio CAM0_RST_L GPIO_ACTIVE_HIGH>;
+		int = <&gpio TEGRA_GPIO(X, 2) GPIO_ACTIVE_HIGH>;
+		vif-supply = <&en_vdd_cam>;
+		vdig-supply = <&en_vdd_cam_1v2>;
+	};
+
+	gpio@6000d000 {
+		gpio-init-names = "default";
+		gpio-init-0 = <&gpio_default>;
+
+		gpio_default: default {
+			gpio-input = <
+				TEGRA_GPIO(X, 2)
+				>;
+			gpio-output-low = <
+				TEGRA_GPIO(S, 4)
+				>;
+		};
+	};
+};
+

@@ -1249,6 +1249,11 @@ static int vi2_channel_capture_setup(struct vi2_channel *chan)
 		data_type = TEGRA_IMAGE_DT_RAW12;
 		image_size = width * 12 / 8;
 		bypass_pixel_transform = 1;
+	} else if (chan->code == V4L2_MBUS_FMT_RGBA8888_4X8_LE) {
+		format = TEGRA_IMAGE_FORMAT_T_A8B8G8R8;
+		data_type = TEGRA_IMAGE_DT_RGB888;
+		image_size = width * 3;
+		bypass_pixel_transform = 0;
 	}
 
 	csi_regs_write(vi2_cam, chan, TEGRA_VI_CSI_IMAGE_DEF,
