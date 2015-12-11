@@ -57,6 +57,8 @@ static inline struct tegra_camera_platform_data *icd_to_pdata(
 
 #define icd_to_port(icd) (icd_to_pdata(icd)->port)
 #define icd_to_lanes(icd) (icd_to_pdata(icd)->lanes)
+#define icd_to_gang_port(icd) (icd_to_pdata(icd)->gang_port)
+#define icd_to_gang_mode(icd) (icd_to_pdata(icd)->gang_mode)
 
 struct tegra_camera;
 

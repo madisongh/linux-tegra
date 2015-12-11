@@ -490,8 +490,27 @@ static const struct v4l2_ctrl_ops tc358840_ctrl_ops = {
 	.s_ctrl		= tc358840_s_ctrl,
 };
 
+static const s64 gang_mode_ctrl_qmenu[] = {
+	CAMERA_GANG_DISABLED,
+	CAMERA_GANG_L_R,
+	CAMERA_GANG_R_L,
+	CAMERA_GANG_T_B,
+	CAMERA_GANG_B_T,
+};
+
 static struct v4l2_ctrl_config ctrl_config_list[] = {
 /* Do not change the name field for the controls! */
+	{
+		.ops = &tc358840_ctrl_ops,
+		.id = V4L2_CID_GANG_MODE,
+		.name = "Gang mode",
+		.type = V4L2_CTRL_TYPE_INTEGER_MENU,
+		.min = 1,
+		.max = 4,
+		.menu_skip_mask = 0,
+		.def = 1,
+		.qmenu_int = gang_mode_ctrl_qmenu,
+	},
 };
 
 static const struct regmap_config sensor_regmap_config = {
@@ -948,9 +967,28 @@ static int tc358840_pwr_init(struct tc358840 *priv)
 	return 0;
 }
 
+void set_def_res(struct tc358840 *priv, int gang_mode)
+{
+	switch (gang_mode) {
+	case CAMERA_GANG_L_R:
+	case CAMERA_GANG_R_L:
+		priv->s_data->def_width = priv->input.hactive;
+		priv->s_data->def_height = priv->input.vactive;
+		break;
+	case CAMERA_GANG_T_B:
+	case CAMERA_GANG_B_T:
+		priv->s_data->def_width = priv->input.hactive / 2;
+		priv->s_data->def_height = priv->input.vactive * 2;
+		break;
+	}
+	dev_info(&priv->i2c_client->dev, "gang_mode %d: size %i x %i\n",
+		gang_mode, priv->s_data->def_width, priv->s_data->def_height);
+}
+
 static irqreturn_t int_irq_handler(int irq, void *data)
 {
 	struct tc358840 *info = (struct tc358840_info *)data;
+	struct v4l2_control gang_mode_control;
 	u16 int_status, val2;
 	u8 hdmi_int0, hdmi_int1, clk_int, sys_int, sys_status;
 	int offset;
@@ -993,6 +1031,10 @@ static irqreturn_t int_irq_handler(int irq, void *data)
 				set_csi_split(info, DISABLE);
 			else
 				set_csi_split(info, LEFT_RIGHT);
+
+			gang_mode_control.id = V4L2_CID_GANG_MODE;
+			v4l2_g_ctrl(&info->ctrl_handler, &gang_mode_control);
+			set_def_res(info, gang_mode_control.value);
 
 			start_csi_tx(info);
 		}
@@ -1111,7 +1153,9 @@ static int tc358840_s_ctrl(struct v4l2_ctrl *ctrl)
 	int err = 0;
 
 	switch (ctrl->id) {
-		/* TODO: Add tc358840 specific ctrl here */
+	case V4L2_CID_GANG_MODE:
+		set_def_res(priv, ctrl->val);
+		break;
 	default:
 		pr_err("%s: unknown ctrl id.\n", __func__);
 		return -EINVAL;
@@ -1216,7 +1260,11 @@ fail:
 static int tc358840_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
+	struct tegra_camera_platform_data *tc358840_camera_data;
+	struct soc_camera_link *tc358840_camera_link;
 	struct camera_common_data *common_data;
+	struct v4l2_control gang_mode_control;
+	struct soc_camera_subdev_desc *ssdd;
 	struct tc358840 *priv;
 	int err;
 
@@ -1247,6 +1295,11 @@ static int tc358840_probe(struct i2c_client *client,
 
 	client->dev.of_node = of_find_node_by_name(NULL, "tc358840");
 
+	tc358840_camera_link = (struct soc_camera_link *)
+		soc_camera_i2c_to_desc(client);
+	tc358840_camera_data = (struct tegra_camera_platform_data *)
+		tc358840_camera_link->priv;
+
 	common_data->ctrl_handler	= &priv->ctrl_handler;
 	common_data->i2c_client		= client;
 	common_data->frmfmt		= &tc358840_frmfmt[0];
@@ -1270,6 +1323,10 @@ static int tc358840_probe(struct i2c_client *client,
 	err = tc358840_ctrls_init(priv);
 	if (err)
 		return err;
+
+	gang_mode_control.id = V4L2_CID_GANG_MODE;
+	gang_mode_control.value = (int)tc358840_camera_data->gang_mode;
+	v4l2_s_ctrl(NULL, common_data->ctrl_handler, &gang_mode_control);
 
 	/* Power init */
 	tc358840_pwr_init(priv);

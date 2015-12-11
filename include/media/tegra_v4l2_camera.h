@@ -32,6 +32,14 @@ enum tegra_camera_port {
 
 #define TEGRA_CAMERA_NUM_CSI_PORT	6
 
+enum camera_gang_mode {
+	CAMERA_GANG_DISABLED = 0,
+	CAMERA_GANG_L_R,
+	CAMERA_GANG_R_L,
+	CAMERA_GANG_T_B,
+	CAMERA_GANG_B_T,
+};
+
 struct tegra_camera_platform_data {
 	int			(*enable_camera)(struct platform_device *pdev);
 	void			(*disable_camera)(struct platform_device *pdev);
@@ -40,6 +48,8 @@ struct tegra_camera_platform_data {
 	enum tegra_camera_port	port;
 	int			lanes;		/* For CSI port only */
 	bool			continuous_clk;	/* For CSI port only */
+	int			gang_port;
+	enum camera_gang_mode   gang_mode;
 };
 
 struct i2c_camera_ctrl {

@@ -493,6 +493,8 @@ t210ref_tc358840_camera_platform_data = {
 	.port			= TEGRA_CAMERA_PORT_CSI_C,
 	.lanes			= 4,
 	.continuous_clk		= 1,
+	.gang_port		= TEGRA_CAMERA_PORT_CSI_E,
+	.gang_mode		= CAMERA_GANG_L_R,
 };
 
 static struct soc_camera_link tc358840_iclink = {
