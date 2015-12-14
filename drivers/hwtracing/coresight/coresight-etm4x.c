@@ -33,6 +33,7 @@
 #include <linux/uaccess.h>
 #include <linux/pm_runtime.h>
 #include <asm/sections.h>
+#include <linux/of.h>
 
 #include "coresight-etm4x.h"
 
@@ -2602,6 +2603,20 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 	struct resource *res = &adev->res;
 	struct coresight_desc *desc;
 	struct device_node *np = adev->dev.of_node;
+	struct device_node *np_cpu = NULL;
+
+	if (np) {
+		pdata = of_get_coresight_platform_data(dev, np);
+		if (IS_ERR(pdata))
+			return PTR_ERR(pdata);
+		np_cpu = of_parse_phandle(np, "cpu", 0);
+		if (np_cpu != of_get_cpu_node(pdata->cpu, NULL)) {
+			dev_err(dev, "Init CPU %d isn't the binding CPU in DTB!\n",
+				pdata->cpu);
+			return -ENODEV;
+		}
+		adev->dev.platform_data = pdata;
+	}
 
 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
 	if (!desc)
@@ -2610,13 +2625,6 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
 	if (!drvdata)
 		return -ENOMEM;
-
-	if (np) {
-		pdata = of_get_coresight_platform_data(dev, np);
-		if (IS_ERR(pdata))
-			return PTR_ERR(pdata);
-		adev->dev.platform_data = pdata;
-	}
 
 	drvdata->dev = &adev->dev;
 	dev_set_drvdata(dev, drvdata);
