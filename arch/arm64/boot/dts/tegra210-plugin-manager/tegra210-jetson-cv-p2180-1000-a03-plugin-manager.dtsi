@@ -15,12 +15,12 @@
 
 / {
 	plugin-manager {
-		p2180-1000-a03@0 {
-			ids = "2180-1000-a03";
+		p2180-1000-300@0 {
+			ids = "2180-1000-000", "2180-1000-100";
 			override@0 {
 				target = <&ina3221x_40>;
 				_overlay_ {
-					status = "okay";
+					status = "disabled";
 				};
 			};
 		};
