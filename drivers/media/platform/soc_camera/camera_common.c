@@ -259,6 +259,7 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 	int hdr_en;
 	int err;
 	int i;
+	bool fmt_match = false;
 
 	dev_dbg(&client->dev, "%s: size %i x %i\n", __func__,
 		 mf->width, mf->height);
@@ -285,6 +286,7 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 			s_data->mode = frmfmt[i].mode;
 			s_data->fmt_width = mf->width;
 			s_data->fmt_height = mf->height;
+			fmt_match = true;
 			break;
 		}
 	}
@@ -297,6 +299,11 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 	if (mf->code != V4L2_MBUS_FMT_SRGGB8_1X8 &&
 		mf->code != V4L2_MBUS_FMT_SRGGB10_1X10)
 		mf->code = V4L2_MBUS_FMT_SRGGB10_1X10;
+
+	if (!fmt_match) {
+		mf->width = s_data->def_width;
+		mf->height = s_data->def_height;
+	}
 
 	mf->field = V4L2_FIELD_NONE;
 	mf->colorspace = V4L2_COLORSPACE_SRGB;
