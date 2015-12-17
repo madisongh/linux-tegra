@@ -1530,6 +1530,12 @@ static int tegra_adma_runtime_resume(struct device *dev)
 		}
 	}
 
+	ret = tegra_adma_init(pdev, tdma->adma_addr);
+	if (ret) {
+		dev_err(dev, "tegra_adma_init failed: %d\n", ret);
+		return ret;
+	}
+
 	global_write(tdma, ADMA_GLOBAL_CMD, tdma->global_reg);
 
 	if (tdma->global_reg) {

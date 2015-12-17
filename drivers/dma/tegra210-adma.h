@@ -3,7 +3,7 @@
  *
  * Author: Dara Ramesh <dramesh@nvidia.com>
  *
- * Copyright (C) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,6 +24,7 @@
 #ifndef __MACH_TEGRA_ADMA_H
 #define __MACH_TEGRA_ADMA_H
 
+#include <linux/platform_device.h>
 
 /* Register offsets from ADMA*_BASE */
 #define ADMA_CH_CMD						0x00
@@ -180,5 +181,11 @@ enum tegra_adma_transfer_direction {
 	MEMORY_TO_AHUB = 4,
 	AHUB_TO_AHUB = 8,
 };
+
+static inline int tegra_adma_init(struct platform_device *pdev,
+				  void __iomem *adma_addr[])
+{
+	return 0;
+}
 
 #endif
