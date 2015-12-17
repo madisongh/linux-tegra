@@ -136,6 +136,9 @@
 #define FW_MAJOR_VERSION(x)		(((x) >> 24) & 0xff)
 #define FW_MINOR_VERSION(x)		(((x) >> 16) & 0xff)
 
+/* firmware retry limit */
+#define FW_RETRY_COUNT			(5)
+
 static struct of_device_id tegra_xusba_pd[] = {
 	{ .compatible = "nvidia, tegra186-xusba-pd", },
 	{},
@@ -291,6 +294,8 @@ struct tegra_xhci_hcd {
 	void *fw_data;
 	size_t fw_size;
 	dma_addr_t fw_dma_addr;
+	struct delayed_work firmware_retry_work;
+	int fw_retry_count;
 	bool fw_loaded;
 
 	struct dentry *debugfs_dir;
@@ -1196,7 +1201,6 @@ role_update:
 	pm_runtime_put_autosuspend(tegra->dev);
 
 }
-
 static void tegra_xhci_update_otg_role(struct tegra_xhci_hcd *tegra)
 {
 	if (IS_ERR(tegra->id_extcon))
@@ -1231,6 +1235,51 @@ static int tegra_xhci_id_notifier(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
+static void tegra_xhci_probe_finish(const struct firmware *fw, void *context);
+
+static void tegra_firmware_retry_work(struct work_struct *work)
+{
+	struct tegra_xhci_hcd *tegra;
+	struct device *dev;
+	int ret;
+	bool uevent = true;
+
+	tegra = container_of(to_delayed_work(work),
+			struct tegra_xhci_hcd, firmware_retry_work);
+	dev = tegra->dev;
+
+	if (++tegra->fw_retry_count >= FW_RETRY_COUNT) {
+		/*
+		 * Last retry.  If CONFIG_FW_LOADER_USER_HELPER_FALLBACK=y and
+		 * uevent=true, in udev based systems, userspace will not get
+		 * any chance to provide firmware file.  This happens due to
+		 * udev stubs aborting firmware requests made by kernel.
+		 *
+		 * Hence try now with uevent=false so that udev does not abort
+		 * syfs based firmware loading interface.  User can load the
+		 * firmware later at any point.
+		 *
+		 * NOTE: If !CONFIG_FW_LOADER_USER_HELPER &&
+		 * !CONFIG_FW_LOADER_USER_HELPER_FALLBACK, last retry will
+		 * be a direct try from rootfs like the previous retries.
+		 */
+		uevent = false;
+		dev_err(dev, "Leaving it upto user to load firmware!\n");
+	}
+
+	ret = request_firmware_nowait(THIS_MODULE, uevent,
+				tegra->soc_config->firmware_file,
+				tegra->dev, GFP_KERNEL, tegra,
+				tegra_xhci_probe_finish);
+	if (ret) {
+		dev_err(dev,
+			"Could not submit async request for firmware load %d\n"
+			, ret);
+		usb_put_hcd(tegra->hcd);
+		tegra->hcd = NULL;
+	}
+}
+
 static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 {
 	struct tegra_xhci_hcd *tegra = context;
@@ -1242,8 +1291,16 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	int i;
 
 	if (!fw) {
-		dev_warn(dev, "can't find firmware\n");
-		goto put_usb2_hcd;
+
+		if (tegra->fw_retry_count >= FW_RETRY_COUNT) {
+			dev_err(dev, "Giving up on firmware\n");
+			goto put_usb2_hcd;
+		}
+
+		dev_err(dev, "cannot find firmware....retry after 1 second\n");
+		schedule_delayed_work(&tegra->firmware_retry_work,
+					msecs_to_jiffies(1000));
+		return;
 	}
 
 	/* Load Falcon controller with its firmware. */
@@ -1668,6 +1725,8 @@ skip_clocks:
 	} else
 		dev_info(&pdev->dev, "no USB ID extcon found\n");
 
+	INIT_DELAYED_WORK(&tegra->firmware_retry_work,
+					tegra_firmware_retry_work);
 
 	ret = request_firmware_nowait(THIS_MODULE, true,
 				      tegra->soc_config->firmware_file,
@@ -1719,6 +1778,9 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 
 	fw_log_deinit(tegra);
 	tegra_xhci_debugfs_deinit(tegra);
+
+	cancel_delayed_work_sync(&tegra->firmware_retry_work);
+
 	if (tegra->fw_loaded) {
 		xhci = hcd_to_xhci(hcd);
 		usb_remove_hcd(xhci->shared_hcd);
