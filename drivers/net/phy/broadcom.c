@@ -493,9 +493,14 @@ static int bcm54xx_config_init(struct phy_device *phydev)
 		/* disable AUTOEEEgr in TOP level expansion register 0x40
 		 * as needed for Native EEE to work.
 		 */
-		reg = bcm54xx_exp_read(phydev, MII_BCM54XX_TOPL_EXP_EXP40);
-		reg &= ~MII_BCM54XX_TOPL_EXP_EXP40_AUTOGREEE;
-		bcm54xx_exp_write(phydev, MII_BCM54XX_TOPL_EXP_EXP40, reg);
+		err = bcm54xx_exp_read(phydev, MII_BCM54XX_TOPL_EXP_EXP40);
+		if (err < 0)
+			return err;
+		err &= ~MII_BCM54XX_TOPL_EXP_EXP40_AUTOGREEE;
+		err = bcm54xx_exp_write(phydev, MII_BCM54XX_TOPL_EXP_EXP40,
+					err);
+		if (err < 0)
+			return err;
 	}
 
 	bcm54xx_phydsp_config(phydev);
