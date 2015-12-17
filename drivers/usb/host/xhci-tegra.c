@@ -1782,7 +1782,9 @@ skip_clocks:
 	tegra->mbox_chan = mbox_request_channel(&tegra->mbox_client, 0);
 	if (IS_ERR(tegra->mbox_chan)) {
 		ret = PTR_ERR(tegra->mbox_chan);
-		dev_warn(&pdev->dev, "can't get mailbox channel (%d)\n", ret);
+		if (ret != -EPROBE_DEFER)
+			dev_warn(&pdev->dev,
+				"can't get mailbox channel (%d)\n", ret);
 		goto disable_regulator;
 	}
 
