@@ -3,7 +3,7 @@
  *
  * Driver for NCT1008, temperature monitoring device from ON Semiconductors
  *
- * Copyright (c) 2010-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2010-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1340,6 +1340,12 @@ static int nct1008_configure_sensor(struct nct1008_data *data)
 	ret = nct1008_write_reg(client, LOC_TEMP_LO_LIMIT_WR, 0);
 	if (ret)
 		goto error;
+
+	/* Initiate one-shot conversion  */
+	nct1008_write_reg(data->client, ONE_SHOT, 0x1);
+
+	/* Give hardware necessary time to finish conversion */
+	msleep(MAX_CONV_TIME_ONESHOT_MS);
 
 	/* read initial temperature */
 	ret = nct1008_read_reg(client, LOC_TEMP_RD);
