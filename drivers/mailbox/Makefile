@@ -18,4 +18,6 @@ obj-$(CONFIG_ALTERA_MBOX)	+= mailbox-altera.o
 obj-$(CONFIG_BCM2835_MBOX)	+= bcm2835-mailbox.o
 
 obj-$(CONFIG_STI_MBOX)		+= mailbox-sti.o
+
+CFLAGS_tegra-xusb-mailbox.o += -Werror
 obj-$(CONFIG_TEGRA_XUSB_MBOX)	+= tegra-xusb-mailbox.o
