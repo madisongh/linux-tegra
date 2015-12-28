@@ -1,7 +1,7 @@
 /*
  *  Header file contains constants and structures for tegra PCIe driver.
  *
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -43,4 +43,9 @@ int tegra_pcie_pm_control(enum tegra_pcie_pm_opt pm_opt, void *user);
 
 void tegra_pcie_port_enable_per_pdev(struct pci_dev *pdev);
 void tegra_pcie_port_disable_per_pdev(struct pci_dev *pdev);
+
+#if defined(CONFIG_TEGRA_PCI_USES_UPHY)
+bool tegra_phy_get_lane_rdet(struct phy *phy, u8 lane_num);
+#endif
+
 #endif
