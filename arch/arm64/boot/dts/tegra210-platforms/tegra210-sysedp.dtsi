@@ -1,7 +1,7 @@
 /*
  * arch/arm/boot/dts/tegra210-platforms/tegra210-sysedp.dtsi
  *
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -23,6 +23,8 @@
 		nvidia,gpu_cap_as_mw;
 		nvidia,gpu_supp_freq;
 		nvidia,corecap = <
+			6000     1000  2000 1600000   1000   2000 1600000       0   77   77
+			7000     1000  3000 1600000   1000   3000 1600000     744  154  154
 			8000     3000  3000 1600000   3000   3000 1600000    1654   77   77
 			9000     3000  3000 1600000   3000   3000 1600000    1654   77   77
 			10000    3000  4000 1600000   3000   4000 1600000    2150  154  154
