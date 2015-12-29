@@ -483,6 +483,9 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		goto out;
 	}
 
+	if (cq_host->ops->runtime_pm_get)
+		cq_host->ops->runtime_pm_get(mmc);
+
 	spin_lock_irqsave(&cq_host->cmdq_lock, flags);
 
 	if (mrq->cmdq_req->cmdq_req_flags & DCMD) {
@@ -531,6 +534,8 @@ static void cmdq_finish_data(struct mmc_host *mmc, unsigned int tag)
 
 	mrq = cq_host->mrq_slot[tag];
 	mrq->done(mrq);
+	if (cq_host->ops->runtime_pm_put)
+		cq_host->ops->runtime_pm_put(mmc);
 }
 
 irqreturn_t cmdq_irq(struct mmc_host *mmc, u32 intmask)

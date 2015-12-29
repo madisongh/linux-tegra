@@ -3133,6 +3133,20 @@ static int sdhci_cmdq_init(struct sdhci_host *host, struct mmc_host *mmc,
 {
 	return cmdq_init(host->cq_host, mmc, dma64);
 }
+
+static void sdhci_cmdq_runtime_pm_get(struct mmc_host *mmc)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+
+	sdhci_runtime_pm_get(host);
+}
+
+static void sdhci_cmdq_runtime_pm_put(struct mmc_host *mmc)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+
+	sdhci_runtime_pm_put(host);
+}
 #else
 static void sdhci_cmdq_clear_set_irqs(struct mmc_host *mmc, u32 clear, u32 set)
 {
@@ -3155,12 +3169,24 @@ static int sdhci_cmdq_init(struct sdhci_host *host, struct mmc_host *mmc,
 		return -ENOSYS;
 }
 
+static void sdhci_cmdq_runtime_pm_get(struct mmc_host *mmc)
+{
+
+}
+
+static void sdhci_cmdq_runtime_pm_put(struct mmc_host *mmc)
+{
+
+}
+
 #endif
 
 static const struct cmdq_host_ops sdhci_cmdq_ops = {
 	.clear_set_irqs = sdhci_cmdq_clear_set_irqs,
 	.set_data_timeout = sdhci_cmdq_set_data_timeout,
 	.dump_vendor_regs = sdhci_cmdq_dump_vendor_regs,
+	.runtime_pm_get = sdhci_cmdq_runtime_pm_get,
+	.runtime_pm_put = sdhci_cmdq_runtime_pm_put,
 };
 
 int sdhci_add_host(struct sdhci_host *host)

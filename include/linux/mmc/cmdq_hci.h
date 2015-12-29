@@ -158,6 +158,8 @@ struct cmdq_host_ops {
 	void (*dump_vendor_regs)(struct mmc_host *mmc);
 	void (*write_l)(struct cmdq_host *host, u32 val, int reg);
 	u32 (*read_l)(struct cmdq_host *host, int reg);
+	void (*runtime_pm_get)(struct mmc_host *mmc);
+	void (*runtime_pm_put)(struct mmc_host *mmc);
 };
 
 static inline void cmdq_writel(struct cmdq_host *host, u32 val, int reg)
