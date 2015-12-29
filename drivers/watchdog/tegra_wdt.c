@@ -339,7 +339,6 @@ static int tegra_wdt_open(struct inode *inode, struct file *file)
 		return -EBUSY;
 
 	wdt->status |= WDT_ENABLED;
-	wdt->timeout = heartbeat;
 	tegra_wdt_enable(wdt);
 	file->private_data = wdt;
 	return nonseekable_open(inode, file);
