@@ -379,6 +379,7 @@ obj-$(CONFIG_SND_SOC_WM9713)	+= snd-soc-wm9713.o
 obj-$(CONFIG_SND_SOC_WM_ADSP)	+= snd-soc-wm-adsp.o
 obj-$(CONFIG_SND_SOC_WM_HUBS)	+= snd-soc-wm-hubs.o
 obj-$(CONFIG_SND_SOC_RT5659)	+= snd-soc-rt5659.o
+obj-$(CONFIG_SND_SOC_RT5659)	+= snd-soc-rl6231.o
 obj-$(CONFIG_SND_SOC_ES755)     += audience/
 
 # Amp
