@@ -3806,6 +3806,8 @@ static int rt5659_parse_dt(struct rt5659_priv *rt5659, struct device *dev)
 		&rt5659->pdata.dmic1_data_pin);
 	device_property_read_u32(dev, "realtek,dmic2-data-pin",
 		&rt5659->pdata.dmic2_data_pin);
+	device_property_read_u32(dev, "realtek,jd-src",
+		&rt5659->pdata.jd_src);
 
 	return 0;
 }
@@ -4060,9 +4062,6 @@ static int rt5659_i2c_probe(struct i2c_client *i2c,
 		return -ENODEV;
 	}
 
-	/* FIXME - pass this info from device tree */
-	rt5659->pdata.dmic1_data_pin = RT5659_DMIC1_DATA_GPIO5;
-
 	regmap_write(rt5659->regmap, RT5659_RESET, 0);
 
 	rt5659_calibrate(rt5659);
@@ -4181,9 +4180,6 @@ static int rt5659_i2c_probe(struct i2c_client *i2c,
 			RT5659_DMIC_1_DP_MASK | RT5659_DMIC_2_DP_MASK,
 			RT5659_DMIC_1_DP_IN2N | RT5659_DMIC_2_DP_IN2P);
 	}
-
-	/*FIXME pass this info from device tree*/
-	rt5659->pdata.jd_src = RT5659_JD3;
 
 	switch (rt5659->pdata.jd_src) {
 	case RT5659_JD3:
