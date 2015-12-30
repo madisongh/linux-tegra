@@ -29,6 +29,7 @@
 #include <sound/initval.h>
 #include <sound/tlv.h>
 #include <sound/rt5659.h>
+#include <linux/of_gpio.h>
 
 #include "rl6231.h"
 #include "rt5659.h"
@@ -4203,8 +4204,10 @@ static int rt5659_i2c_probe(struct i2c_client *i2c,
 
 	INIT_DELAYED_WORK(&rt5659->jack_detect_work, rt5659_jack_detect_work);
 
-	/* FIXME: pass this info from device tree */
-	rt5659->i2c->irq = 542;
+	rt5659->i2c->irq = gpio_to_irq(of_get_gpio
+		(rt5659->i2c->dev.of_node, 0));
+	dev_dbg(&i2c->dev, "irq = %d, assigned for jack interrupt handling\n",
+		rt5659->i2c->irq);
 
 	if (rt5659->i2c->irq) {
 		ret = request_threaded_irq(rt5659->i2c->irq, NULL, rt5659_irq,
