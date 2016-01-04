@@ -1,7 +1,7 @@
 /*
  * NVIDIA Tegra xHCI host controller driver for T186/future chips
  *
- * Copyright (C) 2015, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2015-2016, NVIDIA Corporation.  All rights reserved.
  * Copyright (C) 2014 Google, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -908,6 +908,7 @@ static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
 		usleep_range(1000, 2000);
 	} while (time_is_after_jiffies(timeout));
 
+	val = ioread32(&op_regs->status);
 	if (val & STS_CNR) {
 		dev_err(dev, "XHCI Controller not ready. Falcon state: 0x%x\n",
 			csb_readl(tegra, XUSB_FALC_CPUCTL));
