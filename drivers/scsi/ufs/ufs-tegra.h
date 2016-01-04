@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Authors:
  *      VenkataJagadish.p	<vjagadish@nvidia.com>
@@ -82,8 +82,8 @@
 #define UFS_AUX_ADDR_RANGE	0x18
 
 /*UFS Clock Defines*/
-#define UFSHC_CLK_FREQ		51000000
-#define UFSDEV_CLK_FREQ		38400000
+#define UFSHC_CLK_FREQ		204000000
+#define UFSDEV_CLK_FREQ		19200000
 
 enum ufs_state {
 	UFSHC_INIT,
@@ -97,7 +97,7 @@ enum ufs_state {
  * HCLKFrequency in MHz.
  * HCLKDIV is used to generate 1usec tick signal used by Unipro.
  */
-#define UFS_VNDR_HCLKDIV_1US_TICK	0x33
+#define UFS_VNDR_HCLKDIV_1US_TICK	0xCC
 
 
 /*UFS host controller vendor specific registers */
