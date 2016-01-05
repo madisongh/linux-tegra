@@ -1,4 +1,5 @@
 # Generic MAILBOX API
+GCOV_PROFILE_tegra-xusb-mailbox.o := y
 
 obj-$(CONFIG_MAILBOX)		+= mailbox.o
 
