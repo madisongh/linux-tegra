@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2007 Atmel Corporation
  * Copyright (C) 2013 Intel Corporation
+ * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -346,7 +347,8 @@ static void result(const char *err, unsigned int n, unsigned int src_off,
 {
 	pr_info("%s: result #%u: '%s' with src_off=0x%x dst_off=0x%x len=0x%x (%lu)\n",
 		current->comm, n, err, src_off, dst_off, len, data);
-	if (err)
+
+	if (strcmp(err, "test passed") != 0)
 		error++;
 }
 
@@ -880,6 +882,8 @@ static void run_threaded_test(struct dmatest_info *info)
 	params->pq_sources = pq_sources;
 	params->timeout = timeout;
 	params->noverify = noverify;
+
+	error = 0;
 
 	request_channels(info, DMA_MEMCPY);
 	request_channels(info, DMA_XOR);
