@@ -362,6 +362,7 @@ struct mmc_host {
 #define MMC_CAP2_NO_SLEEP_CMD	(1 << 20)	/* cannot support sleep mode */
 #define MMC_CAP2_HW_CQ		(1 << 23)	/* support eMMC command queue */
 #define MMC_CAP2_CMDQ_QBR	(1 << 24)	/* CMDQ Queue barrier supported */
+#define MMC_CAP2_PERIODIC_CACHE_FLUSH	(1 << 26)
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
@@ -461,7 +462,10 @@ struct mmc_host {
 		int				num_funcs;
 	} embedded_sdio_data;
 #endif
-
+	bool			cache_flush_needed;
+	bool			en_periodic_cflush;
+	unsigned int		flush_timeout;
+	struct timer_list	flush_timer;
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
