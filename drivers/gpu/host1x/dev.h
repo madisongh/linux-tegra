@@ -136,9 +136,9 @@ struct host1x {
 	struct device_dma_parameters dma_parms;
 };
 
-void host1x_sync_writel(struct host1x *host1x, u32 r, u32 v);
+void host1x_sync_writel(struct host1x *host1x, u32 v, u32 r);
 u32 host1x_sync_readl(struct host1x *host1x, u32 r);
-void host1x_ch_writel(struct host1x_channel *ch, u32 r, u32 v);
+void host1x_ch_writel(struct host1x_channel *ch, u32 v, u32 r);
 u32 host1x_ch_readl(struct host1x_channel *ch, u32 r);
 
 static inline void host1x_hw_syncpt_restore(struct host1x *host,
