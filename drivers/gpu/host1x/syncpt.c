@@ -493,7 +493,7 @@ int host1x_syncpt_init(struct host1x *host)
 	if (!host->nop_sp)
 		return -ENOMEM;
 
-#ifdef TEGRA_HOST1X_DOWNSTREAM
+#ifdef CONFIG_TEGRA_HOST1X_DOWNSTREAM
 	syncpt[10].name = "avp";
 	syncpt[10].client_managed = true;
 	syncpt[26].name = "vblank0";
