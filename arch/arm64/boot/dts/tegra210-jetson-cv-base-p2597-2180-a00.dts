@@ -1,7 +1,7 @@
 /*
  * arch/arm64/boot/dts/tegra210-jetson-cv-base-p2597-2180-a00.dts
  *
- * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@
 #include "tegra210-platforms/tegra210-jetson-cv-powermon-p2180-1000-a00.dtsi"
 #include "tegra210-plugin-manager/tegra210-jetson-cv-p2180-1000-a03-plugin-manager.dtsi"
 #include "tegra210-platforms/tegra210-jetson-cpufreq.dtsi"
-
+#include "tegra210-platforms/tegra210-overrides/tegra210-power-dvfs-override-ucm1c.dtsi"
 
 / {
 	model = "jetson_cv";
