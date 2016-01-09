@@ -45,18 +45,26 @@ static irqreturn_t syncpt_thresh_isr(int irq, void *dev_id)
 {
 	struct host1x *host = dev_id;
 	unsigned long reg;
-	unsigned int i, id;
+	unsigned int i, set_bit;
 
 	for (i = 0; i < DIV_ROUND_UP(host->info->nb_pts, 32); i++) {
 		reg = host1x_sync_readl(host,
 			HOST1X_SYNC_SYNCPT_THRESH_CPU0_INT_STATUS(i));
-		for_each_set_bit(id, &reg, BITS_PER_LONG) {
-			struct host1x_syncpt *syncpt =
-				host->syncpt + (i * BITS_PER_LONG + id);
+		for_each_set_bit(set_bit, &reg, 32) {
+			struct host1x_syncpt *syncpt;
+			int id = i * 32 + set_bit;
+
+			if (unlikely(id < 0 || id >= host->info->nb_pts)) {
+				dev_err(host->dev,
+					"%s(): unexptected syncpt id %d\n",
+					__func__, id);
+				goto out;
+			}
+			syncpt = host->syncpt + id;
 			host1x_intr_syncpt_handle(syncpt);
 		}
 	}
-
+out:
 	return IRQ_HANDLED;
 }
 
