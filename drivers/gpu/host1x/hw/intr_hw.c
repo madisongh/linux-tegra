@@ -24,6 +24,16 @@
 #include "../intr.h"
 #include "../dev.h"
 
+
+static inline u32 bit_mask(u32 nr)
+{
+	return 1UL << (nr % 32);
+}
+static inline u32 bit_word(u32 nr)
+{
+	return nr / 32;
+}
+
 /*
  * Sync point threshold interrupt service function
  * Handles sync point threshold triggers, in interrupt context
@@ -33,10 +43,10 @@ static void host1x_intr_syncpt_handle(struct host1x_syncpt *syncpt)
 	unsigned int id = syncpt->id;
 	struct host1x *host = syncpt->host;
 
-	host1x_sync_writel(host, BIT_MASK(id),
-		HOST1X_SYNC_SYNCPT_THRESH_INT_DISABLE(BIT_WORD(id)));
-	host1x_sync_writel(host, BIT_MASK(id),
-		HOST1X_SYNC_SYNCPT_THRESH_CPU0_INT_STATUS(BIT_WORD(id)));
+	host1x_sync_writel(host, bit_mask(id),
+		HOST1X_SYNC_SYNCPT_THRESH_INT_DISABLE(bit_word(id)));
+	host1x_sync_writel(host, bit_mask(id),
+		HOST1X_SYNC_SYNCPT_THRESH_CPU0_INT_STATUS(bit_word(id)));
 
 	schedule_work(&syncpt->intr.work);
 }
@@ -125,17 +135,17 @@ static void _host1x_intr_set_syncpt_threshold(struct host1x *host,
 static void _host1x_intr_enable_syncpt_intr(struct host1x *host,
 					    unsigned int id)
 {
-	host1x_sync_writel(host, BIT_MASK(id),
-		HOST1X_SYNC_SYNCPT_THRESH_INT_ENABLE_CPU0(BIT_WORD(id)));
+	host1x_sync_writel(host, bit_mask(id),
+		HOST1X_SYNC_SYNCPT_THRESH_INT_ENABLE_CPU0(bit_word(id)));
 }
 
 static void _host1x_intr_disable_syncpt_intr(struct host1x *host,
 					     unsigned int id)
 {
-	host1x_sync_writel(host, BIT_MASK(id),
-		HOST1X_SYNC_SYNCPT_THRESH_INT_DISABLE(BIT_WORD(id)));
-	host1x_sync_writel(host, BIT_MASK(id),
-		HOST1X_SYNC_SYNCPT_THRESH_CPU0_INT_STATUS(BIT_WORD(id)));
+	host1x_sync_writel(host, bit_mask(id),
+		HOST1X_SYNC_SYNCPT_THRESH_INT_DISABLE(bit_word(id)));
+	host1x_sync_writel(host, bit_mask(id),
+		HOST1X_SYNC_SYNCPT_THRESH_CPU0_INT_STATUS(bit_word(id)));
 }
 
 static int _host1x_free_syncpt_irq(struct host1x *host)
