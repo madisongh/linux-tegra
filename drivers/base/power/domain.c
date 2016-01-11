@@ -23,16 +23,28 @@
 
 #define GENPD_RETRY_MAX_MS	250		/* Approximate */
 
+/*
+ * TODO: As we are trying to align power-domain code with upstream, and
+ * currently we are in transition phase. So, below check is added so that
+ * devices using downstream version don't break functionality. Once all the
+ * devices are made compatible with upstream, below 'if' check as well as code
+ * within it need to be removed.
+ */
 #define GENPD_DEV_CALLBACK(genpd, type, callback, dev)		\
 ({								\
 	type (*__routine)(struct device *__d); 			\
 	type __ret = (type)0;					\
 								\
 	__routine = genpd->dev_ops.callback; 			\
-	if (__routine) {					\
-		__ret = __routine(dev); 			\
+	if (!(genpd->flags & GENPD_FLAG_PM_UPSTREAM)) {		\
+		if (__routine) {				\
+			__ret = __routine(dev);			\
+		} else {					\
+			__routine = dev_gpd_data(dev)->ops.callback;	\
+			if (__routine)				\
+				__ret = __routine(dev);		\
+		}						\
 	} else {						\
-		__routine = dev_gpd_data(dev)->ops.callback;	\
 		if (__routine) 					\
 			__ret = __routine(dev);			\
 	}							\
@@ -919,7 +931,11 @@ static int pm_genpd_suspend(struct device *dev)
 
 	cancel_delayed_work_sync(&genpd->power_off_delayed_work);
 
-	return genpd->suspend_power_off ? 0 : genpd_suspend_dev(genpd, dev);
+	if (!(dev_to_genpd(dev)->flags & GENPD_FLAG_PM_UPSTREAM))
+		return genpd->suspend_power_off ? 0 :
+					genpd_suspend_dev(genpd, dev);
+	else
+		return genpd->suspend_power_off ? 0 : pm_generic_suspend(dev);
 }
 
 /**
@@ -942,7 +958,12 @@ static int pm_genpd_suspend_late(struct device *dev)
 
 	cancel_delayed_work_sync(&genpd->power_off_delayed_work);
 
-	return genpd->suspend_power_off ? 0 : genpd_suspend_late(genpd, dev);
+	if (!(dev_to_genpd(dev)->flags & GENPD_FLAG_PM_UPSTREAM))
+		return genpd->suspend_power_off ? 0 :
+					genpd_suspend_late(genpd, dev);
+	else
+		return genpd->suspend_power_off ? 0 :
+					pm_generic_suspend_late(dev);
 }
 
 /**
@@ -956,6 +977,9 @@ static int pm_genpd_suspend_noirq(struct device *dev)
 {
 	struct generic_pm_domain *genpd;
 	struct pm_subsys_data *psd;
+	int ret = 0;
+	struct pm_domain_data *pdd;
+	struct generic_pm_domain_data *gpd_data;
 
 	dev_dbg(dev, "%s()\n", __func__);
 
@@ -974,7 +998,20 @@ static int pm_genpd_suspend_noirq(struct device *dev)
 
 	cancel_delayed_work_sync(&genpd->power_off_delayed_work);
 
-	genpd_stop_dev(genpd, dev);
+	pdd = genpd_to_pdd(genpd, dev);
+	if (pdd) {
+		gpd_data = to_gpd_data(pdd);
+		if (gpd_data->need_save) {
+			ret = genpd_save_dev(genpd, dev);
+			if (ret)
+				return ret;
+		
+		}
+	}
+
+	ret = genpd_stop_dev(genpd, dev);
+	if (ret)
+		return ret;
 
 	/*
 	 * Since all of the "noirq" callbacks are executed sequentially, it is
@@ -1021,7 +1058,10 @@ static int pm_genpd_resume_noirq(struct device *dev)
 	pm_genpd_sync_poweron(genpd, true);
 	genpd->suspended_count--;
 
-	return genpd_start_dev(genpd, dev);
+	if (genpd->flags & GENPD_FLAG_PM_UPSTREAM)
+		return genpd_restore_dev(genpd, dev);
+	else
+		return genpd_start_dev(genpd, dev);
 }
 
 /**
@@ -1043,7 +1083,12 @@ static int pm_genpd_resume_early(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : genpd_resume_early(genpd, dev);
+	if (!(dev_to_genpd(dev)->flags & GENPD_FLAG_PM_UPSTREAM))
+		return genpd->suspend_power_off ? 0 :
+					genpd_resume_early(genpd, dev);
+	else
+		return genpd->suspend_power_off ? 0 :
+					pm_generic_resume_early(dev);
 }
 
 /**
@@ -1064,7 +1109,11 @@ static int pm_genpd_resume(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : genpd_resume_dev(genpd, dev);
+	if (!(dev_to_genpd(dev)->flags & GENPD_FLAG_PM_UPSTREAM))
+		return genpd->suspend_power_off ? 0 :
+						genpd_resume_dev(genpd, dev);
+	else
+		return genpd->suspend_power_off ? 0 : pm_generic_resume(dev);
 }
 
 /**
@@ -1085,7 +1134,11 @@ static int pm_genpd_freeze(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : genpd_freeze_dev(genpd, dev);
+	if (!(dev_to_genpd(dev)->flags & GENPD_FLAG_PM_UPSTREAM))
+		return genpd->suspend_power_off ? 0 :
+						genpd_freeze_dev(genpd, dev);
+	else
+		return genpd->suspend_power_off ? 0 : pm_generic_freeze(dev);
 }
 
 /**
@@ -1107,7 +1160,12 @@ static int pm_genpd_freeze_late(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : genpd_freeze_late(genpd, dev);
+	if (!(dev_to_genpd(dev)->flags & GENPD_FLAG_PM_UPSTREAM))
+		return genpd->suspend_power_off ? 0 :
+						genpd_freeze_late(genpd, dev);
+	else
+		 return genpd->suspend_power_off ? 0 :
+						pm_generic_freeze_late(dev);
 }
 
 /**
@@ -1172,7 +1230,12 @@ static int pm_genpd_thaw_early(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : genpd_thaw_early(genpd, dev);
+	if (!(dev_to_genpd(dev)->flags & GENPD_FLAG_PM_UPSTREAM))
+		return genpd->suspend_power_off ? 0 :
+						genpd_thaw_early(genpd, dev);
+	else
+		return genpd->suspend_power_off ? 0 :
+						pm_generic_thaw_early(dev);
 }
 
 /**
@@ -1193,7 +1256,11 @@ static int pm_genpd_thaw(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	return genpd->suspend_power_off ? 0 : genpd_thaw_dev(genpd, dev);
+	if (!(dev_to_genpd(dev)->flags & GENPD_FLAG_PM_UPSTREAM))
+		return genpd->suspend_power_off ? 0 :
+						genpd_thaw_dev(genpd, dev);
+	else
+		return genpd->suspend_power_off ? 0 : pm_generic_thaw(dev);
 }
 
 /**
@@ -1759,9 +1826,18 @@ static int pm_genpd_default_save_state(struct device *dev)
 {
 	int (*cb)(struct device *__dev);
 
-	cb = dev_gpd_data(dev)->ops.save_state;
-	if (cb)
-		return cb(dev);
+/*
+ * TODO: As we are trying to align power-domain code with upstream, and
+ * currently we are in transition phase. So, below check is added so that
+ * devices using downstream version don't break functionality. Once all the
+ * devices are made compatible with upstream, below check as well as code within
+ * it need to be removed.
+ */
+	if (!(dev_to_genpd(dev)->flags & GENPD_FLAG_PM_UPSTREAM)) {
+		cb = dev_gpd_data(dev)->ops.save_state;
+		if (cb)
+			return cb(dev);
+	}
 
 	if (dev->type && dev->type->pm)
 		cb = dev->type->pm->runtime_suspend;
@@ -1786,9 +1862,18 @@ static int pm_genpd_default_restore_state(struct device *dev)
 {
 	int (*cb)(struct device *__dev);
 
-	cb = dev_gpd_data(dev)->ops.restore_state;
-	if (cb)
-		return cb(dev);
+/*
+ * TODO: As we are trying to align power-domain code with upstream, and
+ * currently we are in transition phase. So, below check is added so that
+ * devices using downstream version don't break functionality. Once all the
+ * devices are made compatible with upstream, below check as well as code within
+ * it need to be removed.
+ */
+	if (!(dev_to_genpd(dev)->flags & GENPD_FLAG_PM_UPSTREAM)) {
+		cb = dev_gpd_data(dev)->ops.restore_state;
+		if (cb)
+			return cb(dev);
+	}
 
 	if (dev->type && dev->type->pm)
 		cb = dev->type->pm->runtime_resume;
@@ -1960,7 +2045,13 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
 	genpd->domain.ops.complete = pm_genpd_complete;
 	genpd->dev_ops.save_state = pm_genpd_default_save_state;
 	genpd->dev_ops.restore_state = pm_genpd_default_restore_state;
-
+/*
+ * TODO: As we are trying to align power-domain code with upstream, and
+ * currently we are in transition phase. So, below check is added so that
+ * devices using downstream version don't break functionality. Once all the
+ * devices are made compatible with upstream, the 'else' part and code within
+ * it need to be removed.
+ */
 	if (genpd->flags & GENPD_FLAG_PM_CLK) {
 		genpd->dev_ops.stop = pm_clk_suspend;
 		genpd->dev_ops.start = pm_clk_resume;

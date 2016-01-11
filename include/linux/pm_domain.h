@@ -19,6 +19,8 @@
 
 /* Defines used for the flags field in the struct generic_pm_domain */
 #define GENPD_FLAG_PM_CLK	(1U << 0) /* PM domain uses PM clk */
+#define GENPD_FLAG_PM_UPSTREAM	(1U << 1) /* Upstream implementation of */
+					  /* PM Domain*/
 
 enum gpd_status {
 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
