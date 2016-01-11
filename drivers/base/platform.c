@@ -561,7 +561,6 @@ static void platform_drv_shutdown(struct device *_dev)
 
 	if (drv->shutdown)
 		drv->shutdown(dev);
-	dev_pm_domain_detach(_dev, true);
 }
 
 static void platform_drv_late_shutdown(struct device *_dev)
