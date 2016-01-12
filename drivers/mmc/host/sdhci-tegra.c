@@ -1326,6 +1326,19 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	plat->enable_hw_cq =
 		of_property_read_bool(np, "nvidia,enable-hwcq");
 #endif
+	plat->en_periodic_cflush = of_property_read_bool(np,
+			"nvidia,en-periodic-cflush");
+	if (plat->en_periodic_cflush) {
+		val = 0;
+		of_property_read_u32(np, "nvidia,periodic-cflush-to", &val);
+		host->mmc->flush_timeout = val;
+		if (val == 0) {
+			plat->en_periodic_cflush = false;
+			dev_warn(dev, "Periodic cache flush feature disabled,"
+				"since flush timeout value is zero.\n");
+		}
+	}
+
 	tegra_host->plat = plat;
 	return mmc_of_parse(host->mmc);
 }
@@ -1477,6 +1490,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	}
 	if (plat->en_strobe)
 		host->mmc->caps2 |= MMC_CAP2_EN_STROBE;
+
+	if (plat->en_periodic_cflush)
+		host->mmc->caps2 |= MMC_CAP2_PERIODIC_CACHE_FLUSH;
 
 #ifdef CONFIG_MMC_CQ_HCI
 	if (plat->enable_hw_cq) {
