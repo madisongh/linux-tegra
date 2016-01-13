@@ -254,6 +254,7 @@ struct rm_tch_queue_info {
 /*=============================================================================
 	GLOBAL VARIABLES DECLARATION
 =============================================================================*/
+static struct miscdevice raydium_ts_miscdev;
 struct input_dev *g_input_dev;
 struct spi_device *g_spi;
 struct rm31080a_ts_para g_st_ts;
@@ -490,7 +491,8 @@ static void rm_tch_generate_event(struct rm_tch_ts *dev_touch,
 		break;
 	}
 	envp[1] = NULL;
-	kobject_uevent_env(&dev_touch->dev->kobj, KOBJ_CHANGE, envp);
+	kobject_uevent_env(&raydium_ts_miscdev.this_device->kobj,
+		KOBJ_CHANGE, envp);
 }
 
 /*===========================================================================*/
