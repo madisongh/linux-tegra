@@ -1,7 +1,7 @@
 /*
  * ADMA driver for Nvidia's Tegra ADMA controller.
  *
- * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1328,14 +1328,6 @@ static int tegra_adma_probe(struct platform_device *pdev)
 		}
 	}
 
-	/* Enable clock before accessing registers */
-	pm_runtime_get_sync(&pdev->dev);
-
-	/* Reset ADMA controller */
-	global_ch_write(tdma, ADMA_GLOBAL_INT_CLEAR, 0x1);
-	global_ch_write(tdma, ADMA_GLOBAL_INT_SET, 0x1);
-	global_write(tdma, ADMA_GLOBAL_SOFT_RESET, 0x1);
-
 	INIT_LIST_HEAD(&tdma->dma_dev.channels);
 	for (i = 0; i < tdma->nr_channels; i++) {
 		struct tegra_adma_chan *tdc = &tdma->channels[i];
@@ -1393,6 +1385,15 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	tdma->dma_dev.device_control = tegra_adma_device_control;
 	tdma->dma_dev.device_tx_status = tegra_adma_tx_status;
 	tdma->dma_dev.device_issue_pending = tegra_adma_issue_pending;
+
+	/* Enable clock before accessing registers */
+	pm_runtime_get_sync(&pdev->dev);
+
+	/* Reset ADMA controller */
+	global_ch_write(tdma, ADMA_GLOBAL_INT_CLEAR, 0x1);
+	global_ch_write(tdma, ADMA_GLOBAL_INT_SET, 0x1);
+	global_write(tdma, ADMA_GLOBAL_SOFT_RESET, 0x1);
+
 	/* Enable global ADMA registers */
 	global_write(tdma, ADMA_GLOBAL_CMD, 1);
 
@@ -1470,6 +1471,26 @@ static int tegra_adma_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_adma *tdma = platform_get_drvdata(pdev);
+	int i;
+
+	tdma->global_reg = global_read(tdma, ADMA_GLOBAL_CMD);
+
+	if (tdma->global_reg) {
+		for (i = 0; i < tdma->nr_channels; i++) {
+			struct tegra_adma_chan *tdc = &tdma->channels[i];
+			struct tegra_adma_chan_regs *ch_reg = &tdc->channel_reg;
+
+			ch_reg->tc = channel_read(tdc, ADMA_CH_TC);
+			ch_reg->src_ptr =
+				channel_read(tdc, ADMA_CH_LOWER_SOURCE_ADDR);
+			ch_reg->tgt_ptr =
+				channel_read(tdc, ADMA_CH_LOWER_TARGET_ADDR);
+			ch_reg->ctrl = channel_read(tdc, ADMA_CH_CTRL);
+			ch_reg->ahub_fifo_ctrl =
+				channel_read(tdc, ADMA_CH_AHUB_FIFO_CTRL);
+			ch_reg->config = channel_read(tdc, ADMA_CH_CONFIG);
+		}
+	}
 
 	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
 		clk_disable_unprepare(tdma->dma_clk);
@@ -1486,6 +1507,7 @@ static int tegra_adma_runtime_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_adma *tdma = platform_get_drvdata(pdev);
+	int i;
 	int ret;
 
 	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
@@ -1507,62 +1529,36 @@ static int tegra_adma_runtime_resume(struct device *dev)
 			return ret;
 		}
 	}
+
+	global_write(tdma, ADMA_GLOBAL_CMD, tdma->global_reg);
+
+	if (tdma->global_reg) {
+		for (i = 0; i < tdma->nr_channels; i++) {
+			struct tegra_adma_chan *tdc = &tdma->channels[i];
+			struct tegra_adma_chan_regs *ch_reg = &tdc->channel_reg;
+
+			channel_write(tdc, ADMA_CH_TC, ch_reg->tc);
+			channel_write(tdc, ADMA_CH_LOWER_SOURCE_ADDR,
+					ch_reg->src_ptr);
+			channel_write(tdc, ADMA_CH_LOWER_TARGET_ADDR,
+					ch_reg->tgt_ptr);
+			channel_write(tdc, ADMA_CH_CTRL, ch_reg->ctrl);
+			channel_write(tdc, ADMA_CH_AHUB_FIFO_CTRL,
+					ch_reg->ahub_fifo_ctrl);
+			channel_write(tdc, ADMA_CH_CONFIG, ch_reg->config);
+		}
+	}
 	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP
 static int tegra_adma_pm_suspend(struct device *dev)
 {
-	struct tegra_adma *tdma = dev_get_drvdata(dev);
-	int i;
-	int ret;
-
-	ret = tegra_adma_runtime_resume(dev);
-	if (ret < 0)
-		return ret;
-
-	tdma->global_reg = global_read(tdma, ADMA_GLOBAL_CMD);
-	for (i = 0; i < tdma->nr_channels; i++) {
-		struct tegra_adma_chan *tdc = &tdma->channels[i];
-		struct tegra_adma_chan_regs *ch_reg = &tdc->channel_reg;
-
-		ch_reg->tc = channel_read(tdc, ADMA_CH_TC);
-		ch_reg->src_ptr = channel_read(tdc, ADMA_CH_LOWER_SOURCE_ADDR);
-		ch_reg->tgt_ptr = channel_read(tdc, ADMA_CH_LOWER_TARGET_ADDR);
-		ch_reg->ctrl = channel_read(tdc, ADMA_CH_CTRL);
-		ch_reg->ahub_fifo_ctrl =
-			channel_read(tdc, ADMA_CH_AHUB_FIFO_CTRL);
-		ch_reg->config = channel_read(tdc, ADMA_CH_CONFIG);
-	}
-	tegra_adma_runtime_suspend(dev);
 	return 0;
 }
 
 static int tegra_adma_pm_resume(struct device *dev)
 {
-	struct tegra_adma *tdma = dev_get_drvdata(dev);
-	int i;
-	int ret;
-
-	ret = tegra_adma_runtime_resume(dev);
-	if (ret < 0)
-		return ret;
-
-	global_write(tdma, ADMA_GLOBAL_CMD, tdma->global_reg);
-
-	for (i = 0; i < tdma->nr_channels; i++) {
-		struct tegra_adma_chan *tdc = &tdma->channels[i];
-		struct tegra_adma_chan_regs *ch_reg = &tdc->channel_reg;
-
-		channel_write(tdc, ADMA_CH_TC, ch_reg->tc);
-		channel_write(tdc, ADMA_CH_LOWER_SOURCE_ADDR, ch_reg->src_ptr);
-		channel_write(tdc, ADMA_CH_LOWER_TARGET_ADDR, ch_reg->tgt_ptr);
-		channel_write(tdc, ADMA_CH_CTRL, ch_reg->ctrl);
-		channel_write(tdc, ADMA_CH_AHUB_FIFO_CTRL,
-				ch_reg->ahub_fifo_ctrl);
-		channel_write(tdc, ADMA_CH_CONFIG, ch_reg->config);
-	}
-	tegra_adma_runtime_suspend(dev);
 	return 0;
 }
 #endif
