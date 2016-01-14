@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2015, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA Corporation.  All rights reserved.
  * Copyright (C) 2014 Google, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -70,4 +70,8 @@ int tegra_phy_xusb_pretend_connected(struct phy *phy);
  *       < 0: error
  */
 int tegra_phy_xusb_remote_wake_detected(struct phy *phy);
+void tegra_phy_xusb_utmi_pad_power_on(struct phy *phy);
+void tegra_phy_xusb_utmi_pad_power_down(struct phy *phy);
+void tegra_phy_xusb_utmi_pad_chg_power_on(struct phy *phy);
+void tegra_phy_xusb_utmi_pad_chg_power_down(struct phy *phy);
 #endif /* __SOC_TEGRA_XUSB_H__ */
