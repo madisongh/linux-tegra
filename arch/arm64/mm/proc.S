@@ -117,13 +117,29 @@ ENTRY(cpu_do_suspend)
 	mrs	x9, vbar_el1
 	mrs	x10, mdscr_el1
 	mrs	x11, oslsr_el1
-	mrs	x12, s3_1_c15_c2_0
-	mrs	x13, sctlr_el1
 	stp	x2, x3, [x0]
+	mrs	x2, midr_el1
+	/*
+	 * cpuactlr_el1 is not defined on denver since it is an
+	 * implementation defined register. Accessing this on Denver
+	 * would cause undefined instruction exception on Denver.
+	 * So, skip accessing the register on Denver.
+	 */
+	lsr	x2, x2, #24
+	cmp	x2, #0x4e
+	beq	skip_actrl_save
+	mrs	x12, s3_1_c15_c2_0
+skip_actrl_save:
+	mrs	x13, sctlr_el1
 	stp	x4, x5, [x0, #16]
 	stp	x6, x7, [x0, #32]
 	stp	x8, x9, [x0, #48]
 	stp	x10, x11, [x0, #64]
+	/*
+	 * Save x12 irrespective of it has actrl_el1's contents as it is
+	 * only redundant but not incorrect as it won't be restored on
+	 * Denver
+	 */
 	stp	x12, x13, [x0, #80]
 	ret
 ENDPROC(cpu_do_suspend)
