@@ -26,6 +26,11 @@ const struct cpumask *cpu_coregroup_mask(int cpu);
 struct sched_domain;
 extern unsigned long arm64_arch_scale_cpu_capacity(struct sched_domain *sd,
 							int cpu);
+#ifdef CONFIG_CPU_FREQ
+#define arch_scale_freq_capacity arm64_arch_scale_freq_capacity
+extern unsigned long arm64_arch_scale_freq_capacity(struct sched_domain *sd,
+							int cpu);
+#endif
 #include <asm-generic/topology.h>
 
 #endif /* _ASM_ARM_TOPOLOGY_H */
