@@ -1329,11 +1329,6 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 		goto put_usb2_hcd;
 	device_wakeup_enable(tegra->hcd->self.controller);
 
-	/*
-	 * USB 2.0 roothub is stored in drvdata now. Swap it with the Tegra HCD.
-	 */
-	tegra->hcd = dev_get_drvdata(dev);
-	dev_set_drvdata(dev, tegra);
 	xhci = hcd_to_xhci(tegra->hcd);
 	xhci->shared_hcd = usb_create_shared_hcd(&tegra_xhci_hc_driver,
 						 dev, dev_name(dev),
@@ -1539,6 +1534,11 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	if (!hcd)
 		return -ENOMEM;
 	tegra->hcd = hcd;
+
+	/*
+	 * USB 2.0 roothub is stored in drvdata now. Swap it with the Tegra HCD.
+	 */
+	dev_set_drvdata(&pdev->dev, tegra);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
@@ -1776,10 +1776,8 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	struct usb_hcd *hcd = tegra->hcd;
 	struct xhci_hcd *xhci;
 
-	fw_log_deinit(tegra);
-	tegra_xhci_debugfs_deinit(tegra);
-
 	cancel_delayed_work_sync(&tegra->firmware_retry_work);
+	pm_runtime_get_sync(tegra->dev);
 
 	if (tegra->fw_loaded) {
 		xhci = hcd_to_xhci(hcd);
@@ -1799,10 +1797,6 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 					   &tegra->id_extcon_nb);
 	}
 
-	if (tegra->fw_data)
-		dma_free_coherent(tegra->dev, tegra->fw_size, tegra->fw_data,
-				  tegra->fw_dma_addr);
-
 	cancel_work_sync(&tegra->mbox_req_work);
 	mbox_free_channel(tegra->mbox_chan);
 	tegra_xhci_phy_disable(tegra);
@@ -1813,6 +1807,16 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	tegra_bwmgr_set_emc(tegra->bwmgr_handle, 0,
 		TEGRA_BWMGR_SET_EMC_SHARED_BW);
 	tegra_bwmgr_unregister(tegra->bwmgr_handle);
+
+	if (tegra->fw_data)
+		dma_free_coherent(tegra->dev, tegra->fw_size, tegra->fw_data,
+				  tegra->fw_dma_addr);
+	fw_log_deinit(tegra);
+
+	pm_runtime_disable(tegra->dev);
+	pm_runtime_put(tegra->dev);
+
+	tegra_xhci_debugfs_deinit(tegra);
 
 	return 0;
 }
