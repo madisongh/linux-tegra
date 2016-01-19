@@ -518,6 +518,7 @@ static int xhci_get_ports(struct usb_hcd *hcd, __le32 __iomem ***port_array)
 
 	return max_ports;
 }
+EXPORT_SYMBOL_GPL(xhci_get_ports);
 
 void xhci_set_link_state(struct xhci_hcd *xhci, __le32 __iomem **port_array,
 				int port_id, u32 link_state)
@@ -1209,6 +1210,7 @@ error:
 	spin_unlock_irqrestore(&xhci->lock, flags);
 	return retval;
 }
+EXPORT_SYMBOL_GPL(xhci_hub_control);
 
 /*
  * Returns 0 if the status hasn't changed, or the number of bytes in buf.
@@ -1270,6 +1272,7 @@ int xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 	spin_unlock_irqrestore(&xhci->lock, flags);
 	return status ? retval : 0;
 }
+EXPORT_SYMBOL_GPL(xhci_hub_status_data);
 
 #ifdef CONFIG_PM
 

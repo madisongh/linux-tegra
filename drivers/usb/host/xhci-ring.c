@@ -2778,6 +2778,7 @@ hw_died:
 
 	return IRQ_HANDLED;
 }
+EXPORT_SYMBOL_GPL(xhci_irq);
 
 irqreturn_t xhci_msi_irq(int irq, void *hcd)
 {
