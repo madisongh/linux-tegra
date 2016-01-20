@@ -112,6 +112,19 @@ static const struct of_device_id host1x_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, host1x_of_match);
 
+static int host1x_update_chara(struct host1x *host1x)
+{
+	host1x->host1x_chara.flags = 0;
+
+	return 0;
+}
+
+struct host1x_characteristics *host1x_get_chara(struct host1x *host1x)
+{
+	return &host1x->host1x_chara;
+}
+EXPORT_SYMBOL(host1x_get_chara);
+
 static int host1x_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *id;
@@ -207,6 +220,8 @@ static int host1x_probe(struct platform_device *pdev)
 	err = host1x_register(host);
 	if (err < 0)
 		goto fail_deinit_intr;
+
+	host1x_update_chara(host);
 
 	return 0;
 

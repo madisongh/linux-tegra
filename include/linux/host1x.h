@@ -39,11 +39,18 @@ enum host1x_class {
 };
 
 struct host1x_client;
+struct host1x;
 
 struct host1x_client_ops {
 	int (*init)(struct host1x_client *client);
 	int (*exit)(struct host1x_client *client);
 };
+
+struct host1x_characteristics {
+	__u64 flags;
+};
+
+struct host1x_characteristics *host1x_get_chara(struct host1x *host1x);
 
 struct host1x_client {
 	struct list_head list;

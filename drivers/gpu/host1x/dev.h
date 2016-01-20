@@ -139,6 +139,8 @@ struct host1x {
 
 	struct list_head list;
 	struct device_dma_parameters dma_parms;
+
+	struct host1x_characteristics host1x_chara;
 };
 
 void host1x_sync_writel(struct host1x *host1x, u32 v, u32 r);
