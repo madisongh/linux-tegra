@@ -79,7 +79,7 @@
 #define SR1NV_BLOCK_PROT			(0x7<<2)
 #define CR3V_512PAGE_SIZE			(1<<4)
 
-#define JEDEC_ID_S25FL512S	0x010220
+#define JEDEC_ID_S25FX512S	0x010220
 
 static int qspi_write_en(struct qspi *flash,
 		uint8_t is_enable, uint8_t is_sleep);
@@ -1328,8 +1328,8 @@ static int qspi_probe(struct spi_device *spi)
 		wait_till_ready(flash, FALSE);
 	}
 
-	/* Set 512 page size when s25fl512s */
-	if ((info->jedec_id == JEDEC_ID_S25FL512S) && (info->page_size == 512)) {
+	/* Set 512 page size when s25fx512s */
+	if ((info->jedec_id == JEDEC_ID_S25FX512S) && (info->page_size == 512)) {
 		status = qspi_read_any_reg(flash, RWAR_CR3V, &regval);
 		if (status) {
 			pr_err("error: %s RWAR_CR3V read failed: Status: x%x ",
