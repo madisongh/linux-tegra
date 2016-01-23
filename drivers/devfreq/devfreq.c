@@ -1066,7 +1066,7 @@ static ssize_t trans_stat_show(struct device *dev,
 	len = sprintf(buf, "   From  :   To\n");
 	len += sprintf(buf + len, "         :");
 	for (i = 0; i < max_state; i++)
-		len += sprintf(buf + len, "%8lu",
+		len += sprintf(buf + len, "%10lu",
 				devfreq->profile->freq_table[i]);
 
 	len += sprintf(buf + len, "   time(ms)\n");
@@ -1078,10 +1078,10 @@ static ssize_t trans_stat_show(struct device *dev,
 		} else {
 			len += sprintf(buf + len, " ");
 		}
-		len += sprintf(buf + len, "%8lu:",
+		len += sprintf(buf + len, "%9lu:",
 				devfreq->profile->freq_table[i]);
 		for (j = 0; j < max_state; j++)
-			len += sprintf(buf + len, "%8u",
+			len += sprintf(buf + len, "%9u",
 				devfreq->trans_table[(i * max_state) + j]);
 		len += sprintf(buf + len, "%10u\n",
 			jiffies_to_msecs(devfreq->time_in_state[i]));
