@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2015-2016 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -102,12 +102,36 @@ static int host1x_sync_fill_driver_data(struct sync_pt *sync_pt,
 	return sizeof(info);
 }
 
+static void host1x_sync_timeline_value_str(struct sync_timeline *timeline,
+					   char *str, int size)
+{
+	struct host1x_sync_timeline *tl =
+				(struct host1x_sync_timeline *)timeline;
+
+	snprintf(str, size, "%d",
+			host1x_syncpt_read_min(tl->syncpt));
+}
+
+static void host1x_sync_pt_value_str(struct sync_pt *sync_pt, char *str,
+				     int size)
+{
+	struct host1x_syncpt *syncpt;
+	u32 threshold = 0;
+
+	if (host1x_sync_pt_extract(sync_pt, &syncpt, &threshold))
+		snprintf(str, size, "%u", threshold);
+	else
+		snprintf(str, size, "%s", "0");
+}
+
 static const struct sync_timeline_ops host1x_timeline_ops = {
 	.driver_name = "host1x",
 	.dup = host1x_sync_pt_dup, /* marked required but never used anywhere */
 	.fill_driver_data = host1x_sync_fill_driver_data,
 	.has_signaled = host1x_sync_pt_has_signaled,
 	.compare = host1x_sync_pt_compare,
+	.timeline_value_str = host1x_sync_timeline_value_str,
+	.pt_value_str = host1x_sync_pt_value_str,
 };
 
 bool host1x_sync_fence_wait(struct sync_fence *fence,
