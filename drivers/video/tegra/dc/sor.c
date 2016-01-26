@@ -1,7 +1,7 @@
 /*
  * drivers/video/tegra/dc/sor.c
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -186,6 +186,7 @@ static int dbg_sor_show(struct seq_file *s, void *unused)
 	DUMP_REG(NV_SOR_DC(0));
 	DUMP_REG(NV_SOR_DC(1));
 	DUMP_REG(NV_SOR_LANE_DRIVE_CURRENT(0));
+	DUMP_REG(NV_SOR_LANE4_DRIVE_CURRENT(0));
 	DUMP_REG(NV_SOR_PR(0));
 	DUMP_REG(NV_SOR_LANE4_PREEMPHASIS(0));
 	DUMP_REG(NV_SOR_POSTCURSOR(0));
@@ -1230,6 +1231,9 @@ void tegra_dc_sor_enable_lvds(struct tegra_dc_sor_data *sor,
 	tegra_sor_writel(sor, NV_SOR_LVDS, reg_val);
 	tegra_sor_writel(sor, NV_SOR_LANE_DRIVE_CURRENT(sor->portnum),
 		0x40404040);
+	if (!conforming && (sor->dc->pdata->default_out->depth == 24))
+		tegra_sor_writel(sor, NV_SOR_LANE4_DRIVE_CURRENT(sor->portnum),
+			0x40);
 
 #if 0
 	tegra_sor_write_field(sor, NV_SOR_LVDS,
