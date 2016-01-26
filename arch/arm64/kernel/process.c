@@ -115,9 +115,8 @@ void machine_shutdown(void)
 void machine_halt(void)
 {
 	local_irq_disable();
-	console_lock();
-	console_unlock();
 	smp_send_stop();
+	console_unlock();
 	while (1);
 }
 
@@ -130,9 +129,8 @@ void machine_halt(void)
 void machine_power_off(void)
 {
 	local_irq_disable();
-	console_lock();
-	console_unlock();
 	smp_send_stop();
+	console_unlock();
 	if (pm_power_off)
 		pm_power_off();
 }
@@ -150,9 +148,8 @@ void machine_restart(char *cmd)
 {
 	/* Disable interrupts first */
 	local_irq_disable();
-	console_lock();
-	console_unlock();
 	smp_send_stop();
+	console_unlock();
 
 	/*
 	 * UpdateCapsule() depends on the system being reset via
