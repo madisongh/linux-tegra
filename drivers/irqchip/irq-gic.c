@@ -1385,7 +1385,15 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 			*hwirq += 16;
 
 		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+
+#ifdef CONFIG_TEGRA_APE_AGIC
+	if (of_device_is_compatible(to_of_node(fwspec->fwnode), TEGRA_AGIC_COMPAT)
+		&& (fwspec->param_count == 4) && (fwspec->param[3] < MAX_AGIC_INTERFACES))
+		return tegra_agic_route_interrupt(*hwirq, fwspec->param[3]);
+	return 0;
+#else
 		return 0;
+#endif
 	}
 
 	if (fwspec->fwnode->type == FWNODE_IRQCHIP) {
