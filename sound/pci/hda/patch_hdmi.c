@@ -4,7 +4,7 @@
  *
  *  Copyright(c) 2008-2010 Intel Corporation. All rights reserved.
  *  Copyright (c) 2006 ATI Technologies Inc.
- *  Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (c) 2008-2016, NVIDIA CORPORATION.  All rights reserved.
  *  Copyright (c) 2008 Wei Ni <wni@nvidia.com>
  *  Copyright (c) 2013 Anssi Hannula <anssi.hannula@iki.fi>
  *
@@ -1835,6 +1835,9 @@ static int intel_pin2port(hda_nid_t pin_nid)
  * HDMI callbacks
  */
 
+#define is_pcm_format(format) \
+	((format & (1 << AC_FMT_TYPE_SHIFT)) == (AC_FMT_TYPE_PCM))
+
 static int generic_hdmi_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 					   struct hda_codec *codec,
 					   unsigned int stream_tag,
@@ -1884,7 +1887,8 @@ static int generic_hdmi_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 
 		sor_num = get_sor_num(codec);
 
-		if (substream->runtime->channels == 2)
+		if ((substream->runtime->channels == 2) &&
+			is_pcm_format(format))
 			tegra_hdmi_audio_null_sample_inject(true, sor_num);
 		else
 			tegra_hdmi_audio_null_sample_inject(false, sor_num);
@@ -1931,9 +1935,20 @@ static int hdmi_pcm_close(struct hda_pcm_stream *hinfo,
 	struct hdmi_spec_per_cvt *per_cvt;
 	struct hdmi_spec_per_pin *per_pin;
 	int pinctl;
+	int sor_num;
 
 	if (hinfo->nid) {
 		cvt_idx = cvt_nid_to_cvt_index(codec, hinfo->nid);
+#if defined(CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA) && defined(CONFIG_TEGRA_DC)
+		if ((codec->preset->id == 0x10de0020) ||
+			(codec->preset->id == 0x10de0022) ||
+			(codec->preset->id == 0x10de0028) ||
+			(codec->preset->id == 0x10de0029) ||
+			(codec->preset->id == 0x10de002a)) {
+			sor_num = get_sor_num(codec);
+			tegra_hdmi_audio_null_sample_inject(false, sor_num);
+		}
+#endif
 		if (snd_BUG_ON(cvt_idx < 0))
 			return -EINVAL;
 		per_cvt = get_cvt(spec, cvt_idx);
