@@ -40,6 +40,7 @@ struct host1x_channel_ops {
 		    unsigned int id);
 	int (*submit)(struct host1x_job *job);
 	void (*push_wait)(struct host1x_channel *ch, u32 id, u32 thresh);
+	void (*enable_gather_filter)(struct host1x_channel *ch);
 };
 
 struct host1x_cdma_ops {
@@ -100,6 +101,7 @@ struct host1x_info {
 	int (*init)(struct host1x *host1x); /* initialize per SoC ops */
 	unsigned int sync_offset; /* offset of syncpoint registers */
 	u64 dma_mask; /* mask of addressable memory */
+	bool gather_filter_enabled;
 };
 
 struct host1x {
@@ -248,6 +250,12 @@ static inline void host1x_hw_channel_push_wait(struct host1x *host,
 					       u32 id, u32 thresh)
 {
 	host->channel_op->push_wait(channel, id, thresh);
+}
+
+static inline void host1x_hw_channel_enable_gather_filter(struct host1x *host,
+						   struct host1x_channel *channel)
+{
+	return host->channel_op->enable_gather_filter(channel);
 }
 
 static inline void host1x_hw_cdma_start(struct host1x *host,
