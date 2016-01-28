@@ -102,7 +102,8 @@ void host1x_job_put(struct host1x_job *job)
 EXPORT_SYMBOL(host1x_job_put);
 
 void host1x_job_add_gather(struct host1x_job *job, struct host1x_bo *bo,
-			   u32 words, u32 offset, struct sync_fence *pre_fence)
+			   u32 words, u32 offset, struct sync_fence *pre_fence,
+			   u32 class_id)
 {
 	struct host1x_job_gather *cur_gather = &job->gathers[job->num_gathers];
 
@@ -110,6 +111,7 @@ void host1x_job_add_gather(struct host1x_job *job, struct host1x_bo *bo,
 	cur_gather->bo = bo;
 	cur_gather->offset = offset;
 	cur_gather->pre_fence = pre_fence;
+	cur_gather->class_id = class_id;
 
 	job->num_gathers++;
 }

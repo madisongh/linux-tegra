@@ -265,8 +265,6 @@ struct host1x_job {
 	/* Function to reset the engine in case timeout occurs */
 	void (*reset)(struct device *dev);
 
-	/* Request a SETCLASS to this class */
-	u32 class;
 
 	/* Add a channel wait for previous ops to complete */
 	bool serialize;
@@ -280,7 +278,8 @@ struct host1x_job *host1x_job_alloc(struct host1x_channel *ch,
 				    u32 num_waitchks, u32 num_syncpts);
 void host1x_job_add_gather(struct host1x_job *job, struct host1x_bo *mem_id,
 			   u32 words, u32 offset,
-			   struct sync_fence *pre_fence);
+			   struct sync_fence *pre_fence,
+			   u32 class_id);
 struct host1x_job *host1x_job_get(struct host1x_job *job);
 void host1x_job_put(struct host1x_job *job);
 int host1x_job_pin(struct host1x_job *job, struct device *dev);
