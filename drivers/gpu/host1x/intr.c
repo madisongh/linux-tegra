@@ -20,6 +20,7 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/irq.h>
+#include <linux/pm_runtime.h>
 
 #include <trace/events/host1x.h>
 #include "channel.h"
@@ -115,8 +116,12 @@ static void reset_threshold_interrupt(struct host1x *host,
 static void action_submit_complete(struct host1x_waitlist *waiter)
 {
 	struct host1x_channel *channel = waiter->data;
+	int i;
 
 	host1x_cdma_update(&channel->cdma);
+
+	for (i = 0; i < waiter->count; i++)
+		pm_runtime_put_autosuspend(channel->dev);
 
 	/*  Add nr_completed to trace */
 	trace_host1x_channel_submit_complete(dev_name(channel->dev),
