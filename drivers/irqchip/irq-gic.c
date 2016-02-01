@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 2002 ARM Limited, All Rights Reserved.
  *
- *  Copyright (C) 2014, NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (C) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -276,8 +276,8 @@ int tegra_agic_route_interrupt(int irq, enum tegra_agic_cpu cpu)
 	if (irq_aff & (routing_cpu << shift)) {
 		raw_spin_unlock_irqrestore(&irq_controller_lock,
 							flags);
-		pr_info("routing agic irq %d to same cpu\n", irq);
-		return -EINVAL;
+		pr_debug("routing agic irq %d to same cpu\n", irq);
+		return 0;
 	}
 
 	val32 = readl(dist_base + irq_clear_enable);
