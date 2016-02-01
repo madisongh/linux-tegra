@@ -3,7 +3,7 @@
  *
  * Header file for managing AGIC interrupt controller
  *
- * Copyright (C) 2014-2015 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2016 NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -23,7 +23,8 @@
 
 enum tegra_agic_cpu {
 	TEGRA_AGIC_APE_HOST = 0,
-	TEGRA_AGIC_ADSP,
+	TEGRA_AGIC_ADSP = 1,
+	MAX_AGIC_INTERFACES,
 };
 
 /* AMISC Mailbox Full Interrupts */
