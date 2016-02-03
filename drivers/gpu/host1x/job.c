@@ -117,6 +117,18 @@ void host1x_job_add_gather(struct host1x_job *job, struct host1x_bo *bo,
 }
 EXPORT_SYMBOL(host1x_job_add_gather);
 
+void host1x_job_add_client_gather_address(struct host1x_job *job,
+					  struct host1x_bo *bo,
+					  u32 words,
+					  u32 class_id,
+					  dma_addr_t gather_address)
+{
+	host1x_job_add_gather(job, bo, words, 0, NULL, class_id);
+
+	job->gathers[job->num_gathers - 1].base = gather_address;
+}
+EXPORT_SYMBOL(host1x_job_add_client_gather_address);
+
 /*
  * NULL an already satisfied WAIT_SYNCPT host method, by patching its
  * args in the command stream. The method data is changed to reference

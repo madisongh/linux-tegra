@@ -282,6 +282,11 @@ void host1x_job_add_gather(struct host1x_job *job, struct host1x_bo *mem_id,
 			   u32 words, u32 offset,
 			   struct sync_fence *pre_fence,
 			   u32 class_id);
+void host1x_job_add_client_gather_address(struct host1x_job *job,
+					 struct host1x_bo *bo,
+					 u32 words,
+					 u32 class_id,
+					 dma_addr_t gather_address);
 struct host1x_job *host1x_job_get(struct host1x_job *job);
 void host1x_job_put(struct host1x_job *job);
 int host1x_job_pin(struct host1x_job *job, struct device *dev);
