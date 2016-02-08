@@ -12,6 +12,10 @@ Recommended properties:
                      Documentation/devicetree/bindings/spi/spi-bus.txt
 Optional properties:
 - nvidia,clock-always-on: Enable clock of spi always.
+- nvidia,boost-reg-access: In T210 and earlier chips SPI register access
+	is dependant on SPI clock frequency. Setting this option would
+	allow SPI clock frequency to be boosted. Benefitial when running
+	SPI at low frequencies with cpu based transfers. Default false.
 
 spi-client device controller properties:
 - nvidia,enable-hw-based-cs: (Boolean) Use the HW based CS if enabled.

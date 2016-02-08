@@ -1,7 +1,7 @@
 /*
  * spi-tegra.h: SPI interface for Nvidia Tegra20 SLINK controller.
  *
- * Copyright (C) 2011 NVIDIA Corporation
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ struct tegra_spi_platform_data {
 	int dma_req_sel;
 	unsigned int spi_max_frequency;
 	bool is_clkon_always;
+	bool boost_reg_access;
 };
 
 /*
