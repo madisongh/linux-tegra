@@ -1,7 +1,7 @@
 /*
  * SPI driver for NVIDIA's Tegra124 SPI Controller.
  *
- * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -71,14 +71,14 @@
 #define SPI_CS_SEL_3				(3 << 26)
 #define SPI_CS_SEL_MASK				(3 << 26)
 #define SPI_CS_SEL(x)				(((x) & 0x3) << 26)
-#define SPI_CS(x)				(((x) & 0x3) >> 26)
+#define SPI_CS(x)				(((x) >> 26) & 0x3)
 #define SPI_CONTROL_MODE_0			(0 << 28)
 #define SPI_CONTROL_MODE_1			(1 << 28)
 #define SPI_CONTROL_MODE_2			(2 << 28)
 #define SPI_CONTROL_MODE_3			(3 << 28)
 #define SPI_CONTROL_MODE_MASK			(3 << 28)
 #define SPI_MODE_SEL(x)				(((x) & 0x3) << 28)
-#define SPI_MODE(x)				(((x) & 0x3) >> 28)
+#define SPI_MODE(x)				(((x) >> 28) & 0x3)
 #define SPI_M_S					(1 << 30)
 #define SPI_PIO					(1 << 31)
 
