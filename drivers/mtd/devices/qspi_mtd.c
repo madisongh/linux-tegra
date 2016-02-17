@@ -388,68 +388,32 @@ static int qspi_quad_flag_set(struct qspi *flash, uint8_t is_set)
 		return status;
 	}
 
-	do {
-		if (tried++ == WE_RETRY_COUNT) {
-			pr_err(KERN_ERR "tried max times not changing Q bit\n");
-			return FAIL;
-		}
+	status = qspi_read_any_reg(flash, RWAR_CR1V, &regval);
+	if (status) {
+		pr_err("error: %s CR1V read failed: bset: %d, Status: x%x\n",
+			__func__, is_set, status);
+		return status;
+	}
 
-		status = qspi_write_en(flash, TRUE, FALSE);
-		if (status) {
-			pr_err("error: %s: WE failed: bset:%d, Status: x%x ",
-				__func__, is_set, status);
-			return status;
-		}
+	if (is_set)
+		regval |= 0x02;
+	else
+		regval &= ~0x02;
 
-		status = read_sr1_reg(flash, &regval);
-		if (status) {
-			pr_err("error: %s: RDSR failed: bset:%d, Status: x%x ",
-				__func__, is_set, status);
-			return status;
-		}
+	status = qspi_write_any_reg(flash, RWAR_CR1V, regval);
+	if (status) {
+		pr_err("error: %s CR1V write failed: bset: %d, Status: x%x\n",
+			__func__, is_set, status);
+		return status;
+	}
 
-		memset(t, 0, sizeof(t));
-		spi_message_init(&m);
-
-		tx_buf[0] = OPCODE_WRR;
-		tx_buf[1] = regval;
-		if (is_set) {
-			tx_buf[2] = QUAD_ENABLE;
-			comp = QUAD_ENABLE;
-		} else {
-			tx_buf[2] = QUAD_DISABLE;
-			comp = QUAD_DISABLE;
-		}
-
-		t[0].len = 3;
-		t[0].tx_buf = tx_buf;
-		t[0].bits_per_word = BITS8_PER_WORD;
-
-		set_mode(&t[0], FALSE, flash->curr_cmd_mode, STATUS_READ);
-		spi_message_add_tail(&t[0], &m);
-		err = spi_sync(flash->spi, &m);
-		if (err < 0) {
-			pr_err("error: %s spi_sync call failed: x%x",
-				__func__, status);
-			status = FAIL;
-		}
-		status = wait_till_ready(flash, FALSE);
-		if (status) {
-			pr_err("error: %s: WIP failed: bset:%d, Status: x%x ",
-				__func__, is_set, status);
-			return status;
-		}
-		status = qspi_read_any_reg(flash, RWAR_CR1V, &regval);
-		if (status) {
-			pr_err("error: %s CR1V read failed: bset:%d Sts: x%x\n",
-				__func__, is_set, status);
-			return status;
-		}
-
-	} while ((regval & QUAD_ENABLE) != comp);
+	status = wait_till_ready(flash, FALSE);
+	if (status) {
+		pr_err("error: %s: WIP failed: bset:%d, Status: x%x\n",
+			__func__, is_set, status);
+	}
 
 	flash->is_quad_set = is_set;
-
 	return status;
 }
 
@@ -571,6 +535,8 @@ static int erase_chip(struct qspi *flash)
 		pr_err("error: %s: WE failed: Status: x%x ", __func__, status);
 		return status;
 	}
+	copy_cmd_default(&flash->cmd_table,
+				&cmd_info_table[ERASE_BULK]);
 
 	/* Set up command buffer. */
 	cmd_opcode = OPCODE_CHIP_ERASE;
@@ -579,9 +545,9 @@ static int erase_chip(struct qspi *flash)
 	memset(t, 0, sizeof(t));
 	t[0].len = COMMAND_WIDTH;
 	t[0].tx_buf = &cmd_opcode;
-
-	set_mode(&t[0], flash->cmd_table.qcmd.is_ddr,
-		flash->cmd_table.qcmd.bus_width, cmd_opcode);
+	t[0].cs_change = TRUE;
+	set_mode(&t[0], FALSE,
+		X1, cmd_opcode);
 
 	spi_message_add_tail(&t[0], &m);
 	status = spi_sync(flash->spi, &m);
@@ -623,6 +589,8 @@ static int erase_sector(struct qspi *flash, u32 offset,
 		pr_err("error: %s: WE failed: Status: x%x ", __func__, err);
 		return err;
 	}
+	copy_cmd_default(&flash->cmd_table,
+				&cmd_info_table[ERASE_SECT]);
 
 	/* Set up command buffer. */
 	cmd_addr_buf[0] = erase_opcode;
@@ -637,8 +605,9 @@ static int erase_sector(struct qspi *flash, u32 offset,
 	t[0].len = (COMMAND_WIDTH + ADDRESS_WIDTH);
 	t[0].tx_buf = cmd_addr_buf;
 
-	set_mode(&t[0], flash->cmd_table.qcmd.is_ddr,
-		flash->cmd_table.qcmd.bus_width, flash->erase_opcode);
+	t[0].cs_change = TRUE;
+	set_mode(&t[0], FALSE,
+		X1, flash->erase_opcode);
 
 	spi_message_add_tail(&t[0], &m);
 
@@ -689,10 +658,6 @@ static int qspi_erase(struct mtd_info *mtd, struct erase_info *instr)
 	len = instr->len;
 
 	mutex_lock(&flash->lock);
-#if defined(QMODE_SWITCH_OPTIMIZED)
-	qspi_qpi_flag_set(flash, FALSE);
-	qspi_quad_flag_set(flash, FALSE);
-#endif
 	/* whole-chip erase? */
 	if (len == flash->mtd.size) {
 		if (erase_chip(flash)) {
@@ -809,7 +774,6 @@ static int qspi_read(struct mtd_info *mtd, loff_t from, size_t len,
 		flash->cmd_table.qcmd.post_txn =
 			flash->cmd_table.qcmd.post_txn - 1;
 	}
-
 	cmd_addr_buf[0] = flash->cmd_table.qcmd.op_code;
 	cmd_addr_buf[1] = (from >> 24) & 0xFF;
 	cmd_addr_buf[2] = (from >> 16) & 0xFF;
@@ -875,10 +839,6 @@ static int qspi_read(struct mtd_info *mtd, loff_t from, size_t len,
 		spi_message_add_tail(&t[2], &m);
 	}
 
-#if defined(QMODE_SWITCH_OPTIMIZED)
-	qspi_qpi_flag_set(flash, FALSE);
-#endif
-
 	/* Enable QUAD bit before doing QUAD i/o operation */
 	if (flash->cmd_table.qdata.bus_width == X4) {
 		err = qspi_quad_flag_set(flash, TRUE);
@@ -890,7 +850,6 @@ static int qspi_read(struct mtd_info *mtd, loff_t from, size_t len,
 
 	spi_sync(flash->spi, &m);
 
-#if !defined(QMODE_SWITCH_OPTIMIZED)
 	/* Disable QUAD bit before doing QUAD i/o operation */
 	if (flash->cmd_table.qdata.bus_width == X4) {
 		err = qspi_quad_flag_set(flash, FALSE);
@@ -900,7 +859,6 @@ static int qspi_read(struct mtd_info *mtd, loff_t from, size_t len,
 		}
 	}
 
-#endif
 
 	*retlen = m.actual_length -
 		(flash->cmd_table.qaddr.len + 1 +
@@ -936,14 +894,14 @@ static int qspi_write(struct mtd_info *mtd, loff_t to, size_t len,
 	if (cdata) {
 		if (len > cdata->x1_len_limit) {
 			copy_cmd_default(&flash->cmd_table,
-				&cmd_info_table[QPI_PAGE_PROGRAM]);
+				&cmd_info_table[PAGE_PROGRAM]);
 		} else {
 			copy_cmd_default(&flash->cmd_table,
 					&cmd_info_table[PAGE_PROGRAM]);
 		}
 	} else {
 		copy_cmd_default(&flash->cmd_table,
-				&cmd_info_table[QPI_PAGE_PROGRAM]);
+				&cmd_info_table[PAGE_PROGRAM]);
 	}
 
 	cmd_addr_buf[0] = opcode = flash->cmd_table.qcmd.op_code;
@@ -977,13 +935,6 @@ static int qspi_write(struct mtd_info *mtd, loff_t to, size_t len,
 		spi_message_add_tail(&t[1], &m);
 		/* Wait until finished previous write command. */
 
-		if ((flash->cmd_table.qcmd.bus_width == X4)
-			&& !err)
-			err = qspi_qpi_flag_set(flash, TRUE);
-		else if ((flash->cmd_table.qdata.bus_width == X4)
-			&& !err)
-			err = qspi_quad_flag_set(flash, TRUE);
-
 		if (err) {
 			pr_err("error: %s: QPI/QUAD set failed: Status: x%x ",
 				__func__, err);
@@ -1009,12 +960,6 @@ static int qspi_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 		*retlen = m.actual_length - (flash->cmd_table.qaddr.len + 1);
 clear_qmode:
-#if !defined(QMODE_SWITCH_OPTIMIZED)
-		if ((flash->cmd_table.qcmd.bus_width == X4) && !err)
-			qspi_qpi_flag_set(flash, FALSE);
-		else if ((flash->cmd_table.qdata.bus_width == X4) && !err)
-			qspi_quad_flag_set(flash, FALSE);
-#endif
 
 		mutex_unlock(&flash->lock);
 		return err;
@@ -1043,10 +988,6 @@ clear_qmode:
 		t[1].cs_change = TRUE;
 		spi_message_add_tail(&t[1], &m);
 
-		if ((flash->cmd_table.qcmd.bus_width == X4) && !err)
-			err = qspi_qpi_flag_set(flash, TRUE);
-		else if ((flash->cmd_table.qdata.bus_width == X4) && !err)
-			err = qspi_quad_flag_set(flash, TRUE);
 		if (err) {
 			pr_err("error: %s: QPI/QUAD set failed: Status: x%x ",
 				__func__, err);
@@ -1133,13 +1074,6 @@ clear_qmode:
 				(flash->cmd_table.qaddr.len + 1);
 		}
 clear_qmode1:
-#if !defined(QMODE_SWITCH_OPTIMIZED)
-		if ((flash->cmd_table.qcmd.bus_width == X4) && !err)
-			qspi_qpi_flag_set(flash, FALSE);
-		else if ((flash->cmd_table.qdata.bus_width == X4) && !err)
-			qspi_quad_flag_set(flash, FALSE);
-#endif
-
 		mutex_unlock(&flash->lock);
 
 		return err;
