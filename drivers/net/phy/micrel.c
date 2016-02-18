@@ -492,7 +492,16 @@ static int ksz9031_config_init(struct phy_device *phydev)
 				tx_data_skews, 4);
 	}
 
-	return ksz9031_center_flp_timing(phydev);
+	/* program RGMII control signal PAD skew */
+	ksz9031_extended_write(phydev, OP_DATA, 2, MII_KSZ9031RN_CONTROL_PAD_SKEW, 0x70);
+
+	/* program RGMII Tx PAD skew */
+	ksz9031_extended_write(phydev, OP_DATA, 2, MII_KSZ9031RN_TX_DATA_PAD_SKEW, 0x0);
+
+	/* program RGMII CLK PAD skew */
+	ksz9031_extended_write(phydev, OP_DATA, 2, MII_KSZ9031RN_CLK_PAD_SKEW, 0x3fef);
+
+	return 0;
 }
 
 #define KSZ8873MLL_GLOBAL_CONTROL_4	0x06
