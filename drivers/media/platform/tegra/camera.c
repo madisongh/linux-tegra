@@ -178,6 +178,20 @@ int __camera_get_params(
 	return 0;
 }
 
+static int camera_validate_p_i2c_table(struct camera_info *cam,
+		const struct nvc_param *params,
+		const struct camera_reg *p_i2c_table, const char *caller)
+{
+	u32 idx, last_idx = params->sizeofvalue / sizeof(p_i2c_table[0]);
+
+	for (idx = 0; idx < last_idx; idx++)
+		if (p_i2c_table[idx].addr == CAMERA_TABLE_END)
+			return 0;
+
+	dev_err(cam->dev, "%s: table is not properly terminated\n", caller);
+	return -EINVAL;
+}
+
 static int camera_seq_rd(struct camera_info *cam, unsigned long arg)
 {
 	struct nvc_param params;
@@ -189,6 +203,10 @@ static int camera_seq_rd(struct camera_info *cam, unsigned long arg)
 	if (err)
 		return err;
 
+	err = camera_validate_p_i2c_table(cam, &params, p_i2c_table, __func__);
+	if (err)
+		goto seq_rd_end;
+
 	err = camera_dev_rd_table(cam->cdev, p_i2c_table);
 	if (!err && copy_to_user(MAKE_USER_PTR(params.p_value),
 		p_i2c_table, params.sizeofvalue)) {
@@ -197,6 +215,7 @@ static int camera_seq_rd(struct camera_info *cam, unsigned long arg)
 		err = -EINVAL;
 	}
 
+seq_rd_end:
 	kfree(p_i2c_table);
 	return err;
 }
@@ -250,6 +269,10 @@ static int camera_seq_wr(struct camera_info *cam, unsigned long arg)
 		err = -EFAULT;
 		goto seq_wr_end;
 	}
+
+	err = camera_validate_p_i2c_table(cam, &params, p_i2c_table, __func__);
+	if (err)
+		goto seq_wr_end;
 
 	switch (params.param) {
 	case CAMERA_SEQ_REGISTER_EXEC:
