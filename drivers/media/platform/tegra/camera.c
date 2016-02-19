@@ -1,7 +1,7 @@
 /*
  * camera.c - generic camera device driver
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Contributors:
  *	Charlie Huang <chahuang@nvidia.com>
@@ -131,12 +131,12 @@ int camera_copy_user_params(unsigned long arg, struct nvc_param *prm)
 }
 #endif
 
-int camera_get_params(
+int __camera_get_params(
 	struct camera_info *cam, unsigned long arg, int u_size,
-	struct nvc_param *prm, void **data)
+	struct nvc_param *prm, void **data, bool zero_size_ok)
 {
 	void *buf;
-	unsigned size;
+	size_t size;
 
 #ifdef CONFIG_COMPAT
 	memset(prm, 0, sizeof(*prm));
@@ -156,9 +156,14 @@ int camera_get_params(
 	if (!data)
 		return 0;
 
+	if (zero_size_ok && prm->sizeofvalue == 0) {
+		*data = ZERO_SIZE_PTR;
+		return 0;
+	}
+
 	size = prm->sizeofvalue * u_size;
-	buf = kzalloc(size, GFP_KERNEL);
-	if (!buf) {
+	buf = kcalloc(prm->sizeofvalue, u_size, GFP_KERNEL);
+	if (ZERO_OR_NULL_PTR(buf)) {
 		dev_err(cam->dev, "%s allocate memory failed!\n", __func__);
 		return -ENOMEM;
 	}
@@ -231,7 +236,7 @@ static int camera_seq_wr(struct camera_info *cam, unsigned long arg)
 	}
 
 	p_i2c_table = devm_kzalloc(cdev->dev, params.sizeofvalue, GFP_KERNEL);
-	if (p_i2c_table == NULL) {
+	if (ZERO_OR_NULL_PTR(p_i2c_table)) {
 		dev_err(cam->dev, "%s devm_kzalloc err line %d\n",
 			__func__, __LINE__);
 		return -ENOMEM;
@@ -586,7 +591,8 @@ static int camera_update(struct camera_info *cam, unsigned long arg)
 		return err;
 	}
 
-	err = camera_get_params(cam, arg, sizeof(*upd), &param, (void **)&upd);
+	err = __camera_get_params(cam, arg, sizeof(*upd), &param, (void **)&upd,
+			true);
 	if (err)
 		return err;
 

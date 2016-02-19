@@ -337,7 +337,7 @@ struct camera_chip {
 	int	(*power_off)(struct camera_device *cdev);
 	int	(*shutdown)(struct camera_device *cdev);
 	int	(*update)(struct camera_device *cdev,
-			struct cam_update *upd, int num);
+			struct cam_update *upd, u32 num);
 };
 
 struct camera_sync_dev {
@@ -386,8 +386,14 @@ struct camera_platform_info {
 };
 
 /* common functions */
-int camera_get_params(
-	struct camera_info *, unsigned long, int, struct nvc_param *, void **);
+int __camera_get_params(
+	struct camera_info *, unsigned long, int, struct nvc_param *, void **,
+	bool);
+static inline int camera_get_params(struct camera_info *cam, unsigned long arg,
+		int u_size, struct nvc_param *prm, void **data)
+{
+	return __camera_get_params(cam, arg, u_size, prm, data, false);
+}
 int camera_copy_user_params(unsigned long, struct nvc_param *);
 
 int virtual_device_add(struct device *, unsigned long);

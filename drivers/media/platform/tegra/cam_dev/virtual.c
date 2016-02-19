@@ -41,10 +41,10 @@ struct chip_config {
 };
 
 static int virtual_update(
-	struct camera_device *cdev, struct cam_update *upd, int num)
+	struct camera_device *cdev, struct cam_update *upd, u32 num)
 {
 	int err = 0;
-	int idx;
+	u32 idx;
 
 	dev_dbg(cdev->dev, "%s %d\n", __func__, num);
 	mutex_lock(&cdev->mutex);

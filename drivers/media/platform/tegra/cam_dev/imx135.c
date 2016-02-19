@@ -4,7 +4,7 @@
  * the virtual PCL driver to handle some special features (hardware resources,
  * sequences, etc.).
  *
- * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -42,11 +42,11 @@ struct imx135_info {
 };
 
 static int imx135_update(
-	struct camera_device *cdev, struct cam_update *upd, int num)
+	struct camera_device *cdev, struct cam_update *upd, u32 num)
 {
 	/* struct imx135_info *info = dev_get_drvdata(cdev->dev); */
 	int err = 0;
-	int idx;
+	u32 idx;
 
 	dev_dbg(cdev->dev, "%s %d\n", __func__, num);
 	mutex_lock(&cdev->mutex);

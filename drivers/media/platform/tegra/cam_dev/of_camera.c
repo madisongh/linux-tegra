@@ -1,7 +1,7 @@
 /*
  * debugfs.c
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -222,7 +222,7 @@ int of_camera_get_property(struct camera_info *cam, unsigned long arg)
 	}
 
 	/* sanity check */
-	if (!param.sizeofvalue) {
+	if (!param.sizeofvalue || param.sizeofvalue > INT_MAX) {
 		dev_err(cam->dev, "%s invalid property name length %d\n",
 			__func__, param.sizeofvalue);
 		return -EBADF;
