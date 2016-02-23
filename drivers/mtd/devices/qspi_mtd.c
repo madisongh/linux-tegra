@@ -756,7 +756,7 @@ static int qspi_read(struct mtd_info *mtd, loff_t from, size_t len,
 			}
 		} else {
 			copy_cmd_default(&flash->cmd_table,
-					&cmd_info_table[NORMAL_READ]);
+					&cmd_info_table[FAST_READ]);
 		}
 	} else {
 		copy_cmd_default(&flash->cmd_table,
