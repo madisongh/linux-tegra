@@ -1,6 +1,8 @@
 #
 # camera/video device drivers supported.
 #
+source "drivers/media/platform/tegra/mipical/Kconfig"
+
 config VIDEO_CAMERA
 	tristate "generic camera device support"
 	depends on I2C && PLATFORM_TEGRA

@@ -13,3 +13,4 @@ obj-$(CONFIG_VIDEO_ISC)	+= auto/
 obj-$(CONFIG_VIDEO_CAMERA)	+= regmap_util.o
 obj-$(CONFIG_VIDEO_TEGRA_VI_TPG) += tpg/
 
+obj-$(CONFIG_TEGRA_MIPI_CAL)	+= mipical/
