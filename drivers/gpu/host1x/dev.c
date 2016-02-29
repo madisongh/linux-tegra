@@ -29,6 +29,9 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/host1x.h>
 
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+#include "dev_t186.h"
+#endif
 #include "bus.h"
 #include "dev.h"
 #include "intr.h"
@@ -108,6 +111,9 @@ static const struct host1x_info host1x05_info = {
 };
 
 static const struct of_device_id host1x_of_match[] = {
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+	{ .compatible = "nvidia,tegra186-host1x", .data = &host1x06_info, },
+#endif
 	{ .compatible = "nvidia,tegra210-host1x", .data = &host1x05_info, },
 	{ .compatible = "nvidia,tegra124-host1x", .data = &host1x04_info, },
 	{ .compatible = "nvidia,tegra114-host1x", .data = &host1x02_info, },

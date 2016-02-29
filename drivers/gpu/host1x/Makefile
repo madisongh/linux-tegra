@@ -1,3 +1,9 @@
+ccflags-y += -I../t18x/drivers/gpu/host1x
+
+ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
+obj-$(CONFIG_TEGRA_HOST1X) += $(call tegra-path,t18x/,drivers/gpu/host1x/)
+endif
+
 host1x-y = \
 	bus.o \
 	syncpt.o \
