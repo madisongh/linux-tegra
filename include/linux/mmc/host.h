@@ -95,6 +95,7 @@ struct mmc_cmdq_host_ops {
 	void (*post_req)(struct mmc_host *host, struct mmc_request *mrq,
 			int err);
 	int (*discard_task)(struct mmc_host *mmc, u32 tag, bool all);
+	void (*wait_cq_empty)(struct mmc_host *mmc);
 };
 
 struct mmc_host_ops {
@@ -165,6 +166,7 @@ struct mmc_host_ops {
 	void	(*post_init)(struct mmc_host *host);
 	void	(*clear_cqe_intr)(struct mmc_host *host, u32 intmask);
 	void	(*discard_cqe_task)(struct mmc_host *host, u8 tag, bool all);
+	void	(*enable_host_int)(struct mmc_host *host, bool enable);
 };
 
 struct mmc_card;
@@ -233,7 +235,7 @@ struct mmc_context_info {
 };
 
 enum cmdq_states {
-		CMDQ_STATE_HALT,
+		CMDQ_STATE_HALT = 1,
 		CMDQ_STATE_ERR,
 };
 

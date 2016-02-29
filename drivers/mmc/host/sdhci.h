@@ -469,6 +469,7 @@ struct sdhci_host {
 #define SDHCI_SDR104_NEEDS_TUNING (1<<10)	/* SDR104/HS200 needs tuning */
 #define SDHCI_USE_64_BIT_DMA	(1<<12)	/* Use 64-bit DMA */
 #define SDHCI_HS400_TUNING	(1<<13)	/* Tuning for HS400 */
+#define SDHCI_FORCE_PIO_MODE	(1<<14)	/* Force host to use PIO mode */
 
 	unsigned int version;	/* SDHCI spec. version */
 

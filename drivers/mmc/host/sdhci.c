@@ -81,6 +81,27 @@ static void sdhci_runtime_pm_bus_off(struct sdhci_host *host)
 }
 #endif
 
+static void sdhci_enable_host_interrupts(struct mmc_host *mmc, bool enable)
+{
+	struct sdhci_host *host;
+
+	host = mmc_priv(mmc);
+
+	if (enable) {
+		host->ier = host->ier & ~SDHCI_INT_CMDQ_EN;
+		host->ier |= SDHCI_INT_RESPONSE | SDHCI_INT_DATA_END;
+		host->flags |= SDHCI_FORCE_PIO_MODE;
+	} else {
+		host->ier &= ~SDHCI_INT_ALL_MASK;
+		host->ier |= SDHCI_INT_CMDQ_EN | SDHCI_INT_ERROR_MASK;
+		host->flags &= ~SDHCI_FORCE_PIO_MODE;
+	}
+	sdhci_runtime_pm_get(host);
+	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+	sdhci_runtime_pm_put(host);
+}
+
 static void sdhci_dumpregs(struct sdhci_host *host)
 {
 	pr_debug(DRIVER_NAME ": =========== REGISTER DUMP (%s)===========\n",
@@ -769,7 +790,10 @@ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
 	host->data_early = 0;
 	host->data->bytes_xfered = 0;
 
-	if (host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA))
+	if (!(host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA)) ||
+			(host->flags & SDHCI_FORCE_PIO_MODE))
+		host->flags &= ~SDHCI_REQ_USE_DMA;
+	else if (host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA))
 		host->flags |= SDHCI_REQ_USE_DMA;
 
 	/*
@@ -2419,6 +2443,7 @@ static const struct mmc_host_ops sdhci_ops = {
 	.post_init	= sdhci_post_init,
 	.clear_cqe_intr	= sdhci_clear_cqe_interrupt,
 	.discard_cqe_task	= sdhci_cqe_task_discard_rq,
+	.enable_host_int	= sdhci_enable_host_interrupts,
 };
 
 /*****************************************************************************\
@@ -2761,8 +2786,8 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 		goto out;
 	}
 
-	if (host->mmc->card && mmc_card_cmdq(host->mmc->card) &&
-			host->cq_host->enabled) {
+	if (host->mmc->card && (mmc_card_cmdq(host->mmc->card) &&
+			host->cq_host->enabled)) {
 		pr_debug("*** %s: cmdq intr: 0x%08x\n",
 				mmc_hostname(host->mmc), intmask);
 		result = sdhci_cmdq_irq(host->mmc, intmask);

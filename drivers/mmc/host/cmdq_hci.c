@@ -1,5 +1,5 @@
 /* Copyright (c) 2014, The Linux Foundation. All rights reserved.
- * Copyright (C) 2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,6 +31,12 @@
 /* 1 sec FIXME: optimize it */
 #define HALT_TIMEOUT_MS 1000
 #define TASK_CLEAR_TIMEOUT_MS 10
+/* Timeout vaue = 127 * 1024 * timer_clk_freq;
+ * timer_clk_freq = base_clk_freq * internal_freq_mul;
+ * base_clk_freq = 200MHz;
+ * internal_freq_mul = 0.001;
+ */
+#define QUEUE_EMPTY_TIMEOUT_MS 650
 
 static inline u64 *get_desc(struct cmdq_host *cq_host, u8 tag)
 {
@@ -139,6 +145,37 @@ static void cmdq_dumpregs(struct cmdq_host *cq_host)
 
 	if (cq_host->ops->dump_vendor_regs)
 		cq_host->ops->dump_vendor_regs(mmc);
+}
+
+static void cmdq_wait_cq_empty(struct mmc_host *mmc)
+{
+	struct cmdq_host *cq_host = (struct cmdq_host *)mmc_cmdq_private(mmc);
+	int timeout = QUEUE_EMPTY_TIMEOUT_MS;
+
+	if (cq_host->ops->runtime_pm_get)
+		cq_host->ops->runtime_pm_get(mmc);
+	while (timeout) {
+		if (!cmdq_readl(cq_host, CQTDBR))
+			break;
+		mdelay(1);
+		--timeout;
+	}
+	if (!timeout)
+		pr_err("%s: Some tasks are pending to process by CQE\n",
+				mmc_hostname(mmc));
+
+	timeout = QUEUE_EMPTY_TIMEOUT_MS;
+	while (timeout) {
+		if (!cmdq_readl(cq_host, CQTCN))
+			break;
+		mdelay(1);
+		--timeout;
+	}
+	if (!timeout)
+		pr_err("%s: Some tasks are pending for post proccess by CQE\n",
+				mmc_hostname(mmc));
+	if (cq_host->ops->runtime_pm_put)
+		cq_host->ops->runtime_pm_put(mmc);
 }
 
 /**
@@ -666,6 +703,8 @@ static int cmdq_halt(struct mmc_host *mmc, bool halt)
 	struct cmdq_host *cq_host = (struct cmdq_host *)mmc_cmdq_private(mmc);
 	unsigned timeout = HALT_TIMEOUT_MS;
 
+	if (cq_host->ops->runtime_pm_get)
+		cq_host->ops->runtime_pm_get(mmc);
 	if (halt) {
 		cmdq_writel(cq_host, cmdq_readl(cq_host, CQCTL) | HALT,
 			    CQCTL);
@@ -682,6 +721,8 @@ static int cmdq_halt(struct mmc_host *mmc, bool halt)
 			cmdq_dumpregs(cq_host);
 			cmdq_writel(cq_host, cmdq_readl(cq_host, CQCTL) & 0x1FE,
 			    CQCTL);
+			if (cq_host->ops->runtime_pm_put)
+				cq_host->ops->runtime_pm_put(mmc);
 			return -ETIMEDOUT;
 		}
 	} else {
@@ -689,6 +730,8 @@ static int cmdq_halt(struct mmc_host *mmc, bool halt)
 			    CQCTL);
 	}
 
+	if (cq_host->ops->runtime_pm_put)
+		cq_host->ops->runtime_pm_put(mmc);
 	return 0;
 }
 
@@ -717,6 +760,7 @@ static const struct mmc_cmdq_host_ops cmdq_host_ops = {
 	.halt = cmdq_halt,
 	.post_req = cmdq_post_req,
 	.discard_task = cmdq_discard_task,
+	.wait_cq_empty = cmdq_wait_cq_empty,
 };
 
 struct cmdq_host *cmdq_pltfm_init(struct platform_device *pdev)
