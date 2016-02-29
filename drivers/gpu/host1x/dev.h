@@ -112,6 +112,7 @@ struct host1x {
 	struct host1x_syncpt_base *bases;
 	struct device *dev;
 	struct clk *clk;
+	struct reset_control *reset_control;
 
 	struct mutex intr_mutex;
 	int intr_syncpt_irq;

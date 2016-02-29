@@ -24,6 +24,7 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/dma-mapping.h>
+#include <linux/reset.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/host1x.h>
@@ -195,6 +196,10 @@ static int host1x_probe(struct platform_device *pdev)
 		return err;
 	}
 
+	host->reset_control = devm_reset_control_get(&pdev->dev, NULL);
+	if (IS_ERR(host->reset_control))
+		host->reset_control = NULL;
+
 	err = host1x_channel_list_init(host);
 	if (err) {
 		dev_err(&pdev->dev, "failed to initialize channel list\n");
@@ -206,6 +211,9 @@ static int host1x_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to enable clock\n");
 		return err;
 	}
+
+	if (host->reset_control)
+		reset_control_reset(host->reset_control);
 
 	err = host1x_syncpt_init(host);
 	if (err) {
