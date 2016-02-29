@@ -78,6 +78,9 @@ struct host1x_syncpt_ops {
 	u32 (*load)(struct host1x_syncpt *syncpt);
 	int (*cpu_incr)(struct host1x_syncpt *syncpt);
 	int (*patch_wait)(struct host1x_syncpt *syncpt, void *patch_addr);
+	void (*get_mutex_owner)(struct host1x_syncpt *syncpt,
+				unsigned int mutex_id, bool *cpu, bool *ch,
+				unsigned int *chid);
 };
 
 struct host1x_intr_ops {
