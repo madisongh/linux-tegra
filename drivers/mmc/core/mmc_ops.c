@@ -2,6 +2,7 @@
  *  linux/drivers/mmc/core/mmc_ops.h
  *
  *  Copyright 2006-2007 Pierre Ossman
+ *  Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -326,6 +327,14 @@ mmc_send_cxd_data(struct mmc_card *card, struct mmc_host *host,
 		data.timeout_clks = 64;
 	} else
 		mmc_set_data_timeout(&data, card);
+
+	if (card && mmc_card_cmdq(card)) {
+		if (mmc_cmdq_initiate_halt(host, true)) {
+			pr_err("%s: %s: CQE Halt failed, try again.\n",
+				mmc_hostname(host), __func__);
+			return 0;
+		}
+	}
 
 	mmc_wait_for_req(host, &mrq);
 

@@ -3,6 +3,7 @@
  *
  *  Copyright (C) 2003 Russell King, All Rights Reserved.
  *  Copyright 2006-2007 Pierre Ossman
+ *  Copyright (c) 2015-2016 NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -167,7 +168,8 @@ static inline bool mmc_cmdq_should_pull_reqs(struct mmc_host *host,
 		blocking_dcmd = 0;
 
 	spin_lock_bh(&ctx->cmdq_ctx_lock);
-	if ((blocking_dcmd && ctx->active_dcmd) || ctx->rpmb_in_wait) {
+	if ((blocking_dcmd && ctx->active_dcmd) || ctx->rpmb_in_wait ||
+			ctx->active_ncqcmd) {
 		if ((ctx->curr_state != CMDQ_STATE_HALT) ||
 			(ctx->curr_state != CMDQ_STATE_ERR)) {
 			pr_debug("%s: %s: skip pulling reqs: dcmd: %d rpmb: %d state: %d\n",

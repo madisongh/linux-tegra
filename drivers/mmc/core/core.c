@@ -578,6 +578,10 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
 		__mmc_start_request(host, mrq);
 	}
 
+	/* Resume CQE operations when eMMC is in CQ Halt state */
+	if (host->card && mmc_card_cmdq_halt(host->card))
+		mmc_cmdq_initiate_halt(host, false);
+
 	mmc_retune_release(host);
 }
 
@@ -698,6 +702,58 @@ int mmc_cmdq_start_req(struct mmc_host *host, struct mmc_cmdq_req *cmdq_req)
 	return 0;
 }
 EXPORT_SYMBOL(mmc_cmdq_start_req);
+
+void mmc_wait_hw_cmdq_empty(struct mmc_host *host)
+{
+	if (host->cmdq_ops->wait_cq_empty)
+		host->cmdq_ops->wait_cq_empty(host);
+}
+EXPORT_SYMBOL(mmc_wait_hw_cmdq_empty);
+
+/*
+ *	mmc_cmdq_initiate_halt - Halt/Resume eMMC CQ engine
+ *	@host: MMC host
+ *	@halt: Halt: true | Resume: false
+ *
+ *	Halt and Resume the CQ engine when host issues special commands
+ *	like CMD8 to read eMMC device registers in CQE mode.
+ */
+int mmc_cmdq_initiate_halt(struct mmc_host *host, bool halt)
+{
+	int err = 0;
+
+	mmc_claim_host(host);
+	if (halt) {
+		host->cmdq_ctx.active_ncqcmd = true;
+		mmc_wait_hw_cmdq_empty(host);
+		err = mmc_cmdq_halt(host, true);
+		if (err) {
+			host->cmdq_ctx.active_ncqcmd = false;
+			mmc_release_host(host);
+			return err;
+		}
+		mmc_card_set_cmdq_halt(host->card);
+		host->card->ext_csd.cmdq_mode_en = false;
+		if (host->ops->enable_host_int)
+			host->ops->enable_host_int(host, true);
+		mmc_card_clr_cmdq(host->card);
+	} else {
+		err = mmc_cmdq_halt(host, false);
+		if (err) {
+			mmc_release_host(host);
+			return err;
+		}
+		mmc_card_set_cmdq(host->card);
+		if (host->ops->enable_host_int)
+			host->ops->enable_host_int(host, false);
+		host->card->ext_csd.cmdq_mode_en = true;
+		mmc_card_clr_cmdq_halt(host->card);
+		host->cmdq_ctx.active_ncqcmd = false;
+	}
+	mmc_release_host(host);
+	return err;
+}
+EXPORT_SYMBOL(mmc_cmdq_initiate_halt);
 
 /**
  *	mmc_start_req - start a non-blocking request

@@ -1,7 +1,7 @@
 /*
  *  linux/include/linux/mmc/host.h
  *
- *  Copyright (c) 2016, NVIDIA CORPORATION. All Rights Reserved.
+ *  Copyright (c) 2013-2016, NVIDIA CORPORATION. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -254,6 +254,7 @@ struct mmc_cmdq_context_info {
 	unsigned long	active_reqs; /* in-flight requests */
 	bool		active_dcmd;
 	bool		rpmb_in_wait;
+	bool		active_ncqcmd; /* Non CQ command like CMD8 */
 	enum cmdq_states curr_state;
 
 	/* no free tag available */
