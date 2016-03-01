@@ -2061,19 +2061,28 @@ static int tegra_spi_probe(struct platform_device *pdev)
 		if (gpio_cansleep(tspi->gpio_slave_ready)) {
 			dev_err(&pdev->dev, "Slave Ready GPIO %d is unusable as it can sleep\n",
 					tspi->gpio_slave_ready);
-			tspi->gpio_slave_ready = -EINVAL;
+			ret = -EINVAL;
+			goto exit_free_master;
 		}
 
 	tspi->slave_ready_active_high = pdata->slave_ready_active_high;
 
 	if (gpio_is_valid(tspi->gpio_slave_ready)) {
-		gpio_request(tspi->gpio_slave_ready, "gpio-spi-slave-ready");
+		ret = gpio_request(tspi->gpio_slave_ready,
+				"gpio-spi-slave-ready");
+		if (!ret) {
+			if (tspi->slave_ready_active_high)
+				deassert_val = 0;
+			else
+				deassert_val = 1;
 
-		if (tspi->slave_ready_active_high)
-			deassert_val = 0;
-		else
-			deassert_val = 1;
-		gpio_direction_output(tspi->gpio_slave_ready, deassert_val);
+			gpio_direction_output(tspi->gpio_slave_ready,
+					deassert_val);
+		} else {
+			dev_err(&pdev->dev, "Slave Ready GPIO %d is busy\n",
+					tspi->gpio_slave_ready);
+			goto exit_free_master;
+		}
 	}
 
 
