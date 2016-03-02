@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2001 Russell King
  *           (C) 2002 - 2003 Dominik Brodowski <linux@brodo.de>
+ * Copyright (C) 2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -281,6 +282,7 @@ struct cpufreq_driver {
 	bool		boost_supported;
 	bool		boost_enabled;
 	int		(*set_boost)(int state);
+	u32 (*active_cycle_cnt)(u8 cpu);
 };
 
 /* flags */
@@ -619,4 +621,6 @@ unsigned int cpufreq_generic_get(unsigned int cpu);
 int cpufreq_generic_init(struct cpufreq_policy *policy,
 		struct cpufreq_frequency_table *table,
 		unsigned int transition_latency);
+int active_cycle_cnt(u32 cpu, u32 *cnt);
+
 #endif /* _LINUX_CPUFREQ_H */
