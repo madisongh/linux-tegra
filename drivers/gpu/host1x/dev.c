@@ -221,6 +221,8 @@ static int host1x_probe(struct platform_device *pdev)
 	if (host->reset_control)
 		reset_control_reset(host->reset_control);
 
+	host1x_hw_load_regs(host);
+
 	err = host1x_syncpt_init(host);
 	if (err) {
 		dev_err(&pdev->dev, "failed to initialize syncpts\n");

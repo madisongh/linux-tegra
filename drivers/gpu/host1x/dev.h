@@ -35,6 +35,10 @@ struct push_buffer;
 struct output;
 struct dentry;
 
+struct host1x_dev_ops {
+	int (*load_regs)(struct host1x *host);
+};
+
 struct host1x_channel_ops {
 	int (*init)(struct host1x_channel *channel, struct host1x *host,
 		    unsigned int id);
@@ -123,6 +127,7 @@ struct host1x {
 	/* For general interrupts */
 	int intr_general_irq;
 
+	const struct host1x_dev_ops *dev_op;
 	const struct host1x_syncpt_ops *syncpt_op;
 	const struct host1x_intr_ops *intr_op;
 	const struct host1x_channel_ops *channel_op;
@@ -153,6 +158,12 @@ void host1x_sync_writel(struct host1x *host1x, u32 v, u32 r);
 u32 host1x_sync_readl(struct host1x *host1x, u32 r);
 void host1x_ch_writel(struct host1x_channel *ch, u32 v, u32 r);
 u32 host1x_ch_readl(struct host1x_channel *ch, u32 r);
+
+static inline void host1x_hw_load_regs(struct host1x *host)
+{
+	if (host->dev_op && host->dev_op->load_regs)
+		host->dev_op->load_regs(host);
+}
 
 static inline void host1x_hw_syncpt_restore(struct host1x *host,
 					    struct host1x_syncpt *sp)
