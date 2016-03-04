@@ -1,6 +1,7 @@
 /*
  * xHCI host controller driver
  *
+ * Copyright (c) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
  * Copyright (C) 2008 Intel Corp.
  *
  * Author: Sarah Sharp
@@ -3118,6 +3119,7 @@ static int queue_bulk_sg_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 		struct urb *urb, int slot_id, unsigned int ep_index)
 {
 	struct xhci_ring *ep_ring;
+	struct xhci_ep_ctx *ep_ctx;
 	unsigned int num_trbs;
 	struct urb_priv *urb_priv;
 	struct xhci_td *td;
@@ -3161,6 +3163,18 @@ static int queue_bulk_sg_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 				ep_index, urb->stream_id,
 				1, urb, 1, mem_flags);
 		if (ret < 0)
+			return ret;
+		/*
+		 * We haven't actually checked whether transfer ring has
+		 * space for num_trbs (we have checked only for num_trbs-1).
+		 * Check and expand if necessary for the extra ZLP TRB.
+		 */
+		ep_ctx = xhci_get_ep_ctx(xhci, xhci->devs[slot_id]->out_ctx,
+				ep_index);
+		ret = prepare_ring(xhci, ep_ring,
+				   le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK,
+				   num_trbs, mem_flags);
+		if (ret)
 			return ret;
 	}
 
@@ -3218,6 +3232,8 @@ static int queue_bulk_sg_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 			field |= TRB_IOC;
 		} else if (zero_length_needed && num_trbs == 1) {
 			trb_buff_len = 0;
+			urb_priv->td[1]->start_seg = ep_ring->enq_seg;
+			urb_priv->td[1]->first_trb = ep_ring->enqueue;
 			urb_priv->td[1]->last_trb = ep_ring->enqueue;
 			field |= TRB_IOC;
 		}
@@ -3260,6 +3276,16 @@ static int queue_bulk_sg_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 		 */
 		this_sg_len -= trb_buff_len;
 		if (this_sg_len == 0) {
+			/*
+			 * When ZLP is needed and we are down to the last TRB
+			 * (ZLP TRB), skip further bookkeeping and go for
+			 * another TRB cycle.
+			 *
+			 * Note: num_sgs and sg details will stay the same for
+			 * the next loop iteration.
+			 */
+			if (zero_length_needed && num_trbs == 1)
+				continue;
 			--num_sgs;
 			if (num_sgs == 0)
 				break;
@@ -3289,6 +3315,7 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 		struct urb *urb, int slot_id, unsigned int ep_index)
 {
 	struct xhci_ring *ep_ring;
+	struct xhci_ep_ctx *ep_ctx;
 	struct urb_priv *urb_priv;
 	struct xhci_td *td;
 	int num_trbs;
@@ -3347,6 +3374,19 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 				1, urb, 1, mem_flags);
 		if (ret < 0)
 			return ret;
+
+		/*
+		 * We haven't actually checked whether transfer ring has
+		 * space for num_trbs (we have checked only for num_trbs-1).
+		 * Check and expand if necessary for the extra ZLP TRB.
+		 */
+		ep_ctx = xhci_get_ep_ctx(xhci, xhci->devs[slot_id]->out_ctx,
+				ep_index);
+		ret = prepare_ring(xhci, ep_ring,
+				   le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK,
+				   num_trbs, mem_flags);
+		if (ret)
+			return ret;
 	}
 
 	td = urb_priv->td[0];
@@ -3394,6 +3434,8 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 			field |= TRB_IOC;
 		} else if (zero_length_needed && num_trbs == 1) {
 			trb_buff_len = 0;
+			urb_priv->td[1]->start_seg = ep_ring->enq_seg;
+			urb_priv->td[1]->first_trb = ep_ring->enqueue;
 			urb_priv->td[1]->last_trb = ep_ring->enqueue;
 			field |= TRB_IOC;
 		}
