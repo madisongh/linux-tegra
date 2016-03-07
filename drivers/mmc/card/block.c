@@ -864,7 +864,16 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 		goto cmd_done;
 	}
 
-	mmc_get_card(card);
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	if (mmc_bus_needs_resume(card->host))
+		mmc_resume_bus(card->host);
+#endif
+	if (idata->ic.opcode == MMC_FFU_INVOKE_OP) {
+		err = mmc_ffu_invoke(card, idata->buf);
+		goto cmd_done;
+	}
+
+	mmc_claim_host(card->host);
 
 	ioc_err = __mmc_blk_ioctl_cmd(card, md, idata);
 
