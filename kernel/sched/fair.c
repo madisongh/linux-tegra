@@ -2947,6 +2947,20 @@ static inline unsigned long cfs_rq_load_avg(struct cfs_rq *cfs_rq)
 
 static int idle_balance(struct rq *this_rq);
 
+static bool cpu_overutilized(int cpu);
+
+static void set_rd_overutilized(struct rq *rq)
+{
+	if (!rq->rd->overutilized && cpu_overutilized(rq->cpu))
+		rq->rd->overutilized = true;
+}
+
+static bool task_fits_capacity(struct task_struct *p, int cpu);
+
+static bool task_fits_rq(struct task_struct *p, struct rq *rq)
+{
+	return task_fits_capacity(p, rq->cpu);
+}
 #else /* CONFIG_SMP */
 
 static inline void update_load_avg(struct sched_entity *se, int update_tg) {}
@@ -2966,6 +2980,11 @@ static inline int idle_balance(struct rq *rq)
 	return 0;
 }
 
+static void set_rd_overutilized(struct rq *rq) {}
+static bool task_fits_rq(struct task_struct *p, struct rq *rq)
+{
+	return true;
+}
 #endif /* CONFIG_SMP */
 
 static void enqueue_sleeper(struct cfs_rq *cfs_rq, struct sched_entity *se)
@@ -4209,8 +4228,6 @@ static inline void hrtick_update(struct rq *rq)
 }
 #endif
 
-static bool cpu_overutilized(int cpu);
-
 /*
  * The enqueue_task method is called before nr_running is
  * increased. Here we update the fair scheduling stats and
@@ -4254,8 +4271,7 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!se) {
 		add_nr_running(rq, 1);
-		if (!rq->rd->overutilized && cpu_overutilized(rq->cpu))
-			rq->rd->overutilized = true;
+		set_rd_overutilized(rq);
 	}
 	hrtick_update(rq);
 }
@@ -5472,7 +5488,7 @@ again:
 	if (hrtick_enabled(rq))
 		hrtick_start_fair(rq, p);
 
-	rq->misfit_task = !task_fits_capacity(p, rq->cpu);
+	rq->misfit_task = !task_fits_rq(p, rq);
 
 	return p;
 simple:
@@ -5495,7 +5511,7 @@ simple:
 	if (hrtick_enabled(rq))
 		hrtick_start_fair(rq, p);
 
-	rq->misfit_task = !task_fits_capacity(p, rq->cpu);
+	rq->misfit_task = !task_fits_rq(p, rq);
 
 	return p;
 
@@ -8203,10 +8219,9 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 	if (static_branch_unlikely(&sched_numa_balancing))
 		task_tick_numa(rq, curr);
 
-	if (!rq->rd->overutilized && cpu_overutilized(task_cpu(curr)))
-		rq->rd->overutilized = true;
+	set_rd_overutilized(rq);
 
-	rq->misfit_task = !task_fits_capacity(curr, rq->cpu);
+	rq->misfit_task = !task_fits_rq(curr, rq);
 }
 
 /*
