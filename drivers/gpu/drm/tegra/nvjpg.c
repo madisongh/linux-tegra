@@ -61,7 +61,7 @@ static inline struct nvjpg *to_nvjpg(struct tegra_drm_client *client)
 static int nvjpg_runtime_resume(struct device *dev)
 {
 	struct nvjpg *nvjpg = dev_get_drvdata(dev);
-	int err;
+	int err = 0;
 
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_unpowergate_partition(TEGRA_POWERGATE_NVJPG);
@@ -76,10 +76,12 @@ static int nvjpg_runtime_resume(struct device *dev)
 
 	return 0;
 #else
-	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_NVJPG,
-						nvjpg->clk, nvjpg->rst);
-	if (err < 0)
-		dev_err(dev, "failed to power up device\n");
+	if (nvjpg->rst) {
+		err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_NVJPG,
+							nvjpg->clk, nvjpg->rst);
+		if (err < 0)
+			dev_err(dev, "failed to power up device\n");
+	}
 
 	return err;
 #endif
@@ -94,7 +96,8 @@ static int nvjpg_runtime_suspend(struct device *dev)
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
 	tegra_powergate_partition(TEGRA_POWERGATE_NVJPG);
 #else
-	reset_control_assert(nvjpg->rst);
+	if (nvjpg->rst)
+		reset_control_assert(nvjpg->rst);
 	tegra_powergate_power_off(TEGRA_POWERGATE_NVJPG);
 #endif
 
@@ -119,15 +122,23 @@ static int nvjpg_boot(struct nvjpg *nvjpg)
 
 	/* ensure that the engine is in sane state */
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	tegra_mc_flush(true);
-	tegra_periph_reset_assert(nvjpg->clk);
-	usleep_range(10, 100);
-	tegra_periph_reset_deassert(nvjpg->clk);
-	tegra_mc_flush_done(true);
+	if (nvjpg->rst) {
+		reset_control_assert(nvjpg->rst);
+		usleep_range(10, 100);
+		reset_control_deassert(nvjpg->rst);
+	} else {
+		tegra_mc_flush(true);
+		tegra_periph_reset_assert(nvjpg->clk);
+		usleep_range(10, 100);
+		tegra_periph_reset_deassert(nvjpg->clk);
+		tegra_mc_flush_done(true);
+	}
 #else
-	reset_control_assert(nvjpg->rst);
-	usleep_range(10, 100);
-	reset_control_deassert(nvjpg->rst);
+	if (nvjpg->rst) {
+		reset_control_assert(nvjpg->rst);
+		usleep_range(10, 100);
+		reset_control_deassert(nvjpg->rst);
+	}
 #endif
 
 	err = falcon_boot(&nvjpg->falcon);
@@ -251,15 +262,23 @@ static int nvjpg_exit(struct host1x_client *client)
 
 	if (nvjpg->booted) {
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		tegra_mc_flush(true);
-		tegra_periph_reset_assert(nvjpg->clk);
-		usleep_range(10, 100);
-		tegra_periph_reset_deassert(nvjpg->clk);
-		tegra_mc_flush_done(true);
+		if (nvjpg->rst) {
+			reset_control_assert(nvjpg->rst);
+			usleep_range(10, 100);
+			reset_control_deassert(nvjpg->rst);
+		} else {
+			tegra_mc_flush(true);
+			tegra_periph_reset_assert(nvjpg->clk);
+			usleep_range(10, 100);
+			tegra_periph_reset_deassert(nvjpg->clk);
+			tegra_mc_flush_done(true);
+		}
 #else
-		reset_control_assert(nvjpg->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(nvjpg->rst);
+		if (nvjpg->rst) {
+			reset_control_assert(nvjpg->rst);
+			usleep_range(10, 100);
+			reset_control_deassert(nvjpg->rst);
+		}
 #endif
 	}
 
@@ -369,10 +388,10 @@ static int nvjpg_probe(struct platform_device *pdev)
 		return PTR_ERR(nvjpg->clk);
 	}
 
-	nvjpg->rst = devm_reset_control_get(dev, "nvjpg");
+	nvjpg->rst = devm_reset_control_get(dev, NULL);
 	if (IS_ERR(nvjpg->rst)) {
 		dev_err(&pdev->dev, "cannot get reset\n");
-		return PTR_ERR(nvjpg->rst);
+		nvjpg->rst = NULL;
 	}
 
 	platform_set_drvdata(pdev, nvjpg);
