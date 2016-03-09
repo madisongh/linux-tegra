@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2015-2016 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -25,38 +25,10 @@
 #include <soc/tegra/pmc.h>
 #endif
 
-#include "drm.h"
-#include "falcon.h"
-
-struct nvjpg_config {
-	/* Firmware name */
-	const char *ucode_name;
-};
-
-struct nvjpg {
-	struct falcon falcon;
-	bool booted;
-
-	void __iomem *regs;
-	struct tegra_drm_client client;
-	struct host1x_channel *channel;
-	struct iommu_domain *domain;
-	struct device *dev;
-	struct clk *clk;
-	struct reset_control *rst;
-
-	/* Platform configuration */
-	const struct nvjpg_config *config;
-
-	/* for firewall - this determines if method 1 should be regarded
-	 * as an address register */
-	bool method_data_is_addr_reg;
-};
-
-static inline struct nvjpg *to_nvjpg(struct tegra_drm_client *client)
-{
-	return container_of(client, struct nvjpg, client);
-}
+#include "nvjpg.h"
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+#include "nvjpg_t186.h"
+#endif
 
 static int nvjpg_runtime_resume(struct device *dev)
 {
@@ -109,6 +81,7 @@ static int nvjpg_runtime_suspend(struct device *dev)
 static int nvjpg_boot(struct nvjpg *nvjpg)
 {
 	int err = 0;
+	struct tegra_drm_client *client = &nvjpg->client;
 
 	if (nvjpg->booted)
 		return 0;
@@ -140,6 +113,9 @@ static int nvjpg_boot(struct nvjpg *nvjpg)
 		reset_control_deassert(nvjpg->rst);
 	}
 #endif
+
+	if (client->ops->load_regs)
+		client->ops->load_regs(client);
 
 	err = falcon_boot(&nvjpg->falcon);
 	if (err < 0)
@@ -297,7 +273,7 @@ static const struct host1x_client_ops nvjpg_client_ops = {
 	.exit = nvjpg_exit,
 };
 
-static int nvjpg_open_channel(struct tegra_drm_client *client,
+int nvjpg_open_channel(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context)
 {
 	struct nvjpg *nvjpg = to_nvjpg(client);
@@ -327,7 +303,7 @@ static int nvjpg_open_channel(struct tegra_drm_client *client,
 	return 0;
 }
 
-static void nvjpg_close_channel(struct tegra_drm_context *context)
+void nvjpg_close_channel(struct tegra_drm_context *context)
 {
 	struct nvjpg *nvjpg = to_nvjpg(context->client);
 
@@ -344,10 +320,14 @@ static const struct tegra_drm_client_ops nvjpg_ops = {
 
 static const struct nvjpg_config nvjpg_t210_config = {
 	.ucode_name = "tegra21x/nvhost_nvjpg010.fw",
+	.drm_client_ops = &nvjpg_ops,
 };
 
 static const struct of_device_id nvjpg_match[] = {
 	{ .compatible = "nvidia,tegra210-nvjpg", .data = &nvjpg_t210_config },
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+	{ .compatible = "nvidia,tegra186-nvjpg", .data = &nvjpg_t186_config },
+#endif
 	{ },
 };
 
@@ -406,7 +386,7 @@ static int nvjpg_probe(struct platform_device *pdev)
 	nvjpg->config = nvjpg_config;
 
 	INIT_LIST_HEAD(&nvjpg->client.list);
-	nvjpg->client.ops = &nvjpg_ops;
+	nvjpg->client.ops = nvjpg->config->drm_client_ops;
 
 	err = host1x_client_register(&nvjpg->client.base);
 	if (err < 0) {
