@@ -24,42 +24,12 @@
 #include <soc/tegra/pmc.h>
 #endif
 
-#include "drm.h"
-#include "falcon.h"
+#include "tsec.h"
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+#include "tsec_t186.h"
+#endif
 
 #define TSEC_OS_START_OFFSET 256
-
-struct tsec_config {
-	/* Firmware name */
-	const char *ucode_name;
-
-	u32 class_id;
-};
-
-struct tsec {
-	struct falcon falcon;
-	bool booted;
-
-	void __iomem *regs;
-	struct tegra_drm_client client;
-	struct host1x_channel *channel;
-	struct iommu_domain *domain;
-	struct device *dev;
-	struct clk *clk;
-	struct reset_control *rst;
-
-	/* Platform configuration */
-	const struct tsec_config *config;
-
-	/* for firewall - this determines if method 1 should be regarded
-	 * as an address register */
-	bool method_data_is_addr_reg;
-};
-
-static inline struct tsec *to_tsec(struct tegra_drm_client *client)
-{
-	return container_of(client, struct tsec, client);
-}
 
 static int tsec_runtime_resume(struct device *dev)
 {
@@ -87,6 +57,7 @@ static int tsec_runtime_suspend(struct device *dev)
 static int tsec_boot(struct tsec *tsec)
 {
 	int err = 0;
+	struct tegra_drm_client *client = &tsec->client;
 
 	if (tsec->booted)
 		return 0;
@@ -118,6 +89,9 @@ static int tsec_boot(struct tsec *tsec)
 		reset_control_deassert(tsec->rst);
 	}
 #endif
+
+	if (client->ops->load_regs)
+		client->ops->load_regs(client);
 
 	err = falcon_boot(&tsec->falcon);
 	if (err < 0)
@@ -277,7 +251,7 @@ static const struct host1x_client_ops tsec_client_ops = {
 	.exit = tsec_exit,
 };
 
-static int tsec_open_channel(struct tegra_drm_client *client,
+int tsec_open_channel(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context)
 {
 	struct tsec *tsec = to_tsec(client);
@@ -307,7 +281,7 @@ static int tsec_open_channel(struct tegra_drm_client *client,
 	return 0;
 }
 
-static void tsec_close_channel(struct tegra_drm_context *context)
+void tsec_close_channel(struct tegra_drm_context *context)
 {
 	struct tsec *tsec = to_tsec(context->client);
 
@@ -324,11 +298,13 @@ static const struct tegra_drm_client_ops tsec_ops = {
 
 static const struct tsec_config tsec_t210_config = {
 	.ucode_name = "tegra21x/nvhost_tsec.fw",
+	.drm_client_ops = &tsec_ops,
 	.class_id = HOST1X_CLASS_TSEC,
 };
 
 static const struct tsec_config tsecb_t210_config = {
 	.ucode_name = "tegra21x/nvhost_tsec.fw",
+	.drm_client_ops = &tsec_ops,
 	.class_id = HOST1X_CLASS_TSECB,
 };
 
@@ -339,6 +315,14 @@ static const struct of_device_id tsec_match[] = {
 	{ .name = "tsecb",
 		.compatible = "nvidia,tegra210-tsec",
 		.data = &tsecb_t210_config },
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+	{ .name = "tsec",
+		.compatible = "nvidia,tegra186-tsec",
+		.data = &tsec_t186_config },
+	{ .name = "tsecb",
+		.compatible = "nvidia,tegra186-tsec",
+		.data = &tsecb_t186_config },
+#endif
 	{ },
 };
 
@@ -397,7 +381,7 @@ static int tsec_probe(struct platform_device *pdev)
 	tsec->config = tsec_config;
 
 	INIT_LIST_HEAD(&tsec->client.list);
-	tsec->client.ops = &tsec_ops;
+	tsec->client.ops = tsec->config->drm_client_ops;
 
 	err = host1x_client_register(&tsec->client.base);
 	if (err < 0) {
