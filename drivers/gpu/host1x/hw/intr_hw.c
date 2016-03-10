@@ -169,7 +169,6 @@ static irqreturn_t general_isr(int irq, void *dev_id)
 	struct host1x *host = dev_id;
 	unsigned long stat;
 	u32 ext_stat, addr;
-	int i;
 
 	/* Handle host1x interrupt in ISR */
 	stat = host1x_sync_readl(host, HOST1X_SYNC_HINTSTATUS);
