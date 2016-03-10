@@ -1323,7 +1323,7 @@ static int tegra_adma_probe(struct platform_device *pdev)
 
 	dma_device = &pdev->dev;
 
-	tegra_ape_pd_add_device(&pdev->dev);
+	tegra_pd_add_device(&pdev->dev);
 
 	pm_runtime_enable(&pdev->dev);
 	if (!pm_runtime_enabled(&pdev->dev)) {
@@ -1437,7 +1437,7 @@ err_pm_disable:
 	pm_runtime_disable(&pdev->dev);
 	if (!pm_runtime_status_suspended(&pdev->dev))
 		tegra_adma_runtime_suspend(&pdev->dev);
-	tegra_ape_pd_remove_device(&pdev->dev);
+	tegra_pd_remove_device(&pdev->dev);
 #if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 	clk_put(tdma->ape_clk);
 #else
@@ -1470,7 +1470,7 @@ static int tegra_adma_remove(struct platform_device *pdev)
 	if (!pm_runtime_status_suspended(&pdev->dev))
 		tegra_adma_runtime_suspend(&pdev->dev);
 
-	tegra_ape_pd_remove_device(&pdev->dev);
+	tegra_pd_remove_device(&pdev->dev);
 	return 0;
 }
 
