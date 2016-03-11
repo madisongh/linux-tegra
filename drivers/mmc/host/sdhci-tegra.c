@@ -234,6 +234,9 @@ struct sdhci_tegra {
 
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	unsigned char signal_voltage);
+/* Module Params declarations */
+static unsigned int en_boot_part_access;
+
 static int tegra_sdhci_configure_regulators(struct sdhci_host *sdhci,
 	u8 option, int min_uV, int max_uV);
 static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
@@ -1645,6 +1648,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	if (plat->en_strobe)
 		host->mmc->caps2 |= MMC_CAP2_EN_STROBE;
 
+	if (!en_boot_part_access)
+		host->mmc->caps2 |= MMC_CAP2_BOOTPART_NOACC;
+
 	if (plat->en_periodic_cflush)
 		host->mmc->caps2 |= MMC_CAP2_PERIODIC_CACHE_FLUSH;
 
@@ -1691,6 +1697,10 @@ static struct platform_driver sdhci_tegra_driver = {
 
 module_platform_driver(sdhci_tegra_driver);
 
+module_param(en_boot_part_access, uint, 0444);
+
 MODULE_DESCRIPTION("SDHCI driver for Tegra");
 MODULE_AUTHOR("Google, Inc.");
 MODULE_LICENSE("GPL v2");
+
+MODULE_PARM_DESC(en_boot_part_access, "Allow boot partitions access on device.");
