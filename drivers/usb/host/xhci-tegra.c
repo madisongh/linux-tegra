@@ -998,17 +998,28 @@ static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
 
 static int tegra_xhci_phy_enable(struct tegra_xhci_hcd *tegra)
 {
+	struct device *dev = tegra->dev;
 	unsigned int i, j;
 	int ret;
 
 	for (i = 0; i < ARRAY_SIZE(tegra->phys); i++) {
 		for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
 			ret = phy_init(tegra->phys[i][j]);
-			if (ret)
+			if (ret) {
+				dev_dbg(dev, "phy_init %s phy %d failed\n",
+					tegra_phy_names[i], j);
 				goto disable_phy;
+			}
 			ret = phy_power_on(tegra->phys[i][j]);
 			if (ret) {
-				phy_exit(tegra->phys[i][j]);
+				dev_dbg(dev, "phy_power_on %s phy %d failed\n",
+					tegra_phy_names[i], j);
+
+				ret = phy_exit(tegra->phys[i][j]);
+				if (ret) {
+					dev_dbg(dev, "phy_exit %s phy %d failed\n",
+						tegra_phy_names[i], j);
+				}
 				goto disable_phy;
 			}
 		}
@@ -1020,13 +1031,29 @@ static int tegra_xhci_phy_enable(struct tegra_xhci_hcd *tegra)
 	return 0;
 disable_phy:
 	for (; j > 0; j--) {
-		phy_power_off(tegra->phys[i][j - 1]);
-		phy_exit(tegra->phys[i][j - 1]);
+		ret = phy_power_off(tegra->phys[i][j - 1]);
+		if (ret) {
+			dev_dbg(dev, "phy_power_off %s phy %d failed\n",
+				tegra_phy_names[i], j);
+		}
+		ret = phy_exit(tegra->phys[i][j - 1]);
+		if (ret) {
+			dev_dbg(dev, "phy_exit %s phy %d failed\n",
+				tegra_phy_names[i], j);
+		}
 	}
 	for (; i > 0; i--) {
 		for (j = 0; j < tegra->soc_config->num_phys[i - 1]; j++) {
-			phy_power_off(tegra->phys[i - 1][j]);
-			phy_exit(tegra->phys[i - 1][j]);
+			ret = phy_power_off(tegra->phys[i - 1][j]);
+			if (ret) {
+				dev_dbg(dev, "phy_power_off %s phy %d failed\n",
+					tegra_phy_names[i], j);
+			}
+			ret = phy_exit(tegra->phys[i - 1][j]);
+			if (ret) {
+				dev_dbg(dev, "phy_exit %s phy %d failed\n",
+					tegra_phy_names[i], j);
+			}
 		}
 	}
 	return ret;
@@ -1034,12 +1061,21 @@ disable_phy:
 
 static void tegra_xhci_phy_disable(struct tegra_xhci_hcd *tegra)
 {
-	unsigned int i, j;
+	struct device *dev = tegra->dev;
+	unsigned int i, j, ret;
 
 	for (i = 0; i < ARRAY_SIZE(tegra->phys); i++) {
 		for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
-			phy_power_off(tegra->phys[i][j]);
-			phy_exit(tegra->phys[i][j]);
+			ret = phy_power_off(tegra->phys[i][j]);
+			if (ret) {
+				dev_dbg(dev, "phy_power_off %s phy %d failed\n",
+					tegra_phy_names[i], j);
+			}
+			ret = phy_exit(tegra->phys[i][j]);
+			if (ret) {
+				dev_dbg(dev, "phy_exit %s phy %d failed\n",
+					tegra_phy_names[i], j);
+			}
 		}
 	}
 }
@@ -1164,8 +1200,9 @@ static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 {
 	struct xhci_hcd *xhci;
 	int port = tegra->utmi_otg_port_base_1 - 1;
+	struct phy *otg_phy;
 	u32 status;
-	int wait;
+	int wait, ret;
 
 	if (!tegra->utmi_otg_port_base_1)
 		return;
@@ -1180,10 +1217,15 @@ static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 		return;
 	}
 
+	otg_phy = tegra->phys[UTMI_PHY][port];
 	if (on)
-		tegra_phy_xusb_set_id_override(tegra->phys[UTMI_PHY][port]);
+		ret = tegra_phy_xusb_set_id_override(otg_phy);
 	else
-		tegra_phy_xusb_clear_id_override(tegra->phys[UTMI_PHY][port]);
+		ret = tegra_phy_xusb_clear_id_override(otg_phy);
+	if (ret) {
+		dev_dbg(tegra->dev, "%s ID override failed\n",
+			on ? "set" : "clear");
+	}
 
 	if (!tegra->otg_role_initialized) {
 		tegra->otg_role_initialized = true;
@@ -1445,8 +1487,13 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	tegra_xhci_update_otg_role(tegra);
 
 	/* set pretend connected per HSIC PHY DTB */
-	for (i = 0; i < tegra->soc_config->num_phys[HSIC_PHY]; i++)
-		tegra_phy_xusb_pretend_connected(tegra->phys[HSIC_PHY][i]);
+	for (i = 0; i < tegra->soc_config->num_phys[HSIC_PHY]; i++) {
+		struct phy *hsic_phy = tegra->phys[HSIC_PHY][i];
+
+		ret = tegra_phy_xusb_pretend_connected(hsic_phy);
+		if (ret)
+			dev_dbg(dev, "HSIC phy %d pretend connect failed\n", i);
+	}
 
 	release_firmware(fw);
 
@@ -2186,8 +2233,16 @@ static int tegra_xhci_unpowergate(struct tegra_xhci_hcd *tegra)
 				if (i == UTMI_PHY)
 					tegra_phy_xusb_utmi_pad_power_on(phy);
 			}
-			tegra_phy_xusb_disable_wake(phy);
-			phy_power_on(phy);
+			ret = tegra_phy_xusb_disable_wake(phy);
+			if (ret) {
+				dev_dbg(dev, "%s port %d disable wake failed\n",
+					tegra_phy_names[i], j);
+			}
+			ret = phy_power_on(phy);
+			if (ret) {
+				dev_dbg(dev, "%s port %d power on failed\n",
+					tegra_phy_names[i], j);
+			}
 		}
 	}
 
@@ -2222,7 +2277,11 @@ static int tegra_xhci_unpowergate(struct tegra_xhci_hcd *tegra)
 			if (!phy)
 				continue;
 
-			tegra_phy_xusb_disable_sleepwalk(phy);
+			ret = tegra_phy_xusb_disable_sleepwalk(phy);
+			if (ret) {
+				dev_dbg(dev, "%s port %d disable sleepwalk failed\n",
+					tegra_phy_names[i], j);
+			}
 		}
 	}
 
