@@ -143,6 +143,69 @@
 /* firmware retry limit */
 #define FW_RETRY_COUNT			(5)
 
+/* device quirks */
+#define QUIRK_FOR_SS_DEVICE				BIT(0)
+#define QUIRK_FOR_HS_DEVICE				BIT(1)
+#define QUIRK_FOR_FS_DEVICE				BIT(2)
+#define QUIRK_FOR_LS_DEVICE				BIT(3)
+#define QUIRK_FOR_USB2_DEVICE \
+	(QUIRK_FOR_HS_DEVICE | QUIRK_FOR_FS_DEVICE | QUIRK_FOR_LS_DEVICE)
+
+#define USB_DEVICE_USB3(vid, pid) \
+	USB_DEVICE(vid, pid), \
+	.driver_info = (QUIRK_FOR_USB2_DEVICE | QUIRK_FOR_SS_DEVICE),
+
+#define USB_DEVICE_USB2(vid, pid) \
+	USB_DEVICE(vid, pid), \
+	.driver_info = QUIRK_FOR_USB2_DEVICE,
+
+#define USB_DEVICE_SS(vid, pid) \
+	USB_DEVICE(vid, pid), \
+	.driver_info = QUIRK_FOR_SS_DEVICE,
+
+#define USB_DEVICE_HS(vid, pid) \
+	USB_DEVICE(vid, pid), \
+	.driver_info = QUIRK_FOR_HS_DEVICE,
+
+#define USB_DEVICE_FS(vid, pid) \
+	USB_DEVICE(vid, pid), \
+	.driver_info = QUIRK_FOR_FS_DEVICE,
+
+#define USB_DEVICE_LS(vid, pid) \
+	USB_DEVICE(vid, pid), \
+	.driver_info = QUIRK_FOR_LS_DEVICE,
+
+static const struct usb_device_id disable_usb_persist_quirk_list[] = {
+	/* Sandisk Extreme USB 3.0 pen drive, SuperSpeed */
+	{ USB_DEVICE_SS(0x0781, 0x5580) },
+	{ }  /* terminating entry must be last */
+};
+
+static int usb_match_speed(struct usb_device *udev,
+			    const struct usb_device_id *id)
+{
+	if (!id)
+		return 0;
+
+	if ((id->driver_info & QUIRK_FOR_SS_DEVICE) &&
+					udev->speed == USB_SPEED_SUPER)
+		return 1;
+
+	if ((id->driver_info & QUIRK_FOR_HS_DEVICE) &&
+					udev->speed == USB_SPEED_HIGH)
+		return 1;
+
+	if ((id->driver_info & QUIRK_FOR_FS_DEVICE) &&
+					udev->speed == USB_SPEED_FULL)
+		return 1;
+
+	if ((id->driver_info & QUIRK_FOR_LS_DEVICE) &&
+					udev->speed == USB_SPEED_LOW)
+		return 1;
+
+	return 0;
+}
+
 static struct of_device_id tegra_xusba_pd[] = {
 	{ .compatible = "nvidia, tegra186-xusba-pd", },
 	{},
@@ -2331,12 +2394,28 @@ static int tegra_xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 	return xhci_hub_status_data(hcd, buf);
 }
 
+static int tegra_xhci_update_device(struct usb_hcd *hcd,
+				    struct usb_device *udev)
+{
+	struct usb_device_id *id;
+
+	for (id = disable_usb_persist_quirk_list; id->match_flags; id++) {
+		if (usb_match_device(udev, id) && usb_match_speed(udev, id)) {
+			udev->persist_enabled = 0;
+			break;
+		}
+	}
+
+	return xhci_update_device(hcd, udev);
+}
+
 static int __init tegra_xhci_init(void)
 {
 	xhci_init_driver(&tegra_xhci_hc_driver, tegra_xhci_setup);
 	tegra_xhci_hc_driver.irq = tegra_xhci_irq;
 	tegra_xhci_hc_driver.hub_control = tegra_xhci_hub_control;
 	tegra_xhci_hc_driver.hub_status_data = tegra_xhci_hub_status_data;
+	tegra_xhci_hc_driver.update_device = tegra_xhci_update_device;
 	return platform_driver_register(&tegra_xhci_driver);
 }
 module_init(tegra_xhci_init);
