@@ -1912,7 +1912,7 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_PM_SLEEP) || IS_ENABLED(CONFIG_PM_RUNTIME)
+#if IS_ENABLED(CONFIG_PM_SLEEP) || IS_ENABLED(CONFIG_PM)
 static inline u32 read_portsc(struct tegra_xhci_hcd *tegra, unsigned int port)
 {
 	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
@@ -2279,7 +2279,7 @@ static int tegra_xhci_resume(struct device *dev)
 }
 #endif
 
-#ifdef CONFIG_PM_RUNTIME
+#ifdef CONFIG_PM
 static int tegra_xhci_runtime_suspend(struct device *dev)
 {
 	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
