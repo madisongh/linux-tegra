@@ -1577,7 +1577,7 @@ static int tegra_adma_pm_resume(struct device *dev)
 #endif
 
 static const struct dev_pm_ops tegra_adma_dev_pm_ops = {
-#ifdef CONFIG_PM_RUNTIME
+#ifdef CONFIG_PM
 	.runtime_suspend = tegra_adma_runtime_suspend,
 	.runtime_resume = tegra_adma_runtime_resume,
 #endif
