@@ -103,6 +103,8 @@
 /* Do not enable auto calibration if the platform doesn't support */
 #define NVQUIRK_DISABLE_AUTO_CALIBRATION	BIT(6)
 #define NVQUIRK2_SET_PLL_CLK_PARENT		BIT(0)
+/* Tegra register write WAR - needs follow on register read */
+#define NVQUIRK2_TEGRA_WRITE_REG		BIT(1)
 
 /* Common quirks for Tegra 12x and later versions of sdmmc controllers */
 #define TEGRA_SDHCI_QUIRKS (SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | \
@@ -304,6 +306,8 @@ static int sdhci_tegra_get_max_tuning_loop_counter(struct sdhci_host *sdhci)
 static void tegra_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 
 	switch (reg) {
 	case SDHCI_TRANSFER_MODE:
@@ -316,10 +320,25 @@ static void tegra_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
 	case SDHCI_COMMAND:
 		writel((val << 16) | pltfm_host->xfer_mode_shadow,
 			host->ioaddr + SDHCI_TRANSFER_MODE);
+		if (soc_data->nvquirks2 & NVQUIRK2_TEGRA_WRITE_REG)
+			readl(host->ioaddr + SDHCI_TRANSFER_MODE);
 		return;
 	}
 
 	writew(val, host->ioaddr + reg);
+	if (soc_data->nvquirks2 & NVQUIRK2_TEGRA_WRITE_REG)
+		readw(host->ioaddr + reg);
+}
+
+static void tegra_sdhci_writeb(struct sdhci_host *host, u8 val, int reg)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+
+	writeb(val, host->ioaddr + reg);
+	if (soc_data->nvquirks2 & NVQUIRK2_TEGRA_WRITE_REG)
+		readb(host->ioaddr + reg);
 }
 
 static void tegra_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
@@ -336,6 +355,8 @@ static void tegra_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
 		val &= ~(SDHCI_INT_TIMEOUT|SDHCI_INT_CRC);
 
 	writel(val, host->ioaddr + reg);
+	if (soc_data->nvquirks2 & NVQUIRK2_TEGRA_WRITE_REG)
+		readl(host->ioaddr + reg);
 
 	if (unlikely((soc_data->nvquirks & NVQUIRK_ENABLE_BLOCK_GAP_DET) &&
 			(reg == SDHCI_INT_ENABLE))) {
@@ -346,6 +367,8 @@ static void tegra_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
 		else
 			gap_ctrl &= ~0x8;
 		writeb(gap_ctrl, host->ioaddr + SDHCI_BLOCK_GAP_CONTROL);
+		if (soc_data->nvquirks2 & NVQUIRK2_TEGRA_WRITE_REG)
+			readb(host->ioaddr + SDHCI_BLOCK_GAP_CONTROL);
 	}
 }
 
@@ -1443,13 +1466,14 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_ro     = tegra_sdhci_get_ro,
 	.card_event = sdhci_tegra_card_event,
 	.read_w     = tegra_sdhci_readw,
+	.write_b    = tegra_sdhci_writeb,
+	.write_w    = tegra_sdhci_writew,
 	.write_l    = tegra_sdhci_writel,
 	.set_clock  = tegra_sdhci_set_clock,
 	.set_bus_width = tegra_sdhci_set_bus_width,
 	.reset      = tegra_sdhci_reset,
 	.set_uhs_signaling = tegra_sdhci_set_uhs_signaling,
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
-	.write_w    = tegra_sdhci_writew,
 	.post_init	= tegra_sdhci_post_init,
 	.switch_signal_voltage = tegra_sdhci_signal_voltage_switch,
 	.switch_signal_voltage_exit = tegra_sdhci_post_voltage_switch,
@@ -1565,6 +1589,7 @@ static const struct sdhci_pltfm_data sdhci_tegra210_pdata = {
 
 static const struct sdhci_tegra_soc_data soc_data_tegra210 = {
 	.pdata = &sdhci_tegra210_pdata,
+	.nvquirks2 = NVQUIRK2_TEGRA_WRITE_REG,
 };
 
 static const struct of_device_id sdhci_tegra_dt_match[] = {
