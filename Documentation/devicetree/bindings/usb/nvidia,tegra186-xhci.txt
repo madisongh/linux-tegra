@@ -30,6 +30,8 @@ Required properties for Tegra186:
 
 Optional properties:
 --------------------
+ - nvidia,pmc-usb-wakes-disabled: set if platform doesn't support/require waking system from
+   suspend with USB events.
  - extcon-cables: OTG support. Must contains an excon-cable entry which detects
    USB ID pin. See ../extcon/extcon-gpio-states.txt for details.
    When the extcon cable state is 1, OTG port will transition to host mode.
