@@ -1362,6 +1362,7 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	struct tegra_xusb_mbox_msg msg;
 	int ret;
 	int i;
+	u32 val;
 
 	if (!fw) {
 
@@ -1446,6 +1447,11 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	pm_runtime_set_autosuspend_delay(dev, 2000);
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
+
+	/* Enable EU3S bit of USBCMD */
+	val = readl(&xhci->op_regs->command);
+	val |= CMD_PM_INDEX;
+	writel(val, &xhci->op_regs->command);
 
 	return;
 
