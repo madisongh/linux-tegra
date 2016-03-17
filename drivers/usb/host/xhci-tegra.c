@@ -378,6 +378,8 @@ struct tegra_xhci_hcd {
 
 	bool host_mode;
 	bool otg_role_initialized;
+
+	bool pmc_usb_wakes_disabled;
 };
 
 static struct hc_driver __read_mostly tegra_xhci_hc_driver;
@@ -1548,6 +1550,15 @@ static irqreturn_t tegra_xhci_padctl_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static void tegra_xhci_parse_dt(struct platform_device *pdev,
+				struct tegra_xhci_hcd *tegra)
+{
+	struct device_node *node = pdev->dev.of_node;
+
+	tegra->pmc_usb_wakes_disabled = of_property_read_bool(node,
+				"nvidia,pmc-usb-wakes-disabled");
+}
+
 static int tegra_xhci_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
@@ -1600,6 +1611,8 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 	tegra->soc_config = match->data;
+
+	tegra_xhci_parse_dt(pdev, tegra);
 
 	hcd = usb_create_hcd(&tegra_xhci_hc_driver, &pdev->dev,
 				    dev_name(&pdev->dev));
@@ -2223,9 +2236,12 @@ static int tegra_xhci_suspend(struct device *dev)
 
 	pm_runtime_disable(dev);
 
-	ret = enable_irq_wake(tegra->padctl_irq);
-	if (ret)
-		dev_err(tegra->dev, "failed to enable padctl wakes %d\n", ret);
+	if (!tegra->pmc_usb_wakes_disabled) {
+		ret = enable_irq_wake(tegra->padctl_irq);
+		if (ret)
+			dev_err(tegra->dev, "failed to enable padctl wakes %d\n",
+				ret);
+	}
 
 	return ret;
 }
@@ -2250,7 +2266,8 @@ static int tegra_xhci_resume(struct device *dev)
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
 
-	disable_irq_wake(tegra->padctl_irq);
+	if (!tegra->pmc_usb_wakes_disabled)
+		disable_irq_wake(tegra->padctl_irq);
 
 	return 0;
 }
