@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
-
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
  * version 2, as published by the Free Software Foundation.
@@ -164,6 +163,7 @@ struct edp_cfg {
 
 #define VIRTUAL_DEV_MAX_REGULATORS	8
 #define VIRTUAL_DEV_MAX_GPIOS		8
+#define VIRTUAL_DEV_MAX_POWER_SIZE	32
 #define VIRTUAL_REGNAME_SIZE		(VIRTUAL_DEV_MAX_REGULATORS * \
 						CAMERA_MAX_NAME_LENGTH)
 #ifdef CONFIG_COMPAT
