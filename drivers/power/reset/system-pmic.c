@@ -27,6 +27,8 @@
 #include <linux/slab.h>
 #include <linux/pm.h>
 #include <linux/psci.h>
+#include <linux/debugfs.h>
+#include <linux/uaccess.h>
 #include <linux/power/reset/system-pmic.h>
 
 struct system_pmic_dev {
@@ -112,6 +114,91 @@ int system_pmic_set_power_on_event(enum system_pmic_power_on_event event,
 }
 EXPORT_SYMBOL_GPL(system_pmic_set_power_on_event);
 
+#ifdef CONFIG_DEBUG_FS
+static struct dentry *debugfs_root;
+
+static ssize_t system_pmic_show_poweroff_commands(struct file *file,
+			char __user *user_buf, size_t count, loff_t *ppos)
+{
+	char buf[50] = { 0, };
+	ssize_t ret = 0;
+
+	if (system_pmic_dev->avoid_power_off_command)
+		ret = snprintf(buf, sizeof(buf),
+				"Avoid power off commands Enabled\n");
+	else
+		ret = snprintf(buf, sizeof(buf),
+				"Avoid power off commands disabled\n");
+
+	return simple_read_from_buffer(user_buf, count, ppos, buf, ret);
+}
+
+static ssize_t system_pmic_store_poweroff_commands(struct file *file,
+			const char __user *user_buf, size_t count, loff_t *ppos)
+{
+	char buf[50] = { 0, };
+	ssize_t buf_size;
+	bool enabled;
+	int ret;
+
+	buf_size = min(count, (sizeof(buf)-1));
+	if (copy_from_user(buf, user_buf, buf_size))
+		return -EFAULT;
+
+	if ((*buf == 'E') || (*buf == 'e'))
+		enabled = true;
+	else if ((*buf == 'D') || (*buf == 'd'))
+		enabled = false;
+	else
+		return -EINVAL;
+
+	if (enabled && !system_pmic_dev->avoid_power_off_command) {
+		pm_power_off = NULL;
+		pm_power_off = system_pmic_post_power_off_handler;
+		system_pmic_dev->allow_power_off = false;
+		system_pmic_dev->avoid_power_off_command = true;
+		if (system_pmic_dev->ops->override_poweroff_config)
+			system_pmic_dev->ops->override_poweroff_config(
+				system_pmic_dev->pmic_drv_data, enabled);
+		ret = snprintf(buf, sizeof(buf),
+				"Avoid power off commands Enabled now\n");
+	} else if (!enabled && system_pmic_dev->avoid_power_off_command) {
+		pm_power_off = system_pmic_power_off;
+		system_pmic_dev->allow_power_off = true;
+		system_pmic_dev->avoid_power_off_command = false;
+		if (system_pmic_dev->ops->override_poweroff_config)
+			system_pmic_dev->ops->override_poweroff_config(
+				system_pmic_dev->pmic_drv_data, enabled);
+		ret = snprintf(buf, sizeof(buf),
+				"Avoid power off commands disabled now\n");
+	}
+
+	return count;
+}
+
+static const struct file_operations system_pmic_debug_fops = {
+	.open		= simple_open,
+	.write		= system_pmic_store_poweroff_commands,
+	.read		= system_pmic_show_poweroff_commands,
+};
+
+static int system_pmic_debugfs_init(void)
+{
+	debugfs_root = debugfs_create_dir("system_pmic", NULL);
+	if (!debugfs_root)
+		pr_warn("system_pmic: Failed to create debugfs directory\n");
+
+	debugfs_create_file("avoid_system_pmic_poweroff", S_IRUGO | S_IWUSR,
+			debugfs_root, system_pmic_dev, &system_pmic_debug_fops);
+	return 0;
+}
+#else
+static int system_pmic_debugfs_init(void)
+{
+	return 0;
+}
+#endif
+
 struct system_pmic_dev *system_pmic_register(struct device *dev,
 	struct system_pmic_ops *ops, struct system_pmic_config *config,
 	void *drv_data)
@@ -148,6 +235,8 @@ struct system_pmic_dev *system_pmic_register(struct device *dev,
 	}
 
 	psci_prepare_poweroff = system_pmic_prepare_power_off;
+
+	system_pmic_debugfs_init();
 
 	return system_pmic_dev;
 
