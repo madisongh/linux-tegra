@@ -4737,6 +4737,7 @@ static long effective_load(struct task_group *tg, int cpu, long wl, long wg)
 #endif
 
 static unsigned int capacity_margin = 1280; /* ~20% margin */
+static unsigned int capacity_down_margin = 1706;
 
 static int cpu_util(int cpu);
 
@@ -5028,6 +5029,7 @@ static int capacity_aware_wake(struct task_struct *p, int target)
 	struct sched_domain *sd;
 	struct sched_group *sg, *sg_target;
 	int target_max_cap = INT_MAX;
+	int prev_cap = capacity_orig_of(task_cpu(p));
 	int min_usage = INT_MAX;
 	int target_cpu = target;
 	int i;
@@ -5062,6 +5064,14 @@ static int capacity_aware_wake(struct task_struct *p, int target)
 	/* The previous CPU the task was on is valid */
 	if (cpumask_test_cpu(task_cpu(p), sched_group_cpus(sg_target)))
 		return select_idle_sibling(p, task_cpu(p));
+
+	/* Hysteresis when moving to a lower capacity CPU */
+	if (prev_cap > target_max_cap) {
+		unsigned long task_util = task_utilization(p);
+
+		if (task_util * capacity_down_margin > target_max_cap * 1024)
+			return select_idle_sibling(p, task_cpu(p));
+	}
 
 	/* Find the least used cpu in sg_target with enough spare capacity */
 	for_each_cpu_and(i, tsk_cpus_allowed(p), sched_group_cpus(sg_target)) {
