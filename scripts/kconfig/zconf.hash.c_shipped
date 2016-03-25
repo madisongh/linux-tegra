@@ -56,9 +56,9 @@ kconf_id_hash (register const char *str, register unsigned int len)
       52, 52, 52, 52, 52, 52, 52, 52, 52, 52,
       52, 52, 52, 52, 52, 52, 52, 52, 52, 52,
       52, 52, 52, 52, 52, 52, 52, 10, 40,  5,
-       0,  0,  5, 52,  0, 20, 52, 52, 10, 20,
+       0,  0,  5, 52, 10, 20, 52, 52, 10, 20,
        5,  0, 35, 52,  0, 30,  0, 15,  0, 52,
-      15, 52, 52, 52, 52, 52, 52, 52, 52, 52,
+       5,  5, 52, 52, 52, 52, 52, 52, 52, 52,
       52, 52, 52, 52, 52, 52, 52, 52, 52, 52,
       52, 52, 52, 52, 52, 52, 52, 52, 52, 52,
       52, 52, 52, 52, 52, 52, 52, 52, 52, 52,
@@ -101,7 +101,7 @@ struct kconf_id_strings_t
     char kconf_id_strings_str11[sizeof("choice")];
     char kconf_id_strings_str12[sizeof("default")];
     char kconf_id_strings_str13[sizeof("def_bool")];
-    char kconf_id_strings_str14[sizeof("help")];
+    char kconf_id_strings_str14[sizeof("trysource")];
     char kconf_id_strings_str16[sizeof("config")];
     char kconf_id_strings_str17[sizeof("def_tristate")];
     char kconf_id_strings_str18[sizeof("hex")];
@@ -109,6 +109,7 @@ struct kconf_id_strings_t
     char kconf_id_strings_str20[sizeof("---help---")];
     char kconf_id_strings_str22[sizeof("if")];
     char kconf_id_strings_str23[sizeof("int")];
+    char kconf_id_strings_str24[sizeof("help")];
     char kconf_id_strings_str27[sizeof("modules")];
     char kconf_id_strings_str28[sizeof("tristate")];
     char kconf_id_strings_str29[sizeof("menu")];
@@ -138,7 +139,7 @@ static const struct kconf_id_strings_t kconf_id_strings_contents =
     "choice",
     "default",
     "def_bool",
-    "help",
+    "trysource",
     "config",
     "def_tristate",
     "hex",
@@ -146,6 +147,7 @@ static const struct kconf_id_strings_t kconf_id_strings_contents =
     "---help---",
     "if",
     "int",
+    "help",
     "modules",
     "tristate",
     "menu",
@@ -174,7 +176,7 @@ kconf_id_lookup (register const char *str, register unsigned int len)
 {
   enum
     {
-      TOTAL_KEYWORDS = 34,
+      TOTAL_KEYWORDS = 35,
       MIN_WORD_LENGTH = 2,
       MAX_WORD_LENGTH = 14,
       MIN_HASH_VALUE = 2,
@@ -196,7 +198,7 @@ kconf_id_lookup (register const char *str, register unsigned int len)
       {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str11,		T_CHOICE,	TF_COMMAND},
       {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str12,	T_DEFAULT,	TF_COMMAND, S_UNKNOWN},
       {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str13,	T_DEFAULT,	TF_COMMAND, S_BOOLEAN},
-      {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str14,		T_HELP,		TF_COMMAND},
+      {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str14,	T_TRYSOURCE,	TF_COMMAND},
       {-1},
       {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str16,		T_CONFIG,	TF_COMMAND},
       {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str17,	T_DEFAULT,	TF_COMMAND, S_TRISTATE},
@@ -206,7 +208,8 @@ kconf_id_lookup (register const char *str, register unsigned int len)
       {-1},
       {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str22,		T_IF,		TF_COMMAND|TF_PARAM},
       {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str23,		T_TYPE,		TF_COMMAND, S_INT},
-      {-1}, {-1}, {-1},
+      {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str24,		T_HELP,		TF_COMMAND},
+      {-1}, {-1},
       {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str27,	T_OPT_MODULES,	TF_OPTION},
       {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str28,	T_TYPE,		TF_COMMAND, S_TRISTATE},
       {(int)(long)&((struct kconf_id_strings_t *)0)->kconf_id_strings_str29,		T_MENU,		TF_COMMAND},
