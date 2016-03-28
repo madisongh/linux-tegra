@@ -1,8 +1,12 @@
 GCOV_PROFILE := y
-ccflags-y += -I../nvhost/drivers/video/tegra/host
 ccflags-y += -Idrivers/video/tegra/host
 ccflags-y += -Idrivers/video/tegra/camera
 ccflags-y += -Idrivers/media/platform/tegra
+ccflags-y += -Idrivers/video/tegra/host/t124
+ccflags-y += -Wno-multichar
 ccflags-y += -Werror
 
-obj-y += camera_common.o mc_common.o core.o channel.o graph.o camera_gpio.o
+nvhost-t210-objs  = \
+        t210.o
+
+obj-$(CONFIG_TEGRA_GRHOST) += nvhost-t210.o
