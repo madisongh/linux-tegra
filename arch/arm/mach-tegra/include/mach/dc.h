@@ -892,7 +892,10 @@ struct tegra_dc_cmu_csc {
 
 #if defined(CONFIG_TEGRA_DC_CMU_V2)
 struct tegra_dc_cmu {
-	u64 rgb[1025];
+	u64			rgb[1025];
+#if defined(CONFIG_TEGRA_CSC_V2)
+	struct tegra_dc_csc_v2	panel_csc;
+#endif
 };
 #else
 struct tegra_dc_cmu {
