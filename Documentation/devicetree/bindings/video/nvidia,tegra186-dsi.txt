@@ -219,7 +219,11 @@ NVIDIA TEGRA186 Display Serial Interface
    output LUT. For each index first three values from the array are taken, which
    represent RED, GREEN and BLUE values and merged together and place in a
    64bit value to program to hw register.
-
+ - nvidia,panel-csc: 4x3 matrix to color correct panel response, derived using
+   panel calibration. If defined, only windows attached to this panel will use
+   this matrix else per window csc is disabled. Userland program can
+   enable, disable or change per window csc using TEGRA_DC_EXT_SET_CSC_V2 or
+   TEGRA_DC_EXT_FLIP* ioctls.
 
 Example
 
@@ -316,7 +320,10 @@ Example
 					nvidia,use-vpulse2 = <1>;
 					nvidia,bl-device-name = "pwm-backlight";
 				};
-				cmu {
+				nvdisp-cmu {
+					nvidia,panel-csc = < 0x10000 0x00000 0x00000 0x00000
+							     0x00000 0x10000 0x00000 0x00000
+							     0x00000 0x00000 0x10000 0x00000 >;
 					nvidia,cmu-lut = <
 							0x6000 0x6000 0x6000 0x60ce 0x60ce 0x60ce
 							0x619d 0x619d 0x619d 0x626c 0x626c 0x626c
