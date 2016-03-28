@@ -2495,7 +2495,7 @@ static int tegra_xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 static int tegra_xhci_update_device(struct usb_hcd *hcd,
 				    struct usb_device *udev)
 {
-	struct usb_device_id *id;
+	const struct usb_device_id *id;
 
 	for (id = disable_usb_persist_quirk_list; id->match_flags; id++) {
 		if (usb_match_device(udev, id) && usb_match_speed(udev, id)) {
