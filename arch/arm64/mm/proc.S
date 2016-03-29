@@ -244,4 +244,3 @@ crval:
 	.word	0xfcffffff			// clear
 	.word	0x34d5d91d			// set
 #endif
->>>>>>> 2ec6f25... arm64: optionally set CP15BEN in SCTLR
