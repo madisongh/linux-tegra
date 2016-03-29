@@ -346,6 +346,7 @@ struct thermal_zone_of_device_ops {
 	int (*get_trend)(void *, int, enum thermal_trend *);
 	int (*set_emul_temp)(void *, int);
 	int (*trip_update)(void *, int);
+	int (*set_trip_temp)(void *, int, int);
 };
 
 /**
