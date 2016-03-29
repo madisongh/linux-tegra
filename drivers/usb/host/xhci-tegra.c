@@ -2252,7 +2252,7 @@ static int tegra_xhci_suspend(struct device *dev)
 
 	pm_runtime_disable(dev);
 
-	if (!tegra->pmc_usb_wakes_disabled) {
+	if (!tegra->pmc_usb_wakes_disabled && device_may_wakeup(dev)) {
 		ret = enable_irq_wake(tegra->padctl_irq);
 		if (ret)
 			dev_err(tegra->dev, "failed to enable padctl wakes %d\n",
@@ -2282,7 +2282,7 @@ static int tegra_xhci_resume(struct device *dev)
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
 
-	if (!tegra->pmc_usb_wakes_disabled)
+	if (!tegra->pmc_usb_wakes_disabled && device_may_wakeup(dev))
 		disable_irq_wake(tegra->padctl_irq);
 
 	return 0;
