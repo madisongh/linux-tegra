@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * Hypervisor interfaces
  *
@@ -44,6 +44,7 @@
 #define HVC_NR_ACK_GUEST_CLEANUP	8
 #define HVC_NR_READ_HYP_INFO		9
 #define HVC_NR_GUEST_RESET		10
+#define HVC_NR_SYSINFO_IPA		13
 
 #define GUEST_PRIMARY		0
 #define GUEST_IVC_SERVER	0
@@ -248,6 +249,18 @@ static inline int hyp_guest_reset(unsigned int vmid)
 	return (int)r0;
 }
 
+static inline uint64_t hyp_sysinfo_ipa(void)
+{
+	register uint64_t r0 asm("x0");
+
+	asm("hvc %1"
+		: "=r"(r0)
+		: "i"(HVC_NR_SYSINFO_IPA)
+		: "x1", "x2", "x3", _X4_X17);
+
+	return r0;
+}
+
 #undef _X4_X17
 
 #else
@@ -257,6 +270,7 @@ int hyp_read_nguests(unsigned int *nguests);
 int hyp_read_ivc_info(uint64_t *ivc_info_page_pa);
 int hyp_read_ipa_pa_info(struct hyp_ipa_pa_info *info, int guestid, u64 ipa);
 int hyp_raise_irq(unsigned int irq, unsigned int vmid);
+uint64_t hyp_sysinfo_ipa(void);
 
 /* ASM prototypes */
 extern int hvc_read_gid(void *);

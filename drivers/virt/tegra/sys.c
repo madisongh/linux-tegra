@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * System calls to hypervisor
  *
@@ -83,4 +83,9 @@ int hyp_read_ipa_pa_info(struct hyp_ipa_pa_info *info, int guestid, u64 ipa)
 int hyp_raise_irq(unsigned int irq, unsigned int vmid)
 {
 	return hvc_raise_irq(irq, vmid);
+}
+
+uint64_t hyp_sysinfo_ipa(void)
+{
+	return hvc_sysinfo_ipa();
 }

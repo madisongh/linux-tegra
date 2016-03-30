@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA Corporation. All rights reserved.
  *
  * Hypervisor related routines
  *
@@ -72,6 +72,7 @@ declare_syscall read_gid HVC_NR_READ_GID
 declare_syscall read_nguests HVC_NR_READ_NGUESTS
 declare_syscall read_ivc_info HVC_NR_READ_IVC
 declare_syscall read_ipa_pa_info HVC_NR_READ_IPA_PA
+declare_syscall sysinfo_ipa HVC_NR_SYSINFO_IPA
 
 /* TODO: Define calls with no read in a way that does less reg. read/writes */
 /*
