@@ -1347,6 +1347,21 @@ static long mods_krnl_ioctl(struct file  *fp,
 				    esc_mods_flush_cpu_cache_range,
 				    MODS_FLUSH_CPU_CACHE_RANGE);
 		break;
+	case MODS_ESC_DMA_ALLOC_COHERENT:
+		MODS_IOCTL(MODS_ESC_DMA_ALLOC_COHERENT,
+			   esc_mods_dma_alloc_coherent,
+			   MODS_DMA_COHERENT_MEM_HANDLE);
+		break;
+	case MODS_ESC_DMA_FREE_COHERENT:
+		MODS_IOCTL(MODS_ESC_DMA_FREE_COHERENT,
+			   esc_mods_dma_free_coherent,
+			   MODS_DMA_COHERENT_MEM_HANDLE);
+		break;
+	case MODS_ESC_DMA_COPY_TO_USER:
+		MODS_IOCTL(MODS_ESC_DMA_COPY_TO_USER,
+			   esc_mods_dma_copy_to_user,
+			   MODS_DMA_COPY_TO_USER);
+		break;
 #if defined(CONFIG_DMA_ENGINE)
 	case MODS_ESC_DMA_REQUEST_HANDLE:
 		MODS_IOCTL(MODS_ESC_DMA_REQUEST_HANDLE,

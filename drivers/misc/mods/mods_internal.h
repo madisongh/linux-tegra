@@ -496,6 +496,12 @@ int esc_mods_clock_reset_deassert(struct file *,
 				  struct MODS_CLOCK_HANDLE *);
 int esc_mods_flush_cpu_cache_range(struct file *,
 				   struct MODS_FLUSH_CPU_CACHE_RANGE *);
+int esc_mods_dma_alloc_coherent(struct file *,
+				struct MODS_DMA_COHERENT_MEM_HANDLE *);
+int esc_mods_dma_free_coherent(struct file *,
+				struct MODS_DMA_COHERENT_MEM_HANDLE *);
+int esc_mods_dma_copy_to_user(struct file *,
+				struct MODS_DMA_COPY_TO_USER *);
 #ifdef CONFIG_DMA_ENGINE
 int esc_mods_dma_request_channel(struct file *, struct MODS_DMA_HANDLE *);
 int esc_mods_dma_release_channel(struct file *, struct MODS_DMA_HANDLE *);

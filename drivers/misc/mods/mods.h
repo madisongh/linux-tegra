@@ -859,6 +859,22 @@ struct MODS_NET_DEVICE_NAME {
 	/* in */
 	char device_name[MAX_NET_DEVICE_NAME_LENGTH];
 };
+
+struct MODS_DMA_COHERENT_MEM_HANDLE {
+	__u32	num_bytes;
+	__u32	attrib;
+	__u64	memory_handle_phys;
+	__u64	memory_handle_virt;
+};
+
+/* MODS_ESC_DMA_COPY_TO_USER */
+struct MODS_DMA_COPY_TO_USER {
+	__u32	num_bytes;
+	__u32	attrib;
+	__u64	memory_handle_src;
+	__u64	memory_handle_dst;
+};
+
 #pragma pack(pop)
 
 /* ************************************************************************* */
@@ -1049,4 +1065,13 @@ struct MODS_NET_DEVICE_NAME {
 		    _IOW(MODS_IOC_MAGIC, 87, struct MODS_NET_DEVICE_NAME)
 #define MODS_ESC_REGISTER_IRQ_3			\
 		    _IOW(MODS_IOC_MAGIC, 88, struct MODS_REGISTER_IRQ_3)
+#define MODS_ESC_DMA_ALLOC_COHERENT			\
+		   _IOWR(MODS_IOC_MAGIC, 89,		\
+		   struct MODS_DMA_COHERENT_MEM_HANDLE)
+#define MODS_ESC_DMA_FREE_COHERENT			\
+		   _IOWR(MODS_IOC_MAGIC, 90,		\
+		   struct MODS_DMA_COHERENT_MEM_HANDLE)
+#define MODS_ESC_DMA_COPY_TO_USER			\
+		   _IOWR(MODS_IOC_MAGIC, 91,		\
+		   struct MODS_DMA_COPY_TO_USER)
 #endif /* _MODS_H_  */

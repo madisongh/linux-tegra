@@ -1,7 +1,7 @@
 /*
  * mods_dma.c - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -423,4 +423,91 @@ int esc_mods_dma_wait(struct file *pfile,
 
 	LOG_EXT();
 	return  ret;
+}
+
+int esc_mods_dma_alloc_coherent(struct file                    *fp,
+				struct MODS_DMA_COHERENT_MEM_HANDLE *p)
+{
+	dma_addr_t    p_phys_addr;
+	void          *p_cpu_addr;
+
+	LOG_ENT();
+
+	p_cpu_addr = dma_alloc_coherent(NULL,
+					p->num_bytes,
+					&p_phys_addr,
+					GFP_KERNEL);
+
+	mods_debug_printk(DEBUG_MEM,
+		"%s:num_bytes=%d, p_cpu_addr=%p, p_phys_addr=%p\n",
+		__func__,
+		p->num_bytes,
+		(void *)p_cpu_addr,
+		(void *)p_phys_addr);
+
+	if (!p_cpu_addr) {
+		mods_error_printk(
+		"%s:FAILED!!!num_bytes=%d, p_cpu_addr=%p, p_phys_addr=%p\n",
+		__func__,
+		p->num_bytes,
+		(void *)p_cpu_addr,
+		(void *)p_phys_addr);
+		LOG_EXT();
+		return -1;
+	}
+
+	memset(p_cpu_addr, 0x00, p->num_bytes);
+
+	p->memory_handle_phys = (u64)p_phys_addr;
+	p->memory_handle_virt = (u64)p_cpu_addr;
+
+	LOG_EXT();
+	return 0;
+}
+
+int esc_mods_dma_free_coherent(struct file                    *fp,
+				struct MODS_DMA_COHERENT_MEM_HANDLE *p)
+{
+	LOG_ENT();
+
+	mods_debug_printk(DEBUG_MEM,
+		"%s : num_bytes = %d, p_cpu_addr=%p, p_phys_addr=%p\n",
+		__func__,
+		p->num_bytes,
+		(void *)(p->memory_handle_virt),
+		(void *)(p->memory_handle_phys));
+
+	dma_free_coherent(NULL,
+		p->num_bytes,
+		(void *)(p->memory_handle_virt),
+		(dma_addr_t)(p->memory_handle_phys));
+
+	p->memory_handle_phys = (u64)0;
+	p->memory_handle_virt = (u64)0;
+
+	LOG_EXT();
+	return 0;
+}
+
+int esc_mods_dma_copy_to_user(struct file                    *fp,
+				struct MODS_DMA_COPY_TO_USER *p)
+{
+	int retval;
+
+	LOG_ENT();
+
+	mods_debug_printk(DEBUG_MEM,
+		"%s:memory_handle_dst=%p, memory_handle_src=%p, num_bytes=%d\n",
+		__func__,
+		(void *)(p->memory_handle_dst),
+		(void *)(p->memory_handle_src),
+		p->num_bytes);
+
+	retval = copy_to_user((void *)(p->memory_handle_dst),
+				(void *)(p->memory_handle_src),
+				p->num_bytes);
+
+	LOG_EXT();
+
+	return retval;
 }
