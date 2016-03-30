@@ -97,6 +97,18 @@ config ARM64
 	help
 	  ARM 64-bit (AArch64) Linux support.
 
+trysource ../kernel-t18x/arch/arm64/Kconfig
+
+config ARCH_TEGRA_18x_SOC
+	bool "Tegra 18x family SOC Kconfig placeholder"
+	select ARCH_TEGRA_18x_SOC_PRIVATE
+	help
+	  Kconfig placeholder for NVIDIA Tegra18x family of SoCs
+
+config ARCH_TEGRA_19x_SOC
+	bool "Tegra 19x family SOC"
+	help
+	  Enable support for NVIDIA Tegra19x family of SoCs
 config 64BIT
 	def_bool y
 
@@ -857,6 +869,12 @@ config SYSVIPC_COMPAT
 
 endmenu
 
+config DEFAULT_DMA_COHERENT_POOL_SIZE
+	int "Default  DMA coherent pool size (bytes)"
+	default "1048576"
+	help
+	  The default value is 1MB.
+
 menu "Power management options"
 
 source "kernel/power/Kconfig"
@@ -865,6 +883,12 @@ config ARCH_SUSPEND_POSSIBLE
 	def_bool y
 
 endmenu
+
+config SERROR_HANDLER
+	bool "Platform specific SError handler support"
+	help
+	  This option configures the arm64 kernel to call a platform specific
+	  SError (system error) handler.
 
 menu "CPU Power Management"
 
@@ -896,3 +920,5 @@ source "arch/arm64/crypto/Kconfig"
 endif
 
 source "lib/Kconfig"
+
+source "drivers/firmware/tegra/Kconfig"
