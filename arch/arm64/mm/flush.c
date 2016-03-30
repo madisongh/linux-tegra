@@ -66,6 +66,11 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
 	preempt_enable();
 }
 
+void __clean_dcache_page(struct page *page)
+{
+	__clean_dcache_area(page_address(page), PAGE_SIZE);
+}
+
 void __sync_icache_dcache(pte_t pte, unsigned long addr)
 {
 	struct page *page = pte_page(pte);
@@ -99,6 +104,11 @@ EXPORT_SYMBOL(flush_dcache_page);
  * Additional functions defined in assembly.
  */
 EXPORT_SYMBOL(flush_icache_range);
+EXPORT_SYMBOL(flush_cache_all);
+EXPORT_SYMBOL(__flush_dcache_all);
+EXPORT_SYMBOL(__clean_dcache_all);
+EXPORT_SYMBOL(__clean_dcache_louis);
+EXPORT_SYMBOL(__clean_dcache_page);
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 #ifdef CONFIG_HAVE_RCU_TABLE_FREE
