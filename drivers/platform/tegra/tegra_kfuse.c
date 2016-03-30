@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2010-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -32,6 +32,7 @@
 #include "tegra_kfuse_priv.h"
 #ifdef CONFIG_ARCH_TEGRA_18x_SOC
 #include "tegra18_kfuse_priv.h"
+#include <linux/platform/tegra/tegra18_kfuse.h>
 #endif
 
 /* Public API does not provide kfuse structure or device */
@@ -86,12 +87,21 @@ int tegra_kfuse_read(void *dest, size_t len)
 	int err;
 	u32 v;
 	unsigned cnt;
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+	int ret;
+#endif
 
 	if (!kfuse)
 		return -ENODEV;
 
 	if (len > KFUSE_DATA_SZ)
 		return -EINVAL;
+
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+	ret = tegra_kfuse_enable_sensing();
+	if (ret)
+		return ret;
+#endif
 
 	err = clk_prepare_enable(kfuse->clk);
 	if (err)
@@ -129,6 +139,9 @@ int tegra_kfuse_read(void *dest, size_t len)
 		tegra_kfuse_writel(kfuse, KFUSE_PD_PD, KFUSE_PD);
 
 	clk_disable_unprepare(kfuse->clk);
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+	tegra_kfuse_disable_sensing();
+#endif
 
 	return 0;
 }
