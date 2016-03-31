@@ -27,7 +27,7 @@
 
 #ifdef CONFIG_TEGRA_POWERGATE
 int tegra_cpu_powergate_id(int cpuid);
-bool tegra_powergate_is_powered(int id);
+int tegra_powergate_is_powered(int id);
 int tegra_powergate_mc_disable(int id);
 int tegra_powergate_mc_enable(int id);
 int tegra_powergate_mc_flush(int id);
@@ -71,7 +71,7 @@ int slcg_register_notifier(int id, struct notifier_block *nb);
 int slcg_unregister_notifier(int id, struct notifier_block *nb);
 int tegra_powergate_cpuid_to_powergate_id(int cpu);
 #else
-static inline bool tegra_powergate_is_powered(int id)
+static inline int tegra_powergate_is_powered(int id)
 {
 	return 1;
 }

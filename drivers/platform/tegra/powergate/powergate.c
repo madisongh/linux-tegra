@@ -125,7 +125,7 @@ int tegra_powergate_remove_clamping(int id)
 }
 EXPORT_SYMBOL(tegra_powergate_remove_clamping);
 
-bool tegra_powergate_is_powered(int id)
+int tegra_powergate_is_powered(int id)
 {
 	if (!pg_ops) {
 		pr_debug("This SOC doesn't support powergating\n");
