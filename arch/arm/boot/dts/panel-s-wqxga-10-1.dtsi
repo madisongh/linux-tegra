@@ -35,18 +35,17 @@
 				nvidia,dsi-video-data-type = <TEGRA_DSI_VIDEO_TYPE_COMMAND_MODE>;
 				nvidia,dsi-video-clock-mode = <TEGRA_DSI_VIDEO_CLOCK_TX_ONLY>;
 				nvidia,dsi-ganged-type = <TEGRA_DSI_GANGED_SYMMETRIC_LEFT_RIGHT>;
+				nvidia,dsi-ganged-write-to-all-links = <1>;
 				nvidia,dsi-controller-vs = <DSI_VS_1>;
 				nvidia,dsi-virtual-channel = <TEGRA_DSI_VIRTUAL_CHANNEL_0>;
 				nvidia,dsi-panel-reset = <TEGRA_DSI_ENABLE>;
 				nvidia,dsi-power-saving-suspend = <TEGRA_DSI_ENABLE>;
 				nvidia,dsi-lp00-pre-panel-wakeup = <TEGRA_DSI_ENABLE>;
 				nvidia,dsi-ulpm-not-support = <TEGRA_DSI_ENABLE>;
-				nvidia,dsi-suspend-aggr = <DSI_HOST_SUSPEND_LV2>;
 				nvidia,dsi-init-cmd =
 							/* Long  Packet: <PACKETTYPE[u8] COMMANDID[u8] PAYLOADCOUNT[u16] ECC[u8] PAYLOAD[..] CHECKSUM[u16]> */
 							/* Short Packet: <PACKETTYPE[u8] COMMANDID[u8] DATA0[u8] DATA1[u8] ECC[u8]> */
 							/* For DSI packets each DT cell is interpreted as u8 not u32 */
-
 							<TEGRA_DSI_PACKET_CMD DSI_GENERIC_LONG_WRITE 0x3 0x0 0x0 0x10 0x00 0x2A 0x0 0x0>,
 							<TEGRA_DSI_DELAY_MS 20>,
 							<TEGRA_DSI_PACKET_CMD DSI_DCS_WRITE_0_PARAM DSI_DCS_NO_OP 0x0 0x0>,
@@ -60,8 +59,10 @@
 							<TEGRA_DSI_PACKET_CMD DSI_DCS_WRITE_0_PARAM DSI_DCS_EXIT_SLEEP_MODE 0x0 0x0>,
 							<TEGRA_DSI_DELAY_MS 120>,
 							<TEGRA_DSI_PACKET_CMD DSI_DCS_WRITE_0_PARAM DSI_DCS_SET_DISPLAY_ON 0x0 0x0>,
-							<TEGRA_DSI_DELAY_MS 20>;
-				nvidia,dsi-n-init-cmd = <14>;
+							<TEGRA_DSI_DELAY_MS 20>,
+							<TEGRA_DSI_SEND_FRAME 1>,
+							<TEGRA_DSI_DELAY_MS 120>;
+				nvidia,dsi-n-init-cmd = <16>;
 				nvidia,dsi-suspend-cmd =
 							<TEGRA_DSI_PACKET_CMD DSI_DCS_WRITE_0_PARAM DSI_DCS_SET_DISPLAY_OFF 0x0 0x0>,
 							<TEGRA_DSI_DELAY_MS 50>,
@@ -70,11 +71,12 @@
 							<TEGRA_DSI_PACKET_CMD DSI_DCS_WRITE_0_PARAM DSI_DCS_SET_TEARING_EFFECT_OFF 0x0 0x0>,
 							<TEGRA_DSI_DELAY_MS 20>;
 				nvidia,dsi-n-suspend-cmd = <6>;
+
 				disp-default-out {
 					nvidia,out-type = <TEGRA_DC_OUT_DSI>;
 					nvidia,out-width = <216>;
 					nvidia,out-height = <135>;
-					nvidia,out-flags = <TEGRA_DC_OUT_ONE_SHOT_MODE TEGRA_DC_OUT_ONE_SHOT_LP_MODE>;
+					nvidia,out-flags = <TEGRA_DC_OUT_ONE_SHOT_MODE>;
 					nvidia,out-parent-clk = "pll_d_out0";
 					nvidia,out-xres = <2560>;
 					nvidia,out-yres = <1600>;
