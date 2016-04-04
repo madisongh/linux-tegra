@@ -2,6 +2,7 @@
  * pm_domain.h - Definitions and headers related to device power domains.
  *
  * Copyright (C) 2011 Rafael J. Wysocki <rjw@sisk.pl>, Renesas Electronics Corp.
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This file is released under the GPLv2.
  */
@@ -18,6 +19,8 @@
 
 /* Defines used for the flags field in the struct generic_pm_domain */
 #define GENPD_FLAG_PM_CLK	(1U << 0) /* PM domain uses PM clk */
+#define GENPD_FLAG_PM_UPSTREAM	(1U << 1) /* Upstream implementation of */
+					  /* PM Domain*/
 
 enum gpd_status {
 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
@@ -34,6 +37,14 @@ struct gpd_dev_ops {
 	int (*stop)(struct device *dev);
 	int (*save_state)(struct device *dev);
 	int (*restore_state)(struct device *dev);
+	int (*suspend)(struct device *dev);
+	int (*suspend_late)(struct device *dev);
+	int (*resume_early)(struct device *dev);
+	int (*resume)(struct device *dev);
+	int (*freeze)(struct device *dev);
+	int (*freeze_late)(struct device *dev);
+	int (*thaw_early)(struct device *dev);
+	int (*thaw)(struct device *dev);
 	bool (*active_wakeup)(struct device *dev);
 };
 
@@ -61,11 +72,17 @@ struct generic_pm_domain {
 	s64 max_off_time_ns;	/* Maximum allowed "suspended" time. */
 	bool max_off_time_changed;
 	bool cached_power_down_ok;
+	struct device_node *of_node; /* Node in device tree */
 	int (*attach_dev)(struct generic_pm_domain *domain,
 			  struct device *dev);
 	void (*detach_dev)(struct generic_pm_domain *domain,
 			   struct device *dev);
 	unsigned int flags;		/* Bit field of configs for genpd */
+	struct delayed_work power_off_delayed_work;
+	s64 power_off_delay;
+	unsigned long power_on_jiffies;
+	unsigned long power_off_jiffies;
+	unsigned long accounting_timestamp;
 };
 
 static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
@@ -95,11 +112,18 @@ struct pm_domain_data {
 
 struct generic_pm_domain_data {
 	struct pm_domain_data base;
+	struct gpd_dev_ops ops;
 	struct gpd_timing_data td;
 	struct notifier_block nb;
+	struct mutex lock;
+	unsigned int refcount;
+	int need_restore;
+	bool need_save;
 };
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS
+struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name);
+
 static inline struct generic_pm_domain_data *to_gpd_data(struct pm_domain_data *pdd)
 {
 	return container_of(pdd, struct generic_pm_domain_data, base);
@@ -111,16 +135,29 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
 }
 
 extern struct generic_pm_domain *pm_genpd_lookup_dev(struct device *dev);
+static inline void pm_genpd_set_poweroff_delay(struct generic_pm_domain *genpd,
+	s64 delay)
+{
+	genpd->power_off_delay = delay;
+}
+
+extern struct generic_pm_domain *dev_to_genpd(struct device *dev);
 extern int __pm_genpd_add_device(struct generic_pm_domain *genpd,
 				 struct device *dev,
 				 struct gpd_timing_data *td);
 
 extern int pm_genpd_remove_device(struct generic_pm_domain *genpd,
 				  struct device *dev);
+extern void pm_genpd_dev_need_restore(struct device *dev, bool val);
+extern void pm_genpd_dev_need_save(struct device *dev, bool val);
 extern int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
 				  struct generic_pm_domain *new_subdomain);
 extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
 				     struct generic_pm_domain *target);
+extern int pm_genpd_add_callbacks(struct device *dev,
+				  struct gpd_dev_ops *ops,
+				  struct gpd_timing_data *td);
+extern int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td);
 extern void pm_genpd_init(struct generic_pm_domain *genpd,
 			  struct dev_power_governor *gov, bool is_off);
 
@@ -128,6 +165,13 @@ extern struct dev_power_governor simple_qos_governor;
 extern struct dev_power_governor pm_domain_always_on_gov;
 #else
 
+static inline struct generic_pm_domain *pm_genpd_lookup_name
+				   (const char *domain_name)
+{
+	return NULL;
+}
+static inline void pm_genpd_set_poweroff_delay(struct generic_pm_domain *genpd,
+	s64 delay) {}
 static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
 {
 	return ERR_PTR(-ENOSYS);
@@ -135,6 +179,10 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
 static inline struct generic_pm_domain *pm_genpd_lookup_dev(struct device *dev)
 {
 	return NULL;
+}
+static inline struct generic_pm_domain *dev_to_genpd(struct device *dev)
+{
+	return ERR_PTR(-ENOSYS);
 }
 static inline int __pm_genpd_add_device(struct generic_pm_domain *genpd,
 					struct device *dev,
@@ -147,6 +195,8 @@ static inline int pm_genpd_remove_device(struct generic_pm_domain *genpd,
 {
 	return -ENOSYS;
 }
+static inline void pm_genpd_dev_need_restore(struct device *dev, bool val) {}
+static inline void pm_genpd_dev_need_save(struct device *dev, bool val) {}
 static inline int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
 					 struct generic_pm_domain *new_sd)
 {
@@ -154,6 +204,16 @@ static inline int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
 }
 static inline int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
 					    struct generic_pm_domain *target)
+{
+	return -ENOSYS;
+}
+static inline int pm_genpd_add_callbacks(struct device *dev,
+					 struct gpd_dev_ops *ops,
+					 struct gpd_timing_data *td)
+{
+	return -ENOSYS;
+}
+static inline int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td)
 {
 	return -ENOSYS;
 }
@@ -167,6 +227,11 @@ static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
 				      struct device *dev)
 {
 	return __pm_genpd_add_device(genpd, dev, NULL);
+}
+
+static inline int pm_genpd_remove_callbacks(struct device *dev)
+{
+	return __pm_genpd_remove_callbacks(dev, true);
 }
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS_SLEEP
@@ -203,6 +268,9 @@ struct generic_pm_domain *__of_genpd_xlate_onecell(
 					void *data);
 
 int genpd_dev_pm_attach(struct device *dev);
+int genpd_pm_subdomain_attach(struct generic_pm_domain *sd);
+int genpd_pm_subdomain_detach(struct generic_pm_domain *sd);
+int genpd_dev_pm_add(const struct of_device_id *dev_id, struct device *dev);
 #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
 static inline int __of_genpd_add_provider(struct device_node *np,
 					genpd_xlate_t xlate, void *data)
@@ -221,6 +289,19 @@ static inline struct generic_pm_domain *of_genpd_get_from_provider(
 #define __of_genpd_xlate_onecell	NULL
 
 static inline int genpd_dev_pm_attach(struct device *dev)
+{
+	return -ENODEV;
+}
+static inline int genpd_pm_subdomain_attach(struct generic_pm_domain *sd)
+{
+	return -ENODEV;
+}
+static inline int genpd_pm_subdomain_detach(struct generic_pm_domain *sd)
+{
+	return -ENODEV;
+}
+static inline int genpd_dev_pm_add(const struct of_device_id *dev_id,
+						struct device *dev)
 {
 	return -ENODEV;
 }
