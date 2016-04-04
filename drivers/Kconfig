@@ -200,4 +200,10 @@ source "drivers/hwtracing/intel_th/Kconfig"
 
 source "drivers/fpga/Kconfig"
 
+trysource "../kernel-t18x/drivers/tachometer/Kconfig"
+
+trysource "../kernel-t18x/drivers/misc/csi_mipi_cal/Kconfig"
+
+trysource "../kernel-t18x/drivers/misc/tegra186-ahc/Kconfig"
+
 endmenu
