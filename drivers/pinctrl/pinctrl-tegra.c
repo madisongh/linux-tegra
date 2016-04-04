@@ -1,7 +1,7 @@
 /*
  * Driver for the NVIDIA Tegra pinmux
  *
- * Copyright (c) 2011-2012, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Derived from code:
  * Copyright (C) 2010 Google, Inc.
@@ -104,6 +104,7 @@ static const struct cfg_param {
 	{"nvidia,io-reset",		TEGRA_PINCONF_PARAM_IORESET},
 	{"nvidia,rcv-sel",		TEGRA_PINCONF_PARAM_RCV_SEL},
 	{"nvidia,io-hv",		TEGRA_PINCONF_PARAM_RCV_SEL},
+	{"nvidia,io-high-voltage",	TEGRA_PINCONF_PARAM_E_IO_HV},
 	{"nvidia,high-speed-mode",	TEGRA_PINCONF_PARAM_HIGH_SPEED_MODE},
 	{"nvidia,schmitt",		TEGRA_PINCONF_PARAM_SCHMITT},
 	{"nvidia,low-power-mode",	TEGRA_PINCONF_PARAM_LOW_POWER_MODE},
@@ -303,7 +304,7 @@ static int tegra_pinconf_reg(struct tegra_pmx *pmx,
 			     const struct tegra_pingroup *g,
 			     enum tegra_pinconf_param param,
 			     bool report_err,
-			     s8 *bank, s16 *reg, s8 *bit, s8 *width)
+			     s8 *bank, s32 *reg, s8 *bit, s8 *width)
 {
 	switch (param) {
 	case TEGRA_PINCONF_PARAM_PULL:
@@ -346,6 +347,12 @@ static int tegra_pinconf_reg(struct tegra_pmx *pmx,
 		*bank = g->mux_bank;
 		*reg = g->mux_reg;
 		*bit = g->rcv_sel_bit;
+		*width = 1;
+		break;
+	case TEGRA_PINCONF_PARAM_E_IO_HV:
+		*bank = g->mux_bank;
+		*reg = g->mux_reg;
+		*bit = g->e_io_hv_bit;
 		*width = 1;
 		break;
 	case TEGRA_PINCONF_PARAM_HIGH_SPEED_MODE:
@@ -462,7 +469,7 @@ static int tegra_pinconf_group_get(struct pinctrl_dev *pctldev,
 	const struct tegra_pingroup *g;
 	int ret;
 	s8 bank, bit, width;
-	s16 reg;
+	s32 reg;
 	u32 val, mask;
 
 	g = &pmx->soc->groups[group];
@@ -491,7 +498,7 @@ static int tegra_pinconf_group_set(struct pinctrl_dev *pctldev,
 	const struct tegra_pingroup *g;
 	int ret, i;
 	s8 bank, bit, width;
-	s16 reg;
+	s32 reg;
 	u32 val, mask;
 
 	g = &pmx->soc->groups[group];
@@ -559,7 +566,7 @@ static void tegra_pinconf_group_dbg_show(struct pinctrl_dev *pctldev,
 	const struct tegra_pingroup *g;
 	int i, ret;
 	s8 bank, bit, width;
-	s16 reg;
+	s32 reg;
 	u32 val;
 
 	g = &pmx->soc->groups[group];

@@ -32,6 +32,8 @@ enum tegra_pinconf_param {
 	/* argument: Boolean */
 	TEGRA_PINCONF_PARAM_RCV_SEL,
 	/* argument: Boolean */
+	TEGRA_PINCONF_PARAM_E_IO_HV,
+	/* argument: Boolean */
 	TEGRA_PINCONF_PARAM_HIGH_SPEED_MODE,
 	/* argument: Boolean */
 	TEGRA_PINCONF_PARAM_SCHMITT,
