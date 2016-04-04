@@ -51,6 +51,14 @@ enum tegra_pinconf_param {
 	TEGRA_PINCONF_PARAM_DRIVE_TYPE,
 	/* Set pin to GPIO mode */
 	TEGRA_PINCONF_PARAM_GPIO_MODE,
+	/* argument: Boolean */
+	TEGRA_PINCONF_PARAM_LPDR,
+	/* argument: Boolean */
+	TEGRA_PINCONF_PARAM_PBIAS_BUF,
+	/* argument: Boolean */
+	TEGRA_PINCONF_PARAM_PREEMP,
+	/* argument: Integer, range is HW-dependent */
+	TEGRA_PINCONF_PARAM_RFU_IN,
 };
 
 enum tegra_pinconf_pull {
