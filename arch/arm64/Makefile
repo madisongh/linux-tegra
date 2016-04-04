@@ -40,6 +40,8 @@ AS		+= -EL
 LD		+= -EL
 endif
 
+# For mach-xxx/mach/{io.h|irqs.h}
+KBUILD_CPPFLAGS += -Iarch/arm/mach-tegra/include
 CHECKFLAGS	+= -D__aarch64__
 
 ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
@@ -85,6 +87,9 @@ KBUILD_DTBS	:= dtbs
 all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
 
 boot := arch/arm64/boot
+# FIXME: copied from arch/arm/Makefile
+archprepare:
+	$(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
 
 Image: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
