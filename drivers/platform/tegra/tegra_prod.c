@@ -48,7 +48,7 @@ static int tegra_prod_get_child_tupple_count(const struct device_node *np,
 		if (!of_device_is_available(child))
 			continue;
 
-		count = of_property_count_u32(child, "prod");
+		count = of_property_count_u32_elems(child, "prod");
 		if (count < 0) {
 			pr_err("Node %s: prod prop not found\n", child->name);
 			continue;
@@ -77,7 +77,7 @@ static int tegra_prod_read_prod_data(const struct device_node *np,
 	if (!of_device_is_available(np))
 		return 0;
 
-	count = of_property_count_u32(np, "prod");
+	count = of_property_count_u32_elems(np, "prod");
 	if (count < 0) {
 		pr_err("Node %s: prod prop not found\n", np->name);
 		return -EINVAL;
@@ -200,7 +200,7 @@ static int tegra_prod_parse_dt(const struct device_node *np,
 		}
 		t_prod->count = count;
 
-		count = of_property_count_u32(child, "prod");
+		count = of_property_count_u32_elems(child, "prod");
 		if ((count < 0) || (count < n_tupple) ||
 				(count % n_tupple != 0)) {
 			pr_err("Node %s: Not found proper setting in %s\n",

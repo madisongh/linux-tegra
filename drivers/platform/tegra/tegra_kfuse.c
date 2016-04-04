@@ -23,6 +23,7 @@
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/clk.h>
+#include <linux/module.h>
 
 #include <linux/platform/tegra/tegra_kfuse.h>
 

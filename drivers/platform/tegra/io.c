@@ -37,7 +37,7 @@
 #define MT_DEVICE MT_DEVICE_nGnRE
 #endif
 
-static struct map_desc tegra_io_desc[] __initdata = {
+static struct map_desc tegra_io_desc[] __maybe_unused __initdata = {
 	{
 		.virtual = (unsigned long)IO_PPSB_VIRT,
 		.pfn = __phys_to_pfn(IO_PPSB_PHYS),
@@ -121,5 +121,8 @@ static struct map_desc tegra_io_desc[] __initdata = {
 void __init tegra_map_common_io(void)
 {
 	debug_ll_io_init();
-	iotable_init(tegra_io_desc, ARRAY_SIZE(tegra_io_desc));
+	/* 
+	 * TEMP: disable this until memory changes are ready
+	 * iotable_init(tegra_io_desc, ARRAY_SIZE(tegra_io_desc));
+	 */
 }

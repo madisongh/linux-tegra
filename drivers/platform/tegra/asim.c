@@ -20,6 +20,7 @@
 #include <linux/ioport.h>
 #include <linux/platform_device.h>
 #include <linux/of_device.h>
+#include <linux/module.h>
 
 #include <mach/irqs.h>
 
@@ -97,11 +98,10 @@ static int __init asim_init(void)
 
 	return platform_driver_register(&platform_driver);
 }
+arch_initcall(asim_init);
 
 static void __exit asim_exit(void)
 {
         platform_driver_unregister(&platform_driver);
 }
-
-arch_initcall(asim_init);
 module_exit(asim_exit);
