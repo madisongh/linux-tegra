@@ -45,6 +45,10 @@ struct tegra_pmx {
 	void __iomem **regs;
 };
 
+static int tegra_pinconf_group_set(struct pinctrl_dev *pctldev,
+		   unsigned group, unsigned long *configs,
+		   unsigned num_configs);
+
 static inline u32 pmx_readl(struct tegra_pmx *pmx, u32 bank, u32 reg)
 {
 	return readl(pmx->regs[bank] + reg);
@@ -264,6 +268,21 @@ static int tegra_pinctrl_get_func_groups(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
+static int tegra_pinconfig_group_set(struct pinctrl_dev *pctldev,
+		unsigned group, unsigned long param, unsigned long arg)
+{
+	unsigned long config;
+	int ret;
+
+	config = TEGRA_PINCONF_PACK(param, arg);
+	ret = tegra_pinconf_group_set(pctldev, group, &config, 1);
+	if (ret < 0)
+		dev_err(pctldev->dev,
+			"Pinctrl group %u tristate config failed: %d\n",
+			group, ret);
+	return ret;
+}
+
 static int tegra_pinctrl_set_mux(struct pinctrl_dev *pctldev,
 				 unsigned function,
 				 unsigned group)
@@ -293,11 +312,65 @@ static int tegra_pinctrl_set_mux(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
+static int tegra_pinctrl_gpio_request_enable(struct pinctrl_dev *pctldev,
+				struct pinctrl_gpio_range *range,
+				unsigned pin)
+{
+	struct tegra_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
+
+	if (pmx->soc->gpio_request_enable)
+		return pmx->soc->gpio_request_enable(pin);
+	return 0;
+}
+
+static int tegra_pinctrl_gpio_set_direction(struct pinctrl_dev *pctldev,
+	struct pinctrl_gpio_range *range, unsigned offset, bool input)
+{
+	struct tegra_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
+	unsigned  group;
+	const unsigned *pins;
+	unsigned num_pins;
+	int ret;
+
+	for (group = 0; group < pmx->soc->ngroups; ++group) {
+		ret = tegra_pinctrl_get_group_pins(pctldev, group,
+				&pins, &num_pins);
+		if (ret < 0 || num_pins != 1)
+			continue;
+		if (offset ==  pins[0])
+			break;
+	}
+
+	if (group == pmx->soc->ngroups) {
+		dev_err(pctldev->dev,
+			"Pingroup not found for pin %u\n", offset);
+		return -EINVAL;
+	}
+
+	/*
+	 * Set input = 1 for the input direction and
+	 * tristate = 0 for output direction.
+	 */
+	if (input)
+		ret = tegra_pinconfig_group_set(pctldev, group,
+					TEGRA_PINCONF_PARAM_ENABLE_INPUT, 1);
+	else
+		ret = tegra_pinconfig_group_set(pctldev, group,
+					TEGRA_PINCONF_PARAM_TRISTATE, 0);
+
+	if (pmx->soc->is_gpio_reg_support)
+		ret = tegra_pinconfig_group_set(pctldev, group,
+					TEGRA_PINCONF_PARAM_GPIO_MODE, 0);
+	return ret;
+}
+
 static const struct pinmux_ops tegra_pinmux_ops = {
 	.get_functions_count = tegra_pinctrl_get_funcs_count,
 	.get_function_name = tegra_pinctrl_get_func_name,
 	.get_function_groups = tegra_pinctrl_get_func_groups,
 	.set_mux = tegra_pinctrl_set_mux,
+	.gpio_request_enable = tegra_pinctrl_gpio_request_enable,
+	.gpio_set_direction = tegra_pinctrl_gpio_set_direction,
 };
 
 static int tegra_pinconf_reg(struct tegra_pmx *pmx,
@@ -418,6 +491,13 @@ static int tegra_pinconf_reg(struct tegra_pmx *pmx,
 		*bit = g->drvtype_bit;
 		*width = 2;
 		break;
+	case TEGRA_PINCONF_PARAM_GPIO_MODE:
+		*bank = g->mux_bank;
+		*reg = g->mux_reg;
+		*bit = g->gpio_bit;
+		*width = 1;
+		break;
+
 	default:
 		dev_err(pmx->dev, "Invalid config param %04x\n", param);
 		return -ENOTSUPP;
