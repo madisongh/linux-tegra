@@ -1896,6 +1896,7 @@ static int generic_hdmi_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 		err = tegra_hdmi_setup_audio_freq_source(
 				substream->runtime->rate, HDA, sor_num);
 		if ( err < 0 ) {
+			mutex_unlock(&per_pin->lock);
 			codec_err(codec,
 				"Unable to set hdmi audio freq to %d\n",
 						substream->runtime->rate);
