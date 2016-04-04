@@ -205,7 +205,7 @@ static const char *get_filename(const struct file *file, char *buf, int size)
 	const char *filename;
 	size_t root_len = strlen(root_path);
 
-	filename = dentry_path(file->f_dentry, buf, size);
+	filename = dentry_path(file->f_path.dentry, buf, size);
 	if (IS_ERR_OR_NULL(filename))
 		return NULL;
 
