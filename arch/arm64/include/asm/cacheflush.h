@@ -69,6 +69,11 @@ extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, u
 extern void flush_icache_range(unsigned long start, unsigned long end);
 extern void __flush_dcache_area(void *addr, size_t len);
 extern long __flush_cache_user_range(unsigned long start, unsigned long end);
+extern void flush_cache_all(void);
+extern void __clean_dcache_louis(void *);
+extern void __flush_dcache_all(void *arg);
+extern void __clean_dcache_all(void *arg);
+extern void __clean_dcache_area(void *addr, size_t len);
 
 static inline void flush_cache_mm(struct mm_struct *mm)
 {
