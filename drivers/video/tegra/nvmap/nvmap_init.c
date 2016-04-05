@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
-#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
@@ -26,6 +26,7 @@
 #include <linux/nvmap.h>
 #include <linux/tegra-ivc.h>
 #include <linux/dma-contiguous.h>
+#include <linux/cma.h>
 
 #include <asm/dma-contiguous.h>
 
@@ -33,7 +34,9 @@
 #include "iomap.h"
 #include "board.h"
 #include <linux/platform/tegra/common.h>
+#ifdef CONFIG_TEGRA_VIRTUALIZATION
 #include "../../../drivers/virt/tegra/syscalls.h"
+#endif
 
 phys_addr_t __weak tegra_carveout_start;
 phys_addr_t __weak tegra_carveout_size;
@@ -50,12 +53,14 @@ EXPORT_SYMBOL(tegra_vpr_dev);
 struct device __weak tegra_iram_dev;
 struct device __weak tegra_generic_cma_dev;
 struct device __weak tegra_vpr_cma_dev;
-struct dma_resize_notifier_ops __weak vpr_dev_ops;
 
 static const struct of_device_id nvmap_of_ids[] = {
 	{ .compatible = "nvidia,carveouts" },
 	{ }
 };
+
+#ifdef CONFIG_NVMAP_SUPPORT_RESIZABLE_CMA
+struct dma_resize_notifier_ops __weak vpr_dev_ops;
 
 static struct dma_declare_info generic_dma_info = {
 	.name = "generic",
@@ -68,6 +73,7 @@ static struct dma_declare_info vpr_dma_info = {
 	.size = SZ_32M,
 	.notifier.ops = &vpr_dev_ops,
 };
+#endif
 
 static struct nvmap_platform_carveout nvmap_carveouts[4] = {
 	[0] = {
@@ -85,7 +91,9 @@ static struct nvmap_platform_carveout nvmap_carveouts[4] = {
 		.size		= 0,
 		.dma_dev	= &tegra_generic_dev,
 		.cma_dev	= &tegra_generic_cma_dev,
+#ifdef CONFIG_NVMAP_SUPPORT_RESIZABLE_CMA
 		.dma_info	= &generic_dma_info,
+#endif
 	},
 	[2] = {
 		.name		= "vpr",
@@ -94,7 +102,9 @@ static struct nvmap_platform_carveout nvmap_carveouts[4] = {
 		.size		= 0,
 		.dma_dev	= &tegra_vpr_dev,
 		.cma_dev	= &tegra_vpr_cma_dev,
+#ifdef CONFIG_NVMAP_SUPPORT_RESIZABLE_CMA
 		.dma_info	= &vpr_dma_info,
+#endif
 		.enable_static_dma_map = true,
 	},
 };
@@ -252,6 +262,9 @@ static int __init nvmap_co_device_init(struct reserved_mem *rmem,
 				"%s :dma coherent mem declare fail %pa,%zu\n",
 				co->name, &co->base, co->size);
 	} else {
+#ifndef CONFIG_NVMAP_SUPPORT_RESIZABLE_CMA
+		return -ENODEV;
+#else
 		/*
 		 * When vpr memory is reserved, kmemleak tries to scan vpr
 		 * memory for pointers. vpr memory should not be accessed
@@ -270,6 +283,7 @@ static int __init nvmap_co_device_init(struct reserved_mem *rmem,
 				     co->name);
 		else
 			co->init_done = true;
+#endif
 	}
 	return err;
 }

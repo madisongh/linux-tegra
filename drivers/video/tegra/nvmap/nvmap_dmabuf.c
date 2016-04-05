@@ -605,6 +605,7 @@ struct dma_buf *__nvmap_make_dmabuf(struct nvmap_client *client,
 	int err;
 	struct dma_buf *dmabuf;
 	struct nvmap_handle_info *info;
+	DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
 
 	info = kzalloc(sizeof(*info), GFP_KERNEL);
 	if (!info) {
@@ -615,8 +616,12 @@ struct dma_buf *__nvmap_make_dmabuf(struct nvmap_client *client,
 	INIT_LIST_HEAD(&info->maps);
 	mutex_init(&info->maps_lock);
 
-	dmabuf = dma_buf_export(info, &nvmap_dma_buf_ops, handle->size,
-				O_RDWR, NULL);
+	exp_info.priv = info;
+	exp_info.ops = &nvmap_dma_buf_ops;
+	exp_info.size = handle->size;
+	exp_info.flags = O_RDWR;
+
+	dmabuf = dma_buf_export(&exp_info);
 	if (IS_ERR(dmabuf)) {
 		err = PTR_ERR(dmabuf);
 		goto err_export;

@@ -59,6 +59,7 @@ struct list_block {
 	unsigned int mem_prot;
 	phys_addr_t orig_addr;
 	size_t size;
+	size_t align;
 	struct nvmap_heap *heap;
 	struct list_head free_list;
 };
@@ -113,6 +114,7 @@ static phys_addr_t nvmap_alloc_mem(struct nvmap_heap *h, size_t len,
 
 	dma_set_attr(DMA_ATTR_ALLOC_EXACT_SIZE, &attrs);
 
+#ifdef CONFIG_TEGRA_VIRTUALIZATION
 	if (start && h->is_ivm) {
 		void *ret;
 		pa = h->base + (*start);
@@ -125,7 +127,9 @@ static phys_addr_t nvmap_alloc_mem(struct nvmap_heap *h, size_t len,
 			dev_dbg(dev, "reserved (%pa) len(%zu)\n",
 				&pa, len);
 		}
-	} else {
+	} else
+#endif
+	{
 		(void)dma_alloc_attrs(dev, len, &pa,
 				DMA_MEMORY_NOMAP, &attrs);
 		if (!dma_mapping_error(dev, pa))
@@ -143,9 +147,12 @@ static void nvmap_free_mem(struct nvmap_heap *h, phys_addr_t base,
 	DEFINE_DMA_ATTRS(attrs);
 
 	dev_dbg(dev, "Free base (%pa) size (%zu)\n", &base, len);
+#ifdef CONFIG_TEGRA_VIRTUALIZATION
 	if (h->is_ivm && !h->can_alloc) {
 		dma_mark_declared_memory_unoccupied(dev, base, len);
-	} else {
+	} else
+#endif
+	{
 		dma_set_attr(DMA_ATTR_ALLOC_EXACT_SIZE, &attrs);
 		dma_free_attrs(dev, len,
 				(void *)(uintptr_t)base,
@@ -292,8 +299,7 @@ struct nvmap_heap_block *nvmap_heap_alloc(struct nvmap_heap *h,
 	return b;
 }
 
-/* nvmap_heap_free: frees block b*/
-void nvmap_heap_free(struct nvmap_heap_block *b)
+struct nvmap_heap *nvmap_block_to_heap(struct nvmap_heap_block *b)
 {
 	struct list_block *lb;
 	lb = container_of(b, struct list_block, block);
@@ -333,7 +339,7 @@ struct nvmap_heap *nvmap_heap_create(struct device *parent,
 
 	h->dma_dev = co->dma_dev;
 	if (co->cma_dev) {
-#ifdef CONFIG_DMA_CMA
+#ifdef CONFIG_NVMAP_SUPPORT_RESIZABLE_CMA
 		struct dma_contiguous_stats stats;
 
 		if (dma_get_contiguous_stats(co->cma_dev, &stats))

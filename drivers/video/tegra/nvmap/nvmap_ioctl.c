@@ -191,7 +191,9 @@ int nvmap_ioctl_vpr_floor_size(struct file *filp, void __user *arg)
 	if (copy_from_user(&floor_size, arg, sizeof(floor_size)))
 		return -EFAULT;
 
+#ifdef CONFIG_NVMAP_SUPPORT_RESIZABLE_CMA
 	err = dma_set_resizable_heap_floor_size(&tegra_vpr_dev, floor_size);
+#endif
 	return err;
 }
 

@@ -36,6 +36,7 @@
 /* common carveout heaps */
 #define NVMAP_HEAP_CARVEOUT_IRAM    (1ul<<29)
 #define NVMAP_HEAP_CARVEOUT_VPR     (1ul<<28)
+#define NVMAP_HEAP_CARVEOUT_IVM     (1ul<<1)
 #define NVMAP_HEAP_CARVEOUT_GENERIC (1ul<<0)
 
 #define NVMAP_HEAP_CARVEOUT_MASK    (NVMAP_HEAP_IOVMM - 1)
@@ -52,7 +53,6 @@
 
 #define NVMAP_HANDLE_KIND_SPECIFIED  (0x1ul << 3)
 #define NVMAP_HANDLE_COMPR_SPECIFIED (0x1ul << 4)
-#define NVMAP_HANDLE_ZEROED_PAGES    (0x1ul << 5)
 #define NVMAP_HANDLE_PHYS_CONTIG     (0x1ul << 6)
 #define NVMAP_HANDLE_CACHE_SYNC      (0x1ul << 7)
 #define NVMAP_HANDLE_CACHE_SYNC_AT_RESERVE      (0x1ul << 8)
@@ -139,6 +139,15 @@ struct nvmap_alloc_handle {
 	__u32 align;		/* min alignment necessary */
 };
 
+struct nvmap_alloc_ivm_handle {
+	__u32 handle;		/* nvmap handle */
+	__u32 heap_mask;	/* heaps to allocate from */
+	__u32 flags;		/* wb/wc/uc/iwb etc. */
+	__u32 align;		/* min alignment necessary */
+	__u32 peer;		/* peer with whom handle must be shared. Used
+				 * only for NVMAP_HEAP_CARVEOUT_IVM
+				 */
+};
 
 struct nvmap_alloc_kind_handle {
 	__u32 handle;		/* nvmap handle */
@@ -327,6 +336,11 @@ struct nvmap_debugfs_handles_entry {
 /* Perform reserve operation on a list of handles. */
 #define NVMAP_IOC_RESERVE _IOW(NVMAP_IOC_MAGIC, 18,	\
 				  struct nvmap_cache_op_list)
+
+#define NVMAP_IOC_FROM_IVC_ID _IOWR(NVMAP_IOC_MAGIC, 19, struct nvmap_create_handle)
+#define NVMAP_IOC_GET_IVC_ID _IOWR(NVMAP_IOC_MAGIC, 20, struct nvmap_create_handle)
+#define NVMAP_IOC_GET_IVM_HEAPS _IOR(NVMAP_IOC_MAGIC, 21, unsigned int)
+
 /* START of T124 IOCTLS */
 /* Actually allocates memory for the specified handle, with kind */
 #define NVMAP_IOC_ALLOC_KIND _IOW(NVMAP_IOC_MAGIC, 100, struct nvmap_alloc_kind_handle)

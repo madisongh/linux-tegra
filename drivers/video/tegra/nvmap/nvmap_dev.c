@@ -21,6 +21,7 @@
  */
 
 #include <linux/backing-dev.h>
+#include <linux/backing-dev-defs.h>
 #include <linux/bitmap.h>
 #include <linux/debugfs.h>
 #include <linux/delay.h>
@@ -60,9 +61,12 @@ struct nvmap_stats nvmap_stats;
 
 static struct backing_dev_info nvmap_bdi = {
 	.ra_pages	= 0,
-	.capabilities	= (BDI_CAP_NO_ACCT_AND_WRITEBACK |
-			   BDI_CAP_READ_MAP | BDI_CAP_WRITE_MAP),
+	.capabilities	= BDI_CAP_NO_ACCT_AND_WRITEBACK,
 };
+
+#ifndef CONFIG_MMU
+static unsigned nvmap_mmap_capabilities(struct file *filp);
+#endif
 
 static struct device_dma_parameters nvmap_dma_parameters = {
 	.max_segment_size = UINT_MAX,
@@ -82,6 +86,9 @@ static const struct file_operations nvmap_user_fops = {
 	.compat_ioctl = nvmap_ioctl,
 #endif
 	.mmap		= nvmap_map,
+#ifndef CONFIG_MMU
+	.mmap_capabilities = nvmap_mmap_capabilities,
+#endif
 };
 
 /*
@@ -487,7 +494,7 @@ static int nvmap_open(struct inode *inode, struct file *filp)
 
 	priv->kernel_client = false;
 
-	filp->f_mapping->backing_dev_info = &nvmap_bdi;
+	inode->i_sb->s_bdi = &nvmap_bdi;
 
 	filp->private_data = priv;
 	return 0;
@@ -547,6 +554,13 @@ static int nvmap_map(struct file *filp, struct vm_area_struct *vma)
 		task_tgid_nr(current), task_comm);
 	return -EPERM;
 }
+
+#ifndef CONFIG_MMU
+static unsigned nvmap_mmap_capabilities(struct file *filp)
+{
+	return NOMMU_MAP_READ | NOMMU_MAP_WRITE;
+}
+#endif
 
 static long nvmap_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
