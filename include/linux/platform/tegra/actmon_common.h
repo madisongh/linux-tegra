@@ -138,6 +138,7 @@ struct actmon_dev {
 	void (*actmon_dev_clk_enable)(struct actmon_dev *);
 	spinlock_t lock;
 	struct notifier_block rate_change_nb;
+	struct kobj_attribute avgact_attr;
 };
 
 struct actmon_reg_ops {
@@ -164,6 +165,7 @@ struct actmon_drv_data {
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dfs_root;
 #endif
+	struct kobject *actmon_kobj;
 };
 
 static inline void actmon_wmb(void)

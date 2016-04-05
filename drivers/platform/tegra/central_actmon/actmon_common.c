@@ -23,11 +23,15 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/irq.h>
+#include <linux/kobject.h>
+#include <linux/sysfs.h>
+
 #include "linux/platform/tegra/actmon_common.h"
 
 /* Global definitions */
 static struct actmon_drv_data *actmon;
 static struct device *mon_dev;
+
 #define offs(dev_reg_offs) (actmon->base + dev_reg_offs)
 
 static inline unsigned long do_percent(unsigned long val, unsigned int pct)
@@ -167,6 +171,16 @@ static inline int actmon_dev_wmark_set(struct actmon_dev *dev)
 
 end:
 	return ret;
+}
+
+static ssize_t avgactv_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	struct actmon_dev *dev = container_of(attr, struct actmon_dev,
+		avgact_attr);
+	unsigned long val = actmon_dev_avg_freq_get(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%lu\n", val);
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -986,9 +1000,13 @@ static void actmon_free_resource(struct platform_device *pdev)
 	if (actmon->base)
 		devm_iounmap(mon_dev, actmon->base);
 
-	for (i = 0; i < MAX_DEVICES; i++)
-		actmon->dev_free_resource(&actmon->devices[i], pdev);
+	for (i = 0; i < MAX_DEVICES; i++) {
+		if (actmon->devices[i].dn)
+			sysfs_remove_file(actmon->actmon_kobj,
+				&actmon->devices[i].avgact_attr.attr);
 
+		actmon->dev_free_resource(&actmon->devices[i], pdev);
+	}
 	devm_kfree(mon_dev, actmon);
 }
 
@@ -1032,6 +1050,13 @@ static int __init actmon_probe(struct platform_device *pdev)
 	if (actmon->ops.set_glb_intr)
 		actmon->ops.set_glb_intr(0xff, actmon->base);
 
+	actmon->actmon_kobj = kobject_create_and_add("actmon_avg_activity",
+					kernel_kobj);
+	if (!actmon->actmon_kobj) {
+		pr_err("%s: Couldn't create avg_actv kobj\n",
+				__func__);
+	}
+
 	for (i = 0; i < MAX_DEVICES; i++) {
 		dn = of_get_next_available_child(pdev->dev.of_node, dn);
 		if (!dn)
@@ -1043,6 +1068,17 @@ static int __init actmon_probe(struct platform_device *pdev)
 				ret ? "Failed" : "Completed", dn->name);
 		if (ret)
 			goto err_out;
+
+		actmon->devices[i].avgact_attr.attr.name = dn->name;
+		actmon->devices[i].avgact_attr.attr.mode = S_IRUGO;
+		actmon->devices[i].avgact_attr.show = avgactv_show;
+
+		ret = sysfs_create_file(actmon->actmon_kobj,
+			&actmon->devices[i].avgact_attr.attr);
+		if (ret) {
+			pr_err("%s: Couldn't create avg_actv files\n",
+				__func__);
+		}
 	}
 
 #ifdef CONFIG_DEBUG_FS
