@@ -1,7 +1,7 @@
 /*
  * Inter-VM Communication
  *
- * Copyright (C) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This file is licensed under the terms of the GNU General Public License
  * version 2.  This program is licensed "as is" without any warranty of any
@@ -680,14 +680,12 @@ EXPORT_SYMBOL(tegra_ivc_channel_notified);
  */
 int tegra_ivc_channel_sync(struct ivc *ivc)
 {
-	/* This only works when nframes is a power of 2. */
-	if ((ivc->nframes & (ivc->nframes - 1)) != 0) {
-		pr_err("%s: nframes must be a power of 2: %u\n", __func__,
-				ivc->nframes);
+	if ((ivc == NULL) || (ivc->nframes == 0)) {
 		return -EINVAL;
+	} else {
+		ivc->w_pos = ivc->tx_channel->w_count % ivc->nframes;
+		ivc->r_pos = ivc->rx_channel->r_count % ivc->nframes;
 	}
-	ivc->w_pos = ivc->tx_channel->w_count % ivc->nframes;
-	ivc->r_pos = ivc->rx_channel->r_count % ivc->nframes;
 	return 0;
 }
 EXPORT_SYMBOL(tegra_ivc_channel_sync);
