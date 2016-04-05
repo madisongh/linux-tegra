@@ -9,14 +9,6 @@
 #include <linux/dma-direction.h>
 #include <linux/scatterlist.h>
 
-struct dma_resize_notifier_ops {
-	int (*resize)(phys_addr_t, size_t);
-};
-
-struct dma_resize_notifier {
-	struct dma_resize_notifier_ops *ops;
-};
-
 /*
  * A dma_addr_t can hold any valid DMA or bus address for the platform.
  * It can be given to a device to use as a DMA source or target.  A CPU cannot
