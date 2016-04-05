@@ -281,4 +281,6 @@ config TEGRA_MODS_OF
 	  node in live dtb at driver initialisation and add all clocks that it
 	  needs to that node. The 2 OF_ configs help to do that.
 
-trysource "../kernel-t18x/drivers/platform/tegra/Kconfig"
+if ARCH_TEGRA_18x_SOC
+source "../kernel-t18x/drivers/platform/tegra/Kconfig"
+endif

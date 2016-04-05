@@ -281,5 +281,8 @@ config PINCTRL_TB10X
 	depends on OF && ARC_PLAT_TB10X
 	select GPIOLIB
 
-trysource "../kernel-t18x/drivers/pinctrl/Kconfig"
+if ARCH_TEGRA_18x_SOC
+source "../kernel-t18x/drivers/pinctrl/Kconfig"
+endif
+
 endmenu
