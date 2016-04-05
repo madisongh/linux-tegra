@@ -8,6 +8,7 @@
 #include <linux/rmap.h>
 #include <linux/swap.h>
 #include <linux/swapops.h>
+#include <linux/dma-contiguous.h>
 
 #include <linux/sched.h>
 #include <linux/rwsem.h>
@@ -424,8 +425,10 @@ static inline struct page *migrate_replace_cma_page(struct page *page)
 	 */
 	get_page_foll(newpage);
 
-	if (migrate_replace_page(page, newpage) == 0)
+	if (migrate_replace_page(page, newpage) == 0) {
+		put_page(newpage);
 		return newpage;
+	}
 
 	put_page(newpage);
 	__free_page(newpage);
@@ -519,6 +522,7 @@ long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		struct page *page;
 		unsigned int foll_flags = gup_flags;
 		unsigned int page_increm;
+		static DEFINE_MUTEX(s_follow_page_lock);
 
 		/* first iteration or cross vma bound */
 		if (!vma || start >= vma->vm_end) {
@@ -551,11 +555,13 @@ retry:
 		if (unlikely(fatal_signal_pending(current)))
 			return i ? i : -ERESTARTSYS;
 		cond_resched();
+		mutex_lock(&s_follow_page_lock);
 		page = follow_page_mask(vma, start, foll_flags, &page_mask);
 		if (!page) {
 			int ret;
 			ret = faultin_page(tsk, vma, start, &foll_flags,
 					nonblocking);
+			mutex_unlock(&s_follow_page_lock);
 			switch (ret) {
 			case 0:
 				goto retry;
@@ -579,8 +585,48 @@ retry:
 			return i ? i : PTR_ERR(page);
 		}
 
-		if ((gup_flags & FOLL_DURABLE) && is_cma_page(page))
+		if (dma_contiguous_should_replace_page(page) &&
+			(foll_flags & FOLL_GET)) {
+			struct page *old_page = page;
+			unsigned int fault_flags = 0;
+
+			put_page(page);
+			wait_on_page_locked_timeout(page);
 			page = migrate_replace_cma_page(page);
+			/* migration might be successful. vma mapping
+			 * might have changed if there had been a write
+			 * fault from other accesses before migration
+			 * code locked the page. Follow the page again
+			 * to get the latest mapping. If migration was
+			 * successful, follow again would get
+			 * non-CMA page. If there had been a write
+			 * page fault, follow page and CMA page
+			 * replacement(if necessary) would restart with
+			 * new page.
+			 */
+			if (page == old_page)
+				wait_on_page_locked_timeout(page);
+			if (foll_flags & FOLL_WRITE) {
+				/* page would be marked as old during
+				 * migration. To make it young, call
+				 * handle_mm_fault.
+				 * This to avoid the sanity check
+				 * failures in the calling code, which
+				 * check for pte write permission
+				 * bits.
+				 */
+				fault_flags |= FAULT_FLAG_WRITE;
+				handle_mm_fault(mm, vma,
+					start, fault_flags);
+			}
+			foll_flags = gup_flags;
+			mutex_unlock(&s_follow_page_lock);
+			goto retry;
+		}
+
+		mutex_unlock(&s_follow_page_lock);
+		BUG_ON(dma_contiguous_should_replace_page(page) &&
+			(foll_flags & FOLL_GET));
 
 		if (pages) {
 			pages[i] = page;
