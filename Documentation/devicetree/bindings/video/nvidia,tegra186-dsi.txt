@@ -101,8 +101,8 @@ NVIDIA TEGRA186 Display Serial Interface
    number of slices to one of the above options.
  - nvidia,comp-rate: Three compression rates are supported - 8 bpc, 12 bpc, 16 bpc.(bpc stands for bits per
    component). Select the compression rate supported by the panel.
- - nvidia,enable-hs-clk-in-lp-mode: Enable HS clock rate in lp mode. To be used when lp clock rate cannot be
-   derived from pll_d.
+ - nvidia,enable-hs-clk-in-lp-mode: Enable HS clock rate in lp mode, 1 to enable and 0 to disable.
+   To be enabled when lp clock rate cannot be derived from pll_d.
 
  - Child nodes represent node of modes, output settings,
    smart dimmer settings, color management unit settings.
