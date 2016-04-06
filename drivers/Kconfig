@@ -202,6 +202,8 @@ source "drivers/hwtracing/intel_th/Kconfig"
 
 source "drivers/fpga/Kconfig"
 
+source "../kernel-nvgpu/drivers/gpu/nvgpu/Kconfig"
+
 if ARCH_TEGRA_18x_SOC
 source "../kernel-t18x/drivers/tachometer/Kconfig"
 
