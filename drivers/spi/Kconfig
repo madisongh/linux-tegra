@@ -702,6 +702,10 @@ config SPI_TLE62X0
 # Add new SPI protocol masters in alphabetical order above this line
 #
 
+if ARCH_TEGRA_18x_SOC
+source "../kernel-t18x/drivers/spi/Kconfig"
+endif
+
 endif # SPI_MASTER
 
 # (slave support would go here)

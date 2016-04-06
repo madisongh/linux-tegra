@@ -1625,4 +1625,8 @@ config USBPCWATCHDOG
 
 	  Most people will say N.
 
+if ARCH_TEGRA_18x_SOC
+source "../kernel-t18x/drivers/watchdog/Kconfig"
+endif
+
 endif # WATCHDOG
