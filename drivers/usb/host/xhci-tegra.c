@@ -1398,8 +1398,6 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 		goto put_usb2_hcd;
 	}
 
-	device_init_wakeup(tegra->dev, true);
-
 	ret = usb_add_hcd(tegra->hcd, tegra->irq, IRQF_SHARED);
 	if (ret < 0)
 		goto put_usb2_hcd;
@@ -1838,7 +1836,8 @@ skip_clocks:
 		goto unregister_extcon;
 	}
 
-		return 0;
+	device_init_wakeup(tegra->dev, true);
+	return 0;
 
 unregister_extcon:
 	cancel_work_sync(&tegra->id_extcon_work);
