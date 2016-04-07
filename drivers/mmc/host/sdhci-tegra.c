@@ -1,6 +1,8 @@
 /*
  * Copyright (C) 2010 Google, Inc.
  *
+ * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -20,14 +22,24 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/reset.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/slot-gpio.h>
+#include <linux/delay.h>
 #include <linux/gpio/consumer.h>
+#include <linux/clk/tegra.h>
+#include <linux/platform_data/mmc-sdhci-tegra.h>
 
 #include "sdhci-pltfm.h"
 
 /* Tegra SDHOST controller vendor register definitions */
+#define SDHCI_VNDR_CLK_CTRL       0x100
+#define SDHCI_VNDR_CLK_CTRL_PADPIPE_CLKEN_OVERRIDE	0x8
+#define SDHCI_VNDR_CLK_CTRL_SPI_MODE_CLKEN_OVERRIDE	0x4
+#define SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK		0x2
+#define SDHCI_VNDR_CLK_CTRL_SDMMC_CLK			0x1
+
 #define SDHCI_TEGRA_VENDOR_MISC_CTRL		0x120
 #define SDHCI_MISC_CTRL_ENABLE_SDR104		0x8
 #define SDHCI_MISC_CTRL_ENABLE_SDR50		0x10
@@ -40,15 +52,40 @@
 #define NVQUIRK_DISABLE_SDR50		BIT(3)
 #define NVQUIRK_DISABLE_SDR104		BIT(4)
 #define NVQUIRK_DISABLE_DDR50		BIT(5)
+/* ENAABLE FEEDBACK IO CLOCK */
+#define NVQUIRK_EN_FEEDBACK_CLK		BIT(7)
+
+/* Common quirks for Tegra 12x and later versions of sdmmc controllers */
+#define TEGRA_SDHCI_QUIRKS (SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | \
+		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK | \
+		  SDHCI_QUIRK_SINGLE_POWER_WRITE | \
+		  SDHCI_QUIRK_NO_HISPD_BIT | \
+		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC | \
+		  SDHCI_QUIRK_BROKEN_CARD_DETECTION | \
+		  SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC)
+
+#define TEGRA_SDHCI_QUIRKS2 (SDHCI_QUIRK2_PRESET_VALUE_BROKEN | \
+	SDHCI_QUIRK2_HOST_OFF_CARD_ON)
+
+#define TEGRA_SDHCI_NVQUIRKS (NVQUIRK_EN_FEEDBACK_CLK)
 
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
 	u32 nvquirks;
+	u32 nvquirks2;
 };
 
 struct sdhci_tegra {
 	const struct sdhci_tegra_soc_data *soc_data;
 	struct gpio_desc *power_gpio;
+	const struct tegra_sdhci_platform_data *plat;
+	bool	clk_enabled;
+	/* ensure atomic set clock calls */
+	struct mutex	set_clock_mutex;
+	/* max clk supported by the platform */
+	unsigned int max_clk_limit;
+	/* max ddr clk supported by the platform */
+	struct reset_control *rstc;
 };
 
 static u16 tegra_sdhci_readw(struct sdhci_host *host, int reg)
@@ -124,12 +161,23 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
-	u32 misc_ctrl;
+	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
+	u32 misc_ctrl, vendor_ctrl;
 
 	sdhci_reset(host, mask);
 
 	if (!(mask & SDHCI_RESET_ALL))
 		return;
+
+	vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_CLK_CTRL);
+	vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_PADPIPE_CLKEN_OVERRIDE;
+	vendor_ctrl &= ~SDHCI_VNDR_CLK_CTRL_SPI_MODE_CLKEN_OVERRIDE;
+	/* Enable feedback/internal clock */
+	if (soc_data->nvquirks & NVQUIRK_EN_FEEDBACK_CLK)
+		vendor_ctrl &= ~SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK;
+	else
+		vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK;
+	sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 
 	misc_ctrl = sdhci_readw(host, SDHCI_TEGRA_VENDOR_MISC_CTRL);
 	/* Erratum: Enable SDHCI spec v3.00 support */
@@ -143,6 +191,56 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	if (soc_data->nvquirks & NVQUIRK_DISABLE_SDR104)
 		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_SDR104;
 	sdhci_writew(host, misc_ctrl, SDHCI_TEGRA_VENDOR_MISC_CTRL);
+
+	/* Mask any bus speed modes if set in platform data */
+	if (plat->uhs_mask & MMC_UHS_MASK_DDR50) {
+		host->mmc->caps &= ~MMC_CAP_UHS_DDR50;
+		host->mmc->caps &= ~MMC_CAP_1_8V_DDR;
+	}
+
+	if (plat->uhs_mask & MMC_MASK_HS200) {
+		host->mmc->caps2 &= ~MMC_CAP2_HS200;
+		host->mmc->caps2 &= ~MMC_CAP2_HS400;
+	}
+
+	if (plat->uhs_mask & MMC_MASK_HS400)
+		host->mmc->caps2 &= ~MMC_CAP2_HS400;
+}
+
+static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	u8 vendor_ctrl;
+	int ret = 0;
+
+	mutex_lock(&tegra_host->set_clock_mutex);
+	pr_debug("%s %s %u enabled=%u\n", __func__,
+		mmc_hostname(sdhci->mmc), clock, tegra_host->clk_enabled);
+	if (clock) {
+		if (!tegra_host->clk_enabled) {
+			ret = clk_prepare_enable(pltfm_host->clk);
+			if (ret) {
+				dev_err(mmc_dev(sdhci->mmc),
+				"clock enable is failed, ret: %d\n", ret);
+				mutex_unlock(&tegra_host->set_clock_mutex);
+				return;
+			}
+			tegra_host->clk_enabled = true;
+			vendor_ctrl = sdhci_readb(sdhci, SDHCI_VNDR_CLK_CTRL);
+			vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_SDMMC_CLK;
+			sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
+		}
+		sdhci_set_clock(sdhci, clock);
+	} else if (!clock && tegra_host->clk_enabled) {
+		sdhci_set_clock(sdhci, 0);
+		vendor_ctrl = sdhci_readb(sdhci, SDHCI_VNDR_CLK_CTRL);
+		vendor_ctrl &= ~0x1;
+		sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
+		clk_disable_unprepare(pltfm_host->clk);
+		tegra_host->clk_enabled = false;
+	}
+	mutex_unlock(&tegra_host->set_clock_mutex);
 }
 
 static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
@@ -168,11 +266,12 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_ro     = tegra_sdhci_get_ro,
 	.read_w     = tegra_sdhci_readw,
 	.write_l    = tegra_sdhci_writel,
-	.set_clock  = sdhci_set_clock,
+	.set_clock  = tegra_sdhci_set_clock,
 	.set_bus_width = tegra_sdhci_set_bus_width,
 	.reset      = tegra_sdhci_reset,
 	.set_uhs_signaling = sdhci_set_uhs_signaling,
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+	.write_w    = tegra_sdhci_writew,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -235,8 +334,19 @@ static struct sdhci_tegra_soc_data soc_data_tegra114 = {
 		    NVQUIRK_DISABLE_DDR50 |
 		    NVQUIRK_DISABLE_SDR104,
 };
+static const struct sdhci_pltfm_data sdhci_tegra186_pdata = {
+	.quirks = TEGRA_SDHCI_QUIRKS,
+	.quirks2 = TEGRA_SDHCI_QUIRKS2,
+	.ops  = &tegra_sdhci_ops,
+};
+
+static struct sdhci_tegra_soc_data soc_data_tegra186 = {
+	.pdata = &sdhci_tegra186_pdata,
+	.nvquirks = TEGRA_SDHCI_NVQUIRKS,
+};
 
 static const struct of_device_id sdhci_tegra_dt_match[] = {
+	{ .compatible = "nvidia,tegra186-sdhci", .data = &soc_data_tegra186 },
 	{ .compatible = "nvidia,tegra124-sdhci", .data = &soc_data_tegra114 },
 	{ .compatible = "nvidia,tegra114-sdhci", .data = &soc_data_tegra114 },
 	{ .compatible = "nvidia,tegra30-sdhci", .data = &soc_data_tegra30 },
@@ -245,6 +355,27 @@ static const struct of_device_id sdhci_tegra_dt_match[] = {
 };
 MODULE_DEVICE_TABLE(of, sdhci_tegra_dt_match);
 
+static int sdhci_tegra_parse_dt(struct device *dev)
+{
+	struct device_node *np = dev->of_node;
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	struct tegra_sdhci_platform_data *plat;
+
+	if (!np)
+		return -EINVAL;
+
+	plat = devm_kzalloc(dev, sizeof(*plat), GFP_KERNEL);
+	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
+	of_property_read_u32(np, "uhs-mask", &plat->uhs_mask);
+	/* Mask eMMC DDR, HS200 and HS400 modes */
+	plat->uhs_mask = 0x68;
+
+	tegra_host->plat = plat;
+	return mmc_of_parse(host->mmc);
+}
+
 static int sdhci_tegra_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
@@ -252,6 +383,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	struct sdhci_host *host;
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_tegra *tegra_host;
+	const struct tegra_sdhci_platform_data *plat;
 	struct clk *clk;
 	int rc;
 
@@ -273,26 +405,32 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	}
 	tegra_host->soc_data = soc_data;
 	pltfm_host->priv = tegra_host;
-
-	rc = mmc_of_parse(host->mmc);
+	rc = sdhci_tegra_parse_dt(&pdev->dev);
 	if (rc)
 		goto err_parse_dt;
 
-	tegra_host->power_gpio = devm_gpiod_get_optional(&pdev->dev, "power",
-							 GPIOD_OUT_HIGH);
-	if (IS_ERR(tegra_host->power_gpio)) {
-		rc = PTR_ERR(tegra_host->power_gpio);
-		goto err_power_req;
-	}
+	plat = tegra_host->plat;
 
-	clk = devm_clk_get(mmc_dev(host->mmc), NULL);
+	mutex_init(&tegra_host->set_clock_mutex);
+	clk = devm_clk_get(&pdev->dev, "sdmmc");
 	if (IS_ERR(clk)) {
 		dev_err(mmc_dev(host->mmc), "clk err\n");
 		rc = PTR_ERR(clk);
 		goto err_clk_get;
 	}
-	clk_prepare_enable(clk);
 	pltfm_host->clk = clk;
+
+	/* Reset the sdhci controller to clear all previous status.*/
+
+	tegra_host->rstc = devm_reset_control_get(&pdev->dev, "sdmmc");
+	if (IS_ERR(tegra_host->rstc))
+		pr_err("Reset for %s is failed\n", dev_name(&pdev->dev));
+	else
+		reset_control_reset(tegra_host->rstc);
+
+	pltfm_host->priv = tegra_host;
+
+	tegra_host->max_clk_limit = plat->max_clk_limit;
 
 	rc = sdhci_add_host(host);
 	if (rc)
@@ -303,7 +441,6 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 err_add_host:
 	clk_disable_unprepare(pltfm_host->clk);
 err_clk_get:
-err_power_req:
 err_parse_dt:
 err_alloc_tegra_host:
 	sdhci_pltfm_free(pdev);
