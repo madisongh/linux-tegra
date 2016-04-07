@@ -100,7 +100,7 @@ static int bpmp_module_load(struct device *dev, const void *base, u32 size,
 	struct { u32 phys; u32 size; } __packed msg;
 	int r;
 
-	virt = dma_alloc_coherent(dev, size, &phys, GFP_KERNEL);
+	virt = tegra_bpmp_alloc_coherent(size, &phys, GFP_KERNEL);
 	if (virt == NULL)
 		return -ENOMEM;
 
@@ -112,7 +112,7 @@ static int bpmp_module_load(struct device *dev, const void *base, u32 size,
 	r = tegra_bpmp_send_receive(MRQ_MODULE_LOAD, &msg, sizeof(msg),
 			handle, sizeof(*handle));
 
-	dma_free_coherent(dev, size, virt, phys);
+	tegra_bpmp_free_coherent(size, virt, phys);
 	return r;
 }
 
@@ -465,7 +465,7 @@ static void *bpmp_trace_start(struct seq_file *file, loff_t *pos)
 	if (!first && i->eof == 1)
 		return NULL;
 
-	i->virt = dma_alloc_coherent(device, PAGE_SIZE, &i->phys, GFP_KERNEL);
+	i->virt = tegra_bpmp_alloc_coherent(PAGE_SIZE, &i->phys, GFP_KERNEL);
 	if (!i->virt)
 		return NULL;
 
@@ -486,7 +486,7 @@ static void bpmp_trace_stop(struct seq_file *file, void *v)
 
 	pr_debug("%s: eof %d\n", __func__, i->eof);
 	if (i->virt) {
-		dma_free_coherent(device, PAGE_SIZE, i->virt, i->phys);
+		tegra_bpmp_free_coherent(PAGE_SIZE, i->virt, i->phys);
 		i->virt = NULL;
 	}
 }
@@ -658,6 +658,11 @@ int bpmp_get_fwtag(void) { return 0; }
 int __bpmp_do_ping(void) { return 0; }
 #endif
 
+void *__weak bpmp_get_virt_for_alloc(void *virt, dma_addr_t phys)
+{
+	return virt;
+}
+
 void *tegra_bpmp_alloc_coherent(size_t size, dma_addr_t *phys,
 		gfp_t flags)
 {
@@ -668,6 +673,14 @@ void *tegra_bpmp_alloc_coherent(size_t size, dma_addr_t *phys,
 
 	virt = dma_alloc_coherent(device, size, phys,
 			flags);
+
+	virt = bpmp_get_virt_for_alloc(virt, *phys);
+
+	return virt;
+}
+
+void *__weak bpmp_get_virt_for_free(void *virt, dma_addr_t phys)
+{
 	return virt;
 }
 
@@ -679,6 +692,8 @@ void tegra_bpmp_free_coherent(size_t size, void *vaddr,
 		return;
 	}
 
+	vaddr = bpmp_get_virt_for_free(vaddr, phys);
+
 	dma_free_coherent(device, size, vaddr, phys);
 }
 
@@ -686,7 +701,7 @@ static int bpmp_mem_init(void)
 {
 	dma_addr_t phys;
 
-	shared_virt = dma_alloc_coherent(device, SHARED_SIZE, &phys,
+	shared_virt = tegra_bpmp_alloc_coherent(SHARED_SIZE, &phys,
 			GFP_KERNEL);
 	if (!shared_virt)
 		return -ENOMEM;
@@ -699,10 +714,18 @@ static struct syscore_ops bpmp_syscore_ops = {
 	.resume = tegra_bpmp_resume,
 };
 
+void __weak bpmp_setup_allocator(struct device *dev)
+{
+}
+
 static int bpmp_probe(struct platform_device *pdev)
 {
 	int r = 0;
 
+	bpmp_setup_allocator(&pdev->dev);
+
+	/*tegra_bpmp_alloc_coherent can be called as soon as "device" is set up
+	 */
 	device = &pdev->dev;
 
 	r = bpmp_linear_map_init(device);
@@ -721,6 +744,7 @@ static int bpmp_probe(struct platform_device *pdev)
 
 static const struct of_device_id bpmp_of_matches[] = {
 	{ .compatible = "nvidia,tegra186-bpmp" },
+	{ .compatible = "nvidia,tegra186-bpmp-hv" },
 	{ .compatible = "nvidia,tegra210-bpmp" },
 	{}
 };
