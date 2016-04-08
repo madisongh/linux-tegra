@@ -45,8 +45,10 @@ struct sugov_cpu {
 	struct update_util_data update_util;
 	struct sugov_policy *sg_policy;
 
+	unsigned long util[nr_util_types];
+	unsigned long total_util;
+
 	/* The fields below are only needed when sharing a policy. */
-	unsigned long util;
 	unsigned long max;
 	u64 last_update;
 };
@@ -129,6 +131,22 @@ static unsigned int get_next_freq(struct cpufreq_policy *policy,
 	return (freq + (freq >> 2)) * util / max;
 }
 
+static unsigned long sugov_sum_total_util(struct sugov_cpu *sg_cpu)
+{
+	enum sched_class_util sc;
+
+	sg_cpu->total_util = 0;
+	for (sc = 0; sc < nr_util_types; sc++) {
+		if (sg_cpu->util[sc] == ULONG_MAX) {
+			sg_cpu->total_util = ULONG_MAX;
+			break;
+		}
+		sg_cpu->total_util += sg_cpu->util[sc];
+	}
+
+	return sg_cpu->total_util;
+}
+
 static void sugov_update_single(struct update_util_data *hook,
 				unsigned long util, enum sched_class_util sc)
 {
@@ -138,13 +156,17 @@ static void sugov_update_single(struct update_util_data *hook,
 	struct rq *rq = this_rq();
 	unsigned long max = rq->cpu_capacity_orig;
 	u64 time = rq_clock(rq);
+	unsigned long total_util;
 	unsigned int next_f;
+
+	sg_cpu->util[sc] = util;
 
 	if (!sugov_should_update_freq(sg_policy, time))
 		return;
 
-	next_f = util == ULONG_MAX ? policy->cpuinfo.max_freq :
-			get_next_freq(policy, util, max);
+	total_util = sugov_sum_total_util(sg_cpu);
+	next_f = total_util == ULONG_MAX ? policy->cpuinfo.max_freq :
+			get_next_freq(policy, total_util, max);
 	sugov_update_commit(sg_policy, time, next_f);
 }
 
@@ -179,7 +201,7 @@ static unsigned int sugov_next_freq_shared(struct sugov_policy *sg_policy,
 		if (delta_ns > TICK_NSEC)
 			continue;
 
-		j_util = j_sg_cpu->util;
+		j_util = j_sg_cpu->total_util;
 		if (j_util == ULONG_MAX)
 			return max_f;
 
@@ -201,16 +223,18 @@ static void sugov_update_shared(struct update_util_data *hook,
 	struct rq *rq = this_rq();
 	unsigned long max = rq->cpu_capacity_orig;
 	u64 time = rq_clock(rq);
+	unsigned long total_util;
 	unsigned int next_f;
 
 	raw_spin_lock(&sg_policy->update_lock);
 
-	sg_cpu->util = util;
+	sg_cpu->util[sc] = util;
 	sg_cpu->max = max;
 	sg_cpu->last_update = time;
+	total_util = sugov_sum_total_util(sg_cpu);
 
 	if (sugov_should_update_freq(sg_policy, time)) {
-		next_f = sugov_next_freq_shared(sg_policy, util, max);
+		next_f = sugov_next_freq_shared(sg_policy, total_util, max);
 		sugov_update_commit(sg_policy, time, next_f);
 	}
 
@@ -423,6 +447,7 @@ static int sugov_start(struct cpufreq_policy *policy)
 {
 	struct sugov_policy *sg_policy = policy->governor_data;
 	unsigned int cpu;
+	enum sched_class_util sc;
 
 	sg_policy->freq_update_delay_ns = sg_policy->tunables->rate_limit_us * NSEC_PER_USEC;
 	sg_policy->last_freq_update_time = 0;
@@ -434,8 +459,11 @@ static int sugov_start(struct cpufreq_policy *policy)
 		struct sugov_cpu *sg_cpu = &per_cpu(sugov_cpu, cpu);
 
 		sg_cpu->sg_policy = sg_policy;
+		for (sc = 0; sc < nr_util_types; sc++) {
+			sg_cpu->util[sc] = 0;
+			sg_cpu->total_util = ULONG_MAX;
+		}
 		if (policy_is_shared(policy)) {
-			sg_cpu->util = ULONG_MAX;
 			sg_cpu->max = 0;
 			sg_cpu->last_update = 0;
 			cpufreq_add_update_util_hook(cpu, &sg_cpu->update_util,
