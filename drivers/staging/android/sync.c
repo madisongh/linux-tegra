@@ -761,6 +761,14 @@ static long sync_fence_ioctl(struct file *file, unsigned int cmd,
 	}
 }
 
+struct sync_pt *sync_pt_from_fence(struct fence *fence)
+{
+	if (fence->ops != &android_fence_ops)
+		return NULL;
+
+	return container_of(fence, struct sync_pt, base);
+}
+
 static const struct file_operations sync_fence_fops = {
 	.release = sync_fence_release,
 	.poll = sync_fence_poll,
