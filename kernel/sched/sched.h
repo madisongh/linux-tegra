@@ -1794,14 +1794,14 @@ DECLARE_PER_CPU(struct update_util_data *, cpufreq_update_util_data);
  *
  * It can only be called from RCU-sched read-side critical sections.
  */
-static inline void cpufreq_update_util(u64 time, unsigned long util,
-					unsigned long max)
+static inline void cpufreq_update_util(unsigned long util,
+				       enum sched_class_util sc)
 {
 	struct update_util_data *data;
 
 	data = rcu_dereference_sched(*this_cpu_ptr(&cpufreq_update_util_data));
 	if (data)
-		data->func(data, time, util, max);
+		data->func(data, util, sc);
 }
 
 /**
@@ -1820,9 +1820,9 @@ static inline void cpufreq_update_util(u64 time, unsigned long util,
  * but that really is a band-aid.  Going forward it should be replaced with
  * solutions targeted more specifically at RT and DL tasks.
  */
-static inline void cpufreq_trigger_update(u64 time)
+static inline void cpufreq_trigger_update(enum sched_class_util sc)
 {
-	cpufreq_update_util(time, ULONG_MAX, 0);
+	cpufreq_update_util(ULONG_MAX, sc);
 }
 #else
 static inline void cpufreq_update_util(u64 time, unsigned long util,

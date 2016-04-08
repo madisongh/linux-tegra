@@ -129,12 +129,15 @@ static unsigned int get_next_freq(struct cpufreq_policy *policy,
 	return (freq + (freq >> 2)) * util / max;
 }
 
-static void sugov_update_single(struct update_util_data *hook, u64 time,
-				unsigned long util, unsigned long max)
+static void sugov_update_single(struct update_util_data *hook,
+				unsigned long util, enum sched_class_util sc)
 {
 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_util);
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
 	struct cpufreq_policy *policy = sg_policy->policy;
+	struct rq *rq = this_rq();
+	unsigned long max = rq->cpu_capacity_orig;
+	u64 time = rq_clock(rq);
 	unsigned int next_f;
 
 	if (!sugov_should_update_freq(sg_policy, time))
@@ -190,11 +193,14 @@ static unsigned int sugov_next_freq_shared(struct sugov_policy *sg_policy,
 	return get_next_freq(policy, util, max);
 }
 
-static void sugov_update_shared(struct update_util_data *hook, u64 time,
-				unsigned long util, unsigned long max)
+static void sugov_update_shared(struct update_util_data *hook,
+				unsigned long util, enum sched_class_util sc)
 {
 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_util);
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
+	struct rq *rq = this_rq();
+	unsigned long max = rq->cpu_capacity_orig;
+	u64 time = rq_clock(rq);
 	unsigned int next_f;
 
 	raw_spin_lock(&sg_policy->update_lock);

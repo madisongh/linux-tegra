@@ -3190,15 +3190,23 @@ static inline unsigned long rlimit_max(unsigned int limit)
 	return task_rlimit_max(current, limit);
 }
 
+enum sched_class_util {
+	cfs_util,
+	rt_util,
+	dl_util,
+	nr_util_types,
+};
+
 #ifdef CONFIG_CPU_FREQ
 struct update_util_data {
 	void (*func)(struct update_util_data *data,
-		     u64 time, unsigned long util, unsigned long max);
+		     unsigned long util, enum sched_class_util sc);
 };
 
 void cpufreq_add_update_util_hook(int cpu, struct update_util_data *data,
-			void (*func)(struct update_util_data *data, u64 time,
-				     unsigned long util, unsigned long max));
+			void (*func)(struct update_util_data *data,
+				     unsigned long util,
+				     enum sched_class_util sc));
 void cpufreq_remove_update_util_hook(int cpu);
 #endif /* CONFIG_CPU_FREQ */
 

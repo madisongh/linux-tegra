@@ -32,8 +32,9 @@ DEFINE_PER_CPU(struct update_util_data *, cpufreq_update_util_data);
  * called or it will WARN() and return with no effect.
  */
 void cpufreq_add_update_util_hook(int cpu, struct update_util_data *data,
-			void (*func)(struct update_util_data *data, u64 time,
-				     unsigned long util, unsigned long max))
+			void (*func)(struct update_util_data *data,
+				     unsigned long util,
+				     enum sched_class_util sc))
 {
 	if (WARN_ON(!data || !func))
 		return;
