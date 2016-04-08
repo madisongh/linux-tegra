@@ -932,6 +932,39 @@ static int sched_rt_runtime_exceeded(struct rt_rq *rt_rq)
 	return 0;
 }
 
+#ifdef CONFIG_SMP
+static void sched_rt_update_util(struct rq *rq)
+{
+	u64 total, used, age_stamp, avg;
+	s64 delta;
+
+	if (rq->cpu != smp_processor_id())
+		return;
+
+	/*
+	 * Since we're reading these variables without serialization make sure
+	 * we read them once before doing sanity checks on them.
+	 */
+	age_stamp = ACCESS_ONCE(rq->age_stamp);
+	avg = ACCESS_ONCE(rq->rt_avg);
+
+	delta = rq_clock(rq) - age_stamp;
+	if (unlikely(delta < 0))
+		delta = 0;
+
+	total = sched_avg_period() + delta;
+
+	used = div_u64(avg, total);
+
+	if (unlikely(used > SCHED_CAPACITY_SCALE))
+		used = SCHED_CAPACITY_SCALE;
+
+	cpufreq_update_util(used, rt_util);
+}
+#else
+static inline void sched_rt_update_util(struct rq *rq) { }
+#endif
+
 /*
  * Update the current task's runtime statistics. Skip current tasks that
  * are not in our scheduling class.
@@ -951,7 +984,7 @@ static void update_curr_rt(struct rq *rq)
 
 	/* Kick cpufreq (see the comment in linux/cpufreq.h). */
 	if (cpu_of(rq) == smp_processor_id())
-		cpufreq_trigger_update(rt_util);
+		sched_rt_update_util(rq);
 
 	schedstat_set(curr->se.statistics.exec_max,
 		      max(curr->se.statistics.exec_max, delta_exec));
