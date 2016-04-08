@@ -1,3 +1,17 @@
+source "../kernel-nvhost/drivers/video/tegra/Kconfig"
+if ARCH_TEGRA_18x_SOC
+source "../kernel-t18x/drivers/video/tegra/Kconfig"
+endif
+
+config TEGRA_GRHOST_SYNC
+	depends on TEGRA_GRHOST || TEGRA_HOST1X
+	bool "Tegra host synchronization objects"
+	default y
+	select SYNC
+	help
+	  Add tegra host backend for the cross driver synchronization framework.
+	  Allows creating sync fence file descriptors from Tegra host syncpoints.
+
 source "drivers/video/tegra/nvmap/Kconfig"
 
 if ARCH_TEGRA
