@@ -19,9 +19,16 @@ struct dma_iommu_mapping {
 	size_t			bitmap_size;	/* size of a single bitmap */
 	size_t			bits;		/* per bitmap */
 	dma_addr_t		base;
+	dma_addr_t		end;
 
 	spinlock_t		lock;
 	struct kref		kref;
+
+	bool			gap_page;
+	int			num_pf_page;
+	/* FIXME: currently only alignment of 2^n is supported. */
+	size_t			alignment;
+
 };
 
 struct dma_iommu_mapping *

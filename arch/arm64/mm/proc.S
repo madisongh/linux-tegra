@@ -44,6 +44,52 @@
 #define MAIR(attr, mt)	((attr) << ((mt) * 8))
 
 /*
+ *	cpu_cache_off()
+ *
+ *	Turn the CPU D-cache off.
+ */
+ENTRY(cpu_cache_off)
+	mrs	x0, sctlr_el1
+	bic	x0, x0, #1 << 2			// clear SCTLR.C
+	msr	sctlr_el1, x0
+	isb
+	ret
+ENDPROC(cpu_cache_off)
+
+/*
+ *	cpu_reset(loc)
+ *
+ *	Perform a soft reset of the system.  Put the CPU into the same state
+ *	as it would be if it had been reset, and branch to what would be the
+ *	reset vector. It must be executed with the flat identity mapping.
+ *
+ *	- loc   - location to jump to for soft reset
+ */
+	.align	5
+ENTRY(cpu_reset)
+	mrs	x1, sctlr_el1
+	bic	x1, x1, #1
+	msr	sctlr_el1, x1			// disable the MMU
+	isb
+	ret	x0
+ENDPROC(cpu_reset)
+
+ENTRY(cpu_soft_restart)
+	/* Save address of cpu_reset() and reset address */
+	mov	x19, x0
+	mov	x20, x1
+
+	/* Turn D-cache off */
+	bl	cpu_cache_off
+
+	/* Push out all dirty data, and ensure cache is empty */
+	bl	flush_cache_all
+
+	mov	x0, x20
+	ret	x19
+ENDPROC(cpu_soft_restart)
+
+/*
  *	cpu_do_idle()
  *
  *	Idle the processor (wait for interrupt).
@@ -71,13 +117,30 @@ ENTRY(cpu_do_suspend)
 	mrs	x9, vbar_el1
 	mrs	x10, mdscr_el1
 	mrs	x11, oslsr_el1
-	mrs	x12, sctlr_el1
 	stp	x2, x3, [x0]
+	mrs	x2, midr_el1
+	/*
+	 * cpuactlr_el1 is not defined on denver since it is an
+	 * implementation defined register. Accessing this on Denver
+	 * would cause undefined instruction exception on Denver.
+	 * So, skip accessing the register on Denver.
+	 */
+	lsr	x2, x2, #24
+	cmp	x2, #0x4e
+	beq	skip_actrl_save
+	mrs	x12, s3_1_c15_c2_0
+skip_actrl_save:
+	mrs	x13, sctlr_el1
 	stp	x4, x5, [x0, #16]
 	stp	x6, x7, [x0, #32]
 	stp	x8, x9, [x0, #48]
 	stp	x10, x11, [x0, #64]
-	str	x12, [x0, #80]
+	/*
+	 * Save x12 irrespective of it has actrl_el1's contents as it is
+	 * only redundant but not incorrect as it won't be restored on
+	 * Denver
+	 */
+	stp	x12, x13, [x0, #80]
 	ret
 ENDPROC(cpu_do_suspend)
 
@@ -100,7 +163,7 @@ ENTRY(cpu_do_resume)
 	ldp	x6, x7, [x0, #32]
 	ldp	x8, x9, [x0, #48]
 	ldp	x10, x11, [x0, #64]
-	ldr	x12, [x0, #80]
+	ldp	x12, x13, [x0, #80]
 	msr	tpidr_el0, x2
 	msr	tpidrro_el0, x3
 	msr	contextidr_el1, x4
@@ -117,7 +180,20 @@ ENTRY(cpu_do_resume)
 	 */
 	ubfx	x11, x11, #1, #1
 	msr	oslar_el1, x11
-	mov	x0, x12
+	mrs	x2, midr_el1
+	/*
+	 * cpuactlr_el1 is an implementation defined register
+	 * and Denver uses it to indicate the power state to enter.
+	 * If restored same value on restore then it is possible
+	 * that CPU would enter unexpected power state on next WFI.
+	 * Hence skip restoring this register for Denver.
+	 */
+	lsr	x2, x2, #24
+	cmp	x2, #0x4e
+	beq	skip_actlr_restore
+	msr	s3_1_c15_c2_0, x12
+skip_actlr_restore:
+	mov	x0, x13
 	dsb	nsh		// Make sure local tlb invalidation completed
 	isb
 	ret

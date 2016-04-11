@@ -85,6 +85,16 @@ config DEBUG_ALIGN_RODATA
 
 	  If in doubt, say N
 
+config DEBUG_RODATA_TEST
+	bool "TEstcase for the DEBUG_RODATA feature"
+	depends on DEBUG_RODATA
+	default n
+	help
+	  This option enabled a testcase for the DEBUG_RODATA
+	  feature.
+
+	  If in doubt, say N
+
 source "drivers/hwtracing/coresight/Kconfig"
 
 endmenu
