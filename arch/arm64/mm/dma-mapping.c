@@ -129,7 +129,7 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
 	if (IS_ENABLED(CONFIG_ZONE_DMA) &&
 	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
 		flags |= GFP_DMA;
-	if (IS_ENABLED(CONFIG_DMA_CMA) && (flags & __GFP_WAIT)) {
+	if (IS_ENABLED(CONFIG_DMA_CMA) && (gfpflags_allow_blocking(flags))) {
 		struct page *page;
 		void *addr;
 
@@ -143,9 +143,8 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
 		addr = page_address(page);
 		memset(addr, 0, size);
 		return addr;
-	} else {
-		return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
 	}
+	return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
 }
 
 static void __dma_free_coherent(struct device *dev, size_t size,
@@ -176,7 +175,7 @@ static void *__dma_alloc_noncoherent(struct device *dev, size_t size,
 
 	size = PAGE_ALIGN(size);
 
-	if (!(flags & __GFP_WAIT)) {
+	if (!gfpflags_allow_blocking(flags)) {
 		struct page *page = NULL;
 		void *addr = __alloc_from_pool(size, &page, flags);
 
@@ -921,7 +920,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 
 	if (is_coherent || nommu())
 		addr = __alloc_simple_buffer(dev, size, gfp, &page);
-	else if (!(gfp & __GFP_WAIT))
+	else if (!gfpflags_allow_blocking(gfp))
 		addr = __alloc_from_pool(size, &page, gfp);
 	else if (!IS_ENABLED(CONFIG_CMA))
 		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller);
