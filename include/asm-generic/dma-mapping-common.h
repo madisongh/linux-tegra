@@ -296,7 +296,11 @@ static inline void dma_free_attrs(struct device *dev, size_t size,
 	BUG_ON(!ops);
 	WARN_ON(irqs_disabled());
 
-	if (dma_release_from_coherent(dev, get_order(size), cpu_addr))
+	/* Note: Deviation from upstream. upstream passes get_order(size)
+	 * instead of size. This has been modified to avoid memory failures
+	 * happening from internal fragmentation.
+	 */
+	if (dma_release_from_coherent(dev, size, cpu_addr))
 		return;
 
 	if (!ops->free)
