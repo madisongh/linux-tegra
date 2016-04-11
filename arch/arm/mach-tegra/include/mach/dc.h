@@ -25,6 +25,7 @@
 #include <linux/pm.h>
 #include <linux/types.h>
 #include <linux/fb.h>
+#include <linux/platform/tegra/isomgr.h>
 #include <drm/drm_fixed.h>
 
 #if defined(CONFIG_TEGRA_NVDISPLAY)
@@ -1339,4 +1340,17 @@ struct tegra_dp_out {
 	struct tegra_dc_lt_data *lt_data;
 	int n_lt_data;
 };
+
+/*
+ * On T18x, isohub is the only memclient that's relevant to display.
+ * This struct keeps track of its isoclient info.
+ */
+#if defined(CONFIG_TEGRA_NVDISPLAY) && defined(CONFIG_TEGRA_ISOMGR)
+struct nvdisp_isoclient_bw_info {
+	tegra_isomgr_handle	isomgr_handle;
+	u32			available_bw;
+	u32			reserved_bw_kbps;
+	u32			new_bw_kbps;
+};
+#endif
 #endif
