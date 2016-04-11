@@ -84,28 +84,6 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
 	return (phys_addr_t)dev_addr;
 }
 
-static inline int dma_mapping_error(struct device *dev, dma_addr_t dev_addr)
-{
-	struct dma_map_ops *ops = get_dma_ops(dev);
-	debug_dma_mapping_error(dev, dev_addr);
-	return ops->mapping_error(dev, dev_addr);
-}
-
-static inline int dma_supported(struct device *dev, u64 mask)
-{
-	struct dma_map_ops *ops = get_dma_ops(dev);
-	return ops->dma_supported(dev, mask);
-}
-
-static inline int dma_set_mask(struct device *dev, u64 mask)
-{
-	if (!dev->dma_mask || !dma_supported(dev, mask))
-		return -EIO;
-	*dev->dma_mask = mask;
-
-	return 0;
-}
-
 static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
 {
 	if (!dev->dma_mask)
@@ -137,31 +115,6 @@ static inline void *dma_alloc_at_attrs(struct device *dev, size_t size,
 	return vaddr;
 }
 
-static inline void *dma_alloc_attrs(struct device *dev, size_t size,
-				    dma_addr_t *dma_handle, gfp_t flags,
-				    struct dma_attrs *attrs)
-{
-	*dma_handle = DMA_ERROR_CODE;
-	return dma_alloc_at_attrs(dev, size, dma_handle, flags, attrs);
-}
-
-static inline void dma_free_attrs(struct device *dev, size_t size,
-				  void *vaddr, dma_addr_t dev_addr,
-				  struct dma_attrs *attrs)
-{
-	struct dma_map_ops *ops = get_dma_ops(dev);
-
-	/* Note: Deviation from upstream. upstream passes get_order(size)
-	 * instead of size. This has been modified to avoid memory failures
-	 * happening from internal fragmentation.
-	 */
-	if (dma_release_from_coherent(dev, size, vaddr))
-		return;
-
-	debug_dma_free_coherent(dev, size, vaddr, dev_addr);
-	ops->free(dev, size, vaddr, dev_addr, attrs);
-}
-
 static inline phys_addr_t dma_iova_to_phys(struct device *dev, dma_addr_t iova)
 {
 	struct dma_map_ops *ops = get_dma_ops(dev);
@@ -170,19 +123,6 @@ static inline phys_addr_t dma_iova_to_phys(struct device *dev, dma_addr_t iova)
 		return 0;
 
 	return ops->iova_to_phys(dev, iova);
-}
-/*
- * There is no dma_cache_sync() implementation, so just return NULL here.
- */
-static inline void *dma_alloc_noncoherent(struct device *dev, size_t size,
-					  dma_addr_t *handle, gfp_t flags)
-{
-	return NULL;
-}
-
-static inline void dma_free_noncoherent(struct device *dev, size_t size,
-					void *cpu_addr, dma_addr_t handle)
-{
 }
 
 /* FIXME: copied from arch/arm
