@@ -921,10 +921,11 @@ struct tegra_dc_imp_head_results {
 	u32	metering_slots_value_cursor;
 	u32	pipe_meter_value_cursor;
 	u32	pool_config_entries_cursor;
+	u64	total_latency;
 	u64     hubclk;
 	u32	window_slots_value;
 	u32	cursor_slots_value;
-	u64     total_display_iso_bw_bytes;
+	u64     required_total_bw_kbps;
 };
 
 struct tegra_dc_win {
