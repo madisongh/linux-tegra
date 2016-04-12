@@ -12,6 +12,9 @@
  *
  */
 #ifndef ACTMON_COMMON_H
+
+#include <asm/io.h>
+
 /* START: These device register offsets have common value across socs */
 #define ACTMON_CMN_DEV_CTRL				0x00
 #define ACTMON_CMN_DEV_CTRL_ENB			(0x1 << 31)
