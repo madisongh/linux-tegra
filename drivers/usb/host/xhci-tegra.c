@@ -1279,7 +1279,7 @@ static void tegra_xhci_update_otg_role(struct tegra_xhci_hcd *tegra)
 	if (IS_ERR(tegra->id_extcon))
 		return;
 
-	if (extcon_get_cable_state(tegra->id_extcon, "USB-Host"))
+	if (extcon_get_cable_state_(tegra->id_extcon, EXTCON_USB_HOST))
 		tegra_xhci_set_host_mode(tegra, true);
 	else
 		tegra_xhci_set_host_mode(tegra, false);
@@ -1805,10 +1805,10 @@ skip_clocks:
 	tegra_xhci_debugfs_init(tegra);
 
 	INIT_WORK(&tegra->id_extcon_work, tegra_xhci_id_extcon_work);
-	tegra->id_extcon = extcon_get_extcon_dev_by_cable(&pdev->dev, "id");
+	tegra->id_extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
 	if (!IS_ERR(tegra->id_extcon)) {
 		tegra->id_extcon_nb.notifier_call = tegra_xhci_id_notifier;
-		extcon_register_notifier(tegra->id_extcon,
+		extcon_register_notifier(tegra->id_extcon, EXTCON_USB_HOST,
 					 &tegra->id_extcon_nb);
 	} else if (PTR_ERR(tegra->id_extcon) == -EPROBE_DEFER) {
 		ret = -EPROBE_DEFER;
@@ -1833,7 +1833,7 @@ skip_clocks:
 unregister_extcon:
 	cancel_work_sync(&tegra->id_extcon_work);
 	if (!IS_ERR(tegra->id_extcon)) {
-		extcon_unregister_notifier(tegra->id_extcon,
+		extcon_unregister_notifier(tegra->id_extcon, EXTCON_USB_HOST,
 					   &tegra->id_extcon_nb);
 	}
 disable_phy:
@@ -1884,7 +1884,7 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 
 	cancel_work_sync(&tegra->id_extcon_work);
 	if (!IS_ERR(tegra->id_extcon)) {
-		extcon_unregister_notifier(tegra->id_extcon,
+		extcon_unregister_notifier(tegra->id_extcon, EXTCON_USB_HOST,
 					   &tegra->id_extcon_nb);
 	}
 
@@ -2352,7 +2352,7 @@ static int tegra_xhci_hub_control(struct usb_hcd *hcd, u16 type_req,
 		if ((type_req == ClearPortFeature) &&
 			(value == USB_PORT_FEAT_C_CONNECTION)) {
 			struct xhci_hcd *xhci = hcd_to_xhci(hcd);
-			u32 portsc = xhci_readl(xhci, xhci->usb2_ports[port]);
+			u32 portsc = readl(xhci->usb2_ports[port]);
 
 			if (portsc & PORT_CONNECT)
 				tegra_phy_xusb_utmi_pad_power_on(
@@ -2432,9 +2432,14 @@ static int tegra_xhci_update_device(struct usb_hcd *hcd,
 	return xhci_update_device(hcd, udev);
 }
 
+static const struct xhci_driver_overrides tegra_xhci_overrides __initconst = {
+	.extra_priv_size = sizeof(struct xhci_hcd),
+	.reset = tegra_xhci_setup,
+};
+
 static int __init tegra_xhci_init(void)
 {
-	xhci_init_driver(&tegra_xhci_hc_driver, tegra_xhci_setup);
+	xhci_init_driver(&tegra_xhci_hc_driver, &tegra_xhci_overrides);
 	tegra_xhci_hc_driver.irq = tegra_xhci_irq;
 	tegra_xhci_hc_driver.hub_control = tegra_xhci_hub_control;
 	tegra_xhci_hc_driver.hub_status_data = tegra_xhci_hub_status_data;
