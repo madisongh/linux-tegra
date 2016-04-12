@@ -283,8 +283,9 @@ static void __init free_unused_memmap(void)
  */
 void __init mem_init(void)
 {
+#ifdef CONFIG_SWIOTLB
 	swiotlb_init(1);
-
+#endif
 	set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
 
 #ifndef CONFIG_SPARSEMEM_VMEMMAP
