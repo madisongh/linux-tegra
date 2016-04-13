@@ -361,6 +361,8 @@ struct usb_bus {
 	u8 otg_port;			/* 0, or number of OTG/HNP port */
 	unsigned is_b_host:1;		/* true during some HNP roleswitches */
 	unsigned b_hnp_enable:1;	/* OTG: did A-Host enable HNP? */
+
+	unsigned otg_quick_hnp:1;	/* OTG: quick hnp is set by device */
 	unsigned no_stop_on_short:1;    /*
 					 * Quirk: some controllers don't stop
 					 * the ep queue on a short transfer
