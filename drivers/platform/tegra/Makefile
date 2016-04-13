@@ -11,7 +11,9 @@ subdir-ccflags-y += -I$(srctree)/drivers/platform/tegra/include \
 		    -I$(srctree)/arch/arm/mach-tegra
 
 obj-$(CONFIG_ARCH_TEGRA_18x_SOC)        += tegra_vpr.o
+ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
 obj-$(CONFIG_USB_SUPPORT)		+= tegra_usb_pmc.o
+endif
 obj-$(CONFIG_TEGRA_USB_SHARED_PAD)	+= tegra_usb_pad_ctrl.o
 obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
 obj-$(CONFIG_OF_TEGRA_IOMMU_SMMU)       += iommu.o
