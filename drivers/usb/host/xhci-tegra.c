@@ -206,6 +206,7 @@ static int usb_match_speed(struct usb_device *udev,
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
 static struct of_device_id tegra_xusba_pd[] = {
 	{ .compatible = "nvidia, tegra186-xusba-pd", },
 	{},
@@ -215,6 +216,7 @@ static struct of_device_id tegra_xusbc_pd[] = {
 	{ .compatible = "nvidia, tegra186-xusbc-pd", },
 	{},
 };
+#endif
 
 enum build_info_log {
 	LOG_NONE = 0,
@@ -1578,11 +1580,19 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 
 	BUILD_BUG_ON(sizeof(struct tegra_xhci_fw_cfgtbl) != 256);
 
+#if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
 	partition_id_xusbc = tegra_pd_get_powergate_id(tegra_xusbc_pd);
+#else
+	partition_id_xusbc = TEGRA_POWERGATE_XUSBC;
+#endif
 	if (partition_id_xusbc < 0)
 		return -EINVAL;
 
+#if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
 	partition_id_xusba = tegra_pd_get_powergate_id(tegra_xusba_pd);
+#else
+	partition_id_xusba = TEGRA_POWERGATE_XUSBA;
+#endif
 	if (partition_id_xusba < 0)
 		return -EINVAL;
 
