@@ -76,6 +76,7 @@ struct gpio_extcon_info {
 	bool wakeup_source;
 };
 
+static int last_cstate; /* keep the print low */
 static void gpio_extcon_scan_work(struct work_struct *work)
 {
 	int state = 0;
@@ -103,8 +104,13 @@ static void gpio_extcon_scan_work(struct work_struct *work)
 		cstate = 0;
 	}
 
-	dev_info(gpex->dev, "Cable state %d\n", cstate);
+	if (cstate != last_cstate)
+		dev_info(gpex->dev, "Cable state %d\n", cstate);
+	last_cstate = cstate;
 	extcon_set_state(gpex->edev, cstate);
+
+	/* keeps polling irq, FIXME: remove this when interrupt is available */
+	schedule_delayed_work(&gpex->work, msecs_to_jiffies(1000));
 }
 
 static void gpio_extcon_notifier_timer(unsigned long _data)
