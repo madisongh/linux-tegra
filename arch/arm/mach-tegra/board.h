@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board.h
  *
- * Copyright (c) 2013 NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2013-2016 NVIDIA Corporation. All rights reserved.
  * Copyright (C) 2010 Google, Inc.
  *
  * Author:
@@ -29,5 +29,11 @@ void __init tegra_map_common_io(void);
 void __init tegra_init_irq(void);
 
 void __init tegra_paz00_wifikill_init(void);
+
+extern phys_addr_t tegra_carveout_start;
+extern phys_addr_t tegra_carveout_size;
+extern phys_addr_t tegra_vpr_start;
+extern phys_addr_t tegra_vpr_size;
+extern bool tegra_vpr_resize;
 
 #endif
