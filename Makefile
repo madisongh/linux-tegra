@@ -723,6 +723,7 @@ KBUILD_CFLAGS += -I$(srctree)/../kernel-t18x/include
 KBUILD_CFLAGS += -I$(srctree)/../kernel-nvhost-t18x/include
 endif
 KBUILD_CFLAGS += -I$(srctree)/../kernel-nvhost/include
+KBUILD_CFLAGS += -I$(srctree)/../kernel-display/include
 
 ifdef CONFIG_DEBUG_INFO_REDUCED
 KBUILD_CFLAGS 	+= $(call cc-option, -femit-struct-debug-baseonly) \

@@ -8,3 +8,5 @@ endif
 
 obj-$(CONFIG_TEGRA_GRHOST) += ../../../../kernel-nvhost/drivers/video/tegra/host/
 obj-$(CONFIG_TEGRA_NVMAP) += nvmap/
+obj-$(CONFIG_TEGRA_DC)     += ../../../../kernel-display/drivers/video/tegra/dc/
+obj-$(CONFIG_FB_TEGRA)     += ../../../../kernel-display/drivers/video/tegra/fb.o
