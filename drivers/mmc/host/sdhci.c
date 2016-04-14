@@ -1157,6 +1157,7 @@ void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 	u16 clk = 0;
 	unsigned long timeout;
 	bool switch_base_clk = false;
+	unsigned int timing = host->mmc->ios.timing;
 
 	host->mmc->actual_clock = 0;
 
@@ -1216,9 +1217,14 @@ void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 
 		if (!host->clk_mul || switch_base_clk) {
 			/* Version 3.00 divisors must be a multiple of 2. */
-			if (host->max_clk <= clock)
-				div = 1;
-			else {
+			if (host->max_clk <= clock) {
+				if ((host->quirks2 & SDHCI_QUIRK2_DDR_FIXED_DIVISOR)
+					&& ((timing == MMC_TIMING_MMC_DDR52) ||
+					(timing == MMC_TIMING_UHS_DDR50)))
+					div = 2;
+				else
+					div = 1;
+			} else {
 				for (div = 2; div < SDHCI_MAX_DIV_SPEC_300;
 				     div += 2) {
 					if ((host->max_clk / div) <= clock)
