@@ -35,6 +35,10 @@
 
 /* Tegra SDHOST controller vendor register definitions */
 #define SDHCI_VNDR_CLK_CTRL       0x100
+#define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT		16
+#define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK		0xFF
+#define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT		24
+#define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK		0x1F
 #define SDHCI_VNDR_CLK_CTRL_PADPIPE_CLKEN_OVERRIDE	0x8
 #define SDHCI_VNDR_CLK_CTRL_SPI_MODE_CLKEN_OVERRIDE	0x4
 #define SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK		0x2
@@ -68,6 +72,10 @@
 	SDHCI_QUIRK2_HOST_OFF_CARD_ON)
 
 #define TEGRA_SDHCI_NVQUIRKS (NVQUIRK_EN_FEEDBACK_CLK)
+
+/* max limit defines */
+#define SDHCI_TEGRA_MAX_TAP_VALUES	0xFF
+#define SDHCI_TEGRA_MAX_TRIM_VALUES	0x1F
 
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
@@ -154,6 +162,62 @@ static void tegra_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
 static unsigned int tegra_sdhci_get_ro(struct sdhci_host *host)
 {
 	return mmc_gpio_get_ro(host->mmc);
+}
+static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
+	int trim_delay)
+{
+	u32 vendor_ctrl;
+
+	if ((trim_delay > SDHCI_TEGRA_MAX_TRIM_VALUES) && (trim_delay < 0)) {
+		dev_err(mmc_dev(sdhci->mmc), "Invalid trim value\n");
+		return -1;
+	}
+
+	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
+	vendor_ctrl &= ~(SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK <<
+			SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
+	vendor_ctrl |= (trim_delay << SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
+	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
+
+	return 0;
+}
+
+static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
+	int tap_delay)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	u32 vendor_ctrl;
+	u16 clk;
+	bool card_clk_enabled;
+
+	if ((tap_delay > SDHCI_TEGRA_MAX_TAP_VALUES) && (tap_delay < 0)){
+		dev_err(mmc_dev(sdhci->mmc), "Invalid tap value\n");
+		return -1;
+	}
+
+	clk = sdhci_readw(sdhci, SDHCI_CLOCK_CONTROL);
+	card_clk_enabled = clk & SDHCI_CLOCK_CARD_EN;
+
+	if (card_clk_enabled) {
+		clk &= ~SDHCI_CLOCK_CARD_EN;
+		sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
+	}
+
+	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
+	vendor_ctrl &= ~(SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK <<
+			SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
+	vendor_ctrl |= (tap_delay << SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
+	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
+	udelay(1);
+	sdhci_reset(sdhci, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
+
+	if (card_clk_enabled) {
+		clk |= SDHCI_CLOCK_CARD_EN;
+		sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
+	}
+
+	return 0;
 }
 
 static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
@@ -262,6 +326,36 @@ static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
 	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
 }
 
+static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
+		unsigned int timing)
+{
+	u16 clk;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
+
+	/* Set the UHS signaling mode */
+	sdhci_set_uhs_signaling(host, timing);
+
+	/*
+	 * Tegra SDMMC controllers support only a clock divisor of 2 in DDR
+	 * mode. No other divisors are supported.
+	 */
+	if ((timing == MMC_TIMING_UHS_DDR50) ||
+		(timing == MMC_TIMING_MMC_DDR52)) {
+		clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+		clk &= ~(0xFF << SDHCI_DIVIDER_SHIFT);
+		clk |= 1 << SDHCI_DIVIDER_SHIFT;
+		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+
+		/* Set ddr mode tap delay */
+		sdhci_tegra_set_tap_delay(host, plat->ddr_tap_delay);
+
+		/* Set the ddr mode trim delay if required */
+		sdhci_tegra_set_trim_delay(host, plat->ddr_trim_delay);
+	}
+}
+
 static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_ro     = tegra_sdhci_get_ro,
 	.read_w     = tegra_sdhci_readw,
@@ -269,7 +363,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.set_clock  = tegra_sdhci_set_clock,
 	.set_bus_width = tegra_sdhci_set_bus_width,
 	.reset      = tegra_sdhci_reset,
-	.set_uhs_signaling = sdhci_set_uhs_signaling,
+	.set_uhs_signaling = tegra_sdhci_set_uhs_signaling,
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
 	.write_w    = tegra_sdhci_writew,
 };
@@ -369,8 +463,8 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	plat = devm_kzalloc(dev, sizeof(*plat), GFP_KERNEL);
 	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
 	of_property_read_u32(np, "uhs-mask", &plat->uhs_mask);
-	/* Mask eMMC DDR, HS200 and HS400 modes */
-	plat->uhs_mask = 0x68;
+	of_property_read_u32(np, "nvidia,ddr-tap-delay", &plat->ddr_tap_delay);
+	of_property_read_u32(np, "nvidia,ddr-trim-delay", &plat->ddr_trim_delay);
 
 	tegra_host->plat = plat;
 	return mmc_of_parse(host->mmc);

@@ -27,6 +27,8 @@
 struct tegra_sdhci_platform_data {
 	unsigned int max_clk_limit;
 	unsigned int uhs_mask;
+	unsigned int ddr_tap_delay;
+	unsigned int ddr_trim_delay;
 };
 
 #endif
