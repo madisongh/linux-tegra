@@ -258,7 +258,7 @@ static void sugov_irq_work(struct irq_work *irq_work)
 	struct sugov_policy *sg_policy;
 
 	sg_policy = container_of(irq_work, struct sugov_policy, irq_work);
-	schedule_work_on(smp_processor_id(), &sg_policy->work);
+	queue_work_on(smp_processor_id(), system_highpri_wq, &sg_policy->work);
 }
 
 /************************** sysfs interface ************************/
