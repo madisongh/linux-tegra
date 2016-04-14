@@ -12,7 +12,7 @@ config TEGRA_GRHOST_SYNC
 	  Add tegra host backend for the cross driver synchronization framework.
 	  Allows creating sync fence file descriptors from Tegra host syncpoints.
 
-source "drivers/video/tegra/nvmap/Kconfig"
+source "../kernel-nvmap/drivers/video/tegra/nvmap/Kconfig"
 
 if PLATFORM_TEGRA
 
