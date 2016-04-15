@@ -101,6 +101,7 @@ static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
 	[TEGRA_REVISION_A01]     = "A01",
 	[TEGRA_REVISION_A01q]    = "A01Q",
 	[TEGRA_REVISION_A02]     = "A02",
+	[TEGRA_REVISION_A02p]     = "A02P",
 	[TEGRA_REVISION_A03]     = "A03",
 	[TEGRA_REVISION_A03p]    = "A03 prime",
 	[TEGRA_REVISION_A04]     = "A04",
@@ -531,6 +532,7 @@ static struct chip_revision tegra_chip_revisions[] = {
 	CHIP_REVISION(TEGRA21, 1, 2, 0,   A02),
 	CHIP_REVISION(TEGRA18, 1, 1, 0,   A01),
 	CHIP_REVISION(TEGRA18, 1, 2, 0,   A02),
+	CHIP_REVISION(TEGRA18, 1, 2, 'p',   A02p),
 };
 
 static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
@@ -1566,7 +1568,7 @@ static void tegra_set_bct_strapping(void)
 u32 tegra_get_fuse_opt_subrevision(void)
 {
 	u8 ret = 0;
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC) || defined(CONFIG_ARCH_TEGRA_18x_SOC)
 	u32 reg;
 
 	reg = tegra_fuse_readl(FUSE_OPT_SUBREVISION);
