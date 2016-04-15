@@ -27,23 +27,75 @@ struct max77620_gpio {
 };
 
 static const struct regmap_irq max77620_gpio_irqs[] = {
-	REGMAP_IRQ_REG(0, 0, MAX77620_IRQ_LVL2_GPIO_EDGE0),
-	REGMAP_IRQ_REG(1, 0, MAX77620_IRQ_LVL2_GPIO_EDGE1),
-	REGMAP_IRQ_REG(2, 0, MAX77620_IRQ_LVL2_GPIO_EDGE2),
-	REGMAP_IRQ_REG(3, 0, MAX77620_IRQ_LVL2_GPIO_EDGE3),
-	REGMAP_IRQ_REG(4, 0, MAX77620_IRQ_LVL2_GPIO_EDGE4),
-	REGMAP_IRQ_REG(5, 0, MAX77620_IRQ_LVL2_GPIO_EDGE5),
-	REGMAP_IRQ_REG(6, 0, MAX77620_IRQ_LVL2_GPIO_EDGE6),
-	REGMAP_IRQ_REG(7, 0, MAX77620_IRQ_LVL2_GPIO_EDGE7),
+	[MAX77620_IRQ_GPIO0 - MAX77620_IRQ_GPIO0] = {
+		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE0,
+		.type_rising_mask = MAX77620_CNFG_GPIO_INT_RISING,
+		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
+		.reg_offset = 0,
+		.type_reg_offset = 0,
+	},
+	[MAX77620_IRQ_GPIO1 - MAX77620_IRQ_GPIO0] = {
+		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE1,
+		.type_rising_mask = MAX77620_CNFG_GPIO_INT_RISING,
+		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
+		.reg_offset = 0,
+		.type_reg_offset = 1,
+	},
+	[MAX77620_IRQ_GPIO2 - MAX77620_IRQ_GPIO0] = {
+		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE2,
+		.type_rising_mask = MAX77620_CNFG_GPIO_INT_RISING,
+		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
+		.reg_offset = 0,
+		.type_reg_offset = 2,
+	},
+	[MAX77620_IRQ_GPIO3 - MAX77620_IRQ_GPIO0] = {
+		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE3,
+		.type_rising_mask = MAX77620_CNFG_GPIO_INT_RISING,
+		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
+		.reg_offset = 0,
+		.type_reg_offset = 3,
+	},
+	[MAX77620_IRQ_GPIO4 - MAX77620_IRQ_GPIO0] = {
+		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE4,
+		.type_rising_mask = MAX77620_CNFG_GPIO_INT_RISING,
+		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
+		.reg_offset = 0,
+		.type_reg_offset = 4,
+	},
+	[MAX77620_IRQ_GPIO5 - MAX77620_IRQ_GPIO0] = {
+		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE5,
+		.type_rising_mask = MAX77620_CNFG_GPIO_INT_RISING,
+		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
+		.reg_offset = 0,
+		.type_reg_offset = 5,
+	},
+	[MAX77620_IRQ_GPIO6 - MAX77620_IRQ_GPIO0] = {
+		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE6,
+		.type_rising_mask = MAX77620_CNFG_GPIO_INT_RISING,
+		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
+		.reg_offset = 0,
+		.type_reg_offset = 6,
+	},
+	[MAX77620_IRQ_GPIO7 - MAX77620_IRQ_GPIO0] = {
+		.mask = MAX77620_IRQ_LVL2_GPIO_EDGE7,
+		.type_rising_mask = MAX77620_CNFG_GPIO_INT_RISING,
+		.type_falling_mask = MAX77620_CNFG_GPIO_INT_FALLING,
+		.reg_offset = 0,
+		.type_reg_offset = 7,
+	},
 };
+
 
 static struct regmap_irq_chip max77620_gpio_irq_chip = {
 	.name = "max77620-gpio",
 	.irqs = max77620_gpio_irqs,
 	.num_irqs = ARRAY_SIZE(max77620_gpio_irqs),
 	.num_regs = 1,
+	.num_type_reg = 8,
 	.irq_reg_stride = 1,
+	.type_reg_stride = 1,
 	.status_base = MAX77620_REG_IRQ_LVL2_GPIO,
+	.type_base = MAX77620_REG_GPIO0,
 };
 
 static int max77620_gpio_dir_input(struct gpio_chip *gc, unsigned int offset)
@@ -213,21 +265,17 @@ static int max77620_gpio_probe(struct platform_device *pdev)
 	}
 	mgpio->gpio_base = mgpio->gpio_chip.base;
 
-	ret = regmap_add_irq_chip(chip->rmap, mgpio->gpio_irq, IRQF_ONESHOT,
-				  mgpio->irq_base,
-				  &max77620_gpio_irq_chip,
-				  &chip->gpio_irq_data);
+	ret = devm_regmap_add_irq_chip(mgpio->dev, chip->rmap,
+				mgpio->gpio_irq, IRQF_ONESHOT,
+				mgpio->irq_base,
+				&max77620_gpio_irq_chip,
+				&chip->gpio_irq_data);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to add gpio irq_chip %d\n", ret);
-		goto fail;
+		return ret;
 	}
 
 	return 0;
-
-fail:
-	gpiochip_remove(&mgpio->gpio_chip);
-
-	return ret;
 }
 
 static int max77620_gpio_remove(struct platform_device *pdev)

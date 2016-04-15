@@ -287,6 +287,15 @@ enum {
 	MAX77620_IRQ_LBT_MBATLOW,	/* Thermal alarm status, > 120C */
 	MAX77620_IRQ_LBT_TJALRM1,	/* Thermal alarm status, > 120C */
 	MAX77620_IRQ_LBT_TJALRM2,	/* Thermal alarm status, > 140C */
+
+	MAX77620_IRQ_GPIO0,		/* GPIO0 edge detection */
+	MAX77620_IRQ_GPIO1,		/* GPIO1 edge detection */
+	MAX77620_IRQ_GPIO2,		/* GPIO2 edge detection */
+	MAX77620_IRQ_GPIO3,		/* GPIO3 edge detection */
+	MAX77620_IRQ_GPIO4,		/* GPIO4 edge detection */
+	MAX77620_IRQ_GPIO5,		/* GPIO5 edge detection */
+	MAX77620_IRQ_GPIO6,		/* GPIO6 edge detection */
+	MAX77620_IRQ_GPIO7,		/* GPIO7 edge detection */
 };
 
 /* GPIOs */
