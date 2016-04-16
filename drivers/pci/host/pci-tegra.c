@@ -382,8 +382,13 @@ static unsigned long tegra_pcie_conf_offset(unsigned int devfn, int where)
 static struct tegra_pcie_bus *tegra_pcie_bus_alloc(struct tegra_pcie *pcie,
 						   unsigned int busnr)
 {
+#ifndef CONFIG_ARM64
 	pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				 L_PTE_XN | L_PTE_MT_DEV_SHARED | L_PTE_SHARED);
+#else
+	pgprot_t prot = __pgprot(PTE_VALID | PTE_PROT_NONE | PTE_AF |
+				PTE_DIRTY | PTE_UXN | PTE_SHARED);
+#endif
 	phys_addr_t cs = pcie->cs->start;
 	struct tegra_pcie_bus *bus;
 	unsigned int i;
@@ -1998,7 +2003,9 @@ static int tegra_pcie_probe(struct platform_device *pdev)
 	if (err < 0)
 		return err;
 
+#ifndef CONFIG_ARM64
 	pcibios_min_mem = 0;
+#endif
 
 	err = tegra_pcie_get_resources(pcie);
 	if (err < 0) {
