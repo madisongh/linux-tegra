@@ -28,6 +28,7 @@ enum tegra_agic_cpu {
 };
 
 /* AMISC Mailbox Full Interrupts */
+#define INT_AGIC_START			32
 #define INT_AMISC_MBOX_FULL0		32
 #define INT_AMISC_MBOX_FULL1		33
 #define INT_AMISC_MBOX_FULL2		34
@@ -109,5 +110,7 @@ enum tegra_agic_cpu {
 
 /* AMISC Actmon interrupt */
 #define INT_ADSP_ACTMON			87
+
+#define INT_AGIC_END			87
 
 #endif /* _TEGRA_T210_AGIC_H_ */
