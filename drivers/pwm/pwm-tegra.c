@@ -26,9 +26,11 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/pwm.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/reset.h>
 
 #define PWM_ENABLE	(1 << 31)
 #define PWM_DUTY_WIDTH	8
@@ -36,15 +38,19 @@
 #define PWM_SCALE_WIDTH	13
 #define PWM_SCALE_SHIFT	0
 
-#define NUM_PWM 4
+struct tegra_pwm_chipdata {
+	int num_pwm;
+};
 
 struct tegra_pwm_chip {
 	struct pwm_chip		chip;
 	struct device		*dev;
 
 	struct clk		*clk;
+	struct reset_control	*rstc;
 
 	void __iomem		*mmio_base;
+	const struct tegra_pwm_chipdata	*chip_data;
 };
 
 static inline struct tegra_pwm_chip *to_tegra_pwm_chip(struct pwm_chip *chip)
@@ -169,8 +175,15 @@ static const struct pwm_ops tegra_pwm_ops = {
 static int tegra_pwm_probe(struct platform_device *pdev)
 {
 	struct tegra_pwm_chip *pwm;
+	const struct tegra_pwm_chipdata *cdata = NULL;
 	struct resource *r;
 	int ret;
+
+	cdata = of_device_get_match_data(&pdev->dev);
+	if (!cdata) {
+		dev_err(&pdev->dev, "Chip data not found\n");
+		return -ENODEV;
+	}
 
 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
 	if (!pwm)
@@ -185,14 +198,25 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, pwm);
 
-	pwm->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(pwm->clk))
+	pwm->clk = devm_clk_get(&pdev->dev, "pwm");
+	if (IS_ERR(pwm->clk)) {
+		dev_err(&pdev->dev, "PWM clock get failed\n");
 		return PTR_ERR(pwm->clk);
+	}
 
+	pwm->rstc = devm_reset_control_get(&pdev->dev, "pwm");
+	if (IS_ERR(pwm->rstc)) {
+		ret = PTR_ERR(pwm->rstc);
+		dev_err(&pdev->dev, "Reset control is not found: %d\n", ret);
+		return ret;
+	}
+	reset_control_reset(pwm->rstc);
+
+	pwm->chip_data = cdata;
 	pwm->chip.dev = &pdev->dev;
 	pwm->chip.ops = &tegra_pwm_ops;
 	pwm->chip.base = -1;
-	pwm->chip.npwm = NUM_PWM;
+	pwm->chip.npwm = pwm->chip_data->num_pwm;
 
 	ret = pwmchip_add(&pwm->chip);
 	if (ret < 0) {
@@ -211,7 +235,7 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 	if (WARN_ON(!pc))
 		return -ENODEV;
 
-	for (i = 0; i < NUM_PWM; i++) {
+	for (i = 0; i < pc->chip_data->num_pwm; i++) {
 		struct pwm_device *pwm = &pc->chip.pwms[i];
 
 		if (!pwm_is_enabled(pwm))
@@ -226,9 +250,18 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 	return pwmchip_remove(&pc->chip);
 }
 
+static const struct tegra_pwm_chipdata tegra20_pwm_cdata = {
+	.num_pwm = 4,
+};
+
+static const struct tegra_pwm_chipdata tegra186_pwm_cdata = {
+	.num_pwm = 1,
+};
+
 static const struct of_device_id tegra_pwm_of_match[] = {
-	{ .compatible = "nvidia,tegra20-pwm" },
-	{ .compatible = "nvidia,tegra30-pwm" },
+	{ .compatible = "nvidia,tegra20-pwm", .data = &tegra20_pwm_cdata },
+	{ .compatible = "nvidia,tegra30-pwm", .data = &tegra20_pwm_cdata },
+	{ .compatible = "nvidia,tegra186-pwm", .data = &tegra186_pwm_cdata, },
 	{ }
 };
 
