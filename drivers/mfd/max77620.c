@@ -570,7 +570,17 @@ static struct i2c_driver max77620_driver = {
 	.id_table = max77620_id,
 };
 
-module_i2c_driver(max77620_driver);
+static int __init max77620_init(void)
+{
+	return i2c_add_driver(&max77620_driver);
+}
+subsys_initcall(max77620_init);
+
+static void __exit max77620_exit(void)
+{
+	i2c_del_driver(&max77620_driver);
+}
+module_exit(max77620_exit);
 
 MODULE_DESCRIPTION("MAX77620/MAX20024 Multi Function Device Core Driver");
 MODULE_AUTHOR("Laxman Dewangan <ldewangan@nvidia.com>");
