@@ -1481,15 +1481,21 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 
 		sor_num = get_sor_num(codec);
 
+		hinfo->pcm_open_retry_count++;
 		if (!eld->monitor_present) {
 			if (tegra_hdmi_setup_hda_presence(sor_num) < 0) {
-				codec_warn(codec,
-					"HDMI: No HDMI device connected\n");
+				/* Throttle log after 5 retries */
+				if (hinfo->pcm_open_retry_count < 5) {
+					codec_warn(codec,
+						"HDMI: No HDMI device"
+						" connected\n");
+				}
 				return -ENODEV;
 			}
 		}
 		if (!eld->info.lpcm_sad_ready)
 			return -ENODEV;
+		hinfo->pcm_open_retry_count = 0;
 	}
 #endif
 
@@ -1980,6 +1986,7 @@ static int hdmi_pcm_close(struct hda_pcm_stream *hinfo,
 		per_pin->setup = false;
 		per_pin->channels = 0;
 		mutex_unlock(&per_pin->lock);
+		hinfo->pcm_open_retry_count = 0;
 	}
 
 	return 0;
