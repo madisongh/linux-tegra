@@ -11,7 +11,9 @@ communicating with an off-chip PMIC either via an I2C bus or via PWM signals.
 Currently only the I2C mode is supported by these bindings.
 
 Required properties:
-- compatible : should be "nvidia,tegra124-dfll"
+- compatible : should be one of following:
+  - "nvidia,tegra124-dfll" for the Tegra124 SoC
+  - "nvidia,tegra210-dfll" for the Tegra210 SoC
 - reg : Defines the following set of registers, in the order listed:
         - registers for the DFLL control logic.
         - registers for the I2C output logic.

@@ -44,6 +44,11 @@ static const unsigned long tegra124_cpu_max_freq_table[] = {
 	[3] = 2524500000UL,
 };
 
+static const unsigned long tegra210_cpu_max_freq_table[] = {
+	[0] = 1912500000UL,
+	[1] = 1912500000UL,
+};
+
 static const struct cvb_table tegra124_cpu_cvb_tables[] = {
 	{
 		.speedo_id = -1,
@@ -87,6 +92,45 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
 	},
 };
 
+static const struct cvb_table tegra210_cpu_cvb_tables[] = {
+	{
+		.speedo_id = -1,
+		.process_id = -1,
+		.min_millivolts = 850,
+		.max_millivolts = 1170,
+		.speedo_scale = 100,
+		.voltage_scale = 1000,
+		.cvb_table = {
+			{51000000UL,    {1007452, -23865, 370} },
+			{102000000UL,   {1007452, -23865, 370} },
+			{204000000UL,   {1007452, -23865, 370} },
+			{306000000UL,   {1052709, -24875, 370} },
+			{408000000UL,   {1099069, -25895, 370} },
+			{510000000UL,   {1146534, -26905, 370} },
+			{612000000UL,   {1195102, -27915, 370} },
+			{714000000UL,   {1244773, -28925, 370} },
+			{816000000UL,   {1295549, -29935, 370} },
+			{918000000UL,   {1347428, -30955, 370} },
+			{1020000000UL,  {1400411, -31965, 370} },
+			{1122000000UL,  {1454497, -32975, 370} },
+			{1224000000UL,  {1509687, -33985, 370} },
+			{1326000000UL,  {1565981, -35005, 370} },
+			{1428000000UL,  {1623379, -36015, 370} },
+			{1530000000UL,  {1681880, -37025, 370} },
+			{1632000000UL,  {1741485, -38035, 370} },
+			{1734000000UL,  {1802194, -39055, 370} },
+			{1836000000UL,  {1864006, -40065, 370} },
+			{1912500000UL,  {1910780, -40815, 370} },
+			{0,             {      0,      0,   0} },
+		},
+		.cpu_dfll_data = {
+			.tune0_low = 0xffead0ff,
+			.tune0_high = 0xffead0ff,
+			.tune1 = 0x20091d9,
+		}
+	},
+};
+
 static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
 	.cpu_max_freq_table = tegra124_cpu_max_freq_table,
 	.cpu_max_freq_table_size = ARRAY_SIZE(tegra124_cpu_max_freq_table),
@@ -94,10 +138,21 @@ static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
 	.cpu_cvb_tables_size = ARRAY_SIZE(tegra124_cpu_cvb_tables)
 };
 
+static const struct dfll_fcpu_data tegra210_dfll_fcpu_data = {
+	.cpu_max_freq_table = tegra210_cpu_max_freq_table,
+	.cpu_max_freq_table_size = ARRAY_SIZE(tegra210_cpu_max_freq_table),
+	.cpu_cvb_tables = tegra210_cpu_cvb_tables,
+	.cpu_cvb_tables_size = ARRAY_SIZE(tegra210_cpu_cvb_tables)
+};
+
 static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
 	{
 		.compatible = "nvidia,tegra124-dfll",
 		.data = &tegra124_dfll_fcpu_data
+	},
+	{
+		.compatible = "nvidia,tegra210-dfll",
+		.data = &tegra210_dfll_fcpu_data
 	},
 	{ },
 };
