@@ -419,6 +419,83 @@ static int of_gpiochip_add_pin_range(struct gpio_chip *chip)
 static int of_gpiochip_add_pin_range(struct gpio_chip *chip) { return 0; }
 #endif
 
+void of_gpiochip_init(struct gpio_chip *chip)
+{
+	struct device_node *np = chip->of_node;
+	struct device_node *np_config;
+	int state;
+	const char *statename;
+	int ret, count;
+	unsigned int pval;
+	bool found;
+	int i;
+
+	if (!chip->of_node)
+		return;
+
+	/* For each defined state ID */
+	state = 0;
+	for_each_child_of_node(np, np_config) {
+		if (!of_device_is_available(np_config))
+			continue;
+
+		found = false;
+
+		count = of_property_count_u32_elems(np_config, "gpio-input");
+		for (i = 0; i < count; ++i) {
+			found = true;
+			ret = of_property_read_u32_index(np_config,
+					"gpio-input", i, &pval);
+			if (!ret)
+				chip->direction_input(chip, pval);
+		}
+
+		count = of_property_count_u32_elems(np_config, "gpio-output-low");
+		for (i = 0; i < count; ++i) {
+			found = true;
+			ret = of_property_read_u32_index(np_config,
+					"gpio-output-low", i, &pval);
+			if (!ret)
+				chip->direction_output(chip, pval, 0);
+		}
+
+		count = of_property_count_u32_elems(np_config, "gpio-output-high");
+		for (i = 0; i < count; ++i) {
+			found = true;
+			ret = of_property_read_u32_index(np_config,
+					"gpio-output-high", i, &pval);
+			if (!ret)
+				chip->direction_output(chip, pval, 1);
+		}
+
+		count = of_property_count_u32_elems(np_config, "gpio-to-sfio");
+		for (i = 0; i < count; ++i) {
+			found = true;
+			ret = of_property_read_u32_index(np_config,
+					"gpio-to-sfio", i, &pval);
+			if (!ret) {
+				if (chip->request)
+					chip->request(chip, pval);
+				if (chip->free)
+					chip->free(chip, pval);
+			}
+		}
+
+		if (found) {
+			statename = NULL;
+			/* Determine whether gpio-init-names property names the state */
+			of_property_read_string_index(np, "gpio-init-names",
+						    state, &statename);
+
+			dev_info(chip->parent, "Initialising GPIO state %d: name %s\n",
+				state, (statename) ? statename : np_config->name);
+		}
+
+		of_node_put(np_config);
+		state++;
+	}
+}
+
 int of_gpiochip_add(struct gpio_chip *chip)
 {
 	int status;

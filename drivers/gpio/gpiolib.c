@@ -52,7 +52,6 @@ static DEFINE_MUTEX(gpio_lookup_lock);
 static LIST_HEAD(gpio_lookup_list);
 LIST_HEAD(gpio_chips);
 
-
 static void gpiochip_free_hogs(struct gpio_chip *chip);
 static void gpiochip_irqchip_remove(struct gpio_chip *gpiochip);
 
@@ -367,6 +366,8 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
 		goto err_remove_chip;
 
 	acpi_gpiochip_add(chip);
+
+        of_gpiochip_init(chip);
 
 	status = gpiochip_sysfs_register(chip);
 	if (status)
