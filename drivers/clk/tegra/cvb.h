@@ -49,7 +49,6 @@ struct cvb_table {
 
 	int min_millivolts;
 	int max_millivolts;
-	struct rail_alignment alignment;
 
 	int speedo_scale;
 	int voltage_scale;
@@ -59,8 +58,11 @@ struct cvb_table {
 
 const struct cvb_table *tegra_cvb_build_opp_table(
 		const struct cvb_table *cvb_tables,
-		size_t sz, int process_id,
-		int speedo_id, int speedo_value,
+		size_t sz,
+		const struct rail_alignment *align,
+		int process_id,
+		int speedo_id,
+		int speedo_value,
 		unsigned long max_rate,
 		struct device *opp_dev);
 

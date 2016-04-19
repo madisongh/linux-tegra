@@ -34,6 +34,14 @@ Required properties:
   hardware will start controlling. The regulator will be queried for
   the I2C register, control values and supported voltages.
 
+Reguired properties for build voltage table:
+- nvidia,align-step-uv: Step uV of regulator for CPU voltage rail. This
+  value will be applied when building frequency-voltage table to ensure
+  all calculated voltages will be aligned to voltages regulator supplied.
+
+Optional properties for build voltage table:
+- nvidia,align-offset-uv: Offset uV for calculating DFLL output voltage.
+
 Required properties for the control loop parameters:
 - nvidia,sample-rate: Sample rate of the DFLL control loop.
 - nvidia,droop-ctrl: See the register CL_DVFS_DROOP_CTRL in the TRM.
@@ -68,6 +76,7 @@ clock@0,70110000 {
         vdd-cpu-supply = <&vdd_cpu>;
         status = "okay";
 
+        nvidia,align-step-uv = <10000>; /* 10mv */
         nvidia,sample-rate = <12500>;
         nvidia,droop-ctrl = <0x00000f00>;
         nvidia,force-mode = <1>;

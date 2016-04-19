@@ -42,9 +42,6 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
 		.process_id = -1,
 		.min_millivolts = 900,
 		.max_millivolts = 1260,
-		.alignment = {
-			.step_uv = 10000, /* 10mV */
-		},
 		.speedo_scale = 100,
 		.voltage_scale = 1000,
 		.cvb_table = {
@@ -84,7 +81,8 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
 
 static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 {
-	int process_id, speedo_id, speedo_value;
+	int process_id, speedo_id, speedo_value, ret;
+	struct rail_alignment align;
 	struct tegra_dfll_soc_data *soc;
 	const struct cvb_table *cvb;
 
@@ -108,8 +106,24 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	ret = of_property_read_u32(pdev->dev.of_node, "nvidia,align-offset-uv",
+					&align.offset_uv);
+	if (ret < 0) {
+		dev_dbg(&pdev->dev,
+			"offset uv not found, the default value will be 0\n");
+		align.offset_uv = 0;
+	}
+
+	ret = of_property_read_u32(pdev->dev.of_node, "nvidia,align-step-uv",
+					&align.step_uv);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "missing step uv\n");
+		return -EINVAL;
+	}
+
 	cvb = tegra_cvb_build_opp_table(tegra124_cpu_cvb_tables,
 					ARRAY_SIZE(tegra124_cpu_cvb_tables),
+					&align,
 					process_id, speedo_id, speedo_value,
 					cpu_max_freq_table[speedo_id],
 					soc->dev);
@@ -120,6 +134,7 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 	}
 
 	soc->min_millivolts = cvb->min_millivolts;
+	soc->alignment = align.step_uv;
 	soc->tune0_low = cvb->cpu_dfll_data.tune0_low;
 	soc->tune0_high = cvb->cpu_dfll_data.tune0_high;
 	soc->tune1 = cvb->cpu_dfll_data.tune1;

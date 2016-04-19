@@ -37,6 +37,7 @@
 struct tegra_dfll_soc_data {
 	struct device *dev;
 	unsigned int min_millivolts;
+	unsigned int alignment;
 	u32 tune0_low;
 	u32 tune0_high;
 	u32 tune1;

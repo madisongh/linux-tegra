@@ -630,7 +630,7 @@ static void dfll_init_out_if(struct tegra_dfll *td)
 static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
 {
 	struct dev_pm_opp *opp;
-	int i, uv;
+	int i, align_volt;
 
 	rcu_read_lock();
 
@@ -639,12 +639,13 @@ static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
 		rcu_read_unlock();
 		return PTR_ERR(opp);
 	}
-	uv = dev_pm_opp_get_voltage(opp);
+	align_volt = dev_pm_opp_get_voltage(opp) / td->soc->alignment;
 
 	rcu_read_unlock();
 
 	for (i = 0; i < td->i2c_lut_size; i++) {
-		if (regulator_list_voltage(td->vdd_reg, td->i2c_lut[i]) == uv)
+		if ((regulator_list_voltage(td->vdd_reg, td->i2c_lut[i]) /
+				td->soc->alignment) == align_volt)
 			return i;
 	}
 
@@ -1380,15 +1381,17 @@ di_err1:
  */
 static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
 {
-	int i, n_voltages, reg_uV;
+	int i, n_voltages, reg_volt, align_volt;
 
+	align_volt = uV / td->soc->alignment;
 	n_voltages = regulator_count_voltages(td->vdd_reg);
 	for (i = 0; i < n_voltages; i++) {
-		reg_uV = regulator_list_voltage(td->vdd_reg, i);
-		if (reg_uV < 0)
+		reg_volt = regulator_list_voltage(td->vdd_reg, i) /
+					td->soc->alignment;
+		if (reg_volt < 0)
 			break;
 
-		if (uV == reg_uV)
+		if (align_volt == reg_volt)
 			return i;
 	}
 
@@ -1402,15 +1405,17 @@ static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
  * */
 static int find_vdd_map_entry_min(struct tegra_dfll *td, int uV)
 {
-	int i, n_voltages, reg_uV;
+	int i, n_voltages, reg_volt, align_volt;
 
+	align_volt = uV / td->soc->alignment;
 	n_voltages = regulator_count_voltages(td->vdd_reg);
 	for (i = 0; i < n_voltages; i++) {
-		reg_uV = regulator_list_voltage(td->vdd_reg, i);
-		if (reg_uV < 0)
+		reg_volt = regulator_list_voltage(td->vdd_reg, i) /
+					td->soc->alignment;
+		if (reg_volt < 0)
 			break;
 
-		if (uV <= reg_uV)
+		if (align_volt <= reg_volt)
 			return i;
 	}
 
