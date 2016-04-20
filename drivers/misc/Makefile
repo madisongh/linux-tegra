@@ -59,3 +59,4 @@ obj-$(CONFIG_VEXPRESS_SYSCFG)	+= vexpress-syscfg.o
 obj-$(CONFIG_CXL_BASE)		+= cxl/
 obj-$(CONFIG_UID_CPUTIME) += uid_cputime.o
 obj-$(CONFIG_PLATFORM_TEGRA)    += tegra-fuse/
+obj-$(CONFIG_TEGRA_CRYPTO_DEV)  += tegra-cryptodev.o
