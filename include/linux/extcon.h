@@ -175,6 +175,8 @@ extern int devm_extcon_dev_register(struct device *dev,
 extern void devm_extcon_dev_unregister(struct device *dev,
 				       struct extcon_dev *edev);
 extern struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name);
+extern struct extcon_dev *extcon_get_extcon_dev_by_cable(struct device *dev,
+			const char *cable_name);
 
 /*
  * Following APIs control the memory of extcon device.
@@ -319,6 +321,13 @@ static inline int extcon_set_cable_state(struct extcon_dev *edev,
 }
 
 static inline struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name)
+{
+	return NULL;
+}
+
+static inline struct extcon_dev *extcon_get_extcon_dev_by_cable(
+		struct device *dev, const char *cable_name)
+
 {
 	return NULL;
 }
