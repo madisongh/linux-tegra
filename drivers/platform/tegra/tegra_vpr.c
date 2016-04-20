@@ -31,6 +31,7 @@ early_param("vpr_resize", tegra_vpr_resize_arg);
 static int tegra_update_resize_cfg(phys_addr_t base , size_t size)
 {
 	int err = -EPERM;
+#if defined(CONFIG_TRUSTED_LITTLE_KERNEL)
 #define MAX_RETRIES 6
 	int retries = MAX_RETRIES;
 retry:
@@ -47,6 +48,7 @@ retry:
 			goto retry;
 		}
 	}
+#endif
 	return err;
 }
 
