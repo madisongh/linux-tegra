@@ -2,6 +2,7 @@
  * drivers/cpufreq/cpufreq_interactive.c
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (c) 2012-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -115,28 +116,6 @@ struct cpufreq_interactive_tunables {
 	int timer_slack_val;
 	bool io_is_busy;
 };
-
-/*
- * HACK: FIXME: Bring back cpufreq_{get,put}_global_kobject()
- * definition removed by upstream commit 8eec1020f0c0 "cpufreq:
- * create cpu/cpufreq at boot time" to fix build failures.
- */
-static int cpufreq_global_kobject_usage;
-
-int cpufreq_get_global_kobject(void)
-{
-	if (!cpufreq_global_kobject_usage++)
-		return kobject_add(cpufreq_global_kobject,
-				&cpu_subsys.dev_root->kobj, "%s", "cpufreq");
-
-	return 0;
-}
-
-void cpufreq_put_global_kobject(void)
-{
-	if (!--cpufreq_global_kobject_usage)
-		kobject_del(cpufreq_global_kobject);
-}
 
 /* For cases where we have single governor instance for system */
 static struct cpufreq_interactive_tunables *common_tunables;
@@ -1170,20 +1149,16 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		spin_lock_init(&tunables->above_hispeed_delay_lock);
 
 		policy->governor_data = tunables;
-		if (!have_governor_per_policy()) {
+		if (!have_governor_per_policy())
 			common_tunables = tunables;
-			WARN_ON(cpufreq_get_global_kobject());
-		}
 
 		rc = sysfs_create_group(get_governor_parent_kobj(policy),
 				get_sysfs_attr());
 		if (rc) {
 			kfree(tunables);
 			policy->governor_data = NULL;
-			if (!have_governor_per_policy()) {
+			if (!have_governor_per_policy())
 				common_tunables = NULL;
-				cpufreq_put_global_kobject();
-			}
 			return rc;
 		}
 
@@ -1205,9 +1180,6 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 
 			sysfs_remove_group(get_governor_parent_kobj(policy),
 					get_sysfs_attr());
-
-			if (!have_governor_per_policy())
-				cpufreq_put_global_kobject();
 
 			kfree(tunables);
 			common_tunables = NULL;
