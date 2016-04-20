@@ -16,6 +16,7 @@
 
 #include <linux/cpu.h>
 #include <linux/interrupt.h>
+#include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/notifier.h>
 #include <linux/semaphore.h>
@@ -49,7 +50,7 @@ int tegra_bpmp_read_data(unsigned int ch, void *data, size_t sz)
 {
 	if (!data || sz > MSG_DATA_SZ || ch >= NR_CHANNELS)
 		return -EINVAL;
-	memcpy(data, channel_area[ch].ib->data, sz);
+	memcpy_fromio(data, channel_area[ch].ib->data, sz);
 	return 0;
 }
 EXPORT_SYMBOL(tegra_bpmp_read_data);
@@ -133,7 +134,7 @@ static void __bpmp_write_ch(int ch, int mrq, int flags, void *data, int sz)
 	p->code = mrq;
 	p->flags = flags;
 	if (data)
-		memcpy(p->data, data, sz);
+		memcpy_toio(p->data, data, sz);
 	bpmp_signal_slave(ch);
 }
 
@@ -183,7 +184,7 @@ static int __bpmp_read_ch(int ch, void *data, int sz)
 {
 	struct mb_data *p = channel_area[ch].ib;
 	if (data)
-		memcpy(data, p->data, sz);
+		memcpy_fromio(data, p->data, sz);
 	bpmp_free_master(ch);
 	return p->code;
 }
