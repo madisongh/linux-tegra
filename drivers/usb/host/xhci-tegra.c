@@ -1815,7 +1815,7 @@ skip_clocks:
 	tegra_xhci_debugfs_init(tegra);
 
 	INIT_WORK(&tegra->id_extcon_work, tegra_xhci_id_extcon_work);
-	tegra->id_extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
+	tegra->id_extcon = extcon_get_extcon_dev_by_cable(&pdev->dev, "id");
 	if (!IS_ERR(tegra->id_extcon)) {
 		tegra->id_extcon_nb.notifier_call = tegra_xhci_id_notifier;
 		extcon_register_notifier(tegra->id_extcon, EXTCON_USB_HOST,
