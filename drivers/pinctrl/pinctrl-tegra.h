@@ -108,6 +108,8 @@ struct tegra_function {
  * @einput_bit:		Enable-input register bit.
  * @odrain_bit:		Open-drain register bit.
  * @lock_bit:		Lock register bit.
+ * @parked_reg:		Parked register offset. -1 if unsupported.
+ * @parked_bank:	Parked register bank. 0 if unsupported.
  * @parked_bit:		Parked register bit.
  * @ioreset_bit:	IO reset register bit.
  * @rcv_sel_bit:	Receiver select bit.
@@ -151,10 +153,12 @@ struct tegra_pingroup {
 	s32 pupd_reg;
 	s32 tri_reg;
 	s32 drv_reg;
+	s32 parked_reg;
 	u32 mux_bank:2;
 	u32 pupd_bank:2;
 	u32 tri_bank:2;
 	u32 drv_bank:2;
+	u32 parked_bank:2;
 	s32 mux_bit:6;
 	s32 pupd_bit:6;
 	s32 tri_bit:6;
