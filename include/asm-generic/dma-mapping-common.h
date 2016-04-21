@@ -252,7 +252,7 @@ static inline void *dma_alloc_attrs(struct device *dev, size_t size,
 	*dma_handle = DMA_ERROR_CODE;
 	BUG_ON(!ops);
 
-	if (dma_alloc_from_coherent(dev, size, dma_handle, &cpu_addr))
+	if (dma_alloc_from_coherent_attr(dev, size, dma_handle, &cpu_addr, attrs))
 		return cpu_addr;
 
 	if (!arch_dma_alloc_attrs(&dev, &flag))
@@ -278,7 +278,8 @@ static inline void dma_free_attrs(struct device *dev, size_t size,
 	 * instead of size. This has been modified to avoid memory failures
 	 * happening from internal fragmentation.
 	 */
-	if (dma_release_from_coherent(dev, size, cpu_addr))
+	if (dma_release_from_coherent_attr(dev, size, cpu_addr,
+				attrs, dma_handle))
 		return;
 
 	if (!ops->free)

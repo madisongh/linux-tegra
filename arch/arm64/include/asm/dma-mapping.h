@@ -126,7 +126,7 @@ static inline void *dma_alloc_at_attrs(struct device *dev, size_t size,
 	struct dma_map_ops *ops = get_dma_ops(dev);
 	void *vaddr;
 
-	if (dma_alloc_from_coherent(dev, size, dma_handle, &vaddr))
+	if (dma_alloc_from_coherent_attr(dev, size, dma_handle, &vaddr, attrs))
 		return vaddr;
 
 	vaddr = ops->alloc(dev, size, dma_handle, flags, attrs);
