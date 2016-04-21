@@ -1,7 +1,7 @@
 /*
  * ADSP mailbox manager
  *
- * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -30,7 +30,7 @@ static inline bool is_mboxq_empty(struct nvadsp_mbox_queue *queue)
 
 static inline bool is_mboxq_full(struct nvadsp_mbox_queue *queue)
 {
-	return (queue->head == NVADSP_MBOX_QUEUE_SIZE);
+	return (queue->count == NVADSP_MBOX_QUEUE_SIZE);
 }
 
 static void mboxq_init(struct nvadsp_mbox_queue *queue)
