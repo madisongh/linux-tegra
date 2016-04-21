@@ -722,10 +722,13 @@ struct tegra_vrr {
 	s32	db_tolerance;
 	s32	frame2flip_us;
 	s32	adjust_vfp;
-	s32     adjust_db;
-	u32 db_correct_cap;
-	u32 db_hist_cap;
-	s32     vfp;
+	s32	adjust_db;
+	u32	db_correct_cap;
+	u32	db_hist_cap;
+	s32	vfp;
+	s32	insert_frame;
+	s32	g_vrr_session_id;
+	s32	nvdisp_direct_drive;
 
 	/* Must be kept in order */
 	u8	keynum;
