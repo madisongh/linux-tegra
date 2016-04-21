@@ -1694,7 +1694,7 @@ static ssize_t smmu_debugfs_iova2phys_write(struct file *file,
 	if (copy_from_user(str, buffer, count))
 		return -EINVAL;
 
-	ret = sscanf(str, "0x%llx", &tmp);
+	ret = sscanf(str, "0x%16llx", &tmp);
 	if (ret != 1)
 		return -EINVAL;
 
