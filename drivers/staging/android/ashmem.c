@@ -523,7 +523,8 @@ static int set_name(struct ashmem_area *asma, void __user *name)
 	if (unlikely(asma->file))
 		ret = -EINVAL;
 	else
-		strcpy(asma->name + ASHMEM_NAME_PREFIX_LEN, local_name);
+		strncpy(asma->name + ASHMEM_NAME_PREFIX_LEN, local_name,
+				ASHMEM_NAME_LEN - 1);
 
 	mutex_unlock(&ashmem_mutex);
 	return ret;
