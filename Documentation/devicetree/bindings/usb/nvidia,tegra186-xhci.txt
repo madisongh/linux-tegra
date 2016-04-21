@@ -22,11 +22,13 @@ Required properties for Tegra186:
    See ../phy/phy-bindings.txt for details.
  - phy-names: Should include an entry for each PHY used by the controller.
    Names must be of the form "<type>-<number>" where <type> is one of "utmi",
-   "hsic", or "usb3" and <number> is a 0-based index.
+   "hsic", "usb3", or "cdp" and <number> is a 0-based index.
    On Tegra186, there may be up to:
    - 3 USB3 PHYs, SuperSpeed (SSTX+/SSTX-/SSRX+/SSRX-) data lines
    - 3 UTMI PHYs, USB 2.0 (D+/D-) data lines
    - 1 HSIC PHYs, HSIC (DATA/STROBE) data lines
+   - 3 CDP PHYs, which is an abstraction type of PHY to support CDP (charging
+       downstream port) for each UTMI PHYs in the system
 
 Optional properties:
 --------------------
@@ -45,8 +47,9 @@ Example:
 		mbox-names = "xusb";
 		phys = <&padctl TEGRA_PADCTL_PHY_UTMI_P(0)>, /* USB 2.0 micro-AB, J20 */
 			<&padctl TEGRA_PADCTL_PHY_UTMI_P(1)>, /* USB 3.0 STD-A, J19 */
-			<&padctl TEGRA_PADCTL_PHY_USB3_P(1)>; /* USB 3.0 STD-A, J19 */
-		phy-names = "utmi-0", "utmi-1", "usb3-1";
+			<&padctl TEGRA_PADCTL_PHY_USB3_P(1)>, /* USB 3.0 STD-A, J19 */
+			<&padctl TEGRA_PADCTL_PHY_CDP_P(1)>; /* CDP for J19 port */
+		phy-names = "utmi-0", "utmi-1", "usb3-1", "cdp-1";
 
 		avddio_usb-supply = <&spmic_sd3_3v3>;
 		avdd_pll_utmip-supply = <&spmic_sd2_1v8>;

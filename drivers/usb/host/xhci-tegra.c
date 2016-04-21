@@ -400,6 +400,7 @@ struct tegra_xhci_hcd {
 
 	int num_phys;
 	struct phy **phys[MAX_PHY_TYPES];
+	struct phy **cdp_phys;
 	unsigned enabled_ss_ports; /* bitmap */
 	unsigned num_hsic_port; /* count */
 
@@ -435,6 +436,9 @@ struct tegra_xhci_hcd {
 	bool otg_role_initialized;
 
 	bool pmc_usb_wakes_disabled;
+
+	u8 *connected_utmi_ports; /* keep track of connected UTMI ports */
+	bool cdp_enabled;
 };
 
 static struct hc_driver __read_mostly tegra_xhci_hc_driver;
@@ -1087,6 +1091,26 @@ static int tegra_xhci_phy_enable(struct tegra_xhci_hcd *tegra)
 	unsigned int i, j;
 	int ret;
 
+	/* enable CDP on non-OTG port */
+	for (j = 0; j < tegra->soc_config->num_phys[UTMI_PHY]; j++) {
+		if (j == tegra->utmi_otg_port_base_1 - 1)
+			continue;
+		ret = phy_init(tegra->cdp_phys[j]);
+		if (ret) {
+			dev_dbg(dev, "phy_init CDP phy %d failed %d\n", j, ret);
+			continue;
+		}
+		ret = phy_power_on(tegra->cdp_phys[j]);
+		if (ret) {
+			dev_dbg(dev, "phy_power_on CDP phy %d failed %d\n", j,
+				 ret);
+			ret = phy_exit(tegra->cdp_phys[j]);
+			if (ret)
+				dev_dbg(dev, "phy_exit CDP phy %d failed: %d",
+					 j, ret);
+		}
+	}
+
 	for (i = 0; i < ARRAY_SIZE(tegra->phys); i++) {
 		for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
 			ret = phy_init(tegra->phys[i][j]);
@@ -1160,6 +1184,21 @@ static void tegra_xhci_phy_disable(struct tegra_xhci_hcd *tegra)
 			}
 		}
 	}
+
+	/* disable CDP on non-OTG ports */
+	for (j = 0; j < tegra->soc_config->num_phys[UTMI_PHY]; j++) {
+		if (j == tegra->utmi_otg_port_base_1 - 1)
+			continue;
+		ret = phy_power_off(tegra->cdp_phys[j]);
+		if (ret)
+			dev_dbg(dev, "phy_power_off CDP phy %d failed %d\n", j,
+				ret);
+		ret = phy_exit(tegra->cdp_phys[j]);
+		if (ret)
+			dev_dbg(dev, "phy_exit CDP phy %d failed %d\n", j,
+				ret);
+	}
+
 }
 
 static bool is_host_mbox_message(u32 cmd)
@@ -1320,6 +1359,28 @@ static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 	}
 
 	otg_phy = tegra->phys[UTMI_PHY][port];
+
+	/* turn on off CDP phy for OTG port only when role changes */
+	if ((tegra->host_mode && !on) || (!tegra->host_mode && on)) {
+		if (on) {
+			dev_dbg(tegra->dev, "%s: power on CDP phy %d\n",
+				__func__, port);
+			ret = phy_power_on(tegra->cdp_phys[port]);
+			if (ret)
+				dev_dbg(tegra->dev,
+					"%s: power on CDP phy %d failed\n",
+					__func__, port);
+		} else if (tegra->otg_role_initialized) {
+			dev_dbg(tegra->dev, "%s: power off CDP phy %d\n",
+				__func__, port);
+			ret = phy_power_off(tegra->cdp_phys[port]);
+			if (ret)
+				dev_dbg(tegra->dev,
+					"%s: power off CDP phy %d failed\n",
+					__func__, port);
+		}
+	}
+
 	if (on)
 		ret = tegra_phy_xusb_set_id_override(otg_phy);
 	else
@@ -1780,7 +1841,7 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	struct tegra_xhci_hcd *tegra;
 	struct resource *res;
 	struct usb_hcd *hcd;
-	struct phy *phy;
+	struct phy *phy, *cdp_phy;
 	unsigned int i, j;
 	int ret;
 	int partition_id_xusba, partition_id_xusbc;
@@ -2006,11 +2067,24 @@ skip_clocks:
 					      tegra->soc_config->num_phys[i],
 					      sizeof(*tegra->phys[i]),
 					      GFP_KERNEL);
-		if (!tegra->phys[i])
+		if (!tegra->phys[i]) {
+			ret = -ENOMEM;
 			goto put_mbox;
+		}
+
+		/* allocate optional cdp_phys */
+		if (i == UTMI_PHY) {
+			tegra->cdp_phys = devm_kcalloc(&pdev->dev,
+					tegra->soc_config->num_phys[i],
+					sizeof(struct phy *), GFP_KERNEL);
+			if (!tegra->cdp_phys) {
+				ret = -ENOMEM;
+				goto put_mbox;
+			}
+		}
 
 		for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
-			char prop[8];
+			char prop[8], cdp_prop[8];
 
 			snprintf(prop, sizeof(prop), "%s-%d",
 				 tegra_phy_names[i], j);
@@ -2035,6 +2109,18 @@ skip_clocks:
 						tegra->utmi_otg_port_base_1 =
 									  j + 1;
 					}
+					/* get optional CDP phy */
+					snprintf(cdp_prop, sizeof(cdp_prop),
+						 "cdp-%d", j);
+					cdp_phy = devm_phy_optional_get(
+						  &pdev->dev, cdp_prop);
+					if (!IS_ERR_OR_NULL(cdp_phy)) {
+						dev_info(&pdev->dev,
+							"UTMI CDP phy %d registered\n",
+							j);
+						tegra->cdp_phys[j] = cdp_phy;
+						tegra->cdp_enabled = true;
+					}
 				}
 
 				if (phy && strstr(prop, "hsic"))
@@ -2044,6 +2130,10 @@ skip_clocks:
 			tegra->phys[i][j] = phy;
 		}
 	}
+
+	tegra->connected_utmi_ports = devm_kcalloc(&pdev->dev,
+					tegra->soc_config->num_phys[UTMI_PHY],
+					sizeof(u8), GFP_KERNEL);
 
 	if (tegra->utmi_otg_port_base_1) {
 		dev_info(&pdev->dev, "UTMI port %d has OTG_CAP\n",
@@ -2193,8 +2283,6 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_PM_SLEEP) || IS_ENABLED(CONFIG_PM)
-
 static inline u32 read_portsc(struct tegra_xhci_hcd *tegra, unsigned int port)
 {
 	struct xhci_hcd *xhci = hcd_to_xhci(tegra->hcd);
@@ -2257,6 +2345,7 @@ static bool port_connected(struct tegra_xhci_hcd *tegra, unsigned int port)
 	return !!(portsc & PORT_CONNECT);
 }
 
+#if IS_ENABLED(CONFIG_PM_SLEEP) || IS_ENABLED(CONFIG_PM)
 static void tegra_xhci_save_context(struct tegra_xhci_hcd *tegra)
 {
 #ifdef CONFIG_ARCH_TEGRA_21x_SOC
@@ -2711,6 +2800,7 @@ static int tegra_xhci_suspend(struct device *dev)
 {
 	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
 	int ret = 0;
+	unsigned int j;
 
 	if (!tegra->fw_loaded)
 		return 0;
@@ -2728,6 +2818,28 @@ static int tegra_xhci_suspend(struct device *dev)
 	ret = tegra_xhci_powergate(tegra, false);
 	if (ret < 0)
 		goto out;
+
+	/* disable CDP for all ports */
+	if (tegra->cdp_enabled) {
+		for (j = 0; j < tegra->soc_config->num_phys[UTMI_PHY]; j++) {
+			dev_dbg(dev, "%s: power off CDP phy %d\n", __func__, j);
+			ret = phy_power_off(tegra->cdp_phys[j]);
+			if (ret)
+				dev_dbg(dev, "%s: power off CDP phy %d failed\n",
+					__func__, j);
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+			/*
+			 * turn off VBUS for CDP enabled case.
+			 * skip vbus off for OTG port when it isn't host role
+			 */
+			if (j != tegra->utmi_otg_port_base_1 - 1 ||
+					tegra->host_mode)
+				tegra_phy_xusb_utmi_vbus_power_off(
+						tegra->phys[UTMI_PHY][j]);
+#endif
+
+		}
+	}
 
 	pm_runtime_disable(dev);
 
@@ -2749,6 +2861,7 @@ static int tegra_xhci_resume_common(struct device *dev)
 {
 	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
 	int ret;
+	unsigned int j;
 
 	mutex_lock(&tegra->lock);
 	if (!tegra->suspended) {
@@ -2757,6 +2870,25 @@ static int tegra_xhci_resume_common(struct device *dev)
 	}
 
 	tegra->lp0_exit = true;
+
+	/* enable CDP for all ports */
+	if (tegra->cdp_enabled) {
+		for (j = 0; j < tegra->soc_config->num_phys[UTMI_PHY]; j++) {
+			dev_dbg(dev, "%s: power on CDP phy %d\n", __func__, j);
+			ret = phy_power_on(tegra->cdp_phys[j]);
+			if (ret)
+				dev_dbg(dev, "%s: power on CDP phy %d failed\n",
+					__func__, j);
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+			/* skip vbus on for OTG port when it isn't host role */
+			if (j != tegra->utmi_otg_port_base_1 - 1 ||
+					tegra->host_mode)
+				tegra_phy_xusb_utmi_vbus_power_on(
+						tegra->phys[UTMI_PHY][j]);
+#endif
+		}
+	}
+
 	ret = tegra_xhci_unpowergate(tegra);
 	if (ret < 0) {
 		mutex_unlock(&tegra->lock);
@@ -2796,6 +2928,16 @@ static int tegra_xhci_resume_noirq(struct device *dev)
 	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
 
 	if (!tegra->fw_loaded)
+		return 0;
+
+	/*
+	 * when CDP is enabled, VBUS will be off in SC7 and re-enabled in SC7
+	 * resume. We don't have to resume earlier in noirq callback here
+	 * because device will disconnect and re-connected in resume. Also,
+	 * turning VBUS on in resume_noirq callback is not working if the
+	 * gpio is in GPIO expander controlled through I2C bus.
+	 */
+	if (tegra->cdp_enabled)
 		return 0;
 
 	return tegra_xhci_resume_common(dev);
@@ -3015,6 +3157,75 @@ static const struct xhci_driver_overrides tegra_xhci_overrides __initconst = {
 	.reset = tegra_xhci_setup,
 };
 
+static int tegra_xhci_alloc_dev(struct usb_hcd *hcd, struct usb_device *udev)
+{
+	struct tegra_xhci_hcd *tegra = hcd_to_tegra_xhci(hcd);
+	int ret;
+	int i;
+
+	/* disable CDP for newly connected USB2.0 root hub port */
+	if (tegra->cdp_enabled && usb_hcd_is_primary_hcd(hcd)) {
+		for (i = 0; i < tegra->soc_config->num_phys[UTMI_PHY]; i++) {
+			int port_array_offset =
+				tegra->soc_config->utmi_port_offset;
+
+			/* find newly connected ports only */
+			if (!tegra->connected_utmi_ports[i] &&
+			    port_connected(tegra, port_array_offset + i)) {
+				dev_dbg(tegra->dev,
+					"%s: power off CDP phy %d\n",
+					__func__, i);
+				ret = phy_power_off(tegra->cdp_phys[i]);
+				if (ret)
+					dev_dbg(tegra->dev,
+						"%s: power off CDP phy %d failed\n",
+						__func__, i);
+				tegra->connected_utmi_ports[i] = 1;
+
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+				/*
+				 * set pad protection circuit to >= 2A
+				 * CDP current range: 1.5A~5A see [BC1.2] p36
+				 */
+				tegra_phy_xusb_utmi_pad_set_protection_level(
+						tegra->phys[UTMI_PHY][i], 3);
+#endif
+			}
+		}
+	}
+
+	return xhci_alloc_dev(hcd, udev);
+}
+
+static void tegra_xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
+{
+	struct tegra_xhci_hcd *tegra = hcd_to_tegra_xhci(hcd);
+	struct device *dev = tegra->dev;
+	u8 port = udev->portnum - 1;
+	int ret;
+	bool is_roothub_port = udev->parent == udev->bus->root_hub;
+
+	xhci_free_dev(hcd, udev);
+
+	/* make sure CDP is enabled for for USB2.0 root hub ports */
+	if (is_roothub_port && tegra->cdp_enabled &&
+			usb_hcd_is_primary_hcd(hcd)) {
+		/* we have to make sure CDP is turned on before VBUS on */
+		dev_dbg(dev, "%s: power on CDP phy %d\n", __func__, port);
+		ret = phy_power_on(tegra->cdp_phys[port]);
+		if (ret)
+			dev_dbg(dev, "%s: power on CDP phy %d failed\n",
+				__func__, port);
+		tegra->connected_utmi_ports[port] = 0;
+
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+		/* disable pad protection circuit on this UTMI pad */
+		tegra_phy_xusb_utmi_pad_set_protection_level(
+				tegra->phys[UTMI_PHY][port], -1);
+#endif
+	}
+}
+
 static int __init tegra_xhci_init(void)
 {
 	xhci_init_driver(&tegra_xhci_hc_driver, &tegra_xhci_overrides);
@@ -3024,6 +3235,8 @@ static int __init tegra_xhci_init(void)
 	tegra_xhci_hc_driver.update_device = tegra_xhci_update_device;
 	tegra_xhci_hc_driver.enable_usb3_lpm_timeout =
 			tegra_xhci_enable_usb3_lpm_timeout;
+	tegra_xhci_hc_driver.alloc_dev = tegra_xhci_alloc_dev;
+	tegra_xhci_hc_driver.free_dev = tegra_xhci_free_dev;
 	return platform_driver_register(&tegra_xhci_driver);
 }
 fs_initcall(tegra_xhci_init);
