@@ -28,10 +28,70 @@
 #include <linux/of_device.h>
 #include <linux/of_platform.h>
 
+#ifdef CONFIG_DEBUG_FS
+#include <linux/debugfs.h>
+#endif
+
 #include "ufshcd.h"
 #include "unipro.h"
 #include "ufs-tegra.h"
 #include "ufshci.h"
+
+
+#ifdef CONFIG_DEBUG_FS
+static int ufs_tegra_show_configuration(struct seq_file *s, void *data)
+{
+	struct ufs_hba *hba = s->private;
+	u32 major_version;
+	u32 minor_version;
+
+	seq_puts(s, "UFS Configuration:\n");
+	if ((hba->ufs_version == UFSHCI_VERSION_10) ||
+			(hba->ufs_version == UFSHCI_VERSION_11)) {
+		major_version = hba->ufs_version >> 16;
+		minor_version = ((hba->ufs_version) & 0xffff);
+	} else {
+		major_version = ((hba->ufs_version) & 0xff00) >> 8;
+		minor_version = ((hba->ufs_version) & 0xf0) >> 4;
+	}
+
+	seq_puts(s, "\n");
+	seq_puts(s, "UFSHCI Version Information:\n");
+	seq_printf(s, "Major Version Number: %u\n", major_version);
+	seq_printf(s, "Minor Version Number: %u\n", minor_version);
+
+	seq_puts(s, "\n");
+	seq_puts(s, "Number of UTP Transfer Request Slots:\n");
+	seq_printf(s, "NUTRS: %u\n", hba->nutrs);
+
+	seq_puts(s, "\n");
+	seq_puts(s, "UTP Task Management Request Slots:\n");
+	seq_printf(s, "NUTMRS: %u\n", hba->nutmrs);
+
+	return 0;
+}
+
+static int ufs_tegra_open_configuration(struct inode *inode, struct file *file)
+{
+	return single_open(file, ufs_tegra_show_configuration, inode->i_private);
+}
+
+static const struct file_operations ufs_tegra_debugfs_ops = {
+	.open           = ufs_tegra_open_configuration,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+void ufs_tegra_init_debugfs(struct ufs_hba *hba)
+{
+	struct dentry *device_root;
+
+	device_root = debugfs_create_dir(dev_name(hba->dev), NULL);
+	debugfs_create_file("configuration", S_IFREG | S_IRUGO,
+			device_root, hba, &ufs_tegra_debugfs_ops);
+}
+#endif
 
 
 /*
@@ -857,6 +917,31 @@ out:
 }
 
 
+static void ufs_tegra_print_power_mode_config(struct ufs_hba *hba,
+			struct ufs_pa_layer_attr *configured_params)
+{
+	u32 rx_gear;
+	u32 tx_gear;
+	const char *freq_series = "";
+
+	rx_gear = configured_params->gear_rx;
+	tx_gear = configured_params->gear_tx;
+
+	if (configured_params->hs_rate) {
+		if (configured_params->hs_rate == PA_HS_MODE_A)
+			freq_series = "RATE_A";
+		else if (configured_params->hs_rate == PA_HS_MODE_B)
+			freq_series = "RATE_B";
+		dev_info(hba->dev,
+			"HS Mode RX_Gear:gear_%u TX_Gear:gear_%u %s series\n",
+				rx_gear, tx_gear, freq_series);
+	} else {
+		dev_info(hba->dev,
+			"PWM Mode RX_Gear:gear_%u TX_Gear:gear_%u\n",
+				rx_gear, tx_gear);
+	}
+}
+
 static int ufs_tegra_pwr_change_notify(struct ufs_hba *hba,
 		enum ufs_notify_change_status status,
 		struct ufs_pa_layer_attr *dev_max_params,
@@ -930,6 +1015,7 @@ static int ufs_tegra_pwr_change_notify(struct ufs_hba *hba,
 		}
 		break;
 	case POST_CHANGE:
+		ufs_tegra_print_power_mode_config(hba, dev_req_params);
 		break;
 	default:
 		break;
@@ -978,6 +1064,8 @@ static int ufs_tegra_link_startup_notify(struct ufs_hba *hba,
 		ufs_tegra_unipro_pre_linkup(hba);
 		break;
 	case POST_CHANGE:
+		/*POST_CHANGE case is called on success of link start-up*/
+		dev_info(hba->dev, "dme-link-startup Successful\n");
 		ufs_tegra_unipro_post_linkup(hba);
 		err = ufs_tegra_mphy_receiver_calibration(ufs_tegra);
 		break;
@@ -1154,6 +1242,9 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 		ufs_tegra_mphy_rx_advgran(ufs_tegra);
 		ufs_tegra_ufs_aux_prog(ufs_tegra);
 		ufs_tegra_cfg_vendor_registers(hba);
+#ifdef CONFIG_DEBUG_FS
+		ufs_tegra_init_debugfs(hba);
+#endif
 	}
 	return err;
 
@@ -1205,3 +1296,6 @@ struct ufs_hba_variant_ops ufs_hba_tegra_vops = {
 	.link_startup_notify	= ufs_tegra_link_startup_notify,
 	.pwr_change_notify      = ufs_tegra_pwr_change_notify,
 };
+
+MODULE_AUTHOR("Naveen Kumar Arepalli <naveenk@nvidia.com>");
+MODULE_AUTHOR("Venkata Jagadish <vjagadish@nvidia.com>");
