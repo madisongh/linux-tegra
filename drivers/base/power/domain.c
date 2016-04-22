@@ -2405,7 +2405,6 @@ int genpd_dev_pm_attach(struct device *dev)
 	}
 
 	dev->pm_domain->detach = genpd_dev_pm_detach;
-	ret = genpd_poweron(pd);
 
 out:
 	return ret ? -EPROBE_DEFER : 0;
