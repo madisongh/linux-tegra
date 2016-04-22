@@ -2560,7 +2560,6 @@ static char *genpd_get_status(enum gpd_status status)
 	return NULL;
 }
 
-#ifdef CONFIG_PM
 static char *genpd_get_device_status(struct device *dev)
 {
 	enum rpm_status status = dev->power.runtime_status;
@@ -2585,14 +2584,11 @@ static char *genpd_get_device_status(struct device *dev)
 	}
 	return NULL;
 }
-#endif
 
 static int pm_genpd_summary_show(struct seq_file *s, void *data)
 {
 	struct generic_pm_domain *gpd, *slave;
-#ifdef CONFIG_PM_RUNTIME
 	struct pm_domain_data *pdd;
-#endif
 	struct gpd_link *link;
 
 	seq_puts(s, " device/domain                   state      ref count     suspend time     \n");
@@ -2621,7 +2617,6 @@ static int pm_genpd_summary_show(struct seq_file *s, void *data)
 
 				mutex_unlock(&slave->lock);
 		}
-#ifdef CONFIG_PM_RUNTIME
 		list_for_each_entry(pdd, &gpd->dev_list, list_node) {
 			struct device *dev = pdd->dev;
 			struct dev_pm_info *power = &dev->power;
@@ -2635,7 +2630,6 @@ static int pm_genpd_summary_show(struct seq_file *s, void *data)
 				jiffies_to_msecs(power->suspended_jiffies));
 			spin_unlock_irq(&power->lock);
 		}
-#endif
 	}
 
 	mutex_unlock(&gpd_list_lock);
