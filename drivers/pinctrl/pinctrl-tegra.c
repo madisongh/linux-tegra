@@ -524,14 +524,14 @@ static int tegra_pinconf_reg(struct tegra_pmx *pmx,
 		*bank = g->mux_bank;
 		*reg = g->mux_reg;
 		*bit = g->rfu_in_bit;
-		*width = g->rfu_in_width;
+		*width = 4;
 		break;
 	default:
 		dev_err(pmx->dev, "Invalid config param %04x\n", param);
 		return -ENOTSUPP;
 	}
 
-	if (*reg < 0 || *bit > 31) {
+	if (*reg < 0 || *bit < 0 || *bit > 31) {
 		if (report_err) {
 			const char *prop = "unknown";
 			int i;
@@ -755,6 +755,23 @@ static bool gpio_node_has_range(void)
 	return has_prop;
 }
 
+static void pinctrl_clear_parked_bits(struct tegra_pmx *pmx)
+{
+	int i = 0;
+	const struct tegra_pingroup *g;
+	u32 val;
+
+	for (i = 0; i < pmx->soc->ngroups; ++i) {
+		if (pmx->soc->groups[i].parked_bit >= 0 &&
+			 pmx->soc->groups[i].parked_bit <= 31) {
+			g = &pmx->soc->groups[i];
+			val = pmx_readl(pmx, g->mux_bank, g->mux_reg);
+			val &= ~(1 << g->parked_bit);
+			pmx_writel(pmx, val, g->mux_bank, g->mux_reg);
+		}
+	}
+}
+
 int tegra_pinctrl_probe(struct platform_device *pdev,
 			const struct tegra_pinctrl_soc_data *soc_data)
 {
@@ -832,6 +849,8 @@ int tegra_pinctrl_probe(struct platform_device *pdev,
 		if (IS_ERR(pmx->regs[i]))
 			return PTR_ERR(pmx->regs[i]);
 	}
+
+	pinctrl_clear_parked_bits(pmx);
 
 	pmx->pctl = pinctrl_register(&tegra_pinctrl_desc, &pdev->dev, pmx);
 	if (IS_ERR(pmx->pctl)) {

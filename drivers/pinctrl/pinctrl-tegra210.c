@@ -1297,6 +1297,11 @@ static struct tegra_function tegra210_functions[] = {
 			TEGRA_MUX_##f3,					\
 		},							\
 		.mux_reg = PINGROUP_REG(r),				\
+		.drvdn_bit = -1,				\
+		.drvup_bit = -1,				\
+		.slwr_bit = -1,					\
+		.slwf_bit = -1,					\
+		.lpmd_bit = -1,					\
 		.mux_bank = 1,						\
 		.mux_bit = 0,						\
 		.pupd_reg = PINGROUP_REG(r),				\
@@ -1305,7 +1310,6 @@ static struct tegra_function tegra210_functions[] = {
 		.tri_reg = PINGROUP_REG(r),				\
 		.tri_bank = 1,						\
 		.tri_bit = 4,						\
-		.parked_reg = -1,					\
 		.einput_bit = 6,					\
 		.odrain_bit = 11,					\
 		.lock_bit = 7,						\
@@ -1325,6 +1329,10 @@ static struct tegra_function tegra210_functions[] = {
 		.slwr_width = slwr_w,					\
 		.slwf_bit = slwf_b,					\
 		.slwf_width = slwf_w,					\
+		.lpdr_bit = -1,					\
+		.pbias_buf_bit = -1,			\
+		.preemp_bit = -1,				\
+		.rfu_in_bit = -1,				\
 	}
 
 #define DRV_PINGROUP(pg_name, r, drvdn_b, drvdn_w, drvup_b, drvup_w,	\
@@ -1341,20 +1349,24 @@ static struct tegra_function tegra210_functions[] = {
 		.lock_bit = -1,						\
 		.ioreset_bit = -1,					\
 		.rcv_sel_bit = -1,					\
-		.parked_reg = -1,					\
-		.drv_reg = DRV_PINGROUP_REG(r),				\
-		.drv_bank = 0,						\
-		.hsm_bit = -1,						\
-		.schmitt_bit = -1,					\
+		.parked_bit = -1,					\
+		.hsm_bit = -1,					\
+		.schmitt_bit = -1,				\
+		.lpdr_bit = -1,				\
+		.pbias_buf_bit = -1,			\
+		.preemp_bit = -1,				\
+		.rfu_in_bit = -1,				\
+		.drv_reg = DRV_PINGROUP_Y(r),		\
+		.drv_bank = 0,					\
 		.lpmd_bit = -1,						\
-		.drvdn_bit = drvdn_b,					\
-		.drvdn_width = drvdn_w,					\
-		.drvup_bit = drvup_b,					\
-		.drvup_width = drvup_w,					\
-		.slwr_bit = slwr_b,					\
-		.slwr_width = slwr_w,					\
-		.slwf_bit = slwf_b,					\
-		.slwf_width = slwf_w,					\
+		.drvdn_bit = drvdn_b,				\
+		.drvdn_width = drvdn_w,				\
+		.drvup_bit = drvup_b,				\
+		.drvup_width = drvup_w,				\
+		.slwr_bit = slwr_b,				\
+		.slwr_width = slwr_w,				\
+		.slwf_bit = slwf_b,				\
+		.slwf_width = slwf_w,				\
 		.drvtype_bit = -1,					\
 	}
 

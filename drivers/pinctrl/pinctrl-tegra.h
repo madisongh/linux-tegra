@@ -108,8 +108,6 @@ struct tegra_function {
  * @einput_bit:		Enable-input register bit.
  * @odrain_bit:		Open-drain register bit.
  * @lock_bit:		Lock register bit.
- * @parked_reg:		Parked register offset. -1 if unsupported.
- * @parked_bank:	Parked register bank. 0 if unsupported.
  * @parked_bit:		Parked register bit.
  * @ioreset_bit:	IO reset register bit.
  * @rcv_sel_bit:	Receiver select bit.
@@ -129,7 +127,6 @@ struct tegra_function {
  * @slwr_width:		Slew Rising field width.
  * @slwf_bit:		Slew Falling register bit.
  * @slwf_width:		Slew Falling field width.
- * @drvtype_bank:	Drive type fields register bank.
  * @drvtype_bit:	Drive type register bit.
  * @drvtype_width:	Drive type field width.
  *
