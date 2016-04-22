@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -129,6 +129,7 @@ enum tegra_clk_ex_param {
 	TEGRA_CLK_PLLD_CSI_OUT_ENB,
 	TEGRA_CLK_PLLD_DSI_OUT_ENB,
 	TEGRA_CLK_PLLD_MIPI_MUX_SEL,
+	TEGRA_CLK_SOR_CLK_SEL,
 };
 
 void tegra_periph_reset_deassert(struct clk *c);
