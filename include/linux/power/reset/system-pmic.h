@@ -48,6 +48,7 @@ struct system_pmic_ops {
 	void (*power_reset)(void *pmic_data);
 	void (*power_off)(void *pmic_data);
 	void (*prepare_power_off)(void *pmic_data);
+	void (*override_poweroff_config) (void *pmic_data, bool enable);
 };
 
 extern void (*soc_specific_power_off)(void);
