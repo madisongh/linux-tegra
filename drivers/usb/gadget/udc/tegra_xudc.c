@@ -619,7 +619,6 @@ static void tegra_xudc_device_mode_on(struct tegra_xudc *xudc)
 	spin_lock_irqsave(&xudc->lock, flags);
 	dev_info(xudc->dev, "device mode on\n");
 	tegra_phy_xusb_utmi_pad_power_on(xudc->utmi_phy);
-	tegra_phy_xusb_utmi_pad_chg_power_on(xudc->utmi_phy);
 	tegra_phy_xusb_set_vbus_override(xudc->utmi_phy);
 
 	xudc->device_mode = true;
@@ -645,7 +644,6 @@ static void tegra_xudc_device_mode_off(struct tegra_xudc *xudc)
 
 	tegra_phy_xusb_clear_vbus_override(xudc->utmi_phy);
 	tegra_phy_xusb_utmi_pad_power_down(xudc->utmi_phy);
-	tegra_phy_xusb_utmi_pad_chg_power_down(xudc->utmi_phy);
 
 	pls = (xudc_readl(xudc, PORTSC) >> PORTSC_PLS_SHIFT) &
 		PORTSC_PLS_MASK;
