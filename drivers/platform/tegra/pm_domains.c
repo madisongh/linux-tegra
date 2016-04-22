@@ -22,7 +22,9 @@
 #include <linux/tegra_pm_domains.h>
 #include <linux/tegra-powergate.h>
 #include <soc/tegra/tegra_bpmp.h>
+#ifdef CONFIG_TEGRA_APE_AGIC
 #include <linux/irqchip/tegra-agic.h>
+#endif
 #include <linux/slab.h>
 #include <linux/wakelock.h>
 
@@ -361,8 +363,10 @@ static int tegra_ape_power_on(struct generic_pm_domain *genpd)
 		 */
 		clk_disable_unprepare(ape_pd->clk[ADSP_CLK]);
 
+#ifdef CONFIG_TEGRA_APE_AGIC
 #ifdef CONFIG_CPU_PM
 		tegra_agic_restore_registers();
+#endif
 #endif
 		list_for_each_entry(pdd, &genpd->dev_list, list_node)
 			TEGRA_PD_DEV_CALLBACK(resume, pdd->dev);
@@ -394,8 +398,10 @@ static int tegra_ape_power_off(struct generic_pm_domain *genpd)
 	list_for_each_entry(pdd, &genpd->dev_list, list_node)
 		TEGRA_PD_DEV_CALLBACK(suspend, pdd->dev);
 
+#ifdef CONFIG_TEGRA_APE_AGIC
 #ifdef CONFIG_CPU_PM
 	tegra_agic_save_registers();
+#endif
 #endif
 	ape_pd = to_tegra_pd(genpd);
 
