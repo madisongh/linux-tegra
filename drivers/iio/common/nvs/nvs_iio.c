@@ -75,6 +75,7 @@
 #include <linux/iio/kfifo_buf.h>
 #include <linux/iio/trigger.h>
 #include <linux/nvs.h>
+#include <linux/version.h>
 
 #define NVS_IIO_DRIVER_VERSION		(213)
 

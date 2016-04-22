@@ -163,6 +163,7 @@
 
 
 #include <linux/of.h>
+#include <linux/version.h>
 #include <linux/nvs_light.h>
 
 #define NVS_LIGHT_VERSION		(103)

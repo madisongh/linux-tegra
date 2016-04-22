@@ -190,6 +190,7 @@
 
 
 #include <linux/of.h>
+#include <linux/version.h>
 #include <linux/nvs_proximity.h>
 
 #define NVS_PROXIMITY_VERSION		(100)
