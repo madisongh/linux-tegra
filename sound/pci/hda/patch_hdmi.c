@@ -180,7 +180,7 @@ struct dp_audio_infoframe {
 	u8 type; /* 0x84 */
 	u8 len;  /* 0x1b */
 	u8 ver;  /* 0x11 << 2 */
-#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
+#ifdef CONFIG_SND_HDA_TEGRA
 	u8 checksum;
 #endif
 	u8 CC02_CT47;	/* match with HDMI infoframe from this on */
@@ -1946,7 +1946,7 @@ static int hdmi_pcm_close(struct hda_pcm_stream *hinfo,
 
 	if (hinfo->nid) {
 		cvt_idx = cvt_nid_to_cvt_index(codec, hinfo->nid);
-#if defined(CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA) && defined(CONFIG_TEGRA_DC)
+#if defined(CONFIG_SND_HDA_TEGRA) && defined(CONFIG_TEGRA_DC)
 		if ((codec->preset->id == 0x10de0020) ||
 			(codec->preset->id == 0x10de0022) ||
 			(codec->preset->id == 0x10de0028) ||
