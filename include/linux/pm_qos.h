@@ -5,6 +5,9 @@
  * Mark Gross <mgross@linux.intel.com>
  *
  * Copyright (c) 2013-2016, NVIDIA CORPORATION. All rights reserved.
+ * Support added for bounded constraints by Sai Gurrappadi
+ * <sgurrappad@nvidia.com>
+ *
  */
 
 #include <linux/plist.h>
@@ -21,12 +24,31 @@ enum {
 	PM_QOS_MEMORY_BANDWIDTH,
 	PM_QOS_GPU_FREQ_MIN,
 	PM_QOS_GPU_FREQ_MAX,
+	PM_QOS_MIN_ONLINE_CPUS,
 	PM_QOS_MAX_ONLINE_CPUS,
 	PM_QOS_CPU_FREQ_MIN,
 	PM_QOS_CPU_FREQ_MAX,
+	PM_QOS_EMC_FREQ_MIN,
+	PM_QOS_MAX_CPU_POWER,
+	PM_QOS_MAX_GPU_POWER,
 
 	/* insert new class ID */
 	PM_QOS_NUM_CLASSES,
+};
+
+/**
+ * enum pm_qos_bounded_classes - Class ID's for bounded constraints
+ *
+ * Each class wraps around a corresponding min and max pm qos node
+ * and binds the two constraints in one.
+ */
+enum pm_qos_bounded_classes {
+	PM_QOS_RESERVED_BOUNDS = 0,
+	PM_QOS_CPU_FREQ_BOUNDS,	/* requests should be in KHz to not exceed s32*/
+	PM_QOS_GPU_FREQ_BOUNDS,	/* requests should be in KHz to not exceed s32*/
+	PM_QOS_ONLINE_CPUS_BOUNDS,
+	/* insert new bounded class ids here */
+	PM_QOS_NUM_BOUNDED_CLASSES,
 };
 
 enum pm_qos_flags_status {
@@ -49,14 +71,21 @@ enum pm_qos_flags_status {
 #define PM_QOS_GPU_FREQ_MIN_DEFAULT_VALUE	0
 #define PM_QOS_GPU_FREQ_MAX_DEFAULT_VALUE	INT_MAX
 #define PM_QOS_MAX_ONLINE_CPUS_DEFAULT_VALUE	INT_MAX
+#define PM_QOS_MIN_ONLINE_CPUS_DEFAULT_VALUE	0
 #define PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE	0
 #define PM_QOS_CPU_FREQ_MAX_DEFAULT_VALUE	INT_MAX
+#define PM_QOS_EMC_FREQ_MIN_DEFAULT_VALUE	0
+#define PM_QOS_EMC_FREQ_MAX_DEFAULT_VALUE	INT_MAX
+#define PM_QOS_CPU_POWER_MAX_DEFAULT_VALUE	INT_MAX
+#define PM_QOS_GPU_POWER_MAX_DEFAULT_VALUE	INT_MAX
+
 #define PM_QOS_FLAG_NO_POWER_OFF	(1 << 0)
 #define PM_QOS_FLAG_REMOTE_WAKEUP	(1 << 1)
 
 struct pm_qos_request {
 	struct plist_node node;
 	int pm_qos_class;
+	int priority;
 	struct delayed_work work; /* for pm_qos_update_request_timeout */
 };
 
@@ -87,6 +116,62 @@ enum pm_qos_type {
 	PM_QOS_SUM		/* return the sum */
 };
 
+/**
+ * enum pm_qos_bound_priority - priority value of the given bound request
+ *
+ * Kernel space clients can request any priority level; priorities
+ * PM_QOS_PRIO_TRUSTED and higher should be used when the client wants to
+ * ensure that no userspace client can override it's request
+ *
+ * Userspace clients can request any priority as high as PM_QOS_PRIO_UNTRUSTED
+ * Default userspace request which don't have any priority specified will have
+ * PM_QOS_PRIO_DEFAULT_UNTRUSTED priority.
+ *
+ * General rule of thumb - request as low (numerically larger) a priority
+ * as you can
+ */
+enum pm_qos_bound_priority {
+	/* kernel clients */
+	PM_QOS_PRIO_HIGHEST = 0,
+	PM_QOS_PRIO_TRUSTED = 10,
+	/* userspace clients */
+	PM_QOS_PRIO_UNTRUSTED,
+	PM_QOS_PRIO_DEFAULT_UNTRUSTED = 50,
+	PM_QOS_NUM_PRIO = 100,
+};
+
+/**
+ * struct pm_qos_prio - priority node for bounded constraints
+ * @max_list: List of upper bound requests
+ * @min_list: list of lower bound requests
+ * @node: node to queue in the list of priorities
+ */
+struct pm_qos_prio {
+	struct plist_head max_list;
+	struct plist_head min_list;
+	struct plist_node node;
+};
+
+/**
+ * struct pm_qos_bounded_constraint - binds two pm_qos_constraints
+ * @prio_list: list of priorities
+ * @max_class: Class id of the upper bound
+ * @min_class: Class id of the lower bound
+ * @min_wins: Pick min if min > max
+ *
+ * Requests are added at their corresponding priority level. Target
+ * values for a bounded constraint will be the intersection of all the
+ * (min, max) ranges specified by each priority level. If the intersection
+ * is null at any priority level, the higher priority level's requests are
+ * honoured.
+ */
+struct pm_qos_bounded_constraint {
+	struct plist_head prio_list;
+	int max_class;
+	int min_class;
+	bool min_wins;
+};
+
 /*
  * Note: The lockless read path depends on the CPU accessing target_value
  * or effective_flags atomically.  Atomic access is only guaranteed on all CPU
@@ -99,11 +184,13 @@ struct pm_qos_constraints {
 	s32 no_constraint_value;
 	enum pm_qos_type type;
 	struct blocking_notifier_head *notifiers;
+	int parent_class;
 };
 
 struct pm_qos_flags {
 	struct list_head list;
 	s32 effective_flags;	/* Do not change to 64 bit */
+	struct blocking_notifier_head *notifiers;
 };
 
 struct dev_pm_qos {
@@ -139,6 +226,27 @@ void pm_qos_update_request(struct pm_qos_request *req,
 void pm_qos_update_request_timeout(struct pm_qos_request *req,
 				   s32 new_value, unsigned long timeout_us);
 void pm_qos_remove_request(struct pm_qos_request *req);
+
+/* Interface for bounded constraints */
+void pm_qos_add_min_bound_req(struct pm_qos_request *req, int priority,
+			      int pm_qos_bounded_class, s32 val);
+void pm_qos_add_max_bound_req(struct pm_qos_request *req, int priority,
+			      int pm_qos_bounded_class, s32 val);
+void pm_qos_update_bounded_req(struct pm_qos_request *req, int priority,
+			       s32 val);
+void pm_qos_update_bounded_req_timeout(struct pm_qos_request *req,
+				       unsigned long timeout_us);
+void pm_qos_remove_bounded_req(struct pm_qos_request *req);
+void pm_qos_add_min_notifier(int pm_qos_bounded_class,
+			     struct notifier_block *notifer);
+void pm_qos_add_max_notifier(int pm_qos_bounded_class,
+			     struct notifier_block *notifier);
+void pm_qos_remove_min_notifier(int pm_qos_bounded_class,
+				struct notifier_block *notifier);
+void pm_qos_remove_max_notifier(int pm_qos_bounded_class,
+				struct notifier_block *notifier);
+s32 pm_qos_read_min_bound(int pm_qos_bounded_class);
+s32 pm_qos_read_max_bound(int pm_qos_bounded_class);
 
 int pm_qos_request(int pm_qos_class);
 int pm_qos_add_notifier(int pm_qos_class, struct notifier_block *notifier);
