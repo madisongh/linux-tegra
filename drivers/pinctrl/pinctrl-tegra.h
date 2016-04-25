@@ -204,7 +204,7 @@ struct tegra_pinctrl_soc_data {
 	unsigned ngpios;
 	const struct pinctrl_pin_desc *pins;
 	unsigned npins;
-	const struct tegra_function *functions;
+	struct tegra_function *functions;
 	unsigned nfunctions;
 	const struct tegra_pingroup *groups;
 	unsigned ngroups;
