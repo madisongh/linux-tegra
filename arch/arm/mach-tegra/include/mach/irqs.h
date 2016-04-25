@@ -748,8 +748,6 @@
 					 INT_SYNCPT_THRESH_NR)
 #define INT_GPIO_NR			(32 * 8)
 
-#elif defined(CONFIG_ARCH_TEGRA_21x_SOC)
-#include "../../../../arm64/mach-tegra/include/mach/irqs-t21x.h"
 #else
 
 /* future chips */

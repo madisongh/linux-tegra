@@ -137,8 +137,6 @@ void tegra_periph_reset_deassert(struct clk *c);
 void tegra_periph_reset_assert(struct clk *c);
 
 #ifdef CONFIG_COMMON_CLK
-void tegra_clocks_apply_init_table(void);
-
 /* Keep using these functions until the replacement in place */
 int tegra_dvfs_get_freqs(struct clk *c, unsigned long **freqs, int *num_freqs);
 int tegra_dvfs_set_rate(struct clk *c, unsigned long rate);

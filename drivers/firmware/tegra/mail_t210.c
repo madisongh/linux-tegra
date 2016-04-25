@@ -42,11 +42,14 @@
 #define CPU2_IB_CH		10
 #define CPU3_IB_CH		11
 
-#define CPU_OB_IRQ		INT_SHR_SEM_OUTBOX_IBF
-#define CPU0_IB_IRQ		INT_SHR_SEM_INBOX_IBF
-#define CPU1_IB_IRQ		INT_SHR_SEM_INBOX_IBE
-#define CPU2_IB_IRQ		INT_SHR_SEM_OUTBOX_IBE
-#define CPU3_IB_IRQ		INT_AVP_UCQ
+#define CPU_OB_IRQ		38
+// BUG: I introduced a bug here in order to make this compile.
+// A better implementation would take these values from DeviceTree instead of
+// hard coded constants.
+#define CPU0_IB_IRQ		36
+#define CPU1_IB_IRQ		37
+#define CPU2_IB_IRQ		38
+#define CPU3_IB_IRQ		50
 
 #define TEGRA_ATOMICS_BASE	0x70016000
 #define ATOMICS_AP0_TRIGGER	IO_ADDRESS(TEGRA_ATOMICS_BASE + 0x000)
