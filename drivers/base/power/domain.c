@@ -490,6 +490,7 @@ static struct pm_domain_data *genpd_to_pdd(struct generic_pm_domain *genpd,
 	mutex_lock(&genpd->lock);
 	list_for_each_entry(pdd, &genpd->dev_list, list_node)
 		if (pdd->dev == dev) {
+			mutex_unlock(&genpd->lock);
 			return pdd;
 		}
 	mutex_unlock(&genpd->lock);
