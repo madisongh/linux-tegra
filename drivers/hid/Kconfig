@@ -706,6 +706,12 @@ config HID_SAMSUNG
 	---help---
 	Support for Samsung InfraRed remote control or keyboards.
 
+config HID_SHIELD_REMOTE
+    tristate "SHIELD remote control support"
+    depends on USB_HID
+    ---help---
+    Support for NVIDIA SHIELD remote control.
+
 config HID_SONY
 	tristate "Sony PS2/3/4 accessories"
 	depends on USB_HID
@@ -722,7 +728,7 @@ config HID_SONY
 	  * Logitech Harmony adapter for Sony Playstation 3 (Bluetooth)
 
 config SONY_FF
-	bool "Sony PS2/3/4 accessories force feedback support" 
+	bool "Sony PS2/3/4 accessories force feedback support"
 	depends on HID_SONY
 	select INPUT_FF_MEMLESS
 	---help---
