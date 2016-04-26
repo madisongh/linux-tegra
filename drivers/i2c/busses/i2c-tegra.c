@@ -91,6 +91,7 @@
 #define PACKET_HEADER0_HEADER_SIZE_SHIFT	28
 #define PACKET_HEADER0_PACKET_ID_SHIFT		16
 #define PACKET_HEADER0_CONT_ID_SHIFT		12
+#define PACKET_HEADER0_CONT_ID_MASK		0xF
 #define PACKET_HEADER0_PROTOCOL_I2C		(1<<4)
 
 #define I2C_HEADER_HIGHSPEED_MODE		(1<<22)
@@ -918,7 +919,6 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	i2c_dev->adapter.algo = &tegra_i2c_algo;
 	i2c_dev->adapter.quirks = &tegra_i2c_quirks;
 	i2c_dev->irq = irq;
-	i2c_dev->cont_id = pdev->id;
 	i2c_dev->dev = &pdev->dev;
 
 	i2c_dev->rst = devm_reset_control_get(&pdev->dev, "i2c");
@@ -1018,6 +1018,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Failed to add I2C adapter\n");
 		goto disable_div_clk;
 	}
+	i2c_dev->cont_id = i2c_dev->adapter.nr & PACKET_HEADER0_CONT_ID_MASK;
 
 	return 0;
 
