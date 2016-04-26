@@ -30,6 +30,7 @@
 #include <linux/of_device.h>
 #include <linux/module.h>
 #include <linux/reset.h>
+#include <linux/iopoll.h>
 
 #include <asm/unaligned.h>
 
@@ -116,6 +117,8 @@
 #define I2C_MASTER_RESET_CONTROL		0x0A8
 
 #define I2C_MAX_TRANSFER_LEN			4096
+
+#define I2C_CONFIG_LOAD_TIMEOUT			1000000
 
 /*
  * msg_end_type: The bus control which need to be send at end of transfer.
@@ -437,7 +440,6 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
 	u32 val;
 	int err = 0;
 	u32 clk_divisor;
-	unsigned long timeout = jiffies + HZ;
 
 	err = tegra_i2c_clock_enable(i2c_dev);
 	if (err < 0) {
@@ -497,15 +499,17 @@ skip_periph_reset:
 		i2c_writel(i2c_dev, I2C_MST_CORE_CLKEN_OVR, I2C_CLKEN_OVERRIDE);
 
 	if (i2c_dev->hw->has_config_load_reg) {
+		u32 val;
+
 		i2c_writel(i2c_dev, I2C_MSTR_CONFIG_LOAD, I2C_CONFIG_LOAD);
-		while (i2c_readl(i2c_dev, I2C_CONFIG_LOAD) != 0) {
-			if (time_after(jiffies, timeout)) {
-				dev_warn(i2c_dev->dev,
-					"timeout waiting for config load\n");
-				err = -ETIMEDOUT;
-				goto err;
-			}
-			msleep(1);
+		err = readx_poll_timeout(readl, i2c_dev->base +
+					 tegra_i2c_reg_addr(i2c_dev,
+					 I2C_CONFIG_LOAD), val, val == 0,
+					 1000, I2C_CONFIG_LOAD_TIMEOUT);
+		if (err) {
+			dev_warn(i2c_dev->dev,
+				 "timeout waiting for config load\n");
+			goto err;
 		}
 	}
 
