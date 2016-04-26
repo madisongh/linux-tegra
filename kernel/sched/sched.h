@@ -528,6 +528,9 @@ struct root_domain {
 	/* Indicate more than one runnable task for any CPU */
 	bool overload;
 
+	/* Indicate one or more cpus over-utilized (tipping point) */
+	bool overutilized;
+
 	/*
 	 * The bit corresponding to a CPU gets set here if such CPU has more
 	 * than one runnable -deadline task (as it is below for RT tasks).
@@ -543,6 +546,9 @@ struct root_domain {
 	 */
 	cpumask_var_t rto_mask;
 	struct cpupri cpupri;
+
+	/* Maximum cpu capacity in the system. */
+	unsigned long max_cpu_capacity;
 };
 
 extern struct root_domain def_root_domain;
@@ -572,6 +578,7 @@ struct rq {
 	#define CPU_LOAD_IDX_MAX 5
 	unsigned long cpu_load[CPU_LOAD_IDX_MAX];
 	unsigned long last_load_update_tick;
+	unsigned int misfit_task;
 #ifdef CONFIG_NO_HZ_COMMON
 	u64 nohz_stamp;
 	unsigned long nohz_flags;
@@ -843,7 +850,8 @@ struct sched_group_capacity {
 	 * CPU capacity of this group, SCHED_LOAD_SCALE being max capacity
 	 * for a single CPU.
 	 */
-	unsigned int capacity;
+	unsigned long capacity;
+	unsigned long max_capacity; /* Max per-cpu capacity in group */
 	unsigned long next_update;
 	int imbalance; /* XXX unrelated to capacity but shared group state */
 	/*
@@ -1309,6 +1317,7 @@ extern void init_dl_task_timer(struct sched_dl_entity *dl_se);
 unsigned long to_ratio(u64 period, u64 runtime);
 
 extern void init_entity_runnable_average(struct sched_entity *se);
+extern void post_init_entity_util_avg(struct sched_entity *se);
 
 static inline void add_nr_running(struct rq *rq, unsigned count)
 {

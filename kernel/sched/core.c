@@ -2385,6 +2385,8 @@ void wake_up_new_task(struct task_struct *p)
 	 */
 	set_task_cpu(p, select_task_rq(p, task_cpu(p), SD_BALANCE_FORK, 0));
 #endif
+	/* Post initialize new task's util average when its cfs_rq is set */
+	post_init_entity_util_avg(&p->se);
 
 	rq = __task_rq_lock(p);
 	activate_task(rq, p, 0);
@@ -5714,7 +5716,7 @@ static int sched_domain_debug_one(struct sched_domain *sd, int cpu, int level,
 		printk(KERN_CONT " %*pbl",
 		       cpumask_pr_args(sched_group_cpus(group)));
 		if (group->sgc->capacity != SCHED_CAPACITY_SCALE) {
-			printk(KERN_CONT " (cpu_capacity = %d)",
+			printk(KERN_CONT " (cpu_capacity = %lu)",
 				group->sgc->capacity);
 		}
 
@@ -6176,6 +6178,7 @@ build_overlap_sched_groups(struct sched_domain *sd, int cpu)
 		 * die on a /0 trap.
 		 */
 		sg->sgc->capacity = SCHED_CAPACITY_SCALE * cpumask_weight(sg_span);
+		sg->sgc->max_capacity = SCHED_CAPACITY_SCALE;
 
 		/*
 		 * Make sure the first group of this domain contains the
@@ -6971,6 +6974,7 @@ static int build_sched_domains(const struct cpumask *cpu_map,
 	enum s_alloc alloc_state;
 	struct sched_domain *sd;
 	struct s_data d;
+	struct rq *rq;
 	int i, ret = -ENOMEM;
 
 	alloc_state = __visit_domain_allocation_hell(&d, cpu_map);
@@ -7021,10 +7025,17 @@ static int build_sched_domains(const struct cpumask *cpu_map,
 	/* Attach the domains */
 	rcu_read_lock();
 	for_each_cpu(i, cpu_map) {
+		rq = cpu_rq(i);
 		sd = *per_cpu_ptr(d.sd, i);
 		cpu_attach_domain(sd, d.rd, i);
+
+		if (rq->cpu_capacity_orig > rq->rd->max_cpu_capacity)
+			rq->rd->max_cpu_capacity = rq->cpu_capacity_orig;
 	}
 	rcu_read_unlock();
+
+	rq = cpu_rq(cpumask_first(cpu_map));
+	pr_debug("Max cpu capacity: %lu\n", rq->rd->max_cpu_capacity);
 
 	ret = 0;
 error:
