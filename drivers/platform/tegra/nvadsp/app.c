@@ -310,7 +310,7 @@ static nvadsp_app_handle_t app_load(const char *appfile,
 		ser = devm_kzalloc(dev, sizeof(*ser), GFP_KERNEL);
 		if (!ser)
 			goto err;
-		strncpy(ser->name, appname, NVADSP_NAME_SZ);
+		strlcpy(ser->name, appname, NVADSP_NAME_SZ);
 
 		/*load the module in to memory */
 		ser->mod = dynamic ?
