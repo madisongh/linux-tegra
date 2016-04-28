@@ -2542,7 +2542,7 @@ static int tegra_padctl_parse_dt(struct platform_device *pdev,
 	bool enable_sata_port;
 	struct device_node *node = pdev->dev.of_node;
 
-	count = of_property_count_u32(node, "nvidia,ss_ports");
+	count = of_property_count_u32_elems(node, "nvidia,ss_ports");
 	if (count < 4 || count % 4 != 0) {
 		pr_err("nvidia,ss_ports not found or invalid count %d\n",
 						count);
