@@ -443,7 +443,8 @@ create_global_symbol_table(const struct firmware *fw)
 		if ((ELF32_ST_BIND(sym->st_info) == STB_GLOBAL) &&
 		((type == STT_OBJECT) || (type == STT_FUNC))) {
 			char *name = priv.adsp_glo_sym_tbl[i].name;
-			strncpy(name, name_table + sym->st_name, SYM_NAME_SZ);
+
+			strlcpy(name, name_table + sym->st_name, SYM_NAME_SZ);
 			priv.adsp_glo_sym_tbl[i].addr = sym->st_value;
 			priv.adsp_glo_sym_tbl[i].info = info;
 			i++;
