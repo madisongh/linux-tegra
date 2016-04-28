@@ -29,6 +29,7 @@
 #include <linux/pinctrl/pinmux.h>
 #include <linux/pinctrl/pinconf.h>
 #include <linux/slab.h>
+#include <linux/tegra_prod.h>
 
 #include "core.h"
 #include "pinctrl-tegra.h"
@@ -43,7 +44,10 @@ struct tegra_pmx {
 
 	int nbanks;
 	void __iomem **regs;
+	struct tegra_prod_list *prod_list;
 };
+
+static struct tegra_pmx *pmx;
 
 static int tegra_pinconf_group_set(struct pinctrl_dev *pctldev,
 		   unsigned group, unsigned long *configs,
@@ -775,9 +779,8 @@ static void pinctrl_clear_parked_bits(struct tegra_pmx *pmx)
 int tegra_pinctrl_probe(struct platform_device *pdev,
 			const struct tegra_pinctrl_soc_data *soc_data)
 {
-	struct tegra_pmx *pmx;
 	struct resource *res;
-	int i;
+	int i, ret;
 	const char **group_pins;
 	int fn, gn, gfn;
 
@@ -852,6 +855,18 @@ int tegra_pinctrl_probe(struct platform_device *pdev,
 
 	pinctrl_clear_parked_bits(pmx);
 
+	pmx->prod_list = tegra_prod_get(&pdev->dev, NULL);
+	if (IS_ERR(pmx->prod_list)) {
+		dev_info(&pdev->dev, "Prod-settngs not available\n");
+		pmx->prod_list = NULL;
+	} else {
+		ret = tegra_prod_set_boot_init(pmx->regs, pmx->prod_list);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "Prod config failed: %d\n", ret);
+			return ret;
+		}
+	}
+
 	pmx->pctl = pinctrl_register(&tegra_pinctrl_desc, &pdev->dev, pmx);
 	if (IS_ERR(pmx->pctl)) {
 		dev_err(&pdev->dev, "Couldn't register pinctrl driver\n");
@@ -878,3 +893,22 @@ int tegra_pinctrl_remove(struct platform_device *pdev)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(tegra_pinctrl_remove);
+
+int tegra_pinctrl_config_prod(struct device *dev, const char *prod_name)
+{
+	int ret;
+
+	if (!pmx) {
+		dev_err(dev, "Pincontrol driver is not initialised yet\n");
+		return -EIO;
+	}
+
+	ret = tegra_prod_set_by_name(pmx->regs, prod_name, pmx->prod_list);
+	if (ret < 0) {
+		dev_err(pmx->dev, "Prod config %s for device %s failed: %d\n",
+			prod_name, dev_name(dev), ret);
+		return ret;
+	}
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tegra_pinctrl_config_prod);
