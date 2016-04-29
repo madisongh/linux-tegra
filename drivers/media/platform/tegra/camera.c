@@ -686,9 +686,20 @@ static int camera_layout_get(struct camera_info *cam, unsigned long arg)
 	if (err)
 		return err;
 
+	if (param.variant > MAX_PARAM_VARIANT) {
+		dev_err(cam->dev, "%s param variant is too large: %u\n",
+		__func__, param.variant);
+		return -EINVAL;
+	}
+	if (param.sizeofvalue > MAX_PARAM_SIZE_OF_VALUE) {
+		dev_err(cam->dev, "%s size of param value is too large: %u\n",
+		__func__, param.sizeofvalue);
+		return -EINVAL;
+	}
+
 	len = (int)cam_desc.size_layout - param.variant;
 	if (len <= 0) {
-		dev_err(cam->dev, "%s invalid offset %d\n",
+		dev_err(cam->dev, "%s invalid offset %u\n",
 			__func__, param.variant);
 		err = -EINVAL;
 		goto getlayout_end;
