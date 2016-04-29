@@ -491,7 +491,6 @@ void of_gpiochip_init(struct gpio_chip *chip)
 				state, (statename) ? statename : np_config->name);
 		}
 
-		of_node_put(np_config);
 		state++;
 	}
 }
