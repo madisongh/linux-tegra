@@ -1,2 +1,2 @@
 /* Automatically generated file; DO NOT EDIT. */
-#include "../../../arch/arm/mach-tegra/board-panel.c"
+#include "../../../../kernel-display/drivers/video/tegra/dc/panel/board-panel.c"
