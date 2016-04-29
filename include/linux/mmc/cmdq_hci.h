@@ -182,5 +182,6 @@ static inline u32 cmdq_readl(struct cmdq_host *host, int reg)
 extern irqreturn_t cmdq_irq(struct mmc_host *mmc, u32 intmask);
 extern int cmdq_init(struct cmdq_host *cq_host, struct mmc_host *mmc,
 		     bool dma64);
+extern int cmdq_reenable(struct mmc_host *mmc);
 extern struct cmdq_host *cmdq_pltfm_init(struct platform_device *pdev);
 #endif

@@ -266,6 +266,9 @@ static int cmdq_enable(struct mmc_host *mmc)
 	bool dcmd_enable;
 	struct cmdq_host *cq_host = mmc_cmdq_private(mmc);
 
+	if (cq_host->ops->runtime_pm_get)
+		cq_host->ops->runtime_pm_get(mmc);
+
 	if (!cq_host || !mmc->card || !mmc_card_mmc(mmc->card)) {
 		err = -EINVAL;
 		goto out;
@@ -281,6 +284,7 @@ static int cmdq_enable(struct mmc_host *mmc)
 		pr_info("%s: %s: cq_host is already enabled\n",
 				mmc_hostname(mmc), __func__);
 		WARN_ON(1);
+		cq_host->enabled = true;
 		goto out;
 	}
 
@@ -299,11 +303,12 @@ static int cmdq_enable(struct mmc_host *mmc)
 		err = cmdq_host_alloc_tdl(cq_host);
 		if (err)
 			goto out;
-		cmdq_writel(cq_host, lower_32_bits(cq_host->desc_dma_base),
-				CQTDLBA);
-		cmdq_writel(cq_host, upper_32_bits(cq_host->desc_dma_base),
-				CQTDLBAU);
 	}
+
+	cmdq_writel(cq_host, lower_32_bits(cq_host->desc_dma_base),
+			CQTDLBA);
+	cmdq_writel(cq_host, upper_32_bits(cq_host->desc_dma_base),
+			CQTDLBAU);
 
 	/* Enable Interrupt Coalescing feature */
 	if (cq_host->quirks & CMDQ_QUIRK_CQIC_SUPPORT)
@@ -339,8 +344,25 @@ static int cmdq_enable(struct mmc_host *mmc)
 		    CQCFG);
 	cq_host->enabled = true;
 out:
+	if (cq_host->ops->runtime_pm_put)
+		cq_host->ops->runtime_pm_put(mmc);
 	return err;
 }
+
+int cmdq_reenable(struct mmc_host *mmc)
+{
+	struct cmdq_host *cq_host = (struct cmdq_host *)mmc_cmdq_private(mmc);
+	int err = 0;
+
+	cq_host->enabled = false;
+	err = cmdq_enable(mmc);
+	if (err)
+		pr_err("%s: error %d in re-enabling cmdq engine\n",
+			mmc_hostname(mmc), err);
+
+	return err;
+}
+EXPORT_SYMBOL(cmdq_reenable);
 
 static void cmdq_disable(struct mmc_host *mmc, bool soft)
 {
@@ -715,6 +737,7 @@ static int cmdq_halt(struct mmc_host *mmc, bool halt)
 {
 	struct cmdq_host *cq_host = (struct cmdq_host *)mmc_cmdq_private(mmc);
 	unsigned timeout = HALT_TIMEOUT_MS;
+	int err = 0;
 
 	if (cq_host->ops->runtime_pm_get)
 		cq_host->ops->runtime_pm_get(mmc);
@@ -730,13 +753,14 @@ static int cmdq_halt(struct mmc_host *mmc, bool halt)
 		} while (timeout);
 
 		if (!timeout) {
-			pr_debug("%s: Setting HALT is failed\n", mmc_hostname(mmc));
+			pr_err("%s: Setting HALT is failed\n",
+					mmc_hostname(mmc));
 			cmdq_dumpregs(cq_host);
 			cmdq_writel(cq_host, cmdq_readl(cq_host, CQCTL) & 0x1FE,
 			    CQCTL);
 			if (cq_host->ops->runtime_pm_put)
 				cq_host->ops->runtime_pm_put(mmc);
-			return -ETIMEDOUT;
+			err = -ETIMEDOUT;
 		}
 	} else {
 		cmdq_writel(cq_host, cmdq_readl(cq_host, CQCTL) & ~HALT,
@@ -745,7 +769,7 @@ static int cmdq_halt(struct mmc_host *mmc, bool halt)
 
 	if (cq_host->ops->runtime_pm_put)
 		cq_host->ops->runtime_pm_put(mmc);
-	return 0;
+	return err;
 }
 
 static void cmdq_post_req(struct mmc_host *host, struct mmc_request *mrq,

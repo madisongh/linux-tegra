@@ -46,6 +46,7 @@
 #endif
 
 #define MAX_TUNING_LOOP 40
+static int sdhci_cmdq_enable(struct sdhci_host *host);
 
 static unsigned int debug_quirks = 0;
 static unsigned int debug_quirks2;
@@ -3005,6 +3006,15 @@ int sdhci_resume_host(struct sdhci_host *host)
 	if (host->ops->platform_resume)
 		host->ops->platform_resume(host);
 
+	/* Re-enable CQE if eMMC card is in CQ mode */
+	if (host->mmc->card && mmc_card_cmdq(host->mmc->card) &&
+			host->cq_host->enabled) {
+		ret = sdhci_cmdq_enable(host);
+		if (ret)
+			pr_err("%s: error: %d during cqe enable in resume\n",
+					mmc_hostname(host->mmc), ret);
+	}
+
 	return ret;
 }
 
@@ -3159,6 +3169,23 @@ static int sdhci_cmdq_init(struct sdhci_host *host, struct mmc_host *mmc,
 	return cmdq_init(host->cq_host, mmc, dma64);
 }
 
+static int sdhci_cmdq_enable(struct sdhci_host *host)
+{
+	u8 mode;
+
+	/* Select ADMA3_CQE DMA mode in eMMC CQE mode */
+	mode = sdhci_readb(host, SDHCI_HOST_CONTROL);
+	mode &= ~SDHCI_CTRL_DMA_MASK;
+	mode |= SDHCI_CTRL_ADMA3_CQE;
+	sdhci_writeb(host, mode, SDHCI_HOST_CONTROL);
+
+	/* Restore block size to 512 bytes before enabling CQE */
+	sdhci_writew(host, SDHCI_MAKE_BLKSZ(SDHCI_DEFAULT_BOUNDARY_ARG,
+			SDHCI_DEFAULT_BLK_SIZE), SDHCI_BLOCK_SIZE);
+
+	return cmdq_reenable(host->mmc);
+}
+
 static void sdhci_cmdq_runtime_pm_get(struct mmc_host *mmc)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
@@ -3192,6 +3219,11 @@ static int sdhci_cmdq_init(struct sdhci_host *host, struct mmc_host *mmc,
 					   bool dma64)
 {
 		return -ENOSYS;
+}
+
+static int sdhci_cmdq_enable(struct sdhci_host *host)
+{
+
 }
 
 static void sdhci_cmdq_runtime_pm_get(struct mmc_host *mmc)

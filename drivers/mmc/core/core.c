@@ -943,6 +943,14 @@ int mmc_wait_for_cmd(struct mmc_host *host, struct mmc_command *cmd, int retries
 	mrq.cmd = cmd;
 	cmd->data = NULL;
 
+	if (host->card && mmc_card_cmdq(host->card)) {
+		if (mmc_cmdq_initiate_halt(host, true)) {
+			pr_err("%s: %s: CQE Halt failed, try again.\n",
+				mmc_hostname(host), __func__);
+			return -EAGAIN;
+		}
+	}
+
 	mmc_wait_for_req(host, &mrq);
 
 	return cmd->error;
