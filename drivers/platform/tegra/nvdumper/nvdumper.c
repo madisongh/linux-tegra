@@ -232,7 +232,7 @@ static ssize_t nvdumper_set_show(struct kobject *kobj,
 	struct kobj_attribute *attr,
 	char *buf)
 {
-	return sprintf(buf, "%s\n", nvdumper_set_str);
+	return snprintf(buf, PAGE_SIZE, "%s\n", nvdumper_set_str);
 }
 
 static ssize_t nvdumper_set_store(struct kobject *kobj,
@@ -242,7 +242,7 @@ static ssize_t nvdumper_set_store(struct kobject *kobj,
 	if (n < 1)
 		return 0;
 
-	sprintf(nvdumper_set_str, "%s", buf);
+	snprintf(nvdumper_set_str, strlen("dirty_dump"), "%s", buf);
 	nvdumper_set_str[n-1] = '\0';
 
 	if (!strcmp(nvdumper_set_str, "clean"))
@@ -265,7 +265,7 @@ static ssize_t nvdumper_prev_show(struct kobject *kobj,
 	struct kobj_attribute *attr,
 	char *buf)
 {
-	return sprintf(buf, "%s\n", nvdumper_set_str);
+	return snprintf(buf, PAGE_SIZE, "%s\n", nvdumper_set_str);
 }
 
 static const struct kobj_attribute nvdumper_attr[] = {

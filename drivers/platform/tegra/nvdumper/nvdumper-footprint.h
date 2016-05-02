@@ -1,7 +1,7 @@
 /*
  * arch/arm64/mach-tegra/include/mach/nvdumper-footprint.h
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -72,9 +72,11 @@ struct dbg_footprint_data_soc {
 		memset((void *) var.element.data, 0, \
 			sizeof(var.element.data)); \
 		if (strlen(stringname) < DBG_FOOTPRINT_NAME_LEN - 1) \
-			strcpy((char *) var.element.name, stringname); \
+			strlcpy((char *) var.element.name, stringname, \
+				DBG_FOOTPRINT_NAME_LEN - 1); \
 		else \
-			strcpy((char *) var.element.name, "error in name"); \
+			strlcpy((char *) var.element.name, "error in name", \
+				DBG_FOOTPRINT_NAME_LEN - 1); \
 	} while (0)
 
 #define GET_DBG_FP_DATA_CPU(element, core) (dbp_fp_cpu.element.data[core])
