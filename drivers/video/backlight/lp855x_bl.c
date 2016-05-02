@@ -18,7 +18,7 @@
 #include <linux/platform_data/lp855x.h>
 #include <linux/pwm.h>
 #include <linux/regulator/consumer.h>
-#include "../../../kernel-display/drivers/video/tegra/dc/board-panel.h"
+#include "../../../kernel-next/arch/arm/mach-tegra/board-panel.h"
 
 /* LP8550/1/2/3/6 Registers */
 #define LP855X_BRIGHTNESS_CTRL		0x00
