@@ -719,7 +719,7 @@ static unsigned int tegra_spi_copy_spi_rxbuf_to_client_rxbuf(
 static void tegra_spi_rx_dma_complete(void *args)
 {
 	struct tegra_spi_data *tspi = args;
-	dump_regs(dbg, tspi, "rx-dma-complete");
+	dev_dbg(tspi->dev, "rx-dma-complete\n");
 	complete(&tspi->rx_dma_complete);
 	/* TODO: how to get transfer size from dma */
 }
@@ -727,7 +727,7 @@ static void tegra_spi_rx_dma_complete(void *args)
 static void tegra_spi_tx_dma_complete(void *args)
 {
 	struct tegra_spi_data *tspi = args;
-	dump_regs(dbg, tspi, "tx-dma-complete");
+	dev_dbg(tspi->dev, "tx-dma-complete\n");
 	complete(&tspi->tx_dma_complete);
 }
 
@@ -1636,8 +1636,22 @@ static int tegra_spi_handle_message(struct tegra_spi_data *tspi,
 		if (tspi->cur_direction & DATA_DIR_TX) {
 			if ((IS_SPI_CS_INACTIVE(tspi->status_reg)) &&
 				tspi->variable_length_transfer) {
-				dmaengine_terminate_all(tspi->tx_dma_chan);
-				async_tx_ack(tspi->tx_dma_desc);
+				/* Check for TX DMA completion. If the TX DMA
+				 * is already completed, No need to terminate
+				 * the DMA xfer.
+				 */
+				wait_status = try_wait_for_completion(
+							&tspi->tx_dma_complete);
+				if (!wait_status) {
+					dev_dbg(tspi->dev,
+						"terminating tx dma\n");
+					dmaengine_terminate_all(
+							tspi->tx_dma_chan);
+					async_tx_ack(tspi->tx_dma_desc);
+				} else
+					dev_dbg(tspi->dev,
+						"received tx dma completion\n");
+
 				tspi->reset_ctrl_status = true;
 			} else {
 				wait_status =
