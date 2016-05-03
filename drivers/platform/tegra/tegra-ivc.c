@@ -626,13 +626,18 @@ int tegra_ivc_channel_notified(struct ivc *ivc)
 			offsetof(struct ivc_channel_header, w_count));
 	peer_state = ACCESS_ONCE(ivc->rx_channel->state);
 
-	if (peer_state == ivc_state_sync || peer_state == ivc_state_ack) {
-
+	if (peer_state == ivc_state_sync) {
 		/*
 		 * Order observation of ivc_state_sync before stores clearing
 		 * tx_channel.
 		 */
 		ivc_rmb();
+
+		/*
+		 * Reset tx_channel counters. The remote end is in the SYNC
+		 * state and won't make progress until we change our state,
+		 * so the counters are not in use at this time.
+		 */
 		ivc->tx_channel->w_count = 0;
 		ivc->rx_channel->r_count = 0;
 
@@ -646,29 +651,108 @@ int tegra_ivc_channel_notified(struct ivc *ivc)
 		ivc_wmb();
 
 		/*
-		 * If the other end has already cleared its counters, skip to
-		 * established.
+		 * Move to ACK state. We have just cleared our counters, so it
+		 * is now safe for the remote end to start using these values.
 		 */
-		ivc->tx_channel->state = peer_state == ivc_state_sync ?
-			ivc_state_ack : ivc_state_established;
+		ivc->tx_channel->state = ivc_state_ack;
 		ivc_flush_counter(ivc, ivc->tx_handle +
 				offsetof(struct ivc_channel_header, w_count));
 
+		/*
+		 * Notify remote end to observe state transition.
+		 */
+		ivc->notify(ivc);
+
+	} else if (ivc->tx_channel->state == ivc_state_sync &&
+			peer_state == ivc_state_ack) {
+		/*
+		 * Order observation of ivc_state_sync before stores clearing
+		 * tx_channel.
+		 */
+		ivc_rmb();
+
+		/*
+		 * Reset tx_channel counters. The remote end is in the ACK
+		 * state and won't make progress until we change our state,
+		 * so the counters are not in use at this time.
+		 */
+		ivc->tx_channel->w_count = 0;
+		ivc->rx_channel->r_count = 0;
+
+		ivc->w_pos = 0;
+		ivc->r_pos = 0;
+
+		/*
+		 * Ensure that counters appear cleared before new state can be
+		 * observed.
+		 */
+		ivc_wmb();
+
+		/*
+		 * Move to ESTABLISHED state. We know that the remote end has
+		 * already cleared its counters, so it is safe to start
+		 * writing/reading on this channel.
+		 */
+		ivc->tx_channel->state = ivc_state_established;
+		ivc_flush_counter(ivc, ivc->tx_handle +
+				offsetof(struct ivc_channel_header, w_count));
+
+		/*
+		 * Notify remote end to observe state transition.
+		 */
 		ivc->notify(ivc);
 
 	} else if (ivc->tx_channel->state == ivc_state_ack &&
-			(peer_state == ivc_state_ack ||
-			peer_state == ivc_state_established)) {
+			peer_state == ivc_state_established) {
 		/*
 		 * Order observation of peer state before storing to tx_channel.
 		 */
 		ivc_rmb();
 
+		/*
+		 * Move to ESTABLISHED state. We know that we have previously
+		 * cleared our counters, and we know that the remote end has
+		 * cleared its counters, so it is safe to start writing/reading
+		 * on this channel.
+		 */
 		ivc->tx_channel->state = ivc_state_established;
 		ivc_flush_counter(ivc, ivc->tx_handle +
 				offsetof(struct ivc_channel_header, w_count));
-		if (peer_state != ivc_state_established)
-			ivc->notify(ivc);
+
+		/*
+		 * There is no need to notify the remote end. The peer is
+		 * already in the ESTABLISHED state.
+		 */
+
+	} else if (ivc->tx_channel->state == ivc_state_ack &&
+			peer_state == ivc_state_ack) {
+		/*
+		 * Order observation of peer state before storing to tx_channel.
+		 */
+		ivc_rmb();
+
+		/*
+		 * Move to ESTABLISHED state. We know that we have previously
+		 * cleared our counters, and we know that the remote end has
+		 * cleared its counters, so it is safe to start writing/reading
+		 * on this channel.
+		 */
+		ivc->tx_channel->state = ivc_state_established;
+		ivc_flush_counter(ivc, ivc->tx_handle +
+				offsetof(struct ivc_channel_header, w_count));
+
+		/*
+		 * Notify remote end to observe state transition.
+		 */
+		ivc->notify(ivc);
+
+	} else {
+		/*
+		 * There is no need to handle any further action. Either the
+		 * channel is already fully established, or we are waiting for
+		 * the remote end to catch up with our current state. Refer
+		 * to the diagram in "IVC State Transition Table" above.
+		 */
 	}
 
 	return ivc->tx_channel->state == ivc_state_established ? 0 : -EAGAIN;
