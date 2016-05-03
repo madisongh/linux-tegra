@@ -472,9 +472,9 @@ static int bcm54xx_config_init(struct phy_device *phydev)
 	/* enable energy detect interrupt status update */
 	if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM89610 ||
 	    BRCM_PHY_MODEL(phydev) == PHY_ID_BCM50610) {
-		reg = bcm54xx_shadow_read(phydev, BCM54XX_SHD_SCR3);
+		reg = bcm_phy_read_shadow(phydev, BCM54XX_SHD_SCR3);
 		reg |= BCM54XX_SHD_SCR3_EDETECT_EN;
-		bcm54xx_shadow_write(phydev, BCM54XX_SHD_SCR3, reg);
+		bcm_phy_write_shadow(phydev, BCM54XX_SHD_SCR3, reg);
 		bcm89xx_enable_oob(phydev);
 
 		/* Enable phy to tx/rx jumbo frames. Driver

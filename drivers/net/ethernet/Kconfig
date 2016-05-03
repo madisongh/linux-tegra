@@ -189,5 +189,7 @@ source "drivers/net/ethernet/wiznet/Kconfig"
 source "drivers/net/ethernet/xilinx/Kconfig"
 source "drivers/net/ethernet/xircom/Kconfig"
 
-trysource "../kernel-t18x/drivers/net/ethernet/nvidia/eqos/Kconfig"
+if ARCH_TEGRA_18x_SOC
+source "../kernel-t18x/drivers/net/ethernet/nvidia/eqos/Kconfig"
+endif
 endif # ETHERNET

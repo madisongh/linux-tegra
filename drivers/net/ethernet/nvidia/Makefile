@@ -17,4 +17,3 @@ ifeq ($(CONFIG_NET_VENDOR_NVIDIA),y)
 obj-$(CONFIG_FORCEDETH) += forcedeth.o
 endif
 
-obj-$(CONFIG_EQOS) += ../../../../../kernel-t18x/drivers/net/ethernet/nvidia/eqos/
