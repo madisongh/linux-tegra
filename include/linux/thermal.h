@@ -32,7 +32,7 @@
 #include <uapi/linux/thermal.h>
 
 #define THERMAL_TRIPS_NONE	-1
-#define THERMAL_MAX_TRIPS	12
+#define THERMAL_MAX_TRIPS	48
 
 /* invalid cooling state */
 #define THERMAL_CSTATE_INVALID -1UL
@@ -42,6 +42,9 @@
 
 /* Default weight of a bound cooling device */
 #define THERMAL_WEIGHT_DEFAULT 0
+
+/* use value, which < 0K, to indicate an invalid/uninitialized temperature */
+#define THERMAL_TEMP_INVALID	-274000
 
 /* Unit conversion macros */
 #define DECI_KELVIN_TO_CELSIUS(t)	({			\
@@ -167,6 +170,7 @@ struct thermal_attr {
  * @forced_passive:	If > 0, temperature at which to switch on all ACPI
  *			processor cooling devices.  Currently only used by the
  *			step-wise governor.
+ * @need_update:	if equals 1, thermal_zone_device_update needs to be invoked.
  * @ops:	operations this &thermal_zone_device supports
  * @tzp:	thermal zone parameters
  * @governor:	pointer to the governor for this thermal zone
@@ -194,6 +198,7 @@ struct thermal_zone_device {
 	int emul_temperature;
 	int passive;
 	unsigned int forced_passive;
+	atomic_t need_update;
 	struct thermal_zone_device_ops *ops;
 	struct thermal_zone_params *tzp;
 	struct thermal_governor *governor;
@@ -221,7 +226,16 @@ struct thermal_governor {
 	char name[THERMAL_NAME_LENGTH];
 	int (*bind_to_tz)(struct thermal_zone_device *tz);
 	void (*unbind_from_tz)(struct thermal_zone_device *tz);
+	/*
+	 * The start and stop operations will be called when thermal zone is
+	 * registered and when change governor via sysfs. They will not be
+	 * called when cooling devices are registered or when cooling devices
+	 * are bound to thermal zones.
+	 */
+	int (*start)(struct thermal_zone_device *tz);
+	void (*stop)(struct thermal_zone_device *tz);
 	int (*throttle)(struct thermal_zone_device *tz, int trip);
+	int (*of_parse)(struct thermal_zone_params *tp, struct device_node *np);
 	struct list_head	governor_list;
 };
 
@@ -245,7 +259,7 @@ struct thermal_bind_params {
 	 * thermal zone and cdev, for a particular trip point.
 	 * See Documentation/thermal/sysfs-api.txt for more information.
 	 */
-	int trip_mask;
+	u64 trip_mask;
 
 	/*
 	 * This is an array of cooling state limits. Must have exactly
@@ -333,6 +347,7 @@ struct thermal_zone_of_device_ops {
 	int (*get_temp)(void *, int *);
 	int (*get_trend)(void *, long *);
 	int (*set_emul_temp)(void *, int);
+	int (*trip_update)(void *, int);
 };
 
 /**
@@ -386,7 +401,7 @@ int power_actor_get_min_power(struct thermal_cooling_device *,
 			      struct thermal_zone_device *tz, u32 *min_power);
 int power_actor_set_power(struct thermal_cooling_device *,
 			  struct thermal_instance *, u32);
-struct thermal_zone_device *thermal_zone_device_register(const char *, int, int,
+struct thermal_zone_device *thermal_zone_device_register(const char *, int, u64,
 		void *, struct thermal_zone_device_ops *,
 		struct thermal_zone_params *, int, int);
 void thermal_zone_device_unregister(struct thermal_zone_device *);
@@ -427,7 +442,7 @@ static inline int power_actor_set_power(struct thermal_cooling_device *cdev,
 			  struct thermal_instance *tz, u32 power)
 { return 0; }
 static inline struct thermal_zone_device *thermal_zone_device_register(
-	const char *type, int trips, int mask, void *devdata,
+	const char *type, int trips, u64 mask, void *devdata,
 	struct thermal_zone_device_ops *ops,
 	const struct thermal_zone_params *tzp,
 	int passive_delay, int polling_delay)
