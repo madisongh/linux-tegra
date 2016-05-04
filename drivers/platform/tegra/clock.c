@@ -40,7 +40,7 @@
 #include <linux/poll.h>
 #include <linux/sched.h>
 
-#include <mach/edp.h>
+#include "edp.h"
 
 #include <linux/platform/tegra/tegra_emc.h>
 

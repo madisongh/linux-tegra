@@ -27,7 +27,7 @@
 #include <linux/pwm_backlight.h>
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
-#include "../../../arch/arm/mach-tegra/board.h"
+#include <linux/tegra-common.h>
 
 static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
 {

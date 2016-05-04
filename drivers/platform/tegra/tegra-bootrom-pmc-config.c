@@ -85,7 +85,7 @@ static int tegra_bootrom_get_commands_from_node(struct device *dev,
 		if (!of_device_is_available(child))
 			continue;
 
-		ret = of_property_count_u32(child, "nvidia,write-commands");
+		ret = of_property_count_u32_elems(child, "nvidia,write-commands");
 		if (ret < 0) {
 			dev_err(dev, "Node %s does not have write-commnds\n",
 					child->full_name);
@@ -136,7 +136,7 @@ static int tegra_bootrom_get_commands_from_node(struct device *dev,
 					"nvidia,controller-type-i2c");
 		block->enable_reset = of_property_read_bool(child,
 					"nvidia,enable-controller-reset");
-		count = of_property_count_u32(child, "nvidia,write-commands");
+		count = of_property_count_u32_elems(child, "nvidia,write-commands");
 		ncommands = count / 2;
 
 		block->commands = command_ptr;

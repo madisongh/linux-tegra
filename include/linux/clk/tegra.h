@@ -159,6 +159,26 @@ static inline long tegra_emc_round_rate_updown(unsigned long rate, bool up)
 
 #else
 
+#ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
+int tegra_dvfs_clamp_dfll_at_vmin(struct clk *dfll_clk, bool clamp);
+int tegra_dvfs_cmp_dfll_vmin_tfloor(struct clk *dfll_clk, int *tfloor);
+#else
+static inline int tegra_dvfs_clamp_dfll_at_vmin(struct clk *dfll_clk,
+		                                                bool clamp)
+{ return -ENOSYS; }
+static inline int tegra_dvfs_cmp_dfll_vmin_tfloor(struct clk *dfll_clk,
+		                                                int *tfloor)
+{ return 0; }
+#endif
+
+int tegra_is_clk_enabled(struct clk *clk);
+
+unsigned long tegra_dvfs_predict_hz_at_mv_max_tfloor(struct clk *c, int mv);
+int tegra_dvfs_predict_mv_at_hz_no_tfloor(struct clk *c, unsigned long rate);
+int tegra_dvfs_predict_mv_at_hz_cur_tfloor(struct clk *c, unsigned long rate);
+int tegra_dvfs_predict_mv_at_hz_max_tfloor(struct clk *c, unsigned long rate);
+int tegra_dvfs_set_fmax_at_vmin(struct clk *c, unsigned long f_max, int v_min);
+
 static inline void tegra_clocks_apply_init_table(void)
 {}
 

@@ -1660,7 +1660,7 @@ void of_phandle_iter_start(struct of_phandle_iter *iter,
 			   const char *list_name, const char *cells_name,
 			   int cell_count)
 {
-	size_t bytes;
+	int bytes;
 
 	iter->cur = of_get_property(np, list_name, &bytes);
 	if (!iter->cur)
