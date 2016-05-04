@@ -1546,7 +1546,7 @@ int snd_hda_ctl_add(struct hda_codec *codec, hda_nid_t nid,
 	unsigned short flags = 0;
 	struct hda_nid_item *item;
 	int pcmdev = codec->pcm_info->device;
-	char prefixed_ctl[50];
+	char prefixed_ctl[SNDRV_CTL_ELEM_ID_NAME_MAXLEN];
 
 	if (kctl->id.subdevice & HDA_SUBDEV_AMP_FLAG) {
 		flags |= HDA_NID_ITEM_AMP;
