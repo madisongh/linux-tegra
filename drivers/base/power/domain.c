@@ -2,7 +2,7 @@
  * drivers/base/power/domain.c - Common code related to device power domains.
  *
  * Copyright (C) 2011 Rafael J. Wysocki <rjw@sisk.pl>, Renesas Electronics Corp.
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This file is released under the GPLv2.
  */
@@ -1414,6 +1414,10 @@ static struct generic_pm_domain_data *genpd_alloc_dev_data(struct device *dev,
 	struct generic_pm_domain_data *gpd_data;
 	int ret;
 
+	if (IS_ERR_OR_NULL(genpd)) {
+		dev->pm_domain = NULL;
+		return ERR_PTR(-EINVAL);
+	}
 	ret = dev_pm_get_subsys_data(dev);
 	if (ret)
 		return ERR_PTR(ret);
@@ -1730,7 +1734,7 @@ int pm_genpd_add_callbacks(struct device *dev, struct gpd_dev_ops *ops,
 		return -EINVAL;
 
 	gpd_data_new = genpd_alloc_dev_data(dev, dev_to_genpd(dev), td);
-	if (!gpd_data_new)
+	if (IS_ERR(gpd_data_new))
 		return -ENOMEM;
 
 	pm_runtime_disable(dev);
