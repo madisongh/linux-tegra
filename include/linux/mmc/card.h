@@ -1,6 +1,8 @@
 /*
  *  linux/include/linux/mmc/card.h
  *
+ *  Copyright (c) 2016, NVIDIA CORPORATION. All Rights Reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -121,6 +123,7 @@ struct mmc_ext_csd {
 
 	unsigned int            feature_support;
 #define MMC_DISCARD_FEATURE	BIT(0)                  /* CMD38 feature */
+	bool			strobe_support;
 };
 
 struct sd_scr {

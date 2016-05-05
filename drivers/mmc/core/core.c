@@ -5,6 +5,7 @@
  *  SD support Copyright (C) 2004 Ian Molton, All Rights Reserved.
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
  *  MMCv4 support Copyright (C) 2006 Philip Langdale, All Rights Reserved.
+ *  Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1086,9 +1087,14 @@ int mmc_execute_tuning(struct mmc_card *card)
 	struct mmc_host *host = card->host;
 	u32 opcode;
 	int err;
+	bool strobe_en = (host->caps2 & MMC_CAP2_EN_STROBE) ?
+		(card->ext_csd.strobe_support) : false;
 
-	if (!host->ops->execute_tuning)
+	if (!host->ops->execute_tuning || strobe_en) {
+		pr_info("%s: Skipping tuning since strobe enabled\n",
+				mmc_hostname(host));
 		return 0;
+	}
 
 	if (mmc_card_mmc(card))
 		opcode = MMC_SEND_TUNING_BLOCK_HS200;
