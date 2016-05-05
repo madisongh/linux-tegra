@@ -29,6 +29,7 @@ struct tegra_sdhci_platform_data {
 	unsigned int uhs_mask;
 	unsigned int ddr_tap_delay;
 	unsigned int ddr_trim_delay;
+	bool en_strobe;
 };
 
 #endif

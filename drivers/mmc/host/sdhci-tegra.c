@@ -44,6 +44,10 @@
 #define SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK		0x2
 #define SDHCI_VNDR_CLK_CTRL_SDMMC_CLK			0x1
 
+#define SDHCI_VNDR_SYS_SW_CTRL				0x104
+#define SDHCI_VNDR_SYS_SW_CTRL_WR_CRC_USE_TMCLK		0x40000000
+#define SDHCI_VNDR_SYS_SW_CTRL_STROBE_SHIFT		31
+
 #define SDHCI_VNDR_DLLCAL_CFG				0x1b0
 #define SDHCI_VNDR_DLLCAL_CFG_EN_CALIBRATE		0x80000000
 
@@ -82,11 +86,21 @@
 /* max limit defines */
 #define SDHCI_TEGRA_MAX_TAP_VALUES	0xFF
 #define SDHCI_TEGRA_MAX_TRIM_VALUES	0x1F
+#define MAX_DIVISOR_VALUE		128
+#define DEFAULT_SDHOST_FREQ		50000000
+#define SDHOST_MIN_FREQ			6000000
+#define TEGRA_SDHCI_MAX_PLL_SOURCE 2
 
 struct sdhci_tegra_soc_data {
 	const struct sdhci_pltfm_data *pdata;
 	u32 nvquirks;
 	u32 nvquirks2;
+	const char *parent_clk_list[TEGRA_SDHCI_MAX_PLL_SOURCE];
+};
+
+struct sdhci_tegra_pll_parent {
+	struct clk *pll;
+	unsigned long pll_rate;
 };
 
 struct sdhci_tegra {
@@ -99,7 +113,10 @@ struct sdhci_tegra {
 	/* max clk supported by the platform */
 	unsigned int max_clk_limit;
 	/* max ddr clk supported by the platform */
+	unsigned int ddr_clk_limit;
 	struct reset_control *rstc;
+	struct sdhci_tegra_pll_parent pll_source[TEGRA_SDHCI_MAX_PLL_SOURCE];
+	bool is_parent_pll_source_1;
 };
 
 static u16 tegra_sdhci_readw(struct sdhci_host *host, int reg)
@@ -191,8 +208,6 @@ static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 	int tap_delay)
 {
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	u32 vendor_ctrl;
 	u16 clk;
 	bool card_clk_enabled;
@@ -277,6 +292,157 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		host->mmc->caps2 &= ~MMC_CAP2_HS400;
 }
 
+/*
+* Calculation of nearest clock frequency for desired rate:
+* Get the divisor value, div = p / d_rate
+* 1. If it is nearer to ceil(p/d_rate) then increment the div value by 0.5 and
+* nearest_rate, i.e. result = p / (div + 0.5) = (p << 1)/((div << 1) + 1).
+* 2. If not, result = p / div
+* As the nearest clk freq should be <= to desired_rate,
+* 3. If result > desired_rate then increment the div by 0.5
+* and do, (p << 1)/((div << 1) + 1)
+* 4. Else return result
+* Here, If condtions 1 & 3 are both satisfied then to keep track of div value,
+* defined index variable.
+*/
+static unsigned long get_nearest_clock_freq(unsigned long pll_rate,
+		unsigned long desired_rate)
+{
+	unsigned long result;
+	int div;
+	int index = 1;
+
+	if (pll_rate <= desired_rate)
+		return pll_rate;
+
+	div = pll_rate / desired_rate;
+	if (div > MAX_DIVISOR_VALUE) {
+		div = MAX_DIVISOR_VALUE;
+		result = pll_rate / div;
+	} else {
+		if ((pll_rate % desired_rate) >= (desired_rate / 2))
+			result = (pll_rate << 1) / ((div << 1) + index++);
+		else
+			result = pll_rate / div;
+
+		if (desired_rate < result) {
+			/*
+			* Trying to get lower clock freq than desired clock,
+			* by increasing the divisor value by 0.5
+			*/
+			result = (pll_rate << 1) / ((div << 1) + index);
+		}
+	}
+
+	return result;
+}
+
+static void tegra_sdhci_clock_set_parent(struct sdhci_host *host,
+		unsigned long desired_rate)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	struct clk *parent_clk;
+	unsigned long pll_source_1_freq;
+	unsigned long pll_source_2_freq;
+	struct sdhci_tegra_pll_parent *pll_source = tegra_host->pll_source;
+	int rc;
+
+#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+	return;
+#endif
+
+	/*
+	 * Currently pll_p and pll_c are used as clock sources for SDMMC. If clk
+	 * rate is missing for either of them, then no selection is needed and
+	 * the default parent is used.
+	 */
+	if (!pll_source[0].pll_rate || !pll_source[1].pll_rate)
+		return;
+
+	pll_source_1_freq = get_nearest_clock_freq(pll_source[0].pll_rate,
+			desired_rate);
+	pll_source_2_freq = get_nearest_clock_freq(pll_source[1].pll_rate,
+			desired_rate);
+
+	/*
+	 * For low freq requests, both the desired rates might be higher than
+	 * the requested clock frequency. In such cases, select the parent
+	 * with the lower frequency rate.
+	 */
+	if ((pll_source_1_freq > desired_rate)
+		&& (pll_source_2_freq > desired_rate)) {
+		if (pll_source_2_freq <= pll_source_1_freq) {
+			desired_rate = pll_source_2_freq;
+			pll_source_1_freq = 0;
+			parent_clk = pll_source[1].pll;
+		} else {
+			desired_rate = pll_source_1_freq;
+			pll_source_2_freq = 0;
+			parent_clk = pll_source[0].pll;
+		}
+		rc = clk_set_rate(pltfm_host->clk, desired_rate);
+		goto set_parent_clk;
+	}
+
+	if (pll_source_1_freq > pll_source_2_freq) {
+		if (!tegra_host->is_parent_pll_source_1) {
+			parent_clk = pll_source[0].pll;
+			tegra_host->is_parent_pll_source_1 = true;
+			clk_set_rate(pltfm_host->clk, DEFAULT_SDHOST_FREQ);
+		} else
+			return;
+	} else if (tegra_host->is_parent_pll_source_1) {
+		parent_clk = pll_source[1].pll;
+		tegra_host->is_parent_pll_source_1 = false;
+		clk_set_rate(pltfm_host->clk, DEFAULT_SDHOST_FREQ);
+	} else
+		return;
+
+set_parent_clk:
+	rc = clk_set_parent(pltfm_host->clk, parent_clk);
+	if (rc)
+		pr_err("%s: failed to set pll parent clock %d\n",
+			mmc_hostname(host->mmc), rc);
+}
+
+static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
+	unsigned int clock)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	unsigned int clk_rate;
+
+	clk_rate = clk_get_rate(pltfm_host->clk);
+
+	if (clk_rate == clock)
+		return;
+
+	/*
+	 * In ddr mode, tegra sdmmc controller clock frequency
+	 * should be double the card clock frequency.
+	 */
+	if ((sdhci->mmc->ios.timing == MMC_TIMING_UHS_DDR50) ||
+		(sdhci->mmc->ios.timing == MMC_TIMING_MMC_DDR52)) {
+		if (tegra_host->ddr_clk_limit &&
+				(tegra_host->ddr_clk_limit < clock))
+			clk_rate = tegra_host->ddr_clk_limit * 2;
+		else
+			clk_rate = clock * 2;
+	} else
+		clk_rate = clock;
+
+	if (tegra_host->max_clk_limit && (clk_rate > tegra_host->max_clk_limit))
+		clk_rate = tegra_host->max_clk_limit;
+
+	if (clk_rate < SDHOST_MIN_FREQ)
+		clk_rate = SDHOST_MIN_FREQ;
+
+	tegra_sdhci_clock_set_parent(sdhci, clk_rate);
+	clk_set_rate(pltfm_host->clk, clk_rate);
+	sdhci->max_clk = clk_get_rate(pltfm_host->clk);
+}
+
 static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
@@ -301,6 +467,7 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 			vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_SDMMC_CLK;
 			sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 		}
+		tegra_sdhci_set_clk_rate(sdhci, clock);
 		sdhci_set_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
 		sdhci_set_clock(sdhci, 0);
@@ -362,7 +529,6 @@ static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 	}
 }
 
-
 static void tegra_sdhci_en_strobe(struct sdhci_host *host)
 {
 	u32 vndr_ctrl;
@@ -408,6 +574,36 @@ static void tegra_sdhci_post_init(struct sdhci_host *sdhci)
 	if (!timeout) {
 		dev_err(mmc_dev(sdhci->mmc), "DLL calibration is failed\n");
 	}
+}
+
+static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
+		const char **parent_clk_list, int size)
+{
+	struct device_node *np = pdev->dev.of_node;
+	const char *pll_str;
+	int i, cnt;
+
+	if (!np)
+		return -EINVAL;
+
+	if (!of_find_property(np, "pll_source", NULL))
+		return -ENXIO;
+
+	cnt = of_property_count_strings(np, "pll_source");
+	if (!cnt)
+		return -EINVAL;
+
+	if (cnt > size) {
+		dev_warn(&pdev->dev,
+			"pll list provide in DT exceeds max supported\n");
+		cnt = size;
+	}
+
+	for (i = 0; i < cnt; i++) {
+		of_property_read_string_index(np, "pll_source", i, &pll_str);
+		parent_clk_list[i] = pll_str;
+	}
+	return 0;
 }
 
 static const struct sdhci_ops tegra_sdhci_ops = {
@@ -521,6 +717,8 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	of_property_read_u32(np, "uhs-mask", &plat->uhs_mask);
 	of_property_read_u32(np, "nvidia,ddr-tap-delay", &plat->ddr_tap_delay);
 	of_property_read_u32(np, "nvidia,ddr-trim-delay", &plat->ddr_trim_delay);
+	plat->en_strobe =
+		of_property_read_bool(np, "nvidia,enable-strobe-mode");
 
 	tegra_host->plat = plat;
 	return mmc_of_parse(host->mmc);
@@ -535,8 +733,11 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	struct sdhci_tegra *tegra_host;
 	const struct tegra_sdhci_platform_data *plat;
 	struct clk *clk;
-	int rc;
+	const char *parent_clk_list[TEGRA_SDHCI_MAX_PLL_SOURCE];
+	int rc, i;
 
+	for (i = 0; i < ARRAY_SIZE(parent_clk_list); i++)
+		parent_clk_list[i] = NULL;
 	match = of_match_device(sdhci_tegra_dt_match, &pdev->dev);
 	if (!match)
 		return -EINVAL;
@@ -561,6 +762,34 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 	plat = tegra_host->plat;
 
+	/* check if DT provide list possible pll parents */
+	if (sdhci_tegra_get_pll_from_dt(pdev,
+		&parent_clk_list[0], ARRAY_SIZE(parent_clk_list))) {
+		parent_clk_list[0] = soc_data->parent_clk_list[0];
+		parent_clk_list[1] = soc_data->parent_clk_list[1];
+	}
+	for (i = 0; i < ARRAY_SIZE(parent_clk_list); i++) {
+		if (!parent_clk_list[i])
+			continue;
+
+		tegra_host->pll_source[i].pll = devm_clk_get(&pdev->dev,
+				parent_clk_list[i]);
+		if (IS_ERR(tegra_host->pll_source[i].pll)) {
+			rc = PTR_ERR(tegra_host->pll_source[i].pll);
+			dev_err(mmc_dev(host->mmc),
+					"clk[%d] error in getting %s: %d\n",
+					i, parent_clk_list[i], rc);
+			goto err_power_req;
+		}
+		tegra_host->pll_source[i].pll_rate =
+			clk_get_rate(tegra_host->pll_source[i].pll);
+
+		dev_info(mmc_dev(host->mmc), "Parent select= %s rate=%ld\n",
+				parent_clk_list[i],
+				tegra_host->pll_source[i].pll_rate);
+	}
+
+
 	mutex_init(&tegra_host->set_clock_mutex);
 	clk = devm_clk_get(&pdev->dev, "sdmmc");
 	if (IS_ERR(clk)) {
@@ -581,6 +810,10 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	pltfm_host->priv = tegra_host;
 
 	tegra_host->max_clk_limit = plat->max_clk_limit;
+	host->mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY;
+
+	if (plat->en_strobe)
+		host->mmc->caps2 |= MMC_CAP2_EN_STROBE;
 
 	rc = sdhci_add_host(host);
 	if (rc)
@@ -591,6 +824,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 err_add_host:
 	clk_disable_unprepare(pltfm_host->clk);
 err_clk_get:
+err_power_req:
 err_parse_dt:
 err_alloc_tegra_host:
 	sdhci_pltfm_free(pdev);
