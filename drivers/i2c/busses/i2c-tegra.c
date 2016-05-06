@@ -64,6 +64,7 @@
 #define I2C_FIFO_STATUS_RX_SHIFT		0
 #define I2C_INT_MASK				0x064
 #define I2C_INT_STATUS				0x068
+#define I2C_INT_BUS_CLEAR_DONE			(1<<11)
 #define I2C_INT_PACKET_XFER_COMPLETE		(1<<7)
 #define I2C_INT_ALL_PACKETS_XFER_COMPLETE	(1<<6)
 #define I2C_INT_TX_FIFO_OVERFLOW		(1<<5)
@@ -106,6 +107,15 @@
 #define I2C_HEADER_CONTINUE_XFER		(1<<15)
 #define I2C_HEADER_MASTER_ADDR_SHIFT		12
 #define I2C_HEADER_SLAVE_ADDR_SHIFT		1
+
+#define I2C_BUS_CLEAR_CNFG			0x084
+#define I2C_BC_SCLK_THRESHOLD			(9<<16)
+#define I2C_BC_STOP_COND			(1<<2)
+#define I2C_BC_TERMINATE			(1<<1)
+#define I2C_BC_ENABLE				(1<<0)
+
+#define I2C_BUS_CLEAR_STATUS			0x088
+#define I2C_BC_STATUS				(1<<0)
 
 #define I2C_CONFIG_LOAD				0x08C
 #define I2C_MSTR_CONFIG_LOAD			(1 << 0)
@@ -161,6 +171,7 @@ struct tegra_i2c_hw_feature {
 	bool has_multi_master_mode;
 	bool has_slcg_override_reg;
 	bool has_sw_reset_reg;
+	bool has_hw_arb_support;
 };
 
 /**
@@ -553,6 +564,7 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
 	const u32 status_err = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST;
 	struct tegra_i2c_dev *i2c_dev = dev_id;
 	unsigned long flags;
+	u32 mask;
 
 	status = i2c_readl(i2c_dev, I2C_INT_STATUS);
 
@@ -580,6 +592,10 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
 		goto err;
 	}
 
+	if (i2c_dev->hw->has_hw_arb_support &&
+		(status & I2C_INT_BUS_CLEAR_DONE))
+		goto err;
+
 	if (i2c_dev->msg_read && (status & I2C_INT_RX_FIFO_DATA_REQ)) {
 		if (i2c_dev->msg_buf_remaining)
 			tegra_i2c_empty_rx_fifo(i2c_dev);
@@ -605,9 +621,16 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
 	goto done;
 err:
 	/* An error occurred, mask all interrupts */
-	tegra_i2c_mask_irq(i2c_dev, I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
+	mask = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
 		I2C_INT_PACKET_XFER_COMPLETE | I2C_INT_TX_FIFO_DATA_REQ |
-		I2C_INT_RX_FIFO_DATA_REQ);
+		I2C_INT_RX_FIFO_DATA_REQ;
+
+	if (i2c_dev->hw->has_hw_arb_support)
+		mask |= I2C_INT_BUS_CLEAR_DONE;
+
+	/* An error occurred, mask all interrupts */
+	tegra_i2c_mask_irq(i2c_dev, mask);
+
 	i2c_writel(i2c_dev, status, I2C_INT_STATUS);
 	if (i2c_dev->is_dvc)
 		dvc_writel(i2c_dev, DVC_STATUS_I2C_DONE_INTR, DVC_STATUS);
@@ -616,6 +639,43 @@ err:
 done:
 	spin_unlock_irqrestore(&i2c_dev->xfer_lock, flags);
 	return IRQ_HANDLED;
+}
+
+static int tegra_i2c_issue_bus_clear(struct tegra_i2c_dev *i2c_dev)
+{
+	unsigned long timeout;
+	int ret;
+
+	if (i2c_dev->hw->has_hw_arb_support) {
+		reinit_completion(&i2c_dev->msg_complete);
+		i2c_writel(i2c_dev, I2C_BC_ENABLE
+				| I2C_BC_SCLK_THRESHOLD
+				| I2C_BC_STOP_COND
+				| I2C_BC_TERMINATE
+				, I2C_BUS_CLEAR_CNFG);
+		if (i2c_dev->hw->has_config_load_reg) {
+			ret = tegra_i2c_wait_for_config_load(i2c_dev);
+			if (ret)
+				return ret;
+		}
+		tegra_i2c_unmask_irq(i2c_dev, I2C_INT_BUS_CLEAR_DONE);
+
+		ret = wait_for_completion_timeout(&i2c_dev->msg_complete,
+						  TEGRA_I2C_TIMEOUT);
+		if (ret == 0)
+			dev_err(i2c_dev->dev, "timed out for bus clear\n");
+
+		if (!(i2c_readl(i2c_dev, I2C_BUS_CLEAR_STATUS) & I2C_BC_STATUS))
+			dev_warn(i2c_dev->dev, "Un-recovered Arb lost\n");
+	} else {
+		ret = i2c_recover_bus(&i2c_dev->adapter);
+		if (ret) {
+			dev_warn(i2c_dev->dev, "Un-recovered Arb lost\n");
+			return ret;
+		}
+	}
+
+	return 0;
 }
 
 static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
@@ -715,9 +775,12 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
 		return -EREMOTEIO;
 
 	if (i2c_dev->msg_err == I2C_ERR_ARBITRATION_LOST) {
-		ret = i2c_recover_bus(&i2c_dev->adapter);
-		if (ret)
-			dev_warn(i2c_dev->dev, "Un-recovered Arb lost\n");
+		if (!i2c_dev->is_multimaster_mode) {
+			ret = tegra_i2c_issue_bus_clear(i2c_dev);
+			if (ret)
+				return ret;
+
+		}
 		return -EAGAIN;
 	}
 
@@ -838,6 +901,7 @@ static const struct tegra_i2c_hw_feature tegra20_i2c_hw = {
 	.has_multi_master_mode = false,
 	.has_slcg_override_reg = false,
 	.has_sw_reset_reg = false,
+	.has_hw_arb_support = false,
 };
 
 static const struct tegra_i2c_hw_feature tegra30_i2c_hw = {
@@ -851,6 +915,7 @@ static const struct tegra_i2c_hw_feature tegra30_i2c_hw = {
 	.has_multi_master_mode = false,
 	.has_slcg_override_reg = false,
 	.has_sw_reset_reg = false,
+	.has_hw_arb_support = false,
 };
 
 static const struct tegra_i2c_hw_feature tegra114_i2c_hw = {
@@ -864,6 +929,7 @@ static const struct tegra_i2c_hw_feature tegra114_i2c_hw = {
 	.has_multi_master_mode = false,
 	.has_slcg_override_reg = false,
 	.has_sw_reset_reg = false,
+	.has_hw_arb_support = true,
 };
 
 static const struct tegra_i2c_hw_feature tegra124_i2c_hw = {
@@ -877,6 +943,7 @@ static const struct tegra_i2c_hw_feature tegra124_i2c_hw = {
 	.has_multi_master_mode = false,
 	.has_slcg_override_reg = true,
 	.has_sw_reset_reg = false,
+	.has_hw_arb_support = true,
 };
 
 static const struct tegra_i2c_hw_feature tegra210_i2c_hw = {
@@ -890,6 +957,7 @@ static const struct tegra_i2c_hw_feature tegra210_i2c_hw = {
 	.has_multi_master_mode = true,
 	.has_slcg_override_reg = true,
 	.has_sw_reset_reg = false,
+	.has_hw_arb_support = true,
 };
 
 static const struct tegra_i2c_hw_feature tegra186_i2c_hw = {
@@ -903,6 +971,7 @@ static const struct tegra_i2c_hw_feature tegra186_i2c_hw = {
 	.has_multi_master_mode = true,
 	.has_slcg_override_reg = true,
 	.has_sw_reset_reg = true,
+	.has_hw_arb_support = true,
 };
 
 /* Match table for of_platform binding */
