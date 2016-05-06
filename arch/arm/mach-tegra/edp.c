@@ -389,7 +389,7 @@ static int init_cpu_edp_limits_calculated(void)
 	unsigned int cpu_g_minf, cpu_g_maxf;
 	unsigned int cpu_iddq_ma;
 	unsigned int cpu_speedo_idx;
-	unsigned int cap, limit;
+	unsigned int cap, limit = -EINVAL;
 	struct tegra_edp_limits *cpu_edp_calculated_limits;
 	struct tegra_edp_limits *reg_idle_calc_limits;
 	struct tegra_system_edp_entry *power_edp_calc_limits;
@@ -469,10 +469,20 @@ static int init_cpu_edp_limits_calculated(void)
 		     temp_idx < ARRAY_SIZE(temperatures); temp_idx++) {
 			cpu_edp_calculated_limits[temp_idx].temperature =
 				temperatures[temp_idx];
-			if (temperatures[temp_idx] >= 76 &&
-					tegra_cpu_speedo_id() == 8)
-				limit = 1836000;
-			else
+			if (temperatures[temp_idx] >= 76) {
+					/* CD575M UCM2 */
+					if (tegra_cpu_speedo_id() == 6)
+						limit = 1836000;
+					/* CD575MI UCM2 */
+					else if (tegra_cpu_speedo_id() == 7)
+						limit = 1810500;
+					/* CD575MI UCM1 */
+					else if (tegra_cpu_speedo_id() == 8)
+						limit = 1887000;
+					/* CD575M UCM1 default */
+					else if (tegra_cpu_speedo_id() == -1)
+						limit = 1887000;
+			} else
 				limit = cpu_edp_calculate_maxf(params,
 						   temperatures[temp_idx],
 						   -1,

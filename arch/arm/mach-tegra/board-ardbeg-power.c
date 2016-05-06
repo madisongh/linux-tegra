@@ -391,9 +391,20 @@ int __init ardbeg_edp_init(void)
 			regulator_mA = 16800;
 		else if (pmu_board_info.board_id == BOARD_PM374)
 			regulator_mA = 32000;
-		else if (pmu_board_info.board_id == BOARD_PM375)
-			regulator_mA = 11000;
-		else
+		else if (pmu_board_info.board_id == BOARD_PM375) {
+			/* CD575M UCM2 */
+			if(tegra_cpu_speedo_id() == 6)
+				regulator_mA = 11800;
+			/* CD575MI UCM1 */
+			else if (tegra_cpu_speedo_id() == 8)
+				regulator_mA = 12450;
+			/* CD575MI UCM2 */
+			else if (tegra_cpu_speedo_id() == 7)
+				regulator_mA = 11500;
+			/* CD575M UCM1 default */
+			else
+				regulator_mA = 12500;
+		} else
 			regulator_mA = 14000;
 	}
 
