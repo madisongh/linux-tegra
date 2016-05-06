@@ -31,6 +31,7 @@
 #include <linux/module.h>
 #include <linux/reset.h>
 #include <linux/iopoll.h>
+#include <linux/of_gpio.h>
 
 #include <asm/unaligned.h>
 
@@ -204,6 +205,7 @@ struct tegra_i2c_dev {
 	bool is_multimaster_mode;
 	bool is_periph_reset_done;
 	spinlock_t xfer_lock;
+	struct i2c_bus_recovery_info bri;
 };
 
 static void dvc_writel(struct tegra_i2c_dev *i2c_dev, u32 val, unsigned long reg)
@@ -623,6 +625,7 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
 	u32 int_mask;
 	unsigned long time_left;
 	unsigned long flags;
+	int ret;
 
 	tegra_i2c_flush_fifos(i2c_dev);
 
@@ -710,6 +713,13 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
 	tegra_i2c_init(i2c_dev);
 	if (i2c_dev->msg_err == I2C_ERR_NO_ACK)
 		return -EREMOTEIO;
+
+	if (i2c_dev->msg_err == I2C_ERR_ARBITRATION_LOST) {
+		ret = i2c_recover_bus(&i2c_dev->adapter);
+		if (ret)
+			dev_warn(i2c_dev->dev, "Un-recovered Arb lost\n");
+		return -EAGAIN;
+	}
 
 	return -EIO;
 }
@@ -801,6 +811,9 @@ static void tegra_i2c_parse_dt(struct tegra_i2c_dev *i2c_dev)
 		i2c_dev->bus_clk_rate = 100000; /* default clock rate */
 
 	i2c_dev->is_multimaster_mode = of_property_read_bool(np, "multi-master");
+
+	i2c_dev->bri.scl_gpio = of_get_named_gpio(np, "scl-gpio", 0);
+	i2c_dev->bri.sda_gpio = of_get_named_gpio(np, "sda-gpio", 0);
 }
 
 static const struct i2c_algorithm tegra_i2c_algo = {
@@ -1048,6 +1061,8 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	i2c_dev->adapter.dev.parent = &pdev->dev;
 	i2c_dev->adapter.nr = pdev->id;
 	i2c_dev->adapter.dev.of_node = pdev->dev.of_node;
+	i2c_dev->bri.recover_bus = i2c_generic_gpio_recovery;
+	i2c_dev->adapter.bus_recovery_info = &i2c_dev->bri;
 
 	ret = i2c_add_numbered_adapter(&i2c_dev->adapter);
 	if (ret) {
