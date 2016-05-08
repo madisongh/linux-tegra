@@ -60,6 +60,7 @@ obj-$(CONFIG_CXL_BASE)		+= cxl/
 obj-$(CONFIG_UID_CPUTIME) += uid_cputime.o
 obj-$(CONFIG_PLATFORM_TEGRA)    += tegra-fuse/
 obj-$(CONFIG_TEGRA_CRYPTO_DEV)  += tegra-cryptodev.o
+obj-$(CONFIG_BLUEDROID_PM)      += bluedroid_pm.o
 obj-$(CONFIG_MODS) 		+= mods/
 obj-$(CONFIG_SENSORS_NCT1008)	+= nct1008.o
 obj-$(CONFIG_THERM_EST)		+= therm_est.o
