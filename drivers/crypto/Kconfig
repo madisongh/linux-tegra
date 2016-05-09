@@ -353,8 +353,8 @@ config CRYPTO_DEV_TEGRA_SE
         help
           This option allows you to have support of Security Engine for crypto acceleration.
 
-source "../kernel-t18x/drivers/crypto/Kconfig"
-source "../kernel-t18x/drivers/crypto/elliptic/Kconfig"
+source "../t18x/drivers/crypto/Kconfig"
+source "../t18x/drivers/crypto/elliptic/Kconfig"
 
 
 config CRYPTO_DEV_NX

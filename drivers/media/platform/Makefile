@@ -56,4 +56,4 @@ obj-$(CONFIG_VIDEO_XILINX)		+= xilinx/
 
 obj-$(CONFIG_PLATFORM_TEGRA) += tegra/
 ccflags-y += -I$(srctree)/drivers/media/i2c
-ccflags-y += -I$(srctree)/../kernel-nvhost/drivers/video/tegra/host
+ccflags-y += -I$(srctree)/../nvhost/drivers/video/tegra/host

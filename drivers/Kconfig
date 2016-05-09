@@ -202,14 +202,14 @@ source "drivers/hwtracing/intel_th/Kconfig"
 
 source "drivers/fpga/Kconfig"
 
-source "../kernel-nvgpu/drivers/gpu/nvgpu/Kconfig"
+source "../nvgpu/drivers/gpu/nvgpu/Kconfig"
 
 if ARCH_TEGRA_18x_SOC
-source "../kernel-t18x/drivers/tachometer/Kconfig"
+source "../t18x/drivers/tachometer/Kconfig"
 
-source "../kernel-t18x/drivers/misc/csi_mipi_cal/Kconfig"
+source "../t18x/drivers/misc/csi_mipi_cal/Kconfig"
 
-source "../kernel-t18x/drivers/misc/tegra186-ahc/Kconfig"
+source "../t18x/drivers/misc/tegra186-ahc/Kconfig"
 endif
 
 endmenu

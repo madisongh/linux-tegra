@@ -7,7 +7,7 @@ GCOV_PROFILE := y
 
 subdir-ccflags-y += -Werror
 subdir-ccflags-y += -I$(srctree)/drivers/platform/tegra/include \
-		    -I$(srctree)/../kernel-t18x/drivers/platform/tegra/ \
+		    -I$(srctree)/../t18x/drivers/platform/tegra/ \
 		    -I$(srctree)/arch/arm/mach-tegra
 
 obj-$(CONFIG_ARCH_TEGRA_18x_SOC)        += tegra_vpr.o
