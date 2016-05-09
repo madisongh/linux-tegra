@@ -1049,7 +1049,7 @@ config GPIO_VIPERBOARD
 endmenu
 
 if ARCH_TEGRA_18x_SOC
-source "../kernel-t18x/drivers/gpio/Kconfig"
+source "../t18x/drivers/gpio/Kconfig"
 endif
 
 endif

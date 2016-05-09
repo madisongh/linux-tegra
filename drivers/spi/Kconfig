@@ -711,7 +711,7 @@ config SPI_TLE62X0
 #
 
 if ARCH_TEGRA_18x_SOC
-source "../kernel-t18x/drivers/spi/Kconfig"
+source "../t18x/drivers/spi/Kconfig"
 endif
 
 endif # SPI_MASTER
