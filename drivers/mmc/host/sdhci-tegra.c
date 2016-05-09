@@ -44,6 +44,12 @@
 #define SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK		0x2
 #define SDHCI_VNDR_CLK_CTRL_SDMMC_CLK			0x1
 
+#define SDHCI_VNDR_DLLCAL_CFG				0x1b0
+#define SDHCI_VNDR_DLLCAL_CFG_EN_CALIBRATE		0x80000000
+
+#define SDHCI_VNDR_DLLCAL_CFG_STATUS			0x1bc
+#define SDHCI_VNDR_DLLCAL_CFG_STATUS_DLL_ACTIVE		0x80000000
+
 #define SDHCI_TEGRA_VENDOR_MISC_CTRL		0x120
 #define SDHCI_MISC_CTRL_ENABLE_SDR104		0x8
 #define SDHCI_MISC_CTRL_ENABLE_SDR50		0x10
@@ -356,6 +362,54 @@ static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 	}
 }
 
+
+static void tegra_sdhci_en_strobe(struct sdhci_host *host)
+{
+	u32 vndr_ctrl;
+
+	vndr_ctrl = sdhci_readl(host, SDHCI_VNDR_SYS_SW_CTRL);
+	vndr_ctrl |= (1 <<
+		SDHCI_VNDR_SYS_SW_CTRL_STROBE_SHIFT);
+	sdhci_writel(host, vndr_ctrl, SDHCI_VNDR_SYS_SW_CTRL);
+}
+
+/* Execute DLL calibration once for MMC device if it is
+ * enumerated in HS400 mode at 200MHz clock freq before
+ * starting any data transfer.
+ */
+static void tegra_sdhci_post_init(struct sdhci_host *sdhci)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	u32 dll_cfg;
+	unsigned timeout = 5;
+
+	if ((sdhci->mmc->card->ext_csd.strobe_support) &&
+			(sdhci->mmc->caps2 & MMC_CAP2_EN_STROBE) &&
+			tegra_host->plat->en_strobe)
+		tegra_sdhci_en_strobe(sdhci);
+
+	dll_cfg = sdhci_readl(sdhci, SDHCI_VNDR_DLLCAL_CFG);
+	dll_cfg |= SDHCI_VNDR_DLLCAL_CFG_EN_CALIBRATE;
+	sdhci_writel(sdhci, dll_cfg, SDHCI_VNDR_DLLCAL_CFG);
+
+	mdelay(1);
+
+	/* Wait until the dll calibration is done */
+	do {
+		if (!(sdhci_readl(sdhci, SDHCI_VNDR_DLLCAL_CFG_STATUS) &
+			SDHCI_VNDR_DLLCAL_CFG_STATUS_DLL_ACTIVE))
+			break;
+
+		mdelay(1);
+		timeout--;
+	} while (timeout);
+
+	if (!timeout) {
+		dev_err(mmc_dev(sdhci->mmc), "DLL calibration is failed\n");
+	}
+}
+
 static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_ro     = tegra_sdhci_get_ro,
 	.read_w     = tegra_sdhci_readw,
@@ -366,6 +420,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.set_uhs_signaling = tegra_sdhci_set_uhs_signaling,
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
 	.write_w    = tegra_sdhci_writew,
+	.post_init	= tegra_sdhci_post_init,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
