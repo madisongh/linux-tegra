@@ -1680,6 +1680,19 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	if (!oldcard)
 		host->card = card;
 
+	if (mmc_card_hs400(card) && card->host->ops->post_init) {
+		card->host->ops->post_init(card->host);
+		if (host->caps & MMC_CAP_BUS_WIDTH_TEST)
+			err = mmc_bus_test(card, MMC_BUS_WIDTH_8);
+		else
+			err = mmc_compare_ext_csds(card, MMC_BUS_WIDTH_8);
+		if (err) {
+			pr_warn("%s: post init failed for hs400 mode\n",
+				mmc_hostname(card->host));
+			goto err;
+		}
+	}
+
 	return 0;
 
 free_card:

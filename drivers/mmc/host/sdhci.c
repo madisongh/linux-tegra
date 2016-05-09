@@ -1354,6 +1354,18 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
 	}
 }
 
+static void sdhci_post_init(struct mmc_host *mmc)
+{
+	struct sdhci_host *host;
+
+	host = mmc_priv(mmc);
+
+	sdhci_runtime_pm_get(host);
+	if (host->ops->post_init)
+		host->ops->post_init(host);
+	sdhci_runtime_pm_put(host);
+}
+
 /*****************************************************************************\
  *                                                                           *
  * MMC callbacks                                                             *
@@ -2230,6 +2242,7 @@ static const struct mmc_host_ops sdhci_ops = {
 	.select_drive_strength		= sdhci_select_drive_strength,
 	.card_event			= sdhci_card_event,
 	.card_busy	= sdhci_card_busy,
+	.post_init	= sdhci_post_init,
 };
 
 /*****************************************************************************\
