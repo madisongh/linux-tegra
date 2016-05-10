@@ -248,10 +248,9 @@ static int __nvhost_channelopen(struct inode *inode,
 	trace_nvhost_channel_open(dev_name(&ch->dev->dev));
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-	if (!priv) {
-		nvhost_putchannel(ch, 1);
+	if (!priv)
 		goto fail;
-	}
+
 	filp->private_data = priv;
 	priv->ch = ch;
 	if (nvhost_module_add_client(ch->dev, priv))
@@ -281,13 +280,15 @@ static int __nvhost_channelopen(struct inode *inode,
 		priv->timeout = 0;
 	mutex_unlock(&channel_lock);
 	return 0;
+
 fail_priv:
 	nvhost_module_remove_client(ch->dev, priv);
 fail_add_client:
 	kfree(priv);
 fail:
+	nvhost_putchannel(ch, 1);
 	mutex_unlock(&channel_lock);
-	nvhost_channelrelease(inode, filp);
+
 	return -ENOMEM;
 }
 
