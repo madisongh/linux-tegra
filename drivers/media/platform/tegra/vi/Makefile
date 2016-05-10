@@ -22,6 +22,4 @@ obj-$(CONFIG_VIDEO_TEGRA_VI) += \
 	../../../../../../t18x/drivers/video/tegra/host/vi/vi_notify.o \
 	../../../../../../t18x/drivers/video/tegra/host/vi/host_vi_notify.o \
 	../../../../../../t18x/drivers/video/tegra/host/vi/vi4.o
-obj-$(CONFIG_TEGRA_CAMERA_RTCPU) += \
-	../../../../../../t18x/drivers/video/tegra/host/vi/rtcpu_vi_notify.o
 endif
