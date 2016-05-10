@@ -1182,12 +1182,12 @@ int tegra_dc_set_fb_mode(struct tegra_dc *dc, const struct fb_videomode *fbmode,
 unsigned tegra_dc_get_out_height(const struct tegra_dc *dc);
 unsigned tegra_dc_get_out_width(const struct tegra_dc *dc);
 unsigned tegra_dc_get_out_max_pixclock(const struct tegra_dc *dc);
-
-void nvsd_enbl_dsbl_prism(struct device *dev, bool status);
 #ifdef CONFIG_TEGRA_NVDISPLAY
 void tegra_sd_check_prism_thresh(struct device *dev, int brightness);
+void tegra_sd_enbl_dsbl_prism(struct device *dev, bool status);
 #else
 void nvsd_check_prism_thresh(struct device *dev, int brightness);
+void nvsd_enbl_dsbl_prism(struct device *dev, bool status);
 #endif
 
 /* PM0 and PM1 signal control */
