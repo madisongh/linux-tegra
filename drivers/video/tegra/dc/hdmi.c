@@ -319,7 +319,7 @@ static int tegra_hdmi_get_audio_config(unsigned audio_freq, unsigned pix_clock,
 		/* Compute the absolute error */
 		err = abs64(cts_f - cts);
 		if (err < min_err || (err == min_err &&
-				abs(n - ideal_n) < abs(n - config->n))) {
+				abs(n - ideal_n) < abs(config->n - ideal_n))) {
 			config->n = n;
 			config->cts = cts >> 16;
 			config->aval = aval_f >> 16;
