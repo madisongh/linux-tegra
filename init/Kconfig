@@ -904,6 +904,13 @@ config ARCH_SUPPORTS_INT128
 config ARCH_WANT_NUMA_VARIABLE_LOCALITY
 	bool
 
+config CAPACTIY_AWARE_DEFAULT_ENABLED
+	bool "Automatically enable CAPACITY_AWARE task placement"
+	depends on SMP
+	help
+	  If set, automatically enable CAPACITY_AWARE scheduling by default on
+	  SMP systems. It improves throughput for hetereogenous machines.
+
 config NUMA_BALANCING
 	bool "Memory placement aware NUMA scheduler"
 	depends on ARCH_SUPPORTS_NUMA_BALANCING

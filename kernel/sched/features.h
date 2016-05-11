@@ -73,4 +73,8 @@ SCHED_FEAT(ATTACH_AGE_LOAD, true)
  * Make load balance and wake paths capacity aware to optimize
  * throughput for heterogenous multi-processor systems (ex: big.LITTLE)
  */
+#ifdef CONFIG_CAPACTIY_AWARE_DEFAULT_ENABLED
+SCHED_FEAT(CAPACITY_AWARE, true)
+#else
 SCHED_FEAT(CAPACITY_AWARE, false)
+#endif
