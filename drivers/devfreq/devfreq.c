@@ -196,9 +196,6 @@ int update_devfreq(struct devfreq *devfreq)
 	if (err)
 		return err;
 
-	if (devfreq->previous_freq == freq)
-		return 0;
-
 	/*
 	 * Adjust the frequency with user freq and QoS.
 	 *
