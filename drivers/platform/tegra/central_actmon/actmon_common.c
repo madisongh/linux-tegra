@@ -1069,6 +1069,7 @@ static int __init actmon_probe(struct platform_device *pdev)
 		if (ret)
 			goto err_out;
 
+		sysfs_attr_init(&actmon->devices[i].avgact_attr.attr);
 		actmon->devices[i].avgact_attr.attr.name = dn->name;
 		actmon->devices[i].avgact_attr.attr.mode = S_IRUGO;
 		actmon->devices[i].avgact_attr.show = avgactv_show;
