@@ -7240,6 +7240,10 @@ static int need_active_balance(struct lb_env *env)
 			    capacity_orig_of(env->dst_cpu) * capacity_margin)
 				return 0;
 
+			/* src_cpu has enough capacity to handle its task */
+			if (!cpu_overutilized(env->src_cpu))
+				return 0;
+
 			/* dst_cpu has more spare capacity */
 			if (get_spare_capacity(env->dst_cpu) * 1024 >=
 			    capacity_orig_of(env->src_cpu) * capacity_margin)
