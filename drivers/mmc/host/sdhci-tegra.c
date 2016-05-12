@@ -798,6 +798,10 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		goto err_clk_get;
 	}
 	pltfm_host->clk = clk;
+	/* enable clocks first time */
+	rc = clk_prepare_enable(pltfm_host->clk);
+	if (rc != 0)
+		goto err_clk_put;
 
 	/* Reset the sdhci controller to clear all previous status.*/
 
@@ -823,6 +827,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 err_add_host:
 	clk_disable_unprepare(pltfm_host->clk);
+err_clk_put:
+	if (pltfm_host->clk)
+		clk_put(pltfm_host->clk);
 err_clk_get:
 err_power_req:
 err_parse_dt:
