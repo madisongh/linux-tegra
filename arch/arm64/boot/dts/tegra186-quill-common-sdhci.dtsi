@@ -1,0 +1,22 @@
+/ {
+	sdhci@3460000 {
+		uhs-mask = <0x0>; /*enable HS400 mode*/
+		nvidia,enable-strobe-mode;
+		status = "okay";
+	};
+
+	sdhci@3440000 {
+		status = "disabled";
+	};
+
+	sdhci@3420000 {
+		status = "disabled";
+	};
+
+	sdhci@3400000 {
+		cd-gpios = <&tegra_gpio TEGRA_GPIO(P, 6) 0>;
+		wp-gpios = <&tegra_gpio TEGRA_GPIO(P, 4) 0>;
+		uhs-mask = <0x8>;
+		status = "disabled";
+	};
+};
