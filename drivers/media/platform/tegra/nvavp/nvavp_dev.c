@@ -567,7 +567,10 @@ static void nvavp_clks_enable(struct nvavp_info *nvavp)
 
 static void nvavp_clks_disable(struct nvavp_info *nvavp)
 {
-	if ((--nvavp->clk_enabled == 0) && !nvavp->stay_on) {
+	if (nvavp->clk_enabled) {
+		nvavp->clk_enabled--;
+	}
+	if ((nvavp->clk_enabled == 0) && !nvavp->stay_on) {
 		clk_disable_unprepare(nvavp->bsev_clk);
 		clk_disable_unprepare(nvavp->vde_clk);
 		clk_set_rate(nvavp->emc_clk, 0);
