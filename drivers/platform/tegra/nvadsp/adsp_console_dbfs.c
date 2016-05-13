@@ -40,6 +40,53 @@
 
 static int open_cnt;
 
+#define ADSP_APP_CTX_MAX	32
+
+static uint64_t adsp_app_ctx_vals[ADSP_APP_CTX_MAX];
+
+static int adsp_app_ctx_add(uint64_t ctx)
+{
+	int i;
+
+	if (ctx == 0)
+		return -EINVAL;
+
+	for (i = 0; i < ADSP_APP_CTX_MAX; i++) {
+		if (adsp_app_ctx_vals[i] == 0) {
+			adsp_app_ctx_vals[i] = ctx;
+			return 0;
+		}
+	}
+	return -EINVAL;
+}
+
+static int adsp_app_ctx_check(uint64_t ctx)
+{
+	int i;
+
+	if (ctx == 0)
+		return -EINVAL;
+
+	for (i = 0; i < ADSP_APP_CTX_MAX; i++) {
+		if (adsp_app_ctx_vals[i] == ctx)
+			return 0;
+	}
+	return -EINVAL;
+}
+
+
+static void adsp_app_ctx_remove(uint64_t ctx)
+{
+	int i;
+
+	for (i = 0; i < ADSP_APP_CTX_MAX; i++) {
+		if (adsp_app_ctx_vals[i] == ctx) {
+			adsp_app_ctx_vals[i] = 0;
+			return;
+		}
+	}
+}
+
 static int adsp_consol_open(struct inode *i, struct file *f)
 {
 
@@ -92,8 +139,9 @@ adsp_consol_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 
 	int ret = 0;
 	uint16_t *mid;
-	uint16_t  mbxid;
+	uint16_t  mbxid = 0;
 	uint32_t  data;
+	uint64_t  ctx2;
 	nvadsp_app_info_t *app_info;
 	struct adsp_consol_run_app_arg_t app_args;
 	struct nvadsp_cnsl *console = f->private_data;
@@ -165,6 +213,11 @@ adsp_consol_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 				app_args.app_name);
 			return -EINVAL;
 		}
+		if (adsp_app_ctx_add(app_args.ctx2)) {
+			dev_info(dev, "adsp_consol: unable to add %s ctx\n",
+				app_args.app_name);
+			return -EINVAL;
+		}
 #else
 		app_args.ctx1 = (uint64_t)nvadsp_app_load(app_args.app_path,
 			app_args.app_name);
@@ -174,15 +227,12 @@ adsp_consol_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 				app_args.app_name);
 			return -EINVAL;
 		}
-
-		app_args.ctx1 = (uint64_t)nvadsp_app_load(app_args.app_path,
-			app_args.app_name);
-		if (!app_args.ctx1) {
-			dev_info(dev,
-				"adsp_consol: dynamic app load failed %s\n",
+		if (adsp_app_ctx_add(app_args.ctx1)) {
+			dev_info(dev, "adsp_consol: unable to add %s ctx\n",
 				app_args.app_name);
 			return -EINVAL;
 		}
+
 		dev_info(dev, "adsp_consol: calling nvadsp_app_init\n");
 		app_args.ctx2 =
 			(uint64_t)nvadsp_app_init((void *)app_args.ctx1, NULL);
@@ -191,6 +241,12 @@ adsp_consol_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 				"adsp_consol: unable to initilize the app\n");
 			return -EINVAL;
 		}
+		if (adsp_app_ctx_add(app_args.ctx2)) {
+			dev_info(dev, "adsp_consol: unable to add %s ctx\n",
+				app_args.app_name);
+			return -EINVAL;
+		}
+
 		dev_info(dev, "adsp_consol: calling nvadsp_app_start\n");
 		ret = nvadsp_app_start((void *)app_args.ctx2);
 		if (ret) {
@@ -218,34 +274,63 @@ adsp_consol_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 			ret = -EACCES;
 			break;
 		}
+		if (adsp_app_ctx_check(app_args.ctx2)) {
+			dev_info(dev, "adsp_consol: unable to check %s ctx\n",
+				 app_args.app_name);
+			return -EINVAL;
+		}
+
 		app_args.ctx1 = (uint64_t)
 			((nvadsp_app_info_t *)app_args.ctx2)->handle;
+
 		nvadsp_exit_app((nvadsp_app_info_t *)app_args.ctx2, false);
 		nvadsp_app_unload((const void *)app_args.ctx1);
+
+		adsp_app_ctx_remove(app_args.ctx2);
 #else
 		if ((!app_args.ctx2) || (!app_args.ctx1)) {
 			ret = -EACCES;
 			break;
 		}
+
+		if (adsp_app_ctx_check(app_args.ctx2) ||
+		    adsp_app_ctx_check(app_args.ctx1)) {
+			dev_info(dev, "adsp_consol: unable to check %s ctx\n",
+				 app_args.app_name);
+			return -EINVAL;
+		}
+
 		nvadsp_app_deinit((void *)app_args.ctx2);
 		nvadsp_app_unload((void *)app_args.ctx1);
+
+		adsp_app_ctx_remove(app_args.ctx2);
+		adsp_app_ctx_remove(app_args.ctx1);
 #endif
+
 		break;
 	case _IOC_NR(ADSP_CNSL_CLR_BUFFER):
 		break;
 	case _IOC_NR(ADSP_CNSL_OPN_MBX):
-		if (!access_ok(0, uarg,
-			sizeof(struct adsp_consol_run_app_arg_t)))
+		if (!access_ok(0, uarg, sizeof(ctx2)))
 			return -EACCES;
-		ret = copy_from_user(&app_info, uarg,
-			sizeof(app_info));
+		ret = copy_from_user(&ctx2, uarg, sizeof(ctx2));
 		if (ret) {
 			ret = -EACCES;
 			break;
 		}
-		mid = (short *)(app_info->mem.shared);
-		dev_info(dev, "adsp_consol: open %x\n", *mid);
-		mbxid = *mid;
+		if (adsp_app_ctx_check(ctx2)) {
+			dev_info(dev, "adsp_consol: unable to check ctx\n");
+			return -EINVAL;
+		}
+
+		app_info = (nvadsp_app_info_t *)ctx2;
+
+		if (app_info && app_info->mem.shared) {
+			mid = (short *)(app_info->mem.shared);
+			dev_info(dev, "adsp_consol: open %x\n", *mid);
+			mbxid = *mid;
+		}
+
 		ret = nvadsp_mbox_open(&console->app_mbox, &mbxid,
 			"app_mbox", NULL, NULL);
 		if (ret) {
@@ -264,7 +349,7 @@ adsp_consol_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		break;
 	case _IOC_NR(ADSP_CNSL_PUT_MBX):
 		if (!access_ok(0, uarg,
-			sizeof(struct adsp_consol_run_app_arg_t)))
+			sizeof(uint32_t)))
 			return -EACCES;
 		ret = copy_from_user(&data, uarg,
 			sizeof(uint32_t));
@@ -277,7 +362,7 @@ adsp_consol_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		break;
 	case _IOC_NR(ADSP_CNSL_GET_MBX):
 		if (!access_ok(0, uarg,
-			sizeof(struct adsp_consol_run_app_arg_t)))
+			       sizeof(uint32_t)))
 			return -EACCES;
 		ret = nvadsp_mbox_recv(&console->app_mbox, &data, 0, 0);
 		if (ret)

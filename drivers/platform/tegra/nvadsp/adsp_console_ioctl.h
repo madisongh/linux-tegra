@@ -21,7 +21,7 @@
 #include <linux/ioctl.h>
 
 #if !defined(NVADSP_NAME_SZ)
-#define NVADSP_NAME_SZ 64
+#define NVADSP_NAME_SZ 128
 #endif
 
 #define NVADSP_NAME_SZ_MAX	(NVADSP_NAME_SZ - 1)
