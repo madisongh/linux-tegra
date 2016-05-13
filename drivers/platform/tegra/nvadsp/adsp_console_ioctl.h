@@ -1,20 +1,20 @@
 /*
-* adsp_console_ioctl.h
-*
-* A header file for adsp console driver
-*
-* Copyright (C) 2014-2015 NVIDIA Corporation. All rights reserved.
-*
-* This software is licensed under the terms of the GNU General Public
-* License version 2, as published by the Free Software Foundation, and
-* may be copied, distributed, and modified under those terms.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-*/
+ * adsp_console_ioctl.h
+ *
+ * A header file for adsp console driver
+ *
+ * Copyright (C) 2014-2016, NVIDIA Corporation. All rights reserved.
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
 
 #ifndef ADSP_CNSL_IOCTL_H
 #define ADSP_CNSL_IOCTL_H
@@ -23,6 +23,9 @@
 #if !defined(NVADSP_NAME_SZ)
 #define NVADSP_NAME_SZ 64
 #endif
+
+#define NVADSP_NAME_SZ_MAX	(NVADSP_NAME_SZ - 1)
+
 #if !defined(ARGV_SIZE_IN_WORDS)
 #define ARGV_SIZE_IN_WORDS 128
 #endif
