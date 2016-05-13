@@ -1,4 +1,5 @@
 msp3400-objs	:=	msp3400-driver.o msp3400-kthreads.o
+ccflags-y += -I$(srctree)/drivers/media/platform/tegra
 obj-$(CONFIG_VIDEO_MSP3400) += msp3400.o
 
 obj-$(CONFIG_VIDEO_SMIAPP)	+= smiapp/
@@ -79,3 +80,5 @@ obj-$(CONFIG_VIDEO_IR_I2C)  += ir-kbd-i2c.o
 obj-$(CONFIG_VIDEO_ML86V7667)	+= ml86v7667.o
 obj-$(CONFIG_VIDEO_OV2659)	+= ov2659.o
 obj-$(CONFIG_VIDEO_TC358743)	+= tc358743.o
+obj-$(CONFIG_VIDEO_OV23850) += ov23850.o
+obj-$(CONFIG_VIDEO_LC898212) += lc898212.o
