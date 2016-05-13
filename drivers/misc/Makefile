@@ -65,3 +65,5 @@ obj-$(CONFIG_MODS) 		+= mods/
 obj-$(CONFIG_SENSORS_NCT1008)	+= nct1008.o
 obj-$(CONFIG_THERM_EST)		+= therm_est.o
 obj-$(CONFIG_FAN_THERM_EST)	+= therm_fan_est.o
+obj-$(CONFIG_TEGRA_PROC_POWER_MODEL) += tegra_ppm.o
+
