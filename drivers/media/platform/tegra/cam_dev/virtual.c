@@ -364,6 +364,12 @@ static int virtual_device_sanity_check(
 			__func__, pvd->clk_num);
 	}
 
+	if (pvd->reg_num >= VIRTUAL_DEV_MAX_REGULATORS) {
+		dev_err(dev, "%s too many regulators %u!\n",
+			__func__, pvd->reg_num);
+		return -ENODEV;
+	}
+
 	*len = 0;
 	num = pvd->reg_num;
 	nptr = &pvd->reg_names[0];
