@@ -227,6 +227,15 @@ static inline unsigned tegra_emc_dvfs_latency(unsigned int freq_khz)
 #define TEGRA_MC_CLIENT_NVJPG		40
 #define TEGRA_MC_CLIENT_TSECB		45
 
+#if defined(CONFIG_ARCH_TEGRA_12x_SOC)
+enum {
+	DRAM_TYPE_DDR3   = 0,
+	DRAM_TYPE_LPDDR4 = 1,
+	DRAM_TYPE_LPDDR2 = 2,
+	DRAM_TYPE_DDR2   = 3,
+};
+#endif
+
 int tegra_mc_flush(int id);
 int tegra_mc_flush_done(int id);
 
