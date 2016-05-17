@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2015-2016, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -165,8 +165,8 @@ static void adsp_cpustat_disable(void)
 	spin_unlock_irqrestore(&cpumon->lock, flags);
 }
 
-#define RW_MODE (S_IWUSR | S_IRUGO)
-#define RO_MODE S_IRUGO
+#define RW_MODE (S_IWUSR | S_IRUSR)
+#define RO_MODE S_IRUSR
 
 static int cur_usage_get(void *data, u64 *val)
 {

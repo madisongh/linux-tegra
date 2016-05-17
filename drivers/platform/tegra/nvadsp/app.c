@@ -3,7 +3,7 @@
  *
  * ADSP OS App management
  *
- * Copyright (C) 2014-2016 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -189,7 +189,7 @@ static int aram_exclusive_app_file_node(struct seq_file *s, void *data)
 
 #define ADSP_APP_CREATE_FILE(x, priv, root) \
 	do { \
-		if (IS_ERR_OR_NULL(debugfs_create_file(#x, S_IRUGO, root, \
+		if (IS_ERR_OR_NULL(debugfs_create_file(#x, S_IRUSR, root, \
 			priv, &x##_node_operations))) { \
 			dev_err(dev, "unable tp create app %s file\n", #x); \
 			ret = -ENOENT; \

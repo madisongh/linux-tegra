@@ -3,7 +3,7 @@
  *
  * Emc dynamic frequency scaling due to APE
  *
- * Copyright (C) 2014-2015, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -199,8 +199,8 @@ static void emc_dfs_disable(void)
 #ifdef CONFIG_DEBUG_FS
 static struct dentry *emc_dfs_root;
 
-#define RW_MODE (S_IWUSR | S_IRUGO)
-#define RO_MODE S_IRUGO
+#define RW_MODE (S_IWUSR | S_IRUSR)
+#define RO_MODE S_IRUSR
 
 /* Get emc dfs staus: 0: disabled 1:enabled */
 static int dfs_enable_get(void *data, u64 *val)

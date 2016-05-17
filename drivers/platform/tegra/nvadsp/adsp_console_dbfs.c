@@ -412,7 +412,7 @@ adsp_create_cnsl(struct dentry *adsp_debugfs_root, struct nvadsp_cnsl *cnsl)
 		goto err_out;
 	}
 
-	if (!debugfs_create_file("adsp_console", S_IRUGO,
+	if (!debugfs_create_file("adsp_console", S_IRUSR,
 		adsp_debugfs_root, cnsl,
 		&adsp_console_operations)) {
 		dev_err(dev,

@@ -3,7 +3,7 @@
  *
  * ARAM manager
  *
- * Copyright (C) 2014-2015 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -83,7 +83,7 @@ int aram_init(unsigned long addr, unsigned long size)
 
 #ifdef CONFIG_DEBUG_FS
 	aram_dump_debugfs_file = debugfs_create_file("aram_dump",
-		S_IRUGO, NULL, NULL, &aram_dump_fops);
+		S_IRUSR, NULL, NULL, &aram_dump_fops);
 	if (!aram_dump_debugfs_file) {
 		pr_err("ERROR: failed to create aram_dump debugfs");
 		destroy_mem_manager(aram_handle);

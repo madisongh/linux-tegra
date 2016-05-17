@@ -3,7 +3,7 @@
  *
  * adsp dynamic frequency scaling
  *
- * Copyright (C) 2014-2015, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -312,8 +312,8 @@ err_out:
 
 #ifdef CONFIG_DEBUG_FS
 
-#define RW_MODE (S_IWUSR | S_IRUGO)
-#define RO_MODE S_IRUGO
+#define RW_MODE (S_IWUSR | S_IRUSR)
+#define RO_MODE S_IRUSR
 
 /* Get adsp dfs staus: 0: disabled, 1: enabled */
 static int dfs_enable_get(void *data, u64 *val)
@@ -559,7 +559,7 @@ static int adsp_dfs_debugfs_init(struct platform_device *pdev)
 	if (!d)
 		goto err_out;
 
-	d = debugfs_create_file("time_in_state", S_IRUGO,
+	d = debugfs_create_file("time_in_state", RO_MODE,
 					root, &freq_stats,
 					&time_in_state_fops);
 	if (!d)

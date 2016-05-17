@@ -3,7 +3,7 @@
  *
  * dram app memory manager for allocating memory for text,bss and data
  *
- * Copyright (C) 2014 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -88,7 +88,7 @@ int dram_app_mem_init(unsigned long start, unsigned long size)
 #ifdef CONFIG_DEBUG_FS
 	dram_app_mem_dump_debugfs_file =
 		debugfs_create_file("dram_app_mem_dump",
-				S_IRUGO, NULL, NULL, &dram_app_mem_dump_fops);
+				S_IRUSR, NULL, NULL, &dram_app_mem_dump_fops);
 	if (!dram_app_mem_dump_debugfs_file) {
 		pr_err("ERROR: failed to create dram_app_mem_dump debugfs");
 		destroy_mem_manager(dram_app_mem_handle);
