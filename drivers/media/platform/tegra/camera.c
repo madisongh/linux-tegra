@@ -878,31 +878,46 @@ static long camera_ioctl(struct file *file,
 		break;
 	case PCLLK_IOCTL_DEV_DEL:
 		mutex_lock(cam_desc.d_mutex);
+		if (!cam->cdev) {
+			err = -ENODEV;
+			mutex_unlock(cam_desc.d_mutex);
+			break;
+		}
 		list_del(&cam->cdev->list);
-		mutex_unlock(cam_desc.d_mutex);
 		camera_remove_device(cam->cdev, true);
+		mutex_unlock(cam_desc.d_mutex);
 		break;
 	case PCLLK_IOCTL_DEV_FREE:
 		err = camera_free_device(cam, arg);
 		break;
 	case PCLLK_IOCTL_SEQ_WR:
+		mutex_lock(cam_desc.d_mutex);
 		err = camera_seq_wr(cam, arg);
+		mutex_unlock(cam_desc.d_mutex);
 		break;
 	case PCLLK_IOCTL_SEQ_RD:
+		mutex_lock(cam_desc.d_mutex);
 		err = camera_seq_rd(cam, arg);
+		mutex_unlock(cam_desc.d_mutex);
 		break;
 	case PCLLK_IOCTL_PARAM_RD:
 		/* err = camera_param_rd(cam, arg); */
 		break;
 	case PCLLK_IOCTL_PWR_WR:
 		/* This is a Guaranteed Level of Service (GLOS) call */
+		mutex_lock(cam_desc.d_mutex);
 		err = camera_dev_pwr_set(cam, arg);
+		mutex_unlock(cam_desc.d_mutex);
 		break;
 	case PCLLK_IOCTL_PWR_RD:
+		mutex_lock(cam_desc.d_mutex);
 		err = camera_dev_pwr_get(cam, arg);
+		mutex_unlock(cam_desc.d_mutex);
 		break;
 	case PCLLK_IOCTL_UPDATE:
+		mutex_lock(cam_desc.d_mutex);
 		err = camera_update(cam, arg);
+		mutex_unlock(cam_desc.d_mutex);
 		break;
 	case PCLLK_IOCTL_LAYOUT_WR:
 		err = camera_layout_update(cam, arg);
@@ -924,16 +939,22 @@ static long camera_ioctl(struct file *file,
 		err = virtual_device_add(cam_desc.dev, arg);
 		break;
 	case PCLLK_IOCTL_32_SEQ_WR:
+		mutex_lock(cam_desc.d_mutex);
 		err = camera_seq_wr(cam, arg);
+		mutex_unlock(cam_desc.d_mutex);
 		break;
 	case PCLLK_IOCTL_32_SEQ_RD:
+		mutex_lock(cam_desc.d_mutex);
 		err = camera_seq_rd(cam, arg);
+		mutex_unlock(cam_desc.d_mutex);
 		break;
 	case PCLLK_IOCTL_32_PARAM_RD:
 		/* err = camera_param_rd(cam, arg); */
 		break;
 	case PCLLK_IOCTL_32_UPDATE:
+		mutex_lock(cam_desc.d_mutex);
 		err = camera_update(cam, arg);
+		mutex_unlock(cam_desc.d_mutex);
 		break;
 	case PCLLK_IOCTL_32_LAYOUT_WR:
 		err = camera_layout_update(cam, arg);
