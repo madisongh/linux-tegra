@@ -208,12 +208,12 @@ static int usb_match_speed(struct usb_device *udev,
 
 #if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
 static struct of_device_id tegra_xusba_pd[] = {
-	{ .compatible = "nvidia, tegra186-xusba-pd", },
+	{ .compatible = "nvidia,tegra186-xusba-pd", },
 	{},
 };
 
 static struct of_device_id tegra_xusbc_pd[] = {
-	{ .compatible = "nvidia, tegra186-xusbc-pd", },
+	{ .compatible = "nvidia,tegra186-xusbc-pd", },
 	{},
 };
 #endif
