@@ -30,7 +30,6 @@
 #include <linux/io.h>
 #include <linux/seq_file.h>
 #include <linux/spinlock.h>
-#include <linux/clk/tegra.h>
 #include <linux/tegra-powergate.h>
 #include <linux/tegra-soc.h>
 #include <soc/tegra/fuse.h>
@@ -149,6 +148,28 @@ int tegra_powergate_set(int id, bool new_state)
 	return 0;
 }
 
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+static int is_clk_enabled(struct clk *clk)
+{
+	return __clk_is_enabled(clk);
+}
+
+static const char *clk_get_name(struct clk *clk)
+{
+	return __clk_get_name(clk);
+}
+#else
+static int is_clk_enabled(struct clk *clk)
+{
+	return tegra_is_clk_enabled(clk);
+}
+
+static const char *clk_get_name(struct clk *clk)
+{
+	return clk->name;
+}
+#endif
+
 int is_partition_clk_disabled(struct powergate_partition_info *pg_info)
 {
 	u32 idx;
@@ -164,7 +185,7 @@ int is_partition_clk_disabled(struct powergate_partition_info *pg_info)
 			break;
 
 		if (clk_info->clk_type != RST_ONLY) {
-			if (tegra_is_clk_enabled(clk)) {
+			if (is_clk_enabled(clk)) {
 				ret = -1;
 				break;
 			}
@@ -216,7 +237,7 @@ int partition_clk_enable(struct powergate_partition_info *pg_info)
 			break;
 
 		if (clk_info->clk_type != RST_ONLY) {
-			ret = tegra_clk_prepare_enable(clk);
+			ret = clk_prepare_enable(clk);
 			if (ret)
 				goto err_clk_en;
 		}
@@ -225,11 +246,11 @@ int partition_clk_enable(struct powergate_partition_info *pg_info)
 	return 0;
 
 err_clk_en:
-	WARN(1, "Could not enable clk %s, error %d", clk->name, ret);
+	WARN(1, "Could not enable clk %s, error %d", clk_get_name(clk), ret);
 	while (idx--) {
 		clk_info = &pg_info->clk_info[idx];
 		if (clk_info->clk_type != RST_ONLY)
-			tegra_clk_disable_unprepare(clk_info->clk_ptr);
+			clk_disable_unprepare(clk_info->clk_ptr);
 	}
 
 	return ret;
@@ -249,7 +270,7 @@ void partition_clk_disable(struct powergate_partition_info *pg_info)
 			break;
 
 		if (clk_info->clk_type != RST_ONLY)
-			tegra_clk_disable_unprepare(clk);
+			clk_disable_unprepare(clk);
 	}
 }
 
@@ -342,7 +363,7 @@ int slcg_clk_enable(struct powergate_partition_info *pg_info)
 		if (!clk)
 			break;
 
-		ret = tegra_clk_prepare_enable(clk);
+		ret = clk_prepare_enable(clk);
 		if (ret)
 			goto err_clk_en;
 	}
@@ -350,10 +371,10 @@ int slcg_clk_enable(struct powergate_partition_info *pg_info)
 	return 0;
 
 err_clk_en:
-	WARN(1, "Could not enable clk %s, error %d", clk->name, ret);
+	WARN(1, "Could not enable clk %s, error %d", __clk_get_name(clk), ret);
 	while (idx--) {
 		slcg_info = &pg_info->slcg_info[idx];
-		tegra_clk_disable_unprepare(slcg_info->clk_ptr);
+		clk_disable_unprepare(slcg_info->clk_ptr);
 	}
 
 	return ret;
@@ -372,7 +393,7 @@ void slcg_clk_disable(struct powergate_partition_info *pg_info)
 		if (!clk)
 			break;
 
-		tegra_clk_disable_unprepare(clk);
+		clk_disable_unprepare(clk);
 	}
 }
 
