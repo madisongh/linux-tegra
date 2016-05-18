@@ -577,7 +577,7 @@ config TEGRA_THROUGHPUT
 	Dev node /dev/tegra-throughput used to set a throughput target.
 
 config FAN_THERM_EST
-	bool "Fan driving temp estimator"
+	tristate "Fan driving temp estimator"
 	---help---
 	Thermal driver that estimates the fan driving temperature based on
 	other sensors.
