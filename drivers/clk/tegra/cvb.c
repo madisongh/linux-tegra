@@ -62,13 +62,13 @@ static int round_voltage(int mv, const struct rail_alignment *align, int up)
 }
 
 static int build_opp_table(const struct cvb_table *d,
+			   const struct rail_alignment *align,
 			   int speedo_value,
 			   unsigned long max_freq,
 			   struct device *opp_dev)
 {
 	int i, ret, dfll_mv, min_mv, max_mv;
 	const struct cvb_table_freq_entry *table = NULL;
-	const struct rail_alignment *align = &d->alignment;
 
 	min_mv = round_voltage(d->min_millivolts, align, UP);
 	max_mv = round_voltage(d->max_millivolts, align, DOWN);
@@ -110,8 +110,11 @@ static int build_opp_table(const struct cvb_table *d,
  */
 const struct cvb_table *tegra_cvb_build_opp_table(
 		const struct cvb_table *cvb_tables,
-		size_t sz, int process_id,
-		int speedo_id, int speedo_value,
+		size_t sz,
+		const struct rail_alignment *align,
+		int process_id,
+		int speedo_id,
+		int speedo_value,
 		unsigned long max_rate,
 		struct device *opp_dev)
 {
@@ -125,7 +128,8 @@ const struct cvb_table *tegra_cvb_build_opp_table(
 		if (d->process_id != -1 && d->process_id != process_id)
 			continue;
 
-		ret = build_opp_table(d, speedo_value, max_rate, opp_dev);
+		ret = build_opp_table(
+			d, align, speedo_value, max_rate, opp_dev);
 		return ret ? ERR_PTR(ret) : d;
 	}
 

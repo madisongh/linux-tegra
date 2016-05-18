@@ -21,6 +21,7 @@
 #include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <soc/tegra/fuse.h>
 
@@ -28,12 +29,24 @@
 #include "clk-dfll.h"
 #include "cvb.h"
 
+struct dfll_fcpu_data {
+	const unsigned long *cpu_max_freq_table;
+	unsigned int cpu_max_freq_table_size;
+	const struct cvb_table *cpu_cvb_tables;
+	unsigned int cpu_cvb_tables_size;
+};
+
 /* Maximum CPU frequency, indexed by CPU speedo id */
-static const unsigned long cpu_max_freq_table[] = {
+static const unsigned long tegra124_cpu_max_freq_table[] = {
 	[0] = 2014500000UL,
 	[1] = 2320500000UL,
 	[2] = 2116500000UL,
 	[3] = 2524500000UL,
+};
+
+static const unsigned long tegra210_cpu_max_freq_table[] = {
+	[0] = 1912500000UL,
+	[1] = 1912500000UL,
 };
 
 static const struct cvb_table tegra124_cpu_cvb_tables[] = {
@@ -42,9 +55,6 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
 		.process_id = -1,
 		.min_millivolts = 900,
 		.max_millivolts = 1260,
-		.alignment = {
-			.step_uv = 10000, /* 10mV */
-		},
 		.speedo_scale = 100,
 		.voltage_scale = 1000,
 		.cvb_table = {
@@ -82,17 +92,89 @@ static const struct cvb_table tegra124_cpu_cvb_tables[] = {
 	},
 };
 
+static const struct cvb_table tegra210_cpu_cvb_tables[] = {
+	{
+		.speedo_id = -1,
+		.process_id = -1,
+		.min_millivolts = 850,
+		.max_millivolts = 1170,
+		.speedo_scale = 100,
+		.voltage_scale = 1000,
+		.cvb_table = {
+			{51000000UL,    {1007452, -23865, 370} },
+			{102000000UL,   {1007452, -23865, 370} },
+			{204000000UL,   {1007452, -23865, 370} },
+			{306000000UL,   {1052709, -24875, 370} },
+			{408000000UL,   {1099069, -25895, 370} },
+			{510000000UL,   {1146534, -26905, 370} },
+			{612000000UL,   {1195102, -27915, 370} },
+			{714000000UL,   {1244773, -28925, 370} },
+			{816000000UL,   {1295549, -29935, 370} },
+			{918000000UL,   {1347428, -30955, 370} },
+			{1020000000UL,  {1400411, -31965, 370} },
+			{1122000000UL,  {1454497, -32975, 370} },
+			{1224000000UL,  {1509687, -33985, 370} },
+			{1326000000UL,  {1565981, -35005, 370} },
+			{1428000000UL,  {1623379, -36015, 370} },
+			{1530000000UL,  {1681880, -37025, 370} },
+			{1632000000UL,  {1741485, -38035, 370} },
+			{1734000000UL,  {1802194, -39055, 370} },
+			{1836000000UL,  {1864006, -40065, 370} },
+			{1912500000UL,  {1910780, -40815, 370} },
+			{0,             {      0,      0,   0} },
+		},
+		.cpu_dfll_data = {
+			.tune0_low = 0xffead0ff,
+			.tune0_high = 0xffead0ff,
+			.tune1 = 0x20091d9,
+		}
+	},
+};
+
+static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
+	.cpu_max_freq_table = tegra124_cpu_max_freq_table,
+	.cpu_max_freq_table_size = ARRAY_SIZE(tegra124_cpu_max_freq_table),
+	.cpu_cvb_tables = tegra124_cpu_cvb_tables,
+	.cpu_cvb_tables_size = ARRAY_SIZE(tegra124_cpu_cvb_tables)
+};
+
+static const struct dfll_fcpu_data tegra210_dfll_fcpu_data = {
+	.cpu_max_freq_table = tegra210_cpu_max_freq_table,
+	.cpu_max_freq_table_size = ARRAY_SIZE(tegra210_cpu_max_freq_table),
+	.cpu_cvb_tables = tegra210_cpu_cvb_tables,
+	.cpu_cvb_tables_size = ARRAY_SIZE(tegra210_cpu_cvb_tables)
+};
+
+static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
+	{
+		.compatible = "nvidia,tegra124-dfll",
+		.data = &tegra124_dfll_fcpu_data
+	},
+	{
+		.compatible = "nvidia,tegra210-dfll",
+		.data = &tegra210_dfll_fcpu_data
+	},
+	{ },
+};
+MODULE_DEVICE_TABLE(of, tegra124_dfll_fcpu_of_match);
+
 static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 {
-	int process_id, speedo_id, speedo_value;
+	int process_id, speedo_id, speedo_value, ret;
+	struct rail_alignment align;
 	struct tegra_dfll_soc_data *soc;
 	const struct cvb_table *cvb;
+	const struct of_device_id *of_id;
+	const struct dfll_fcpu_data *fcpu_data;
+
+	of_id = of_match_device(tegra124_dfll_fcpu_of_match, &pdev->dev);
+	fcpu_data = of_id->data;
 
 	process_id = tegra_sku_info.cpu_process_id;
 	speedo_id = tegra_sku_info.cpu_speedo_id;
 	speedo_value = tegra_sku_info.cpu_speedo_value;
 
-	if (speedo_id >= ARRAY_SIZE(cpu_max_freq_table)) {
+	if (speedo_id >= fcpu_data->cpu_max_freq_table_size) {
 		dev_err(&pdev->dev, "unknown max CPU freq for speedo_id=%d\n",
 			speedo_id);
 		return -ENODEV;
@@ -108,11 +190,27 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	cvb = tegra_cvb_build_opp_table(tegra124_cpu_cvb_tables,
-					ARRAY_SIZE(tegra124_cpu_cvb_tables),
-					process_id, speedo_id, speedo_value,
-					cpu_max_freq_table[speedo_id],
-					soc->dev);
+	ret = of_property_read_u32(pdev->dev.of_node, "nvidia,align-offset-uv",
+					&align.offset_uv);
+	if (ret < 0) {
+		dev_dbg(&pdev->dev,
+			"offset uv not found, the default value will be 0\n");
+		align.offset_uv = 0;
+	}
+
+	ret = of_property_read_u32(pdev->dev.of_node, "nvidia,align-step-uv",
+					&align.step_uv);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "missing step uv\n");
+		return -EINVAL;
+	}
+
+	cvb = tegra_cvb_build_opp_table(fcpu_data->cpu_cvb_tables,
+				fcpu_data->cpu_cvb_tables_size,
+				&align,
+				process_id, speedo_id, speedo_value,
+				fcpu_data->cpu_max_freq_table[speedo_id],
+				soc->dev);
 	if (IS_ERR(cvb)) {
 		dev_err(&pdev->dev, "couldn't build OPP table: %ld\n",
 			PTR_ERR(cvb));
@@ -120,18 +218,13 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 	}
 
 	soc->min_millivolts = cvb->min_millivolts;
+	soc->alignment = align.step_uv;
 	soc->tune0_low = cvb->cpu_dfll_data.tune0_low;
 	soc->tune0_high = cvb->cpu_dfll_data.tune0_high;
 	soc->tune1 = cvb->cpu_dfll_data.tune1;
 
 	return tegra_dfll_register(pdev, soc);
 }
-
-static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
-	{ .compatible = "nvidia,tegra124-dfll", },
-	{ },
-};
-MODULE_DEVICE_TABLE(of, tegra124_dfll_fcpu_of_match);
 
 static const struct dev_pm_ops tegra124_dfll_pm_ops = {
 	SET_RUNTIME_PM_OPS(tegra_dfll_runtime_suspend,
