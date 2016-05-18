@@ -33,6 +33,7 @@
 #include <linux/clk/tegra.h>
 #include <linux/tegra-powergate.h>
 #include <linux/tegra-soc.h>
+#include <soc/tegra/fuse.h>
 #include <trace/events/power.h>
 #include <asm/atomic.h>
 
@@ -714,31 +715,31 @@ static int tegra_powergate_init_refcount(void)
 int __init tegra_powergate_init(void)
 {
 	switch (tegra_get_chip_id()) {
-		case TEGRA_CHIPID_TEGRA2:
+		case TEGRA20:
 			pg_ops = tegra2_powergate_init_chip_support();
 			break;
 
-		case TEGRA_CHIPID_TEGRA3:
+		case TEGRA30:
 			pg_ops = tegra3_powergate_init_chip_support();
 			break;
 
-		case TEGRA_CHIPID_TEGRA11:
+		case TEGRA114:
 			pg_ops = tegra11x_powergate_init_chip_support();
 			break;
 
-		case TEGRA_CHIPID_TEGRA14:
+		case TEGRA148:
 			pg_ops = tegra14x_powergate_init_chip_support();
 			break;
 
-		case TEGRA_CHIPID_TEGRA12:
+		case TEGRA124:
 			pg_ops = tegra12x_powergate_init_chip_support();
 			break;
 
-		case TEGRA_CHIPID_TEGRA13:
+		case TEGRA132:
 			pg_ops = tegra12x_powergate_init_chip_support(); /* FIXME */
 			break;
 
-		case TEGRA_CHIPID_TEGRA21:
+		case TEGRA210:
 			pg_ops = tegra210_powergate_init_chip_support();
 			break;
 
