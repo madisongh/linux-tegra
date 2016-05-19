@@ -83,8 +83,6 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 {
 	struct cpufreq_policy *policy = sg_policy->policy;
 
-	sg_policy->last_freq_update_time = time;
-
 	if (policy->fast_switch_enabled) {
 		if (sg_policy->next_freq == next_freq) {
 			trace_cpu_frequency(policy->cur, smp_processor_id());
@@ -97,10 +95,12 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 
 		policy->cur = next_freq;
 		trace_cpu_frequency(next_freq, smp_processor_id());
+		sg_policy->last_freq_update_time = time;
 	} else if (sg_policy->next_freq != next_freq) {
 		sg_policy->next_freq = next_freq;
 		sg_policy->work_in_progress = true;
 		irq_work_queue(&sg_policy->irq_work);
+		sg_policy->last_freq_update_time = time;
 	}
 }
 
@@ -129,6 +129,25 @@ static unsigned int get_next_freq(struct cpufreq_policy *policy,
 				policy->cpuinfo.max_freq : policy->cur;
 
 	return (freq + (freq >> 2)) * util / max;
+}
+
+/**
+ * get_clipped_freq - Clip the input frequency to the freq. table.
+ * @freq: frequency to clip
+ *
+ * Returns the frequency clipped to the table. Rounds up.
+ */
+static unsigned int get_clipped_freq(unsigned int freq,
+				     struct cpufreq_policy *policy)
+{
+	unsigned int target_freq = UINT_MAX;
+	struct cpufreq_frequency_table *entry;
+
+	cpufreq_for_each_valid_entry(entry, policy->freq_table)
+		if (entry->frequency >= freq && entry->frequency < target_freq)
+			target_freq = entry->frequency;
+
+	return target_freq != UINT_MAX ? target_freq : policy->cpuinfo.max_freq;
 }
 
 static unsigned long sugov_sum_total_util(struct sugov_cpu *sg_cpu)
@@ -177,7 +196,7 @@ static unsigned int sugov_next_freq_shared(struct sugov_policy *sg_policy,
 	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned int max_f = policy->cpuinfo.max_freq;
 	u64 last_freq_update_time = sg_policy->last_freq_update_time;
-	unsigned int j;
+	unsigned int j, freq;
 
 	if (util == ULONG_MAX)
 		return max_f;
@@ -213,7 +232,8 @@ static unsigned int sugov_next_freq_shared(struct sugov_policy *sg_policy,
 		}
 	}
 
-	return get_next_freq(policy, util, max);
+	freq = get_next_freq(policy, util, max);
+	return get_clipped_freq(freq, policy);
 }
 
 static void sugov_update_shared(struct update_util_data *hook,
