@@ -3,7 +3,7 @@
  *
  * isomgr logging to ftrace.
  *
- * Copyright (c) 2013, NVIDIA Corporation.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION, All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@ TRACE_EVENT(tegra_isomgr_register,
 	TP_STRUCT__entry(
 		__field(enum tegra_iso_client, client)
 		__field(u32, dedi_bw)
-		__field(tegra_isomgr_renegotiate, renegotiate)
+		__field(void *, renegotiate)
 		__field(void *, priv)
 		__field(char *, name)
 		__field(char *, msg)
