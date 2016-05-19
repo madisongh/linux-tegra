@@ -1836,7 +1836,7 @@ static int tegra_spi_transfer_one_message(struct spi_master *master,
 				SPI_RX_FIFO_OVF | SPI_RX_FIFO_UNF))
 			dump_regs(dbg, tspi, "sw-handle-error");
 
-		if (!(ret & (SPI_RX_FIFO_EMPTY || SPI_TX_FIFO_EMPTY)))
+		if (!(ret & SPI_FIFO_EMPTY))
 			dump_regs(dbg, tspi, "rx/tx fifo are not empty");
 	}
 	ret = 0;
