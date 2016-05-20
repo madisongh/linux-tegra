@@ -251,6 +251,11 @@ static int ax88172_bind(struct usbnet *dev, struct usb_interface *intf)
 		ADVERTISE_ALL | ADVERTISE_CSMA | ADVERTISE_PAUSE_CAP);
 	mii_nway_restart(&dev->mii);
 
+	dev->driver_priv = kzalloc(sizeof(struct asix_common_private),
+		GFP_KERNEL);
+	if (!dev->driver_priv)
+		return -ENOMEM;
+
 	return 0;
 
 out:
