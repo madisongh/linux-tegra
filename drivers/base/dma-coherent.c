@@ -983,10 +983,18 @@ EXPORT_SYMBOL(dma_alloc_from_coherent_attr);
  * generic pools.
  */
 int dma_release_from_coherent_attr(struct device *dev, size_t size, void *vaddr,
-				struct dma_attrs *attrs)
+			struct dma_attrs *attrs, dma_addr_t dma_handle)
 {
 	if (!dev)
 		return 0;
+
+	if (!vaddr)
+		/*
+		 * The only possible valid case where vaddr is NULL is when
+		 * dma_alloc_attrs() is called on coherent dev which was
+		 * initialized with DMA_MEMORY_NOMAP.
+		 */
+		vaddr = (void *)dma_handle;
 
 	if (dev->dma_mem)
 		return dma_release_from_coherent_dev(dev, size, vaddr, attrs);

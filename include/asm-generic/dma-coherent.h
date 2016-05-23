@@ -10,11 +10,12 @@ int dma_alloc_from_coherent_attr(struct device *dev, ssize_t size,
 				       dma_addr_t *dma_handle, void **ret,
 				       struct dma_attrs *attrs);
 int dma_release_from_coherent_attr(struct device *dev, size_t size, void *vaddr,
-				       struct dma_attrs *attrs);
+				       struct dma_attrs *attrs,
+				       dma_addr_t dma_handle);
 #define dma_alloc_from_coherent(d, s, h, r) \
 	 dma_alloc_from_coherent_attr(d, s, h, r, NULL)
 #define dma_release_from_coherent(d, s, v) \
-	 dma_release_from_coherent_attr(d, s, v, NULL)
+	 dma_release_from_coherent_attr(d, s, v, NULL, 0)
 
 int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
 			    void *cpu_addr, size_t size, int *ret);

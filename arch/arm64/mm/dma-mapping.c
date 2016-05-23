@@ -1086,7 +1086,8 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
 {
 	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
 
-	if (dma_release_from_coherent_attr(dev, size, cpu_addr, attrs))
+	if (dma_release_from_coherent_attr(dev, size, cpu_addr,
+		attrs, handle))
 		return;
 
 	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs)) {
