@@ -159,6 +159,9 @@ struct tegra_adma {
 	 */
 	unsigned int			dma_start_index;
 
+	/* If "true", means running in hypervisor */
+	bool				is_virt;
+
 	/* global register need to be cache before suspend */
 	u32				global_reg;
 
@@ -1182,6 +1185,9 @@ static const struct of_device_id tegra_adma_of_match[] = {
 		.compatible = "nvidia,tegra210-adma",
 		.data = &tegra210_adma_chip_data,
 	}, {
+		.compatible = "nvidia,tegra210-adma-hv",
+		.data = &tegra210_adma_chip_data,
+	}, {
 	},
 };
 MODULE_DEVICE_TABLE(of, tegra_adma_of_match);
@@ -1202,6 +1208,7 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	unsigned int nr_channels = 0;
 	unsigned int dma_start_index = 0;
 	unsigned int adma_page = 1;
+	bool is_virt = false;
 	int ret, i;
 
 	const struct tegra_adma_chip_data *cdata = NULL;
@@ -1241,6 +1248,11 @@ static int tegra_adma_probe(struct platform_device *pdev)
 		adma_page = 1;
 	}
 
+	if (of_device_is_compatible(pdev->dev.of_node,
+	    "nvidia,tegra210-adma-hv")) {
+		is_virt = true;
+	}
+
 	tdma = devm_kzalloc(&pdev->dev, sizeof(*tdma) + nr_channels *
 			sizeof(struct tegra_adma_chan), GFP_KERNEL);
 	if (!tdma) {
@@ -1252,6 +1264,7 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	tdma->chip_data = cdata;
 	tdma->nr_channels = nr_channels;
 	tdma->dma_start_index = dma_start_index;
+	tdma->is_virt = is_virt;
 	platform_set_drvdata(pdev, tdma);
 
 	for (i = 0; i < ADMA_MAX_ADDR; i++) {
@@ -1379,13 +1392,19 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	/* Enable clock before accessing registers */
 	pm_runtime_get_sync(&pdev->dev);
 
-	/* Reset ADMA controller */
 	global_ch_write(tdma, ADMA_GLOBAL_INT_CLEAR, 0x1);
 	global_ch_write(tdma, ADMA_GLOBAL_INT_SET, 0x1);
-	global_write(tdma, ADMA_GLOBAL_SOFT_RESET, 0x1);
 
-	/* Enable global ADMA registers */
-	global_write(tdma, ADMA_GLOBAL_CMD, 1);
+	if (tdma->is_virt == false) {
+		/* Reset ADMA controller */
+		global_write(tdma, ADMA_GLOBAL_SOFT_RESET, 0x1);
+
+		/* Enable global ADMA registers */
+		global_write(tdma, ADMA_GLOBAL_CMD, 1);
+	} else {
+		/* Audio Server owns ADMA GLOBAL and set registers */
+		tdma->global_reg = 1;
+	}
 
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -1463,7 +1482,8 @@ static int tegra_adma_runtime_suspend(struct device *dev)
 	struct tegra_adma *tdma = platform_get_drvdata(pdev);
 	int i;
 
-	tdma->global_reg = global_read(tdma, ADMA_GLOBAL_CMD);
+	if (tdma->is_virt == false)
+		tdma->global_reg = global_read(tdma, ADMA_GLOBAL_CMD);
 
 	if (tdma->global_reg) {
 		for (i = 0; i < tdma->nr_channels; i++) {
@@ -1520,13 +1540,15 @@ static int tegra_adma_runtime_resume(struct device *dev)
 		}
 	}
 
-	ret = tegra_adma_init(pdev, tdma->adma_addr);
-	if (ret) {
-		dev_err(dev, "tegra_adma_init failed: %d\n", ret);
-		return ret;
-	}
+	if (tdma->is_virt == false) {
+		ret = tegra_adma_init(pdev, tdma->adma_addr);
+		if (ret) {
+			dev_err(dev, "tegra_adma_init failed: %d\n", ret);
+			return ret;
+		}
 
-	global_write(tdma, ADMA_GLOBAL_CMD, tdma->global_reg);
+		global_write(tdma, ADMA_GLOBAL_CMD, tdma->global_reg);
+	}
 
 	if (tdma->global_reg) {
 		for (i = 0; i < tdma->nr_channels; i++) {
