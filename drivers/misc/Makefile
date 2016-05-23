@@ -79,3 +79,4 @@ obj-$(CONFIG_EQOS_APE_HWDEP)    += eqos_ape/
 obj-$(CONFIG_TEGRA_PROFILER)	+= tegra-profiler/
 
 GCOV_PROFILE_cpuload.o := y
+obj-y				+= inter-tegra/
