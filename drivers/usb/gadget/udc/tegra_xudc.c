@@ -248,11 +248,12 @@ struct tegra_xudc_ep_context {
 #define EP_TYPE_INTERRUPT_IN 7
 
 #define BUILD_EP_CONTEXT_RW(name, member, shift, mask)			\
-static inline u32 ep_ctx_read_##name(struct tegra_xudc_ep_context *ctx)	\
+static inline u32 __maybe_unused					\
+ep_ctx_read_##name(struct tegra_xudc_ep_context *ctx)			\
 {									\
 	return (le32_to_cpu(ctx->member) >> shift) & mask;		\
 }									\
-static inline void							\
+static inline void __maybe_unused					\
 ep_ctx_write_##name(struct tegra_xudc_ep_context *ctx, u32 val)		\
 {									\
 	u32 tmp;							\
@@ -338,11 +339,12 @@ struct tegra_xudc_trb {
 #define TRB_CMPL_CODE_CTRL_SEQNUM_ERR 223
 
 #define BUILD_TRB_RW(name, member, shift, mask)				\
-static inline u32 trb_read_##name(struct tegra_xudc_trb *trb)		\
+static inline u32 __maybe_unused					\
+trb_read_##name(struct tegra_xudc_trb *trb)				\
 {									\
 	return (le32_to_cpu(trb->member) >> shift) & mask;		\
 }									\
-static inline void							\
+static inline void __maybe_unused					\
 trb_write_##name(struct tegra_xudc_trb *trb, u32 val)			\
 {									\
 	u32 tmp;							\
