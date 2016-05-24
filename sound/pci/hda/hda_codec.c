@@ -53,6 +53,17 @@
 #define codec_has_clkstop(codec) \
 	((codec)->core.power_caps & AC_PWRST_CLKSTOP)
 
+static inline int get_pcm_device(struct hda_codec *codec)
+{
+	int d = -1;
+	struct hda_pcm *cpcm;
+
+	list_for_each_entry(cpcm, &codec->pcm_list_head, list)
+		d= cpcm->device;
+
+	return d;
+}
+
 /*
  * Send and receive a verb - passed to exec_verb override for hdac_device
  */
@@ -1545,7 +1556,7 @@ int snd_hda_ctl_add(struct hda_codec *codec, hda_nid_t nid,
 	int err;
 	unsigned short flags = 0;
 	struct hda_nid_item *item;
-	int pcmdev = codec->pcm_info->device;
+	int pcmdev = get_pcm_device(codec);
 	char prefixed_ctl[SNDRV_CTL_ELEM_ID_NAME_MAXLEN];
 
 	if (kctl->id.subdevice & HDA_SUBDEV_AMP_FLAG) {

@@ -62,9 +62,9 @@ MODULE_PARM_DESC(static_hdmi_pcm, "Don't restrict PCM parameters per ELD info");
 #define is_cherryview(codec) ((codec)->core.vendor_id == 0x80862883)
 #define is_valleyview_plus(codec) (is_valleyview(codec) || is_cherryview(codec))
 
-#define is_tegra21x(codec)  ((codec)->vendor_id == 0x10de0029)
-#define is_tegra_18x_sor0(codec)  ((codec)->vendor_id == 0x10de002d)
-#define is_tegra_18x_sor1(codec)  ((codec)->vendor_id == 0x10de002e)
+#define is_tegra21x(codec)  ((codec)->core.vendor_id == 0x10de0029)
+#define is_tegra_18x_sor0(codec)  ((codec)->core.vendor_id == 0x10de002d)
+#define is_tegra_18x_sor1(codec)  ((codec)->core.vendor_id == 0x10de002e)
 #define get_sor_num(codec)  (is_tegra_18x_sor0(codec) ? 0 : 1)
 
 struct hdmi_spec_per_cvt {
@@ -1291,10 +1291,10 @@ static int hdmi_pin_hbr_setup(struct hda_codec *codec, hda_nid_t pin_nid,
 
 	/* Assuming the HW supports HBR for Tegra21x/Tegra12x HDMI */
 	if ((snd_hda_query_pin_caps(codec, pin_nid) & AC_PINCAP_HBR) ||
-		(codec->preset->id == 0x10de0029) ||
-		(codec->preset->id == 0x10de002d) ||
-		(codec->preset->id == 0x10de002e) ||
-		(codec->preset->id == 0x10de0028)) {
+		((codec)->core.vendor_id == 0x10de0029) ||
+		((codec)->core.vendor_id == 0x10de002d) ||
+		((codec)->core.vendor_id == 0x10de002e) ||
+		((codec)->core.vendor_id == 0x10de0028)) {
 		pinctl = snd_hda_codec_read(codec, pin_nid, 0,
 					    AC_VERB_GET_PIN_WIDGET_CONTROL, 0);
 
@@ -1947,11 +1947,11 @@ static int hdmi_pcm_close(struct hda_pcm_stream *hinfo,
 	if (hinfo->nid) {
 		cvt_idx = cvt_nid_to_cvt_index(codec, hinfo->nid);
 #if defined(CONFIG_SND_HDA_TEGRA) && defined(CONFIG_TEGRA_DC)
-		if ((codec->preset->id == 0x10de0020) ||
-			(codec->preset->id == 0x10de0022) ||
-			(codec->preset->id == 0x10de0028) ||
-			(codec->preset->id == 0x10de0029) ||
-			(codec->preset->id == 0x10de002a)) {
+		if (((codec)->core.vendor_id == 0x10de0020) ||
+			((codec)->core.vendor_id == 0x10de0022) ||
+			((codec)->core.vendor_id == 0x10de0028) ||
+			((codec)->core.vendor_id == 0x10de0029) ||
+			((codec)->core.vendor_id == 0x10de002a)) {
 			sor_num = get_sor_num(codec);
 			tegra_hdmi_audio_null_sample_inject(false, sor_num);
 		}
@@ -3647,6 +3647,8 @@ HDA_CODEC_ENTRY(0x10de0020, "Tegra30 HDMI",	patch_tegra_hdmi),
 HDA_CODEC_ENTRY(0x10de0022, "Tegra114 HDMI",	patch_tegra_hdmi),
 HDA_CODEC_ENTRY(0x10de0028, "Tegra124 HDMI",	patch_tegra_hdmi),
 HDA_CODEC_ENTRY(0x10de0029, "Tegra210 HDMI/DP",	patch_tegra_hdmi),
+HDA_CODEC_ENTRY(0x10de002d, "Tegra18x SOR0",	patch_tegra_hdmi),
+HDA_CODEC_ENTRY(0x10de002e, "Tegra18x SOR1",	patch_tegra_hdmi),
 HDA_CODEC_ENTRY(0x10de0040, "GPU 40 HDMI/DP",	patch_nvhdmi),
 HDA_CODEC_ENTRY(0x10de0041, "GPU 41 HDMI/DP",	patch_nvhdmi),
 HDA_CODEC_ENTRY(0x10de0042, "GPU 42 HDMI/DP",	patch_nvhdmi),
