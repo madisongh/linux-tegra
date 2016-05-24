@@ -390,7 +390,7 @@ nvadsp_get_section(const struct firmware *fw, char *sec_name)
 	return NULL;
 }
 
-static inline void dump_global_symbol_table(void)
+static inline void __maybe_unused dump_global_symbol_table(void)
 {
 	struct device *dev = &priv.pdev->dev;
 	struct global_sym_info *table = priv.adsp_glo_sym_tbl;
