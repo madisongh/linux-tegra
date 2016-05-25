@@ -22,6 +22,7 @@
 #include <linux/mmc/core.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/pm.h>
+#include <linux/semaphore.h>
 
 
 #define SET_DEFAULT_TAP	1
@@ -255,11 +256,13 @@ struct mmc_cmdq_context_info {
 	bool		active_dcmd;
 	bool		rpmb_in_wait;
 	bool		active_ncqcmd; /* Non CQ command like CMD8 */
+	bool		active_qbr;
 	enum cmdq_states curr_state;
 
 	/* no free tag available */
 	unsigned long	req_starved;
 	spinlock_t	cmdq_ctx_lock;
+	struct semaphore	thread_sem;
 };
 
 struct regulator;

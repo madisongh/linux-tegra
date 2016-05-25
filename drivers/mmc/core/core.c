@@ -2262,6 +2262,147 @@ static unsigned int mmc_erase_timeout(struct mmc_card *card,
 		return mmc_mmc_erase_timeout(card, arg, qty);
 }
 
+static void mmc_wait_hw_cmdq_done(struct mmc_request *mrq)
+{
+	complete(&mrq->completion);
+}
+
+static void mmc_wait_for_hw_cmdq_req_done(struct mmc_host *host,
+		struct mmc_request *mrq)
+{
+	struct mmc_command *cmd;
+	int err = 0;
+
+	err = wait_for_completion_timeout(&mrq->completion, jiffies + 10*HZ);
+	if (err) {
+		cmd = mrq->cmd;
+		if (cmd->error)
+			pr_debug("%s: req failed (CMD%u), err: %d\n",
+				mmc_hostname(host), cmd->opcode, cmd->error);
+	} else {
+		pr_err("%s: Timeout waiting for CQ interrupt, err: %d\n",
+				mmc_hostname(host), err);
+	}
+}
+
+static int mmc_wait_for_dcmd(struct mmc_host *host, struct mmc_command *cmd,
+		int retries)
+{
+	struct mmc_request *mrq;
+
+	WARN_ON(!host->claimed);
+
+	memset(cmd->resp, 0, sizeof(cmd->resp));
+	mrq = devm_kzalloc(host->parent, sizeof(struct mmc_request),
+			GFP_KERNEL);
+	mrq->cmdq_req = devm_kzalloc(host->parent, sizeof(struct mmc_cmdq_req),
+			GFP_KERNEL);
+	cmd->data = NULL;
+	cmd->error = 0;
+
+	mrq->cmd = cmd;
+	mrq->host = host;
+	init_completion(&mrq->completion);
+	mrq->done = mmc_wait_hw_cmdq_done;
+	mrq->cmdq_req->cmdq_req_flags = DCMD;
+	mmc_start_cmdq_request(host, mrq);
+	mmc_wait_for_hw_cmdq_req_done(host, mrq);
+
+	devm_kfree(host->parent, mrq->cmdq_req);
+	devm_kfree(host->parent, mrq);
+
+	return cmd->error;
+}
+
+static int mmc_do_erase_use_cmdq(struct mmc_card *card, unsigned int from,
+			unsigned int to, unsigned int arg)
+{
+	struct mmc_command cmd = {0};
+	unsigned int qty = 0;
+	unsigned long timeout;
+	unsigned int fr, nr;
+	int err;
+
+	fr = from;
+	nr = to - from + 1;
+
+	if (card->erase_shift)
+		qty += ((to >> card->erase_shift) -
+			(from >> card->erase_shift)) + 1;
+	else
+		qty += ((to / card->erase_size) -
+			(from / card->erase_size)) + 1;
+
+	if (!mmc_card_blockaddr(card)) {
+		from <<= 9;
+		to <<= 9;
+	}
+
+	cmd.opcode = MMC_ERASE_GROUP_START;
+	cmd.arg = from;
+	cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
+	err = mmc_wait_for_dcmd(card->host, &cmd, 0);
+	if (err) {
+		pr_err("mmc_erase: group start error %d, status %#x\n",
+			err, cmd.resp[0]);
+		err = -EIO;
+		goto out;
+	}
+
+	memset(&cmd, 0, sizeof(struct mmc_command));
+	cmd.opcode = MMC_ERASE_GROUP_END;
+	cmd.arg = to;
+	cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
+	err = mmc_wait_for_dcmd(card->host, &cmd, 0);
+	if (err) {
+		pr_err("mmc_erase: group end error %d, status %#x\n",
+		       err, cmd.resp[0]);
+		err = -EIO;
+		goto out;
+	}
+
+	memset(&cmd, 0, sizeof(struct mmc_command));
+	cmd.opcode = MMC_ERASE;
+	cmd.arg = arg;
+	cmd.flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
+	err = mmc_wait_for_dcmd(card->host, &cmd, 0);
+	if (err) {
+		pr_err("mmc_erase: erase error %d, status %#x\n",
+		       err, cmd.resp[0]);
+		err = -EIO;
+		goto out;
+	}
+
+	timeout = jiffies + msecs_to_jiffies(MMC_CORE_TIMEOUT_MS);
+	do {
+		memset(&cmd, 0, sizeof(struct mmc_command));
+		cmd.opcode = MMC_SEND_STATUS;
+		cmd.arg = card->rca << 16;
+		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
+		/* Do not retry else we can't see errors */
+		err = mmc_wait_for_dcmd(card->host, &cmd, 0);
+		if (err || (cmd.resp[0] & 0xFDF92000)) {
+			pr_err("error %d requesting status %#x\n",
+					err, cmd.resp[0]);
+			err = -EIO;
+			goto out;
+		}
+
+		/* Timeout if the device never becomes ready for data and
+		 * never leaves the program state.
+		 */
+		if (time_after(jiffies, timeout)) {
+			pr_err("%s: Card stuck in programming state! %s\n",
+				mmc_hostname(card->host), __func__);
+			err =  -EIO;
+			goto out;
+		}
+	} while (!(cmd.resp[0] & R1_READY_FOR_DATA) ||
+		 (R1_CURRENT_STATE(cmd.resp[0]) == R1_STATE_PRG));
+out:
+	return err;
+}
+
 static int mmc_do_erase(struct mmc_card *card, unsigned int from,
 			unsigned int to, unsigned int arg)
 {
@@ -2465,7 +2606,10 @@ int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
 			return err;
 	}
 
-	return mmc_do_erase(card, from, to, arg);
+	if (mmc_card_cmdq(card))
+		return mmc_do_erase_use_cmdq(card, from, to, arg);
+	else
+		return mmc_do_erase(card, from, to, arg);
 }
 EXPORT_SYMBOL(mmc_erase);
 

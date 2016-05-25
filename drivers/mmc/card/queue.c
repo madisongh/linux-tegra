@@ -37,29 +37,31 @@ static int mmc_cmdq_thread(void *d)
 	struct mmc_cmdq_context_info *ctx = &host->cmdq_ctx;
 	struct request *req;
 
+	current->flags |= PF_MEMALLOC;
+
 	down(&mq->thread_sem);
 	do {
-		spin_lock_irq(q->queue_lock);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!mmc_cmdq_should_pull_reqs(host, ctx)) {
 			test_and_set_bit(0, &ctx->req_starved);
-			spin_unlock_irq(q->queue_lock);
 			continue;
 		}
 
+		spin_lock_irq(q->queue_lock);
 		req = blk_peek_request(q);
+		spin_unlock_irq(q->queue_lock);
 		if (!req) {
 			if (kthread_should_stop()) {
 				set_current_state(TASK_RUNNING);
 				break;
 			}
-			spin_unlock_irq(q->queue_lock);
 			up(&mq->thread_sem);
 			schedule();
 			down(&mq->thread_sem);
 			continue;
 		}
 
+		spin_lock_irq(q->queue_lock);
 		if (blk_queue_start_tag(q, req)) {
 			test_and_set_bit(0, &ctx->req_starved);
 			spin_unlock_irq(q->queue_lock);
@@ -69,6 +71,7 @@ static int mmc_cmdq_thread(void *d)
 		spin_unlock_irq(q->queue_lock);
 		set_current_state(TASK_RUNNING);
 		mq->cmdq_issue_fn(mq, req);
+		cond_resched();
 	} while (1);
 
 	up(&mq->thread_sem);
@@ -172,12 +175,13 @@ static inline bool mmc_cmdq_should_pull_reqs(struct mmc_host *host,
 			ctx->active_ncqcmd) {
 		if ((ctx->curr_state != CMDQ_STATE_HALT) ||
 			(ctx->curr_state != CMDQ_STATE_ERR)) {
-			pr_debug("%s: %s: skip pulling reqs: dcmd: %d rpmb: %d state: %d\n",
-				 mmc_hostname(host), __func__, ctx->active_dcmd,
-				 ctx->rpmb_in_wait, ctx->curr_state);
-			spin_unlock_bh(&ctx->cmdq_ctx_lock);
-			return false;
+			pr_debug("%s: skip pulling reqs: dcmd: %d rpmb: %d ncq: %d state: %d\n",
+				 mmc_hostname(host), ctx->active_dcmd,
+				 ctx->rpmb_in_wait, ctx->active_ncqcmd,
+				 ctx->curr_state);
 		}
+		spin_unlock_bh(&ctx->cmdq_ctx_lock);
+		return false;
 	} else {
 		spin_unlock_bh(&ctx->cmdq_ctx_lock);
 		return true;
@@ -278,6 +282,7 @@ void mmc_blk_cmdq_setup_queue(struct mmc_queue *mq, struct mmc_card *card)
 	struct mmc_host *host = card->host;
 
 	queue_flag_set_unlocked(QUEUE_FLAG_NONROT, mq->queue);
+	queue_flag_clear_unlocked(QUEUE_FLAG_ADD_RANDOM, mq->queue);
 	if (mmc_can_erase(card))
 		mmc_queue_setup_discard(mq->queue, card);
 
@@ -316,6 +321,8 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 		mq->queue = blk_init_queue(mmc_cmdq_dispatch_req, lock);
 		if (!mq->queue)
 			return -ENOMEM;
+		mq->queue->queuedata = mq;
+		blk_queue_prep_rq(mq->queue, mmc_prep_request);
 		mmc_blk_cmdq_setup_queue(mq, card);
 		ret = mmc_cmdq_init(mq, card);
 		if (ret) {
@@ -323,7 +330,6 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 				       mmc_hostname(card->host), ret);
 			blk_cleanup_queue(mq->queue);
 		} else {
-			mq->queue->queuedata = mq;
 			sema_init(&mq->thread_sem, 1);
 			mq->cq_thread = kthread_run(mmc_cmdq_thread, mq,
 				"mmc_cmdq_d/%d%s", host->index,
@@ -556,6 +562,7 @@ int mmc_cmdq_init(struct mmc_queue *mq, struct mmc_card *card)
 
 	card->cmdq_init = false;
 	spin_lock_init(&card->host->cmdq_ctx.cmdq_ctx_lock);
+	sema_init(&card->host->cmdq_ctx.thread_sem, 1);
 
 	mq->mqrq_cmdq = kzalloc(
 		sizeof(struct mmc_queue_req) * q_depth, GFP_KERNEL);
