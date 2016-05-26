@@ -104,25 +104,6 @@ static void ufs_tegra_cfg_vendor_registers(struct ufs_hba *hba)
 	ufshcd_writel(hba, UFS_VNDR_HCLKDIV_1US_TICK, REG_UFS_VNDR_HCLKDIV);
 }
 
-/*
- * ufs_tegra_ufs_pwrcntrl_update - To config UFSHC_PWR_CNTRL_0
- */
-
-static void ufs_tegra_ufs_pwrcntrl_update(bool psw_on)
-{
-	if (psw_on) {
-		tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_ISOL_EN_MASK,
-			UFSHC_PWR_CNTRL_0_LP_ISOL_EN_ENABLE);
-		tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_PWR_RDY_MASK,
-			UFSHC_PWR_CNTRL_0_LP_PWR_RDY_DISABLE);
-	} else {
-		tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_PWR_RDY_MASK,
-			UFSHC_PWR_CNTRL_0_LP_PWR_RDY_ENABLE);
-		tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_ISOL_EN_MASK,
-			UFSHC_PWR_CNTRL_0_LP_ISOL_EN_DISABLE);
-	}
-}
-
 static int ufs_tegra_host_regulator_get(struct device *dev,
 		const char *name, struct regulator **regulator_out)
 {
@@ -531,12 +512,6 @@ static int ufs_tegra_ufs_reset_init(struct ufs_tegra_host *ufs_tegra)
 	return ret;
 }
 
-static void ufs_tegra_ufs_assert_reset(struct ufs_tegra_host *ufs_tegra)
-{
-	reset_control_assert(ufs_tegra->ufs_axi_m_rst);
-	reset_control_assert(ufs_tegra->ufshc_lp_rst);
-}
-
 static void ufs_tegra_ufs_deassert_reset(struct ufs_tegra_host *ufs_tegra)
 {
 	reset_control_deassert(ufs_tegra->ufs_rst);
@@ -904,8 +879,7 @@ static int ufs_tegra_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 		 * Save all armphy_rx_apb and armphy_tx_apb registers
 		 */
 		ufs_tegra_context_save(ufs_tegra);
-
-		ufs_tegra_ufs_pwrcntrl_update(true);
+		reset_control_assert(ufs_tegra->ufshc_lp_rst);
 	}
 
 	/*
@@ -916,7 +890,7 @@ static int ufs_tegra_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	ufs_tegra_disable_mphylane_clks(ufs_tegra);
 	ufs_tegra_mphy_assert_reset(ufs_tegra);
 	ufs_tegra_disable_ufs_clks(ufs_tegra);
-	ufs_tegra_ufs_assert_reset(ufs_tegra);
+	reset_control_assert(ufs_tegra->ufs_axi_m_rst);
 
 	phy_power_off(ufs_tegra->u_phy);
 
@@ -936,8 +910,6 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	ufs_tegra->ufshc_state = UFSHC_RESUME;
 
 	ufs_tegra_enable_regulators(ufs_tegra);
-	tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_PWR_RDY_MASK,
-			UFSHC_PWR_CNTRL_0_LP_PWR_RDY_ENABLE);
 
 	/*
 	 * Power on UPHY
@@ -955,8 +927,6 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 		goto out_disable_ufs_clks;
 	ufs_tegra_mphy_deassert_reset(ufs_tegra);
 	ufs_tegra_ufs_deassert_reset(ufs_tegra);
-	tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_ISOL_EN_MASK,
-			UFSHC_PWR_CNTRL_0_LP_ISOL_EN_DISABLE);
 	ufs_tegra_ufs_aux_prog(ufs_tegra);
 
 	if (ufs_tegra->ufs_padctrl) {
@@ -1308,7 +1278,6 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 			goto out_disable_mphylane_clks;
 
 		ufs_tegra_ufs_deassert_reset(ufs_tegra);
-		ufs_tegra_ufs_pwrcntrl_update(false);
 		ufs_tegra_disable_mphy_slcg(ufs_tegra);
 		ufs_tegra_mphy_rx_advgran(ufs_tegra);
 		ufs_tegra_ufs_aux_prog(ufs_tegra);
