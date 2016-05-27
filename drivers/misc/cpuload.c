@@ -66,7 +66,7 @@ static ssize_t show_cpus_online(struct kobject *kobj,
 	const cpumask_t *cpus = cpu_online_mask;
 
 	i = 0;
-	for_each_cpu_mask(t, *cpus)
+	for_each_cpu(t, cpus)
 		i++;
 
 	return sprintf(buf, "%u\n", i);
@@ -81,7 +81,7 @@ static ssize_t show_cpu_usage(struct kobject *kobj,
 	unsigned int t, len, total = 0;
 	const cpumask_t *cpus = cpu_online_mask;
 
-	for_each_cpu_mask(t, *cpus) {
+	for_each_cpu(t, cpus) {
 		/* XXX: Remove the hardcoded 0 once readers are updated */
 		len = sprintf(buf, "%u %u %llu %llu %llu\n",
 			      t, 0,
@@ -138,15 +138,9 @@ static struct attribute_group cpuload_attr_group = {
 
 static int __init cpuload_monitor_init(void)
 {
-	int rc;
-	rc = cpufreq_get_global_kobject();
-	if (rc)
-		return rc;
-
 	/* XXX: Move this node into a different syfs path */
-	rc = sysfs_create_group(cpufreq_global_kobject,
+	return sysfs_create_group(cpufreq_global_kobject,
 			&cpuload_attr_group);
-	return rc;
 }
 
 module_init(cpuload_monitor_init);
@@ -155,7 +149,6 @@ static void __exit cpuload_monitor_exit(void)
 {
 	sysfs_remove_group(cpufreq_global_kobject,
 			&cpuload_attr_group);
-	cpufreq_put_global_kobject();
 }
 
 module_exit(cpuload_monitor_exit);
