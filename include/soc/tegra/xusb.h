@@ -98,4 +98,6 @@ bool tegra_phy_xusb_utmi_pad_dcd(struct phy *phy);
 bool tegra_phy_xusb_utmi_pad_primary_charger_detect(struct phy *phy);
 bool tegra_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy);
 
+int tegra_phy_xusb_utmi_vbus_power_on(struct phy *phy);
+int tegra_phy_xusb_utmi_vbus_power_off(struct phy *phy);
 #endif /* __SOC_TEGRA_XUSB_H__ */
