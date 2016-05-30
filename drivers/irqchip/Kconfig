@@ -193,3 +193,14 @@ config IRQ_MXS
 	def_bool y if MACH_ASM9260 || ARCH_MXS
 	select IRQ_DOMAIN
 	select STMP_DEVICE
+
+config TEGRA_APE_AGIC
+	bool "Enable AGIC interrupt controller"
+	depends on ARCH_TEGRA_APE
+	default n
+	help
+	  The AGIC interrupt controller is based on GIC 400. Use this
+	  controller if the tegra platform needs interrupts from/to
+	  APE modules.
+
+	  If unsure, say N
