@@ -77,6 +77,14 @@ config CHARGER_BQ2419X
 	  Say Y here to enable driver support for TI BQ24190/
 	  BQ24192/BQ24192i/BQ24193 Charger.
 
+config BATTERY_BQ27441
+	tristate "TI's BQ27441 Fuel Gauge"
+	depends on I2C
+	select BATTERY_CHARGER_GAUGE_COMM
+	help
+	  BQ27441 is fuel-gauge systems for lithium-ion (Li+) batteries
+	  in handheld and portable equipment.
+
 config BATTERY_88PM860X
 	tristate "Marvell 88PM860x battery driver"
 	depends on MFD_88PM860X
