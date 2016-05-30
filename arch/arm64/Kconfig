@@ -133,6 +133,16 @@ config ARCH_TEGRA_21x_SOC
           Support for NVIDIA Tegra 21x family of SoCs, based upon the
 	  Cortex-A57 CPU.
 
+
+config ARCH_TEGRA_APE
+	bool "Tegra Audio Processing Engine(APE) present"
+	default n
+	help
+	  Say Y here if the SOC supports
+	  the Tegra Audio Processing Engine (APE)
+	  which handles audio specific
+	  tasks.
+
 if ARCH_TEGRA_18x_SOC
 source ../t18x/arch/arm64/Kconfig
 endif
