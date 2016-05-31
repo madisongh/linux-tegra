@@ -64,6 +64,11 @@ obj-$(CONFIG_BLUEDROID_PM)      += bluedroid_pm.o
 obj-$(CONFIG_MODS) 		+= mods/
 obj-$(CONFIG_SENSORS_NCT1008)	+= nct1008.o
 obj-$(CONFIG_THERM_EST)		+= therm_est.o
+CFLAGS_tegra-throughput.o        = -Werror
+ifeq ($(CONFIG_ARM64),y)
+CFLAGS_tegra-throughput.o       += -Iarch/arm/mach-tegra/include
+endif
+obj-$(CONFIG_TEGRA_THROUGHPUT)  += tegra-throughput.o
+obj-$(CONFIG_CPULOAD_MONITOR)   += cpuload.o
 obj-$(CONFIG_FAN_THERM_EST)	+= therm_fan_est.o
 obj-$(CONFIG_TEGRA_PROC_POWER_MODEL) += tegra_ppm.o
-
