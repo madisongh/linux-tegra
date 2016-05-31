@@ -46,7 +46,7 @@
 
 #define PCA_GPIO_MASK		0x00FF
 #define PCA_INT			0x0100
-#define PCA_PCAL			0x0200
+#define PCA_PCAL		0x0200
 #define PCA953X_TYPE		0x1000
 #define PCA957X_TYPE		0x2000
 #define PCA_TYPE_MASK		0xF000
@@ -137,7 +137,7 @@ static int pca953x_read_single(struct pca953x_chip *chip, int reg, u32 *val,
 static int pca953x_write_single(struct pca953x_chip *chip, int reg, u32 val,
 				int off)
 {
-	int ret = 0;
+	int ret;
 	int bank_shift = fls((chip->gpio_chip.ngpio - 1) / BANK_SZ);
 	int offset = off / BANK_SZ;
 
@@ -237,7 +237,6 @@ static int pca953x_gpio_direction_input(struct gpio_chip *gc, unsigned off)
 		goto exit;
 
 	chip->reg_direction[off / BANK_SZ] = reg_val;
-	ret = 0;
 exit:
 	mutex_unlock(&chip->i2c_lock);
 	return ret;
@@ -288,7 +287,6 @@ static int pca953x_gpio_direction_output(struct gpio_chip *gc,
 		goto exit;
 
 	chip->reg_direction[off / BANK_SZ] = reg_val;
-	ret = 0;
 exit:
 	mutex_unlock(&chip->i2c_lock);
 	return ret;
@@ -352,7 +350,6 @@ static void pca953x_gpio_set_value(struct gpio_chip *gc, unsigned off, int val)
 exit:
 	mutex_unlock(&chip->i2c_lock);
 }
-
 
 static void pca953x_gpio_set_multiple(struct gpio_chip *gc,
 		unsigned long *mask, unsigned long *bits)
@@ -854,7 +851,7 @@ static int pca953x_remove(struct i2c_client *client)
 {
 	struct pca953x_platform_data *pdata = dev_get_platdata(&client->dev);
 	struct pca953x_chip *chip = i2c_get_clientdata(client);
-	int ret = 0;
+	int ret;
 
 	if (pdata && pdata->teardown) {
 		ret = pdata->teardown(client, chip->gpio_chip.base,
