@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015 NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2016 NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -11,18 +11,20 @@
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef __OTE_PROTOCOL_H__
-#define __OTE_PROTOCOL_H__
+#include <linux/linkage.h>
 
-int tegra_set_vpr_params(void *vpr_base, size_t vpr_size);
+/* uint32_t invoke_smc(uint32_t arg0, uintptr_t arg1, uintptr_t arg2); */
 
-void te_restore_keyslots(void);
-int  te_vrr_set_buf(phys_addr_t addr);
-void te_vrr_sec(void);
-
+#ifdef CONFIG_ARM64
+ENTRY(invoke_smc)
+	smc	#0
+	ret
+ENDPROC(invoke_smc)
+#else
+ENTRY(invoke_smc)
+        smc     #0
+        mov     pc, lr
+ENDPROC(invoke_smc)
 #endif
