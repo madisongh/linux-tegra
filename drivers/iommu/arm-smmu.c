@@ -2282,11 +2282,6 @@ static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void *data)
 	return 0; /* Continue walking */
 }
 
-static void __arm_smmu_release_pci_iommudata(void *data)
-{
-	kfree(data);
-}
-
 static int arm_iommu_fault(struct iommu_domain *domain, struct device *dev,
 		unsigned long iova, int flags, void *token)
 {
@@ -2316,7 +2311,6 @@ static int arm_smmu_add_device(struct device *dev)
 	struct iommu_group *group;
 	struct arm_smmu_master *master;
 	struct dma_iommu_mapping *mapping;
-	void (*releasefn)(void *) = NULL;
 	int ret;
 	int i;
 	u64 swgids = 0;
@@ -2351,7 +2345,6 @@ static int arm_smmu_add_device(struct device *dev)
 
 		pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid,
 				       &cfg->streamids[0]);
-		releasefn = __arm_smmu_release_pci_iommudata;
 	}
 
 	if (tegra_platform_is_linsim() &&
@@ -2360,7 +2353,7 @@ static int arm_smmu_add_device(struct device *dev)
 		return 0;
 	}
 
-	iommu_group_set_iommudata(group, cfg, releasefn);
+	iommu_group_set_iommudata(group, cfg, NULL);
 	ret = iommu_group_add_device(group, dev);
 	iommu_group_put(group);
 	if (ret)
