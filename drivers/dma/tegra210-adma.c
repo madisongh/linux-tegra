@@ -707,7 +707,7 @@ end:
 	return;
 }
 
-static void tegra_adma_terminate_all(struct dma_chan *dc)
+static int tegra_adma_terminate_all(struct dma_chan *dc)
 {
 	struct tegra_adma_chan *tdc = to_tegra_adma_chan(dc);
 	struct tegra_adma_sg_req *sgreq;
@@ -720,7 +720,7 @@ static void tegra_adma_terminate_all(struct dma_chan *dc)
 	spin_lock_irqsave(&tdc->lock, flags);
 	if (list_empty(&tdc->pending_sg_req)) {
 		spin_unlock_irqrestore(&tdc->lock, flags);
-		return;
+		return 0;
 	}
 
 	if (!tdc->busy)
@@ -759,6 +759,8 @@ skip_dma_stop:
 		dma_desc->cb_count = 0;
 	}
 	spin_unlock_irqrestore(&tdc->lock, flags);
+
+	return 0;
 }
 
 static enum dma_status tegra_adma_tx_status(struct dma_chan *dc,
@@ -810,26 +812,6 @@ static enum dma_status tegra_adma_tx_status(struct dma_chan *dc,
 	spin_unlock_irqrestore(&tdc->lock, flags);
 	return ret;
 }
-
-static int tegra_adma_device_control(struct dma_chan *dc, enum dma_ctrl_cmd cmd,
-			unsigned long arg)
-{
-	switch (cmd) {
-	case DMA_SLAVE_CONFIG:
-		return tegra_adma_slave_config(dc,
-				(struct dma_slave_config *)arg);
-
-	case DMA_TERMINATE_ALL:
-		tegra_adma_terminate_all(dc);
-		return 0;
-
-	default:
-		break;
-	}
-
-	return -ENXIO;
-}
-
 
 static int get_transfer_param(struct tegra_adma_chan *tdc,
 	enum dma_transfer_direction direction, unsigned long *ahub_fifo_ctrl,
@@ -1389,9 +1371,10 @@ static int tegra_adma_probe(struct platform_device *pdev)
 					tegra_adma_free_chan_resources;
 	tdma->dma_dev.device_prep_slave_sg = tegra_adma_prep_slave_sg;
 	tdma->dma_dev.device_prep_dma_cyclic = tegra_adma_prep_dma_cyclic;
-	tdma->dma_dev.device_control = tegra_adma_device_control;
+	tdma->dma_dev.device_config = tegra_adma_slave_config;
 	tdma->dma_dev.device_tx_status = tegra_adma_tx_status;
 	tdma->dma_dev.device_issue_pending = tegra_adma_issue_pending;
+	tdma->dma_dev.device_terminate_all = tegra_adma_terminate_all;
 
 	/* Enable clock before accessing registers */
 	pm_runtime_get_sync(&pdev->dev);
