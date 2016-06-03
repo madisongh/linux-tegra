@@ -161,7 +161,8 @@ static void sugov_update_single(struct update_util_data *hook,
 
 	sg_cpu->util[sc] = util;
 
-	if (!sugov_should_update_freq(sg_policy, time))
+	if (!sugov_should_update_freq(sg_policy, time) ||
+	    (cpu_of(rq) != smp_processor_id()))
 		return;
 
 	total_util = sugov_sum_total_util(sg_cpu);
@@ -233,7 +234,8 @@ static void sugov_update_shared(struct update_util_data *hook,
 	sg_cpu->last_update = time;
 	total_util = sugov_sum_total_util(sg_cpu);
 
-	if (sugov_should_update_freq(sg_policy, time)) {
+	if (cpu_of(rq) == smp_processor_id() &&
+	    sugov_should_update_freq(sg_policy, time)) {
 		next_f = sugov_next_freq_shared(sg_policy, total_util, max);
 		sugov_update_commit(sg_policy, time, next_f);
 	}

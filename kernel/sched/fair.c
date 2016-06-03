@@ -2827,9 +2827,8 @@ static inline u64 cfs_rq_clock_task(struct cfs_rq *cfs_rq);
 static inline void cfs_rq_util_change(struct cfs_rq *cfs_rq)
 {
 	struct rq *rq = rq_of(cfs_rq);
-	int cpu = cpu_of(rq);
 
-	if (cpu == smp_processor_id() && &rq->cfs == cfs_rq) {
+	if (&rq->cfs == cfs_rq) {
 		unsigned long max = rq->cpu_capacity_orig;
 		unsigned long usage = max(cfs_rq->avg.util_fast_avg,
 					  cfs_rq->avg.util_avg);
