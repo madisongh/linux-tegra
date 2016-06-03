@@ -148,12 +148,12 @@ static unsigned long sugov_sum_total_util(struct sugov_cpu *sg_cpu)
 }
 
 static void sugov_update_single(struct update_util_data *hook,
-				unsigned long util, enum sched_class_util sc)
+				unsigned long util, enum sched_class_util sc,
+				struct rq *rq)
 {
 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_util);
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
 	struct cpufreq_policy *policy = sg_policy->policy;
-	struct rq *rq = this_rq();
 	unsigned long max = rq->cpu_capacity_orig;
 	u64 time = rq_clock(rq);
 	unsigned long total_util;
@@ -216,11 +216,11 @@ static unsigned int sugov_next_freq_shared(struct sugov_policy *sg_policy,
 }
 
 static void sugov_update_shared(struct update_util_data *hook,
-				unsigned long util, enum sched_class_util sc)
+				unsigned long util, enum sched_class_util sc,
+				struct rq *rq)
 {
 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_util);
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
-	struct rq *rq = this_rq();
 	unsigned long max = rq->cpu_capacity_orig;
 	u64 time = rq_clock(rq);
 	unsigned long total_util;

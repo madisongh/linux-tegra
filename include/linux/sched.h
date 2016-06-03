@@ -3198,15 +3198,18 @@ enum sched_class_util {
 };
 
 #ifdef CONFIG_CPU_FREQ
+struct rq;
+
 struct update_util_data {
 	void (*func)(struct update_util_data *data,
-		     unsigned long util, enum sched_class_util sc);
+		     unsigned long util, enum sched_class_util sc,
+		     struct rq *rq);
 };
 
 void cpufreq_add_update_util_hook(int cpu, struct update_util_data *data,
 			void (*func)(struct update_util_data *data,
 				     unsigned long util,
-				     enum sched_class_util sc));
+				     enum sched_class_util sc, struct rq *rq));
 void cpufreq_remove_update_util_hook(int cpu);
 #endif /* CONFIG_CPU_FREQ */
 

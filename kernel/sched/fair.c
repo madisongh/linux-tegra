@@ -2850,7 +2850,7 @@ static inline void cfs_rq_util_change(struct cfs_rq *cfs_rq)
 		 *
 		 * See cpu_util().
 		 */
-		cpufreq_update_util(min(usage, max), cfs_util);
+		cpufreq_update_util(min(usage, max), cfs_util, rq);
 	}
 }
 

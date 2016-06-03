@@ -959,7 +959,7 @@ static void sched_rt_update_util(struct rq *rq)
 	if (unlikely(used > SCHED_CAPACITY_SCALE))
 		used = SCHED_CAPACITY_SCALE;
 
-	cpufreq_update_util(used, rt_util);
+	cpufreq_update_util(used, rt_util, rq);
 }
 #else
 static inline void sched_rt_update_util(struct rq *rq) { }
