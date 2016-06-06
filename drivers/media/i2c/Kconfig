@@ -517,6 +517,16 @@ config VIDEO_OV9650
 	  This is a V4L2 sensor-level driver for the Omnivision
 	  OV9650 and OV9652 camera sensors.
 
+config VIDEO_OV10823
+	tristate "OmniVision OV10823 camera sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	---help---
+	  This is a Video4Linux2 sensor driver for the OmniVision
+	  OV10823 camera sensor, for use with the tegra isp.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called ov10823.
+
 config VIDEO_OV23850
 	tristate "OmniVision OV23850 sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
