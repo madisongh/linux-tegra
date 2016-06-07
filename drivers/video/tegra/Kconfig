@@ -1,7 +1,4 @@
 source "../nvhost/drivers/video/tegra/Kconfig"
-if ARCH_TEGRA_18x_SOC
-source "../t18x/drivers/video/tegra/Kconfig"
-endif
 
 config TEGRA_GRHOST_SYNC
 	depends on TEGRA_GRHOST || TEGRA_HOST1X
