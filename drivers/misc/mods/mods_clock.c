@@ -1,7 +1,7 @@
 /*
  * mods_clock.c - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -20,13 +20,15 @@
 #include "mods_internal.h"
 #include <linux/clk.h>
 #include <linux/platform/tegra/clock.h>
-#ifdef CONFIG_TEGRA_CLK_FRAMEWORK
+#if defined(CONFIG_TEGRA_CLK_FRAMEWORK)
 	#include <mach/clk.h>
 #elif defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
 defined(CONFIG_OF_DYNAMIC)
+	#define MODS_COMMON_CLK 1
+#endif
+#if defined(MODS_COMMON_CLK)
 	#include "mods_clock.h"
 	#include <linux/clk-provider.h>
-	#include <linux/clk-private.h>
 	#include <linux/of_device.h>
 	#include <linux/of.h>
 	#include <linux/of_fdt.h>
@@ -44,8 +46,7 @@ struct clock_entry {
 	struct list_head list;
 };
 
-#if defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
-defined(CONFIG_OF_DYNAMIC)
+#if defined(MODS_COMMON_CLK)
 static struct property clock_names_prop = {
 	.name = "clock-names",
 };
@@ -177,7 +178,7 @@ static void mods_attach_node_data(void)
 	while (np) {
 		struct device_node *next = np->sibling;
 
-		np->parent = of_allnodes;
+		np->parent = of_root;
 		mods_attach_node_and_children(np);
 		np = next;
 	}
@@ -200,18 +201,25 @@ static void mods_remove_node_data(void)
 
 void mods_init_clock_api(void)
 {
-	spin_lock_init(&mods_clock_lock);
-	INIT_LIST_HEAD(&mods_clock_handles);
-	last_handle = 0;
-
-#if defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
-defined(CONFIG_OF_DYNAMIC)
+#if defined(MODS_COMMON_CLK)
 	struct device_node *mods_np = 0;
 	struct device_node *car_np = 0;
 	void *clk_names = 0;
 	void *clk_tuples = 0;
 	int index, size, pos, num_clocks = 0;
+#endif
 
+#if defined(CONFIG_RESET_CONTROLLER)
+	void *rst_names;
+	void *rst_tuples;
+	u32 num_resets = 0;
+#endif
+
+	spin_lock_init(&mods_clock_lock);
+	INIT_LIST_HEAD(&mods_clock_handles);
+	last_handle = 0;
+
+#if defined(MODS_COMMON_CLK)
 	/* add mods node to kernel's live device tree*/
 	mods_attach_node_data();
 
@@ -280,11 +288,7 @@ defined(CONFIG_OF_DYNAMIC)
 		goto err;
 	}
 
-#ifdef CONFIG_RESET_CONTROLLER
-	void *rst_names;
-	void *rst_tuples;
-	u32 num_resets = 0;
-
+#if defined(CONFIG_RESET_CONTROLLER)
 	for (index = 0; index < num_clocks; ++index)
 		if (clock_list[index].rst_uid != -1)
 			++num_resets;
@@ -360,8 +364,7 @@ void mods_shutdown_clock_api(void)
 		kfree(entry);
 	}
 
-#if defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
-defined(CONFIG_OF_DYNAMIC)
+#if defined(MODS_COMMON_CLK)
 	mods_remove_node_data();
 #endif /* CONFIG_COMMON_CLOCK */
 
@@ -427,15 +430,12 @@ static struct clk *mods_get_clock(u32 handle)
 int esc_mods_get_clock_handle(struct file *pfile,
 			      struct MODS_GET_CLOCK_HANDLE *p)
 {
-#if defined(CONFIG_TEGRA_CLK_FRAMEWORK) || (defined(CONFIG_COMMON_CLK) && \
-	defined(CONFIG_OF_RESOLVE) && defined(CONFIG_OF_DYNAMIC))
 	struct clk *pclk = 0;
-#endif
 	int ret = -EINVAL;
 
+#if defined(CONFIG_TEGRA_CLK_FRAMEWORK)
 	LOG_ENT();
 
-#ifdef CONFIG_TEGRA_CLK_FRAMEWORK
 	p->device_name[sizeof(p->device_name)-1] = 0;
 	p->controller_name[sizeof(p->controller_name)-1] = 0;
 	pclk = clk_get_sys(p->device_name, p->controller_name);
@@ -447,11 +447,12 @@ int esc_mods_get_clock_handle(struct file *pfile,
 		p->clock_handle = mods_get_clock_handle(pclk);
 		ret = OK;
 	}
-#elif defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
-defined(CONFIG_OF_DYNAMIC)
+#elif defined(MODS_COMMON_CLK)
 	struct device_node *mods_np = 0;
 	struct property *pp = 0;
 	u32 index, size = 0;
+
+	LOG_ENT();
 
 	mods_np = find_node("nvidia,tegra-mods");
 	if (!mods_np || !of_device_is_available(mods_np)) {
@@ -548,7 +549,7 @@ int esc_mods_get_clock_max_rate(struct file *pfile, struct MODS_CLOCK_RATE *p)
 	if (!pclk) {
 		mods_error_printk("unrecognized clock handle: 0x%x\n",
 				  p->clock_handle);
-#ifdef CONFIG_TEGRA_CLK_FRAMEWORK
+#if defined(CONFIG_TEGRA_CLK_FRAMEWORK)
 	} else if (!pclk->ops || !pclk->ops->round_rate) {
 		mods_error_printk(
 			"unable to detect max rate for clock handle 0x%x\n",
@@ -557,8 +558,7 @@ int esc_mods_get_clock_max_rate(struct file *pfile, struct MODS_CLOCK_RATE *p)
 		long rate = pclk->ops->round_rate(pclk, pclk->max_rate);
 		p->clock_rate_hz = rate < 0 ? pclk->max_rate
 					    : (unsigned long)rate;
-#elif defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
-defined(CONFIG_OF_DYNAMIC)
+#elif defined(MODS_COMMON_CLK)
 	} else {
 		long rate = clk_round_rate(pclk, ARBITRARY_MAX_CLK_FREQ);
 		p->clock_rate_hz = rate < 0 ? ARBITRARY_MAX_CLK_FREQ
@@ -587,7 +587,7 @@ int esc_mods_set_clock_max_rate(struct file *pfile, struct MODS_CLOCK_RATE *p)
 		mods_error_printk("unrecognized clock handle: 0x%x\n",
 				  p->clock_handle);
 	} else {
-#ifdef CONFIG_TEGRA_CLOCK_DEBUG_FUNC
+#if defined(CONFIG_TEGRA_CLOCK_DEBUG_FUNC)
 		ret = tegra_clk_set_max(pclk, p->clock_rate_hz);
 		if (ret) {
 			mods_error_printk(
@@ -682,8 +682,7 @@ int esc_mods_enable_clock(struct file *pfile, struct MODS_CLOCK_HANDLE *p)
 		mods_error_printk("unrecognized clock handle: 0x%x\n",
 				  p->clock_handle);
 	} else {
-#if defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
-defined(CONFIG_OF_DYNAMIC)
+#if defined(MODS_COMMON_CLK)
 		ret = clk_prepare(pclk);
 		if (ret) {
 			mods_error_printk("unable to prepare clock 0x%x before "
@@ -718,8 +717,7 @@ int esc_mods_disable_clock(struct file *pfile, struct MODS_CLOCK_HANDLE *p)
 				  p->clock_handle);
 	} else {
 		clk_disable(pclk);
-#if defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
-defined(CONFIG_OF_DYNAMIC)
+#if defined(MODS_COMMON_CLK)
 		clk_unprepare(pclk);
 #endif
 		mods_debug_printk(DEBUG_CLOCK, "clock 0x%x disabled\n",
@@ -744,11 +742,10 @@ int esc_mods_is_clock_enabled(struct file *pfile, struct MODS_CLOCK_ENABLED *p)
 		mods_error_printk("unrecognized clock handle: 0x%x\n",
 				  p->clock_handle);
 	} else {
-#ifdef CONFIG_TEGRA_CLK_FRAMEWORK
+#if defined(CONFIG_TEGRA_CLK_FRAMEWORK)
 		p->enable_count = pclk->refcnt;
-#elif defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
-defined(CONFIG_OF_DYNAMIC)
-		p->enable_count = pclk->enable_count;
+#elif defined(MODS_COMMON_CLK)
+		p->enable_count = (u32)__clk_is_enabled(pclk);
 #endif
 		mods_debug_printk(DEBUG_CLOCK, "clock 0x%x enable count is %u\n",
 				  p->clock_handle, p->enable_count);
@@ -773,13 +770,13 @@ int esc_mods_clock_reset_assert(struct file *pfile,
 		mods_error_printk("unrecognized clock handle: 0x%x\n",
 				  p->clock_handle);
 	} else {
-#ifdef CONFIG_TEGRA_CLK_FRAMEWORK
+#if defined(CONFIG_TEGRA_CLK_FRAMEWORK)
 		tegra_periph_reset_assert(pclk);
 		mods_debug_printk(DEBUG_CLOCK, "clock 0x%x reset asserted\n",
 				  p->clock_handle);
 		ret = OK;
-#elif defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
-defined(CONFIG_OF_DYNAMIC) && defined(CONFIG_RESET_CONTROLLER)
+#elif defined(MODS_COMMON_CLK) && defined(CONFIG_RESET_CONTROLLER)
+		const char *clk_name = 0;
 		struct reset_control *prst = 0;
 		struct device_node *mods_np = 0;
 		struct property *pp = 0;
@@ -794,7 +791,7 @@ defined(CONFIG_OF_DYNAMIC) && defined(CONFIG_RESET_CONTROLLER)
 		if (IS_ERR(pp)) {
 			mods_error_printk("'reset-names' prop not found in 'mods' node."
 					  " Can't get handle for reset dev %s\n",
-					  pclk->name);
+					  __clk_get_name(pclk));
 			goto err;
 		}
 
@@ -803,8 +800,9 @@ defined(CONFIG_OF_DYNAMIC) && defined(CONFIG_RESET_CONTROLLER)
 			if (clock_list[index].mhandle == p->clock_handle)
 				break;
 		if (index == size) {
+			clk_name = __clk_get_name(pclk);
 			for (index = 0; index < size; ++index) {
-				if (!strcmp(clock_list[index].name, pclk->name)) {
+				if (!strcmp(clock_list[index].name, clk_name)) {
 					clock_list[index].mhandle =
 						p->clock_handle;
 					break;
@@ -849,13 +847,13 @@ int esc_mods_clock_reset_deassert(struct file *pfile,
 		mods_error_printk("unrecognized clock handle: 0x%x\n",
 				  p->clock_handle);
 	} else {
-#ifdef CONFIG_TEGRA_CLK_FRAMEWORK
+#if defined(CONFIG_TEGRA_CLK_FRAMEWORK)
 		tegra_periph_reset_deassert(pclk);
 		mods_debug_printk(DEBUG_CLOCK, "clock 0x%x reset deasserted\n",
 				  p->clock_handle);
 		ret = OK;
-#elif defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
-defined(CONFIG_OF_DYNAMIC) && defined(CONFIG_RESET_CONTROLLER)
+#elif defined(MODS_COMMON_CLK) && defined(CONFIG_RESET_CONTROLLER)
+		const char *clk_name = 0;
 		struct reset_control *prst = 0;
 		struct device_node *mods_np = 0;
 		struct property *pp = 0;
@@ -870,7 +868,7 @@ defined(CONFIG_OF_DYNAMIC) && defined(CONFIG_RESET_CONTROLLER)
 		if (IS_ERR(pp)) {
 			mods_error_printk("'reset-names' prop not found in 'mods' node."
 					  " Can't get handle for reset dev %s\n",
-					  pclk->name);
+					  __clk_get_name(pclk));
 			goto err;
 		}
 
@@ -879,8 +877,9 @@ defined(CONFIG_OF_DYNAMIC) && defined(CONFIG_RESET_CONTROLLER)
 			if (clock_list[index].mhandle == p->clock_handle)
 				break;
 		if (index == size) {
+			clk_name = __clk_get_name(pclk);
 			for (index = 0; index < size; ++index) {
-				if (!strcmp(clock_list[index].name, pclk->name)) {
+				if (!strcmp(clock_list[index].name, clk_name)) {
 					clock_list[index].mhandle =
 						p->clock_handle;
 					break;

@@ -78,7 +78,6 @@ struct clock_details clock_list[] = {
 	{0, -1, TEGRA186_CLK_EXTPERIPH2, TEGRA186_RESET_EXTPERIPH2, "extperiph2"},
 	{0, -1, TEGRA186_CLK_EXTPERIPH3, TEGRA186_RESET_EXTPERIPH3, "extperiph3"},
 	{0, -1, TEGRA186_CLK_EXTPERIPH4, TEGRA186_RESET_EXTPERIPH4, "extperiph4"},
-	{0, -1, TEGRA186_CLK_EXT_VIMCLK, -1, "ext_vimclk"},
 	/* AHCI clocks */
 	{0, -1, TEGRA186_CLK_SATA, TEGRA186_RESET_SATA, "sata"},
 	{0, -1, TEGRA186_CLK_SATA_OOB, -1, "sata_oob"},
@@ -159,16 +158,12 @@ struct clock_details clock_list[] = {
 	/* Tach clock */
 	{0, -1, TEGRA186_CLK_TACH, TEGRA186_RESET_TACH, "tach"},
 	/* PLLP variants */
-	{0, -1, TEGRA186_CLK_PLLP_OUT_CPU, -1, "pllp_out_cpu"},
-	{0, -1, TEGRA186_CLK_PLLP_PLL_REF, -1, "pllp_pll_ref"},
-	{0, -1, TEGRA186_CLK_PLLP_UD, -1, "pllp_ud"},
 	{0, -1, TEGRA186_CLK_PLLP_OUT0, -1, "pllp_out0" },
 	{0, -1, TEGRA186_CLK_PLLP_OUT5, -1, "pllp_out5"},
 	{0, -1, TEGRA186_CLK_PLLP, -1, "pllp"},
 	{0, -1, TEGRA186_CLK_PLLP_DIV8, -1, "pllp_div8"},
 	/* PLLA variants */
 	{0, -1, TEGRA186_CLK_PLLA, -1, "plla"},
-	{0, -1, TEGRA186_CLK_PLLA_VCO, -1, "plla_vco"},
 	{0, -1, TEGRA186_CLK_PLLA1, -1, "plla1"},
 	{0, -1, TEGRA186_CLK_PLL_A_OUT0, -1, "pll_a_out0"},
 	{0, -1, TEGRA186_CLK_PLL_A_OUT1, -1, "pll_a_out1"},
@@ -177,7 +172,6 @@ struct clock_details clock_list[] = {
 	{0, -1, TEGRA186_CLK_PLLC_OUT_ISP, -1, "pllc_out_isp"},
 	{0, -1, TEGRA186_CLK_PLLC_OUT_VE, -1, "pllc_out_ve" },
 	{0, -1, TEGRA186_CLK_PLLC_OUT_AON, -1, "pllc_out_aon"},
-	{0, -1, TEGRA186_CLK_PLLC_UD, -1, "pllc_ud"},
 	/* PLLC2 clocks */
 	{0, -1, TEGRA186_CLK_PLLC2, -1, "pllc2"},
 	/* PLLC3 clocks */
@@ -191,7 +185,6 @@ struct clock_details clock_list[] = {
 	{0, -1, TEGRA186_CLK_PLLC4_OUT_MUX, -1, "pllc4_out_mux"},
 	/* PLLD clocks */
 	{0, -1, TEGRA186_CLK_PLLD, -1, "pll_d"},
-	{0, -1, TEGRA186_CLK_PLLD_OUT_CPU, -1, "plld_out_cpu"},
 	{0, -1, TEGRA186_CLK_PLLD_OUT1, -1, "pll_d_out1"},
 	{0, -1, TEGRA186_CLK_PLLD2, -1, "pll_d2"},
 	{0, -1, TEGRA186_CLK_PLLD3, -1, "pll_d3"},
