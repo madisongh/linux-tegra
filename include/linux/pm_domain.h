@@ -160,6 +160,7 @@ extern int pm_genpd_add_callbacks(struct device *dev,
 extern int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td);
 extern void pm_genpd_init(struct generic_pm_domain *genpd,
 			  struct dev_power_governor *gov, bool is_off);
+extern void pm_genpd_deinit(struct generic_pm_domain *genpd);
 
 extern struct dev_power_governor simple_qos_governor;
 extern struct dev_power_governor pm_domain_always_on_gov;
@@ -219,6 +220,9 @@ static inline int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td)
 }
 static inline void pm_genpd_init(struct generic_pm_domain *genpd,
 				 struct dev_power_governor *gov, bool is_off)
+{
+}
+static inline void pm_genpd_deinit(struct generic_pm_domain *genpd)
 {
 }
 #endif
