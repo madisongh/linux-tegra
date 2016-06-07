@@ -4926,6 +4926,7 @@ static int __init tegra_pcie_init_driver(void)
 static void __exit_refok tegra_pcie_exit_driver(void)
 {
 	platform_driver_unregister(&tegra_pcie_driver);
+	pm_genpd_deinit(&pcie_domain.tpd.gpd);
 }
 
 module_init(tegra_pcie_init_driver);
