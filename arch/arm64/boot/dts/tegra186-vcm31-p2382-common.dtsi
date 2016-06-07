@@ -42,4 +42,14 @@
 		wp-inverted;
 		status = "okay";
 	};
+
+	/*
+	 * FIXME : when auatmotive team switchs to k4.4 from k3.18
+	 *   1. serial index will be moved from ttyS0 to ttyS1 in os_args in cfg
+	 *   2. remove serial0/1 alias below
+	 */
+	aliases {
+		serial1 = &uarta;
+		serial0 = &uartb;
+	};
 };
