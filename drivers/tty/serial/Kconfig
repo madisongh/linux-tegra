@@ -1629,6 +1629,15 @@ config SERIAL_STM32_CONSOLE
 	depends on SERIAL_STM32=y
 	select SERIAL_CORE_CONSOLE
 
+config SERIAL_UBLOX_GPS
+       tristate "u-blox 6 I2C GPS support"
+       depends on I2C
+       default n
+       help
+         This driver uses i2c to communicate with the u-blox 6 GPS module
+         and has a serial tty device interface to the user-space, making
+         it easy to read/write data from/to the GPS.
+
 endmenu
 
 config SERIAL_MCTRL_GPIO
