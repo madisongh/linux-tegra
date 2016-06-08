@@ -1,0 +1,7 @@
+/ {
+	pcie-controller@10003000 {
+		pci@2,0 {
+			status = "disabled";
+		};
+	};
+};
