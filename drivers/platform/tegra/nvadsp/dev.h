@@ -100,6 +100,7 @@ struct nvadsp_drv_data {
 	struct clk *uartape_clk;
 	struct clk *ahub_clk;
 	unsigned long adsp_freq; /* in KHz*/
+	unsigned long adsp_freq_hz; /* in Hz*/
 	unsigned long ape_freq; /* in KHz*/
 	unsigned long ape_emc_freq; /* in KHz*/
 

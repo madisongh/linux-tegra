@@ -858,7 +858,7 @@ static int set_adsp_clks(struct nvadsp_drv_data *drv_data)
 	unsigned long adsp_freq;
 	int ret = 0;
 
-	adsp_freq = drv_data->adsp_freq * 1000; /* in Hz*/
+	adsp_freq = drv_data->adsp_freq_hz; /* in Hz*/
 	max_adsp_freq = clk_round_rate(drv_data->adsp_clk, ULONG_MAX);
 
 	/* Set max adsp boot freq */
@@ -866,10 +866,14 @@ static int set_adsp_clks(struct nvadsp_drv_data *drv_data)
 		adsp_freq = max_adsp_freq;
 
 	ret = clk_set_rate(drv_data->adsp_clk, adsp_freq);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "setting adsp_freq:%luHz failed.\n", adsp_freq);
+		dev_err(dev, "max_adsp_freq:%luHz\n", max_adsp_freq);
 		goto end;
+	}
 
 	drv_data->adsp_freq = adsp_freq / 1000; /* adsp_freq in KHz*/
+	drv_data->adsp_freq_hz = adsp_freq;
 	os_args->adsp_freq_hz = adsp_freq;
 end:
 	dev_dbg(dev, "adsp cpu freq %luKHz\n",
@@ -1029,13 +1033,17 @@ static int __nvadsp_os_start(void)
 
 	dev_dbg(dev, "Setting freqs\n");
 	ret = nvadsp_set_boot_freqs(drv_data);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to set boot freqs\n");
 		goto end;
+	}
 
 	dev_dbg(dev, "De-asserting adsp\n");
 	ret = nvadsp_deassert_adsp(drv_data);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to deassert ADSP\n");
 		goto end;
+	}
 
 	dev_dbg(dev, "Waiting for ADSP OS to boot up...\n");
 

@@ -124,8 +124,10 @@ static void __init nvadsp_parse_clk_entries(struct platform_device *pdev)
 	/* Optional properties, should come from platform dt files */
 	if (of_property_read_u32(dev->of_node, "nvidia,adsp_freq", &val32))
 		dev_dbg(dev, "adsp_freq dt not found\n");
-	else
+	else {
 		drv_data->adsp_freq = val32;
+		drv_data->adsp_freq_hz = val32 * 1000;
+	}
 
 	if (of_property_read_u32(dev->of_node, "nvidia,ape_freq", &val32))
 		dev_dbg(dev, "ape_freq dt not found\n");
