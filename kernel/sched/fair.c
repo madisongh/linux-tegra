@@ -2831,6 +2831,8 @@ static inline void cfs_rq_util_change(struct cfs_rq *cfs_rq)
 
 	if (cpu == smp_processor_id() && &rq->cfs == cfs_rq) {
 		unsigned long max = rq->cpu_capacity_orig;
+		unsigned long usage = max(cfs_rq->avg.util_fast_avg,
+					  cfs_rq->avg.util_avg);
 
 		/*
 		 * There are a few boundary cases this might miss but it should
@@ -2848,7 +2850,7 @@ static inline void cfs_rq_util_change(struct cfs_rq *cfs_rq)
 		 *
 		 * See cpu_util().
 		 */
-		cpufreq_update_util(min(cfs_rq->avg.util_avg, max), cfs_util);
+		cpufreq_update_util(min(usage, max), cfs_util);
 	}
 }
 
