@@ -19,6 +19,18 @@
 
 #include <linux/mmc/host.h>
 
+/*
+ * MMC_OCR_1V8_MASK will be used in board sdhci file
+ * Example for cardhu it will be used in board-cardhu-sdhci.c
+ * for built_in = 0 devices enabling ocr_mask to MMC_OCR_1V8_MASK
+ * sets the voltage to 1.8V
+ */
+#define MMC_OCR_1V8_MASK    0x00000008
+#define MMC_OCR_2V8_MASK    0x00010000
+#define MMC_OCR_3V2_MASK    0x00100000
+#define MMC_OCR_3V3_MASK    0x00200000
+
+
 /* uhs mask can be used to mask any of the UHS modes support */
 #define MMC_UHS_MASK_DDR50	0x8
 #define MMC_MASK_HS200		0x20
@@ -30,6 +42,8 @@ struct tegra_sdhci_platform_data {
 	unsigned int ddr_tap_delay;
 	unsigned int ddr_trim_delay;
 	bool en_strobe;
+	unsigned int ocr_mask;
+	bool pwrdet_support;
 };
 
 #endif
