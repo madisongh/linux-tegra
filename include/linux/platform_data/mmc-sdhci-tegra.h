@@ -47,6 +47,10 @@ struct tegra_sdhci_platform_data {
 	bool disable_auto_cal;
 	unsigned int auto_cal_step;
 	bool enable_autocal_slew_override;
+	unsigned int dqs_trim_delay;
+	bool is_ddr_trim_delay;
+	unsigned int tap_delay;
+	unsigned int trim_delay;
 };
 
 #endif

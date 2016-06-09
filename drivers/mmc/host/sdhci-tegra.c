@@ -44,6 +44,7 @@
 #define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK		0xFF
 #define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT		24
 #define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK		0x1F
+#define SDHCI_VNDR_CLK_CTRL_SDR50_TUNING		0x20
 #define SDHCI_VNDR_CLK_CTRL_PADPIPE_CLKEN_OVERRIDE	0x8
 #define SDHCI_VNDR_CLK_CTRL_SPI_MODE_CLKEN_OVERRIDE	0x4
 #define SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK		0x2
@@ -53,11 +54,17 @@
 #define SDHCI_VNDR_SYS_SW_CTRL_WR_CRC_USE_TMCLK		0x40000000
 #define SDHCI_VNDR_SYS_SW_CTRL_STROBE_SHIFT		31
 
+#define SDHCI_VNDR_CAP_OVERRIDES_0			0x10c
+#define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT	8
+#define SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_MASK	0x3F
+
 #define SDHCI_VNDR_DLLCAL_CFG				0x1b0
 #define SDHCI_VNDR_DLLCAL_CFG_EN_CALIBRATE		0x80000000
 
 #define SDHCI_VNDR_DLLCAL_CFG_STATUS			0x1bc
 #define SDHCI_VNDR_DLLCAL_CFG_STATUS_DLL_ACTIVE		0x80000000
+
+#define SDHCI_VNDR_MISC_CTRL		0x120
 
 #define SDHCI_TEGRA_VENDOR_MISC_CTRL		0x120
 #define SDHCI_MISC_CTRL_ENABLE_SDR104		0x8
@@ -68,7 +75,7 @@
 #define SDMMC_AUTO_CAL_CONFIG	0x1E4
 #define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START	0x80000000
 #define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE	0x20000000
-#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_SLW_OVERRIDE	0x1000000
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_SLW_OVERRIDE	0x10000000
 #define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET_SHIFT	0x8
 #define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_STEP_OFFSET_SHIFT	0x10
 
@@ -94,6 +101,12 @@
 #define NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION	BIT(11)
 /* Set Calibration Offsets */
 #define NVQUIRK_SET_CALIBRATION_OFFSETS		BIT(12)
+/* Set tap delay */
+#define NVQUIRK_SET_TAP_DELAY			BIT(13)
+/* Set trim delay */
+#define NVQUIRK_SET_TRIM_DELAY			BIT(14)
+/* Enable Frequency Tuning for SDR50 mode */
+#define NVQUIRK_ENABLE_SDR50_TUNING		BIT(15)
 
 /* Common quirks for Tegra 12x and later versions of sdmmc controllers */
 #define TEGRA_SDHCI_QUIRKS (SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | \
@@ -112,6 +125,7 @@
 /* max limit defines */
 #define SDHCI_TEGRA_MAX_TAP_VALUES	0xFF
 #define SDHCI_TEGRA_MAX_TRIM_VALUES	0x1F
+#define SDHCI_TEGRA_MAX_DQS_TRIM_VALUES	0x3F
 #define MAX_DIVISOR_VALUE		128
 #define DEFAULT_SDHOST_FREQ		50000000
 #define SDHOST_MIN_FREQ			6000000
@@ -160,6 +174,9 @@ struct sdhci_tegra {
 	/* max ddr clk supported by the platform */
 	unsigned int ddr_clk_limit;
 	struct reset_control *rstc;
+	unsigned int tuned_tap_delay;
+	unsigned int tuning_status;
+	#define TUNING_STATUS_DONE	1
 	struct sdhci_tegra_pll_parent pll_source[TEGRA_SDHCI_MAX_PLL_SOURCE];
 	bool is_parent_pll_source_1;
 	struct regulator *vdd_io_reg;
@@ -172,12 +189,17 @@ struct sdhci_tegra {
 	bool is_rail_enabled;
 	bool set_1v8_status;
 	struct padctrl *sdmmc_padctrl;
+	bool calib_1v8_offsets_done;
 };
 
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	unsigned char signal_voltage);
 static int tegra_sdhci_configure_regulators(struct sdhci_host *sdhci,
 	u8 option, int min_uV, int max_uV);
+static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
+	int tap_delay, int type);
+static inline int sdhci_tegra_set_dqs_trim_delay(struct sdhci_host *sdhci,
+	int dqs_trim_delay);
 
 static u16 tegra_sdhci_readw(struct sdhci_host *host, int reg)
 {
@@ -192,6 +214,22 @@ static u16 tegra_sdhci_readw(struct sdhci_host *host, int reg)
 	}
 
 	return readw(host->ioaddr + reg);
+}
+
+static bool tegra_sdhci_is_tuning_done(struct sdhci_host *sdhci)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+
+	if (tegra_host->tuning_status == TUNING_STATUS_DONE) {
+		dev_info(mmc_dev(sdhci->mmc),
+			"Tuning already done, restoring the best tap value : %u\n",
+				tegra_host->tuned_tap_delay);
+		sdhci_tegra_set_tap_delay(sdhci, tegra_host->tuned_tap_delay,
+				SET_TUNED_TAP);
+		return true;
+	}
+	return false;
 }
 
 static void tegra_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
@@ -246,6 +284,26 @@ static unsigned int tegra_sdhci_get_ro(struct sdhci_host *host)
 {
 	return mmc_gpio_get_ro(host->mmc);
 }
+static inline int sdhci_tegra_set_dqs_trim_delay(struct sdhci_host *sdhci,
+	int dqs_trim_delay)
+{
+	u32 vend_ovrds;
+
+	if ((dqs_trim_delay > SDHCI_TEGRA_MAX_DQS_TRIM_VALUES) &&
+		(dqs_trim_delay < 0)) {
+		dev_err(mmc_dev(sdhci->mmc), "Invalid dqs trim value\n");
+		return -1;
+	}
+	vend_ovrds = sdhci_readl(sdhci, SDHCI_VNDR_CAP_OVERRIDES_0);
+	vend_ovrds &= ~(SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_MASK <<
+			SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT);
+	vend_ovrds |= (dqs_trim_delay <<
+			SDHCI_VNDR_CAP_OVERRIDES_0_DQS_TRIM_SHIFT);
+	sdhci_writel(sdhci, vend_ovrds, SDHCI_VNDR_CAP_OVERRIDES_0);
+
+	return 0;
+}
+
 static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 	int trim_delay)
 {
@@ -266,12 +324,13 @@ static inline int sdhci_tegra_set_trim_delay(struct sdhci_host *sdhci,
 }
 
 static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
-	int tap_delay)
+	int tap_delay, int type)
 {
-	u32 vendor_ctrl;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	u16 clk;
 	bool card_clk_enabled;
-
+	int err;
 	if ((tap_delay > SDHCI_TEGRA_MAX_TAP_VALUES) && (tap_delay < 0)){
 		dev_err(mmc_dev(sdhci->mmc), "Invalid tap value\n");
 		return -1;
@@ -284,12 +343,18 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 		clk &= ~SDHCI_CLOCK_CARD_EN;
 		sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
 	}
-
-	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
-	vendor_ctrl &= ~(SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK <<
-			SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
-	vendor_ctrl |= (tap_delay << SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
-	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
+	if (type & (SET_DDR_TAP | SET_DEFAULT_TAP)) {
+		if (type == SET_DDR_TAP)
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"tap-delay-ddr", tegra_host->prods);
+		else
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"tap-delay-default", tegra_host->prods);
+		if (err < 0)
+			dev_err(mmc_dev(sdhci->mmc),
+				"%s: error %d in prod settings\n",
+				__func__, err);
+	}
 	udelay(1);
 	sdhci_reset(sdhci, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
 
@@ -308,6 +373,7 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
 	u32 misc_ctrl, vendor_ctrl;
+	int err;
 
 	sdhci_reset(host, mask);
 
@@ -322,9 +388,26 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		vendor_ctrl &= ~SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK;
 	else
 		vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK;
+	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDR50_TUNING)
+		vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_SDR50_TUNING;
 	sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 
-	misc_ctrl = sdhci_readw(host, SDHCI_TEGRA_VENDOR_MISC_CTRL);
+	/* Set the tap delay value */
+	if (soc_data->nvquirks & NVQUIRK_SET_TAP_DELAY) {
+		if (!tegra_sdhci_is_tuning_done(host))
+			sdhci_tegra_set_tap_delay(host, plat->tap_delay,
+					SET_DEFAULT_TAP);
+	}
+	/* Set the trim delay value */
+	if (soc_data->nvquirks & NVQUIRK_SET_TRIM_DELAY) {
+		err = tegra_prod_set_by_name(&host->ioaddr,
+			"trim-delay-default", tegra_host->prods);
+		if (err < 0)
+			dev_err(mmc_dev(host->mmc),
+			"%s: error %d in prod settings\n",__func__, err);
+	}
+
+	misc_ctrl = sdhci_readl(host, SDHCI_VNDR_MISC_CTRL);
 	/* Erratum: Enable SDHCI spec v3.00 support */
 	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDHCI_SPEC_300)
 		misc_ctrl |= SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300;
@@ -566,13 +649,34 @@ static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
-
+	bool set_1v8_calib_offsets = false;
+	unsigned int dqs_trim_delay;
+	int err;
 	/* Set the UHS signaling mode */
 	sdhci_set_uhs_signaling(host, timing);
+
+	switch (timing) {
+	case MMC_TIMING_UHS_DDR50:
+	case MMC_TIMING_UHS_SDR12:
+	case MMC_TIMING_UHS_SDR25:
+	case MMC_TIMING_UHS_SDR50:
+	case MMC_TIMING_UHS_SDR104:
+	case MMC_TIMING_MMC_HS200:
+	set_1v8_calib_offsets = true;
+
+		break;
+	}
+
+	if (timing == MMC_TIMING_MMC_HS400) {
+		dqs_trim_delay = plat->dqs_trim_delay;
+		sdhci_tegra_set_dqs_trim_delay(host, dqs_trim_delay);
+	}
 
 	/*
 	 * Tegra SDMMC controllers support only a clock divisor of 2 in DDR
 	 * mode. No other divisors are supported.
+	 * Set the best tap value based on timing.
+	 * Set trim delay if required.
 	 */
 	if ((timing == MMC_TIMING_UHS_DDR50) ||
 		(timing == MMC_TIMING_MMC_DDR52)) {
@@ -580,12 +684,30 @@ static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		clk &= ~(0xFF << SDHCI_DIVIDER_SHIFT);
 		clk |= 1 << SDHCI_DIVIDER_SHIFT;
 		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+		sdhci_tegra_set_tap_delay(host, plat->ddr_tap_delay,
+				SET_DDR_TAP);
+		err = tegra_prod_set_by_name(&host->ioaddr,
+			"trim-delay-ddr", tegra_host->prods);
+		if (err < 0)
+			dev_err(mmc_dev(host->mmc),
+				"%s: error %d in prod settings\n",
+				__func__, err);
+	} else if (((timing == MMC_TIMING_MMC_HS200) ||
+		(timing == MMC_TIMING_UHS_SDR104) ||
+		(timing == MMC_TIMING_MMC_HS400) ||
+		(timing == MMC_TIMING_UHS_SDR50)) &&
+		(tegra_host->tuning_status == TUNING_STATUS_DONE)) {
+		sdhci_tegra_set_tap_delay(host, tegra_host->tuned_tap_delay,
+				SET_TUNED_TAP);
+	} else {
+		sdhci_tegra_set_tap_delay(host, tegra_host->plat->tap_delay,
+				SET_DEFAULT_TAP);
+	}
 
-		/* Set ddr mode tap delay */
-		sdhci_tegra_set_tap_delay(host, plat->ddr_tap_delay);
-
-		/* Set the ddr mode trim delay if required */
-		sdhci_tegra_set_trim_delay(host, plat->ddr_trim_delay);
+	if (set_1v8_calib_offsets && !tegra_host->calib_1v8_offsets_done) {
+		tegra_sdhci_do_calibration(host,
+			host->mmc->ios.signal_voltage);
+		tegra_host->calib_1v8_offsets_done = true;
 	}
 }
 
@@ -722,7 +844,6 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	unsigned int timeout = 10;
-	unsigned int calib_offsets = 0;
 	u16 clk;
 	bool card_clk_enabled;
 	int err = 0;
@@ -1006,6 +1127,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.switch_signal_voltage_exit = tegra_sdhci_post_voltage_switch,
 	.switch_signal_voltage_enter = tegra_sdhci_pre_voltage_switch,
 	.do_calibration = tegra_sdhci_do_calibration,
+	.is_tuning_done		= tegra_sdhci_is_tuning_done,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -1127,9 +1249,13 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	plat = devm_kzalloc(dev, sizeof(*plat), GFP_KERNEL);
 	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
 	of_property_read_u32(np, "uhs-mask", &plat->uhs_mask);
+	of_property_read_u32(np, "dqs-trim-delay", &plat->dqs_trim_delay);
 	of_property_read_u32(np, "nvidia,ddr-tap-delay", &plat->ddr_tap_delay);
 	of_property_read_u32(np, "nvidia,ddr-trim-delay", &plat->ddr_trim_delay);
 	plat->pwrdet_support = of_property_read_bool(np, "pwrdet-support");
+	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
+	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
+	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
 	plat->en_strobe =
 		of_property_read_bool(np, "nvidia,enable-strobe-mode");
 
