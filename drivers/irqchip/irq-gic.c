@@ -368,13 +368,14 @@ static void gic_poke_irq(struct irq_data *d, u32 offset)
 	struct gic_chip_data *gic = irq_data_get_irq_chip_data(d);
 	u8 val8;
 	u32 mask = 1 << (gic_irq(d) % 32);
-	u8 curr_cpu = gic_get_cpumask(gic);
+	u8 curr_cpu;
 	u32 irq_target = GIC_DIST_TARGET + gic_irq(d);
 
 #ifdef CONFIG_TEGRA_APE_AGIC
 	if (!gic->is_percpu && tegra_agic_suspended)
 		return;
 #endif
+	curr_cpu = gic_get_cpumask(gic);
 
 	raw_spin_lock(&irq_controller_lock);
 	/*
