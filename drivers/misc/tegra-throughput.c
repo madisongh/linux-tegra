@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -248,7 +248,7 @@ static ssize_t fps_show(struct device *dev,
 	fps = frame_time_avg > 0 ? 1000000 / frame_time_avg : 0;
 
 DONE:
-	return sprintf(buf, "%d\n", fps);
+	return snprintf(buf, PAGE_SIZE, "%d\n", fps);
 }
 
 static DEVICE_ATTR_RO(fps);
@@ -264,7 +264,7 @@ static ssize_t framecount_show(struct device *dev,
 	fstamp = frame_timestamp;
 	spin_unlock(&lock);
 
-	return sprintf(buf, "%llu %llu\n",
+	return snprintf(buf, PAGE_SIZE, "%llu %llu\n",
 		       fcount, fstamp);
 }
 
