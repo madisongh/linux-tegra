@@ -420,6 +420,9 @@ struct sdhci_host {
  */
 #define SDHCI_QUIRK2_NEED_DELAY_AFTER_INT_CLK_RST	(1<<16)
 #define SDHCI_QUIRK2_DDR_FIXED_DIVISOR			(1<<17)
+/* Turn off/on card clock before sending/after tuning command*/
+#define SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK             (1<<18)
+
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */

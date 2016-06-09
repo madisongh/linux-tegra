@@ -897,6 +897,10 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
 	struct mmc_data *data = cmd->data;
 
 	if (data == NULL) {
+		/* Do nothing for tuning commands */
+		if ((cmd->opcode == MMC_SEND_TUNING_BLOCK) ||
+			(cmd->opcode == MMC_SEND_TUNING_BLOCK_HS200))
+			return;
 		if (host->quirks2 &
 			SDHCI_QUIRK2_CLEAR_TRANSFERMODE_REG_BEFORE_CMD) {
 			sdhci_writew(host, 0x0, SDHCI_TRANSFER_MODE);
@@ -1917,7 +1921,7 @@ static int sdhci_prepare_hs400_tuning(struct mmc_host *mmc, struct mmc_ios *ios)
 static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
-	u16 ctrl;
+	u16 ctrl, clk;
 	int tuning_loop_counter = MAX_TUNING_LOOP;
 	int err = 0;
 	unsigned long flags;
@@ -2016,6 +2020,12 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 		mrq.cmd = &cmd;
 		host->mrq = &mrq;
 
+		if (host->quirks2 & SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK) {
+			clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+			clk &= ~SDHCI_CLOCK_CARD_EN;
+			sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+		}
+
 		/*
 		 * In response to CMD19, the card sends 64 bytes of tuning
 		 * block to the Host Controller. So we set the block size
@@ -2040,13 +2050,21 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 		 * Select in the same register to 0.
 		 */
 		sdhci_writew(host, SDHCI_TRNS_READ, SDHCI_TRANSFER_MODE);
-
 		sdhci_send_command(host, &cmd);
 
 		host->cmd = NULL;
 		host->mrq = NULL;
 
 		spin_unlock_irqrestore(&host->lock, flags);
+
+		if (host->quirks2 & SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK) {
+			udelay(1);
+			sdhci_reset(host, SDHCI_RESET_CMD|SDHCI_RESET_DATA);
+			clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+			clk |= SDHCI_CLOCK_CARD_EN;
+			sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+		}
+
 		/* Wait for Buffer Read Ready interrupt */
 		wait_event_interruptible_timeout(host->buf_ready_int,
 					(host->tuning_done == 1),
@@ -2058,6 +2076,7 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 				"Buffer Read Ready interrupt during tuning "
 				"procedure, falling back to fixed sampling "
 				"clock\n");
+			sdhci_dumpregs(host);
 			ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 			ctrl &= ~SDHCI_CTRL_TUNED_CLK;
 			ctrl &= ~SDHCI_CTRL_EXEC_TUNING;
