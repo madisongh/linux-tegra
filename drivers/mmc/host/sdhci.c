@@ -1779,6 +1779,10 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 	u16 ctrl;
 	int ret;
 
+	if (host->ops->switch_signal_voltage)
+		return host->ops->switch_signal_voltage(host,
+			ios->signal_voltage);
+
 	/*
 	 * Signal Voltage Switching is only applicable for Host Controllers
 	 * v3.00 and above.
@@ -1872,7 +1876,15 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
 	if (host->version < SDHCI_SPEC_300)
 		return 0;
 	sdhci_runtime_pm_get(host);
+	/* Do any pre voltage switch platform specific configuration */
+	if  (host->ops->switch_signal_voltage_enter)
+		host->ops->switch_signal_voltage_enter(host,
+			ios->signal_voltage);
 	err = sdhci_do_start_signal_voltage_switch(host, ios);
+	/* Do any post voltage switch platform specific configuration */
+	if  (host->ops->switch_signal_voltage_exit)
+		host->ops->switch_signal_voltage_exit(host,
+			ios->signal_voltage);
 	sdhci_runtime_pm_put(host);
 	return err;
 }
@@ -3166,7 +3178,8 @@ int sdhci_add_host(struct sdhci_host *host)
 		mmc->caps |= MMC_CAP_NEEDS_POLL;
 
 	/* If there are external regulators, get them */
-	if (mmc_regulator_get_supply(mmc) == -EPROBE_DEFER)
+	if (IS_ERR_OR_NULL(mmc->supply.vqmmc) &&
+			(mmc_regulator_get_supply(mmc) == -EPROBE_DEFER))
 		return -EPROBE_DEFER;
 
 	/* If vqmmc regulator and no 1.8V signalling, then there's no UHS */

@@ -938,6 +938,29 @@ static void tegra_sdhci_pre_voltage_switch(struct sdhci_host *sdhci,
 	}
 }
 
+static void tegra_sdhci_post_voltage_switch(struct sdhci_host *sdhci,
+	unsigned char signal_voltage)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	int voltage;
+	bool set;
+
+	if (!tegra_host || !(tegra_host->vdd_io_reg))
+		return;
+
+	if (tegra_host->check_pad_ctrl_setting) {
+		voltage = regulator_get_voltage(tegra_host->vdd_io_reg);
+		set = (signal_voltage == MMC_SIGNAL_VOLTAGE_180) ? true : false;
+		if (set && (voltage <= tegra_host->vddio_prev) &&
+				tegra_host->set_1v8_status) {
+			tegra_sdhci_set_padctrl(sdhci, SDHOST_LOW_VOLT_MAX);
+		}
+	}
+	tegra_sdhci_do_calibration(sdhci, signal_voltage);
+	return;
+}
+
 static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
 		const char **parent_clk_list, int size)
 {
@@ -979,6 +1002,10 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
 	.write_w    = tegra_sdhci_writew,
 	.post_init	= tegra_sdhci_post_init,
+	.switch_signal_voltage = tegra_sdhci_signal_voltage_switch,
+	.switch_signal_voltage_exit = tegra_sdhci_post_voltage_switch,
+	.switch_signal_voltage_enter = tegra_sdhci_pre_voltage_switch,
+	.do_calibration = tegra_sdhci_do_calibration,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {

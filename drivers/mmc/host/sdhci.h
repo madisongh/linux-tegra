@@ -553,6 +553,12 @@ struct sdhci_ops {
 					 unsigned int max_dtr, int host_drv,
 					 int card_drv, int *drv_type);
 	void	(*post_init)(struct sdhci_host *host);
+	int	(*switch_signal_voltage)(struct sdhci_host *host,
+		unsigned int signal_voltage);
+	void	(*switch_signal_voltage_enter)(struct sdhci_host *host,
+				unsigned char signal_voltage);
+	void	(*switch_signal_voltage_exit)(struct sdhci_host *host,
+				unsigned char signal_voltage);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
