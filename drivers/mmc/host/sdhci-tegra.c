@@ -65,16 +65,35 @@
 #define SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300	0x20
 #define SDHCI_MISC_CTRL_ENABLE_DDR50		0x200
 
+#define SDMMC_AUTO_CAL_CONFIG	0x1E4
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START	0x80000000
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE	0x20000000
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_SLW_OVERRIDE	0x1000000
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET_SHIFT	0x8
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_STEP_OFFSET_SHIFT	0x10
+
+#define SDMMC_AUTO_CAL_STATUS	0x1EC
+#define SDMMC_AUTO_CAL_STATUS_AUTO_CAL_ACTIVE	0x80000000
+
 #define NVQUIRK_FORCE_SDHCI_SPEC_200	BIT(0)
 #define NVQUIRK_ENABLE_BLOCK_GAP_DET	BIT(1)
 #define NVQUIRK_ENABLE_SDHCI_SPEC_300	BIT(2)
 #define NVQUIRK_DISABLE_SDR50		BIT(3)
 #define NVQUIRK_DISABLE_SDR104		BIT(4)
 #define NVQUIRK_DISABLE_DDR50		BIT(5)
+/* Do not enable auto calibration if the platform doesn't support */
+#define NVQUIRK_DISABLE_AUTO_CALIBRATION	BIT(6)
 /* ENAABLE FEEDBACK IO CLOCK */
 #define NVQUIRK_EN_FEEDBACK_CLK		BIT(7)
 /*Enable e_input before setting voltage*/
 #define NVQUIRK2_SET_PAD_E_INPUT_VOL		BIT(8)
+/* update PAD_E_INPUT_OR_E_PWRD bit */
+#define NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD	BIT(9)
+/* Set SDMEMCOMP VREF sel values based on IO voltage */
+#define NVQUIRK_SET_SDMEMCOMP_VREF_SEL		BIT(10)
+#define NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION	BIT(11)
+/* Set Calibration Offsets */
+#define NVQUIRK_SET_CALIBRATION_OFFSETS		BIT(12)
 
 /* Common quirks for Tegra 12x and later versions of sdmmc controllers */
 #define TEGRA_SDHCI_QUIRKS (SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | \
@@ -155,6 +174,8 @@ struct sdhci_tegra {
 	struct padctrl *sdmmc_padctrl;
 };
 
+static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
+	unsigned char signal_voltage);
 static int tegra_sdhci_configure_regulators(struct sdhci_host *sdhci,
 	u8 option, int min_uV, int max_uV);
 
@@ -693,11 +714,121 @@ static int tegra_sdhci_configure_regulators(struct sdhci_host *sdhci,
 	return rc;
 }
 
+static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
+	unsigned char signal_voltage)
+{
+	unsigned int val;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+	unsigned int timeout = 10;
+	unsigned int calib_offsets = 0;
+	u16 clk;
+	bool card_clk_enabled;
+	int err = 0;
+	unsigned int timing = sdhci->mmc->ios.timing;
+
+	if (tegra_host->plat->disable_auto_cal)
+		return;
+
+	/*
+	 * Do not enable auto calibration if the platform doesn't
+	 * support it.
+	 */
+	if (unlikely(soc_data->nvquirks & NVQUIRK_DISABLE_AUTO_CALIBRATION))
+		return;
+
+	clk = sdhci_readw(sdhci, SDHCI_CLOCK_CONTROL);
+	card_clk_enabled = clk & SDHCI_CLOCK_CARD_EN;
+	if (card_clk_enabled) {
+		clk &= ~SDHCI_CLOCK_CARD_EN;
+		sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
+	}
+
+	if (soc_data->nvquirks & NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD)
+		tegra_sdhci_configure_e_input(sdhci, true);
+	if (soc_data->nvquirks & NVQUIRK_SET_SDMEMCOMP_VREF_SEL) {
+		if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+			"comp-vref-3v3", tegra_host->prods);
+		else if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+			"comp-vref-1v8", tegra_host->prods);
+	} else
+		err = tegra_prod_set_by_name(&sdhci->ioaddr,
+			"comp-vref-default", tegra_host->prods);
+	if (err < 0)
+		dev_err(mmc_dev(sdhci->mmc),
+			"%s: error %d in prod settings\n",__func__, err);
+
+	/* Wait for 1us after e_input is enabled*/
+	if (soc_data->nvquirks2 & NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION)
+		udelay(1);
+
+	/* Enable Auto Calibration*/
+	val = sdhci_readl(sdhci, SDMMC_AUTO_CAL_CONFIG);
+	val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE;
+	val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START;
+	if (tegra_host->plat->enable_autocal_slew_override)
+		val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_SLW_OVERRIDE;
+
+	if (tegra_host->plat->auto_cal_step) {
+		val &= ~(0x7 <<
+			SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_STEP_OFFSET_SHIFT);
+		val |= (tegra_host->plat->auto_cal_step <<
+			SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_STEP_OFFSET_SHIFT);
+	}
+	sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
+
+	switch (signal_voltage) {
+	case MMC_SIGNAL_VOLTAGE_180:
+		if (timing == MMC_TIMING_UHS_SDR104)
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"prod-sdr104-1v8", tegra_host->prods);
+		else
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"prod-default-1v8", tegra_host->prods);
+		break;
+	case MMC_SIGNAL_VOLTAGE_330:
+		err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"prod-default-3v3", tegra_host->prods);
+		break;
+	}
+	if (err < 0)
+		dev_err(mmc_dev(sdhci->mmc),
+			"error %d in prod settings\n", err);
+
+	/* Wait for 2us after auto calibration is enabled*/
+	if (soc_data->nvquirks2 & NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION)
+		udelay(2);
+
+	/* Wait until the calibration is done */
+	do {
+		if (!(sdhci_readl(sdhci, SDMMC_AUTO_CAL_STATUS) &
+			SDMMC_AUTO_CAL_STATUS_AUTO_CAL_ACTIVE))
+			break;
+
+		usleep_range(1000, 1500);
+		timeout--;
+	} while (timeout);
+
+	if (!timeout)
+		dev_err(mmc_dev(sdhci->mmc), "Auto calibration failed\n");
+
+	if (soc_data->nvquirks & NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD)
+		tegra_sdhci_configure_e_input(sdhci, false);
+
+	if (card_clk_enabled) {
+		clk |= SDHCI_CLOCK_CARD_EN;
+		sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
+	}
+
+}
+
 static void tegra_sdhci_set_padctrl(struct sdhci_host *sdhci, int voltage)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
-	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
 	int ret;
 
