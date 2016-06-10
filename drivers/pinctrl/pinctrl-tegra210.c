@@ -2501,19 +2501,6 @@ static const char * const spi4_groups[] = {
 	"uart3_cts_pd4",
 };
 
-static const char * const trace_groups[] = {
-	"pi2",
-	"pi4",
-	"pi7",
-	"ph0",
-	"ph6",
-	"ph7",
-	"pg2",
-	"pg3",
-	"pk1",
-	"pk3",
-};
-
 static const char * const usb_groups[] = {
 	"usb_vbus_en0_pcc4",
 	"usb_vbus_en1_pcc5",
