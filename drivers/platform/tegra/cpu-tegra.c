@@ -509,6 +509,7 @@ static int __init tegra_edp_debug_init(struct dentry *cpu_tegra_debugfs_root)
 
 #ifdef CONFIG_DEBUG_FS
 
+#ifdef CONFIG_TEGRA_HMP_CLUSTER_CONTROL
 static int cpu_edp_safe_get(void *data, u64 *val)
 {
 	struct clk *cluster_clk = data;
@@ -522,6 +523,7 @@ static int cpu_edp_safe_set(void *data, u64 val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(cpu_edp_safe_fops, cpu_edp_safe_get,
 			cpu_edp_safe_set, "%llu\n");
+#endif /* CONFIG_TEGRA_HMP_CLUSTER_CONTROL */
 
 static int __init tegra_cap_debugfs_init(struct dentry *cpu_tegra_debugfs_root)
 {
