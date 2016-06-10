@@ -11,6 +11,7 @@
 
 #include <linux/phy/phy.h>
 #include <linux/usb/phy.h>
+#include <linux/usb/otg-fsm.h>
 
 struct usb_otg {
 	u8			default_a;
@@ -22,6 +23,7 @@ struct usb_otg {
 	struct usb_gadget	*gadget;
 
 	enum usb_otg_state	state;
+	struct otg_fsm fsm;
 
 	/* bind/unbind the host controller */
 	int	(*set_host)(struct usb_otg *otg, struct usb_bus *host);
@@ -127,5 +129,110 @@ enum usb_dr_mode {
  * and returns the correspondig enum usb_dr_mode
  */
 extern enum usb_dr_mode usb_get_dr_mode(struct device *dev);
+
+static inline int otg_chrg_vbus(struct usb_otg *otg, int on)
+{
+	if (!otg->fsm.ops->chrg_vbus)
+		return -EOPNOTSUPP;
+	otg->fsm.ops->chrg_vbus(otg, on);
+	return 0;
+}
+
+static inline int otg_drv_vbus(struct usb_otg *otg, int on)
+{
+	if (!otg->fsm.ops->drv_vbus)
+		return -EOPNOTSUPP;
+	if (otg->fsm.drv_vbus != on) {
+		otg->fsm.drv_vbus = on;
+		otg->fsm.ops->drv_vbus(otg, on);
+	}
+	return 0;
+}
+
+static inline int otg_loc_conn(struct usb_otg *otg, int on)
+{
+	if (!otg->fsm.ops->loc_conn)
+		return -EOPNOTSUPP;
+	if (otg->fsm.loc_conn != on) {
+		otg->fsm.loc_conn = on;
+		otg->fsm.ops->loc_conn(otg, on);
+	}
+	return 0;
+}
+
+static inline int otg_loc_sof(struct usb_otg *otg, int on)
+{
+	if (!otg->fsm.ops->loc_sof)
+		return -EOPNOTSUPP;
+	if (otg->fsm.loc_sof != on) {
+		otg->fsm.loc_sof = on;
+		otg->fsm.ops->loc_sof(otg, on);
+	}
+	return 0;
+}
+
+static inline int otg_start_pulse(struct usb_otg *otg)
+{
+	if (!otg->fsm.ops->start_pulse)
+		return -EOPNOTSUPP;
+	if (!otg->fsm.data_pulse) {
+		otg->fsm.data_pulse = 1;
+		otg->fsm.ops->start_pulse(otg);
+	}
+	return 0;
+}
+
+static inline int otg_start_adp_prb(struct usb_otg *otg)
+{
+	if (!otg->fsm.ops->start_adp_prb)
+		return -EOPNOTSUPP;
+	if (!otg->fsm.adp_prb) {
+		otg->fsm.adp_sns = 0;
+		otg->fsm.adp_prb = 1;
+		otg->fsm.ops->start_adp_prb(otg);
+	}
+	return 0;
+}
+
+static inline int otg_start_adp_sns(struct usb_otg *otg)
+{
+	if (!otg->fsm.ops->start_adp_sns)
+		return -EOPNOTSUPP;
+	if (!otg->fsm.adp_sns) {
+		otg->fsm.adp_sns = 1;
+		otg->fsm.ops->start_adp_sns(otg);
+	}
+	return 0;
+}
+
+static inline int otg_add_timer(struct usb_otg *otg, enum otg_fsm_timer timer)
+{
+	if (!otg->fsm.ops->add_timer)
+		return -EOPNOTSUPP;
+	otg->fsm.ops->add_timer(otg, timer);
+	return 0;
+}
+
+static inline int otg_del_timer(struct usb_otg *otg, enum otg_fsm_timer timer)
+{
+	if (!otg->fsm.ops->del_timer)
+		return -EOPNOTSUPP;
+	otg->fsm.ops->del_timer(otg, timer);
+	return 0;
+}
+
+static inline int otg_start_host(struct usb_otg *otg, int on)
+{
+	if (!otg->fsm.ops->start_host)
+		return -EOPNOTSUPP;
+	return otg->fsm.ops->start_host(otg, on);
+}
+
+static inline int otg_start_gadget(struct usb_otg *otg, int on)
+{
+	if (!otg->fsm.ops->start_gadget)
+		return -EOPNOTSUPP;
+	return otg->fsm.ops->start_gadget(otg, on);
+}
 
 #endif /* __LINUX_USB_OTG_H */
