@@ -231,6 +231,8 @@ int usb_otg_descriptor_init(struct usb_gadget *gadget,
 			otg_attributes |= USB_OTG_SRP;
 		if (otg_caps->adp_support && (otg_caps->otg_rev >= 0x0200))
 			otg_attributes |= USB_OTG_ADP;
+		if (otg_caps->rsp_support && (otg_caps->otg_rev >= 0x0300))
+			otg_attributes |= USB_OTG_RSP;
 	} else {
 		otg_attributes = USB_OTG_SRP | USB_OTG_HNP;
 	}

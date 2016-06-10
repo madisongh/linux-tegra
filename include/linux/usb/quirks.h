@@ -50,4 +50,6 @@
 /* device can't handle Link Power Management */
 #define USB_QUIRK_NO_LPM			BIT(10)
 
+#define USB_QUIRK_OTG_COMPLIANCE	USB_QUIRK_LINEAR_UFRAME_INTR_BINTERVAL
+
 #endif /* __LINUX_USB_QUIRKS_H */

@@ -1,4 +1,6 @@
-/* Copyright (C) 2007,2008 Freescale Semiconductor, Inc.
+/*
+ * Copyright (C) 2007,2008 Freescale Semiconductor, Inc.
+ * Copyright (c) 2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -18,17 +20,10 @@
 #ifndef __LINUX_USB_OTG_FSM_H
 #define __LINUX_USB_OTG_FSM_H
 
-#include <linux/mutex.h>
 #include <linux/errno.h>
-
-#undef VERBOSE
-
-#ifdef VERBOSE
-#define VDBG(fmt, args...) pr_debug("[%s]  " fmt , \
-				 __func__, ## args)
-#else
-#define VDBG(stuff...)	do {} while (0)
-#endif
+#include <linux/list.h>
+#include <linux/mutex.h>
+#include <linux/usb/phy.h>
 
 #ifdef VERBOSE
 #define MPC_LOC printk("Current Location [%s]:[%d]\n", __FILE__, __LINE__)
@@ -69,8 +64,14 @@ enum otg_fsm_timer {
 	B_DATA_PLS,
 	B_SSEND_SRP,
 
+	/* for test device support */
+	TST_MAINT,
+
 	NUM_OTG_FSM_TIMERS,
 };
+
+const char *otg_proto_string(int proto);
+const char *otg_fsm_timer_string(enum otg_fsm_timer);
 
 /**
  * struct otg_fsm - OTG state machine according to the OTG spec
@@ -191,6 +192,7 @@ struct otg_fsm {
 	int b_srp_done;
 	int b_hnp_enable;
 	int a_clr_err;
+	int otg_vbus_off;
 
 	/* Informative variables. All unused as of now */
 	int a_bus_drop_inf;
@@ -206,15 +208,22 @@ struct otg_fsm {
 	int a_wait_bcon_tmout;
 	int a_aidl_bdis_tmout;
 	int b_ase0_brst_tmout;
+	int b_aidl_bdis_tmout;
 	int a_bidl_adis_tmout;
+
+	/* test device support */
+	int start_tst_maint_timer;
+	int tst_maint_tmout;
 
 	bool running;
 	struct otg_fsm_ops *ops;
+	struct list_head state_op_list;
 
 	/* Current usb protocol used: 0:undefine; 1:host; 2:client */
 	int protocol;
 	struct mutex lock;
 	u8 *host_req_flag;
+	bool hnp_polling_initialized;
 	struct delayed_work hnp_polling_work;
 	bool state_changed;
 };
@@ -237,5 +246,10 @@ struct otg_fsm_ops {
 
 
 int otg_statemachine(struct usb_otg *otg);
+
+/* for setting customized callback for some specific OTG state transitions */
+void otg_init_state_op(struct usb_otg *otg);
+int otg_set_state_op(struct usb_otg *otg, enum usb_otg_state from,
+		     enum usb_otg_state to, void (*op)(struct usb_otg *otg));
 
 #endif /* __LINUX_USB_OTG_FSM_H */

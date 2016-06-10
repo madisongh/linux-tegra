@@ -396,7 +396,19 @@ struct hc_driver {
 	int	(*find_raw_port_number)(struct usb_hcd *, int);
 	/* Call for power on/off the port if necessary */
 	int	(*port_power)(struct usb_hcd *hcd, int portnum, bool enable);
+};
 
+/**
+ * struct otg_hcd_ops - Interface between OTG core and HCD
+ *
+ * Provided by the HCD to allow the OTG core to control OTG port owned on HCD
+ *
+ * @start: function to start the HCD on the OTG port
+ * @stop: function to stop the HCD on the OTG port
+ */
+struct otg_hcd_ops {
+	int (*start)(struct usb_hcd *hcd);
+	int (*stop)(struct usb_hcd *hcd);
 };
 
 static inline int hcd_giveback_urb_in_bh(struct usb_hcd *hcd)

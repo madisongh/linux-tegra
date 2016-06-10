@@ -1,5 +1,23 @@
 /* USB OTG (On The Go) defines */
 /*
+ * Copyright (C) 2015 Texas Instruments Incorporated - http://www.ti.com
+ * Copyright (c) 2017, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General  Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the  GNU General Public License along
+ * with this program; if not, write  to the Free Software Foundation, Inc.,
+ * 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ * USB OTG (On The Go) defines
  *
  * These APIs may be used between USB controllers.  USB device drivers
  * (for either host or peripheral roles) don't use these calls; they
@@ -11,28 +29,12 @@
 
 #include <linux/phy/phy.h>
 #include <linux/device.h>
+#include <linux/notifier.h>
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/otg-fsm.h>
 #include <linux/usb/phy.h>
-
-/**
- * struct otg_hcd - host controller state and interface
- *
- * @hcd: host controller
- * @irqnum: IRQ number
- * @irqflags: IRQ flags
- * @ops: OTG to host controller interface
- * @otg_dev: OTG controller device
- */
-struct otg_hcd {
-	struct usb_hcd *hcd;
-	unsigned int irqnum;
-	unsigned long irqflags;
-	struct otg_hcd_ops *ops;
-	struct device *otg_dev;
-};
 
 /**
  * struct usb_otg_caps - describes the otg capabilities of the device
@@ -47,6 +49,22 @@ struct usb_otg_caps {
 	bool hnp_support;
 	bool srp_support;
 	bool adp_support;
+	bool rsp_support;
+};
+
+/**
+ * enum usb_otg_event - otg event for HCD/PCD to notify to OTG controller
+ */
+enum usb_otg_event {
+	OTG_EVENT_HCD_PORT_SUSPEND = 0,
+	OTG_EVENT_HCD_PORT_RESUME,
+	OTG_EVENT_HCD_PORT_CONNECT,
+	OTG_EVENT_HCD_PORT_DISCONNECT,
+	OTG_EVENT_PCD_PORT_SUSPEND,
+	OTG_EVENT_PCD_PORT_RESUME,
+	OTG_EVENT_PCD_PORT_CONNECT,
+	OTG_EVENT_PCD_PORT_DISCONNECT,
+	OTG_EVENT_HCD_TEST_DEVICE,
 };
 
 /**
@@ -86,8 +104,8 @@ struct usb_otg {
 	struct otg_fsm fsm;
 
 	/* internal use only */
-	struct otg_hcd primary_hcd;
-	struct otg_hcd shared_hcd;
+	struct usb_hcd *hcd;
+	struct otg_hcd_ops *hcd_ops;
 	struct otg_gadget_ops *gadget_ops;
 	bool gadget_ready;
 	struct list_head list;
@@ -97,6 +115,9 @@ struct usb_otg {
 #define OTG_FLAG_GADGET_RUNNING (1 << 0)
 #define OTG_FLAG_HOST_RUNNING (1 << 1)
 	/* use otg->fsm.lock for serializing access */
+
+	/* for notification of OTG events */
+	struct atomic_notifier_head notifier;
 
 /*------------- deprecated interface -----------------------------*/
 	/* bind/unbind the host controller */
@@ -124,27 +145,44 @@ struct usb_otg {
  * @otg_work: optional custom OTG state machine work function
  */
 struct usb_otg_config {
-	struct usb_otg_caps *otg_caps;
+	struct usb_otg_caps otg_caps;
 	struct otg_fsm_ops *fsm_ops;
 	void (*otg_work)(struct work_struct *work);
 };
 
 extern const char *usb_otg_state_string(enum usb_otg_state state);
+extern const char *usb_otg_event_string(enum usb_otg_event state);
 
 #if IS_ENABLED(CONFIG_USB_OTG)
 struct usb_otg *usb_otg_register(struct device *dev,
 				 struct usb_otg_config *config);
 int usb_otg_unregister(struct device *dev);
-int usb_otg_register_hcd(struct usb_hcd *hcd, unsigned int irqnum,
-			 unsigned long irqflags, struct otg_hcd_ops *ops);
+int usb_otg_register_hcd(struct usb_hcd *hcd, struct otg_hcd_ops *ops);
 int usb_otg_unregister_hcd(struct usb_hcd *hcd);
 int usb_otg_register_gadget(struct usb_gadget *gadget,
 			    struct otg_gadget_ops *ops);
 int usb_otg_unregister_gadget(struct usb_gadget *gadget);
+int usb_otg_kick_fsm(struct device *hcd_gcd_device);
 void usb_otg_sync_inputs(struct usb_otg *otg);
 int usb_otg_start_host(struct usb_otg *otg, int on);
 int usb_otg_start_gadget(struct usb_otg *otg, int on);
-int usb_otg_gadget_ready(struct usb_gadget *gadget, bool ready);
+
+/* used by HCD/PCD to notify events to USB core */
+int usb_otg_notify(struct device *dev, enum usb_otg_event event);
+
+/* used by OTG controller to register OTG event notifier */
+static inline int usb_otg_register_notifier(struct usb_otg *otg,
+					    struct notifier_block *nb)
+{
+	return atomic_notifier_chain_register(&otg->notifier, nb);
+}
+
+/* used by OTG controller to unregister OTG event notifier */
+static inline void usb_otg_unregister_notifier(struct usb_otg *otg,
+					       struct notifier_block *nb)
+{
+	atomic_notifier_chain_unregister(&otg->notifier, nb);
+}
 
 #else /* CONFIG_USB_OTG */
 
@@ -159,8 +197,7 @@ static inline int usb_otg_unregister(struct device *dev)
 	return -ENOTSUPP;
 }
 
-static inline int usb_otg_register_hcd(struct usb_hcd *hcd, unsigned int irqnum,
-				       unsigned long irqflags,
+static inline int usb_otg_register_hcd(struct usb_hcd *hcd,
 				       struct otg_hcd_ops *ops)
 {
 	return -ENOTSUPP;
@@ -182,6 +219,11 @@ static inline int usb_otg_unregister_gadget(struct usb_gadget *gadget)
 	return -ENOTSUPP;
 }
 
+static inline int usb_otg_kick_fsm(struct device *hcd_gcd_device)
+{
+	return -ENOTSUPP;
+}
+
 static inline void usb_otg_sync_inputs(struct usb_otg *otg)
 {
 }
@@ -196,10 +238,22 @@ static inline int usb_otg_start_gadget(struct usb_otg *otg, int on)
 	return -ENOTSUPP;
 }
 
-static inline int usb_otg_gadget_ready(struct usb_gadget *gadget, bool ready)
+static inline int usb_otg_notify(struct device *dev, enum usb_otg_event event)
 {
 	return -ENOTSUPP;
 }
+
+static inline int usb_otg_register_notifier(struct usb_otg *otg,
+					    struct notifier_block *nb)
+{
+	return -ENOTSUPP;
+}
+
+static inline void usb_otg_unregister_notifier(struct usb_otg *otg,
+					       struct notifier_block *nb)
+{
+}
+
 #endif /* CONFIG_USB_OTG */
 
 /*------------- deprecated interface -----------------------------*/

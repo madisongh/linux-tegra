@@ -597,6 +597,10 @@ struct usb_gadget_ops {
  *	in peripheral mode can support HNP polling.
  * @host_request_flag: OTG device feature flag, indicating if A-Peripheral
  *	or B-Peripheral wants to take host role.
+ * @otg_hnp_reqd: indicate if otg_hnp_reqd feature has been enabled by test
+ *      device to force a HNP to be performed. See OTG2.0 spec Table 6-8
+ * @otg_srp_reqd: indicate if otg_srp_reqd feature has been enabled by test
+ *      device to force a SRP to be performed. See OTG2.0 spec Table 6-8
  * @quirk_ep_out_aligned_size: epout requires buffer size to be aligned to
  *	MaxPacketSize.
  * @is_selfpowered: if the gadget is self-powered.
@@ -647,6 +651,8 @@ struct usb_gadget {
 	unsigned			a_alt_hnp_support:1;
 	unsigned			hnp_polling_support:1;
 	unsigned			host_request_flag:1;
+	unsigned			otg_hnp_reqd:1;
+	unsigned			otg_srp_reqd:1;
 	unsigned			quirk_ep_out_aligned_size:1;
 	unsigned			quirk_altset_not_supp:1;
 	unsigned			quirk_stall_not_supp:1;
@@ -1083,6 +1089,20 @@ struct usb_gadget_driver {
 };
 
 
+/*-------------------------------------------------------------------------*/
+
+/**
+ * struct otg_gadget_ops - Interface between OTG core and gadget
+ *
+ * Provided by the gadget core to allow the OTG core to start/stop the gadget
+ *
+ * @start: function to start the gadget
+ * @stop: function to stop the gadget
+ */
+struct otg_gadget_ops {
+	int (*start)(struct usb_gadget *gadget);
+	int (*stop)(struct usb_gadget *gadget);
+};
 
 /*-------------------------------------------------------------------------*/
 

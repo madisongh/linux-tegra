@@ -165,6 +165,7 @@ int of_usb_update_otg_caps(struct device_node *np,
 		case 0x0120:
 		case 0x0130:
 		case 0x0200:
+		case 0x0300:
 			/* Choose the lesser one if it's already been set */
 			if (otg_caps->otg_rev)
 				otg_caps->otg_rev = min_t(u16, otg_rev,
@@ -193,6 +194,9 @@ int of_usb_update_otg_caps(struct device_node *np,
 	if (of_find_property(np, "adp-disable", NULL) ||
 				(otg_caps->otg_rev < 0x0200))
 		otg_caps->adp_support = false;
+	if (of_find_property(np, "rsp-disable", NULL) ||
+				(otg_caps->otg_rev < 0x0300))
+		otg_caps->rsp_support = false;
 
 	return 0;
 }

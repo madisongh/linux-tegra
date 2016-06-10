@@ -126,6 +126,10 @@
 #define USB_DEVICE_A_ALT_HNP_SUPPORT	5	/* (otg) other RH port does */
 #define USB_DEVICE_DEBUG_MODE		6	/* (special devices only) */
 
+/* OTG2.0 spec Table 6-8, to force an SRP to be performed by test device */
+#define TEST_MODE_OTG_SRP_REQD		0x6
+/* OTG2.0 spec Table 6-8, to force an HNP to be performed by test device */
+#define TEST_MODE_OTG_HNP_REQD		0x7
 /*
  * Test Mode Selectors
  * See USB 2.0 spec Table 9-7
@@ -689,6 +693,7 @@ struct usb_otg20_descriptor {
 #define USB_OTG_SRP		(1 << 0)
 #define USB_OTG_HNP		(1 << 1)	/* swap host/device roles */
 #define USB_OTG_ADP		(1 << 2)	/* support ADP */
+#define USB_OTG_RSP		(1 << 3)	/* support RSP */
 
 /*-------------------------------------------------------------------------*/
 

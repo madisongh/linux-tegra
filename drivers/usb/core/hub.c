@@ -1,7 +1,7 @@
 /*
  * USB hub driver.
  *
- * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016-2017, NVIDIA CORPORATION.  All rights reserved.
  * (C) Copyright 1999 Linus Torvalds
  * (C) Copyright 1999 Johannes Erdfelt
  * (C) Copyright 1999 Gregory P. Smith
@@ -2248,6 +2248,8 @@ static int usb_enumerate_device_otg(struct usb_device *udev)
 	int err = 0;
 
 #ifdef	CONFIG_USB_OTG
+	struct usb_hcd *hcd = bus_to_hcd(udev->bus);
+
 	/*
 	 * OTG-aware devices on OTG-capable root hubs may be able to use SRP,
 	 * to wake us after we've powered off VBUS; and HNP, switching roles
@@ -2256,9 +2258,22 @@ static int usb_enumerate_device_otg(struct usb_device *udev)
 	if (!udev->bus->is_b_host
 			&& udev->config
 			&& udev->parent == udev->bus->root_hub) {
-		struct usb_otg_descriptor	*desc = NULL;
+		struct usb_otg20_descriptor	*desc = NULL;
 		struct usb_bus			*bus = udev->bus;
 		unsigned			port1 = udev->portnum;
+
+		if (udev->descriptor.bcdDevice & 0x1) {
+			dev_info(&udev->dev, "feature bit otg_vbus_off set\n");
+			bus->otg_vbus_off = 1;
+		} else {
+			bus->otg_vbus_off = 0;
+		}
+
+		/* if test device is enumerated on OTG port */
+		if ((udev->quirks & USB_QUIRK_OTG_COMPLIANCE) &&
+				port1 == bus->otg_port)
+			usb_otg_notify(hcd->self.controller,
+				       OTG_EVENT_HCD_TEST_DEVICE);
 
 		/* descriptor may appear anywhere in config */
 		err = __usb_get_extra_descriptor(udev->rawdescriptors[0],
@@ -2267,8 +2282,34 @@ static int usb_enumerate_device_otg(struct usb_device *udev)
 		if (err || !(desc->bmAttributes & USB_OTG_HNP))
 			return 0;
 
-		dev_info(&udev->dev, "Dual-Role OTG device on %sHNP port\n",
-					(port1 == bus->otg_port) ? "" : "non-");
+		dev_info(&udev->dev,
+			 "Dual-Role OTG device on %sHNP port, OTG ver: %04x\n",
+			 (port1 == bus->otg_port) ? "" : "non-", desc->bcdOTG);
+
+		/* support old v1.3 OTG device */
+		if ((le16_to_cpu(desc->bLength) != sizeof(
+				struct usb_otg20_descriptor)) ||
+				le16_to_cpu(desc->bcdOTG) < 0x0200) {
+			bus->otgv13_hnp = 1;
+			if (port1 == bus->otg_port) {
+				dev_info(&udev->dev,
+					 "Set A_HNP_SUPPORT on OTG v1.3 device\n");
+				err = usb_control_msg(udev,
+					usb_sndctrlpipe(udev, 0),
+					USB_REQ_SET_FEATURE, 0,
+					USB_DEVICE_A_HNP_SUPPORT,
+					0, NULL, 0,
+					USB_CTRL_SET_TIMEOUT);
+				if (err < 0) {
+					dev_err(&udev->dev,
+						"can't set A_HNP_SUPPORT: %d\n",
+						err);
+				}
+			}
+		} else {
+			bus->otgv13_hnp = 0;
+			bus->otg_quick_hnp = 0;
+		}
 
 		/* enable HNP before suspend, it's simpler */
 		if (port1 == bus->otg_port) {
@@ -2284,8 +2325,9 @@ static int usb_enumerate_device_otg(struct usb_device *udev)
 				 * OTG MESSAGE: report errors here,
 				 * customize to match your product.
 				 */
-				dev_err(&udev->dev, "can't set HNP mode: %d\n",
-									err);
+				dev_err(&udev->dev,
+					"Device no response: can't set HNP mode %d\n",
+					err);
 				bus->b_hnp_enable = 0;
 			}
 		} else if (desc->bLength == sizeof
@@ -2303,6 +2345,7 @@ static int usb_enumerate_device_otg(struct usb_device *udev)
 					err);
 		}
 	}
+
 #endif
 	return err;
 }
@@ -3214,6 +3257,11 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 			msleep(10);
 		}
 		usb_set_device_state(udev, USB_STATE_SUSPENDED);
+
+		/* send port suspend event to OTG Core */
+		if (!hub->hdev->parent && port1 == hub->hdev->bus->otg_port)
+			usb_otg_notify(hub->hdev->bus->controller,
+				       OTG_EVENT_HCD_PORT_SUSPEND);
 	}
 
 	if (status == 0 && !udev->do_remote_wakeup && udev->persist_enabled
@@ -3239,8 +3287,10 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
  */
 static int finish_port_resume(struct usb_device *udev)
 {
+	struct usb_hub	*hub = usb_hub_to_struct_hub(udev->parent);
 	int	status = 0;
 	u16	devstatus = 0;
+	int	port1 = udev->portnum;
 
 	/* caller owns the udev device lock */
 	dev_dbg(&udev->dev, "%s\n",
@@ -3254,6 +3304,11 @@ static int finish_port_resume(struct usb_device *udev)
 	usb_set_device_state(udev, udev->actconfig
 			? USB_STATE_CONFIGURED
 			: USB_STATE_ADDRESS);
+
+	/* send port resume event to OTG Core */
+	if (!hub->hdev->parent && port1 == hub->hdev->bus->otg_port)
+		usb_otg_notify(hub->hdev->bus->controller,
+			       OTG_EVENT_HCD_PORT_RESUME);
 
 	/* 10.5.4.5 says not to reset a suspended port if the attached
 	 * device is enabled for remote wakeup.  Hence the reset
@@ -4677,8 +4732,13 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 
 	/* Disconnect any existing devices under this port */
 	if (udev) {
-		if (hcd->usb_phy && !hdev->parent)
-			usb_phy_notify_disconnect(hcd->usb_phy, udev->speed);
+		if (!hdev->parent && (port1 == hdev->bus->otg_port)) {
+			if (hcd->usb_phy)
+				usb_phy_notify_disconnect(hcd->usb_phy,
+							  udev->speed);
+			usb_otg_notify(hcd->self.controller,
+				       OTG_EVENT_HCD_PORT_DISCONNECT);
+		}
 		usb_disconnect(&port_dev->child);
 	}
 
@@ -4836,9 +4896,15 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 				spin_unlock_irq(&device_state_lock);
 				mutex_unlock(&usb_port_peer_mutex);
 			} else {
-				if (hcd->usb_phy && !hdev->parent)
-					usb_phy_notify_connect(hcd->usb_phy,
+				if (!hdev->parent &&
+					(port1 == hdev->bus->otg_port)) {
+					if (hcd->usb_phy)
+						usb_phy_notify_connect(
+							hcd->usb_phy,
 							udev->speed);
+					usb_otg_notify(hcd->self.controller,
+						OTG_EVENT_HCD_PORT_CONNECT);
+				}
 			}
 		}
 
