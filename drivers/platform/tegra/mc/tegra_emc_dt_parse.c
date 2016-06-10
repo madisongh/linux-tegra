@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/mc/tegra_emc_dt_parse.c
  *
- * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -110,11 +110,8 @@ static void *tegra_emc_dt_parse_pdata_comp(const char *emc_mode,
 						iter->full_name);
 				continue;
 			}
-#if defined(CONFIG_ARCH_TEGRA_12x_SOC)
-			strncpy(tables[i].src_name, source_name, 16);
-#elif defined(CONFIG_ARCH_TEGRA_21x_SOC)
-			strncpy(tables[i].src_name, source_name, 32);
-#endif
+			strlcpy(tables[i].src_name, source_name,
+					sizeof(tables[i].src_name));
 
 			ret = of_property_read_string(iter,
 					"nvidia,dvfs-version", &dvfs_ver);
@@ -124,7 +121,7 @@ static void *tegra_emc_dt_parse_pdata_comp(const char *emc_mode,
 				continue;
 			}
 			strncpy(tables[i].table_id, dvfs_ver,
-					TEGRA12_MAX_TABLE_ID_LEN);
+					TEGRA12_MAX_TABLE_ID_LEN - 1);
 
 			PNE_U32(iter, "nvidia,revision", rev);
 			PNE_U32(iter, "clock-frequency", rate);

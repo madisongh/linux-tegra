@@ -111,6 +111,8 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
 		return -EINVAL;
 	}
 	size = dt_mem_next_cell(dt_root_size_cells, &prop);
+	if (!size)
+		return -EINVAL;
 
 	nomap = of_get_flat_dt_prop(node, "no-map", NULL) != NULL;
 
@@ -296,24 +298,30 @@ static inline struct reserved_mem *__find_rmem(struct device_node *node)
 int of_reserved_mem_device_init(struct device *dev)
 {
 	struct reserved_mem *rmem;
-	struct device_node *np;
-	int ret;
+	int err = -EINVAL;
+	struct of_phandle_iter iter;
 
-	np = of_parse_phandle(dev->of_node, "memory-region", 0);
-	if (!np)
-		return -ENODEV;
+	of_property_for_each_phandle_with_args(iter, dev->of_node, "memory-region",
+					       NULL, 0) {
+		struct of_phandle_args *ret = &iter.out_args;
 
-	rmem = __find_rmem(np);
-	of_node_put(np);
+		if (!ret->np)
+			return err;
 
-	if (!rmem || !rmem->ops || !rmem->ops->device_init)
-		return -EINVAL;
+		of_node_get(ret->np);
+		rmem = __find_rmem(ret->np);
+		of_node_put(ret->np);
 
-	ret = rmem->ops->device_init(rmem, dev);
-	if (ret == 0)
+		if (!rmem || !rmem->ops || !rmem->ops->device_init)
+			return err;
+
+		err = rmem->ops->device_init(rmem, dev);
+		if (err)
+			break;
 		dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
+	}
 
-	return ret;
+	return err;
 }
 EXPORT_SYMBOL_GPL(of_reserved_mem_device_init);
 
@@ -326,18 +334,23 @@ EXPORT_SYMBOL_GPL(of_reserved_mem_device_init);
 void of_reserved_mem_device_release(struct device *dev)
 {
 	struct reserved_mem *rmem;
-	struct device_node *np;
+	struct of_phandle_iter iter;
 
-	np = of_parse_phandle(dev->of_node, "memory-region", 0);
-	if (!np)
-		return;
+	of_property_for_each_phandle_with_args(iter, dev->of_node, "memory-region",
+					       NULL, 1) {
+		struct of_phandle_args *ret = &iter.out_args;
 
-	rmem = __find_rmem(np);
-	of_node_put(np);
+		if (!ret->np)
+			return;
 
-	if (!rmem || !rmem->ops || !rmem->ops->device_release)
-		return;
+		of_node_get(ret->np);
+		rmem = __find_rmem(ret->np);
+		of_node_put(ret->np);
 
-	rmem->ops->device_release(rmem, dev);
+		if (!rmem || !rmem->ops || !rmem->ops->device_release)
+			return;
+
+		rmem->ops->device_release(rmem, dev);
+	}
 }
 EXPORT_SYMBOL_GPL(of_reserved_mem_device_release);

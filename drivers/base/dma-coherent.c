@@ -57,7 +57,7 @@ struct dma_coherent_mem {
 	void		*virt_base;
 	dma_addr_t	device_base;
 	unsigned long	pfn_base;
-	int		size;
+	size_t		size;
 	int		flags;
 	unsigned long	*bitmap;
 	spinlock_t	spinlock;
@@ -150,7 +150,7 @@ int dma_set_resizable_heap_floor_size(struct device *dev, size_t floor_size)
 	ret = update_vpr_config(h);
 	if (!ret) {
 		dev_dbg(&h->dev,
-			"grow heap base from=0x%pa to=0x%pa,"
+			"grow heap base from=%pa to=%pa,"
 			" len from=0x%zx to=0x%zx\n",
 			&orig_base, &h->curr_base, orig_len, h->curr_len);
 		goto success_set_floor;
@@ -252,11 +252,11 @@ static int declare_coherent_heap(struct device *dev, phys_addr_t base,
 	err = dma_declare_coherent_memory(dev, 0,
 			base, size, DMA_MEMORY_NOMAP);
 	if (err & DMA_MEMORY_NOMAP) {
-		dev_dbg(dev, "dma coherent mem base (0x%pa) size (0x%zx)\n",
+		dev_dbg(dev, "dma coherent mem base (%pa) size (0x%zx)\n",
 			&base, size);
 		return 0;
 	}
-	dev_err(dev, "declare dma coherent_mem fail 0x%pa 0x%zx\n",
+	dev_err(dev, "declare dma coherent_mem fail %pa 0x%zx\n",
 		&base, size);
 	return -ENOMEM;
 }
@@ -284,7 +284,7 @@ int dma_declare_coherent_resizable_cma_memory(struct device *dev,
 	}
 
 	dma_get_contiguous_stats(dma_info->cma_dev, &stats);
-	pr_info("resizable heap=%s, base=0x%pa, size=0x%zx\n",
+	pr_info("resizable heap=%s, base=%pa, size=0x%zx\n",
 		dma_info->name, &stats.base, stats.size);
 	strcpy(heap_info->name, dma_info->name);
 	dev_set_name(dev, "dma-%s", heap_info->name);
@@ -385,7 +385,7 @@ static phys_addr_t alloc_from_contiguous_heap(
 	struct page *page;
 	unsigned long order;
 
-	dev_dbg(h->cma_dev, "req at base (0x%pa) size (0x%zx)\n",
+	dev_dbg(h->cma_dev, "req at base (%pa) size (0x%zx)\n",
 		&base, len);
 	order = get_order(len);
 	count = PAGE_ALIGN(len) >> PAGE_SHIFT;
@@ -397,7 +397,7 @@ static phys_addr_t alloc_from_contiguous_heap(
 	}
 
 	base = page_to_phys(page);
-	dev_dbg(h->cma_dev, "allocated at base (0x%pa) size (0x%zx)\n",
+	dev_dbg(h->cma_dev, "allocated at base (%pa) size (0x%zx)\n",
 		&base, len);
 	BUG_ON(base < h->cma_base ||
 		base - h->cma_base + len > h->cma_len);
@@ -415,7 +415,7 @@ static void release_from_contiguous_heap(
 	size_t count = PAGE_ALIGN(len) >> PAGE_SHIFT;
 
 	dma_release_from_contiguous(h->cma_dev, page, count);
-	dev_dbg(h->cma_dev, "released at base (0x%pa) size (0x%zx)\n",
+	dev_dbg(h->cma_dev, "released at base (%pa) size (0x%zx)\n",
 		&base, len);
 }
 
@@ -509,7 +509,7 @@ alloc_success:
 		goto fail_update;
 
 	dev_dbg(&h->dev,
-		"grow heap base from=0x%pa to=0x%pa,"
+		"grow heap base from=%pa to=%pa,"
 		" len from=0x%zx to=0x%zx\n",
 		&prev_base, &h->curr_base, prev_len, h->curr_len);
 	return 0;
@@ -635,7 +635,7 @@ retry_alloc:
 	if (dma_alloc_from_coherent_dev_at(
 		&h->dev, len, dma_handle, ret, attrs,
 		(h->curr_base - h->cma_base) >> PAGE_SHIFT)) {
-		dev_dbg(&h->dev, "allocated addr 0x%pa len 0x%zx\n",
+		dev_dbg(&h->dev, "allocated addr %pa len 0x%zx\n",
 			dma_handle, len);
 		goto out;
 	}
@@ -698,16 +698,17 @@ static int dma_release_from_coherent_heap_dev(struct device *dev, size_t len,
 	BUG_ON(!h);
 	if (!h)
 		return 1;
-	if ((uintptr_t)base < h->cma_base ||
-	    len > h->cma_chunk_size ||
-	    (uintptr_t)base - h->cma_base > h->cma_len - len) {
+
+	mutex_lock(&h->resize_lock);
+	if ((uintptr_t)base < h->curr_base || len > h->curr_len ||
+	    (uintptr_t)base - h->curr_base > h->curr_len - len) {
 		BUG();
+		mutex_unlock(&h->resize_lock);
 		return 1;
 	}
 
 	dma_set_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs);
 
-	mutex_lock(&h->resize_lock);
 	idx = div_u64((uintptr_t)base - h->cma_base, h->cma_chunk_size);
 	dev_dbg(&h->dev, "req free addr (%p) size (0x%zx) idx (%d)\n",
 		base, len, idx);
@@ -747,7 +748,7 @@ static bool shrink_chunk_locked(struct heap_info *h, int idx)
 		goto out;
 	} else {
 		dev_dbg(&h->dev,
-			"prep to remove chunk b=0x%pa, s=0x%zx\n",
+			"prep to remove chunk b=%pa, s=0x%zx\n",
 			&dev_base, chunk_size);
 		resize_err = dma_release_from_coherent_dev(
 				&h->dev, chunk_size,
@@ -780,8 +781,8 @@ static bool shrink_chunk_locked(struct heap_info *h, int idx)
 		h->curr_len -= chunk_size;
 		update_alloc_range(h);
 		release_from_contiguous_heap(h, dev_base, chunk_size);
-		dev_dbg(&h->dev, "removed chunk b=0x%pa, s=0x%zx"
-			" new heap b=0x%pa, s=0x%zx\n", &dev_base,
+		dev_dbg(&h->dev, "removed chunk b=%pa, s=0x%zx"
+			" new heap b=%pa, s=0x%zx\n", &dev_base,
 			chunk_size, &h->curr_base, h->curr_len);
 		return true;
 	}
@@ -872,23 +873,67 @@ void dma_release_declared_memory(struct device *dev)
 EXPORT_SYMBOL(dma_release_declared_memory);
 
 void *dma_mark_declared_memory_occupied(struct device *dev,
-					dma_addr_t device_addr, size_t size)
+					dma_addr_t device_addr, size_t size,
+					struct dma_attrs *attrs)
 {
 	struct dma_coherent_mem *mem = dev->dma_mem;
-	int pos, err;
+	int order = get_order(size);
+	int pos, freepage;
+	unsigned int count;
+	unsigned long align = 0;
 
 	size += device_addr & ~PAGE_MASK;
 
 	if (!mem)
 		return ERR_PTR(-EINVAL);
 
+	if (!dma_get_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs)) {
+		if (order > DMA_BUF_ALIGNMENT)
+			align = (1 << DMA_BUF_ALIGNMENT) - 1;
+		else
+			align = (1 << order) - 1;
+	}
+
+	if (dma_get_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs))
+		count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	else
+		count = 1 << order;
+
 	pos = (device_addr - mem->device_base) >> PAGE_SHIFT;
-	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
-	if (err != 0)
-		return ERR_PTR(err);
+
+	freepage = bitmap_find_next_zero_area(mem->bitmap, mem->size,
+			pos, count, align);
+
+	if (pos >= mem->size || freepage != pos)
+		return ERR_PTR(-EBUSY);
+
+	bitmap_set(mem->bitmap, pos, count);
+
 	return mem->virt_base + (pos << PAGE_SHIFT);
 }
 EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
+
+void dma_mark_declared_memory_unoccupied(struct device *dev,
+					 dma_addr_t device_addr, size_t size,
+					 struct dma_attrs *attrs)
+{
+	struct dma_coherent_mem *mem = dev->dma_mem;
+	int pos;
+	int count;
+
+	if (!mem)
+		return;
+
+	size += device_addr & ~PAGE_MASK;
+
+	if (dma_get_attr(DMA_ATTR_ALLOC_EXACT_SIZE, attrs))
+		count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	else
+		count = 1 << get_order(size);
+	pos = (device_addr - mem->device_base) >> PAGE_SHIFT;
+	bitmap_clear(mem->bitmap, pos, count);
+}
+EXPORT_SYMBOL(dma_mark_declared_memory_unoccupied);
 
 /**
  * dma_alloc_from_coherent_attr() - try to allocate memory from the per-device
@@ -938,10 +983,18 @@ EXPORT_SYMBOL(dma_alloc_from_coherent_attr);
  * generic pools.
  */
 int dma_release_from_coherent_attr(struct device *dev, size_t size, void *vaddr,
-				struct dma_attrs *attrs)
+			struct dma_attrs *attrs, dma_addr_t dma_handle)
 {
 	if (!dev)
 		return 0;
+
+	if (!vaddr)
+		/*
+		 * The only possible valid case where vaddr is NULL is when
+		 * dma_alloc_attrs() is called on coherent dev which was
+		 * initialized with DMA_MEMORY_NOMAP.
+		 */
+		vaddr = (void *)dma_handle;
 
 	if (dev->dma_mem)
 		return dma_release_from_coherent_dev(dev, size, vaddr, attrs);

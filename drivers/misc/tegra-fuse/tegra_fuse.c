@@ -55,7 +55,7 @@
 #elif defined(CONFIG_ARCH_TEGRA_12x_SOC) || defined(CONFIG_ARCH_TEGRA_13x_SOC)
 #include "tegra12x_fuse_offsets.h"
 #elif defined(CONFIG_ARCH_TEGRA_18x_SOC)
-#include "../../../../kernel-t18x/drivers/misc/tegra-fuse/tegra18x_fuse_offsets.h"
+#include "../../../../t18x/drivers/misc/tegra-fuse/tegra18x_fuse_offsets.h"
 #elif defined(CONFIG_ARCH_TEGRA_21x_SOC)
 #include "tegra21x_fuse_offsets.h"
 #endif
@@ -101,6 +101,7 @@ static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
 	[TEGRA_REVISION_A01]     = "A01",
 	[TEGRA_REVISION_A01q]    = "A01Q",
 	[TEGRA_REVISION_A02]     = "A02",
+	[TEGRA_REVISION_A02p]     = "A02P",
 	[TEGRA_REVISION_A03]     = "A03",
 	[TEGRA_REVISION_A03p]    = "A03 prime",
 	[TEGRA_REVISION_A04]     = "A04",
@@ -123,6 +124,7 @@ static unsigned int tegra_fuse_vp8_enable;
 #endif
 #ifdef CONFIG_ARCH_TEGRA_18x_SOC
 static int t18x_fuse_pgm_cycles;
+static struct device_node *tegra18x_fuse_base_init(void);
 #endif
 static int tegra_gpu_num_pixel_pipes;
 static int tegra_gpu_num_alus_per_pixel_pipe;
@@ -383,6 +385,9 @@ u32 tegra_fuse_readl(unsigned long offset)
 {
 	u32 val = 0;
 
+	if (!fuse_base)
+		tegra18x_fuse_base_init();
+
 	if (fuse_base)
 		val = readl(fuse_base + offset);
 	else {
@@ -531,6 +536,7 @@ static struct chip_revision tegra_chip_revisions[] = {
 	CHIP_REVISION(TEGRA21, 1, 2, 0,   A02),
 	CHIP_REVISION(TEGRA18, 1, 1, 0,   A01),
 	CHIP_REVISION(TEGRA18, 1, 2, 0,   A02),
+	CHIP_REVISION(TEGRA18, 1, 2, 'p',   A02p),
 };
 
 static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
@@ -1566,7 +1572,7 @@ static void tegra_set_bct_strapping(void)
 u32 tegra_get_fuse_opt_subrevision(void)
 {
 	u8 ret = 0;
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC) || defined(CONFIG_ARCH_TEGRA_18x_SOC)
 	u32 reg;
 
 	reg = tegra_fuse_readl(FUSE_OPT_SUBREVISION);
@@ -1819,19 +1825,35 @@ static void __exit tegra_fuse_exit(void)
 module_exit(tegra_fuse_exit);
 
 #ifdef CONFIG_ARCH_TEGRA_18x_SOC
+static struct device_node *tegra18x_fuse_base_init(void)
+{
+	struct device_node *np;
+
+	np = of_find_matching_node(NULL, tegra_fuse_of_match);
+	if (!np)
+		goto err;
+
+	if (fuse_base)
+		return np;
+
+	fuse_base = of_iomap(np, 0);
+	if (!fuse_base) {
+		pr_warn("fuse DT node missing\n");
+		goto err;
+	}
+	return np;
+err:
+	return NULL;
+}
+
 static int tegra18x_fuse_init(void)
 {
 	struct device_node *np;
 	struct clk *fuse_clk;
 
-	np = of_find_matching_node(NULL, tegra_fuse_of_match);
-	if (np)
-		fuse_base = of_iomap(np, 0);
-
-	if (!fuse_base)	{
-		pr_warn("fuse DT node missing\n");
-		return -ENXIO;
-	}
+	np = tegra18x_fuse_base_init();
+	if (!np)
+		return -ENOENT;
 
 	fuse_clk = of_clk_get_by_name(np, "fuse");
 	if (IS_ERR(fuse_clk)) {

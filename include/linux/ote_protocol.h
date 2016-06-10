@@ -19,7 +19,8 @@
 #ifndef __OTE_PROTOCOL_H__
 #define __OTE_PROTOCOL_H__
 
-int te_set_vpr_params(void *vpr_base, size_t vpr_size);
+int tegra_set_vpr_params(void *vpr_base, size_t vpr_size);
+
 void te_restore_keyslots(void);
 int  te_vrr_set_buf(phys_addr_t addr);
 void te_vrr_sec(void);

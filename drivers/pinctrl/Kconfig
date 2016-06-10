@@ -282,7 +282,7 @@ config PINCTRL_TB10X
 	select GPIOLIB
 
 if ARCH_TEGRA_18x_SOC
-source "../kernel-t18x/drivers/pinctrl/Kconfig"
+source "../t18x/drivers/pinctrl/Kconfig"
 endif
 
 endmenu

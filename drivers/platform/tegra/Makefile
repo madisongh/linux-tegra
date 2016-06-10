@@ -7,10 +7,9 @@ GCOV_PROFILE := y
 
 subdir-ccflags-y += -Werror
 subdir-ccflags-y += -I$(srctree)/drivers/platform/tegra/include \
-		    -I$(srctree)/../kernel-t18x/drivers/platform/tegra/ \
+		    -I$(srctree)/../t18x/drivers/platform/tegra/ \
 		    -I$(srctree)/arch/arm/mach-tegra
 
-obj-$(CONFIG_ARCH_TEGRA_18x_SOC)        += tegra_vpr.o
 ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
 obj-$(CONFIG_USB_SUPPORT)		+= tegra_usb_pmc.o
 endif
@@ -19,6 +18,9 @@ obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
 obj-$(CONFIG_OF_TEGRA_IOMMU_SMMU)       += iommu.o
 obj-$(CONFIG_TEGRA_BOOTLOADER_DEBUG)    += tegra_bootloader_debug.o
 obj-$(CONFIG_TEGRA_BOOTLOADER_DEBUG_INIT) += tegra_bootloader_debug_init.o
+
+obj-y					+= tegra_vpr.o
+obj-y					+= smc-calls.o
 
 obj-$(CONFIG_TEGRA_CAMERA_MIPI_CAL)     += mipi-cal.o
 obj-$(CONFIG_TEGRA_NVADSP)		+= nvadsp/

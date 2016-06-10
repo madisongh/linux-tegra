@@ -133,8 +133,18 @@ config ARCH_TEGRA_21x_SOC
           Support for NVIDIA Tegra 21x family of SoCs, based upon the
 	  Cortex-A57 CPU.
 
+
+config ARCH_TEGRA_APE
+	bool "Tegra Audio Processing Engine(APE) present"
+	default n
+	help
+	  Say Y here if the SOC supports
+	  the Tegra Audio Processing Engine (APE)
+	  which handles audio specific
+	  tasks.
+
 if ARCH_TEGRA_18x_SOC
-source ../kernel-t18x/arch/arm64/Kconfig
+source ../t18x/arch/arm64/Kconfig
 endif
 
 config ARCH_TEGRA_18x_SOC
@@ -202,6 +212,9 @@ config LOCKDEP_SUPPORT
 
 config TRACE_IRQFLAGS_SUPPORT
 	def_bool y
+
+config FIQ_GLUE
+	bool
 
 config RWSEM_XCHGADD_ALGORITHM
 	def_bool y
@@ -633,6 +646,9 @@ config ARCH_WANT_HUGE_PMD_SHARE
 	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
 
 config HAVE_ARCH_TRANSPARENT_HUGEPAGE
+	def_bool y
+
+config ARCH_HAS_CACHE_LINE_SIZE
 	def_bool y
 
 source "mm/Kconfig"

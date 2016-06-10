@@ -1199,7 +1199,7 @@ config I2C_OPAL
 	  called as i2c-opal.
 
 if ARCH_TEGRA_18x_SOC
-source "../kernel-t18x/drivers/i2c/busses/Kconfig"
+source "../t18x/drivers/i2c/busses/Kconfig"
 endif
 
 endmenu

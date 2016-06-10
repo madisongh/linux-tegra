@@ -108,7 +108,7 @@ static pgprot_t vm_pgprot_modify(pgprot_t oldprot, unsigned long vm_flags)
 }
 
 /* Update vma->vm_page_prot to reflect vma->vm_flags. */
-void vma_set_page_prot(struct vm_area_struct *vma)
+bool vma_set_page_prot(struct vm_area_struct *vma)
 {
 	unsigned long vm_flags = vma->vm_flags;
 
@@ -117,7 +117,9 @@ void vma_set_page_prot(struct vm_area_struct *vma)
 		vm_flags &= ~VM_SHARED;
 		vma->vm_page_prot = vm_pgprot_modify(vma->vm_page_prot,
 						     vm_flags);
+		return 1;
 	}
+	return 0;
 }
 
 
@@ -1697,7 +1699,7 @@ out:
 	 */
 	vma->vm_flags |= VM_SOFTDIRTY;
 
-	vma_set_page_prot(vma);
+	(void)vma_set_page_prot(vma);
 
 	return addr;
 
@@ -2639,6 +2641,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 
 	return 0;
 }
+EXPORT_SYMBOL(do_munmap);
 
 int vm_munmap(unsigned long start, size_t len)
 {

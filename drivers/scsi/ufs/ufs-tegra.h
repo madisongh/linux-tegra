@@ -21,6 +21,7 @@
 #define _UFS_TEGRA_H
 
 #include <linux/io.h>
+#include <linux/padctrl/padctrl.h>
 
 #define NV_ADDRESS_MAP_MPHY_L0_BASE	0x02470000
 #define NV_ADDRESS_MAP_MPHY_L1_BASE	0x02480000
@@ -153,7 +154,6 @@ static u16 mphy_rx_apb[] = {
 0x0a0, /* MPHY_RX_APB_ATTRIBUTE_A0_A3_0  */
 0x0a4, /* MPHY_RX_APB_ATTRIBUTE_A4_A7_0  */
 0x0a8, /* MPHY_RX_APB_ATTRIBUTE_A8_AB_0  */
-0x0c0, /* MPHY_RX_APB_RX_STATUS_C0_0     */
 0x0d0, /* MPHY_RX_APB_MC_STATUS_D0_D3_0  */
 0x0d4, /* MPHY_RX_APB_MC_STATUS_D4_D7_0  */
 0x0d8, /* MPHY_RX_APB_MC_STATUS_D8_DB_0  */
@@ -211,7 +211,6 @@ static u16 mphy_tx_apb[] = {
 0x030, /* MPHY_TX_APB_TX_ATTRIBUTE_30_33_0  */
 0x034, /* MPHY_TX_APB_TX_ATTRIBUTE_34_37_0  */
 0x038, /* MPHY_TX_APB_TX_ATTRIBUTE_38_3B_0  */
-0x040, /* MPHY_TX_APB_TX_STATUS_40_44_0     */
 0x060, /* MPHY_TX_APB_MC_ATTRIBUTE_60_63_0  */
 0x064, /* MPHY_TX_APB_MC_ATTRIBUTE_64_67_0  */
 0x100, /* MPHY_TX_APB_TX_VENDOR0_0          */
@@ -286,6 +285,7 @@ struct ufs_tegra_host {
 	struct clk *ufsdev_ref_clk;
 	struct regulator *vddio_ufs;
 	struct regulator *vddio_ufs_ap;
+	struct padctrl *ufs_padctrl;
 
 };
 

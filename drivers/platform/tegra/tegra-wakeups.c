@@ -29,7 +29,7 @@
 #include <linux/system-wakeup.h>
 
 #include <mach/irqs.h>
-#include <linux/platform_data/gpio-tegra.h>
+#include <linux/gpio/gpio-tegra.h>
 
 int *tegra_gpio_wake_table;
 EXPORT_SYMBOL_GPL(tegra_gpio_wake_table);

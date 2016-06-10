@@ -114,7 +114,7 @@ config MTD_SST25L
 
 config MTD_QSPI_FLASH
 	tristate "Support Quad SPI Flash chips (S25FL512S,MT25QL512AB)"
-	depends on SPI_MASTER && QSPI_TEGRA210
+	depends on SPI_MASTER && QSPI_TEGRA
 	help
 	  This enables access to Quad SPI flash chips, used for
 	  program and data storage.

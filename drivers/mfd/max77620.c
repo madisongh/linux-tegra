@@ -86,10 +86,10 @@ static struct mfd_cell max20024_children[] = {
 	MAX77620_MFD_CELL_NAME("max20024-clock"),
 };
 
-int max77620_top_irq_chip_pre_irq(void *data)
+static int max77620_top_irq_chip_pre_irq(void *data)
 {
 	struct max77620_chip *chip = data;
-	int ret = 0;
+	int ret;
 
 	ret = regmap_update_bits(chip->rmap, MAX77620_REG_INTENLBT,
 		MAX77620_GLBLM_MASK, MAX77620_GLBLM_MASK);
@@ -99,10 +99,10 @@ int max77620_top_irq_chip_pre_irq(void *data)
 	return ret;
 }
 
-int max77620_top_irq_chip_post_irq(void *data)
+static int max77620_top_irq_chip_post_irq(void *data)
 {
 	struct max77620_chip *chip = data;
-	int ret = 0;
+	int ret;
 
 	ret = regmap_update_bits(chip->rmap, MAX77620_REG_INTENLBT,
 			MAX77620_GLBLM_MASK, 0);

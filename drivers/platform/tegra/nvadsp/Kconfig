@@ -7,18 +7,6 @@ config TEGRA_NVADSP
 
 	  If unsure, say N
 
-config TEGRA_APE_AGIC
-	bool "Enable AGIC interrupt controller"
-	depends on ARCH_TEGRA_APE
-	select FIQ
-	default n
-	help
-	  The AGIC interrupt controller is based on GIC 400. Use this
-	  controller if the tegra platform needs interrupts from/to
-	  APE modules.
-
-	  If unsure, say N
-
 config TEGRA_NVADSP_ON_SMMU
 	bool "Use SMMU to relocate ADSP"
 	depends on (TEGRA_IOMMU_SMMU || OF_TEGRA_IOMMU_SMMU) && TEGRA_NVADSP

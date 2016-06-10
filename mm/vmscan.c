@@ -46,7 +46,6 @@
 #include <linux/oom.h>
 #include <linux/prefetch.h>
 #include <linux/printk.h>
-#include <linux/debugfs.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -221,38 +220,15 @@ static unsigned long get_lru_size(struct lruvec *lruvec, enum lru_list lru)
 	return zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru);
 }
 
-struct dentry *debug_file;
-
-static int debug_shrinker_show(struct seq_file *s, void *unused)
+/* If zram is being used as swap, and zram is using zsmalloc allocator
+ * then there is a potential bug when reclaim happens from interrupt
+ * context
+ */
+static void adjust_scan_control(struct scan_control *sc)
 {
-	struct shrinker *shrinker;
-	struct shrink_control sc;
-
-	sc.gfp_mask = -1;
-	sc.nr_to_scan = 0;
-
-	down_read(&shrinker_rwsem);
-	list_for_each_entry(shrinker, &shrinker_list, list) {
-		int num_objs;
-
-		num_objs = shrinker->count_objects(shrinker, &sc);
-		seq_printf(s, "%pf %d\n", shrinker->scan_objects, num_objs);
-	}
-	up_read(&shrinker_rwsem);
-	return 0;
+	if (in_interrupt() && IS_ENABLED(ZSMALLOC) && total_swap_pages)
+		sc->may_swap = 0;
 }
-
-static int debug_shrinker_open(struct inode *inode, struct file *file)
-{
-        return single_open(file, debug_shrinker_show, inode->i_private);
-}
-
-static const struct file_operations debug_shrinker_fops = {
-        .open = debug_shrinker_open,
-        .read = seq_read,
-        .llseek = seq_lseek,
-        .release = single_release,
-};
 
 /*
  * Add a shrinker callback to be called from the vm.
@@ -282,15 +258,6 @@ int register_shrinker(struct shrinker *shrinker)
 	return 0;
 }
 EXPORT_SYMBOL(register_shrinker);
-
-static int __init add_shrinker_debug(void)
-{
-	debugfs_create_file("shrinker", 0644, NULL, NULL,
-			    &debug_shrinker_fops);
-	return 0;
-}
-
-late_initcall(add_shrinker_debug);
 
 /*
  * Remove one
@@ -1285,6 +1252,7 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
 	unsigned long ret, dummy1, dummy2, dummy3, dummy4, dummy5;
 	struct page *page, *next;
 	LIST_HEAD(clean_pages);
+	adjust_scan_control(&sc);
 
 	list_for_each_entry_safe(page, next, page_list, lru) {
 		if (page_is_file_cache(page) && !PageDirty(page) &&
@@ -2881,6 +2849,8 @@ unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
 		.may_swap = 1,
 	};
 
+	adjust_scan_control(&sc);
+
 	/*
 	 * Do not enter reclaim if fatal signal was delivered while throttled.
 	 * 1 is returned so that the page allocator does not OOM kill at this
@@ -2917,6 +2887,8 @@ unsigned long mem_cgroup_shrink_node_zone(struct mem_cgroup *memcg,
 	struct lruvec *lruvec = mem_cgroup_zone_lruvec(zone, memcg);
 	int swappiness = mem_cgroup_swappiness(memcg);
 	unsigned long lru_pages;
+
+	adjust_scan_control(&sc);
 
 	sc.gfp_mask = (gfp_mask & GFP_RECLAIM_MASK) |
 			(GFP_HIGHUSER_MOVABLE & ~GFP_RECLAIM_MASK);
@@ -2959,6 +2931,7 @@ unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
 		.may_swap = may_swap,
 	};
 
+	adjust_scan_control(&sc);
 	/*
 	 * Unlike direct reclaim via alloc_pages(), memcg's reclaim doesn't
 	 * take care of from where we get pages. So the node where we start the
@@ -3211,6 +3184,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 		.may_unmap = 1,
 		.may_swap = 1,
 	};
+	adjust_scan_control(&sc);
 	count_vm_event(PAGEOUTRUN);
 
 	do {
@@ -3555,21 +3529,6 @@ void wakeup_kswapd(struct zone *zone, int order, enum zone_type classzone_idx)
 {
 	pg_data_t *pgdat;
 
-	/* Check whether ZRAM is disabled. */
-	if(!total_swap_pages) {
-		/* Avoid kswapd for HIGH MEMORY ZONE. */
-#ifdef CONFIG_HIGHMEM
-                if (classzone_idx == ZONE_HIGHMEM)
-                        return;
-#endif
-
-#ifdef CONFIG_ZONE_DMA32
-	/* Avoid Normal zone balancing when DMA32 zone exist. */
-		if (classzone_idx == ZONE_NORMAL)
-			return;
-#endif
-	}
-
 	if (!populated_zone(zone))
 		return;
 
@@ -3614,6 +3573,7 @@ unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
 	struct task_struct *p = current;
 	unsigned long nr_reclaimed;
 
+	adjust_scan_control(&sc);
 	p->flags |= PF_MEMALLOC;
 	lockdep_set_current_reclaim_state(sc.gfp_mask);
 	reclaim_state.reclaimed_slab = 0;
@@ -3797,6 +3757,7 @@ static int __zone_reclaim(struct zone *zone, gfp_t gfp_mask, unsigned int order)
 		.may_swap = 1,
 	};
 
+	adjust_scan_control(&sc);
 	cond_resched();
 	/*
 	 * We need to be able to allocate from the reserves for RECLAIM_UNMAP

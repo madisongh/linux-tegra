@@ -1046,10 +1046,17 @@ config GPIO_VIPERBOARD
           River Tech's viperboard.h for detailed meaning
           of the module parameters.
 
+config GPIO_TMPM32X_I2C
+	tristate "GPIO support for TMPM32x through I2C"
+	select GPIOLIB_IRQCHIP
+	help
+	  Say yes here to access the GPIO signals of TMPM32x
+	  Toshiba MCU through I2C.
+
 endmenu
 
 if ARCH_TEGRA_18x_SOC
-source "../kernel-t18x/drivers/gpio/Kconfig"
+source "../t18x/drivers/gpio/Kconfig"
 endif
 
 endif

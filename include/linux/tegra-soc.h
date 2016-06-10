@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -37,6 +37,7 @@ enum tegra_revision {
 	TEGRA_REVISION_A01,
 	TEGRA_REVISION_A01q,
 	TEGRA_REVISION_A02,
+	TEGRA_REVISION_A02p,
 	TEGRA_REVISION_A03,
 	TEGRA_REVISION_A03p,
 	TEGRA_REVISION_A04,

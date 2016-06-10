@@ -107,6 +107,7 @@ static int __pm_clk_add(struct device *dev, const char *con_id,
 	spin_unlock_irq(&psd->lock);
 	return 0;
 }
+EXPORT_SYMBOL(pm_clk_add);
 
 /**
  * pm_clk_add - Start using a device clock for power management.
@@ -221,6 +222,7 @@ int pm_clk_create(struct device *dev)
 {
 	return dev_pm_get_subsys_data(dev);
 }
+EXPORT_SYMBOL(pm_clk_create);
 
 /**
  * pm_clk_destroy - Destroy a device's list of power management clocks.

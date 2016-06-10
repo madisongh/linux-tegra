@@ -172,6 +172,7 @@ struct tegra_i2c_hw_feature {
 	bool has_slcg_override_reg;
 	bool has_sw_reset_reg;
 	bool has_hw_arb_support;
+	bool has_reg_write_buffering;
 };
 
 /**
@@ -247,8 +248,10 @@ static void i2c_writel(struct tegra_i2c_dev *i2c_dev, u32 val,
 	writel(val, i2c_dev->base + tegra_i2c_reg_addr(i2c_dev, reg));
 
 	/* Read back register to make sure that register writes completed */
-	if (reg != I2C_TX_FIFO)
-		readl(i2c_dev->base + tegra_i2c_reg_addr(i2c_dev, reg));
+	if (i2c_dev->hw->has_reg_write_buffering) {
+		if (reg != I2C_TX_FIFO)
+			readl(i2c_dev->base + tegra_i2c_reg_addr(i2c_dev, reg));
+	}
 }
 
 static u32 i2c_readl(struct tegra_i2c_dev *i2c_dev, unsigned long reg)
@@ -470,6 +473,22 @@ static int tegra_i2c_wait_for_config_load(struct tegra_i2c_dev *i2c_dev)
 	return 0;
 }
 
+static int tegra_i2c_set_clk_rate(struct tegra_i2c_dev *i2c_dev)
+{
+	u32 clk_multiplier = I2C_CLK_MULTIPLIER_STD_FAST_MODE;
+	int ret = 0;
+
+	clk_multiplier *= (i2c_dev->clk_divisor_non_hs_mode + 1);
+	ret = clk_set_rate(i2c_dev->div_clk,
+			   i2c_dev->bus_clk_rate * clk_multiplier);
+	if (ret) {
+		dev_err(i2c_dev->dev, "Clock rate change failed %d\n", ret);
+		return ret;
+	}
+	return ret;
+}
+
+
 static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
 {
 	u32 val;
@@ -507,6 +526,10 @@ skip_periph_reset:
 
 	i2c_writel(i2c_dev, val, I2C_CNFG);
 	i2c_writel(i2c_dev, 0, I2C_INT_MASK);
+
+	err = tegra_i2c_set_clk_rate(i2c_dev);
+	if (err < 0)
+		return err;
 
 	/* Make sure clock divisor programmed correctly */
 	clk_divisor = i2c_dev->hw->clk_divisor_hs_mode;
@@ -833,6 +856,13 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 		return ret;
 	}
 
+	if (adap->bus_clk_rate != i2c_dev->bus_clk_rate) {
+		i2c_dev->bus_clk_rate = adap->bus_clk_rate;
+		ret = tegra_i2c_set_clk_rate(i2c_dev);
+		if (ret < 0)
+			return ret;
+	}
+
 	for (i = 0; i < num; i++) {
 		enum msg_end_type end_type = MSG_END_STOP;
 		if (i < (num - 1)) {
@@ -902,6 +932,7 @@ static const struct tegra_i2c_hw_feature tegra20_i2c_hw = {
 	.has_slcg_override_reg = false,
 	.has_sw_reset_reg = false,
 	.has_hw_arb_support = false,
+	.has_reg_write_buffering = true,
 };
 
 static const struct tegra_i2c_hw_feature tegra30_i2c_hw = {
@@ -916,6 +947,7 @@ static const struct tegra_i2c_hw_feature tegra30_i2c_hw = {
 	.has_slcg_override_reg = false,
 	.has_sw_reset_reg = false,
 	.has_hw_arb_support = false,
+	.has_reg_write_buffering = true,
 };
 
 static const struct tegra_i2c_hw_feature tegra114_i2c_hw = {
@@ -930,6 +962,7 @@ static const struct tegra_i2c_hw_feature tegra114_i2c_hw = {
 	.has_slcg_override_reg = false,
 	.has_sw_reset_reg = false,
 	.has_hw_arb_support = true,
+	.has_reg_write_buffering = true,
 };
 
 static const struct tegra_i2c_hw_feature tegra124_i2c_hw = {
@@ -944,6 +977,7 @@ static const struct tegra_i2c_hw_feature tegra124_i2c_hw = {
 	.has_slcg_override_reg = true,
 	.has_sw_reset_reg = false,
 	.has_hw_arb_support = true,
+	.has_reg_write_buffering = true,
 };
 
 static const struct tegra_i2c_hw_feature tegra210_i2c_hw = {
@@ -958,6 +992,7 @@ static const struct tegra_i2c_hw_feature tegra210_i2c_hw = {
 	.has_slcg_override_reg = true,
 	.has_sw_reset_reg = false,
 	.has_hw_arb_support = true,
+	.has_reg_write_buffering = true,
 };
 
 static const struct tegra_i2c_hw_feature tegra186_i2c_hw = {
@@ -972,6 +1007,7 @@ static const struct tegra_i2c_hw_feature tegra186_i2c_hw = {
 	.has_slcg_override_reg = true,
 	.has_sw_reset_reg = true,
 	.has_hw_arb_support = true,
+	.has_reg_write_buffering = false,
 };
 
 /* Match table for of_platform binding */
@@ -997,7 +1033,6 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	void __iomem *base;
 	int irq;
 	int ret = 0;
-	int clk_multiplier = I2C_CLK_MULTIPLIER_STD_FAST_MODE;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	base = devm_ioremap_resource(&pdev->dev, res);
@@ -1086,13 +1121,9 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 		i2c_dev->clk_divisor_non_hs_mode =
 			i2c_dev->hw->clk_divisor_fast_plus_mode;
 
-	clk_multiplier *= (i2c_dev->clk_divisor_non_hs_mode + 1);
-	ret = clk_set_rate(i2c_dev->div_clk,
-			   i2c_dev->bus_clk_rate * clk_multiplier);
-	if (ret) {
-		dev_err(i2c_dev->dev, "Clock rate change failed %d\n", ret);
-		goto unprepare_fast_clk;
-	}
+	ret = tegra_i2c_set_clk_rate(i2c_dev);
+	if (ret < 0)
+		return ret;
 
 	ret = clk_prepare(i2c_dev->div_clk);
 	if (ret < 0) {
@@ -1127,6 +1158,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	i2c_dev->adapter.class = I2C_CLASS_DEPRECATED;
 	strlcpy(i2c_dev->adapter.name, "Tegra I2C adapter",
 		sizeof(i2c_dev->adapter.name));
+	i2c_dev->adapter.bus_clk_rate = i2c_dev->bus_clk_rate;
 	i2c_dev->adapter.dev.parent = &pdev->dev;
 	i2c_dev->adapter.nr = pdev->id;
 	i2c_dev->adapter.dev.of_node = pdev->dev.of_node;

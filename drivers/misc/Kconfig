@@ -426,10 +426,6 @@ config TEGRA_CRYPTO_DEV
         Dev node /dev/tegra-crypto in order to get access to tegra aes
         hardware from user space
 
-config UID_STAT
-	bool "UID based statistics tracking exported to /proc/uid_stat"
-	default n
-
 config VMWARE_BALLOON
 	tristate "VMware Balloon Driver"
 	depends on VMWARE_VMCI && X86 && HYPERVISOR_GUEST
@@ -567,6 +563,13 @@ config THERM_EST
 	---help---
 	Thermal driver which estimates temperature based of other sensors.
 
+config TEGRA_THROUGHPUT
+        bool "Device node to set throughput target"
+        depends on TEGRA_DC && TEGRA_DC_EXTENSIONS
+        default y
+        ---help---
+        Dev node /dev/tegra-throughput used to set a throughput target.
+
 config FAN_THERM_EST
 	bool "Fan driving temp estimator"
 	---help---
@@ -585,6 +588,14 @@ config BLUEDROID_PM
 
 	  Say Y here to compile support for bluedroid_pm support into the kernel
 	  or say M to compile it as module (bluedroid_pm).
+
+config CPULOAD_MONITOR
+        bool "Publish cpu load measures in sysfs"
+        depends on CPU_FREQ
+        default y
+        ---help---
+        Publish cpu load measured in sysfs, to be used by user space cpu
+        frequency controllers.
 
 config TEGRA_PROC_POWER_MODEL
 	bool

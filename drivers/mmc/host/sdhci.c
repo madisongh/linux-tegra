@@ -3397,7 +3397,7 @@ int sdhci_add_host(struct sdhci_host *host)
 	sdhci_init(host, 0);
 
 	ret = request_threaded_irq(host->irq, sdhci_irq, sdhci_thread_irq,
-				   IRQF_SHARED,	mmc_hostname(mmc), host);
+				   IRQF_SHARED,	dev_name(mmc->parent), host);
 	if (ret) {
 		pr_err("%s: Failed to request IRQ %d: %d\n",
 		       mmc_hostname(mmc), host->irq, ret);
