@@ -102,7 +102,6 @@ static int bwmgr_update_clk(void)
 	}
 
 	bw += iso_bw;
-	bw = max(bw, floor);
 	bw = max(bw, bwmgr.emc_min_rate);
 	bw = min(bw, bwmgr.emc_max_rate);
 
@@ -110,6 +109,9 @@ static int bwmgr_update_clk(void)
 			bw, iso_bw, bwmgr.emc_max_rate,
 			iso_client_flags, &iso_bw_min);
 	iso_bw_min = clk_round_rate(bwmgr.emc_clk, iso_bw_min);
+
+	floor = min(floor, bwmgr.emc_max_rate);
+	bw = max(bw, floor);
 
 	bw = min(bw, min(iso_cap, max(non_iso_cap, iso_bw_min)));
 	bw = clk_round_rate(bwmgr.emc_clk, bw);
@@ -404,6 +406,11 @@ static const char * const tegra_bwmgr_client_names[] = {
 	"pcie",
 	"bbc_0",
 	"eqos",
+	"se0",
+	"se1",
+	"se2",
+	"se3",
+	"se4",
 	"debug",
 	"null",
 };

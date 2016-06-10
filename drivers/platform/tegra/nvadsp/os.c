@@ -390,7 +390,7 @@ nvadsp_get_section(const struct firmware *fw, char *sec_name)
 	return NULL;
 }
 
-static inline void dump_global_symbol_table(void)
+static inline void __maybe_unused dump_global_symbol_table(void)
 {
 	struct device *dev = &priv.pdev->dev;
 	struct global_sym_info *table = priv.adsp_glo_sym_tbl;
@@ -1112,11 +1112,11 @@ static void print_agic_irq_states(void)
 	struct device *dev = &priv.pdev->dev;
 	int i;
 
-	for (i = INT_AMISC_MBOX_FULL0; i <= INT_ADSP_ACTMON; i++) {
+	for (i = INT_AGIC_START; i < INT_AGIC_END; i++) {
 		dev_info(dev, "irq %d is %s and %s\n", i,
-		tegra_agic_irq_is_pending(INT_ADSP_WDT) ?
+		tegra_agic_irq_is_pending(i) ?
 			"pending" : "not pending",
-		tegra_agic_irq_is_active(INT_ADSP_WDT) ?
+		tegra_agic_irq_is_active(i) ?
 			"active" : "not active");
 	}
 }

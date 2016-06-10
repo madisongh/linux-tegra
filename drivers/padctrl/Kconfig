@@ -7,5 +7,5 @@ menuconfig PADCTRL
 	  devices.
 
 if PADCTRL
-source "../kernel-t18x/drivers/padctrl/Kconfig"
+source "../t18x/drivers/padctrl/Kconfig"
 endif

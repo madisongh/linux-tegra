@@ -29,6 +29,13 @@ struct dma_iommu_mapping {
 	/* FIXME: currently only alignment of 2^n is supported. */
 	size_t			alignment;
 
+#ifdef CONFIG_DMA_API_DEBUG
+	atomic64_t		map_size;
+	atomic64_t		atomic_alloc_size;
+	atomic64_t		alloc_size;
+	atomic64_t		cpu_map_size;
+#endif
+
 	struct list_head	list;
 };
 

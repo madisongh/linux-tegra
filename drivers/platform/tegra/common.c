@@ -2,7 +2,7 @@
  * drivers/platform/tegra/common.c
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (C) 2010-2015 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2010-2016 NVIDIA Corporation. All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -48,7 +48,6 @@
 #include <linux/tegra-soc.h>
 #include <linux/dma-contiguous.h>
 #include <linux/tegra-fuse.h>
-#include <linux/ote_protocol.h>
 #include <linux/gk20a.h>
 #include <linux/tegra_smmu.h>
 #include <linux/tegra_pm_domains.h>
@@ -177,13 +176,10 @@ phys_addr_t tegra_fb2_start;
 phys_addr_t tegra_fb2_size;
 phys_addr_t tegra_carveout_start;
 phys_addr_t tegra_carveout_size;
-phys_addr_t tegra_vpr_start;
-phys_addr_t tegra_vpr_size;
 phys_addr_t tegra_tsec_start;
 phys_addr_t tegra_tsec_size;
 phys_addr_t tegra_lp0_vec_start;
 phys_addr_t tegra_lp0_vec_size;
-bool tegra_vpr_resize;
 
 bool tegra_lp0_vec_relocate;
 unsigned long tegra_grhost_aperture = ~0ul;
@@ -247,37 +243,6 @@ void tegra_unregister_idle_unidle(void)
 	nvgpu_do_unidle = NULL;
 }
 EXPORT_SYMBOL(tegra_unregister_idle_unidle);
-
-static int tegra_update_resize_cfg(phys_addr_t base , size_t size)
-{
-	int err = 0;
-#define MAX_RETRIES 6
-	int retries = MAX_RETRIES;
-
-retry:
-	if (nvgpu_do_idle)
-		err = nvgpu_do_idle();
-
-	if (!err) {
-		/* Config VPR_BOM/_SIZE in MC */
-		err = te_set_vpr_params((void *)(uintptr_t)base, size);
-
-		if (nvgpu_do_unidle)
-			nvgpu_do_unidle();
-	} else {
-		if (retries--) {
-			pr_err("%s:%d: fail retry=%d",
-				__func__, __LINE__, MAX_RETRIES - retries);
-			msleep(1);
-			goto retry;
-		}
-	}
-	return err;
-}
-
-struct dma_resize_notifier_ops vpr_dev_ops = {
-	.resize = tegra_update_resize_cfg
-};
 
 u32 notrace tegra_read_cycle(void)
 {
@@ -1033,26 +998,6 @@ int tegra_get_chip_personality(void)
 {
 	return chip_personality;
 }
-
-static int __init tegra_vpr_resize_arg(char *options)
-{
-	tegra_vpr_resize = true;
-	return 0;
-}
-early_param("vpr_resize", tegra_vpr_resize_arg);
-
-static int __init tegra_vpr_arg(char *options)
-{
-	char *p = options;
-
-	tegra_vpr_size = memparse(p, &p);
-	if (*p == '@')
-		tegra_vpr_start = memparse(p+1, &p);
-	pr_info("Found vpr, start=0x%llx size=%llx",
-		(u64)tegra_vpr_start, (u64)tegra_vpr_size);
-	return 0;
-}
-early_param("vpr", tegra_vpr_arg);
 
 static int __init tegra_tsec_arg(char *options)
 {

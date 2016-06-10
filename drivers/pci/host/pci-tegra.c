@@ -127,7 +127,6 @@
 
 #define AFI_CONFIGURATION						0xac
 #define AFI_CONFIGURATION_EN_FPCI				(1 << 0)
-#define AFI_CONFIGURATION_PW_NO_DEVSEL_ERR_CYA	(1 << 19)
 
 #define AFI_FPCI_ERROR_MASKS						0xb0
 
@@ -375,6 +374,8 @@
 
 #define INT_PCI_MSI_NR			(32 * 8)
 
+#define LINK_RETRAIN_TIMEOUT HZ
+
 #define DEBUG 0
 #if DEBUG || defined(CONFIG_PCI_DEBUG)
 #define PR_FUNC_LINE	pr_info("PCIE: %s(%d)\n", __func__, __LINE__)
@@ -533,13 +534,13 @@ static inline u32 afi_readl(struct tegra_pcie *pcie, unsigned long offset)
 	return readl(offset + pcie->afi);
 }
 
-static inline void pads_writel(struct tegra_pcie *pcie, u32 value,
+static inline void __maybe_unused pads_writel(struct tegra_pcie *pcie, u32 value,
 							   unsigned long offset)
 {
 	writel(value, offset + pcie->pads);
 }
 
-static inline u32 pads_readl(struct tegra_pcie *pcie, unsigned long offset)
+static inline u32 __maybe_unused pads_readl(struct tegra_pcie *pcie, unsigned long offset)
 {
 	return readl(offset + pcie->pads);
 }
@@ -1342,7 +1343,6 @@ static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
 	/* Finally enable PCIe */
 	val = afi_readl(pcie, AFI_CONFIGURATION);
 	val |=  AFI_CONFIGURATION_EN_FPCI;
-	val &= ~AFI_CONFIGURATION_PW_NO_DEVSEL_ERR_CYA;
 	afi_writel(pcie, val, AFI_CONFIGURATION);
 
 	val = (AFI_INTR_EN_INI_SLVERR | AFI_INTR_EN_INI_DECERR |
@@ -2556,6 +2556,7 @@ static void tegra_pcie_change_link_speed(struct tegra_pcie *pcie,
 	u16 val, link_sts_up_spd, link_sts_dn_spd;
 	u16 link_cap_up_spd, link_cap_dn_spd;
 	u32 rp = 0;
+	unsigned long start_jiffies;
 	struct tegra_pcie_port *port = NULL;
 	struct pci_dev *up_dev, *dn_dev;
 
@@ -2624,6 +2625,19 @@ change:
 	pcie_capability_read_word(dn_dev, PCI_EXP_LNKCTL, &val);
 	val |= PCI_EXP_LNKCTL_RL;
 	pcie_capability_write_word(dn_dev, PCI_EXP_LNKCTL, val);
+
+	/* Wait for link training end. Break out after waiting for timeout */
+	start_jiffies = jiffies;
+	for (;;) {
+		pcie_capability_read_word(dn_dev, PCI_EXP_LNKSTA, &val);
+		if (!(val & PCI_EXP_LNKSTA_LT))
+			break;
+		if (time_after(jiffies, start_jiffies + LINK_RETRAIN_TIMEOUT))
+			break;
+		usleep_range(1000, 1100);
+	}
+	if (val & PCI_EXP_LNKSTA_LT)
+		dev_err(pcie->dev, "Link Re-training failed after speed change\n");
 
 skip:
 	return;
@@ -2781,13 +2795,8 @@ static void tegra_pcie_enable_aspm(struct tegra_pcie *pcie)
 		ctrl = tegra_pcie_port_get_pex_ctrl(port);
 		/* AFI_PEX_STATUS is AFI_PEX_CTRL + 4 */
 		val = afi_readl(port->pcie, ctrl + 4);
-		if (val & 0x1) {
+		if (val & 0x1)
 			data |= PCIE_LINK_STATE_CLKPM;
-			/* disalbe PADS2PLLE control */
-			val = afi_readl(port->pcie, AFI_PLLE_CONTROL);
-			val &= ~AFI_PLLE_CONTROL_PADS2PLLE_CONTROL_EN;
-			afi_writel(port->pcie, val, AFI_PLLE_CONTROL);
-		}
 
 		/* Disable ASPM-l0s for blacklisted devices */
 		if (pci_match_id(aspm_l0s_blacklist, pdev))
@@ -4206,10 +4215,10 @@ DEFINE_ENTRY(dump_ltssm_trace)
 static int tegra_pcie_port_debugfs_init(struct tegra_pcie_port *port)
 {
 	struct dentry *d;
-	char port_name;
+	char port_name[2] = {0};
 
-	sprintf(&port_name, "%d", port->index);
-	port->port_debugfs = debugfs_create_dir(&port_name,
+	snprintf(port_name, sizeof(port_name), "%d", port->index);
+	port->port_debugfs = debugfs_create_dir(port_name,
 							port->pcie->debugfs);
 	if (!port->port_debugfs)
 		return -ENOMEM;
@@ -4652,7 +4661,7 @@ static int tegra_pcie_remove(struct platform_device *pdev)
 	struct tegra_pcie_bus *bus;
 
 	PR_FUNC_LINE;
-	pm_runtime_disable(pcie->dev);
+
 	if (cancel_delayed_work_sync(&pcie->detect_delay))
 		return 0;
 	if (IS_ENABLED(CONFIG_DEBUG_FS))
@@ -4667,14 +4676,14 @@ static int tegra_pcie_remove(struct platform_device *pdev)
 	if (pcie->prod_list)
 		tegra_prod_release(&pcie->prod_list);
 	tegra_pcie_detach(pcie);
-	tegra_pd_remove_device(pcie->dev);
 	tegra_pcie_power_off(pcie);
 #if defined(CONFIG_PINCTRL_TEGRA186_PADCTL_UPHY)
 	if (tegra_platform_is_silicon())
 		phy_exit(pcie->u_phy);
 #endif
-	tegra_pcie_disable_regulators(pcie);
-	tegra_pcie_clocks_put(pcie);
+	tegra_pcie_release_resources(pcie);
+	pm_runtime_disable(pcie->dev);
+	tegra_pd_remove_device(pcie->dev);
 
 	return 0;
 }

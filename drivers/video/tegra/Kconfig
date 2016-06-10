@@ -1,7 +1,4 @@
-source "../kernel-nvhost/drivers/video/tegra/Kconfig"
-if ARCH_TEGRA_18x_SOC
-source "../kernel-t18x/drivers/video/tegra/Kconfig"
-endif
+source "../nvhost/drivers/video/tegra/Kconfig"
 
 config TEGRA_GRHOST_SYNC
 	depends on TEGRA_GRHOST || TEGRA_HOST1X
@@ -12,7 +9,7 @@ config TEGRA_GRHOST_SYNC
 	  Add tegra host backend for the cross driver synchronization framework.
 	  Allows creating sync fence file descriptors from Tegra host syncpoints.
 
-source "../kernel-nvmap/drivers/video/tegra/nvmap/Kconfig"
+source "../nvmap/drivers/video/tegra/nvmap/Kconfig"
 
 if PLATFORM_TEGRA
 
@@ -26,22 +23,7 @@ config TEGRA_DC
 	  Enable this to access the Tegra display controller using either framebuffer
 	  console interface and a proprietary dc-ext interface or with ADF.
 
-source ../kernel-display/drivers/video/tegra/Kconfig
-
-config NVMAP_CONVERT_CARVEOUT_TO_IOVMM
-	bool "Convert carveout to IOVMM"
-	depends on TEGRA_NVMAP &&  (TEGRA_IOVMM_SMMU || IOMMU_API)
-	default y
-	help
-	  Say Y here to force to convert carveout memory requests to
-	  I/O virtual memory requests.
-
-config NVMAP_CONVERT_IOVMM_TO_CARVEOUT
-	bool "Convert IOVMM to carveout"
-	depends on TEGRA_NVMAP && IOMMU_API && !NVMAP_CONVERT_CARVEOUT_TO_IOVMM
-	help
-	  Say Y here to force to convert I/O virtual memory requests to
-	  carveout memory requests.
+source ../display/drivers/video/tegra/Kconfig
 
 config TEGRA_CAMERA_PLATFORM
 	bool "Enable tegra camera platform driver"

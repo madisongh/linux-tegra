@@ -35,7 +35,6 @@ obj-$(CONFIG_ISL29020)		+= isl29020.o
 obj-$(CONFIG_SENSORS_TSL2550)	+= tsl2550.o
 obj-$(CONFIG_DS1682)		+= ds1682.o
 obj-$(CONFIG_TI_DAC7512)	+= ti_dac7512.o
-obj-$(CONFIG_UID_STAT)		+= uid_stat.o
 obj-$(CONFIG_C2PORT)		+= c2port/
 obj-$(CONFIG_HMC6352)		+= hmc6352.o
 obj-y				+= eeprom/
@@ -64,6 +63,11 @@ obj-$(CONFIG_BLUEDROID_PM)      += bluedroid_pm.o
 obj-$(CONFIG_MODS) 		+= mods/
 obj-$(CONFIG_SENSORS_NCT1008)	+= nct1008.o
 obj-$(CONFIG_THERM_EST)		+= therm_est.o
+CFLAGS_tegra-throughput.o        = -Werror
+ifeq ($(CONFIG_ARM64),y)
+CFLAGS_tegra-throughput.o       += -Iarch/arm/mach-tegra/include
+endif
+obj-$(CONFIG_TEGRA_THROUGHPUT)  += tegra-throughput.o
+obj-$(CONFIG_CPULOAD_MONITOR)   += cpuload.o
 obj-$(CONFIG_FAN_THERM_EST)	+= therm_fan_est.o
 obj-$(CONFIG_TEGRA_PROC_POWER_MODEL) += tegra_ppm.o
-

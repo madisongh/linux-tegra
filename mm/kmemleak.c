@@ -565,10 +565,10 @@ static struct kmemleak_object *create_object(unsigned long ptr, size_t size,
 	/* task information */
 	if (in_irq()) {
 		object->pid = 0;
-		strncpy(object->comm, "hardirq", sizeof(object->comm));
+		strlcpy(object->comm, "hardirq", sizeof(object->comm));
 	} else if (in_softirq()) {
 		object->pid = 0;
-		strncpy(object->comm, "softirq", sizeof(object->comm));
+		strlcpy(object->comm, "softirq", sizeof(object->comm));
 	} else {
 		object->pid = current->pid;
 		/*
@@ -577,7 +577,7 @@ static struct kmemleak_object *create_object(unsigned long ptr, size_t size,
 		 * dependency issues with current->alloc_lock. In the worst
 		 * case, the command line is not correct.
 		 */
-		strncpy(object->comm, current->comm, sizeof(object->comm));
+		strlcpy(object->comm, current->comm, sizeof(object->comm));
 	}
 
 	/* kernel backtrace */

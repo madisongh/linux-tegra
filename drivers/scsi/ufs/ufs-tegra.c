@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Authors:
  *      VenkataJagadish.p	<vjagadish@nvidia.com>
@@ -94,6 +94,15 @@ void ufs_tegra_init_debugfs(struct ufs_hba *hba)
 }
 #endif
 
+
+/**
+ * ufs_tegra_cfg_vendor_registers
+ * @hba: host controller instance
+ */
+static void ufs_tegra_cfg_vendor_registers(struct ufs_hba *hba)
+{
+	ufshcd_writel(hba, UFS_VNDR_HCLKDIV_1US_TICK, REG_UFS_VNDR_HCLKDIV);
+}
 
 /*
  * ufs_tegra_ufs_pwrcntrl_update - To config UFSHC_PWR_CNTRL_0
@@ -522,6 +531,12 @@ static int ufs_tegra_ufs_reset_init(struct ufs_tegra_host *ufs_tegra)
 	return ret;
 }
 
+static void ufs_tegra_ufs_assert_reset(struct ufs_tegra_host *ufs_tegra)
+{
+	reset_control_assert(ufs_tegra->ufs_axi_m_rst);
+	reset_control_assert(ufs_tegra->ufshc_lp_rst);
+}
+
 static void ufs_tegra_ufs_deassert_reset(struct ufs_tegra_host *ufs_tegra)
 {
 	reset_control_deassert(ufs_tegra->ufs_rst);
@@ -761,7 +776,7 @@ void ufs_tegra_ufs_aux_prog(struct ufs_tegra_host *ufs_tegra)
 	 * Release the reset to UFS device on pin ufs_rst_n
 	 */
 
-	if (ufs_tegra->ufshc_state == UFSHC_INIT)
+	if (ufs_tegra->ufshc_state != UFSHC_SUSPEND)
 		ufs_aux_update(ufs_tegra->ufs_aux_base, UFSHC_DEV_RESET,
 						UFSHC_AUX_UFSHC_DEV_CTRL_0);
 
@@ -818,9 +833,15 @@ static void ufs_tegra_context_restore(struct ufs_tegra_host *ufs_tegra)
 	 */
 	ufs_restore_regs(ufs_tegra->mphy_l0_base, &mphy_context_restore,
 							mphy_rx_apb, reg_len);
-	if (ufs_tegra->x2config)
+	mphy_update(ufs_tegra->mphy_l0_base, MPHY_GO_BIT,
+				MPHY_RX_APB_VENDOR2_0);
+
+	if (ufs_tegra->x2config) {
 		ufs_restore_regs(ufs_tegra->mphy_l1_base, &mphy_context_restore,
 							mphy_rx_apb, reg_len);
+		mphy_update(ufs_tegra->mphy_l1_base, MPHY_GO_BIT,
+				MPHY_RX_APB_VENDOR2_0);
+	}
 
 	reg_len = ARRAY_SIZE(mphy_tx_apb);
 	/*
@@ -828,25 +849,57 @@ static void ufs_tegra_context_restore(struct ufs_tegra_host *ufs_tegra)
 	 */
 	ufs_restore_regs(ufs_tegra->mphy_l0_base, &mphy_context_restore,
 							mphy_tx_apb, reg_len);
-	if (ufs_tegra->x2config)
+	mphy_writel(ufs_tegra->mphy_l0_base, MPHY_GO_BIT,
+			MPHY_TX_APB_TX_VENDOR0_0);
+
+	if (ufs_tegra->x2config) {
 		ufs_restore_regs(ufs_tegra->mphy_l1_base, &mphy_context_restore,
 							mphy_tx_apb, reg_len);
+		mphy_writel(ufs_tegra->mphy_l1_base, MPHY_GO_BIT,
+				MPHY_TX_APB_TX_VENDOR0_0);
+	}
 }
 
 static int ufs_tegra_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 {
 	struct ufs_tegra_host *ufs_tegra = hba->priv;
+	struct device *dev = hba->dev;
 	u32 val;
 	int ret = 0;
+	int timeout = 5;
+	bool is_ufs_lp_pwr_gated = false;
+
+	if (pm_op != UFS_SYSTEM_PM)
+		return 0;
 
 	ufs_tegra->ufshc_state = UFSHC_SUSPEND;
-
 	/*
-	 * TODO Call PMC driver Function calls
+	 * Enable DPD for UFS
 	 */
+	if (ufs_tegra->ufs_padctrl) {
+		ret = padctrl_power_disable(ufs_tegra->ufs_padctrl);
+		if (ret)
+			dev_err(dev, "padctrl power down fail %d\n", ret);
 
-	val = ufs_aux_readl(ufs_tegra->ufs_aux_base, UFSHC_AUX_UFSHC_STATUS_0);
-	if (val & UFSHC_HIBERNATE_STATUS) {
+	}
+
+	do {
+		udelay(100);
+		val = ufs_aux_readl(ufs_tegra->ufs_aux_base,
+				UFSHC_AUX_UFSHC_STATUS_0);
+		if (val & UFSHC_HIBERNATE_STATUS) {
+			is_ufs_lp_pwr_gated = true;
+			break;
+		}
+		timeout--;
+	} while (timeout > 0);
+
+	if (timeout <= 0) {
+		dev_err(dev, "UFSHC_AUX_UFSHC_STATUS_0 = %x\n", val);
+		return -ETIMEDOUT;
+	}
+
+	if (is_ufs_lp_pwr_gated) {
 		/*
 		 * Save all armphy_rx_apb and armphy_tx_apb registers
 		 */
@@ -856,28 +909,35 @@ static int ufs_tegra_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	}
 
 	/*
-	 * Disable mphy tx/rx lane clocks if they are on
+	 * Disable ufs, mphy tx/rx lane clocks if they are on
 	 * and assert the reset
 	 */
+
 	ufs_tegra_disable_mphylane_clks(ufs_tegra);
 	ufs_tegra_mphy_assert_reset(ufs_tegra);
-	ufs_tegra_ufs_aux_prog(ufs_tegra);
+	ufs_tegra_disable_ufs_clks(ufs_tegra);
+	ufs_tegra_ufs_assert_reset(ufs_tegra);
 
-	/*
-	 * Disable mphy tx/rx lane clocks if they are on
-	 * and powerdown UPHY
-	 */
 	phy_power_off(ufs_tegra->u_phy);
 
 	return ret;
 }
 
+
 static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 {
 	struct ufs_tegra_host *ufs_tegra = hba->priv;
+	struct device *dev = hba->dev;
 	int ret = 0;
 
+	if (pm_op != UFS_SYSTEM_PM)
+		return 0;
+
 	ufs_tegra->ufshc_state = UFSHC_RESUME;
+
+	ufs_tegra_enable_regulators(ufs_tegra);
+	tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_PWR_RDY_MASK,
+			UFSHC_PWR_CNTRL_0_LP_PWR_RDY_ENABLE);
 
 	/*
 	 * Power on UPHY
@@ -886,22 +946,30 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	if (ret)
 		goto out;
 
-	/*
-	 * TODO Enable Required regulators
-	 */
-	/*
-	 * Enable mphy lane
-	 */
+	ret = ufs_tegra_enable_ufs_clks(ufs_tegra);
+	if (ret)
+		goto out_uphy_exit;
+
 	ret = ufs_tegra_enable_mphylane_clks(ufs_tegra);
 	if (ret)
-		goto out_mphy_exit;
-
+		goto out_disable_ufs_clks;
 	ufs_tegra_mphy_deassert_reset(ufs_tegra);
-
-	ufs_tegra_ufs_pwrcntrl_update(false);
+	ufs_tegra_ufs_deassert_reset(ufs_tegra);
+	tegra_pmc_ufs_pwrcntrl_update(UFSHC_PWR_CNTRL_0_LP_ISOL_EN_MASK,
+			UFSHC_PWR_CNTRL_0_LP_ISOL_EN_DISABLE);
 	ufs_tegra_ufs_aux_prog(ufs_tegra);
+
+	if (ufs_tegra->ufs_padctrl) {
+		ret = padctrl_power_enable(ufs_tegra->ufs_padctrl);
+		if (ret) {
+			dev_err(dev, "padctrl power up fail %d\n", ret);
+			goto out_disable_mphylane_clks;
+		}
+
+	}
+
 	ufs_tegra_context_restore(ufs_tegra);
-	ufs_tegra_mphy_tx_advgran(ufs_tegra);
+	ufs_tegra_cfg_vendor_registers(hba);
 	ret = ufs_tegra_mphy_receiver_calibration(ufs_tegra);
 	if (ret < 0)
 		goto out_disable_mphylane_clks;
@@ -910,7 +978,9 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 
 out_disable_mphylane_clks:
 	ufs_tegra_disable_mphylane_clks(ufs_tegra);
-out_mphy_exit:
+out_disable_ufs_clks:
+	ufs_tegra_disable_ufs_clks(ufs_tegra);
+out_uphy_exit:
 	phy_power_off(ufs_tegra->u_phy);
 out:
 	phy_exit(ufs_tegra->u_phy);
@@ -1076,15 +1146,6 @@ static int ufs_tegra_link_startup_notify(struct ufs_hba *hba,
 	return err;
 }
 
-/**
- * ufs_tegra_cfg_vendor_registers
- * @hba: host controller instance
- */
-static void ufs_tegra_cfg_vendor_registers(struct ufs_hba *hba)
-{
-	ufshcd_writel(hba, UFS_VNDR_HCLKDIV_1US_TICK, REG_UFS_VNDR_HCLKDIV);
-}
-
 static int ufs_tegra_context_save_init(struct ufs_tegra_host *ufs_tegra)
 {
 	u32 context_save_size = 0;
@@ -1157,6 +1218,15 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 	hba->priv = (void *)ufs_tegra;
 
 	ufs_tegra_config_soc_data(ufs_tegra);
+	hba->spm_lvl = UFS_PM_LVL_3;
+
+	ufs_tegra->ufs_padctrl = devm_padctrl_get(dev, "ufs");
+	if (IS_ERR(ufs_tegra->ufs_padctrl)) {
+		err = PTR_ERR(ufs_tegra->ufs_padctrl);
+		ufs_tegra->ufs_padctrl = NULL;
+		dev_err(dev, "pad control get failed, error:%d\n", err);
+	}
+
 
 	ufs_tegra->ufs_aux_base = devm_ioremap(dev,
 			NV_ADDRESS_MAP_UFSHC_AUX_BASE, UFS_AUX_ADDR_RANGE);

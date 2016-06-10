@@ -60,3 +60,6 @@ obj-$(CONFIG_BRCMSMAC)	+= brcm80211/
 
 obj-$(CONFIG_CW1200)	+= cw1200/
 obj-$(CONFIG_RSI_91X)	+= rsi/
+
+obj-$(CONFIG_BCMDHD_SDIO)       += bcmdhd/
+obj-$(CONFIG_BCMDHD_PCIE)       += bcmdhd_pcie/

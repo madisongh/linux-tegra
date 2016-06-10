@@ -18,9 +18,15 @@
 #define __LINUX_GPIO_TEGRA_H
 
 #ifdef CONFIG_PLATFORM_TEGRA
+int tegra_gpio_get_bank_int_nr(int gpio);
 int tegra_gpio_is_enabled(int gpio, int *is_gpio, int *is_input);
 #else
 static inline int tegra_gpio_is_enabled(int gpio, int *is_gpio, int *is_input)
+{
+	return 0;
+}
+
+static inline int tegra_gpio_get_bank_int_nr(int gpio)
 {
 	return 0;
 }

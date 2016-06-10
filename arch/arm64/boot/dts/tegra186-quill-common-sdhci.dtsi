@@ -2,6 +2,10 @@
 	sdhci@3460000 {
 		uhs-mask = <0x0>; /*enable HS400 mode*/
 		nvidia,enable-strobe-mode;
+		vqmmc-supply = <&spmic_sd2>;
+		vmmc-supply = <&spmic_sd3>;
+		vddio_sdmmc-supply = <0x0>;
+		vddio_sd_slot-supply = <0x0>;
 		status = "okay";
 	};
 

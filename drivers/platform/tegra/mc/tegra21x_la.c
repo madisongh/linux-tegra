@@ -18,7 +18,6 @@
 #include <asm/io.h>
 
 #include <linux/platform/tegra/latency_allowance.h>
-#include <linux/platform/tegra/tegra_emc.h>
 #include <linux/platform/tegra/mc.h>
 #include <linux/platform/tegra/clock.h>
 
@@ -643,7 +642,7 @@ static int t21x_handle_disp_la(enum tegra_la_id id,
 	if (effective_mccif_buf_sz < 0)
 		return -1;
 
-	la_bw_upper_bound_nsec_fp = effective_mccif_buf_sz *
+	la_bw_upper_bound_nsec_fp = (long long)effective_mccif_buf_sz *
 					LA_FP_FACTOR /
 					bw_mbps;
 	la_bw_upper_bound_nsec_fp = la_bw_upper_bound_nsec_fp *

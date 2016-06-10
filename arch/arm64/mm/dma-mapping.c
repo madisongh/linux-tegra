@@ -53,6 +53,43 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/dmadebug.h>
 
+enum dma_operation {
+	ALLOC_OR_FREE = 1,
+	ATOMIC_ALLOC_OR_FREE,
+	MAP_OR_UNMAP,
+	CPU_MAP_OR_UNMAP
+};
+
+#ifdef CONFIG_DMA_API_DEBUG
+#define NULL_DEV "null_dev"
+struct iommu_usage {
+	struct device		*dev;
+	struct list_head	recordlist;
+};
+
+struct null_device {
+	char const	*dev_name;
+	atomic64_t	map_size;
+	atomic64_t	atomic_alloc_size;
+	atomic64_t	alloc_size;
+	atomic64_t	cpu_map_size;
+};
+
+static struct null_device *dev_is_null;
+static LIST_HEAD(iommu_rlist_head);
+static size_t dmastats_alloc_or_map(struct device *dev, size_t size,
+	const int type);
+static size_t dmastats_free_or_unmap(struct device *dev, size_t size,
+	const int type);
+static void add_value(struct dma_iommu_mapping *iu, size_t size,
+	const int type);
+static void sub_value(struct dma_iommu_mapping *device_ref, size_t size,
+	const int type);
+#else
+#define dmastats_alloc_or_map(dev, size, type)
+#define dmastats_free_or_unmap(dev, size, type)
+#endif
+
 struct dma_map_ops *dma_ops;
 EXPORT_SYMBOL(dma_ops);
 
@@ -115,6 +152,37 @@ static int __free_from_pool(void *start, size_t size)
 
 	return 1;
 }
+
+#ifdef CONFIG_DMA_API_DEBUG
+static void *___alloc_from_pool(struct device *dev, size_t size,
+				struct page **ret_page, gfp_t flags)
+{
+	struct dma_iommu_mapping *mapping;
+	void *ptr = __alloc_from_pool(size, ret_page, flags);
+
+	mapping = to_dma_iommu_mapping(dev);
+	if (ptr && mapping)
+		dmastats_alloc_or_map(dev, size, ATOMIC_ALLOC_OR_FREE);
+
+	return ptr;
+}
+
+static int ___free_from_pool(struct device *dev, void *start, size_t size)
+{
+	int ret = __free_from_pool(start, size);
+
+	if (ret)
+		dmastats_free_or_unmap(dev, size, ATOMIC_ALLOC_OR_FREE);
+
+	return ret;
+}
+
+#define __free_from_pool(start, size)	\
+	___free_from_pool(dev, start, size)
+
+#define __alloc_from_pool(size, ret_page, flags) \
+	___alloc_from_pool(dev, size, ret_page, flags)
+#endif
 
 #ifdef CONFIG_SWIOTLB
 static void *__dma_alloc_coherent(struct device *dev, size_t size,
@@ -1018,7 +1086,8 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
 {
 	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
 
-	if (dma_release_from_coherent_attr(dev, size, cpu_addr, attrs))
+	if (dma_release_from_coherent_attr(dev, size, cpu_addr,
+		attrs, handle))
 		return;
 
 	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs)) {
@@ -1850,6 +1919,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
 		for (i = 0; i < count; i++)
 			pages[i] = page + i;
 
+		dmastats_alloc_or_map(dev, size, ALLOC_OR_FREE);
 		return pages;
 	}
 
@@ -1882,6 +1952,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
 		count -= 1 << order;
 	}
 
+	dmastats_alloc_or_map(dev, size, ALLOC_OR_FREE);
 	return pages;
 error:
 	while (i--)
@@ -1913,6 +1984,8 @@ static int __iommu_free_buffer(struct device *dev, struct page **pages,
 		kfree(pages);
 	else
 		vfree(pages);
+
+	dmastats_free_or_unmap(dev, size, ALLOC_OR_FREE);
 	return 0;
 }
 
@@ -1948,6 +2021,21 @@ err:
 	vunmap(area->addr);
 	return NULL;
 }
+
+#ifdef CONFIG_DMA_API_DEBUG
+static void *
+___iommu_alloc_remap(struct device *dev, struct page **pages, size_t size,
+		    gfp_t gfp, pgprot_t prot, const void *caller)
+{
+	void *ptr = __iommu_alloc_remap(pages, size, gfp, prot, caller);
+
+	if (ptr)
+		dmastats_alloc_or_map(dev, size, CPU_MAP_OR_UNMAP);
+	return ptr;
+}
+#define  __iommu_alloc_remap(pages, size, gfp, prot, caller)	\
+	 ___iommu_alloc_remap(dev, pages, size, gfp, prot, caller)
+#endif
 
 /*
  * Create a mapping in device IO address space for specified pages
@@ -1996,6 +2084,7 @@ ____iommu_create_mapping(struct device *dev, dma_addr_t *req,
 			goto fail;
 	}
 
+	dmastats_alloc_or_map(dev, iova - dma_addr, MAP_OR_UNMAP);
 	return dma_addr;
 fail:
 	_iommu_unmap(mapping, dma_addr, iova - dma_addr);
@@ -2024,6 +2113,8 @@ static int __iommu_remove_mapping(struct device *dev, dma_addr_t iova,
 
 	pg_iommu_unmap(mapping, iova, size, (ulong)attrs);
 	__free_iova(mapping, iova, size, attrs);
+
+	dmastats_alloc_or_map(dev, size, MAP_OR_UNMAP);
 	return 0;
 }
 
@@ -2297,6 +2388,7 @@ static int __iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 
 	trace_dmadebug_map_sg(dev, dma->dma_address, dma->dma_length,
 			      sg_page(sg));
+	dmastats_alloc_or_map(dev, size, MAP_OR_UNMAP);
 	return count+1;
 
 bad_mapping:
@@ -2475,7 +2567,8 @@ static dma_addr_t arm_coherent_iommu_map_page(struct device *dev, struct page *p
 	 * compound page then there's probably a bug somewhere.
 	 */
 	if (page_offset > 0)
-		BUG_ON(page_count(page) == 1);
+		BUG_ON(page_offset > (1 << compound_order(compound_head(page)))
+			- ((page - compound_head(page)) << PAGE_SHIFT));
 
 	dma_addr = __alloc_iova(mapping, len, attrs);
 	if (dma_addr == DMA_ERROR_CODE)
@@ -2940,6 +3033,17 @@ int arm_iommu_attach_device(struct device *dev,
 	struct dma_map_ops *org_ops;
 	struct dma_iommu_mapping *org_map;
 
+#ifdef CONFIG_DMA_API_DEBUG
+	struct iommu_usage *device_ref;
+
+	device_ref = kzalloc(sizeof(*device_ref), GFP_KERNEL);
+	if (!device_ref)
+		return -ENOMEM;
+
+	device_ref->dev = dev;
+	list_add(&device_ref->recordlist, &iommu_rlist_head);
+#endif
+
 	org_ops = get_dma_ops(dev);
 	set_dma_ops(dev, &iommu_ops);
 
@@ -2950,6 +3054,10 @@ int arm_iommu_attach_device(struct device *dev,
 	if (err) {
 		set_dma_ops(dev, org_ops);
 		dev->archdata.mapping = org_map;
+#ifdef CONFIG_DMA_API_DEBUG
+		list_del(&device_ref->recordlist);
+		kfree(device_ref);
+#endif
 		return err;
 	}
 
@@ -2969,12 +3077,26 @@ int arm_iommu_attach_device(struct device *dev,
 void arm_iommu_detach_device(struct device *dev)
 {
 	struct dma_iommu_mapping *mapping;
+#ifdef CONFIG_DMA_API_DEBUG
+	struct iommu_usage *device_ref, *tmp;
+#endif
 
 	mapping = to_dma_iommu_mapping(dev);
 	if (!mapping) {
 		dev_warn(dev, "Not attached\n");
 		return;
 	}
+
+#ifdef CONFIG_DMA_API_DEBUG
+	list_for_each_entry_safe(device_ref, tmp, &iommu_rlist_head,
+		recordlist) {
+		if (dev == device_ref->dev) {
+			list_del(&device_ref->recordlist);
+			kfree(device_ref);
+			break;
+		}
+	}
+#endif
 
 	iommu_detach_device(mapping->domain, dev);
 	kref_put(&mapping->kref, release_iommu_mapping);
@@ -2984,4 +3106,169 @@ void arm_iommu_detach_device(struct device *dev)
 	pr_debug("Detached IOMMU controller from %s device.\n", dev_name(dev));
 }
 
+#endif
+
+#ifdef CONFIG_DMA_API_DEBUG
+static void
+add_value(struct dma_iommu_mapping *device_ref, size_t size, const int type)
+{
+	switch (type) {
+	case ALLOC_OR_FREE:
+		atomic64_add(size, &device_ref->alloc_size);
+		break;
+	case ATOMIC_ALLOC_OR_FREE:
+		atomic64_add(size, &device_ref->atomic_alloc_size);
+		break;
+	case MAP_OR_UNMAP:
+		atomic64_add(size, &device_ref->map_size);
+		break;
+	case CPU_MAP_OR_UNMAP:
+		atomic64_add(size, &device_ref->cpu_map_size);
+		break;
+	default:
+		pr_info("Invalid argument in function %s\n", __func__);
+	}
+}
+
+static void
+sub_value(struct dma_iommu_mapping *device_ref, size_t size, const int type)
+{
+	switch (type) {
+	case ALLOC_OR_FREE:
+		atomic64_sub(size, &device_ref->alloc_size);
+		break;
+	case ATOMIC_ALLOC_OR_FREE:
+		atomic64_sub(size, &device_ref->atomic_alloc_size);
+		break;
+	case MAP_OR_UNMAP:
+		atomic64_sub(size, &device_ref->map_size);
+		break;
+	case CPU_MAP_OR_UNMAP:
+		atomic64_sub(size, &device_ref->cpu_map_size);
+		break;
+	default:
+		pr_info("Invalid argument in function %s\n", __func__);
+	}
+}
+
+static size_t
+dmastats_alloc_or_map(struct device *dev, size_t size, const int type)
+{
+	struct dma_iommu_mapping *mapping;
+
+	mapping = to_dma_iommu_mapping(dev);
+	if (mapping)
+		add_value(mapping, size, type);
+	else
+		atomic64_add(size, &dev_is_null->alloc_size);
+	return 0;
+}
+
+static size_t dmastats_free_or_unmap(struct device *dev, size_t size,
+	const int type)
+{
+	struct dma_iommu_mapping *mapping;
+
+	mapping = to_dma_iommu_mapping(dev);
+	if (mapping)
+		sub_value(mapping, size, type);
+	else
+		atomic64_sub(size, &dev_is_null->alloc_size);
+	return 0;
+}
+
+static int dmastats_debug_show(struct seq_file *s, void *data)
+{
+	struct iommu_usage *device_ref = NULL, *tmp;
+	size_t alloc_size = 0, map_size = 0;
+	size_t atomic_alloc_size = 0, cpu_map_size = 0;
+	struct dma_iommu_mapping *mapping;
+
+	seq_printf(s, "%-24s %18s %18s %18s %18s\n", "DEV_NAME", "ALLOCATED",
+			"ATOMIC_ALLOCATED", "MAPPED", "CPU_MAPPED");
+	list_for_each_entry_safe(device_ref, tmp, &iommu_rlist_head,
+		recordlist) {
+		mapping = to_dma_iommu_mapping(device_ref->dev);
+		alloc_size += atomic64_read(&mapping->alloc_size);
+		map_size += atomic64_read(&mapping->map_size);
+		atomic_alloc_size += atomic64_read(&mapping->atomic_alloc_size);
+		cpu_map_size += atomic64_read(&mapping->cpu_map_size);
+
+		seq_printf(s, "%-24s %18ld %18ld %18ld %18ld\n",
+			dev_name(device_ref->dev),
+			atomic64_read(&mapping->alloc_size),
+			atomic64_read(&mapping->atomic_alloc_size),
+			atomic64_read(&mapping->map_size),
+			atomic64_read(&mapping->cpu_map_size));
+	}
+
+	alloc_size += atomic64_read(&dev_is_null->alloc_size);
+	map_size += atomic64_read(&dev_is_null->map_size);
+	atomic_alloc_size += atomic64_read(&dev_is_null->atomic_alloc_size);
+	cpu_map_size += atomic64_read(&dev_is_null->cpu_map_size);
+
+	seq_printf(s, "%-24s %18ld %18ld %18ld %18ld\n",
+		dev_is_null->dev_name,
+		atomic64_read(&dev_is_null->alloc_size),
+		atomic64_read(&dev_is_null->atomic_alloc_size),
+		atomic64_read(&dev_is_null->map_size),
+		atomic64_read(&dev_is_null->cpu_map_size));
+
+	seq_printf(s, "\n%-24s %18zu %18zu %18zu %18zu\n", "Total",
+		alloc_size, atomic_alloc_size, map_size, cpu_map_size);
+	return 0;
+}
+
+static int dmastats_debug_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dmastats_debug_show, NULL);
+}
+
+static const struct file_operations debug_dmastats_fops = {
+	.open		= dmastats_debug_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int __init dmastats_debug_init(void)
+{
+	struct dentry *rootdir, *ret;
+
+	rootdir = debugfs_create_dir("dma", NULL);
+	if (!rootdir) {
+		pr_err("Failed to create dma directory!\n");
+		return -ENOMEM;
+	}
+
+	ret = debugfs_create_file("usage", S_IRUGO, rootdir, NULL,
+		&debug_dmastats_fops);
+	if (!ret) {
+		pr_err("Failed to create usage debug file!\n");
+		return -ENOMEM;
+	}
+
+	dev_is_null = kzalloc(sizeof(*dev_is_null), GFP_KERNEL);
+	if (!dev_is_null)
+		return -ENOMEM;
+
+	dev_is_null->dev_name = NULL_DEV;
+	return 0;
+}
+
+static void __exit dmastats_debug_exit(void)
+{
+	struct iommu_usage *device_ref = NULL, *tmp;
+
+	list_for_each_entry_safe(device_ref, tmp, &iommu_rlist_head,
+		recordlist) {
+		list_del(&device_ref->recordlist);
+		kfree(device_ref);
+	}
+
+	kfree(dev_is_null);
+}
+
+late_initcall(dmastats_debug_init);
+module_exit(dmastats_debug_exit);
 #endif

@@ -328,7 +328,7 @@ config CLKSRC_ST_LPC
 	  as clocksource.
 
 if ARCH_TEGRA_18x_SOC
-source "../kernel-t18x/drivers/clocksource/Kconfig"
+source "../t18x/drivers/clocksource/Kconfig"
 endif
 
 endmenu

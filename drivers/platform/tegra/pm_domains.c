@@ -51,101 +51,6 @@
 	__ret;							\
 })
 
-#ifdef CONFIG_PM_SLEEP
-
-static int tegra_pd_suspend_dev(struct device *dev)
-{
-	return TEGRA_PD_DEV_CALLBACK(suspend, dev);
-}
-
-static int tegra_pd_suspend_late(struct device *dev)
-{
-	return TEGRA_PD_DEV_CALLBACK(suspend_late, dev);
-}
-
-static int tegra_pd_resume_early(struct device *dev)
-{
-	return TEGRA_PD_DEV_CALLBACK(resume_early, dev);
-}
-
-static int tegra_pd_resume_dev(struct device *dev)
-{
-	return TEGRA_PD_DEV_CALLBACK(resume, dev);
-}
-
-static int tegra_pd_freeze_dev(struct device *dev)
-{
-	return TEGRA_PD_DEV_CALLBACK(freeze, dev);
-}
-
-static int tegra_pd_freeze_late(struct device *dev)
-{
-	return TEGRA_PD_DEV_CALLBACK(freeze_late, dev);
-}
-
-static int tegra_pd_thaw_early(struct device *dev)
-{
-	return TEGRA_PD_DEV_CALLBACK(thaw_early, dev);
-}
-
-static int tegra_pd_thaw_dev(struct device *dev)
-{
-	return TEGRA_PD_DEV_CALLBACK(thaw, dev);
-}
-#else /* !CONFIG_PM_SLEEP */
-
-#define tegra_pd_suspend_dev	NULL
-#define tegra_pd_suspend_late	NULL
-#define tegra_pd_resume_early	NULL
-#define tegra_pd_resume_dev	NULL
-#define tegra_pd_freeze_dev	NULL
-#define tegra_pd_freeze_late	NULL
-#define tegra_pd_thaw_early	NULL
-#define tegra_pd_thaw_dev	NULL
-
-#endif /* !CONFIG_PM_SLEEP */
-
-static bool tegra_pd_active_wakeup(struct device *dev)
-{
-	return device_may_wakeup(dev);
-}
-
-static int tegra_pd_save_dev(struct device *dev)
-{
-	return 0;
-}
-
-static int tegra_pd_restore_dev(struct device *dev)
-{
-	return 0;
-}
-
-static int tegra_pd_stop_dev(struct device *dev)
-{
-	return TEGRA_PD_DEV_CALLBACK(runtime_suspend, dev);
-}
-
-static int tegra_pd_start_dev(struct device *dev)
-{
-	return TEGRA_PD_DEV_CALLBACK(runtime_resume, dev);
-}
-
-static struct gpd_dev_ops tegra_pd_ops = {
-	.active_wakeup = tegra_pd_active_wakeup,
-	.save_state = tegra_pd_save_dev,
-	.restore_state = tegra_pd_restore_dev,
-	.stop = tegra_pd_stop_dev,
-	.start = tegra_pd_start_dev,
-	.suspend = tegra_pd_suspend_dev,
-	.suspend_late = tegra_pd_suspend_late,
-	.resume_early = tegra_pd_resume_early,
-	.resume = tegra_pd_resume_dev,
-	.freeze = tegra_pd_freeze_dev,
-	.freeze_late = tegra_pd_freeze_late,
-	.thaw_early = tegra_pd_thaw_early,
-	.thaw = tegra_pd_thaw_dev,
-};
-
 #ifdef CONFIG_ARCH_TEGRA_21x_SOC
 static int tegra_mc_clk_power_off(struct generic_pm_domain *genpd)
 {
@@ -542,8 +447,7 @@ void tegra_pd_add_device(struct device *dev)
 		device_set_wakeup_capable(dev, 1);
 
 	of_node_put(dev->of_node);
-	pm_genpd_dev_need_save(dev, false);
-	pm_genpd_add_callbacks(dev, &tegra_pd_ops, NULL);
+	pm_genpd_dev_need_save(dev, true);
 }
 EXPORT_SYMBOL(tegra_pd_add_device);
 
