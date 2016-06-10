@@ -1651,6 +1651,10 @@ int nvmap_probe(struct platform_device *pdev)
 					heap_root,
 					(void *)(uintptr_t)node->heap_bit,
 					&debug_allocations_fops);
+				debugfs_create_file("lru_allocations", S_IRUGO,
+					heap_root,
+					(void *)(uintptr_t)node->heap_bit,
+					&debug_lru_allocations_fops);
 				debugfs_create_file("all_allocations", S_IRUGO,
 					heap_root,
 					(void *)(uintptr_t)node->heap_bit,
@@ -1678,6 +1682,9 @@ int nvmap_probe(struct platform_device *pdev)
 			debugfs_create_file("allocations", S_IRUGO, iovmm_root,
 				(void *)(uintptr_t)NVMAP_HEAP_IOVMM,
 				&debug_allocations_fops);
+			debugfs_create_file("lru_allocations", S_IRUGO, iovmm_root,
+				(void *)(uintptr_t)NVMAP_HEAP_IOVMM,
+				&debug_lru_allocations_fops);
 			debugfs_create_file("all_allocations", S_IRUGO,
 				iovmm_root, (void *)(uintptr_t)NVMAP_HEAP_IOVMM,
 				&debug_all_allocations_fops);
