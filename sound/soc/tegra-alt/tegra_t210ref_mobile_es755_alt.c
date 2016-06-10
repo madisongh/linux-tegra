@@ -692,9 +692,6 @@ static int tegra_t210ref_resume_pre(struct snd_soc_card *card)
 	return 0;
 }
 
-static const struct snd_soc_dapm_route tegra_t210ref_audio_map[] = {
-};
-
 static int tegra_t210ref_remove(struct snd_soc_card *card)
 {
 	return 0;
