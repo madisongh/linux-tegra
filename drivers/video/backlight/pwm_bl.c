@@ -173,9 +173,10 @@ static int pwm_backlight_parse_dt(struct device *dev,
 			size = sizeof(*data->levels) * item_counts;
 
 		data->levels = devm_kzalloc(dev, size, GFP_KERNEL);
-		if (!data->levels)
+		if (!data->levels) {
 			ret = -ENOMEM;
 			goto fail_parse_dt;
+		}
 
 		ret = of_property_read_u32_array(bl_node,
 						 "brightness-levels",
