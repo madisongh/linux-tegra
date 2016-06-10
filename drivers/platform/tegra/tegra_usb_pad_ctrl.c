@@ -1982,7 +1982,7 @@ static int tegra_pcie_lane_iddq(bool enable, int lane_owner)
 		XUSB_PADCTL_USB3_PAD_MUX_FORCE_PCIE_PAD_IDDQ_DISABLE_MASK2 |
 		XUSB_PADCTL_USB3_PAD_MUX_FORCE_PCIE_PAD_IDDQ_DISABLE_MASK3 |
 		XUSB_PADCTL_USB3_PAD_MUX_FORCE_PCIE_PAD_IDDQ_DISABLE_MASK4);
-		break;
+	break;
 	case PCIE_LANES_X2_X1:
 	if (enable)
 		val |=
@@ -1999,7 +1999,7 @@ static int tegra_pcie_lane_iddq(bool enable, int lane_owner)
 		val &=
 		~(XUSB_PADCTL_USB3_PAD_MUX_FORCE_PCIE_PAD_IDDQ_DISABLE_MASK1 |
 		XUSB_PADCTL_USB3_PAD_MUX_FORCE_PCIE_PAD_IDDQ_DISABLE_MASK2);
-		break;
+	break;
 	case PCIE_LANES_X0_X1:
 	if (enable)
 		val |=
@@ -2007,7 +2007,7 @@ static int tegra_pcie_lane_iddq(bool enable, int lane_owner)
 	else
 		val &=
 		~XUSB_PADCTL_USB3_PAD_MUX_FORCE_PCIE_PAD_IDDQ_DISABLE_MASK0;
-		break;
+	break;
 #else
 	case PCIE_LANES_X4_X1:
 	if (pcie_modify_lane0_iddq) {
