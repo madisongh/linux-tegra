@@ -28,6 +28,14 @@
 #include "host1x/host1x.h"
 #include "camera/vi/registers.h"
 
+static struct tegra_mc_vi *tegra_mcvi;
+
+struct tegra_mc_vi *tegra_get_mc_vi(void)
+{
+	return tegra_mcvi;
+}
+EXPORT_SYMBOL(tegra_get_mc_vi);
+
 /* In TPG mode, VI only support 2 formats */
 static void vi_tpg_fmts_bitmap_init(struct tegra_channel *chan)
 {
@@ -321,6 +329,8 @@ int tegra_vi_media_controller_init(struct tegra_mc_vi *mc_vi,
 	if (err < 0)
 		goto register_error;
 
+	tegra_mcvi = mc_vi;
+
 	return 0;
 
 register_error:
@@ -341,5 +351,6 @@ void tegra_vi_media_controller_cleanup(struct tegra_mc_vi *mc_vi)
 	tegra_vi_graph_cleanup(mc_vi);
 	tegra_vi_channels_cleanup(mc_vi);
 	tegra_vi_v4l2_cleanup(mc_vi);
+	tegra_mcvi = NULL;
 }
 EXPORT_SYMBOL(tegra_vi_media_controller_cleanup);

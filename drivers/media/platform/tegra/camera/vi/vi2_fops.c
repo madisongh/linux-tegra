@@ -718,6 +718,28 @@ void vi2_channel_stop_streaming(struct vb2_queue *vq)
 	vi_channel_syncpt_free(chan);
 }
 
+int vi2_mfi_work(struct tegra_mc_vi *vi, int csiport)
+{
+	struct tegra_channel *it;
+	int ret = 0;
+
+	/* for vi2, the input argument is the actual CSI port itself */
+	/* search the list and match the port */
+	list_for_each_entry(it, &vi->vi_chans, list) {
+		if (csiport == it->port[0]) {
+			ret = v4l2_subdev_call(it->subdev_on_csi, core,
+					sync, V4L2_SYNC_EVENT_FOCUS_POS);
+			if (ret < 0 && ret != -ENOIOCTLCMD) {
+				dev_err(vi->dev,
+					"%s:channel failed\n", __func__);
+				return ret;
+			}
+		}
+	}
+
+	return ret;
+}
+
 int tegra_vi2_power_on(struct tegra_mc_vi *vi)
 {
 	int ret;
