@@ -156,18 +156,6 @@ static struct device_dma_parameters tegra_dc_dma_parameters = {
 	.max_segment_size = UINT_MAX,
 };
 
-static const struct {
-	bool h;
-	bool v;
-} can_filter[] = {
-	/* Window A has no filtering */
-	{ false, false },
-	/* Window B has both H and V filtering */
-	{ true,  true  },
-	/* Window C has only H filtering */
-	{ false, true  },
-};
-
 #ifdef CONFIG_TEGRA_DC_CMU
 static struct tegra_dc_cmu default_cmu = {
 	/* lut1 maps sRGB to linear space. */
@@ -1858,6 +1846,11 @@ static void tegra_dc_create_debugfs(struct tegra_dc *dc)
 
 	retval = debugfs_create_file("dcb", S_IRUGO, vrrdir,
 				dc->out->vrr, &dbg_vrr_dcb_ops);
+	if (!retval)
+		goto remove_out;
+
+	retval = debugfs_create_file("db_tolerance", S_IRUGO, vrrdir,
+				dc->out->vrr, &dbg_vrr_db_tolerance_ops);
 	if (!retval)
 		goto remove_out;
 
