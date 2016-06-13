@@ -1365,11 +1365,22 @@ static const struct of_device_id ufs_tegra_of_match[] = {
 	{},
 };
 
+static const struct dev_pm_ops ufs_tegra_pm_ops = {
+	.suspend        = ufshcd_pltfrm_suspend,
+	.resume         = ufshcd_pltfrm_resume,
+#ifdef CONFIG_SCSI_UFSHCD_PLATFORM_PM
+	.runtime_suspend = ufshcd_pltfrm_runtime_suspend,
+	.runtime_resume  = ufshcd_pltfrm_runtime_resume,
+	.runtime_idle    = ufshcd_pltfrm_runtime_idle,
+#endif
+};
+
 static struct platform_driver ufs_tegra_platform = {
 	.probe = ufs_tegra_probe,
 	.remove = ufs_tegra_remove,
 	.driver = {
 		.name = "ufs_tegra",
+		.pm   = &ufs_tegra_pm_ops,
 		.owner = THIS_MODULE,
 		.of_match_table = of_match_ptr(ufs_tegra_of_match),
 	},
