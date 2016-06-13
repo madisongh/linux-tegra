@@ -16,6 +16,7 @@
 menuconfig USB_GADGET
 	tristate "USB Gadget Support"
 	select USB_COMMON
+	select USB_OTG_CORE
 	select NLS
 	help
 	   USB is a master/slave protocol, organized with one master

@@ -10,37 +10,28 @@
 #define __LINUX_USB_OTG_H
 
 #include <linux/phy/phy.h>
-#include <linux/usb/phy.h>
+#include <linux/device.h>
+#include <linux/usb.h>
+#include <linux/usb/hcd.h>
+#include <linux/usb/gadget.h>
 #include <linux/usb/otg-fsm.h>
+#include <linux/usb/phy.h>
 
-struct usb_otg {
-	u8			default_a;
-
-	struct phy		*phy;
-	/* old usb_phy interface */
-	struct usb_phy		*usb_phy;
-	struct usb_bus		*host;
-	struct usb_gadget	*gadget;
-
-	enum usb_otg_state	state;
-	struct otg_fsm fsm;
-
-	/* bind/unbind the host controller */
-	int	(*set_host)(struct usb_otg *otg, struct usb_bus *host);
-
-	/* bind/unbind the peripheral controller */
-	int	(*set_peripheral)(struct usb_otg *otg,
-					struct usb_gadget *gadget);
-
-	/* effective for A-peripheral, ignored for B devices */
-	int	(*set_vbus)(struct usb_otg *otg, bool enabled);
-
-	/* for B devices only:  start session with A-Host */
-	int	(*start_srp)(struct usb_otg *otg);
-
-	/* start or continue HNP role switch */
-	int	(*start_hnp)(struct usb_otg *otg);
-
+/**
+ * struct otg_hcd - host controller state and interface
+ *
+ * @hcd: host controller
+ * @irqnum: IRQ number
+ * @irqflags: IRQ flags
+ * @ops: OTG to host controller interface
+ * @otg_dev: OTG controller device
+ */
+struct otg_hcd {
+	struct usb_hcd *hcd;
+	unsigned int irqnum;
+	unsigned long irqflags;
+	struct otg_hcd_ops *ops;
+	struct device *otg_dev;
 };
 
 /**
@@ -58,8 +49,160 @@ struct usb_otg_caps {
 	bool adp_support;
 };
 
+/**
+ * struct usb_otg - usb otg controller state
+ *
+ * @default_a: Indicates we are an A device. i.e. Host.
+ * @phy: USB PHY interface
+ * @usb_phy: old usb_phy interface
+ * @host: host controller bus
+ * @gadget: gadget device
+ * @state: current OTG state
+ * @dev: OTG controller device
+ * @caps: OTG capabilities revision, hnp, srp, etc
+ * @fsm: OTG finite state machine
+ * @hcd_ops: host controller interface
+ * ------- internal use only -------
+ * @primary_hcd: primary host state and interface
+ * @shared_hcd: shared host state and interface
+ * @gadget_ops: gadget controller interface
+ * @list: list of OTG controllers
+ * @work: OTG state machine work
+ * @wq: OTG state machine work queue
+ * @flags: to track if host/gadget is running
+ */
+struct usb_otg {
+	u8			default_a;
+
+	struct phy		*phy;
+	/* old usb_phy interface */
+	struct usb_phy		*usb_phy;
+	struct usb_bus		*host;
+	struct usb_gadget	*gadget;
+
+	enum usb_otg_state	state;
+	struct device *dev;
+	struct usb_otg_caps	caps;
+	struct otg_fsm fsm;
+
+	/* internal use only */
+	struct otg_hcd primary_hcd;
+	struct otg_hcd shared_hcd;
+	struct otg_gadget_ops *gadget_ops;
+	bool gadget_ready;
+	struct list_head list;
+	struct work_struct work;
+	struct workqueue_struct *wq;
+	u32 flags;
+#define OTG_FLAG_GADGET_RUNNING (1 << 0)
+#define OTG_FLAG_HOST_RUNNING (1 << 1)
+	/* use otg->fsm.lock for serializing access */
+
+/*------------- deprecated interface -----------------------------*/
+	/* bind/unbind the host controller */
+	int	(*set_host)(struct usb_otg *otg, struct usb_bus *host);
+
+	/* bind/unbind the peripheral controller */
+	int	(*set_peripheral)(struct usb_otg *otg,
+					struct usb_gadget *gadget);
+
+	/* effective for A-peripheral, ignored for B devices */
+	int	(*set_vbus)(struct usb_otg *otg, bool enabled);
+
+	/* for B devices only:  start session with A-Host */
+	int	(*start_srp)(struct usb_otg *otg);
+
+	/* start or continue HNP role switch */
+	int	(*start_hnp)(struct usb_otg *otg);
+/*---------------------------------------------------------------*/
+};
+
+/**
+ * struct usb_otg_config - OTG controller configuration
+ * @caps: OTG capabilities of the controller
+ * @ops: OTG FSM operations
+ * @otg_work: optional custom OTG state machine work function
+ */
+struct usb_otg_config {
+	struct usb_otg_caps *otg_caps;
+	struct otg_fsm_ops *fsm_ops;
+	void (*otg_work)(struct work_struct *work);
+};
+
 extern const char *usb_otg_state_string(enum usb_otg_state state);
 
+#if IS_ENABLED(CONFIG_USB_OTG)
+struct usb_otg *usb_otg_register(struct device *dev,
+				 struct usb_otg_config *config);
+int usb_otg_unregister(struct device *dev);
+int usb_otg_register_hcd(struct usb_hcd *hcd, unsigned int irqnum,
+			 unsigned long irqflags, struct otg_hcd_ops *ops);
+int usb_otg_unregister_hcd(struct usb_hcd *hcd);
+int usb_otg_register_gadget(struct usb_gadget *gadget,
+			    struct otg_gadget_ops *ops);
+int usb_otg_unregister_gadget(struct usb_gadget *gadget);
+void usb_otg_sync_inputs(struct usb_otg *otg);
+int usb_otg_start_host(struct usb_otg *otg, int on);
+int usb_otg_start_gadget(struct usb_otg *otg, int on);
+int usb_otg_gadget_ready(struct usb_gadget *gadget, bool ready);
+
+#else /* CONFIG_USB_OTG */
+
+static inline struct usb_otg *usb_otg_register(struct device *dev,
+					       struct usb_otg_config *config)
+{
+	return ERR_PTR(-ENOTSUPP);
+}
+
+static inline int usb_otg_unregister(struct device *dev)
+{
+	return -ENOTSUPP;
+}
+
+static inline int usb_otg_register_hcd(struct usb_hcd *hcd, unsigned int irqnum,
+				       unsigned long irqflags,
+				       struct otg_hcd_ops *ops)
+{
+	return -ENOTSUPP;
+}
+
+static inline int usb_otg_unregister_hcd(struct usb_hcd *hcd)
+{
+	return -ENOTSUPP;
+}
+
+static inline int usb_otg_register_gadget(struct usb_gadget *gadget,
+					  struct otg_gadget_ops *ops)
+{
+	return -ENOTSUPP;
+}
+
+static inline int usb_otg_unregister_gadget(struct usb_gadget *gadget)
+{
+	return -ENOTSUPP;
+}
+
+static inline void usb_otg_sync_inputs(struct usb_otg *otg)
+{
+}
+
+static inline int usb_otg_start_host(struct usb_otg *otg, int on)
+{
+	return -ENOTSUPP;
+}
+
+static inline int usb_otg_start_gadget(struct usb_otg *otg, int on)
+{
+	return -ENOTSUPP;
+}
+
+static inline int usb_otg_gadget_ready(struct usb_gadget *gadget, bool ready)
+{
+	return -ENOTSUPP;
+}
+#endif /* CONFIG_USB_OTG */
+
+/*------------- deprecated interface -----------------------------*/
 /* Context: can sleep */
 static inline int
 otg_start_hnp(struct usb_otg *otg)
@@ -110,6 +253,8 @@ otg_start_srp(struct usb_otg *otg)
 
 	return -ENOTSUPP;
 }
+
+/*---------------------------------------------------------------*/
 
 /* for OTG controller drivers (and maybe other stuff) */
 extern int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num);
@@ -234,5 +379,7 @@ static inline int otg_start_gadget(struct usb_otg *otg, int on)
 		return -EOPNOTSUPP;
 	return otg->fsm.ops->start_gadget(otg, on);
 }
+
+int drd_statemachine(struct usb_otg *otg);
 
 #endif /* __LINUX_USB_OTG_H */

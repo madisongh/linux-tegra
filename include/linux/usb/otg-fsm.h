@@ -75,6 +75,11 @@ enum otg_fsm_timer {
 /**
  * struct otg_fsm - OTG state machine according to the OTG spec
  *
+ * DRD mode hardware Inputs
+ *
+ * @id:		TRUE for B-device, FALSE for A-device.
+ * @b_sess_vld:	VBUS voltage in regulation.
+ *
  * OTG hardware Inputs
  *
  *	Common inputs for A and B device
@@ -147,6 +152,7 @@ enum otg_fsm_timer {
  * a_clr_err:	Asserted (by application ?) to clear a_vbus_err due to an
  *		overcurrent condition and causes the A-device to transition
  *		to a_wait_vfall
+ * running:	state machine running/stopped indicator
  */
 struct otg_fsm {
 	/* Input */
@@ -202,6 +208,7 @@ struct otg_fsm {
 	int b_ase0_brst_tmout;
 	int a_bidl_adis_tmout;
 
+	bool running;
 	struct otg_fsm_ops *ops;
 
 	/* Current usb protocol used: 0:undefine; 1:host; 2:client */

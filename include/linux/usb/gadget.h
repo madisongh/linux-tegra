@@ -580,6 +580,7 @@ struct usb_gadget_ops {
  * @out_epnum: last used out ep number
  * @in_epnum: last used in ep number
  * @otg_caps: OTG capabilities of this gadget.
+ * @otg_dev: OTG controller device, if needs to be used with OTG core.
  * @sg_supported: true if we can handle scatter-gather
  * @is_otg: True if the USB device port uses a Mini-AB jack, so that the
  *	gadget driver must provide a USB OTG descriptor.
@@ -636,6 +637,7 @@ struct usb_gadget {
 	unsigned			out_epnum;
 	unsigned			in_epnum;
 	struct usb_otg_caps		*otg_caps;
+	struct device			*otg_dev;
 
 	unsigned			sg_supported:1;
 	unsigned			is_otg:1;

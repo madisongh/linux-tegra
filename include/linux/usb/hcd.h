@@ -183,6 +183,7 @@ struct usb_hcd {
 	struct mutex		*bandwidth_mutex;
 	struct usb_hcd		*shared_hcd;
 	struct usb_hcd		*primary_hcd;
+	struct device		*otg_dev;	/* OTG controller device */
 
 
 #define HCD_BUFFER_POOLS	4
