@@ -14,6 +14,8 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_platform.h>
+#include <linux/platform_device.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/of.h>
 #include <linux/usb/otg.h>
@@ -195,6 +197,32 @@ int of_usb_update_otg_caps(struct device_node *np,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(of_usb_update_otg_caps);
+
+#ifdef CONFIG_USB_OTG
+/**
+ * of_usb_get_otg - get the OTG controller linked to the USB controller
+ * @np: Pointer to the device_node of the USB controller
+ *
+ * Return: The OTG controller device or NULL on error.
+ */
+struct device *of_usb_get_otg(struct device_node *np)
+{
+	struct device_node *otg_np;
+	struct platform_device *pdev;
+
+	otg_np = of_parse_phandle(np, "otg-controller", 0);
+	if (!otg_np)
+		return NULL;
+
+	pdev = of_find_device_by_node(otg_np);
+	of_node_put(otg_np);
+	if (!pdev)
+		return NULL;
+
+	return &pdev->dev;
+}
+EXPORT_SYMBOL_GPL(of_usb_get_otg);
+#endif
 
 #endif
 

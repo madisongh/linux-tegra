@@ -27,6 +27,15 @@ static inline int of_usb_update_otg_caps(struct device_node *np,
 }
 #endif
 
+#if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_USB_OTG)
+struct device *of_usb_get_otg(struct device_node *np);
+#else
+static inline struct device *of_usb_get_otg(struct device_node *np)
+{
+	return NULL;
+}
+#endif
+
 #if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_USB_SUPPORT)
 enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
 #else
