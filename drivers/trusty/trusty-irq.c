@@ -26,9 +26,6 @@
 #include <linux/trusty/sm_err.h>
 #include <linux/trusty/trusty.h>
 
-#define TRUSTY_IPI_CUSTOM_FIRST 7
-#define TRUSTY_IPI_CUSTOM_LAST  15
-
 struct trusty_irq {
 	struct trusty_irq_state *is;
 	struct hlist_node node;
@@ -404,7 +401,7 @@ static int trusty_irq_init_per_cpu_irq(struct trusty_irq_state *is, int tirq)
 
 	dev_dbg(is->dev, "%s: irq %d\n", __func__, tirq);
 
-	irq = irq_of_parse_and_map(is->dev->of_node, 0);
+	irq = trusty_irq_create_irq_mapping(is, tirq);
 	if (irq <= 0) {
 		dev_err(is->dev,
 			"trusty_irq_create_irq_mapping failed (%d)\n", irq);
@@ -465,14 +462,7 @@ static int trusty_irq_init_one(struct trusty_irq_state *is,
 	irq = trusty_smc_get_next_irq(is, irq, per_cpu);
 	if (irq < 0)
 		return irq;
-	/* Bug 200183103 */
-	/* Hack: System will randomly crash in trusty after enable IPI*/
-	/* If the previous CPU is A57, and IPI is sent to Denver*/
-	/* There will be some memory coherence issue between A57 and Denver */
-	/* Before we implement MCE in trusty, we shouldn't register IPI*/
-	if (irq <= TRUSTY_IPI_CUSTOM_LAST
-		&& irq >= TRUSTY_IPI_CUSTOM_FIRST)
-		return irq + 1;
+
 	if (per_cpu)
 		ret = trusty_irq_init_per_cpu_irq(is, irq);
 	else
