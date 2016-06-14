@@ -73,3 +73,5 @@ obj-$(CONFIG_CPULOAD_MONITOR)   += cpuload.o
 obj-$(CONFIG_FAN_THERM_EST)	+= therm_fan_est.o
 obj-$(CONFIG_TEGRA_PROC_POWER_MODEL) += tegra_ppm.o
 obj-$(CONFIG_NVS_DFSH)		+= nvs-dfsh/
+obj-$(CONFIG_SAF775x_HWDEP)	+= saf775x/
+obj-$(CONFIG_SAF36XX_HWDEP) += saf775x/
