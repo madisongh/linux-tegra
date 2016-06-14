@@ -404,7 +404,7 @@ static int trusty_irq_init_per_cpu_irq(struct trusty_irq_state *is, int tirq)
 
 	dev_dbg(is->dev, "%s: irq %d\n", __func__, tirq);
 
-	irq = irq_of_parse_and_map(is->dev->of_node, 0);
+	irq = trusty_irq_create_irq_mapping(is, tirq);
 	if (irq <= 0) {
 		dev_err(is->dev,
 			"trusty_irq_create_irq_mapping failed (%d)\n", irq);
