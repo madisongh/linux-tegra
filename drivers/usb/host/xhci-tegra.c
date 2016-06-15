@@ -285,6 +285,7 @@ static const char * const tegra_phy_names[] = {
 
 struct tegra_xhci_soc_config {
 	const char *firmware_file;
+	bool lpm_support;
 	unsigned int num_phys[MAX_PHY_TYPES];
 	unsigned int utmi_port_offset;
 	unsigned int hsic_port_offset;
@@ -1122,7 +1123,12 @@ static void tegra_xhci_mbox_rx(struct mbox_client *cl, void *data)
 
 static void tegra_xhci_quirks(struct device *dev, struct xhci_hcd *xhci)
 {
+	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
+
 	xhci->quirks |= XHCI_PLAT;
+	if (tegra && tegra->soc_config->lpm_support)
+		xhci->quirks |= XHCI_LPM_SUPPORT;
+
 }
 
 static int tegra_xhci_setup(struct usb_hcd *hcd)
@@ -1132,6 +1138,7 @@ static int tegra_xhci_setup(struct usb_hcd *hcd)
 
 static const struct tegra_xhci_soc_config tegra186_soc_config = {
 	.firmware_file = "tegra18x_xusb_firmware",
+	.lpm_support = true,
 
 	.num_supplies = 3,
 	.supply_names[0] = "avddio_usb",
