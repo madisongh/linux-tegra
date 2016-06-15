@@ -1189,6 +1189,7 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 
 	ufs_tegra_config_soc_data(ufs_tegra);
 	hba->spm_lvl = UFS_PM_LVL_3;
+	hba->caps |= UFSHCD_CAP_INTR_AGGR;
 
 	ufs_tegra->ufs_padctrl = devm_padctrl_get(dev, "ufs");
 	if (IS_ERR(ufs_tegra->ufs_padctrl)) {
