@@ -318,14 +318,28 @@ static struct tipc_msg_buf *vds_get_txbuf(struct tipc_virtio_dev *vds,
 	mb = _vds_get_txbuf(vds);
 
 	if ((PTR_ERR(mb) == -EAGAIN) && timeout) {
-		int rc = wait_event_interruptible_timeout(vds->sendq,
-				PTR_ERR(mb = _vds_get_txbuf(vds)) != -EAGAIN,
-				msecs_to_jiffies(timeout));
-		if (rc < 0)
-			return ERR_PTR(rc);
+		DEFINE_WAIT_FUNC(wait, woken_wake_function);
 
-		if (rc == 0)
-			return ERR_PTR(-ETIMEDOUT);
+		timeout = msecs_to_jiffies(timeout);
+		add_wait_queue(&vds->sendq, &wait);
+		for (;;) {
+			timeout = wait_woken(&wait, TASK_INTERRUPTIBLE,
+					     timeout);
+			if (!timeout) {
+				mb = ERR_PTR(-ETIMEDOUT);
+				break;
+			}
+
+			if (signal_pending(current)) {
+				mb = ERR_PTR(-ERESTARTSYS);
+				break;
+			}
+
+			mb = _vds_get_txbuf(vds);
+			if (PTR_ERR(mb) != -EAGAIN)
+				break;
+		}
+		remove_wait_queue(&vds->sendq, &wait);
 	}
 
 	if (IS_ERR(mb))
