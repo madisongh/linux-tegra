@@ -3254,18 +3254,30 @@ static int tegra_xudc_probe(struct platform_device *pdev)
 	xudc->soc = match->data;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(xudc->dev, "failed to get mem resource 0\n");
+		return -ENXIO;
+	}
 	xudc->base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(xudc->base))
 		return PTR_ERR(xudc->base);
 	xudc->phys_base = res->start;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res) {
+		dev_err(xudc->dev, "failed to get mem resource 1\n");
+		return -ENXIO;
+	}
 	xudc->fpci = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(xudc->fpci))
 		return PTR_ERR(xudc->fpci);
 
 	if (XUDC_IS_T210(xudc)) {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+		if (!res) {
+			dev_err(xudc->dev, "failed to get mem resource 2\n");
+			return -ENXIO;
+		}
 		xudc->ipfs = devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(xudc->ipfs))
 			return PTR_ERR(xudc->ipfs);
@@ -3540,8 +3552,12 @@ static int tegra_xudc_unpowergate(struct tegra_xudc *xudc)
 	if (err < 0)
 		return err;
 
-	phy_init(xudc->usb3_phy);
-	phy_init(xudc->utmi_phy);
+	err = phy_init(xudc->usb3_phy);
+	if (err < 0)
+		return err;
+	err = phy_init(xudc->utmi_phy);
+	if (err < 0)
+		return err;
 
 #if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
 	partition_id = tegra_pd_get_powergate_id(tegra_xusbb_pd);
