@@ -929,7 +929,7 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 			SDMMC_AUTO_CAL_STATUS_AUTO_CAL_ACTIVE))
 			break;
 
-		usleep_range(1000, 1500);
+		mdelay(1);
 		timeout--;
 	} while (timeout);
 
@@ -1022,12 +1022,12 @@ static int tegra_sdhci_signal_voltage_switch(struct sdhci_host *sdhci,
 	}
 
 	/* Wait for the voltage to stabilize */
-	usleep_range(10000, 15000);
+	mdelay(10);
 
 	sdhci_set_clock(sdhci, clock);
 
 	/* Wait 1 msec for clock to stabilize */
-	usleep_range(1000, 1500);
+	mdelay(1);
 
 	tegra_host->check_pad_ctrl_setting = true;
 
@@ -1126,8 +1126,6 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.switch_signal_voltage = tegra_sdhci_signal_voltage_switch,
 	.switch_signal_voltage_exit = tegra_sdhci_post_voltage_switch,
 	.switch_signal_voltage_enter = tegra_sdhci_pre_voltage_switch,
-	.do_calibration = tegra_sdhci_do_calibration,
-	.is_tuning_done		= tegra_sdhci_is_tuning_done,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
