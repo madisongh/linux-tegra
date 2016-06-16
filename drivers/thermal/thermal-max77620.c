@@ -77,7 +77,6 @@ static int max77620_thermal_probe(struct platform_device *pdev)
 	struct max77620_therm_info *mtherm;
 	int ret;
 
-	pdev->dev.of_node = pdev->dev.parent->of_node;
 
 	mtherm = devm_kzalloc(&pdev->dev, sizeof(*mtherm), GFP_KERNEL);
 	if (!mtherm)
@@ -89,6 +88,7 @@ static int max77620_thermal_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Alarm irq number not available\n");
 		return -EINVAL;
 	}
+	pdev->dev.of_node = pdev->dev.parent->of_node;
 
 	mtherm->dev = &pdev->dev;
 	mtherm->rmap = dev_get_regmap(pdev->dev.parent, NULL);
