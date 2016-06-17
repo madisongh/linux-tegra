@@ -7,5 +7,6 @@ subdir-ccflags-y := -Werror
 obj-y				+= csi/
 obj-y				+= camera/
 obj-y				+= vi/
+obj-$(CONFIG_VIDEO_ISC)	+= auto/
 obj-$(CONFIG_VIDEO_CAMERA)	+= regmap_util.o
 
