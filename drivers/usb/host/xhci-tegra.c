@@ -2311,6 +2311,9 @@ static int tegra_xhci_suspend(struct device *dev)
 	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
 	int ret = 0;
 
+	if (!tegra->fw_loaded)
+		return 0;
+
 	flush_work(&tegra->id_extcon_work);
 
 	mutex_lock(&tegra->lock);
@@ -2376,6 +2379,9 @@ static int tegra_xhci_resume(struct device *dev)
 	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
 	int ret = 0;
 
+	if (!tegra->fw_loaded)
+		return 0;
+
 	ret = tegra_xhci_resume_common(dev);
 
 	if (!tegra->pmc_usb_wakes_disabled && device_may_wakeup(dev))
@@ -2386,6 +2392,11 @@ static int tegra_xhci_resume(struct device *dev)
 
 static int tegra_xhci_resume_noirq(struct device *dev)
 {
+	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
+
+	if (!tegra->fw_loaded)
+		return 0;
+
 	return tegra_xhci_resume_common(dev);
 }
 #endif
@@ -2395,6 +2406,9 @@ static int tegra_xhci_runtime_suspend(struct device *dev)
 {
 	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
 	int rc;
+
+	if (!tegra->fw_loaded)
+		return 0;
 
 	mutex_lock(&tegra->lock);
 	rc = tegra_xhci_powergate(tegra, true);
@@ -2407,6 +2421,9 @@ static int tegra_xhci_runtime_resume(struct device *dev)
 {
 	struct tegra_xhci_hcd *tegra = dev_get_drvdata(dev);
 	int rc;
+
+	if (!tegra->fw_loaded)
+		return 0;
 
 	mutex_lock(&tegra->lock);
 	rc = tegra_xhci_unpowergate(tegra);
