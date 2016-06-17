@@ -51,6 +51,7 @@ struct tegra_sdhci_platform_data {
 	bool is_ddr_trim_delay;
 	unsigned int tap_delay;
 	unsigned int trim_delay;
+	bool enable_hw_cq;
 };
 
 #endif

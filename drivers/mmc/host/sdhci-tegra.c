@@ -36,6 +36,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/platform_data/mmc-sdhci-tegra.h>
 #include <linux/padctrl/padctrl.h>
+#include <linux/mmc/cmdq_hci.h>
 
 #include "sdhci-pltfm.h"
 
@@ -1268,7 +1269,10 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 		else if (val == 3)
 			plat->ocr_mask = MMC_OCR_3V3_MASK;
 	}
-
+#ifdef CONFIG_MMC_CQ_HCI
+	plat->enable_hw_cq =
+		of_property_read_bool(np, "nvidia,enable-hwcq");
+#endif
 	tegra_host->plat = plat;
 	return mmc_of_parse(host->mmc);
 }
@@ -1420,6 +1424,17 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	}
 	if (plat->en_strobe)
 		host->mmc->caps2 |= MMC_CAP2_EN_STROBE;
+
+#ifdef CONFIG_MMC_CQ_HCI
+	if (plat->enable_hw_cq) {
+		host->mmc->caps2 |= MMC_CAP2_HW_CQ;
+		host->cq_host = cmdq_pltfm_init(pdev);
+		if (IS_ERR(host->cq_host))
+			pr_err("CMDQ: Error in cmdq_platfm_init function\n");
+		else
+			pr_err("CMDQ: cmdq_platfm_init successful\n");
+	}
+#endif
 
 	rc = sdhci_add_host(host);
 	if (rc)
