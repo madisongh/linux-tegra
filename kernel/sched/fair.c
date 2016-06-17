@@ -3093,6 +3093,11 @@ static bool task_fits_rq(struct task_struct *p, struct rq *rq)
 }
 #else /* CONFIG_SMP */
 
+static inline int
+update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq, bool update_freq)
+{
+	return 0;
+}
 static inline void update_load_avg(struct sched_entity *se, int update_tg) {}
 static inline void
 enqueue_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *se) {}
@@ -8456,6 +8461,7 @@ static void detach_task_cfs_rq(struct task_struct *p)
 {
 	struct sched_entity *se = &p->se;
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
+	u64 now = cfs_rq_clock_task(cfs_rq);
 
 	if (!vruntime_normalized(p)) {
 		/*
@@ -8467,6 +8473,7 @@ static void detach_task_cfs_rq(struct task_struct *p)
 	}
 
 	/* Catch up with the cfs_rq and remove our load when we leave */
+	update_cfs_rq_load_avg(now, cfs_rq, false);
 	detach_entity_load_avg(cfs_rq, se);
 }
 
@@ -8474,6 +8481,7 @@ static void attach_task_cfs_rq(struct task_struct *p)
 {
 	struct sched_entity *se = &p->se;
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
+	u64 now = cfs_rq_clock_task(cfs_rq);
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/*
@@ -8484,6 +8492,7 @@ static void attach_task_cfs_rq(struct task_struct *p)
 #endif
 
 	/* Synchronize task with its cfs_rq */
+	update_cfs_rq_load_avg(now, cfs_rq, false);
 	attach_entity_load_avg(cfs_rq, se);
 
 	if (!vruntime_normalized(p))
