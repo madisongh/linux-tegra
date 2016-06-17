@@ -55,17 +55,13 @@
 	model = "p4573-3310";
 	nvidia,dtsfilename = __FILE__;
 
-	sh_power {
-		compatible = "sensorhub,sh_power";
-		sensorhub,regulator-names = "vdd-sensorhub-hv", "vdd-sensorhub";
-		vdd-sensorhub-supply = <&spmic_sd2>;
-		vdd-sensorhub-hv-supply = <&vdd_3v3>;
-		sensorhub,reset-name = "sensorhub_reset";
-		sensorhub,boot0-name = "sensorhub_boot0";
-		sensorhub,reset-gpio =
-		<&tegra_gpio TEGRA_GPIO(R, 5) GPIO_ACTIVE_LOW>;
-		sensorhub,boot0-gpio =
-		<&tegra_gpio TEGRA_GPIO(X, 6) GPIO_ACTIVE_LOW>;
+	dfsh {
+		compatible = "nvidia,tegra186-dfsh";
+		vdd-1v8-supply = <&spmic_sd2>;
+		dfsh,reset-gpio =
+			<&tegra_gpio TEGRA_GPIO(R, 5) GPIO_ACTIVE_LOW>;
+		dfsh,boot0-gpio =
+			<&tegra_gpio TEGRA_GPIO(X, 6) GPIO_ACTIVE_LOW>;
 		status = "okay";
 	};
 
