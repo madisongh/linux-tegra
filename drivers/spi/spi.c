@@ -1548,6 +1548,8 @@ static void of_register_spi_devices(struct spi_master *master)
 		return;
 
 	for_each_available_child_of_node(master->dev.of_node, nc) {
+		if (!strcmp(nc->name, "prod-settings"))
+			continue;
 		spi = of_register_spi_device(master, nc);
 		if (IS_ERR(spi))
 			dev_warn(&master->dev, "Failed to create SPI device for %s\n",
