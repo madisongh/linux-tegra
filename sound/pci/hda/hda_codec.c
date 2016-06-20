@@ -1572,7 +1572,7 @@ int snd_hda_ctl_add(struct hda_codec *codec, hda_nid_t nid,
 	/* Add prefix for mixer controls for handling multiple codec case*/
 	snprintf(prefixed_ctl, sizeof(prefixed_ctl), "%c %s", 'a' + pcmdev,
 			kctl->id.name);
-	strncpy(kctl->id.name, prefixed_ctl, sizeof(kctl->id.name));
+	strlcpy(kctl->id.name, prefixed_ctl, sizeof(kctl->id.name));
 
 	err = snd_ctl_add(codec->card, kctl);
 	if (err < 0)
