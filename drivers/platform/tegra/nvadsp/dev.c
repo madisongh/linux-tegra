@@ -219,7 +219,7 @@ static int __init nvadsp_probe(struct platform_device *pdev)
 	}
 #endif
 
-#if CONFIG_DEBUG_FS
+#ifdef CONFIG_DEBUG_FS
 	if (adsp_debug_init(drv_data))
 		dev_err(dev,
 			"unable to create tegra_ape debug fs directory\n");

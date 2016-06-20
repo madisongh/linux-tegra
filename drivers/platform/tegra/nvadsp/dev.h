@@ -88,7 +88,7 @@ struct nvadsp_drv_data {
 	unsigned long *mbox_ids;
 	spinlock_t mbox_lock;
 
-#if CONFIG_DEBUG_FS
+#ifdef CONFIG_DEBUG_FS
 	struct dentry *adsp_debugfs_root;
 #endif
 	struct clk *ape_clk;

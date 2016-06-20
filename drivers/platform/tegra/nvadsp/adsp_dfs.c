@@ -310,6 +310,43 @@ err_out:
 	return tfreq / 1000;
 }
 
+/* Set adsp dfs policy min freq(Khz) */
+static int policy_min_set(void *data, u64 val)
+{
+	int ret = -EINVAL;
+	unsigned long min = (unsigned long)val;
+
+	if (!is_os_running(device))
+		return ret;
+
+	mutex_lock(&policy_mutex);
+	if (!policy->enable) {
+		dev_err(device, "adsp dfs policy is not enabled\n");
+		goto exit_out;
+	}
+
+	if (min == policy->min)
+		goto exit_out;
+	else if (min < policy->cpu_min)
+		min = policy->cpu_min;
+	else if (min >= policy->cpu_max)
+		min = policy->cpu_max;
+
+	if (min > policy->cur) {
+		min = update_freq(min);
+		if (min)
+			policy->cur = min;
+	}
+
+	if (min)
+		policy->min = min;
+
+	ret = 0;
+exit_out:
+	mutex_unlock(&policy_mutex);
+	return ret;
+}
+
 #ifdef CONFIG_DEBUG_FS
 
 #define RW_MODE (S_IWUSR | S_IRUSR)
@@ -350,42 +387,6 @@ static int policy_min_get(void *data, u64 *val)
 	return 0;
 }
 
-/* Set adsp dfs policy min freq(Khz) */
-static int policy_min_set(void *data, u64 val)
-{
-	int ret = -EINVAL;
-	unsigned long min = (unsigned long)val;
-
-	if (!is_os_running(device))
-		return ret;
-
-	mutex_lock(&policy_mutex);
-	if (!policy->enable) {
-		dev_err(device, "adsp dfs policy is not enabled\n");
-		goto exit_out;
-	}
-
-	if (min == policy->min)
-		goto exit_out;
-	else if (min < policy->cpu_min)
-		min = policy->cpu_min;
-	else if (min >= policy->cpu_max)
-		min = policy->cpu_max;
-
-	if (min > policy->cur) {
-		min = update_freq(min);
-		if (min)
-			policy->cur = min;
-	}
-
-	if (min)
-		policy->min = min;
-
-	ret = 0;
-exit_out:
-	mutex_unlock(&policy_mutex);
-	return ret;
-}
 DEFINE_SIMPLE_ATTRIBUTE(min_fops, policy_min_get,
 	policy_min_set, "%llu\n");
 
