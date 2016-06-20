@@ -1505,15 +1505,25 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		tegra_host->vddio_max_uv = SDHOST_HIGH_VOLT_MAX;
 	}
 
-
 	rc = tegra_sdhci_configure_regulators(host, CONFIG_REG_GET, 0, 0);
 	if (!rc) {
 		tegra_sdhci_pre_voltage_switch(host, MMC_SIGNAL_VOLTAGE_330);
 		if (tegra_host->vddio_max_uv < SDHOST_HIGH_VOLT_MIN)
 			signal_voltage = MMC_SIGNAL_VOLTAGE_180;
 		rc = tegra_sdhci_signal_voltage_switch(host, signal_voltage);
-		if (rc)
-			dev_err(&pdev->dev, "voltage switch failed in probe, err: %d", rc);
+		if (rc) {
+			dev_err(&pdev->dev,
+				" voltage switch failed in probe, err: %d\n"
+				, rc);
+		} else {
+			rc = tegra_sdhci_configure_regulators(host,
+				CONFIG_REG_EN, 0, 0);
+			if (rc)
+				dev_err(&pdev->dev,
+					" voltage enable failed in probe, err: %d\n"
+					, rc);
+			tegra_sdhci_post_voltage_switch(host, signal_voltage);
+		}
 	}
 	if (plat->en_strobe)
 		host->mmc->caps2 |= MMC_CAP2_EN_STROBE;
