@@ -211,14 +211,6 @@ static int max77620_gpio_to_irq(struct gpio_chip *gc, unsigned int offset)
 	return regmap_irq_get_virq(chip->gpio_irq_data, offset);
 }
 
-static void max77620_gpio_irq_remove(struct max77620_gpio *mgpio)
-{
-	struct max77620_chip *chip = dev_get_drvdata(mgpio->dev->parent);
-
-	regmap_del_irq_chip(mgpio->gpio_irq, chip->gpio_irq_data);
-	chip->gpio_irq_data = NULL;
-}
-
 static int max77620_gpio_probe(struct platform_device *pdev)
 {
 	struct max77620_chip *chip =  dev_get_drvdata(pdev->dev.parent);
@@ -282,7 +274,6 @@ static int max77620_gpio_remove(struct platform_device *pdev)
 {
 	struct max77620_gpio *mgpio = platform_get_drvdata(pdev);
 
-	max77620_gpio_irq_remove(mgpio);
 	gpiochip_remove(&mgpio->gpio_chip);
 
 	return 0;
