@@ -570,6 +570,8 @@ struct sdhci_ops {
 				unsigned char signal_voltage);
 	void	(*switch_signal_voltage_exit)(struct sdhci_host *host,
 				unsigned char signal_voltage);
+	int	(*suspend)(struct sdhci_host *host);
+	int	(*resume)(struct sdhci_host *host);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

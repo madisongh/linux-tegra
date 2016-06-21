@@ -1084,6 +1084,44 @@ static void tegra_sdhci_post_voltage_switch(struct sdhci_host *sdhci,
 	return;
 }
 
+static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
+{
+	int ret = 0;
+
+#ifndef CONFIG_ARCH_TEGRA_18x_SOC
+	/* FIXME:
+	 * Device hang is seen for t186 platform or removable card when
+	 * clock is disabled (getting track in bug# 200107947). Keeping
+	 * clock enabled during suspend for now to avoid device hang.
+	 */
+	if (!(tegra_host->plat->is_sd_device))
+		tegra_sdhci_set_clock(sdhci, 0);
+#endif
+	ret = tegra_sdhci_configure_regulators(sdhci, CONFIG_REG_DIS, 0, 0);
+	return ret;
+}
+
+static int tegra_sdhci_resume(struct sdhci_host *sdhci)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	int ret = 0;
+	int signal_voltage = MMC_SIGNAL_VOLTAGE_330;
+
+	/* Setting the min identification clock of freq 400KHz */
+	tegra_sdhci_set_clock(sdhci, 400000);
+	if (tegra_host->vddio_max_uv < SDHOST_HIGH_VOLT_MIN)
+		signal_voltage = MMC_SIGNAL_VOLTAGE_180;
+	ret = tegra_sdhci_configure_regulators(sdhci, CONFIG_REG_EN, 0, 0);
+	if (!ret) {
+		tegra_sdhci_pre_voltage_switch(sdhci, signal_voltage);
+		ret = tegra_sdhci_signal_voltage_switch(sdhci, signal_voltage);
+		tegra_sdhci_post_voltage_switch(sdhci, signal_voltage);
+	}
+
+	return ret;
+}
+
 static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
 		const char **parent_clk_list, int size)
 {
@@ -1128,6 +1166,8 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.switch_signal_voltage = tegra_sdhci_signal_voltage_switch,
 	.switch_signal_voltage_exit = tegra_sdhci_post_voltage_switch,
 	.switch_signal_voltage_enter = tegra_sdhci_pre_voltage_switch,
+	.suspend                = tegra_sdhci_suspend,
+	.resume                 = tegra_sdhci_resume,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
