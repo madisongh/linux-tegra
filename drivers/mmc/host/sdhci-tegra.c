@@ -1245,6 +1245,7 @@ static struct sdhci_tegra_soc_data soc_data_tegra114 = {
 static const struct sdhci_pltfm_data sdhci_tegra186_pdata = {
 	.quirks = TEGRA_SDHCI_QUIRKS,
 	.quirks2 = TEGRA_SDHCI_QUIRKS2 |
+		SDHCI_QUIRK2_USE_64BIT_ADDR |
 		SDHCI_QUIRK2_DDR_FIXED_DIVISOR,
 	.ops  = &tegra_sdhci_ops,
 };
