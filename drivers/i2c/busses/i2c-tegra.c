@@ -847,7 +847,6 @@ done:
 
 static int tegra_i2c_issue_bus_clear(struct tegra_i2c_dev *i2c_dev)
 {
-	unsigned long timeout;
 	int ret;
 
 	if (i2c_dev->hw->has_hw_arb_support) {
@@ -1307,6 +1306,8 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 		}
 		i2c_dev->fast_clk = fast_clk;
 	}
+
+	spin_lock_init(&i2c_dev->xfer_lock);
 
 	i2c_dev->prod_list = tegra_prod_get(&pdev->dev, NULL);
 	if (IS_ERR_OR_NULL(i2c_dev->prod_list)) {
