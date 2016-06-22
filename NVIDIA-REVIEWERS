@@ -296,66 +296,46 @@ POWER: CLOCKS AND VOLTAGE
 M:	Matthew Longnecker <mlongnecker@nvidia.com>
 M:	Aleksandr Frid <afrid@nvidia.com>
 L:	sw-mobile-clocks@exchange.nvidia.com
-F:	arch/arm/mach-tegra/*_dvfs.c
-F:	arch/arm/mach-tegra/clocks_stats.c
-F:	arch/arm/mach-tegra/tegra*_speedo.c
-F:	arch/arm/mach-tegra/tegra_core_volt_cap.c
-F:	arch/arm/mach-tegra/tegra12_clocks.c
-F:	arch/arm/mach-tegra/dvfs.c
 F:	drivers/clk/tegra/*
-F:	drivers/platform/tegra/*dvfs.c
-F:	drivers/platform/tegra/clock.c
-F:	drivers/platform/tegra/clocks_stats.c
-F:	drivers/platform/tegra/tegra*_speedo.c
-F:	drivers/platform/tegra/tegra*clock.c
-F:	drivers/platform/tegra/tegra3_actmon.c
+F:	drivers/platform/tegra/*actmon*
+F:	drivers/platform/tegra/*clock*
+F:	drivers/platform/tegra/*dvfs*
+F:	drivers/platform/tegra/*speedo*
+F:	drivers/platform/tegra/*volt*
+F:	drivers/platform/tegra/tegra_simon.c
 
 POWER: CPU
 M:	Matthew Longnecker <mlongnecker@nvidia.com>
 L:	sw-mobile-cpu-power@exchange.nvidia.com
 S:	Supported
-F:	arch/arm/mach-tegra/cpuidle-t11x.c
-F:	arch/arm/mach-tegra/cpuidle.c
-F:	arch/arm/mach-tegra/cpuquiet.c
-F:	arch/arm/mach-tegra/sysfs-cluster.c
+F:	arch/arm/mach-tegra/cpuidle*
 F:	drivers/cpufreq/
 F:	drivers/cpuidle/
 X:	drivers/cpuidle/coupled.c
 F:	drivers/cpuquiet/
-F:	drivers/input/input-cfboost.c
-
-F:	drivers/platform/tegra/cluser-control.c
-F:	drivers/platform/tegra/common*.c
-F:	drivers/platform/tegra/cpu-tegra.c
-F:	drivers/platform/tegra/cpu-tegra12.c
-F:	drivers/platform/tegra/cpu-tegra21.c
+F:	drivers/misc/cpuload.c
+F:	drivers/platform/tegra/cluster-control.c
+F:	drivers/platform/tegra/cpu-tegra*
 F:	drivers/platform/tegra/sysfs-cluster.c
 
 POWER: THERMAL
 M:	Matthew Longnecker <mlongnecker@nvidia.com>
 L:	sw-mobile-therm@exchange.nvidia.com
 S:	Supported
-F:	arch/arm64/mach-tegra/board-*-thermal.c
+F:	drivers/misc/nct1008.c
 F:	drivers/misc/tegra-fuse/tegra_fuse_tsosc.c
-F:	drivers/misc/therm_fan_est.c
-F:	drivers/platform/tegra/nct*.c
-F:	drivers/platform/tegra/tegra_soctherm.c
-F:	drivers/platform/tegra/tegra_throttle.c
+F:	drivers/misc/therm*_est.c
+F:	drivers/platform/tegra/*soctherm.c
+F:	drivers/platform/tegra/*throttle.c
 F:	drivers/thermal/
 
 POWER: EDP AND FRIENDS
 M:	Matthew Longnecker <mlongnecker@nvidia.com>
 L:	mobile-sys-edp@exchange.nvidia.com
 S:	Supported
-F:	arch/arm/mach-tegra/board-*-sysedp.c
-F:	arch/arm/mach-tegra/edp.c
-F:	arch/arm/mach-tegra/tegra_simon.c
-F:	arch/arm/mach-tegra/tegra_volt_cap.c
-F:	arch/arm/mach-tegra/tegra12_edp.c
 F:	drivers/edp/
 F:	drivers/misc/tegra_ppm.c
-F:	drivers/platform/tegra/cpu-edp.c
-F:	drivers/platform/tegra/gpu-edp.c
+F:	drivers/platform/tegra/*edp.c
 F:	include/linux/tegra_ppm.h
 
 POWER: GATING AND STATES
@@ -364,26 +344,28 @@ M:	Laxman Dewangan <ldewangan@nvidia.com>
 L:	sw-mobile-power@exchange.nvidia.com
 S:	Supported
 F:	arch/arm*/mach-tegra/pm*.c
-F:	arch/arm*/mach-tegra/powerdetect.c
-F:	arch/arm/mach-tegra/powergate*
-F:	arch/arm/mach-tegra/tegra-wakeups.c
-F:	arch/arm/mach-tegra/wakeups-t*.c
-F:	drivers/platform/tegra/pm.c
-F:	drivers/platform/tegra/pm-irq.c
-F:	drivers/platform/tegra/pm-t3.c
-F:	drivers/platform/tegra/pm.c
-F:	drivers/platform/tegra/pm_domains.c
-F:	drivers/platform/tegra/pmc.c
+F:	drivers/platform/tegra/pm*.c
 F:	drivers/platform/tegra/powergate/
 F:	drivers/platform/tegra/reboot.c
-F:	drivers/platform/tegra/reset.c
-F:	drivers/platform/tegra/tegra*.c
-F:	drivers/platform/tegra/wakeups*.c
+F:	drivers/platform/tegra/*wakeups*.c
 
 PROFILER
 M:	Igor Nabirushkin <inabirushkin@nvidia.com>
 S:	Supported
 F:	drivers/misc/tegra-profiler/*
+
+SCHED
+M:	Sai Gurrappadi <sgurrappadi@nvidia.com>
+M:	Peter Boonstoppel <pboonstoppel@nvidia.com>
+L:	mrl-staff@exchange.nvidia.com
+S:	Supported
+F:	arch/arm64/include/asm/topology.h
+F:	arch/arm64/kernel/topology.c
+F:	include/linux/sched.h
+F:	include/linux/sched/
+F:	kernel/sched/
+F:	kernel/sysctl.c
+F:	kernel/time/tick-sched.c
 
 SECURE OS
 M:	Vincent Chen <vinchen@nvidia.com>
@@ -413,12 +395,6 @@ F:	drivers/input/misc/mpu/*
 F:	drivers/input/misc/pressure/*
 F:	drivers/staging/iio/*
 
-TOUCHSCREEN
-M:	David Pu <dpu@nvidia.com>
-L:	sw-mobile-touch@exchange.nvidia.com
-S:	Supported
-F:	drivers/input/touchscreen/*
-
 STORAGE
 M:	Venu Byravarasu <vbyravarasu@nvidia.com>
 M:	Sumeet Gupta <sumeetg@nvidia.com>
@@ -441,6 +417,12 @@ F:	drivers/platform/tegra/i2c_error_recovery.c
 F:	drivers/platform/tegra/io.c
 F:	drivers/pwm/pwm-tegra.c
 F:	drivers/watchdog/*
+
+TOUCHSCREEN
+M:	David Pu <dpu@nvidia.com>
+L:	sw-mobile-touch@exchange.nvidia.com
+S:	Supported
+F:	drivers/input/touchscreen/*
 
 USB
 M:	Rama Kandhala <rkandhala@nvidia.com>
