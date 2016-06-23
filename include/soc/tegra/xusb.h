@@ -46,6 +46,8 @@ struct tegra_xusb_mbox_msg {
 	u32 data;
 };
 
+struct phy;
+
 int tegra_phy_xusb_set_vbus_override(struct phy *phy);
 int tegra_phy_xusb_clear_vbus_override(struct phy *phy);
 
@@ -72,4 +74,28 @@ int tegra_phy_xusb_pretend_connected(struct phy *phy);
 int tegra_phy_xusb_remote_wake_detected(struct phy *phy);
 void tegra_phy_xusb_utmi_pad_power_on(struct phy *phy);
 void tegra_phy_xusb_utmi_pad_power_down(struct phy *phy);
+
+void tegra_phy_xusb_utmi_pad_chg_power_on(struct phy *phy);
+void tegra_phy_xusb_utmi_pad_chg_power_down(struct phy *phy);
+
+void tegra_phy_xusb_utmi_pad_pd2_deassert(struct phy *phy);
+void tegra_phy_xusb_utmi_pad_pd2_assert(struct phy *phy);
+
+void tegra_phy_xusb_set_idcd_dbnc(struct phy *phy, u32 val);
+
+void tegra_phy_xusb_utmi_pad_battery_charge_on(struct phy *phy);
+void tegra_phy_xusb_utmi_pad_battery_charge_off(struct phy *phy);
+
+void tegra_phy_xusb_utmi_pad_enable_charger_filters(struct phy *phy);
+void tegra_phy_xusb_utmi_pad_disable_charger_filters(struct phy *phy);
+
+/* level < 0: disable protection */
+void tegra_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level);
+
+/* data contact detection */
+bool tegra_phy_xusb_utmi_pad_dcd(struct phy *phy);
+
+bool tegra_phy_xusb_utmi_pad_primary_charger_detect(struct phy *phy);
+bool tegra_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy);
+
 #endif /* __SOC_TEGRA_XUSB_H__ */
