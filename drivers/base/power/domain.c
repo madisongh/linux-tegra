@@ -482,21 +482,6 @@ static void genpd_delayed_power_off_work_fn(struct work_struct *work)
 	__pm_genpd_poweroff(genpd);
 }
 
-static struct pm_domain_data *genpd_to_pdd(struct generic_pm_domain *genpd,
-						struct device *dev)
-{
-	struct pm_domain_data *pdd = NULL;
-
-	mutex_lock(&genpd->lock);
-	list_for_each_entry(pdd, &genpd->dev_list, list_node)
-		if (pdd->dev == dev) {
-			mutex_unlock(&genpd->lock);
-			return pdd;
-		}
-	mutex_unlock(&genpd->lock);
-	return pdd;
-}
-
 /**
  * pm_genpd_runtime_suspend - Suspend a device belonging to I/O PM domain.
  * @dev: Device to suspend.
@@ -514,8 +499,6 @@ static int pm_genpd_runtime_suspend(struct device *dev)
 	ktime_t time_start;
 	s64 elapsed_ns;
 	int ret;
-	struct pm_domain_data *pdd;
-	struct generic_pm_domain_data *gpd_data;
 
 	dev_dbg(dev, "%s()\n", __func__);
 
@@ -537,16 +520,9 @@ static int pm_genpd_runtime_suspend(struct device *dev)
 	if (runtime_pm)
 		time_start = ktime_get();
 
-	pdd = genpd_to_pdd(genpd, dev);
-	if (pdd) {
-		gpd_data = to_gpd_data(pdd);
-		if (gpd_data->need_save) {
-			ret = genpd_save_dev(genpd, dev);
-			if (ret)
-				return ret;
-		
-		}
-	}
+	ret = genpd_save_dev(genpd, dev);
+	if (ret)
+		return ret;
 
 	ret = genpd_stop_dev(genpd, dev);
 	if (ret) {
@@ -979,8 +955,6 @@ static int pm_genpd_suspend_noirq(struct device *dev)
 	struct generic_pm_domain *genpd;
 	struct pm_subsys_data *psd;
 	int ret = 0;
-	struct pm_domain_data *pdd;
-	struct generic_pm_domain_data *gpd_data;
 
 	dev_dbg(dev, "%s()\n", __func__);
 
@@ -999,16 +973,9 @@ static int pm_genpd_suspend_noirq(struct device *dev)
 
 	cancel_delayed_work_sync(&genpd->power_off_delayed_work);
 
-	pdd = genpd_to_pdd(genpd, dev);
-	if (pdd) {
-		gpd_data = to_gpd_data(pdd);
-		if (gpd_data->need_save) {
-			ret = genpd_save_dev(genpd, dev);
-			if (ret)
-				return ret;
-		
-		}
-	}
+	ret = genpd_save_dev(genpd, dev);
+	if (ret)
+		return ret;
 
 	ret = genpd_stop_dev(genpd, dev);
 	if (ret)
