@@ -20,6 +20,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/pwm.h>
+#include <linux/gpio/consumer.h>
 
 struct pwm_regulator_data {
 	/*  Shared */
@@ -31,6 +32,9 @@ struct pwm_regulator_data {
 
 	/* Continuous voltage */
 	int volt_uV;
+
+	/* Enable GPIO */
+	struct gpio_desc *enb_gpio;
 };
 
 struct pwm_voltages {
@@ -87,6 +91,9 @@ static int pwm_regulator_enable(struct regulator_dev *dev)
 {
 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
 
+	if (drvdata->enb_gpio)
+		gpiod_set_value_cansleep(drvdata->enb_gpio, 1);
+
 	return pwm_enable(drvdata->pwm);
 }
 
@@ -96,12 +103,18 @@ static int pwm_regulator_disable(struct regulator_dev *dev)
 
 	pwm_disable(drvdata->pwm);
 
+	if (drvdata->enb_gpio)
+		gpiod_set_value_cansleep(drvdata->enb_gpio, 0);
+
 	return 0;
 }
 
 static int pwm_regulator_is_enabled(struct regulator_dev *dev)
 {
 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
+
+	if (drvdata->enb_gpio && !gpiod_get_value_cansleep(drvdata->enb_gpio))
+		return false;
 
 	return pwm_is_enabled(drvdata->pwm);
 }
@@ -234,6 +247,7 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 	struct regulator_dev *regulator;
 	struct regulator_config config = { };
 	struct device_node *np = pdev->dev.of_node;
+	enum gpiod_flags gpio_flags;
 	int ret;
 
 	if (!np) {
@@ -256,6 +270,19 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 					       &pwm_regulator_desc);
 	if (!init_data)
 		return -ENOMEM;
+
+	if (init_data->constraints.boot_on || init_data->constraints.always_on)
+		gpio_flags = GPIOD_OUT_HIGH;
+	else
+		gpio_flags = GPIOD_OUT_LOW;
+
+	drvdata->enb_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+				gpio_flags);
+	if (IS_ERR(drvdata->enb_gpio)) {
+		ret = PTR_ERR(drvdata->enb_gpio);
+		dev_err(&pdev->dev, "Failed to get enable GPIO: %d\n", ret);
+		return ret;
+	}
 
 	config.of_node = np;
 	config.dev = &pdev->dev;
