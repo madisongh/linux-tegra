@@ -29,6 +29,8 @@ Optional properties:
    USB VBUS pin. See ../extcon/extcon-gpio-states.txt for details.
    When the extcon cable state is 1, OTG port will transition to device mode.
  - extcon-cable-names: Must be "vbus".
+ - charger-detector: USB charger detection support. Must be the phandle of the
+   USB charger detection driver DT node.
 
 Example:
 --------
@@ -47,4 +49,6 @@ Example:
 		extcon-cables = <&vbus_id_extcon 0>;
 		extcon-cable-names = "vbus";
 		#extcon-cells = <1>;
+
+		charger-detector = <&tegra_usb_cd>;
 	};
