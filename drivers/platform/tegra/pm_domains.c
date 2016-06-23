@@ -447,14 +447,12 @@ void tegra_pd_add_device(struct device *dev)
 		device_set_wakeup_capable(dev, 1);
 
 	of_node_put(dev->of_node);
-	pm_genpd_dev_need_save(dev, true);
 }
 EXPORT_SYMBOL(tegra_pd_add_device);
 
 void tegra_sdhci_add_device(struct device *dev)
 {
 	device_set_wakeup_capable(dev, 1);
-	pm_genpd_dev_need_save(dev, false);
 }
 EXPORT_SYMBOL(tegra_sdhci_add_device);
 
