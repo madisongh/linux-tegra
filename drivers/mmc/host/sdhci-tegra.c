@@ -1122,6 +1122,17 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 	return ret;
 }
 
+static void tegra_sdhci_post_resume(struct sdhci_host *sdhci)
+{
+	bool dll_calib_req = false;
+
+	dll_calib_req = (sdhci->mmc->card &&
+		(sdhci->mmc->card->type == MMC_TYPE_MMC) &&
+		(sdhci->mmc->ios.timing == MMC_TIMING_MMC_HS400));
+	if (dll_calib_req)
+		tegra_sdhci_post_init(sdhci);
+}
+
 static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
 		const char **parent_clk_list, int size)
 {
@@ -1168,6 +1179,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.switch_signal_voltage_enter = tegra_sdhci_pre_voltage_switch,
 	.suspend                = tegra_sdhci_suspend,
 	.resume                 = tegra_sdhci_resume,
+	.platform_resume	= tegra_sdhci_post_resume,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {

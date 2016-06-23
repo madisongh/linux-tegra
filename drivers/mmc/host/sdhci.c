@@ -2930,6 +2930,9 @@ int sdhci_resume_host(struct sdhci_host *host)
 
 	sdhci_enable_card_detection(host);
 
+	if (host->ops->platform_resume)
+		host->ops->platform_resume(host);
+
 	return ret;
 }
 
