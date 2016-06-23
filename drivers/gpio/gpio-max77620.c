@@ -253,7 +253,7 @@ static int max77620_gpio_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, mgpio);
 
-	ret = gpiochip_add_data(&mgpio->gpio_chip, mgpio);
+	ret = devm_gpiochip_add_data(mgpio->dev, &mgpio->gpio_chip, mgpio);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "gpio_init: Failed to add max77620_gpio\n");
 		return ret;
@@ -273,15 +273,6 @@ static int max77620_gpio_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int max77620_gpio_remove(struct platform_device *pdev)
-{
-	struct max77620_gpio *mgpio = platform_get_drvdata(pdev);
-
-	gpiochip_remove(&mgpio->gpio_chip);
-
-	return 0;
-}
-
 static const struct platform_device_id max77620_gpio_devtype[] = {
 	{ .name = "max77620-gpio", },
 	{ .name = "max20024-gpio", },
@@ -292,7 +283,6 @@ MODULE_DEVICE_TABLE(platform, max77620_gpio_devtype);
 static struct platform_driver max77620_gpio_driver = {
 	.driver.name	= "max77620-gpio",
 	.probe		= max77620_gpio_probe,
-	.remove		= max77620_gpio_remove,
 	.id_table	= max77620_gpio_devtype,
 };
 
