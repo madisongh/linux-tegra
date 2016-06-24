@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -16,6 +16,8 @@
 #include <linux/tegra_smmu.h>
 #include <linux/dma-contiguous.h>
 #include <linux/tegra-soc.h>
+
+#include <soc/tegra/fuse.h>
 
 #include <asm/dma-iommu.h>
 
@@ -194,12 +196,12 @@ u64 tegra_smmu_fixup_swgids(struct device *dev, struct iommu_linear_map **map)
 	if (!dev)
 		return SWGIDS_ERROR_CODE;
 
-	switch (tegra_get_chipid()) {
-	case TEGRA_CHIPID_TEGRA12:
-	case TEGRA_CHIPID_TEGRA13:
+	switch (tegra_get_chip_id()) {
+	case TEGRA124:
+	case TEGRA132:
 		table = tegra_swgid_fixup_t124;
 		break;
-	case TEGRA_CHIPID_TEGRA21:
+	case TEGRA210:
 		table = tegra_swgid_fixup_t210;
 		break;
 	default:
