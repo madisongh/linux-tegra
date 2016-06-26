@@ -18,6 +18,9 @@
 
 #include "fuse.h"
 
+#define FUSE_FT_REV          0x128
+#define FUSE_CP_REV           0x190
+
 /*
  * SOC_THERM TSENSOR fuse patterns for these chip families:-
  *   TEGRA_CHIPID_TEGRA12, TEGRA_CHIPID_TEGRA13, TEGRA_CHIPID_TEGRA21
