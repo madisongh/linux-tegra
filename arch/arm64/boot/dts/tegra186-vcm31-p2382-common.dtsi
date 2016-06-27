@@ -47,6 +47,15 @@
 		status = "okay";
 	};
 
+	spi@c260000 { /* Tegra SPI2 <-> VCM SPIA: Dirana */
+		cs-gpios = <&tegra_gpio TEGRA_GPIO(N,0) 0>;
+		spi@0 {
+			controller-data {
+				/delete-property/ nvidia,chipselect-gpio;
+			};
+		};
+	};
+
 	/*
 	 * FIXME : when auatmotive team switchs to k4.4 from k3.18
 	 *   1. serial index will be moved from ttyS0 to ttyS1 in os_args in cfg
