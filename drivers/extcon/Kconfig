@@ -52,6 +52,13 @@ config EXTCON_MAX14577
 	  Maxim MAX14577/77836. The MAX14577/77836 MUIC is a USB port accessory
 	  detector and switch.
 
+config EXTCON_CABLE_XLATE
+	tristate "Cable translator based on different cable type"
+	help
+	  Say Y here to enable cable translator which receives the cable states
+	  from different extcon and report as different cable state based on the
+	  state table.
+
 config EXTCON_MAX77693
 	tristate "Maxim MAX77693 EXTCON Support"
 	depends on MFD_MAX77693 && INPUT
