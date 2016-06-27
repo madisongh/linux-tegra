@@ -75,3 +75,4 @@ obj-$(CONFIG_TEGRA_PROC_POWER_MODEL) += tegra_ppm.o
 obj-$(CONFIG_NVS_DFSH)		+= nvs-dfsh/
 obj-$(CONFIG_SAF775x_HWDEP)	+= saf775x/
 obj-$(CONFIG_SAF36XX_HWDEP) += saf775x/
+obj-$(CONFIG_TEGRA_PROFILER)	+= tegra-profiler/
