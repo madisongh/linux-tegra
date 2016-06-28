@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2010 Google, Inc
- * Copyright (c) 2014 NVIDIA Corporation
+ * Copyright (c) 2014-2016, NVIDIA Corporation. All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@google.com>
@@ -107,7 +107,12 @@ int tegra_pmc_cpu_remove_clamping(int cpuid);
 #define TEGRA_IO_RAIL_LVDS	57
 #define TEGRA_IO_RAIL_SYS_DDC	58
 
-#ifdef CONFIG_ARCH_TEGRA
+/* Define reboot-reset mode */
+#define RECOVERY_MODE           BIT(31)
+#define BOOTLOADER_MODE         BIT(30)
+#define FORCED_RECOVERY_MODE    BIT(1)
+
+#if defined CONFIG_ARCH_TEGRA || CONFIG_PLATFORM_TEGRA
 int tegra_powergate_is_powered(int id);
 int tegra_powergate_power_on(int id);
 int tegra_powergate_power_off(int id);
@@ -119,6 +124,8 @@ int tegra_powergate_sequence_power_up(int id, struct clk *clk,
 
 int tegra_io_rail_power_on(int id);
 int tegra_io_rail_power_off(int id);
+int tegra_pmc_set_reboot_reason(u32 reboot_reason);
+int tegra_pmc_clear_reboot_reason(u32 reboot_reason);
 #else
 static inline int tegra_powergate_is_powered(int id)
 {
@@ -155,6 +162,16 @@ static inline int tegra_io_rail_power_off(int id)
 {
 	return -ENOSYS;
 }
-#endif /* CONFIG_ARCH_TEGRA */
+
+static inline int tegra_pmc_set_reboot_reason(u32 reboot_reason)
+{
+	return -ENOTSUPP;
+}
+
+static inline int tegra_pmc_clear_reboot_reason(u32 reboot_reason)
+{
+	return -ENOTSUPP;
+}
+#endif /* CONFIG_ARCH_TEGRA || CONFIG_PLATFORM_TEGRA */
 
 #endif /* __SOC_TEGRA_PMC_H__ */
