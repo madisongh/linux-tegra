@@ -335,28 +335,24 @@ static inline void ufs_aux_clear_bits(void __iomem *ufs_aux_base, u32 val,
 	ufs_aux_writel(ufs_aux_base, update_val, offset);
 }
 
-static void ufs_save_regs(void __iomem *reg_base, u32 **save_addr,
+static void ufs_save_regs(void __iomem *reg_base, u32 *save_addr,
 				u16 reg_array[], u32 no_of_regs)
 {
 	u32 regs;
-	u32 *dest = *save_addr;
+	u32 *dest = save_addr;
 
 	for (regs = 0; regs < no_of_regs; ++regs, ++dest)
 		*dest = readl(reg_base + (u32)reg_array[regs]);
-
-	*save_addr = dest;
 }
 
-static void ufs_restore_regs(void __iomem *reg_base, u32 **save_addr,
+static void ufs_restore_regs(void __iomem *reg_base, u32 *save_addr,
 				u16 reg_array[], u32 no_of_regs)
 {
 	u32 regs;
-	u32 *src = *save_addr;
+	u32 *src = save_addr;
 
 	for (regs = 0; regs < no_of_regs; ++regs, ++src)
 		writel(*src, reg_base + (u32)reg_array[regs]);
-
-	*save_addr = src;
 }
 
 #endif

@@ -773,63 +773,72 @@ void ufs_tegra_ufs_aux_prog(struct ufs_tegra_host *ufs_tegra)
 static void ufs_tegra_context_save(struct ufs_tegra_host *ufs_tegra)
 {
 	u32 reg_len = 0;
+	u32 len = 0;
 	u32 *mphy_context_save = ufs_tegra->mphy_context;
 
 	reg_len = ARRAY_SIZE(mphy_rx_apb);
 	/*
 	 * Save mphy_rx_apb lane0 and lane1 context
 	 */
-	ufs_save_regs(ufs_tegra->mphy_l0_base, &mphy_context_save,
+	ufs_save_regs(ufs_tegra->mphy_l0_base, mphy_context_save,
 							mphy_rx_apb, reg_len);
+	len += reg_len;
 
-	if (ufs_tegra->x2config)
-		ufs_save_regs(ufs_tegra->mphy_l1_base, &mphy_context_save,
+	if (ufs_tegra->x2config) {
+		ufs_save_regs(ufs_tegra->mphy_l1_base, mphy_context_save + len,
 							mphy_rx_apb, reg_len);
+		len += reg_len;
+	}
 
 	reg_len = ARRAY_SIZE(mphy_tx_apb);
 	/*
 	 * Save mphy_tx_apb lane0 and lane1 context
 	 */
-	ufs_save_regs(ufs_tegra->mphy_l0_base, &mphy_context_save,
+	ufs_save_regs(ufs_tegra->mphy_l0_base, mphy_context_save + len,
 							mphy_tx_apb, reg_len);
+	len += reg_len;
 	if (ufs_tegra->x2config)
-		ufs_save_regs(ufs_tegra->mphy_l1_base, &mphy_context_save,
-							mphy_tx_apb, reg_len);
+		ufs_save_regs(ufs_tegra->mphy_l1_base,
+			mphy_context_save + reg_len, mphy_tx_apb, reg_len);
 }
 
 static void ufs_tegra_context_restore(struct ufs_tegra_host *ufs_tegra)
 {
 	u32 reg_len = 0;
+	u32 len = 0;
 	u32 *mphy_context_restore = ufs_tegra->mphy_context;
 
 	reg_len = ARRAY_SIZE(mphy_rx_apb);
 	/*
 	 * Restore mphy_rx_apb lane0 and lane1 context
 	 */
-	ufs_restore_regs(ufs_tegra->mphy_l0_base, &mphy_context_restore,
+	ufs_restore_regs(ufs_tegra->mphy_l0_base, mphy_context_restore,
 							mphy_rx_apb, reg_len);
 	mphy_update(ufs_tegra->mphy_l0_base, MPHY_GO_BIT,
 				MPHY_RX_APB_VENDOR2_0);
 
+	len += reg_len;
 	if (ufs_tegra->x2config) {
-		ufs_restore_regs(ufs_tegra->mphy_l1_base, &mphy_context_restore,
-							mphy_rx_apb, reg_len);
+		ufs_restore_regs(ufs_tegra->mphy_l1_base,
+			mphy_context_restore + len, mphy_rx_apb, reg_len);
 		mphy_update(ufs_tegra->mphy_l1_base, MPHY_GO_BIT,
 				MPHY_RX_APB_VENDOR2_0);
+		len += reg_len;
 	}
 
 	reg_len = ARRAY_SIZE(mphy_tx_apb);
 	/*
 	 * Restore mphy_tx_apb lane0 and lane1 context
 	 */
-	ufs_restore_regs(ufs_tegra->mphy_l0_base, &mphy_context_restore,
+	ufs_restore_regs(ufs_tegra->mphy_l0_base, mphy_context_restore + len,
 							mphy_tx_apb, reg_len);
 	mphy_writel(ufs_tegra->mphy_l0_base, MPHY_GO_BIT,
 			MPHY_TX_APB_TX_VENDOR0_0);
 
+	len += reg_len;
 	if (ufs_tegra->x2config) {
-		ufs_restore_regs(ufs_tegra->mphy_l1_base, &mphy_context_restore,
-							mphy_tx_apb, reg_len);
+		ufs_restore_regs(ufs_tegra->mphy_l1_base,
+			mphy_context_restore + len, mphy_tx_apb, reg_len);
 		mphy_writel(ufs_tegra->mphy_l1_base, MPHY_GO_BIT,
 				MPHY_TX_APB_TX_VENDOR0_0);
 	}
@@ -1122,7 +1131,12 @@ static int ufs_tegra_context_save_init(struct ufs_tegra_host *ufs_tegra)
 	struct device *dev = ufs_tegra->hba->dev;
 	int err = 0;
 
-	context_save_size = ARRAY_SIZE(mphy_rx_apb) + ARRAY_SIZE(mphy_tx_apb);
+	/**
+	 * Allocate memory for 2-mphy lanes (lane 0 and lane 1)rx and
+	 * tx registers
+	 */
+	context_save_size = 2 * (ARRAY_SIZE(mphy_rx_apb) +
+				ARRAY_SIZE(mphy_tx_apb));
 	context_save_size *= sizeof(u32);
 
 	ufs_tegra->mphy_context = devm_kzalloc(dev, context_save_size,
