@@ -198,6 +198,10 @@ tegra_dvfs_core_count_thermal_states(enum tegra_dvfs_core_thermal_type type);
 int tegra_dvfs_core_update_thermal_index(enum tegra_dvfs_core_thermal_type type,
 					 unsigned long new_idx);
 unsigned long tegra_dvfs_get_maxrate(struct clk *c);
+struct dvfs_rail *tegra_dvfs_get_rail_by_name(char *name);
+bool tegra_dvfs_is_rail_up(struct dvfs_rail *rail);
+int tegra_dvfs_rail_power_down(struct dvfs_rail *rail);
+int tegra_dvfs_rail_power_up(struct dvfs_rail *rail);
 #else
 static inline int tegra_dvfs_dfll_mode_set(struct clk *c, unsigned long rate)
 { return -EINVAL; }
@@ -248,6 +252,14 @@ static inline int tegra_dvfs_core_update_thermal_index(
 { return -EINVAL; }
 static inline unsigned long tegra_dvfs_get_maxrate(struct clk *c)
 { return 0; }
+static inline struct dvfs_rail *tegra_dvfs_get_rail_by_name(char *name)
+{ return NULL; }
+static inline bool tegra_dvfs_is_rail_up(struct dvfs_rail *rail)
+{ return false; }
+static inline int tegra_dvfs_rail_power_down(struct dvfs_rail *rail)
+{ return -EINVAL; }
+static inline int tegra_dvfs_rail_power_up(struct dvfs_rail *rail)
+{ return -EINVAL; }
 #endif
 
 #ifdef CONFIG_TEGRA_124_DVFS
