@@ -19,7 +19,6 @@
 #include <linux/time.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
-#include <linux/phy/phy.h>
 #include <linux/tegra-soc.h>
 #include <linux/reset.h>
 #include <linux/tegra-pmc.h>
@@ -901,8 +900,6 @@ static int ufs_tegra_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	ufs_tegra_disable_ufs_clks(ufs_tegra);
 	reset_control_assert(ufs_tegra->ufs_axi_m_rst);
 
-	phy_power_off(ufs_tegra->u_phy);
-
 	return ret;
 }
 
@@ -920,16 +917,9 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 
 	ufs_tegra_enable_regulators(ufs_tegra);
 
-	/*
-	 * Power on UPHY
-	 */
-	ret = phy_power_on(ufs_tegra->u_phy);
-	if (ret)
-		goto out;
-
 	ret = ufs_tegra_enable_ufs_clks(ufs_tegra);
 	if (ret)
-		goto out_uphy_exit;
+		return ret;
 
 	ret = ufs_tegra_enable_mphylane_clks(ufs_tegra);
 	if (ret)
@@ -959,10 +949,7 @@ out_disable_mphylane_clks:
 	ufs_tegra_disable_mphylane_clks(ufs_tegra);
 out_disable_ufs_clks:
 	ufs_tegra_disable_ufs_clks(ufs_tegra);
-out_uphy_exit:
-	phy_power_off(ufs_tegra->u_phy);
-out:
-	phy_exit(ufs_tegra->u_phy);
+
 	return ret;
 }
 
@@ -1240,31 +1227,16 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 		err = ufs_tegra_context_save_init(ufs_tegra);
 		if (err)
 			goto out;
-
-		ufs_tegra->u_phy = devm_phy_get(dev, "uphy");
-
-		if (IS_ERR(ufs_tegra->u_phy)) {
-			err = PTR_ERR(ufs_tegra->u_phy);
-			dev_err(dev, "PHY get failed %d\n", err);
-			goto out_host_free;
-		}
-
-		err = phy_init(ufs_tegra->u_phy);
-		if (err)
-			goto out_host_free;
-		err = phy_power_on(ufs_tegra->u_phy);
-		if (err)
-			goto out_phy_exit;
 	}
 
 	if (tegra_platform_is_silicon()) {
 		err = ufs_tegra_init_regulators(ufs_tegra);
 		if (err) {
-			goto out_disable_uphy;
+			goto out_host_free;
 		} else {
 			err = ufs_tegra_enable_regulators(ufs_tegra);
 			if (err)
-				goto out_disable_uphy;
+				goto out_host_free;
 		}
 		err = ufs_tegra_init_ufs_clks(ufs_tegra);
 		if (err)
@@ -1311,12 +1283,6 @@ out_disable_ufs_clks:
 out_disable_regulators:
 	if (tegra_platform_is_silicon())
 		ufs_tegra_disable_regulators(ufs_tegra);
-out_disable_uphy:
-	if (tegra_platform_is_silicon())
-		phy_power_off(ufs_tegra->u_phy);
-out_phy_exit:
-	if (tegra_platform_is_silicon())
-		phy_exit(ufs_tegra->u_phy);
 out_host_free:
 	if (tegra_platform_is_silicon())
 		hba->priv = NULL;
@@ -1328,12 +1294,8 @@ static void ufs_tegra_exit(struct ufs_hba *hba)
 {
 	struct ufs_tegra_host *ufs_tegra = hba->priv;
 
-	if (tegra_platform_is_silicon()) {
+	if (tegra_platform_is_silicon())
 		ufs_tegra_disable_mphylane_clks(ufs_tegra);
-		phy_power_off(ufs_tegra->u_phy);
-		phy_exit(ufs_tegra->u_phy);
-
-	}
 }
 
 /**

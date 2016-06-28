@@ -236,7 +236,6 @@ static u16 mphy_tx_apb[] = {
 
 struct ufs_tegra_host {
 	struct ufs_hba *hba;
-	struct phy *u_phy;
 	bool is_lane_clks_enabled;
 	bool x2config;
 	bool enable_mphy_rx_calib;
