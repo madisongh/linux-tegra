@@ -30,7 +30,10 @@
 unsigned long long tegra_chip_uid(void);
 bool tegra_spare_fuse(int bit);
 
+#if defined(CONFIG_TEGRA_FUSE)
 u32 tegra_fuse_readl(unsigned long offset);
+#endif
+
 void tegra_fuse_writel(u32 val, unsigned long offset);
 
 extern enum tegra_revision tegra_chip_get_revision(void);
