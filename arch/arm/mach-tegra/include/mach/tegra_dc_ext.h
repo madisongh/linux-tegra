@@ -40,6 +40,7 @@ int tegra_dc_ext_process_hotplug(int output);
 int tegra_dc_ext_process_vblank(int output, ktime_t timestamp);
 int tegra_dc_ext_process_bandwidth_renegotiate(int output,
 					struct tegra_dc_bw_data *bw);
+bool tegra_dc_ext_is_userspace_active(void);
 
 #else /* CONFIG_TEGRA_DC_EXTENSIONS */
 
@@ -86,6 +87,11 @@ static inline
 int tegra_dc_ext_process_vblank(int output, ktime_t timestamp)
 {
 	return 0;
+}
+static inline
+bool tegra_dc_ext_is_userspace_active(void)
+{
+	return false;
 }
 #endif /* CONFIG_TEGRA_DC_EXTENSIONS */
 
