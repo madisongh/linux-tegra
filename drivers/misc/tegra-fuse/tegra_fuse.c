@@ -81,6 +81,7 @@ static DEVICE_ATTR(aid, 0444, tegra_fuse_show, NULL);
 #define MINOR_ASIM_LINSIM	3
 #define MINOR_DSIM_ASIM_LINSIM	4
 #define MINOR_UNIT_FPGA		5
+#define MINOR_VDK		6
 
 #define FUSE_SKU_INFO       0x110
 #define FUSE_SKU_MSB_MASK	0xFF00
@@ -163,6 +164,7 @@ static const char *tegra_platform_name[TEGRA_PLATFORM_MAX] = {
 	[TEGRA_PLATFORM_LINSIM]  = "linsim",
 	[TEGRA_PLATFORM_FPGA]    = "fpga",
 	[TEGRA_PLATFORM_UNIT_FPGA] = "unit fpga",
+	[TEGRA_PLATFORM_VDK] = "vdk",
 };
 
 struct tegra_fuse_chip_data {
@@ -606,6 +608,9 @@ void tegra_set_tegraid(u32 chipid, u32 major, u32 minor,
 		} else if (tegra_id.minor == MINOR_UNIT_FPGA) {
 			cpu_is_asim = true;
 			tegra_platform = TEGRA_PLATFORM_UNIT_FPGA;
+		} else if (tegra_id.minor == MINOR_VDK) {
+			cpu_is_asim = true;
+			tegra_platform = TEGRA_PLATFORM_VDK;
 		}
 	} else {
 		cpu_is_asim = false;

@@ -88,6 +88,7 @@ enum tegra_platform {
 	TEGRA_PLATFORM_LINSIM,
 	TEGRA_PLATFORM_FPGA,
 	TEGRA_PLATFORM_UNIT_FPGA,
+	TEGRA_PLATFORM_VDK,
 	TEGRA_PLATFORM_MAX,
 };
 
@@ -239,6 +240,11 @@ static inline bool tegra_platform_is_fpga(void)
 static inline bool tegra_platform_is_unit_fpga(void)
 {
 	return tegra_get_platform() == TEGRA_PLATFORM_UNIT_FPGA;
+}
+static inline bool tegra_platform_is_vdk(void)
+{
+	int plat = tegra_get_platform();
+	return plat == TEGRA_PLATFORM_VDK;
 }
 
 bool tegra_bonded_out_dev(enum tegra_bondout_dev);
