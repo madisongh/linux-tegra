@@ -521,6 +521,10 @@ struct tegra_xudc {
 	bool powergated;
 
 	struct completion disconnect_complete;
+
+#define TOGGLE_VBUS_WAIT_MS 100
+	struct delayed_work plc_reset_work;
+	bool wait_csc;
 };
 
 #define XUDC_TRB_MAX_BUFFER_SIZE 65536
@@ -718,6 +722,27 @@ static int tegra_xudc_data_role_notifier(struct notifier_block *nb,
 	spin_unlock_irqrestore(&xudc->lock, flags);
 
 	return NOTIFY_DONE;
+}
+
+static void tegra_xudc_plc_reset_work(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct tegra_xudc *xudc = container_of(dwork, struct tegra_xudc,
+					       plc_reset_work);
+	unsigned long flags;
+
+	spin_lock_irqsave(&xudc->lock, flags);
+	if (xudc->wait_csc) {
+		u32 pls = (xudc_readl(xudc, PORTSC) >> PORTSC_PLS_SHIFT) &
+			  PORTSC_PLS_MASK;
+		if (pls == PORTSC_PLS_INACTIVE) {
+			dev_info(xudc->dev, "PLS = Inactive. Toggle VBUS\n");
+			tegra_phy_xusb_clear_vbus_override(xudc->utmi_phy);
+			tegra_phy_xusb_set_vbus_override(xudc->utmi_phy);
+			xudc->wait_csc = false;
+		}
+	}
+	spin_unlock_irqrestore(&xudc->lock, flags);
 }
 
 static dma_addr_t trb_virt_to_phys(struct tegra_xudc_ep *ep,
@@ -2676,6 +2701,10 @@ static void __tegra_xudc_handle_port_status(struct tegra_xudc *xudc)
 			tegra_xudc_port_connect(xudc);
 		else
 			tegra_xudc_port_disconnect(xudc);
+		if (xudc->wait_csc) {
+			cancel_delayed_work(&xudc->plc_reset_work);
+			xudc->wait_csc = false;
+		}
 	}
 
 	portsc = xudc_readl(xudc, PORTSC);
@@ -2695,6 +2724,11 @@ static void __tegra_xudc_handle_port_status(struct tegra_xudc *xudc)
 		case PORTSC_PLS_RESUME:
 			if (xudc->gadget.speed == USB_SPEED_SUPER)
 				tegra_xudc_port_resume(xudc);
+			break;
+		case PORTSC_PLS_INACTIVE:
+			schedule_delayed_work(&xudc->plc_reset_work,
+					msecs_to_jiffies(TOGGLE_VBUS_WAIT_MS));
+			xudc->wait_csc = true;
 			break;
 		default:
 			break;
@@ -3443,6 +3477,8 @@ static int tegra_xudc_probe(struct platform_device *pdev)
 	extcon_register_notifier(xudc->data_role_extcon, EXTCON_USB,
 				 &xudc->data_role_nb);
 
+	INIT_DELAYED_WORK(&xudc->plc_reset_work, tegra_xudc_plc_reset_work);
+
 	tegra_xudc_update_data_role(xudc);
 
 	tegra_pd_add_device(&pdev->dev);
@@ -3475,6 +3511,7 @@ static int tegra_xudc_remove(struct platform_device *pdev)
 
 	pm_runtime_get_sync(xudc->dev);
 
+	cancel_delayed_work(&xudc->plc_reset_work);
 	extcon_unregister_notifier(xudc->data_role_extcon, EXTCON_USB,
 				   &xudc->data_role_nb);
 	cancel_work_sync(&xudc->data_role_work);
