@@ -2,6 +2,7 @@
  * f_fs.c -- user mode file system API for USB composite function controllers
  *
  * Copyright (C) 2010 Samsung Electronics
+ * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
  * Author: Michal Nazarewicz <mina86@mina86.com>
  *
  * Based on inode.c (GadgetFS) which was:
@@ -2618,7 +2619,8 @@ static int __ffs_func_bind_do_os_desc(enum ffs_os_desc_type type,
 		t = &func->function.os_desc_table[desc->bFirstInterfaceNumber];
 		t->if_id = func->interfaces_nums[desc->bFirstInterfaceNumber];
 		memcpy(t->os_desc->ext_compat_id, &desc->CompatibleID,
-		       ARRAY_SIZE(desc->CompatibleID) +
+		       ARRAY_SIZE(desc->CompatibleID));
+		memcpy(t->os_desc->ext_compat_id + 8, &desc->SubCompatibleID,
 		       ARRAY_SIZE(desc->SubCompatibleID));
 		length = sizeof(*desc);
 	}
