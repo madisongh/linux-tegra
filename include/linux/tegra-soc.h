@@ -80,6 +80,7 @@ enum tegra_chipid {
 	TEGRA_CHIPID_TEGRA13 = 0x13,
 	TEGRA_CHIPID_TEGRA21 = 0x21,
 	TEGRA_CHIPID_TEGRA18 = 0x18,
+	TEGRA_CHIPID_TEGRA19 = 0x19,
 };
 
 enum tegra_platform {
