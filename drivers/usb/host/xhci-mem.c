@@ -2,6 +2,7 @@
  * xHCI host controller driver
  *
  * Copyright (C) 2008 Intel Corp.
+ * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
  *
  * Author: Sarah Sharp
  * Some code borrowed from the Linux EHCI driver.
@@ -765,11 +766,13 @@ void xhci_setup_streams_ep_input_ctx(struct xhci_hcd *xhci,
 		struct xhci_stream_info *stream_info)
 {
 	u32 max_primary_streams;
+	int val;
 	/* MaxPStreams is the number of stream context array entries, not the
 	 * number we're actually using.  Must be in 2^(MaxPstreams + 1) format.
 	 * fls(0) = 0, fls(0x1) = 1, fls(0x10) = 2, fls(0x100) = 3, etc.
 	 */
-	max_primary_streams = fls(stream_info->num_stream_ctxs) - 2;
+	val = fls(stream_info->num_stream_ctxs);
+	max_primary_streams = (val < 2 ? 0 : (val - 2));
 	xhci_dbg_trace(xhci,  trace_xhci_dbg_context_change,
 			"Setting number of stream ctx array entries to %u",
 			1 << (max_primary_streams + 1));
