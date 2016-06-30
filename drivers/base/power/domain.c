@@ -1465,7 +1465,6 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
 	list_add_tail(&gpd_data->base.list_node, &genpd->dev_list);
 	gpd_data->td.constraint_changed = true;
 	gpd_data->td.effective_constraint_ns = -1;
-	mutex_unlock(&gpd_data->lock);
 
  out:
 	mutex_unlock(&genpd->lock);
