@@ -545,6 +545,16 @@ config VIDEO_LC898212
 	  To compile this driver as a module, choose M here: the module
 	  will be called lc898212.
 
+config VIDEO_OV5693
+	tristate "OV5693 camera sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the OmniVision
+	  OV5693 camera.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called ov5693.
+
 config VIDEO_VS6624
 	tristate "ST VS6624 sensor support"
 	depends on VIDEO_V4L2 && I2C
