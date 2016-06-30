@@ -115,8 +115,6 @@ struct generic_pm_domain_data {
 	struct gpd_dev_ops ops;
 	struct gpd_timing_data td;
 	struct notifier_block nb;
-	struct mutex lock;
-	unsigned int refcount;
 };
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS
