@@ -360,6 +360,7 @@ struct mmc_host {
 #define MMC_CAP2_NO_WRITE_PROTECT (1 << 18)	/* No physical write protect pin, assume that card is always read-write */
 #define MMC_CAP2_EN_STROBE (1 << 19)
 #define MMC_CAP2_NO_SLEEP_CMD	(1 << 20)	/* cannot support sleep mode */
+#define MMC_CAP2_HS533		(1 << 21)       /* can support HS533*/
 #define MMC_CAP2_HW_CQ		(1 << 23)	/* support eMMC command queue */
 #define MMC_CAP2_CMDQ_QBR	(1 << 24)	/* CMDQ Queue barrier supported */
 #define MMC_CAP2_PERIODIC_CACHE_FLUSH	(1 << 26)

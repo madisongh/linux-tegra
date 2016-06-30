@@ -436,6 +436,8 @@ struct sdhci_host {
 /* Turn off/on card clock before sending/after tuning command*/
 #define SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK             (1<<18)
 #define SDHCI_QUIRK2_USE_64BIT_ADDR             (1<<19)
+/*Controller skips tuning if it is already done*/
+#define SDHCI_QUIRK2_SKIP_TUNING			(1<<17)
 
 
 	int irq;		/* Device IRQ */
@@ -530,6 +532,7 @@ struct sdhci_host {
 	unsigned int		tuning_count;	/* Timer count for re-tuning */
 	unsigned int		tuning_mode;	/* Re-tuning mode supported by host */
 	struct cmdq_host	*cq_host;
+	bool			need_vmmc_ocr_bypass;
 #define SDHCI_TUNING_MODE_1	0
 
 	unsigned long private[0] ____cacheline_aligned;
@@ -580,6 +583,11 @@ struct sdhci_ops {
 	int	(*suspend)(struct sdhci_host *host);
 	int	(*resume)(struct sdhci_host *host);
 	void	(*platform_resume)(struct sdhci_host *host);
+	int	(*get_tuning_counter)(struct sdhci_host *sdhci);
+	void	(*dump_host_cust_regs)(struct sdhci_host *host);
+	int	(*get_max_tuning_loop_counter)(struct sdhci_host *sdhci);
+	void	(*post_tuning)(struct sdhci_host *host);
+	bool	(*is_tuning_done)(struct sdhci_host *sdhci);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

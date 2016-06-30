@@ -2058,6 +2058,15 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	sdhci_runtime_pm_get(host);
 	spin_lock_irqsave(&host->lock, flags);
 
+	if ((host->quirks2 & SDHCI_QUIRK2_SKIP_TUNING) &&
+		host->ops->is_tuning_done) {
+		if(host->ops->is_tuning_done(host)) {
+			spin_unlock_irqrestore(&host->lock, flags);
+			sdhci_runtime_pm_put(host);
+			return 0;
+		}
+	}
+
 	hs400_tuning = host->flags & SDHCI_HS400_TUNING;
 	host->flags &= ~SDHCI_HS400_TUNING;
 
@@ -2235,6 +2244,13 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 			" failed, falling back to fixed sampling"
 			" clock\n");
 		err = -EIO;
+	} else {
+		if (host->ops->post_tuning)
+			host->ops->post_tuning(host);
+		pr_info("%s: hw tuning done ...\n", mmc_hostname(host->mmc));
+		/* log tap, trim and tuning windows */
+		if (host->ops->dump_host_cust_regs)
+			host->ops->dump_host_cust_regs(host);
 	}
 
 out:

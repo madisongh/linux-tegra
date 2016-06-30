@@ -41,6 +41,8 @@
 
 #include "sdhci-pltfm.h"
 
+#define SAVE_TUNED_TAP 0
+
 /* Tegra SDHOST controller vendor register definitions */
 #define SDHCI_VNDR_CLK_CTRL       0x100
 #define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT		16
@@ -68,6 +70,31 @@
 #define SDHCI_VNDR_DLLCAL_CFG_STATUS_DLL_ACTIVE		0x80000000
 
 #define SDHCI_VNDR_MISC_CTRL		0x120
+#define SDHCI_VNDR_TUN_CTRL0_0				0x1c0
+/*MUL_M is defined in [12:6] bits*/
+#define SDHCI_VNDR_TUN_CTRL0_0_MUL_M			0x1FC0
+/* To Set value of [12:6] as 1 */
+#define SDHCI_VNDR_TUN_CTRL0_0_MUL_M_VAL		0x40
+#define SDHCI_VNDR_TUN_CTRL1_0				0x1c4
+#define SDHCI_VNDR_TUN_STATUS0_0			0x1c8
+/* Enable Re-tuning request only when CRC error is detected
+ * in SDR50/SDR104/HS200 modes
+ */
+#define SDHCI_VNDR_TUN_CTRL_RETUNE_REQ_EN		0x8000000
+#define SDHCI_VNDR_TUN_CTRL0_TUN_HW_TAP			0x20000
+#define TUNING_WORD_SEL_MASK 				0x7
+/*value 4 in 13 to 15 bits indicates 256 iterations*/
+#define SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS_MASK	0x7
+#define SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS_SHIFT	13
+/* Value 1 in NUM_TUNING_ITERATIONS indicates 64 iterations */
+#define HW_TUNING_64_TRIES				1
+/* Value 2 in NUM_TUNING_ITERATIONS indicates 128 iterations */
+#define HW_TUNING_128_TRIES				2
+/* Value 4 in NUM_TUNING_ITERATIONS indicates 256 iterations */
+#define HW_TUNING_256_TRIES				4
+
+#define SDHCI_VNDR_TUN_CTRL1_TUN_STEP_SIZE		0x77
+
 
 #define SDHCI_TEGRA_VENDOR_MISC_CTRL		0x120
 #define SDHCI_MISC_CTRL_ENABLE_SDR104		0x8
@@ -85,6 +112,7 @@
 #define SDMMC_AUTO_CAL_STATUS	0x1EC
 #define SDMMC_AUTO_CAL_STATUS_AUTO_CAL_ACTIVE	0x80000000
 
+#define SDMMC_VENDOR_ERR_INTR_STATUS_0	0x108
 #define NVQUIRK_FORCE_SDHCI_SPEC_200	BIT(0)
 #define NVQUIRK_ENABLE_BLOCK_GAP_DET	BIT(1)
 #define NVQUIRK_ENABLE_SDHCI_SPEC_300	BIT(2)
@@ -110,6 +138,8 @@
 #define NVQUIRK_SET_TRIM_DELAY			BIT(14)
 /* Enable Frequency Tuning for SDR50 mode */
 #define NVQUIRK_ENABLE_SDR50_TUNING		BIT(15)
+/* Enable T210 specific SDMMC WAR - Tuning Step Size, Tuning Iterations*/
+#define NVQUIRK_UPDATE_HW_TUNING_CONFG		BIT(16)
 
 /* Common quirks for Tegra 12x and later versions of sdmmc controllers */
 #define TEGRA_SDHCI_QUIRKS (SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | \
@@ -227,6 +257,41 @@ static u16 tegra_sdhci_readw(struct sdhci_host *host, int reg)
 	return readw(host->ioaddr + reg);
 }
 
+static void tegra_sdhci_dumpregs(struct sdhci_host *sdhci)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+	u32 tap_delay;
+	u32 trim_delay;
+	u32 reg, val;
+	int i;
+
+	/* print tuning windows */
+	if (soc_data->nvquirks & NVQUIRK_UPDATE_HW_TUNING_CONFG) {
+		for (i = 0; i <= TUNING_WORD_SEL_MASK; i++) {
+			reg = sdhci_readl(sdhci, SDHCI_VNDR_TUN_CTRL0_0);
+			reg &= ~TUNING_WORD_SEL_MASK;
+			reg |= i;
+			sdhci_writel(sdhci, reg, SDHCI_VNDR_TUN_CTRL0_0);
+			val = sdhci_readl(sdhci, SDHCI_VNDR_TUN_STATUS0_0);
+			pr_info("%s: tuning_window[%d]: %#x\n",
+			mmc_hostname(sdhci->mmc), i, val);
+		}
+	}
+	tap_delay = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
+	trim_delay = tap_delay;
+	tap_delay >>= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT;
+	tap_delay &= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK;
+	trim_delay >>= SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT;
+	trim_delay &= SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK;
+	pr_info("sdhci: Tap value: %u | Trim value: %u\n", tap_delay,
+			trim_delay);
+	pr_info("sdhci: SDMMC_VENDOR_INTR_STATUS[0x%x]: 0x%x\n",
+			SDMMC_VENDOR_ERR_INTR_STATUS_0,
+			sdhci_readl(sdhci, SDMMC_VENDOR_ERR_INTR_STATUS_0));
+}
+
 static bool tegra_sdhci_is_tuning_done(struct sdhci_host *sdhci)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
@@ -241,6 +306,28 @@ static bool tegra_sdhci_is_tuning_done(struct sdhci_host *sdhci)
 		return true;
 	}
 	return false;
+}
+
+static int sdhci_tegra_get_max_tuning_loop_counter(struct sdhci_host *sdhci)
+{
+	u16 hw_tuning_iterations;
+	u32 vendor_ctrl;
+
+	if (sdhci->mmc->ios.timing == MMC_TIMING_UHS_SDR50)
+		hw_tuning_iterations = HW_TUNING_256_TRIES;
+	else if (sdhci->mmc->caps2 & MMC_CAP2_HS533)
+		hw_tuning_iterations = HW_TUNING_64_TRIES;
+	else
+		hw_tuning_iterations = HW_TUNING_128_TRIES;
+
+	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_TUN_CTRL0_0);
+	vendor_ctrl &=	~(SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS_MASK <<
+			SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS_SHIFT);
+	vendor_ctrl |= (hw_tuning_iterations <<
+			SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS_SHIFT);
+	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_TUN_CTRL0_0);
+
+	return 257;
 }
 
 static void tegra_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
@@ -1148,6 +1235,41 @@ static void tegra_sdhci_post_resume(struct sdhci_host *sdhci)
 		tegra_sdhci_post_init(sdhci);
 }
 
+static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	u32 tap_delay;
+
+	switch (option) {
+	case SAVE_TUNED_TAP:
+		tap_delay = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
+		tap_delay >>= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT;
+		tap_delay &= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK;
+		tegra_host->tuned_tap_delay = tap_delay;
+		tegra_host->tuning_status = TUNING_STATUS_DONE;
+		pr_err("%s tuning done saved tap delay=%d\n",
+			mmc_hostname(sdhci->mmc), tegra_host->tuned_tap_delay);
+		break;
+	case SET_DEFAULT_TAP:
+		sdhci_tegra_set_tap_delay(sdhci, tegra_host->plat->tap_delay,
+				SET_DEFAULT_TAP);
+		break;
+	case SET_TUNED_TAP:
+		sdhci_tegra_set_tap_delay(sdhci, tegra_host->tuned_tap_delay,
+				SET_TUNED_TAP);
+		break;
+	default:
+		dev_err(mmc_dev(sdhci->mmc),
+			"Invalid argument passed to tap config\n");
+	}
+}
+
+static void tegra_sdhci_post_tuning(struct sdhci_host *sdhci)
+{
+	tegra_sdhci_config_tap(sdhci, SAVE_TUNED_TAP);
+}
+
 static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
 		const char **parent_clk_list, int size)
 {
@@ -1195,6 +1317,10 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.suspend                = tegra_sdhci_suspend,
 	.resume                 = tegra_sdhci_resume,
 	.platform_resume	= tegra_sdhci_post_resume,
+	.dump_host_cust_regs	= tegra_sdhci_dumpregs,
+	.get_max_tuning_loop_counter = sdhci_tegra_get_max_tuning_loop_counter,
+	.post_tuning	= tegra_sdhci_post_tuning,
+	.is_tuning_done		= tegra_sdhci_is_tuning_done,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -1261,7 +1387,8 @@ static const struct sdhci_pltfm_data sdhci_tegra186_pdata = {
 	.quirks = TEGRA_SDHCI_QUIRKS,
 	.quirks2 = TEGRA_SDHCI_QUIRKS2 |
 		SDHCI_QUIRK2_USE_64BIT_ADDR |
-		SDHCI_QUIRK2_DDR_FIXED_DIVISOR,
+		SDHCI_QUIRK2_DDR_FIXED_DIVISOR |
+		SDHCI_QUIRK2_SKIP_TUNING,
 	.ops  = &tegra_sdhci_ops,
 };
 
