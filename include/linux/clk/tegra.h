@@ -136,7 +136,21 @@ enum tegra_clk_ex_param {
 void tegra_periph_reset_deassert(struct clk *c);
 void tegra_periph_reset_assert(struct clk *c);
 
-#ifndef CONFIG_COMMON_CLK
+#ifdef CONFIG_COMMON_CLK
+/* Keep using these functions until the replacement in place */
+int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting);
+/* To be implemented for COMMON CLK framework */
+/* Get max rate safe at min voltage in all t-ranges; return zero if unknown */
+static inline unsigned long tegra_dvfs_get_fmax_at_vmin_safe_t(struct clk *c)
+{
+       return 0;
+}
+static inline long tegra_emc_round_rate_updown(unsigned long rate, bool up)
+{
+       return 0;
+}
+
+#else
 
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 int tegra_dvfs_clamp_dfll_at_vmin(struct clk *dfll_clk, bool clamp);
