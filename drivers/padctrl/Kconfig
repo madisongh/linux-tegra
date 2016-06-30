@@ -7,4 +7,6 @@ menuconfig PADCTRL
 	  devices.
 if PADCTRL
 trysource "../t18x/drivers/padctrl/Kconfig"
+trysource "../t18x/drivers/padctrl/Kconfig.t18x"
+trysource "drivers/padctrl/Kconfig.t18x"
 endif

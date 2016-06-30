@@ -79,5 +79,7 @@ source "sound/soc/codecs/audience/Kconfig"
 source "sound/soc/generic/Kconfig"
 
 trysource "../t18x/sound/soc/Kconfig"
+trysource "../t18x/sound/soc/Kconfig.t18x"
+trysource "sound/soc/Kconfig.t18x"
 
 endif	# SND_SOC

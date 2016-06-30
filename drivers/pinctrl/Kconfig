@@ -282,5 +282,7 @@ config PINCTRL_TB10X
 	select GPIOLIB
 
 trysource "../t18x/drivers/pinctrl/Kconfig"
+trysource "../t18x/drivers/pinctrl/Kconfig.t18x"
+trysource "drivers/pinctrl/Kconfig.t18x"
 
 endmenu

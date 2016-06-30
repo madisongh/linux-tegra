@@ -717,6 +717,8 @@ config SPI_TLE62X0
 #
 
 trysource "../t18x/drivers/spi/Kconfig"
+trysource "../t18x/drivers/spi/Kconfig.t18x"
+trysource "drivers/spi/Kconfig.t18x"
 
 endif # SPI_MASTER
 

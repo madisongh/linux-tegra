@@ -289,3 +289,5 @@ config TEGRA_THERMAL_THROTTLE
          Also requires enabling a temperature sensor such as NCT1008.
 
 trysource "../t18x/drivers/platform/tegra/Kconfig"
+trysource "../t18x/drivers/platform/tegra/Kconfig.t18x"
+trysource "drivers/platform/tegra/Kconfig.t18x"
