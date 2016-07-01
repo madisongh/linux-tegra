@@ -658,7 +658,7 @@ static int utmi_phy_open(struct tegra_usb_phy *phy)
 
 #ifdef CONFIG_ARCH_TEGRA_21x_SOC
 	if (phy->pdev->dev.of_node) {
-		phy->prod_list = tegra_prod_get(&phy->pdev->dev, NULL);
+		phy->prod_list = devm_tegra_prod_get(&phy->pdev->dev);
 		if (IS_ERR_OR_NULL(phy->prod_list)) {
 			dev_warn(&phy->pdev->dev,
 				"phy: prod list get failed with error %ld\n",
@@ -727,10 +727,6 @@ static void utmi_phy_close(struct tegra_usb_phy *phy)
 		phy->pmc_hotplug_wakeup = false;
 		PHY_DBG("%s DISABLE_PMC inst = %d\n", __func__, phy->inst);
 	}
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	if (phy->prod_list)
-		tegra_prod_release(&phy->prod_list);
-#endif
 
 	clk_put(phy->utmi_pad_clk);
 }
