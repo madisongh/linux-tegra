@@ -674,7 +674,7 @@ EXPORT_SYMBOL_GPL(utmi_phy_pad_disable);
 
 #else
 
-static void utmi_phy_pad(struct tegra_prod_list *prod_list, bool enable)
+static void utmi_phy_pad(struct tegra_prod *prod_list, bool enable)
 {
 	void __iomem *pad_base = IO_ADDRESS(TEGRA_XUSB_PADCTL_BASE);
 	int val;
@@ -746,7 +746,7 @@ safe_settings:
 	}
 }
 
-int utmi_phy_pad_enable(struct tegra_prod_list *prod_list)
+int utmi_phy_pad_enable(struct tegra_prod *prod_list)
 {
 	unsigned long flags;
 	static struct clk *usb2_trk;
@@ -776,7 +776,7 @@ int utmi_phy_pad_enable(struct tegra_prod_list *prod_list)
 }
 EXPORT_SYMBOL_GPL(utmi_phy_pad_enable);
 
-int utmi_phy_pad_disable(struct tegra_prod_list *prod_list)
+int utmi_phy_pad_disable(struct tegra_prod *prod_list)
 {
 	unsigned long flags;
 	static struct clk *usb2_trk;
