@@ -31,6 +31,7 @@ unsigned long long tegra_chip_uid(void);
 bool tegra_spare_fuse(int bit);
 
 #if defined(CONFIG_TEGRA_FUSE)
+u32 tegra_get_chip_id(void);
 u32 tegra_fuse_readl(unsigned long offset);
 #endif
 
