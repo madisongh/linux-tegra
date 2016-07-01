@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
+*/
+
 #include <linux/configfs.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -1329,9 +1333,10 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 			gs->strings[USB_GADGET_MANUFACTURER_IDX].s =
 				gs->manufacturer;
 			gs->strings[USB_GADGET_PRODUCT_IDX].s = gs->product;
-			if (!gs->serialnumber)
-				usb_string_copy(DEFAULT_SERIAL_NO,
-						&gs->serialnumber);
+			if (!gs->serialnumber &&
+				(usb_string_copy(DEFAULT_SERIAL_NO,
+					&gs->serialnumber) < 0))
+				goto err_comp_cleanup;
 			gs->strings[USB_GADGET_SERIAL_IDX].s = gs->serialnumber;
 			i++;
 		}
