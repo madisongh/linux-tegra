@@ -549,7 +549,7 @@
 
 		modules {
 			module0 {
-				badge = "p4572_ov10823_A";
+				badge = "p4572_bottom_ov10823";
 				position = "bottom";
 				orientation = "0";
 				drivernode0 {
@@ -561,7 +561,7 @@
 				};
 			};
 			module1 {
-				badge = "p4572_ov10823_B";
+				badge = "p4572_center_ov10823";
 				position = "center";
 				orientation = "0";
 				drivernode0 {
@@ -573,7 +573,7 @@
 				};
 			};
 			module2 {
-				badge = "p4572_ov10823_C";
+				badge = "p4572_top_ov10823";
 				position = "top";
 				orientation = "0";
 				drivernode0 {
