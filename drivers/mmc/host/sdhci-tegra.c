@@ -225,7 +225,7 @@ struct sdhci_tegra {
 	unsigned int vddio_min_uv;
 	unsigned int vddio_max_uv;
 	bool check_pad_ctrl_setting;
-	struct tegra_prod_list *prods;
+	struct tegra_prod *prods;
 	int vddio_prev;
 	bool is_rail_enabled;
 	bool set_1v8_status;
@@ -1560,7 +1560,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 				tegra_host->pll_source[i].pll_rate);
 	}
 
-	tegra_host->prods = tegra_prod_get(&pdev->dev, NULL);
+	tegra_host->prods = devm_tegra_prod_get(&pdev->dev);
 	if (IS_ERR_OR_NULL(tegra_host->prods)) {
 		dev_info(&pdev->dev, "Prod-setting not available\n");
 		tegra_host->prods = NULL;
