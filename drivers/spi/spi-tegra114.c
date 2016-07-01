@@ -265,7 +265,7 @@ struct tegra_spi_data {
 	dma_addr_t				tx_dma_phys;
 	struct dma_async_tx_descriptor		*tx_dma_desc;
 	const struct tegra_spi_chip_data	*chip_data;
-	struct tegra_prod_list			*prod_list;
+	struct tegra_prod			*prod_list;
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *enable_interface;
 };
@@ -1770,7 +1770,7 @@ static int tegra_spi_probe(struct platform_device *pdev)
 	tspi->master = master;
 	tspi->dev = &pdev->dev;
 
-	tspi->prod_list = tegra_prod_get(tspi->dev, NULL);
+	tspi->prod_list = devm_tegra_prod_get(tspi->dev);
 	if (IS_ERR(tspi->prod_list)) {
 		dev_err(&pdev->dev, "Prod settings list not initialized\n");
 		tspi->prod_list = NULL;
@@ -1920,8 +1920,6 @@ exit_tx_dma_free:
 exit_rx_dma_free:
 	tegra_spi_deinit_dma_param(tspi, true);
 exit_free_master:
-	if (tspi->prod_list)
-		tegra_prod_release(&tspi->prod_list);
 	spi_master_put(master);
 	return ret;
 }
@@ -1948,9 +1946,6 @@ static int tegra_spi_remove(struct platform_device *pdev)
 
 	if (tspi->clock_always_on)
 		clk_disable_unprepare(tspi->clk);
-
-	if (tspi->prod_list)
-		tegra_prod_release(&tspi->prod_list);
 
 	return 0;
 }
