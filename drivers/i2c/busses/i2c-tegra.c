@@ -273,7 +273,7 @@ struct tegra_i2c_dev {
 	bool is_shutdown;
 	u32 low_clock_count;
 	u32 high_clock_count;
-	struct tegra_prod_list *prod_list;
+	struct tegra_prod *prod_list;
 	int clk_divisor_hs_mode;
 	u16 hs_master_code;
 	struct dma_async_tx_descriptor *rx_dma_desc;
@@ -1805,7 +1805,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 
 	spin_lock_init(&i2c_dev->xfer_lock);
 
-	i2c_dev->prod_list = tegra_prod_get(&pdev->dev, NULL);
+	i2c_dev->prod_list = devm_tegra_prod_get(&pdev->dev);
 	if (IS_ERR_OR_NULL(i2c_dev->prod_list)) {
 		dev_dbg(&pdev->dev, "Prod-setting not available\n");
 		i2c_dev->prod_list = NULL;
