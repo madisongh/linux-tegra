@@ -1260,8 +1260,20 @@ static inline struct device_node *tegra_tertiary_panel_get_dt_node(
 #endif
 bool tegra_is_bl_display_initialized(int instance);
 
+#ifdef CONFIG_TEGRA_COMMON
 void find_dc_node(struct device_node **dc1_node,
 				struct device_node **dc2_node);
+#else
+/* stub for panel files that rely on this function
+ * in kernel/.../drivers/platform/tegra/common.c,
+ * which isn't compiled for t186.
+ */
+static inline void find_dc_node(struct device_node **dc1_node,
+	struct device_node **dc2_node)
+{
+	pr_err("%s: function is unimplemented\n", __func__);
+}
+#endif
 
 void tegra_get_fb_resource(struct resource *fb_res);
 void tegra_get_fb2_resource(struct resource *fb2_res);
