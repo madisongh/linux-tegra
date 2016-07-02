@@ -43,7 +43,6 @@ extern struct device tegra_vpr_dev;
 extern struct device tegra_iram_dev;
 extern struct dma_resize_notifier_ops vpr_dev_ops;
 
-u32 tegra_get_sku_id(void);
 u32 tegra_get_bct_strapping(void);
 u32 tegra_get_fuse_opt_subrevision(void);
 enum tegra_revision tegra_chip_get_revision(void);
