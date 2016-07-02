@@ -182,7 +182,7 @@ static inline int tegra_unpowergate_partition_with_clk_on(int id)
 #endif
 
 bool tegra_powergate_check_clamping(int id);
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC) && defined(CONFIG_TEGRA_POWERGATE)
 int slcg_register_notifier(int id, struct notifier_block *nb);
 int slcg_unregister_notifier(int id, struct notifier_block *nb);
 #else

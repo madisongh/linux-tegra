@@ -126,8 +126,6 @@ config ARCH_TEGRA_21x_SOC
         select NVMAP_CACHE_MAINT_BY_SET_WAYS if TEGRA_NVMAP
         select NVMAP_CACHE_MAINT_BY_SET_WAYS_ON_ONE_CPU if TEGRA_NVMAP
 	select ARCH_TEGRA_210_SOC
-        select TEGRA_ISOMGR
-        select TEGRA_ISOMGR_SYSFS
         select ARCH_HAS_PASR if STAGING
         select SKIP_LATE_PASR_SETUP if PASR
         help
