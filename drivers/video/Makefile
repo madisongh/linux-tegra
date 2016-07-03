@@ -1,3 +1,6 @@
+EXTRA_CFLAGS += -I$(srctree)/../display
+EXTRA_CFLAGS += -I$(srctree)
+
 obj-$(CONFIG_VGASTATE)            += vgastate.o
 obj-$(CONFIG_HDMI)                += hdmi.o
 
