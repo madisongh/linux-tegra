@@ -100,7 +100,7 @@
 #define TEGRA_IS_XUSBC_POWERGATE_ID(id) ((id) == TEGRA_POWERGATE_XUSBC)
 #endif
 #else /* CONFIG_ARCH_TEGRA_18x_SOC */
-#include <../../../t18x/include/dt-bindings/soc/nvidia,tegra186-powergate.h>
+#include <dt-bindings/soc/nvidia,tegra186-powergate.h>
 
 #define TEGRA_CPU_POWERGATE_ID(cpu)	-1
 #define TEGRA_IS_CPU_POWERGATE_ID(id)	0
