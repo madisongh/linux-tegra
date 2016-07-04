@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Description:
  * High-speed USB device controller driver.
@@ -911,6 +911,20 @@ static struct ep_td_struct *tegra_build_dtd(struct tegra_req *req,
 
 	dtd->size_ioc_sts = cpu_to_le32(swap_temp);
 
+	/* The short packet happened with ISO multi-transaction */
+	if (req->ep->ep.mult && ((req->ep->desc->bmAttributes &
+			0x3) == USB_ENDPOINT_XFER_ISOC)) {
+		if (*length <= req->ep->ep.maxpacket) {
+			swap_temp = cpu_to_le32(dtd->size_ioc_sts);
+			swap_temp |= DTD_MULTO_MULTIPLIER_1;
+			dtd->size_ioc_sts = cpu_to_le32(swap_temp);
+		} else if (*length <= (req->ep->ep.maxpacket *
+				req->ep->ep.mult)) {
+			swap_temp = cpu_to_le32(dtd->size_ioc_sts);
+			swap_temp |= DTD_MULTO_MULTIPLIER_2;
+			dtd->size_ioc_sts = cpu_to_le32(swap_temp);
+		}
+	}
 	mb();
 
 	VDBG("length = %d address= 0x%x", *length, (int)*dma);
