@@ -39,7 +39,7 @@ static uint32_t shared_phys;
 
 #ifdef CONFIG_DEBUG_FS
 static DEFINE_SPINLOCK(shared_lock);
-static struct dentry *bpmp_root;
+struct dentry *bpmp_root;
 static struct dentry *module_root;
 static char firmware_tag[32];
 static LIST_HEAD(modules);
@@ -731,6 +731,11 @@ static int bpmp_do_ping(void)
 	return ret;
 }
 
+static struct platform_device bpmp_tty = {
+	.name = "tegra-bpmp-tty",
+	.id = -1,
+};
+
 static int bpmp_probe(struct platform_device *pdev)
 {
 	int r = 0;
@@ -750,6 +755,7 @@ static int bpmp_probe(struct platform_device *pdev)
 	r = r ?: bpmp_do_ping();
 	r = r ?: bpmp_get_fwtag();
 	r = r ?: of_platform_populate(device->of_node, NULL, NULL, device);
+	r = r ?: platform_device_register(&bpmp_tty);
 
 	register_syscore_ops(&bpmp_syscore_ops);
 

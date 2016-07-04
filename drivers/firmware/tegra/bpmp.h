@@ -17,6 +17,7 @@
 #ifndef _DRIVERS_BPMP_H
 #define _DRIVERS_BPMP_H
 
+#include <linux/debugfs.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <soc/tegra/tegra_bpmp.h>
@@ -62,6 +63,7 @@ struct channel_data {
 };
 
 extern struct channel_data channel_area[NR_CHANNELS];
+extern struct dentry *bpmp_root;
 
 #ifdef CONFIG_DEBUG_FS
 int bpmp_fwdebug_init(struct dentry *root);

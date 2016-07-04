@@ -5,4 +5,5 @@ obj-$(CONFIG_DEBUG_FS)			+= fwdebug.o
 obj-y					+= bpmp.o
 obj-y					+= mail.o
 obj-y					+= mailman.o
+obj-y					+= bpmp_tty.o
 GCOV_PORFILE := y
