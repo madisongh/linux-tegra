@@ -32,10 +32,7 @@
 
 #include <linux/atomic.h>
 
-#ifdef CONFIG_TEGRA_VIRTUALIZATION
-#include <soc/tegra/virt/syscalls.h>
-#include <linux/tegra-soc.h>
-#endif
+#include "syscalls.h"
 
 #include "trusty-virtio-work.h"
 
@@ -81,7 +78,6 @@ struct trusty_vdev {
 
 #define vdev_to_tvdev(vd)  container_of((vd), struct trusty_vdev, vdev)
 
-#ifdef CONFIG_TEGRA_VIRTUALIZATION
 int hyp_ipa_translate(uint64_t *ipa)
 {
 	int gid, ret = 0;
@@ -89,15 +85,18 @@ int hyp_ipa_translate(uint64_t *ipa)
 
 	if (is_tegra_hypervisor_mode()) {
 		ret = hyp_read_gid(&gid);
+		if (ret)
+			return ret;
+
 		memset(&info, 0, sizeof(info));
 		ret = hyp_read_ipa_pa_info(&info, gid, *ipa);
 
 		*ipa = info.base + info.offset;
-	}
+	} else
+		pr_info("It's not tegra hypervisor mode.\n");
 
 	return ret;
 }
-#endif
 
 static void check_all_vqs(workitem_t *work)
 {
@@ -318,6 +317,7 @@ static struct virtqueue *_find_vq(struct virtio_device *vdev,
 	struct trusty_vring *tvr;
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
 	phys_addr_t pa;
+	int ret = 0;
 
 	if (!name)
 		return ERR_PTR(-EINVAL);
@@ -339,9 +339,12 @@ static struct virtqueue *_find_vq(struct virtio_device *vdev,
 
 	pa = virt_to_phys(tvr->vaddr);
 	/* save vring address to shared structure */
-#ifdef CONFIG_TEGRA_VIRTUALIZATION
-	hyp_ipa_translate(&pa);
-#endif
+	ret = hyp_ipa_translate(&pa);
+	if (ret) {
+		dev_err(&vdev->dev, "IPA to PA failed: %x\n", ret);
+		goto err_new_virtqueue;
+	}
+
 	tvr->vr_descr->da = (u32)pa;
 	/* da field is only 32 bit wide. Use previously unused 'reserved' field
 	 * to store top 32 bits of 64-bit address
