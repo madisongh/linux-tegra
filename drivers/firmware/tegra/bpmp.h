@@ -32,7 +32,7 @@
 #define NR_THREAD_CH		4
 #endif
 
-#define NR_MRQS			32
+#define NR_MRQS			67
 #define __MRQ_ATTRS		0xff000000
 #define __MRQ_INDEX(id)		((id) & ~__MRQ_ATTRS)
 
