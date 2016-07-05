@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/reset.h>
 #include <linux/uaccess.h>
 #include <mach/clk.h>
 #include <soc/tegra/tegra_bpmp.h>
@@ -39,7 +40,7 @@
 #define FLOW_MODE_NONE			0x0
 #define TEGRA_NVAVP_RESET_VECTOR_ADDR	IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE + 0x200)
 
-static struct clk *cop_clk;
+static struct reset_control *cop_reset;
 static struct clk *sclk;
 static struct clk *emc_clk;
 
@@ -90,9 +91,7 @@ static void bpmp_reset(u32 addr)
 	bpmp_stop();
 	writel(addr, TEGRA_NVAVP_RESET_VECTOR_ADDR);
 
-	tegra_periph_reset_assert(cop_clk);
-	udelay(2);
-	tegra_periph_reset_deassert(cop_clk);
+	reset_control_reset(cop_reset);
 
 	writel(FLOW_MODE_NONE, FLOW_CTRL_HALT_COP_EVENTS);
 }
@@ -367,25 +366,24 @@ int bpmp_clk_init(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 
-	cop_clk = clk_get_sys(NULL, "cop");
-	if (IS_ERR(cop_clk)) {
-		dev_err(dev, "cannot get cop clock\n");
+	cop_reset = devm_reset_control_get(dev, "cop");
+	if (IS_ERR(cop_reset)) {
+		dev_err(dev, "cannot get cop reset\n");
 		return -ENODEV;
 	}
 
-	sclk = clk_get_sys(NULL, "sclk");
+	sclk = devm_clk_get(dev, "sclk");
 	if (IS_ERR(sclk)) {
 		dev_err(dev, "cannot get avp sclk\n");
 		return -ENODEV;
 	}
 
-	emc_clk = clk_get_sys("tegra_emc", "emc");
+	emc_clk = devm_clk_get(dev, "emc");
 	if (IS_ERR(emc_clk)) {
 		dev_err(dev, "cannot get avp emc clk\n");
 		return -ENODEV;
 	}
 
-	clk_prepare_enable(cop_clk);
 	clk_prepare_enable(sclk);
 	clk_prepare_enable(emc_clk);
 
