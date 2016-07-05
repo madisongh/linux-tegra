@@ -751,7 +751,7 @@ static int bpmp_probe(struct platform_device *pdev)
 	r = r ?: bpmp_clk_init(pdev);
 	r = r ?: bpmp_init_debug(pdev);
 	r = r ?: bpmp_init_modules(pdev);
-	r = r ?: bpmp_mail_init();
+	r = r ?: bpmp_mail_init(pdev);
 	r = r ?: bpmp_do_ping();
 	r = r ?: bpmp_get_fwtag();
 	r = r ?: of_platform_populate(device->of_node, NULL, NULL, device);

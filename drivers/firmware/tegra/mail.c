@@ -22,6 +22,7 @@
 #include <linux/semaphore.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <soc/tegra/fuse.h>
 #include <soc/tegra/tegra_bpmp.h>
 #include "bpmp.h"
 
@@ -333,7 +334,7 @@ static void bpmp_init_completion(void)
 		init_completion(completion + i);
 }
 
-int bpmp_mail_init(void)
+int bpmp_mail_init(struct platform_device *pdev)
 {
 	int r;
 
@@ -360,10 +361,19 @@ int bpmp_mail_init(void)
 		return r;
 	}
 
-	r = bpmp_connect();
+	r = bpmp_connect(pdev);
 	pr_info("bpmp: connect returned %d\n", r);
 
 	mail_inited = 1;
 	return r;
 }
-postcore_initcall(bpmp_mail_init);
+
+int early_bpmp_mail_init(void)
+{
+	if (tegra_get_chip_id() != TEGRA210)
+		return bpmp_mail_init(NULL);
+
+	return 0;
+}
+
+postcore_initcall(early_bpmp_mail_init);

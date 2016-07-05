@@ -91,7 +91,7 @@ extern struct mutex bpmp_lock;
 extern int connected;
 
 int bpmp_mail_init_prepare(void);
-int bpmp_mail_init(void);
+int bpmp_mail_init(struct platform_device *pdev);
 int bpmp_get_fwtag(void);
 int __bpmp_do_ping(void);
 int bpmp_init_modules(struct platform_device *pdev);
@@ -111,7 +111,7 @@ int bpmp_thread_ch_index(int ch);
 int bpmp_ob_channel(void);
 int bpmp_thread_ch(int idx);
 int bpmp_init_irq(void);
-int bpmp_connect(void);
+int bpmp_connect(struct platform_device *pdev);
 void bpmp_handle_irq(int ch);
 
 bool bpmp_master_free(int ch);

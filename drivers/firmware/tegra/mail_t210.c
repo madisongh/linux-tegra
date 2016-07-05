@@ -20,9 +20,13 @@
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/notifier.h>
+#include <linux/of_irq.h>
 #include <mach/irqs.h>
+#include <soc/tegra/doorbell.h>
 #include "../../../arch/arm/mach-tegra/iomap.h"
 #include "bpmp.h"
+
+static void *arb_sema, *atomics;
 
 /* CPU to BPMP atomic channels */
 #define CPU0_OB_CH0		0
@@ -42,29 +46,16 @@
 #define CPU2_IB_CH		10
 #define CPU3_IB_CH		11
 
-#define CPU_OB_IRQ		38
-// BUG: I introduced a bug here in order to make this compile.
-// A better implementation would take these values from DeviceTree instead of
-// hard coded constants.
-#define CPU0_IB_IRQ		36
-#define CPU1_IB_IRQ		37
-#define CPU2_IB_IRQ		38
-#define CPU3_IB_IRQ		50
+#define CPU_OB_DOORBELL		4
 
-#define TEGRA_ATOMICS_BASE	0x70016000
-#define ATOMICS_AP0_TRIGGER	IO_ADDRESS(TEGRA_ATOMICS_BASE + 0x000)
-#define ATOMICS_AP0_RESULT(id)	IO_ADDRESS(TEGRA_ATOMICS_BASE + 0xc00 + id * 4)
+#define ATOMICS_AP0_TRIGGER	(atomics + 0x000)
+#define ATOMICS_AP0_RESULT(id)	(atomics + 0xc00 + id * 4)
 #define TRIGGER_ID_SHIFT	16
 #define TRIGGER_CMD_GET		4
 
-#define ICTLR_REG_BASE(irq)	IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE + (((irq) - 32) >> 5) * 0x100)
-#define ICTLR_FIR_SET(irq)	(ICTLR_REG_BASE(irq) + 0x18)
-#define ICTLR_FIR_CLR(irq)	(ICTLR_REG_BASE(irq) + 0x1c)
-#define FIR_BIT(irq)		(1 << ((irq) & 0x1f))
-
-#define RES_SEMA_SHRD_SMP_STA	IO_ADDRESS(TEGRA_RES_SEMA_BASE + 0x00)
-#define RES_SEMA_SHRD_SMP_SET	IO_ADDRESS(TEGRA_RES_SEMA_BASE + 0x04)
-#define RES_SEMA_SHRD_SMP_CLR	IO_ADDRESS(TEGRA_RES_SEMA_BASE + 0x08)
+#define RES_SEMA_SHRD_SMP_STA	(arb_sema)
+#define RES_SEMA_SHRD_SMP_SET	(arb_sema + 4)
+#define RES_SEMA_SHRD_SMP_CLR	(arb_sema + 8)
 
 #define PER_CPU_IB_CH(i)	(CPU0_IB_CH + i)
 
@@ -134,12 +125,7 @@ void bpmp_free_master(int ch)
 
 void bpmp_ring_doorbell(int ch)
 {
-	writel(FIR_BIT(CPU_OB_IRQ), ICTLR_FIR_SET(CPU_OB_IRQ));
-}
-
-static void bpmp_ack_doorbell(int irq)
-{
-	writel(FIR_BIT(irq), ICTLR_FIR_CLR(irq));
+	tegra_ring_doorbell(CPU_OB_DOORBELL);
 }
 
 void tegra_bpmp_mail_return_data(int ch, int code, void *data, int sz)
@@ -180,67 +166,11 @@ int bpmp_ob_channel(void)
 	return smp_processor_id() + CPU0_OB_CH0;
 }
 
-static int cpu_irqs[] = { CPU0_IB_IRQ, CPU1_IB_IRQ, CPU2_IB_IRQ, CPU3_IB_IRQ };
-
-static void bpmp_irq_set_affinity(int cpu)
-{
-	int nr_cpus = num_present_cpus();
-	int r;
-	int i;
-
-	for (i = cpu; i < ARRAY_SIZE(cpu_irqs); i += nr_cpus) {
-		r = irq_set_affinity(cpu_irqs[i], cpumask_of(cpu));
-		WARN_ON(r);
-	}
-}
-
-static void bpmp_irq_clr_affinity(int cpu)
-{
-	int nr_cpus = num_present_cpus();
-	int new_cpu;
-	int r;
-	int i;
-
-	for (i = cpu; i < ARRAY_SIZE(cpu_irqs); i += nr_cpus) {
-		new_cpu = cpumask_any_but(cpu_online_mask, cpu);
-		r = irq_set_affinity(cpu_irqs[i], cpumask_of(new_cpu));
-		WARN_ON(r);
-	}
-}
-
-/*
- * When a CPU is being hot unplugged, the incoming
- * doorbell irqs must be moved to another CPU
- */
-static int bpmp_cpu_notify(struct notifier_block *nb, unsigned long action,
-		void *data)
-{
-	int cpu = (long)data;
-
-	switch (action) {
-	case CPU_DOWN_PREPARE:
-	case CPU_DOWN_PREPARE_FROZEN:
-		bpmp_irq_clr_affinity(cpu);
-		break;
-	case CPU_ONLINE:
-	case CPU_ONLINE_FROZEN:
-		bpmp_irq_set_affinity(cpu);
-		break;
-	}
-
-	return NOTIFY_OK;
-}
-
-static struct notifier_block bpmp_cpu_nb = {
-	.notifier_call = bpmp_cpu_notify
-};
-
-static irqreturn_t bpmp_inbox_irq(int irq, void *data)
+static void bpmp_doorbell_handler(void *data)
 {
 	int ch = (long)data;
-	bpmp_ack_doorbell(irq);
+
 	bpmp_handle_irq(ch);
-	return IRQ_HANDLED;
 }
 
 int bpmp_init_irq(void)
@@ -249,36 +179,32 @@ int bpmp_init_irq(void)
 	int r;
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(cpu_irqs); i++) {
+	for (i = 0; i < 4; i++) {
 		ch = PER_CPU_IB_CH(i);
-		r = request_irq(cpu_irqs[i], bpmp_inbox_irq,
-				0, "bpmp", (void *)ch);
+		r = tegra_register_doorbell_handler(i, bpmp_doorbell_handler,
+						   (void *)ch);
 		if (r)
 			return r;
 	}
-
-	r = register_cpu_notifier(&bpmp_cpu_nb);
-	if (r)
-		return r;
-
-	for_each_present_cpu(i)
-		bpmp_irq_set_affinity(i);
 
 	return 0;
 }
 
 /* Channel area is setup by BPMP before signalling handshake */
-static void *bpmp_channel_area(int ch)
+static u32 bpmp_channel_area(int ch)
 {
 	u32 a;
+
 	writel(ch << TRIGGER_ID_SHIFT | TRIGGER_CMD_GET, ATOMICS_AP0_TRIGGER);
 	a = readl(ATOMICS_AP0_RESULT(ch));
-	return a ? IO_ADDRESS(a) : NULL;
+
+	return a;
 }
 
 static int __bpmp_connect(void)
 {
 	void *p;
+	u32 channel_hwaddr[NR_CHANNELS];
 	int i;
 
 	if (connected)
@@ -289,9 +215,14 @@ static int __bpmp_connect(void)
 		return -ENODEV;
 
 	for (i = 0; i < NR_CHANNELS; i++) {
-		p = bpmp_channel_area(i);
-		if (!p)
+		channel_hwaddr[i] = bpmp_channel_area(i);
+		if (!channel_hwaddr[i])
 			return -EFAULT;
+	}
+
+	for (i = 0; i < NR_CHANNELS; i++) {
+		p = ioremap(channel_hwaddr[i], 0x80);
+
 		channel_area[i].ib = p;
 		channel_area[i].ob = p;
 	}
@@ -300,11 +231,22 @@ static int __bpmp_connect(void)
 	return 0;
 }
 
-int bpmp_connect(void)
+int bpmp_connect(struct platform_device *pdev)
 {
+	struct resource *res;
 	/* firmware loaded after boot */
 	if (IS_ENABLED(CONFIG_ARCH_TEGRA_12x_SOC))
 		return 0;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	atomics = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(atomics))
+		return PTR_ERR(atomics);
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	arb_sema = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(arb_sema))
+		return PTR_ERR(arb_sema);
 
 	return __bpmp_connect();
 }
