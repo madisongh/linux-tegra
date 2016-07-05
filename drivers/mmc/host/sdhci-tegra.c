@@ -204,7 +204,6 @@ struct sdhci_tegra_pll_parent {
 
 struct sdhci_tegra {
 	const struct sdhci_tegra_soc_data *soc_data;
-	struct gpio_desc *power_gpio;
 	const struct tegra_sdhci_platform_data *plat;
 	struct tegra_bwmgr_client *emc_clk;
 	bool	clk_enabled;
@@ -1115,15 +1114,6 @@ static int tegra_sdhci_signal_voltage_switch(struct sdhci_host *sdhci,
 			tegra_host->vddio_max_uv);
 	} else if ((!rc) && (signal_voltage == MMC_SIGNAL_VOLTAGE_180))
 		tegra_host->set_1v8_status = true;
-
-	if (gpio_is_valid(tegra_host->power_gpio)) {
-		if (signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
-			gpio_set_value(tegra_host->power_gpio, 1);
-		} else {
-			gpio_set_value(tegra_host->power_gpio, 0);
-			mdelay(1000);
-		}
-	}
 
 	/* Wait for the voltage to stabilize */
 	mdelay(10);
