@@ -2132,6 +2132,15 @@ static int tegra_xhci_powergate(struct tegra_xhci_hcd *tegra, bool runtime)
 			if (i == USB3_PHY)
 				speed = USB_SPEED_SUPER;
 
+			/*
+			 * Should not enable UTMI sleepwalk if VBUS will be OFF,
+			 * here assuming remote wakeup disalbing also implies
+			 * VBUS turns OFF in system suspend.
+			 */
+			if (i == UTMI_PHY && !runtime
+				&& tegra->pmc_usb_wakes_disabled)
+				continue;
+
 			ret = tegra_phy_xusb_enable_sleepwalk(phy, speed);
 			if (ret) {
 				dev_info(dev, "failed to enable sleepwalk for %s phy %d\n"
@@ -2200,6 +2209,7 @@ static int tegra_xhci_unpowergate(struct tegra_xhci_hcd *tegra)
 	struct device *dev = tegra->dev;
 	unsigned int i, j;
 	int ret;
+	bool runtime = true;
 
 	dev_info(dev, "exiting ELPG\n");
 
@@ -2248,6 +2258,7 @@ static int tegra_xhci_unpowergate(struct tegra_xhci_hcd *tegra)
 	if (tegra->lp0_exit) {
 		tegra_xhci_program_utmi_power_lp0_exit(tegra);
 		tegra->lp0_exit = false;
+		runtime = false;
 	}
 
 	tegra_xhci_cfg(tegra);
@@ -2283,6 +2294,10 @@ static int tegra_xhci_unpowergate(struct tegra_xhci_hcd *tegra)
 						tegra_phy_names[i], j);
 				}
 			}
+
+			if (i == UTMI_PHY && !runtime
+				&& tegra->pmc_usb_wakes_disabled)
+				continue;
 
 			ret = tegra_phy_xusb_disable_sleepwalk(phy);
 			if (ret) {
