@@ -22,11 +22,14 @@
  *
  */
 
+#include <linux/cpu.h>
 #include <linux/io.h>
+#include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/irqchip.h>
 #include <linux/irqdomain.h>
 #include <linux/of_address.h>
+#include <linux/of_irq.h>
 #include <linux/slab.h>
 #include <linux/syscore_ops.h>
 
@@ -48,6 +51,7 @@
 #define ICTLR_COP_IEP_CLASS	0x3c
 
 #define TEGRA_MAX_NUM_ICTLRS	6
+#define TEGRA_NUMBER_OF_DOORBELLS 5
 
 static unsigned int num_ictlrs;
 
@@ -88,6 +92,119 @@ struct tegra_ictlr_info {
 
 static struct tegra_ictlr_info *lic;
 
+struct tegra_doorbell {
+	int irq;
+	int hwirq;
+	void *data;
+	void (*handler)(void *data);
+};
+
+static struct tegra_doorbell doorbells[TEGRA_NUMBER_OF_DOORBELLS];
+
+static int doorbell_to_irq(unsigned int doorbell_id)
+{
+	int hwirq;
+
+	if (doorbell_id >= ARRAY_SIZE(doorbells))
+		return -EINVAL;
+	else
+		hwirq = doorbells[doorbell_id].hwirq;
+
+	if (hwirq < 0)
+		return -EINVAL;
+
+	return hwirq;
+}
+
+static void write_doorbell_irq(unsigned int hwirq, unsigned long reg)
+{
+	u32 index, mask;
+
+	index = (hwirq / 32);
+	mask = BIT(hwirq % 32);
+
+	writel_relaxed(mask, lic->base[index] + reg);
+}
+
+static bool is_doorbell_irq(unsigned int hwirq)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(doorbells); i++)
+		if (doorbells[i].irq == hwirq)
+			return true;
+
+	return false;
+}
+
+static void ack_doorbell(unsigned int hwirq)
+{
+	write_doorbell_irq(hwirq, ICTLR_CPU_IEP_FIR_CLR);
+}
+
+static irqreturn_t doorbell_handler(int hwirq, void *data)
+{
+	struct tegra_doorbell *doorbell = (struct tegra_doorbell *)data;
+
+	ack_doorbell(hwirq);
+	if (doorbell->handler)
+		(doorbell->handler)(doorbell->data);
+
+	return IRQ_HANDLED;
+}
+
+static void doorbell_set_irq_affinity(int cpu)
+{
+	int nr_cpus = num_present_cpus(), err, i;
+
+	for (i = cpu; i < ARRAY_SIZE(doorbells) - 1; i += nr_cpus) {
+		if (doorbells[i].irq < 0)
+			continue;
+		err = irq_set_affinity(doorbells[i].irq, cpumask_of(cpu));
+		WARN_ON(err);
+	}
+}
+
+static void doorbell_remove_irq_affinity(int cpu)
+{
+	int nr_cpus = num_present_cpus(), err, i, new_cpu;
+
+	for (i = cpu; i < ARRAY_SIZE(doorbells) - 1; i += nr_cpus) {
+		if (doorbells[i].irq < 0)
+			continue;
+		new_cpu = cpumask_any_but(cpu_online_mask, cpu);
+		err = irq_set_affinity(doorbells[i].irq, cpumask_of(new_cpu));
+		WARN_ON(err);
+	}
+}
+
+/*
+ * When a CPU is being hot unplugged, the incoming
+ * doorbell irqs must be moved to another CPU
+ */
+static int doorbell_cpu_notify(struct notifier_block *nb, unsigned long action,
+				void *data)
+{
+	int cpu = (long)data;
+
+	switch (action) {
+	case CPU_DOWN_PREPARE:
+	case CPU_DOWN_PREPARE_FROZEN:
+		doorbell_remove_irq_affinity(cpu);
+                break;
+	case CPU_ONLINE:
+	case CPU_ONLINE_FROZEN:
+		doorbell_set_irq_affinity(cpu);
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block doorbell_cpu_nb = {
+	.notifier_call = doorbell_cpu_notify
+};
+
 static inline void tegra_ictlr_write_mask(struct irq_data *d, unsigned long reg)
 {
 	void __iomem *base = d->chip_data;
@@ -111,7 +228,8 @@ static void tegra_unmask(struct irq_data *d)
 
 static void tegra_eoi(struct irq_data *d)
 {
-	tegra_ictlr_write_mask(d, ICTLR_CPU_IEP_FIR_CLR);
+	if (!is_doorbell_irq(d->irq))
+		tegra_ictlr_write_mask(d, ICTLR_CPU_IEP_FIR_CLR);
 	irq_chip_eoi_parent(d);
 }
 
@@ -293,13 +411,40 @@ static const struct irq_domain_ops tegra_ictlr_domain_ops = {
 	.free		= tegra_ictlr_domain_free,
 };
 
+int tegra_ring_doorbell(unsigned int doorbell_id)
+{
+	int hwirq;
+
+	hwirq = doorbell_to_irq(doorbell_id);
+	if (hwirq < 0)
+		return hwirq;
+
+	write_doorbell_irq(hwirq, ICTLR_CPU_IEP_FIR_SET);
+
+	return 0;
+}
+
+int tegra_register_doorbell_handler(unsigned int doorbell_id,
+				    void (*handler)(void *data),
+				    void *data)
+{
+	if (doorbell_id < ARRAY_SIZE(doorbells)) {
+		doorbells[doorbell_id].handler = handler;
+		doorbells[doorbell_id].data = data;
+
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
 static int __init tegra_ictlr_init(struct device_node *node,
 				   struct device_node *parent)
 {
 	struct irq_domain *parent_domain, *domain;
 	const struct of_device_id *match;
 	const struct tegra_ictlr_soc *soc;
-	unsigned int i;
+	unsigned int idx, i;
 	int err;
 
 	if (!parent) {
@@ -365,7 +510,37 @@ static int __init tegra_ictlr_init(struct device_node *node,
 	pr_info("%s: %d interrupts forwarded to %s\n",
 		node->full_name, num_ictlrs * 32, parent->full_name);
 
-	return 0;
+	for (i = 0; i < ARRAY_SIZE(doorbells); i++)
+		doorbells[idx].hwirq = -1;
+
+	for (idx = 0; idx < ARRAY_SIZE(doorbells); idx++) {
+		int irq;
+
+		irq = of_irq_get(node, idx);
+		doorbells[idx].irq = irq;
+		if (irq <0)
+			break;
+
+		doorbells[idx].hwirq = irq_to_desc(irq)->irq_data.hwirq - 32;
+		err = request_irq(doorbells[idx].irq, doorbell_handler, 0,
+				  "doorbell", &doorbells[idx]);
+	}
+
+	for_each_present_cpu(i)
+		doorbell_set_irq_affinity(i);
+
+	for (i = 0; idx < ARRAY_SIZE(doorbells); i++, idx++) {
+		int hwirq;
+
+		err = of_property_read_u32_index(node, "outgoing-doorbell", i, &hwirq);
+		if (err < 0)
+			break;
+
+		doorbells[idx].hwirq = hwirq;
+		doorbells[idx].irq = -1;
+	}
+
+	return register_cpu_notifier(&doorbell_cpu_nb);
 
 out_unmap:
 	for (i = 0; i < num_ictlrs; i++)
