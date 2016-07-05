@@ -1,7 +1,7 @@
 /*
  * Tegra Wakeups for NVIDIA SoCs Tegra
  *
- * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Laxman Dewangan <ldewangan@nvidia.com>
  *
@@ -114,6 +114,14 @@ void tegra_irq_to_wake(int irq, int *wak_list, int *wak_size)
 
 out:
 	return;
+}
+
+int tegra_wake_to_gpio(int wake)
+{
+	if (wake < 0 || wake >= tegra_wake_table_len)
+		return -EINVAL;
+
+	return tegra_gpio_wake_table[wake];
 }
 
 int tegra_wake_to_irq(int wake)

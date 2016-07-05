@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2010-2016 NVIDIA Corporation.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -59,6 +59,7 @@ int tegra_set_wake_irq(unsigned int wake, int irq);
 int tegra_gpio_to_wake(int gpio);
 void tegra_irq_to_wake(int irq, int *wak_list, int *wak_size);
 int tegra_wake_to_irq(int wake);
+int tegra_wake_to_gpio(int wake);
 int tegra_set_wake_source(int wake, int wake_int);
 int tegra_disable_wake_source(int wake);
 #else
