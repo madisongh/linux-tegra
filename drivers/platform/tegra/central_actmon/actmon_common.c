@@ -71,6 +71,7 @@ static unsigned long actmon_dev_avg_freq_get(
 	return (u32)val;
 }
 
+#ifdef CONFIG_DEBUG_FS
 static void actmon_dev_disable(struct actmon_dev *dev)
 {
 	u32 val;
@@ -91,6 +92,7 @@ static void actmon_dev_disable(struct actmon_dev *dev)
 	}
 	spin_unlock_irqrestore(&dev->lock, flags);
 }
+#endif
 
 static void actmon_dev_enable(struct actmon_dev *dev)
 {

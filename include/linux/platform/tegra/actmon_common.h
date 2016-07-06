@@ -161,7 +161,7 @@ struct actmon_drv_data {
 	void (*dev_free_resource)(struct actmon_dev *adev,
 		struct platform_device *pdev);
 	struct actmon_reg_ops ops;
-#if CONFIG_DEBUG_FS
+#ifdef CONFIG_DEBUG_FS
 	struct dentry *dfs_root;
 #endif
 };
