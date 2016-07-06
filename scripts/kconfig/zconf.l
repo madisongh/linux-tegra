@@ -312,6 +312,7 @@ void zconf_trynextfile(const char *name)
 	if (!file)
 		return;
 	fclose(file);
+	zconf_nextfile(name);
 }
 
 void zconf_nextfile(const char *name)
