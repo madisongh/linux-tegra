@@ -1,7 +1,7 @@
 obj-y += fuse/
 
 obj-y += common.o
-ifdef CONFIG_TEGRA_PMC
+ifndef CONFIG_TEGRA_PMC
 obj-y += pmc.o
 endif
 
