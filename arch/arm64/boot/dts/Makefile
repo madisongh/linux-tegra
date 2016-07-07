@@ -144,6 +144,7 @@ dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-p3310-1000-a00-00-dsi-dp.dtb
 dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-char-e3301-1080-a00-00-base.dtb
 dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-mfg-p3310-1000-a00-00-base.dtb
 dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-pb-e3301-1000-a00-00-base.dtb
+dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-pb-e3301-1000-a02-00-base.dtb
 dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-slt-e3301-1099-a00-00-base.dtb
 dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-sunstreaker-char-e3340-1080-a00-00-base.dtb
 dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-sunstreaker-char-e3340-1080-a00-00-android-base.dtb
