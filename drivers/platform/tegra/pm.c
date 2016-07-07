@@ -49,13 +49,19 @@ EXPORT_SYMBOL(tegra_log_suspend_entry_time);
 
 void tegra_log_resume_time(void)
 {
+	u32 timer_rate = arch_timer_get_rate()/1000;
+
         resume_time = arch_timer_read_counter() - resume_entry_time;
+	resume_time = resume_time / timer_rate;
 }
 EXPORT_SYMBOL(tegra_log_resume_time);
 
 static void tegra_log_suspend_time(void)
 {
+	u32 timer_rate = arch_timer_get_rate()/1000;
+
         suspend_time = arch_timer_read_counter() - suspend_entry_time;
+	suspend_time = suspend_time / timer_rate;
 }
 
 int tegra_register_pm_notifier(struct notifier_block *nb)
@@ -189,3 +195,43 @@ out:
 	return 0;
 }
 arch_initcall(tegra_debug_uart_syscore_init);
+
+static ssize_t resume_time_show(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%llums\n", resume_time);
+}
+
+static struct kobj_attribute resume_time_attribute =
+	__ATTR(resume_time, 0444, resume_time_show, NULL);
+
+static ssize_t suspend_time_show(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%llums\n", suspend_time);
+}
+
+static struct kobj_attribute suspend_time_attribute =
+	__ATTR(suspend_time, 0444, suspend_time_show, NULL);
+
+static struct kobject *suspend_kobj;
+
+static int __init suspend_resume_time_init(void)
+{
+	suspend_kobj = kobject_create_and_add("suspend", power_kobj);
+	if (suspend_kobj) {
+		if (sysfs_create_file(suspend_kobj,
+					&resume_time_attribute.attr))
+			pr_err("%s: sysfs_create_file resume_time failed!\n",
+								__func__);
+		if (sysfs_create_file(suspend_kobj,
+					&suspend_time_attribute.attr))
+			pr_err("%s: sysfs_create_file suspend_time failed!\n",
+								__func__);
+	}
+
+	return 0;
+}
+late_initcall(suspend_resume_time_init);
