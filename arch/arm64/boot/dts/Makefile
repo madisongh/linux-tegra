@@ -171,7 +171,7 @@ dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-bali-reilly.dtb
 dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-base-vm2-alt.dtb
 dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2379-0000-c00-00-base.dtb
 
-ifeq ($(shell test -d $(srctree)/../t19x/arch/arm64/boot/dts && echo y),y)
+ifeq ($(shell test -d $(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x && echo y),y)
 dtb-$(CONFIG_ARCH_TEGRA_19x_SOC) += tegra194-sim-base.dtb
 dtb-$(CONFIG_ARCH_TEGRA_19x_SOC) += tegra194-sim-vdk.dtb
 endif
@@ -181,18 +181,18 @@ DTCCPP_FLAGS := -I$(srctree)/arch/arm/boot/dts
 
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
 DTC_FLAGS += -i $(srctree)/../t18x/include
-DTC_FLAGS += -i $(srctree)/../t18x/arch/arm64/boot/dts
+DTC_FLAGS += -i $(srctree)/../t18x/arch/arm64/boot/dts/nvidia/t18x
 DTCCPP_FLAGS += -I$(srctree)/../t18x/include
-DTCCPP_FLAGS += -I$(srctree)/../t18x/arch/arm64/boot/dts
+DTCCPP_FLAGS += -I$(srctree)/../t18x/arch/arm64/boot/dts/nvidia/t18x
 endif
 
 ifeq ($(CONFIG_ARCH_TEGRA_19x_SOC),y)
 DTC_FLAGS += -i $(srctree)/../t19x/include
 DTC_FLAGS += -i $(srctree)/../t18x/include
-DTC_FLAGS += -i $(srctree)/../t19x/arch/arm64/boot/dts
+DTC_FLAGS += -i $(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x
 DTCCPP_FLAGS += -I$(srctree)/../t19x/include
 DTCCPP_FLAGS += -I$(srctree)/../t18x/include
-DTCCPP_FLAGS += -I$(srctree)/../t19x/arch/arm64/boot/dts
+DTCCPP_FLAGS += -I$(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x
 endif
 
 DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES))
