@@ -179,12 +179,18 @@ DTC_FLAGS := -i $(srctree)/arch/arm/boot/dts
 DTCCPP_FLAGS := -I$(srctree)/arch/arm/boot/dts
 
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
+DTC_FLAGS += -i $(srctree)/../t18x/include
 DTC_FLAGS += -i $(srctree)/../t18x/arch/arm64/boot/dts
+DTCCPP_FLAGS += -I$(srctree)/../t18x/include
 DTCCPP_FLAGS += -I$(srctree)/../t18x/arch/arm64/boot/dts
 endif
 
 ifeq ($(CONFIG_ARCH_TEGRA_19x_SOC),y)
+DTC_FLAGS += -i $(srctree)/../t19x/include
+DTC_FLAGS += -i $(srctree)/../t18x/include
 DTC_FLAGS += -i $(srctree)/../t19x/arch/arm64/boot/dts
+DTCCPP_FLAGS += -I$(srctree)/../t19x/include
+DTCCPP_FLAGS += -I$(srctree)/../t18x/include
 DTCCPP_FLAGS += -I$(srctree)/../t19x/arch/arm64/boot/dts
 endif
 
