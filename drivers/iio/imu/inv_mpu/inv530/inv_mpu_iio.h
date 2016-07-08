@@ -20,8 +20,8 @@
 #include <linux/spinlock.h>
 #include <linux/mpu.h>
 
-#include <linux/iio/iio.h>
-#include <linux/iio/buffer.h>
+#include "iio.h"
+#include "buffer.h"
 #include "dmp3Default.h"
 
 //#define BIAS_CONFIDENCE_HIGH 1
