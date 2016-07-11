@@ -27,6 +27,7 @@
 #include <linux/syscore_ops.h>
 #include <linux/uaccess.h>
 #include <soc/tegra/tegra_bpmp.h>
+#include <linux/tegra-firmwares.h>
 #include "../../../arch/arm/mach-tegra/iomap.h"
 #include "bpmp.h"
 
@@ -37,11 +38,11 @@ static struct device *device;
 static void *shared_virt;
 static uint32_t shared_phys;
 
-#ifdef CONFIG_DEBUG_FS
+static char firmware_tag[32];
 static DEFINE_SPINLOCK(shared_lock);
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 struct dentry *bpmp_root;
 static struct dentry *module_root;
-static char firmware_tag[32];
 static LIST_HEAD(modules);
 DEFINE_MUTEX(bpmp_lock);
 
@@ -319,29 +320,6 @@ clean:
 	debugfs_remove_recursive(module_root);
 	module_root = NULL;
 	return -EFAULT;
-}
-
-int bpmp_get_fwtag(void)
-{
-	unsigned long flags;
-	int r;
-	size_t sz = sizeof(firmware_tag);
-	char fmt[sz + 1];
-
-	spin_lock(&shared_lock);
-	local_irq_save(flags);
-	r = tegra_bpmp_send_receive_atomic(MRQ_QUERY_TAG,
-			&shared_phys, sizeof(shared_phys), NULL, 0);
-	local_irq_restore(flags);
-	if (!r) {
-		memcpy(firmware_tag, shared_virt, sz);
-		memcpy(fmt, firmware_tag, sz);
-		fmt[sz] = 0;
-		dev_info(device, "firmware tag is %s\n", fmt);
-	}
-	spin_unlock(&shared_lock);
-
-	return r;
 }
 
 int __bpmp_do_ping(void)
@@ -656,9 +634,39 @@ clean:
 #else
 static inline int bpmp_init_debug(struct platform_device *pdev) { return 0; }
 int bpmp_init_modules(struct platform_device *pdev) { return 0; }
-int bpmp_get_fwtag(void) { return 0; }
 int __bpmp_do_ping(void) { return 0; }
 #endif
+
+int bpmp_get_fwtag(void)
+{
+	unsigned long flags;
+	int r;
+	size_t sz = sizeof(firmware_tag);
+	char fmt[sz + 1];
+
+	spin_lock(&shared_lock);
+        local_irq_save(flags);
+	r = tegra_bpmp_send_receive_atomic(MRQ_QUERY_TAG,
+			&shared_phys, sizeof(shared_phys), NULL, 0);
+	local_irq_restore(flags);
+	if (!r) {
+		memcpy(firmware_tag, shared_virt, sz);
+		memcpy(fmt, firmware_tag, sz);
+		fmt[sz] = 0;
+		dev_info(device, "firmware tag is %s\n", fmt);
+	}
+	spin_unlock(&shared_lock);
+
+	return r;
+}
+
+static ssize_t bpmp_version(struct device *dev, char *data, size_t size)
+{
+	return snprintf(data, size, "firmware tag %*.*s",
+		 (int)sizeof(firmware_tag), (int)sizeof(firmware_tag),
+		 firmware_tag);
+}
+
 
 void *__weak bpmp_get_virt_for_alloc(void *virt, dma_addr_t phys)
 {
@@ -761,6 +769,9 @@ static int bpmp_probe(struct platform_device *pdev)
 
 	register_syscore_ops(&bpmp_syscore_ops);
 
+	if (r == 0)
+		devm_tegrafw_register(device, "bpmp",
+			TFW_NORMAL, bpmp_version, NULL);
 	return r;
 }
 
