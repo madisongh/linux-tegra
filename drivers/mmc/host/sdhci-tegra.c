@@ -1381,6 +1381,7 @@ static const struct sdhci_pltfm_data sdhci_tegra186_pdata = {
 	.quirks2 = TEGRA_SDHCI_QUIRKS2 |
 		SDHCI_QUIRK2_USE_64BIT_ADDR |
 		SDHCI_QUIRK2_DDR_FIXED_DIVISOR |
+		SDHCI_QUIRK2_SEL_SDR104_UHS_MODE_IN_SDR50 |
 		SDHCI_QUIRK2_SKIP_TUNING,
 	.ops  = &tegra_sdhci_ops,
 };

@@ -438,7 +438,8 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_NON_STD_TUN_CARD_CLOCK             (1<<18)
 #define SDHCI_QUIRK2_USE_64BIT_ADDR             (1<<19)
 /*Controller skips tuning if it is already done*/
-#define SDHCI_QUIRK2_SKIP_TUNING			(1<<17)
+#define SDHCI_QUIRK2_SKIP_TUNING			(1<<20)
+#define SDHCI_QUIRK2_SEL_SDR104_UHS_MODE_IN_SDR50	(1<<21)
 
 
 	int irq;		/* Device IRQ */
