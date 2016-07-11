@@ -222,7 +222,6 @@ int sdhci_pltfm_unregister(struct platform_device *pdev)
 	struct sdhci_host *host = platform_get_drvdata(pdev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xffffffff);
-
 	sdhci_remove_host(host, dead);
 	clk_disable_unprepare(pltfm_host->clk);
 	sdhci_pltfm_free(pdev);
@@ -274,9 +273,35 @@ int sdhci_pltfm_resume(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(sdhci_pltfm_resume);
 
+int sdhci_pltfm_runtime_suspend(struct device *dev)
+{
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	int ret = 0;
+
+	if (host->ops && host->ops->runtime_suspend)
+		ret = host->ops->runtime_suspend(host);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(sdhci_pltfm_runtime_suspend);
+
+int sdhci_pltfm_runtime_resume(struct device *dev)
+{
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	int ret = 0;
+
+	if (host->ops && host->ops->runtime_resume)
+		ret = host->ops->runtime_resume(host);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(sdhci_pltfm_runtime_resume);
+
 const struct dev_pm_ops sdhci_pltfm_pmops = {
 	.suspend	= sdhci_pltfm_suspend,
 	.resume		= sdhci_pltfm_resume,
+	.runtime_suspend	= sdhci_pltfm_runtime_suspend,
+	.runtime_resume		= sdhci_pltfm_runtime_resume,
 };
 EXPORT_SYMBOL_GPL(sdhci_pltfm_pmops);
 #endif	/* CONFIG_PM */

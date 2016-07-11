@@ -586,6 +586,8 @@ struct sdhci_ops {
 				unsigned char signal_voltage);
 	int	(*suspend)(struct sdhci_host *host);
 	int	(*resume)(struct sdhci_host *host);
+	int	(*runtime_suspend)(struct sdhci_host *host);
+	int	(*runtime_resume)(struct sdhci_host *host);
 	void	(*platform_resume)(struct sdhci_host *host);
 	int	(*get_tuning_counter)(struct sdhci_host *sdhci);
 	void	(*dump_host_cust_regs)(struct sdhci_host *host);

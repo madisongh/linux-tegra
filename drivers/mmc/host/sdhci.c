@@ -178,7 +178,6 @@ static void sdhci_clear_set_irqs(struct sdhci_host *host, u32 clear, u32 set)
 static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
 {
 	u32 present;
-
 	if ((host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) ||
 	    (host->mmc->caps & MMC_CAP_NONREMOVABLE))
 		return;
@@ -186,7 +185,6 @@ static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
 	if (enable) {
 		present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
 				      SDHCI_CARD_PRESENT;
-
 		host->ier |= present ? SDHCI_INT_CARD_REMOVE :
 				       SDHCI_INT_CARD_INSERT;
 	} else {
@@ -2415,11 +2413,13 @@ static void sdhci_card_event(struct mmc_host *mmc)
 	unsigned long flags;
 	int present;
 
+	sdhci_runtime_pm_get(host);
 	/* First check if client has provided their own card event */
 	if (host->ops->card_event)
 		host->ops->card_event(host);
 
 	present = sdhci_do_get_cd(host);
+	sdhci_runtime_pm_put(host);
 
 	spin_lock_irqsave(&host->lock, flags);
 
@@ -2955,6 +2955,7 @@ static void sdhci_disable_irq_wakeups(struct sdhci_host *host)
 
 int sdhci_suspend_host(struct sdhci_host *host)
 {
+	sdhci_runtime_pm_get(host);
 	sdhci_disable_card_detection(host);
 
 	mmc_retune_timer_stop(host->mmc);
@@ -2978,6 +2979,7 @@ int sdhci_suspend_host(struct sdhci_host *host)
 		sdhci_enable_irq_wakeups(host);
 		enable_irq_wake(host->irq);
 	}
+	sdhci_runtime_pm_put(host);
 	return 0;
 }
 
