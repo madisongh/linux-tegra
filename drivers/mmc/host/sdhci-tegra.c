@@ -38,9 +38,11 @@
 #include <linux/platform_data/mmc-sdhci-tegra.h>
 #include <linux/padctrl/padctrl.h>
 #include <linux/mmc/cmdq_hci.h>
+#include <linux/pm_runtime.h>
 
 #include "sdhci-pltfm.h"
 
+#define SDHCI_RTPM_MSEC_TMOUT 10
 #define SAVE_TUNED_TAP 0
 
 /* Tegra SDHOST controller vendor register definitions */
@@ -1217,6 +1219,30 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 	return ret;
 }
 
+static int tegra_sdhci_runtime_suspend(struct sdhci_host *sdhci)
+{
+	/* disable clock */
+	tegra_sdhci_set_clock(sdhci, 0);
+	return 0;
+}
+
+static int tegra_sdhci_runtime_resume(struct sdhci_host *sdhci)
+{
+	unsigned int clk;
+
+	/* enable clock */
+	if (sdhci->clock)
+		clk = sdhci->clock;
+	else if (sdhci->mmc->ios.clock)
+		clk = sdhci->mmc->ios.clock;
+	else
+		clk = sdhci->mmc->f_min;
+
+	tegra_sdhci_set_clock(sdhci, clk);
+
+	return 0;
+}
+
 static void tegra_sdhci_post_resume(struct sdhci_host *sdhci)
 {
 	bool dll_calib_req = false;
@@ -1309,6 +1335,8 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.switch_signal_voltage_enter = tegra_sdhci_pre_voltage_switch,
 	.suspend                = tegra_sdhci_suspend,
 	.resume                 = tegra_sdhci_resume,
+	.runtime_suspend		= tegra_sdhci_runtime_suspend,
+	.runtime_resume			= tegra_sdhci_runtime_resume,
 	.platform_resume	= tegra_sdhci_post_resume,
 	.dump_host_cust_regs	= tegra_sdhci_dumpregs,
 	.get_max_tuning_loop_counter = sdhci_tegra_get_max_tuning_loop_counter,
@@ -1442,6 +1470,7 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	of_property_read_u32(np, "nvidia,ddr-tap-delay", &plat->ddr_tap_delay);
 	of_property_read_u32(np, "nvidia,ddr-trim-delay", &plat->ddr_trim_delay);
 	plat->pwrdet_support = of_property_read_bool(np, "pwrdet-support");
+	plat->disable_rtpm = of_property_read_bool(np, "nvidia,disable-rtpm");
 	plat->instance = of_alias_get_id(np, "sdhci");
 	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
 	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
@@ -1587,10 +1616,6 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 			"Client registration for eMC Successful\n");
 
 	pltfm_host->clk = clk;
-	/* enable clocks first time */
-	rc = clk_prepare_enable(pltfm_host->clk);
-	if (rc != 0)
-		goto err_clk_put;
 
 	/* Reset the sdhci controller to clear all previous status.*/
 
@@ -1599,6 +1624,27 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		pr_err("Reset for %s is failed\n", dev_name(&pdev->dev));
 	else
 		reset_control_reset(tegra_host->rstc);
+
+	if(plat->disable_rtpm) {
+	/* enable clocks first time */
+		rc = clk_prepare_enable(pltfm_host->clk);
+		if (rc != 0)
+			goto err_clk_put;
+	} else {
+
+	/* clock enable call is removed but the below runtime call sequence
+	 * is sensitive. Beware that change in order of calls such as
+	 * pm_runtime_set_active call before pm_runtime_get_sync
+	 * may hang due to sdmmc clock staying off during sdhci access
+	 */
+
+		pm_runtime_enable(mmc_dev(host->mmc));
+		pm_runtime_set_autosuspend_delay(mmc_dev(host->mmc),
+			SDHCI_RTPM_MSEC_TMOUT);
+		pm_runtime_use_autosuspend(mmc_dev(host->mmc));
+		pm_runtime_get_sync(mmc_dev(host->mmc));
+		pm_runtime_set_active(mmc_dev(host->mmc));
+	}
 
 	pltfm_host->priv = tegra_host;
 
@@ -1667,6 +1713,13 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 #endif
 
 	rc = sdhci_add_host(host);
+
+	if(!plat->disable_rtpm) {
+		/* end host register access in probe */
+		pm_runtime_mark_last_busy(mmc_dev(host->mmc));
+		pm_runtime_put_autosuspend(mmc_dev(host->mmc));
+	}
+
 	if (rc)
 		goto err_add_host;
 

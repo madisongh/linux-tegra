@@ -45,6 +45,7 @@ struct tegra_sdhci_platform_data {
 	bool en_strobe;
 	unsigned int ocr_mask;
 	bool pwrdet_support;
+	bool disable_rtpm;
 	bool disable_auto_cal;
 	unsigned int auto_cal_step;
 	bool enable_autocal_slew_override;
