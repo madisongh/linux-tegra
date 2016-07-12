@@ -952,20 +952,28 @@ static int nvadsp_set_boot_freqs(struct nvadsp_drv_data *drv_data)
 	struct device_node *node = dev->of_node;
 	int ret = 0;
 
-	/* on Unit-FPGA do not set clocks, return Sucess */
+	/* on Unit-FPGA do not set clocks, return success */
 	if (drv_data->adsp_unit_fpga)
 		return 0;
 
-	if (drv_data->adsp_cpu_clk || drv_data->adsp_clk) {
-		if (of_device_is_compatible(node, "nvidia,tegra210-adsp"))
+	if (of_device_is_compatible(node, "nvidia,tegra210-adsp")) {
+		if (drv_data->adsp_cpu_clk) {
 			ret = set_adsp_clks_and_timer_prescalar(drv_data);
-		else
-			ret = set_adsp_clks(drv_data);
-		if (ret)
+			if (ret)
+				goto end;
+		} else {
+			ret = -EINVAL;
 			goto end;
+		}
 	} else {
-		ret = -EINVAL;
-		goto end;
+		if (drv_data->adsp_clk) {
+			ret = set_adsp_clks(drv_data);
+			if (ret)
+				goto end;
+		} else {
+			ret = -EINVAL;
+			goto end;
+		}
 	}
 
 	if (drv_data->ape_clk) {
