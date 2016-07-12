@@ -53,6 +53,9 @@ extern struct padctrl *padctrl_get(struct device *dev, const char *name);
 extern void padctrl_put(struct padctrl *pctrl);
 
 extern struct padctrl *devm_padctrl_get(struct device *dev, const char *name);
+extern struct padctrl *devm_padctrl_get_from_node(struct device *dev,
+						  struct device_node *np,
+						  const char *name);
 
 extern int padctrl_set_voltage(struct padctrl *pctrl, u32 voltage);
 extern int padctrl_get_voltage(struct padctrl *pctrl, u32 *voltage);
@@ -87,6 +90,12 @@ static inline void *padctrl_put(struct padctrl *pctrl)
 
 static inline struct padctrl *devm_padctrl_get(struct device *dev,
 	const char *name)
+{
+	return ERR_PTR(-ENODEV);
+}
+
+static inline struct padctrl *devm_padctrl_get_from_node(struct device *dev,
+		struct device_node *np, const char *name)
 {
 	return ERR_PTR(-ENODEV);
 }
