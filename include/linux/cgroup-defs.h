@@ -133,6 +133,12 @@ struct cgroup_subsys_state {
 	 */
 	u64 serial_nr;
 
+	/*
+	 * Incremented by online self and children.  Used to guarantee that
+	 * parents are not offlined before their children.
+	 */
+	atomic_t online_cnt;
+
 	/* percpu_ref killing and RCU release */
 	struct rcu_head rcu_head;
 	struct work_struct destroy_work;
@@ -209,6 +215,9 @@ struct css_set {
 
 	/* all css_task_iters currently walking this cset */
 	struct list_head task_iters;
+
+	/* dead and being drained, ignore for migration */
+	bool dead;
 
 	/* For RCU-protected deletion */
 	struct rcu_head rcu_head;
