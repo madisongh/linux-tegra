@@ -959,6 +959,7 @@ static void populate_fuse_arrs(struct device *dev,
 {
 	u32 *src = (u32 *)info;
 	int i;
+	unsigned long ulong_flags;
 
 	memset(fuse_pgm_data, 0, sizeof(fuse_pgm_data));
 	memset(fuse_pgm_mask, 0, sizeof(fuse_pgm_mask));
@@ -972,7 +973,8 @@ static void populate_fuse_arrs(struct device *dev,
 	if (fuse_odm_prod_mode())
 		goto out;
 
-	for_each_set_bit(i, (unsigned long *)&flags, MAX_PARAMS)
+	ulong_flags = (unsigned long)flags;
+	for_each_set_bit(i, &ulong_flags, MAX_PARAMS)
 		set_fuse(i, src + fuse_info_tbl[i].data_offset);
 
 out:
@@ -1260,6 +1262,7 @@ static int tegra_fuse_program(struct device *dev,
 #endif
 	int ret;
 	int fuse_pgm_cycles;
+	unsigned long ulong_flags;
 
 	if (!pgm_data || !flags) {
 		dev_err(dev, "invalid parameter");
@@ -1332,7 +1335,8 @@ static int tegra_fuse_program(struct device *dev,
 
 	mutex_lock(&fuse_lock);
 	memcpy(&fuse_info, pgm_data, sizeof(fuse_info));
-	for_each_set_bit(i, (unsigned long *)&flags, MAX_PARAMS) {
+	ulong_flags = (unsigned long)flags;
+	for_each_set_bit(i, &ulong_flags, MAX_PARAMS) {
 		fuse_set(dev, (u32)i, fuse_info_tbl[i].addr,
 			fuse_info_tbl[i].sz);
 	}
