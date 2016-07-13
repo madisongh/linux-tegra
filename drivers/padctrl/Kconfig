@@ -5,7 +5,6 @@ menuconfig PADCTRL
 
 	  This framework provides a generic interface to PAD
 	  devices.
-
 if PADCTRL
-source "../t18x/drivers/padctrl/Kconfig"
+trysource "../t18x/drivers/padctrl/Kconfig"
 endif

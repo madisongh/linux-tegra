@@ -581,8 +581,6 @@ config DMATEST
 config DMA_ENGINE_RAID
 	bool
 
-if ARCH_TEGRA_18x_SOC
-source "../t18x/drivers/dma/Kconfig"
-endif
+trysource "../t18x/drivers/dma/Kconfig"
 
 endif

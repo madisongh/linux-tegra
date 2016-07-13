@@ -206,18 +206,14 @@ source "drivers/fpga/Kconfig"
 
 source "../nvgpu/drivers/gpu/nvgpu/Kconfig"
 
-if ARCH_TEGRA_18x_SOC
-source "../nvhost-t18x/drivers/video/tegra/host/Kconfig"
+trysource "../nvhost-t18x/drivers/video/tegra/host/Kconfig"
 
-source "../t18x/drivers/tachometer/Kconfig"
+trysource "../t18x/drivers/tachometer/Kconfig"
 
-source "../t18x/drivers/misc/csi_mipi_cal/Kconfig"
+trysource "../t18x/drivers/misc/csi_mipi_cal/Kconfig"
 
-source "../t18x/drivers/misc/tegra186-ahc/Kconfig"
-endif
+trysource "../t18x/drivers/misc/tegra186-ahc/Kconfig"
 
-if ARCH_TEGRA_19x_SOC
-source "../nvhost-t19x/drivers/video/tegra/host/Kconfig"
-endif
+trysource "../nvhost-t19x/drivers/video/tegra/host/Kconfig"
 
 endmenu

@@ -1055,8 +1055,6 @@ config GPIO_TMPM32X_I2C
 
 endmenu
 
-if ARCH_TEGRA_18x_SOC
-source "../t18x/drivers/gpio/Kconfig"
-endif
+trysource "../t18x/drivers/gpio/Kconfig"
 
 endif

@@ -143,9 +143,7 @@ config ARCH_TEGRA_APE
 	  which handles audio specific
 	  tasks.
 
-if ARCH_TEGRA_18x_SOC
-source ../t18x/arch/arm64/Kconfig
-endif
+trysource ../t18x/arch/arm64/Kconfig
 
 config ARCH_TEGRA_18x_SOC
 	bool "Tegra 18x family SOC Kconfig placeholder"

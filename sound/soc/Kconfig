@@ -78,8 +78,6 @@ source "sound/soc/codecs/audience/Kconfig"
 # generic frame-work
 source "sound/soc/generic/Kconfig"
 
-if ARCH_TEGRA_18x_SOC
-source "../t18x/sound/soc/Kconfig"
-endif
+trysource "../t18x/sound/soc/Kconfig"
 
 endif	# SND_SOC

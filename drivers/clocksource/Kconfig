@@ -327,8 +327,6 @@ config CLKSRC_ST_LPC
 	  Enable this option to use the Low Power controller timer
 	  as clocksource.
 
-if ARCH_TEGRA_18x_SOC
-source "../t18x/drivers/clocksource/Kconfig"
-endif
+trysource "../t18x/drivers/clocksource/Kconfig"
 
 endmenu
