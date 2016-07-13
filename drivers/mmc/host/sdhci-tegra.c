@@ -1425,19 +1425,21 @@ static struct sdhci_tegra_soc_data soc_data_tegra186 = {
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra210_pdata = {
-	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
-		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
-		  SDHCI_QUIRK_SINGLE_POWER_WRITE |
-		  SDHCI_QUIRK_NO_HISPD_BIT |
-		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC,
-	.ops  = &tegra114_sdhci_ops,
+	.quirks = TEGRA_SDHCI_QUIRKS,
+	.quirks2 = TEGRA_SDHCI_QUIRKS2 |
+		SDHCI_QUIRK2_USE_64BIT_ADDR |
+		SDHCI_QUIRK2_DDR_FIXED_DIVISOR |
+		SDHCI_QUIRK2_SKIP_TUNING,
+	.ops  = &tegra_sdhci_ops,
 };
 
 static const struct sdhci_tegra_soc_data soc_data_tegra210 = {
 	.pdata = &sdhci_tegra210_pdata,
-	.nvquirks = NVQUIRK_DISABLE_SDR50 |
-		    NVQUIRK_DISABLE_DDR50 |
-		    NVQUIRK_DISABLE_SDR104,
+	.nvquirks = TEGRA_SDHCI_NVQUIRKS |
+		NVQUIRK_SET_SDMEMCOMP_VREF_SEL |
+		NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD |
+		NVQUIRK_SET_TAP_DELAY |
+		NVQUIRK_SET_TRIM_DELAY,
 };
 
 static const struct of_device_id sdhci_tegra_dt_match[] = {
