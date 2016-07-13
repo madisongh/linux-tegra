@@ -1212,15 +1212,6 @@ static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
 {
 	int ret = 0;
 
-#ifndef CONFIG_ARCH_TEGRA_18x_SOC
-	/* FIXME:
-	 * Device hang is seen for t186 platform or removable card when
-	 * clock is disabled (getting track in bug# 200107947). Keeping
-	 * clock enabled during suspend for now to avoid device hang.
-	 */
-	if (!(tegra_host->plat->is_sd_device))
-		tegra_sdhci_set_clock(sdhci, 0);
-#endif
 	ret = tegra_sdhci_configure_regulators(sdhci, CONFIG_REG_DIS, 0, 0);
 	return ret;
 }
