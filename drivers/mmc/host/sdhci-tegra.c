@@ -143,6 +143,7 @@
 #define NVQUIRK_ENABLE_SDR50_TUNING		BIT(15)
 /* Enable T210 specific SDMMC WAR - Tuning Step Size, Tuning Iterations*/
 #define NVQUIRK_UPDATE_HW_TUNING_CONFG		BIT(16)
+#define NVQUIRK2_SET_PLL_CLK_PARENT		BIT(17)
 
 /* Common quirks for Tegra 12x and later versions of sdmmc controllers */
 #define TEGRA_SDHCI_QUIRKS (SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | \
@@ -524,6 +525,19 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	sdhci_writew(host, misc_ctrl, SDHCI_TEGRA_VENDOR_MISC_CTRL);
 
 	/* Mask any bus speed modes if set in platform data */
+	if (plat->uhs_mask & MMC_UHS_MASK_SDR12)
+		host->mmc->caps &= ~MMC_CAP_UHS_SDR12;
+
+	if (plat->uhs_mask & MMC_UHS_MASK_SDR25)
+		host->mmc->caps &= ~MMC_CAP_UHS_SDR25;
+
+	if (plat->uhs_mask & MMC_UHS_MASK_SDR50)
+		host->mmc->caps &= ~MMC_CAP_UHS_SDR50;
+
+	if (plat->uhs_mask & MMC_UHS_MASK_SDR104)
+		host->mmc->caps &= ~MMC_CAP_UHS_SDR104;
+
+
 	if (plat->uhs_mask & MMC_UHS_MASK_DDR50) {
 		host->mmc->caps &= ~MMC_CAP_UHS_DDR50;
 		host->mmc->caps &= ~MMC_CAP_1_8V_DDR;
@@ -605,6 +619,19 @@ static void tegra_sdhci_clock_set_parent(struct sdhci_host *host,
 	 */
 	if (!pll_source[0].pll_rate || !pll_source[1].pll_rate)
 		return;
+
+	if ((tegra_host->soc_data->nvquirks2 & NVQUIRK2_SET_PLL_CLK_PARENT) &&
+		pll_source[0].pll_rate && !pll_source[1].pll_rate) {
+		rc = clk_set_rate(pltfm_host->clk, desired_rate);
+		if (!tegra_host->is_parent_pll_source_1) {
+			rc = clk_set_parent(pltfm_host->clk, pll_source[0].pll);
+			if (rc)
+				pr_err("%s: failed to set pll parent clock %d\n",
+					mmc_hostname(host->mmc), rc);
+			tegra_host->is_parent_pll_source_1 = true;
+		}
+		return;
+	}
 
 	pll_source_1_freq = get_nearest_clock_freq(pll_source[0].pll_rate,
 			desired_rate);
@@ -1421,6 +1448,7 @@ static struct sdhci_tegra_soc_data soc_data_tegra186 = {
 		NVQUIRK_SET_SDMEMCOMP_VREF_SEL |
 		NVQUIRK_SET_PAD_E_INPUT_OR_E_PWRD,
 	.nvquirks2 = NVQUIRK2_ADD_DELAY_AUTO_CALIBRATION |
+		NVQUIRK2_SET_PLL_CLK_PARENT |
 		NVQUIRK2_SET_PAD_E_INPUT_VOL,
 };
 
@@ -1520,6 +1548,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	struct sdhci_tegra *tegra_host;
 	const struct tegra_sdhci_platform_data *plat;
 	struct clk *clk;
+	struct clk *sdmmc_default_parent;
 	const char *parent_clk_list[TEGRA_SDHCI_MAX_PLL_SOURCE];
 	int rc, i;
 	int signal_voltage = MMC_SIGNAL_VOLTAGE_330;
@@ -1618,6 +1647,14 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 			"Client registration for eMC Successful\n");
 
 	pltfm_host->clk = clk;
+	if (clk_get_parent(pltfm_host->clk) == tegra_host->pll_source[0].pll)
+		tegra_host->is_parent_pll_source_1 = true;
+	if (tegra_host->soc_data->nvquirks2 & NVQUIRK2_SET_PLL_CLK_PARENT) {
+		sdmmc_default_parent = devm_clk_get(&pdev->dev, "pll_p");
+		clk_set_parent(pltfm_host->clk, sdmmc_default_parent);
+		if (strcmp(parent_clk_list[0], "pll_p"))
+			tegra_host->is_parent_pll_source_1 = true;
+	}
 
 	/* Reset the sdhci controller to clear all previous status.*/
 

@@ -32,7 +32,11 @@
 
 
 /* uhs mask can be used to mask any of the UHS modes support */
+#define MMC_UHS_MASK_SDR12	0x1
+#define MMC_UHS_MASK_SDR25	0x2
+#define MMC_UHS_MASK_SDR50	0x4
 #define MMC_UHS_MASK_DDR50	0x8
+#define MMC_UHS_MASK_SDR104	0x10
 #define MMC_MASK_HS200		0x20
 #define MMC_MASK_HS400		0x40
 
