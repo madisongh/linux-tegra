@@ -41,7 +41,6 @@
 	};
 
 	sdhci@3400000 {
-		uhs-mask = <0x1C>;
 		vqmmc-supply = <&spmic_ldo3>;
 		vmmc-supply = <&en_vdd_sdcard1>;
 		vddio_sdmmc-supply = <0x0>;
