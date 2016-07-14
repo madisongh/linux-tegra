@@ -8,6 +8,7 @@ GCOV_PROFILE := y
 subdir-ccflags-y += -Werror
 subdir-ccflags-y += -I$(srctree)/drivers/platform/tegra/include \
 		    -I$(srctree)/../t18x/drivers/platform/tegra/ \
+		    -I$(srctree)/drivers/video/tegra/dc/panel/ \
 		    -I$(srctree)/arch/arm/mach-tegra
 
 ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
