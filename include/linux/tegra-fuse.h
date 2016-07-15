@@ -24,17 +24,19 @@
 #ifndef __TEGRA_FUSE_H
 #define __TEGRA_FUSE_H
 
-#define FUSE_FT_REV		0x128
-#define FUSE_CP_REV		0x190
-
 #define FUSE_SKU_USB_CALIB_0	0x1f0
 #define FUSE_USB_CALIB_EXT_0	0x350
 
 unsigned long long tegra_chip_uid(void);
-void tegra_init_fuse(void);
-bool tegra_spare_fuse(int bit);
 
+#if defined(CONFIG_TEGRA_FUSE)
+bool tegra_spare_fuse(int bit);
+u32 tegra_get_chip_id(void);
 u32 tegra_fuse_readl(unsigned long offset);
+int tegra_get_sku_override(void);
+u32 tegra_get_sku_id(void);
+#endif
+
 void tegra_fuse_writel(u32 val, unsigned long offset);
 
 extern enum tegra_revision tegra_chip_get_revision(void);
@@ -62,7 +64,6 @@ int tegra_cpu_speedo_value(void);
 int tegra_core_speedo_mv(void);
 int tegra_core_speedo_min_mv(void);
 int tegra_gpu_speedo_id(void);
-int tegra_get_sku_override(void);
 int tegra_get_cpu_iddq_value(void);
 int tegra_get_chip_personality(void);
 

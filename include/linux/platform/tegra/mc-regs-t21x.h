@@ -466,4 +466,10 @@
 
 #define T21X_MC_LATENCY_ALLOWANCE_NUM_REGS			41
 
+/* TODO: Cleanup after get_dram is implemented and LA starts working */
+static inline int tegra_emc_get_dram_type (void)
+{ return 1; };
+static inline u32 tegra_get_dvfs_clk_change_latency_nsec(unsigned long emc_freq_khz)
+{ return 2000; }
+
 #endif

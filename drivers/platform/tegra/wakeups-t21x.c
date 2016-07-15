@@ -23,6 +23,12 @@
 #include "gpio-names.h"
 #include "iomap.h"
 
+#define INT_RTC	2
+#define INT_USB 20
+#define INT_USB2 21
+#define INT_XUSB_PADCTL 49
+#define INT_EXTERNAL_PMU 86
+
 static int tegra_gpio_wakes[] = {
 	TEGRA_GPIO_PA2,				/* wake0 */
 	TEGRA_GPIO_PA6,				/* wake1 */

@@ -650,8 +650,8 @@ void tegra_xhci_ss_vcore(u32 portmap, bool enable);
 int utmi_phy_pad_disable(void);
 int utmi_phy_pad_enable(void);
 #else
-int utmi_phy_pad_disable(struct tegra_prod_list *prod_list);
-int utmi_phy_pad_enable(struct tegra_prod_list *prod_list);
+int utmi_phy_pad_disable(struct tegra_prod *prod_list);
+int utmi_phy_pad_enable(struct tegra_prod *prod_list);
 #endif
 int usb3_phy_pad_enable(u32 lane_owner);
 int pcie_phy_pad_enable(bool enable, int lane_owner);

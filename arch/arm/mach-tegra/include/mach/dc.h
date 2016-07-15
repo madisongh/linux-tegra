@@ -1244,14 +1244,20 @@ int tegra_dc_get_panel_sync_rate(void);
 int tegra_dc_get_head(const struct tegra_dc *dc);
 int tegra_dc_get_out(const struct tegra_dc *dc);
 
+#if defined(CONFIG_TEGRA_NVDISPLAY)
 struct device_node *tegra_primary_panel_get_dt_node(
 				struct tegra_dc_platform_data *pdata);
 struct device_node *tegra_secondary_panel_get_dt_node(
 				struct tegra_dc_platform_data *pdata);
-#if defined(CONFIG_TEGRA_NVDISPLAY)
 struct device_node *tegra_tertiary_panel_get_dt_node(
 				struct tegra_dc_platform_data *pdata);
 #else
+static inline struct device_node *tegra_primary_panel_get_dt_node(
+				struct tegra_dc_platform_data *pdata)
+{ return NULL; }
+static inline struct device_node *tegra_secondary_panel_get_dt_node(
+				struct tegra_dc_platform_data *pdata)
+{ return NULL; }
 static inline struct device_node *tegra_tertiary_panel_get_dt_node(
 				struct tegra_dc_platform_data *pdata)
 {

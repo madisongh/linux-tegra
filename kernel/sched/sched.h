@@ -1826,9 +1826,10 @@ static inline void cpufreq_trigger_update(enum sched_class_util sc, struct rq *r
 	cpufreq_update_util(ULONG_MAX, sc, rq);
 }
 #else
-static inline void cpufreq_update_util(u64 time, unsigned long util,
-					 unsigned long max, struct rq *rq) {}
-static inline void cpufreq_trigger_update(u64 time, struct rq *rq) {}
+static inline void cpufreq_update_util(unsigned long util,
+				 enum sched_class_util sc, struct rq *rq) {}
+static inline void cpufreq_trigger_update(
+				enum sched_class_util sc, struct rq *rq) {}
 #endif /* CONFIG_CPU_FREQ */
 
 #ifdef arch_scale_freq_capacity

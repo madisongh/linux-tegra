@@ -23,7 +23,7 @@ config ARM64
 	select ARM_PSCI_FW
 	select BUILDTIME_EXTABLE_SORT
 	select CLONE_BACKWARDS
-	select COMMON_CLK if !ARCH_TEGRA_21x_SOC
+	select COMMON_CLK
 	select CPU_PM if (SUSPEND || CPU_IDLE)
 	select DCACHE_WORD_ACCESS
 	select EDAC_SUPPORT
@@ -125,14 +125,12 @@ config ARCH_TEGRA_21x_SOC
         select CMA
         select NVMAP_CACHE_MAINT_BY_SET_WAYS if TEGRA_NVMAP
         select NVMAP_CACHE_MAINT_BY_SET_WAYS_ON_ONE_CPU if TEGRA_NVMAP
-        select TEGRA_ISOMGR
-        select TEGRA_ISOMGR_SYSFS
+	select ARCH_TEGRA_210_SOC
         select ARCH_HAS_PASR if STAGING
         select SKIP_LATE_PASR_SETUP if PASR
         help
           Support for NVIDIA Tegra 21x family of SoCs, based upon the
 	  Cortex-A57 CPU.
-
 
 config ARCH_TEGRA_APE
 	bool "Tegra Audio Processing Engine(APE) present"
@@ -143,7 +141,12 @@ config ARCH_TEGRA_APE
 	  which handles audio specific
 	  tasks.
 
-trysource ../t18x/arch/arm64/Kconfig
+config ARCH_TEGRA_210_SOC
+	bool
+
+if ARCH_TEGRA_18x_SOC
+source ../t18x/arch/arm64/Kconfig
+endif
 
 config ARCH_TEGRA_18x_SOC
 	bool "Tegra 18x family SOC Kconfig placeholder"
