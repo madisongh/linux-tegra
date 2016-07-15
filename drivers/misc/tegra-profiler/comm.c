@@ -494,6 +494,7 @@ device_ioctl(struct file *file,
 		break;
 
 	case IOCTL_GET_VERSION:
+		memset(&versions, 0, sizeof(versions));
 		strcpy((char *)versions.branch, QUADD_MODULE_BRANCH);
 		strcpy((char *)versions.version, QUADD_MODULE_VERSION);
 
