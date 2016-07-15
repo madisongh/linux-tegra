@@ -43,6 +43,7 @@
 #include "sdhci-pltfm.h"
 
 #define SDHCI_RTPM_MSEC_TMOUT 10
+#define SDMMC_TEGRA_FALLBACK_CLK_HZ 400000
 #define SAVE_TUNED_TAP 0
 
 /* Tegra SDHOST controller vendor register definitions */
@@ -718,7 +719,6 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 		tegra_sdhci_set_clk_rate(sdhci, clock);
 		sdhci_set_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
-		sdhci_set_clock(sdhci, 0);
 		vendor_ctrl = sdhci_readb(sdhci, SDHCI_VNDR_CLK_CTRL);
 		vendor_ctrl &= ~0x1;
 		sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
@@ -1236,7 +1236,7 @@ static int tegra_sdhci_runtime_resume(struct sdhci_host *sdhci)
 	else if (sdhci->mmc->ios.clock)
 		clk = sdhci->mmc->ios.clock;
 	else
-		clk = sdhci->mmc->f_min;
+		clk = SDMMC_TEGRA_FALLBACK_CLK_HZ;
 
 	tegra_sdhci_set_clock(sdhci, clk);
 
