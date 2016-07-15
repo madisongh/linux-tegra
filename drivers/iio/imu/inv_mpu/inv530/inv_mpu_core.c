@@ -1428,10 +1428,10 @@ static DEVICE_ATTR(poll_pedometer, S_IRUGO, inv_ped_show, NULL);
 /* special run time sysfs entry, read only */
 static DEVICE_ATTR(misc_flush_batch, S_IRUGO, inv_flush_batch_show, NULL);
 
-static DEVICE_ATTR(debug_reg_dump, S_IRUGO | S_IWUGO, inv_reg_dump_show, NULL);
-static DEVICE_ATTR(out_temperature, S_IRUGO | S_IWUGO,
+static DEVICE_ATTR(debug_reg_dump, 0660, inv_reg_dump_show, NULL);
+static DEVICE_ATTR(out_temperature, 0660,
 						inv_temperature_show, NULL);
-static DEVICE_ATTR(misc_self_test, S_IRUGO | S_IWUGO, inv_self_test, NULL);
+static DEVICE_ATTR(misc_self_test, 0660, inv_self_test, NULL);
 
 static IIO_DEVICE_ATTR(info_anglvel_matrix, S_IRUGO, inv_attr_show, NULL,
 	ATTR_GYRO_MATRIX);
@@ -1445,194 +1445,194 @@ static IIO_DEVICE_ATTR(info_gyro_sf, S_IRUGO, inv_attr_show, NULL,
 						ATTR_GYRO_SF);
 
 /* sensor on/off sysfs control */
-static IIO_DEVICE_ATTR(in_accel_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_accel_enable, 0660,
 		inv_sensor_on_show, inv_sensor_on_store, SENSOR_ACCEL);
-static IIO_DEVICE_ATTR(in_anglvel_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_anglvel_enable, 0660,
 		inv_sensor_on_show, inv_sensor_on_store, SENSOR_GYRO);
-static IIO_DEVICE_ATTR(in_magn_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_magn_enable, 0660,
 		inv_sensor_on_show, inv_sensor_on_store, SENSOR_COMPASS);
-static IIO_DEVICE_ATTR(in_6quat_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_6quat_enable, 0660,
 		inv_sensor_on_show, inv_sensor_on_store, SENSOR_SIXQ);
-static IIO_DEVICE_ATTR(in_9quat_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_9quat_enable, 0660,
 		inv_sensor_on_show, inv_sensor_on_store, SENSOR_NINEQ);
-static IIO_DEVICE_ATTR(in_geomag_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_geomag_enable, 0660,
 		inv_sensor_on_show, inv_sensor_on_store, SENSOR_GEOMAG);
-static IIO_DEVICE_ATTR(in_p6quat_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_p6quat_enable, 0660,
 		inv_sensor_on_show, inv_sensor_on_store, SENSOR_PEDQ);
-static IIO_DEVICE_ATTR(in_pressure_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_pressure_enable, 0660,
 		inv_sensor_on_show, inv_sensor_on_store, SENSOR_PRESSURE);
-static IIO_DEVICE_ATTR(in_als_px_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_als_px_enable, 0660,
 		inv_sensor_on_show, inv_sensor_on_store, SENSOR_ALS);
-static IIO_DEVICE_ATTR(in_calib_anglvel_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_calib_anglvel_enable, 0660,
 		inv_sensor_on_show, inv_sensor_on_store, SENSOR_CALIB_GYRO);
-static IIO_DEVICE_ATTR(in_calib_magn_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_calib_magn_enable, 0660,
 		inv_sensor_on_show, inv_sensor_on_store, SENSOR_CALIB_COMPASS);
 
 /* sensor rate sysfs control */
-static IIO_DEVICE_ATTR(in_accel_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_accel_rate, 0660,
 	inv_sensor_rate_show, inv_sensor_rate_store, SENSOR_ACCEL);
-static IIO_DEVICE_ATTR(in_anglvel_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_anglvel_rate, 0660,
 	inv_sensor_rate_show, inv_sensor_rate_store, SENSOR_GYRO);
-static IIO_DEVICE_ATTR(in_magn_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_magn_rate, 0660,
 	inv_sensor_rate_show, inv_sensor_rate_store, SENSOR_COMPASS);
-static IIO_DEVICE_ATTR(in_6quat_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_6quat_rate, 0660,
 	inv_sensor_rate_show, inv_sensor_rate_store, SENSOR_SIXQ);
-static IIO_DEVICE_ATTR(in_9quat_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_9quat_rate, 0660,
 	inv_sensor_rate_show, inv_sensor_rate_store, SENSOR_NINEQ);
-static IIO_DEVICE_ATTR(in_geomag_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_geomag_rate, 0660,
 	inv_sensor_rate_show, inv_sensor_rate_store, SENSOR_GEOMAG);
-static IIO_DEVICE_ATTR(in_p6quat_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_p6quat_rate, 0660,
 	inv_sensor_rate_show, inv_sensor_rate_store, SENSOR_PEDQ);
-static IIO_DEVICE_ATTR(in_pressure_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_pressure_rate, 0660,
 	inv_sensor_rate_show, inv_sensor_rate_store, SENSOR_PRESSURE);
-static IIO_DEVICE_ATTR(in_als_px_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_als_px_rate, 0660,
 	inv_sensor_rate_show, inv_sensor_rate_store, SENSOR_ALS);
-static IIO_DEVICE_ATTR(in_calib_anglvel_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_calib_anglvel_rate, 0660,
 	inv_sensor_rate_show, inv_sensor_rate_store, SENSOR_CALIB_GYRO);
-static IIO_DEVICE_ATTR(in_calib_magn_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_calib_magn_rate, 0660,
 	inv_sensor_rate_show, inv_sensor_rate_store, SENSOR_CALIB_COMPASS);
 
 /* debug determine engine related sysfs */
-static IIO_DEVICE_ATTR(debug_anglvel_accuracy_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_anglvel_accuracy_enable, 0660,
 				inv_attr_show, inv_debug_attr_store,
 				ATTR_DMP_IN_ANGLVEL_ACCURACY_ENABLE);
-static IIO_DEVICE_ATTR(debug_accel_accuracy_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_accel_accuracy_enable, 0660,
 	inv_attr_show, inv_debug_attr_store, ATTR_DMP_IN_ACCEL_ACCURACY_ENABLE);
-static IIO_DEVICE_ATTR(debug_magn_accuracy_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_magn_accuracy_enable, 0660,
 	inv_attr_show, inv_debug_attr_store, ATTR_DMP_IN_MAGN_ACCURACY_ENABLE);
-static IIO_DEVICE_ATTR(debug_gyro_cal_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_gyro_cal_enable, 0660,
 	inv_attr_show, inv_debug_attr_store, ATTR_DMP_GYRO_CAL_ENABLE);
-static IIO_DEVICE_ATTR(debug_accel_cal_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_accel_cal_enable, 0660,
 	inv_attr_show, inv_debug_attr_store, ATTR_DMP_ACCEL_CAL_ENABLE);
-static IIO_DEVICE_ATTR(debug_compass_cal_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_compass_cal_enable, 0660,
 	inv_attr_show, inv_debug_attr_store, ATTR_DMP_COMPASS_CAL_ENABLE);
-static IIO_DEVICE_ATTR(misc_magn_recalibration, S_IRUGO | S_IWUGO, NULL,
+static IIO_DEVICE_ATTR(misc_magn_recalibration, 0660, NULL,
 	inv_dmp_bias_store, ATTR_DMP_MISC_COMPASS_RECALIBRATION);
-static IIO_DEVICE_ATTR(misc_ref_mag_3d, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(misc_ref_mag_3d, 0660,
 		inv_attr_show, inv_misc_attr_store, ATTR_DMP_REF_MAG_3D);
 
-static IIO_DEVICE_ATTR(debug_gyro_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_gyro_enable, 0660,
 	inv_attr_show, inv_debug_attr_store, ATTR_GYRO_ENABLE);
-static IIO_DEVICE_ATTR(debug_accel_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_accel_enable, 0660,
 	inv_attr_show, inv_debug_attr_store, ATTR_ACCEL_ENABLE);
-static IIO_DEVICE_ATTR(debug_compass_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_compass_enable, 0660,
 	inv_attr_show, inv_debug_attr_store, ATTR_COMPASS_ENABLE);
-static IIO_DEVICE_ATTR(debug_dmp_on, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_dmp_on, 0660,
 	inv_attr_show, inv_debug_attr_store, ATTR_DMP_ON);
-static IIO_DEVICE_ATTR(debug_dmp_event_int_on, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_dmp_event_int_on, 0660,
 	inv_attr_show, inv_debug_attr_store, ATTR_DMP_EVENT_INT_ON);
-static IIO_DEVICE_ATTR(debug_mem_read, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_mem_read, 0660,
 	inv_attr_show, inv_dmp_bias_store, ATTR_DMP_DEBUG_MEM_READ);
-static IIO_DEVICE_ATTR(debug_mem_write, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_mem_write, 0660,
 	inv_attr_show, inv_dmp_bias_store, ATTR_DMP_DEBUG_MEM_WRITE);
 
-static IIO_DEVICE_ATTR(misc_batchmode_timeout, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(misc_batchmode_timeout, 0660,
 	inv_attr_show, inv_basic_attr_store, ATTR_DMP_BATCHMODE_TIMEOUT);
 
-static IIO_DEVICE_ATTR(info_firmware_loaded, S_IRUGO | S_IWUGO, inv_attr_show,
+static IIO_DEVICE_ATTR(info_firmware_loaded, 0660, inv_attr_show,
 	inv_firmware_loaded_store, ATTR_FIRMWARE_LOADED);
 
 /* engine scale */
-static IIO_DEVICE_ATTR(in_accel_scale, S_IRUGO | S_IWUGO, inv_attr_show,
+static IIO_DEVICE_ATTR(in_accel_scale, 0660, inv_attr_show,
 	inv_misc_attr_store, ATTR_ACCEL_SCALE);
-static IIO_DEVICE_ATTR(in_anglvel_scale, S_IRUGO | S_IWUGO, inv_attr_show,
+static IIO_DEVICE_ATTR(in_anglvel_scale, 0660, inv_attr_show,
 	inv_misc_attr_store, ATTR_GYRO_SCALE);
-static IIO_DEVICE_ATTR(in_magn_scale, S_IRUGO | S_IWUGO, inv_attr_show,
+static IIO_DEVICE_ATTR(in_magn_scale, 0660, inv_attr_show,
 	NULL, ATTR_COMPASS_SCALE);
 
-static IIO_DEVICE_ATTR(debug_low_power_gyro_on, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_low_power_gyro_on, 0660,
 	inv_attr_show, inv_misc_attr_store, ATTR_DMP_LOW_POWER_GYRO_ON);
-static IIO_DEVICE_ATTR(debug_lp_en_off, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_lp_en_off, 0660,
 	inv_attr_show, inv_debug_store, ATTR_DMP_LP_EN_OFF);
-static IIO_DEVICE_ATTR(debug_cycle_mode_off, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_cycle_mode_off, 0660,
 	inv_attr_show, inv_debug_store, ATTR_DMP_CYCLE_MODE_OFF);
-static IIO_DEVICE_ATTR(debug_clock_sel, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_clock_sel, 0660,
 	inv_attr_show, inv_debug_store, ATTR_DMP_CLK_SEL);
-static IIO_DEVICE_ATTR(debug_reg_write, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_reg_write, 0660,
 	inv_attr_show, inv_debug_store, ATTR_DEBUG_REG_WRITE);
-static IIO_DEVICE_ATTR(debug_cfg_write, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_cfg_write, 0660,
 	inv_attr_show, inv_debug_store, ATTR_DEBUG_WRITE_CFG);
-static IIO_DEVICE_ATTR(debug_reg_write_addr, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_reg_write_addr, 0660,
 	inv_attr_show, inv_debug_store, ATTR_DEBUG_REG_ADDR);
-static IIO_DEVICE_ATTR(debug_data_collection_mode_on, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_data_collection_mode_on, 0660,
 	inv_attr_show, inv_misc_attr_store, ATTR_DEBUG_DATA_COLLECTION_MODE);
-static IIO_DEVICE_ATTR(debug_data_collection_mode_gyro_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_data_collection_mode_gyro_rate, 0660,
 	inv_attr_show, inv_misc_attr_store,
 	ATTR_DEBUG_DATA_COLLECTION_GYRO_RATE);
-static IIO_DEVICE_ATTR(debug_data_collection_mode_accel_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_data_collection_mode_accel_rate, 0660,
 	inv_attr_show, inv_misc_attr_store,
 	ATTR_DEBUG_DATA_COLLECTION_ACCEL_RATE);
 
-static IIO_DEVICE_ATTR(in_accel_x_calibbias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_accel_x_calibbias, 0660,
 			inv_attr_bias_show, NULL, ATTR_ACCEL_X_CALIBBIAS);
-static IIO_DEVICE_ATTR(in_accel_y_calibbias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_accel_y_calibbias, 0660,
 			inv_attr_bias_show, NULL, ATTR_ACCEL_Y_CALIBBIAS);
-static IIO_DEVICE_ATTR(in_accel_z_calibbias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_accel_z_calibbias, 0660,
 			inv_attr_bias_show, NULL, ATTR_ACCEL_Z_CALIBBIAS);
 
-static IIO_DEVICE_ATTR(in_anglvel_x_calibbias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_anglvel_x_calibbias, 0660,
 			inv_attr_bias_show, NULL, ATTR_ANGLVEL_X_CALIBBIAS);
-static IIO_DEVICE_ATTR(in_anglvel_y_calibbias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_anglvel_y_calibbias, 0660,
 			inv_attr_bias_show, NULL, ATTR_ANGLVEL_Y_CALIBBIAS);
-static IIO_DEVICE_ATTR(in_anglvel_z_calibbias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_anglvel_z_calibbias, 0660,
 			inv_attr_bias_show, NULL, ATTR_ANGLVEL_Z_CALIBBIAS);
 
-static IIO_DEVICE_ATTR(in_accel_x_dmp_bias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_accel_x_dmp_bias, 0660,
 	inv_attr_bias_show, inv_dmp_bias_store, ATTR_DMP_ACCEL_X_DMP_BIAS);
-static IIO_DEVICE_ATTR(in_accel_y_dmp_bias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_accel_y_dmp_bias, 0660,
 	inv_attr_bias_show, inv_dmp_bias_store, ATTR_DMP_ACCEL_Y_DMP_BIAS);
-static IIO_DEVICE_ATTR(in_accel_z_dmp_bias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_accel_z_dmp_bias, 0660,
 	inv_attr_bias_show, inv_dmp_bias_store, ATTR_DMP_ACCEL_Z_DMP_BIAS);
 
-static IIO_DEVICE_ATTR(in_anglvel_x_dmp_bias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_anglvel_x_dmp_bias, 0660,
 	inv_attr_bias_show, inv_dmp_bias_store, ATTR_DMP_GYRO_X_DMP_BIAS);
-static IIO_DEVICE_ATTR(in_anglvel_y_dmp_bias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_anglvel_y_dmp_bias, 0660,
 	inv_attr_bias_show, inv_dmp_bias_store, ATTR_DMP_GYRO_Y_DMP_BIAS);
-static IIO_DEVICE_ATTR(in_anglvel_z_dmp_bias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_anglvel_z_dmp_bias, 0660,
 	inv_attr_bias_show, inv_dmp_bias_store, ATTR_DMP_GYRO_Z_DMP_BIAS);
 
-static IIO_DEVICE_ATTR(in_magn_x_dmp_bias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_magn_x_dmp_bias, 0660,
 	inv_attr_bias_show, inv_dmp_bias_store, ATTR_DMP_MAGN_X_DMP_BIAS);
-static IIO_DEVICE_ATTR(in_magn_y_dmp_bias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_magn_y_dmp_bias, 0660,
 	inv_attr_bias_show, inv_dmp_bias_store, ATTR_DMP_MAGN_Y_DMP_BIAS);
-static IIO_DEVICE_ATTR(in_magn_z_dmp_bias, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_magn_z_dmp_bias, 0660,
 	inv_attr_bias_show, inv_dmp_bias_store, ATTR_DMP_MAGN_Z_DMP_BIAS);
 
-static IIO_DEVICE_ATTR(debug_determine_engine_on, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(debug_determine_engine_on, 0660,
 	inv_attr_show, inv_misc_attr_store, ATTR_DMP_DEBUG_DETERMINE_ENGINE_ON);
-static IIO_DEVICE_ATTR(misc_gyro_recalibration, S_IRUGO | S_IWUGO, NULL,
+static IIO_DEVICE_ATTR(misc_gyro_recalibration, 0660, NULL,
 	inv_dmp_bias_store, ATTR_DMP_MISC_GYRO_RECALIBRATION);
-static IIO_DEVICE_ATTR(misc_accel_recalibration, S_IRUGO | S_IWUGO, NULL,
+static IIO_DEVICE_ATTR(misc_accel_recalibration, 0660, NULL,
 	inv_dmp_bias_store, ATTR_DMP_MISC_ACCEL_RECALIBRATION);
-static IIO_DEVICE_ATTR(params_accel_calibration_threshold, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(params_accel_calibration_threshold, 0660,
 	inv_attr_show, inv_dmp_bias_store,
 			ATTR_DMP_PARAMS_ACCEL_CALIBRATION_THRESHOLD);
-static IIO_DEVICE_ATTR(params_accel_calibration_rate, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(params_accel_calibration_rate, 0660,
 	inv_attr_show, inv_dmp_bias_store,
 			ATTR_DMP_PARAMS_ACCEL_CALIBRATION_RATE);
 
-static IIO_DEVICE_ATTR(in_step_detector_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_step_detector_enable, 0660,
 	inv_attr_show, inv_basic_attr_store, ATTR_DMP_STEP_DETECTOR_ON);
-static IIO_DEVICE_ATTR(in_step_indicator_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(in_step_indicator_enable, 0660,
 	inv_attr_show, inv_basic_attr_store, ATTR_DMP_STEP_INDICATOR_ON);
 
-static IIO_DEVICE_ATTR(event_smd_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(event_smd_enable, 0660,
 	inv_attr_show, inv_basic_attr_store, ATTR_DMP_SMD_ENABLE);
 
-static IIO_DEVICE_ATTR(params_pedometer_int_on, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(params_pedometer_int_on, 0660,
 	inv_attr_show, inv_misc_attr_store, ATTR_DMP_PED_INT_ON);
-static IIO_DEVICE_ATTR(event_pedometer_enable, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(event_pedometer_enable, 0660,
 	inv_attr_show, inv_basic_attr_store, ATTR_DMP_PED_ON);
-static IIO_DEVICE_ATTR(params_pedometer_step_thresh, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(params_pedometer_step_thresh, 0660,
 	inv_attr_show, inv_misc_attr_store, ATTR_DMP_PED_STEP_THRESH);
-static IIO_DEVICE_ATTR(params_pedometer_int_thresh, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(params_pedometer_int_thresh, 0660,
 	inv_attr_show, inv_misc_attr_store, ATTR_DMP_PED_INT_THRESH);
 
-static IIO_DEVICE_ATTR(out_pedometer_steps, S_IRUGO | S_IWUGO, inv_attr64_show,
+static IIO_DEVICE_ATTR(out_pedometer_steps, 0660, inv_attr64_show,
 	inv_attr64_store, ATTR_DMP_PEDOMETER_STEPS);
-static IIO_DEVICE_ATTR(out_pedometer_time, S_IRUGO | S_IWUGO, inv_attr64_show,
+static IIO_DEVICE_ATTR(out_pedometer_time, 0660, inv_attr64_show,
 	inv_attr64_store, ATTR_DMP_PEDOMETER_TIME);
-static IIO_DEVICE_ATTR(out_pedometer_counter, S_IRUGO | S_IWUGO,
+static IIO_DEVICE_ATTR(out_pedometer_counter, 0660,
 			inv_attr64_show, NULL, ATTR_DMP_PEDOMETER_COUNTER);
 
 static const struct attribute *inv_raw_attributes[] = {
@@ -1920,7 +1920,7 @@ int inv_check_chip_type(struct iio_dev *indio_dev, const char *name)
 static const struct bin_attribute dmp_firmware = {
 	.attr = {
 		.name = "misc_bin_dmp_firmware",
-		.mode = S_IRUGO | S_IWUGO
+		.mode = 0660
 	},
 	.size = DMP_IMAGE_SIZE,
 	.read = inv_dmp_firmware_read,
@@ -1930,7 +1930,7 @@ static const struct bin_attribute dmp_firmware = {
 static const struct bin_attribute soft_iron_matrix = {
 	.attr = {
 		.name = "misc_bin_soft_iron_matrix",
-		.mode = S_IRUGO | S_IWUGO
+		.mode = 0660
 	},
 	.size = SOFT_IRON_MATRIX_SIZE,
 	.write = inv_soft_iron_matrix_write,
@@ -1939,7 +1939,7 @@ static const struct bin_attribute soft_iron_matrix = {
 static const struct bin_attribute accel_covariance = {
 	.attr = {
 		.name = "misc_bin_accel_covariance",
-		.mode = S_IRUGO | S_IWUGO
+		.mode = 0660
 	},
 	.size = ACCEL_COVARIANCE_SIZE,
 	.write = inv_accel_covariance_write,
@@ -1949,7 +1949,7 @@ static const struct bin_attribute accel_covariance = {
 static const struct bin_attribute compass_covariance = {
 	.attr = {
 		.name = "misc_bin_magn_covariance",
-		.mode = S_IRUGO | S_IWUGO
+		.mode = 0660
 	},
 	.size = COMPASS_COVARIANCE_SIZE,
 	.write = inv_compass_covariance_write,
@@ -1959,7 +1959,7 @@ static const struct bin_attribute compass_covariance = {
 static const struct bin_attribute compass_cur_covariance = {
 	.attr = {
 		.name = "misc_bin_cur_magn_covariance",
-		.mode = S_IRUGO | S_IWUGO
+		.mode = 0660
 	},
 	.size = COMPASS_COVARIANCE_SIZE,
 	.write = inv_compass_covariance_cur_write,

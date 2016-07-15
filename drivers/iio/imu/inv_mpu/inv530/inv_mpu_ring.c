@@ -26,6 +26,7 @@
 #include <linux/miscdevice.h>
 
 #include <linux/iio/iio.h>
+#include <linux/iio/buffer.h>
 #include <linux/iio/kfifo_buf.h>
 #include <linux/iio/trigger_consumer.h>
 #include <linux/iio/sysfs.h>
@@ -1008,9 +1009,9 @@ static int inv_predisable(struct iio_dev *indio_dev)
 
 static int inv_preenable(struct iio_dev *indio_dev)
 {
-	int result;
+	int result=0;
 
-	result = iio_sw_buffer_preenable(indio_dev);
+	//result = iio_sw_buffer_preenable(indio_dev);
 
 	return result;
 }
@@ -1052,14 +1053,12 @@ int inv_mpu_configure_ring(struct iio_dev *indio_dev)
 {
 	int ret;
 	struct inv_mpu_state *st = iio_priv(indio_dev);
-	struct iio_buffer *ring;
 
-	ring = iio_kfifo_allocate(indio_dev);
-	if (!ring)
+	indio_dev->buffer = iio_kfifo_allocate();
+	if (!indio_dev->buffer)
 		return -ENOMEM;
-	indio_dev->buffer = ring;
 	/* setup ring buffer */
-	ring->scan_timestamp = true;
+	indio_dev->buffer->scan_timestamp = true;
 	indio_dev->setup_ops = &inv_mpu_ring_setup_ops;
 	ret = request_threaded_irq(st->irq, inv_irq_handler,
 			inv_read_fifo,
