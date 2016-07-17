@@ -62,6 +62,17 @@
 	chosen {
 	};
 
+	reserved-memory {
+		generic_reserved: generic_carveout {
+			compatible = "nvidia,generic_carveout";
+			size = <0x0 0x20000000>;	/* size set as 512MB here. Update it as desired. */
+			alignment = <0 0x100000>;	/* carveout start is aligned to 1MB here*/
+			alloc-ranges = <0 0 0x1 0>;	/* phys memory reserved is between 0x0 and 4GB-1 address range. */
+			no-map;
+			status = "okay";
+		};
+	};
+
 	pmc@7000e400 {
 		nvidia,invert-interrupt;
 		io-pad-defaults {
@@ -80,10 +91,16 @@
 	};
 
 	sdhci@700b0600 { /* SDMMC4 for EMMC */
-		uhs-mask = <0x0>;
+		uhs-mask = <0x68>;
 		built-in;
 		power-off-rail;
 		status = "okay";
+		clocks = <&tegra_car TEGRA210_CLK_SDMMC4>;
+		clock-names = "sdmmc";
+		resets = <&tegra_car 15>;
+		reset-names = "sdmmc";
+		bus-width = <8>;
+		non-removable;
 	};
 
 	sdhci@700b0200 { /* SDMMC2 for Wifi */
@@ -887,5 +904,20 @@
 			pllx-offset-max = <4000>;
 			pllx-offset-min = <2000>;
 		};
+	};
+	dfll: clock@70110000 {
+		status = "okay";
+
+		reg = <0x0 0x70110000 0x0 0x400>;
+		vdd-cpu-supply = <&cpu_ovr_reg>;
+		nvidia,pwm-to-pmic;
+		nvidia,init-uv = <1000000>;
+		nvidia,align-step-uv = <19200>; /* 19.2mv */
+		nvidia,sample-rate = <25000>;
+		nvidia,droop-ctrl = <0x00000f00>;
+		nvidia,force-mode = <1>;
+		nvidia,cf = <6>;
+		nvidia,ci = <0>;
+		nvidia,cg = <2>;
 	};
 };

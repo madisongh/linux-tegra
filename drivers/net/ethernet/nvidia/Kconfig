@@ -4,8 +4,8 @@
 
 config NET_VENDOR_NVIDIA
 	bool "NVIDIA devices"
+	depends on PCI || ARCH_TEGRA_18x_SOC
 	default y
-	depends on PCI
 	---help---
 	  If you have a network (Ethernet) card belonging to this class, say Y.
 
@@ -25,7 +25,8 @@ config FORCEDETH
 	  To compile this driver as a module, choose M here. The module
 	  will be called forcedeth.
 
+if ARCH_TEGRA_18x_SOC
+source "../t18x/drivers/net/ethernet/nvidia/eqos/Kconfig"
+endif # ARCH_TEGRA_18x_SOC
+
 endif # NET_VENDOR_NVIDIA
-
-trysource "../t18x/drivers/net/ethernet/nvidia/eqos/Kconfig"
-

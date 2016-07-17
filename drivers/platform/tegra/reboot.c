@@ -34,6 +34,7 @@
 #define BOOTLOADER_MODE		BIT(30)
 #define FORCED_RECOVERY_MODE	BIT(1)
 
+#define PMC_SCRATCH0            0x50
 #define SYS_RST_OK		1
 
 #ifndef CONFIG_ARCH_TEGRA_18x_SOC

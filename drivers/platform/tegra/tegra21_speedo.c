@@ -23,8 +23,7 @@
 #include <linux/err.h>
 #include <linux/bug.h>			/* For BUG_ON.  */
 
-#include <linux/tegra-fuse.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/fuse.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 
@@ -81,6 +80,7 @@ static int soc_speedo_value;
 static int speedo_rev;
 
 static int enable_app_profiles;
+enum tegra_revision tegra_revision;
 
 static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
 /* proc_id  0,	       1          2 */
@@ -220,7 +220,7 @@ static int get_speedo_rev(void)
 
 void tegra_init_speedo_data(void)
 {
-	int i;
+	int i, err;
 	u32 tegra_sku_id;
 
 	if (!tegra_platform_is_silicon()) {
@@ -251,17 +251,18 @@ void tegra_init_speedo_data(void)
 	}
 
 	/* Read speedo/iddq fuses */
-	cpu_speedo_0_value = tegra_fuse_readl(FUSE_CPU_SPEEDO_0);
-	cpu_speedo_1_value = tegra_fuse_readl(FUSE_CPU_SPEEDO_1);
-	cpu_speedo_2_value = tegra_fuse_readl(FUSE_CPU_SPEEDO_2);
+	err = tegra_fuse_readl(FUSE_CPU_SPEEDO_0, &cpu_speedo_0_value);
+	err |= tegra_fuse_readl(FUSE_CPU_SPEEDO_1, &cpu_speedo_1_value);
+	err |= tegra_fuse_readl(FUSE_CPU_SPEEDO_2, &cpu_speedo_2_value);
+	err |= tegra_fuse_readl(FUSE_SOC_SPEEDO_0, &soc_speedo_0_value);
+	err |= tegra_fuse_readl(FUSE_SOC_SPEEDO_1, &soc_speedo_1_value);
+	err |= tegra_fuse_readl(FUSE_SOC_SPEEDO_2, &soc_speedo_2_value);
 
-	soc_speedo_0_value = tegra_fuse_readl(FUSE_SOC_SPEEDO_0);
-	soc_speedo_1_value = tegra_fuse_readl(FUSE_SOC_SPEEDO_1);
-	soc_speedo_2_value = tegra_fuse_readl(FUSE_SOC_SPEEDO_2);
-
-	cpu_iddq_value = tegra_fuse_readl(FUSE_CPU_IDDQ) * 4;
-	soc_iddq_value = tegra_fuse_readl(FUSE_SOC_IDDQ) * 4;
-	gpu_iddq_value = tegra_fuse_readl(FUSE_GPU_IDDQ) * 5;
+	err |= tegra_fuse_readl(FUSE_CPU_IDDQ, &cpu_iddq_value) * 4;
+	err |= tegra_fuse_readl(FUSE_SOC_IDDQ, &soc_iddq_value) * 4;
+	err |= tegra_fuse_readl(FUSE_GPU_IDDQ, &gpu_iddq_value) * 5;
+	if (err)
+		return;
 
 	/*
 	 * Determine CPU, GPU, SOC speedo values depending on speedo fusing

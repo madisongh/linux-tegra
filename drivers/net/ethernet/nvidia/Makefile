@@ -13,7 +13,5 @@
 # Makefile for the NVIDIA network device drivers.
 #
 
-ifeq ($(CONFIG_NET_VENDOR_NVIDIA),y)
 obj-$(CONFIG_FORCEDETH) += forcedeth.o
-endif
 

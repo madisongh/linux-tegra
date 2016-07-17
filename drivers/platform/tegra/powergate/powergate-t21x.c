@@ -720,9 +720,9 @@ static int tegra210_pg_gpu_unpowergate(int id)
 	 * Make sure all clok branches into GPU, except reference clock are
 	 * gated across resert de-assertion.
 	 */
-	tegra_clk_disable_unprepare(partition->clk_info[0].clk_ptr);
+	clk_disable_unprepare(partition->clk_info[0].clk_ptr);
 	powergate_partition_deassert_reset(partition);
-	tegra_clk_prepare_enable(partition->clk_info[0].clk_ptr);
+	clk_prepare_enable(partition->clk_info[0].clk_ptr);
 
 	/* Flush MC after boot/railgate/SC7 */
 	tegra_powergate_mc_flush(id);

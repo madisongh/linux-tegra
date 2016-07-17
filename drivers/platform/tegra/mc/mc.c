@@ -26,6 +26,7 @@
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 #include <linux/debugfs.h>
+#include <soc/tegra/fuse.h>
 #include <linux/tegra-soc.h>
 #include <linux/of_device.h>
 #include <linux/of_address.h>
@@ -33,7 +34,10 @@
 
 #include <linux/platform/tegra/mc.h>
 #include <linux/platform/tegra/mcerr.h>
+
+#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
 #include <linux/platform/tegra/tegra_emc.h>
+#endif
 
 #define MC_CLIENT_HOTRESET_CTRL		0x200
 #define MC_CLIENT_HOTRESET_STAT		0x204
@@ -137,7 +141,7 @@ static void tegra_mc_timing_save(void)
 #if defined(CONFIG_ARCH_TEGRA_12x_SOC)
 	tegra12_mc_latency_allowance_save(&ctx);
 #elif defined(CONFIG_ARCH_TEGRA_21x_SOC)
-	if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA21)
+	if (tegra_get_chip_id() == TEGRA210)
 		tegra21_mc_latency_allowance_save(&ctx);
 #else
 	for (off = MC_LATENCY_ALLOWANCE_BASE; off <= MC_LATENCY_ALLOWANCE_VI_2;
