@@ -129,47 +129,6 @@ dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2307-a05-00-wifi.dtb
 dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-t18x-interposer-p3310-1000-a00-00.dtb
 dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-t18x-interposer-e3301-1000-a00-00.dtb
 dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-maui.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-fpga-cl34563539.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-fpga-cl34563539-vm.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-fpga-cl34563539-vm1.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-fpga-cl34563539-vm2.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-sim-cl34563539.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-p3310-1000-a00-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-atv-p3310-1000-a00-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-projects-p3310-1000-p4573-0000-a00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-p3310-1000-a00-00-ape-cam.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-p3310-1000-a00-00-edp.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-p3310-1000-a00-00-dsi-hdmi-dp.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-p3310-1000-a00-00-dsi-dp.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-char-e3301-1080-a00-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-mfg-p3310-1000-a00-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-pb-e3301-1000-a00-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-pb-e3301-1000-a02-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-quill-slt-e3301-1099-a00-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-sunstreaker-char-e3340-1080-a00-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-sunstreaker-char-e3340-1080-a00-00-android-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-sunstreaker-char-e3340-1080-a00-00-base-mods-slt.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-sunstreaker-slt-e3340-1099-a00-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-reilly-pfg-sunstreaker-slt-e3340-1099-a00-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-e2681-0003-a01-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-e2681-003-a01-00-base-vm.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-e2681-003-a01-00-base-vm1.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-e2681-003-a01-00-base-vm2.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-e2681-003-a01-00-base-android-vm1.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-reilly.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-hdmi-primary.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-base-vm.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-base-vm1.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-base-vm1-ebp.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-base-android-vm1.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-base-vm2.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-base-vm2-ebp.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-base-noservervm.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-bali.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-bali-reilly.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2382-010-a01-00-base-vm2-alt.dtb
-dtb-$(CONFIG_ARCH_TEGRA_18x_SOC) += tegra186-vcm31-p2379-0000-c00-00-base.dtb
 
 ifeq ($(shell test -d $(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x && echo y),y)
 dtb-$(CONFIG_ARCH_TEGRA_19x_SOC) += tegra194-sim-base.dtb
@@ -195,6 +154,17 @@ DTCCPP_FLAGS += -I$(srctree)/../t18x/include
 DTCCPP_FLAGS += -I$(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x
 endif
 
+ifeq ($(shell test -f $(srctree)/../t18x/arch/arm64/boot/dts/nvidia/t18x/Makefile && echo y),y)
+local-dtb := $(dtb-y)
+dtb-y :=
+include $(srctree)/../t18x/arch/arm64/boot/dts/nvidia/t18x/Makefile
+t18xdts-path := ../../../../../t18x/arch/arm64/boot/dts/nvidia/t18x
+t18x-dtb := $(addprefix ../../../../../t18x/arch/arm64/boot/dts/nvidia/t18x/,$(dtb-y))
+t18x-dtb-out := $(addprefix $(O)/../t18x/arch/arm64/boot/dts/nvidia/t18x/,$(dtb-y))
+dtb-y := $(local-dtb)
+dtb-y += $(t18x-dtb)
+endif
+
 DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES))
 ifneq ($(DTB_NAMES),)
 DTB_LIST := $(addsuffix .dtb,$(DTB_NAMES))
@@ -204,5 +174,11 @@ endif
 targets += $(DTB_LIST)
 
 dtbs: $(addprefix $(obj)/, $(DTB_LIST))
+ifneq ($(t18x-dtb-out),)
+	cp -u $(t18x-dtb-out) arch/arm64/boot/dts/
+endif
 
 clean-files := dts/*.dtb *.dtb
+ifneq ($(t18x-dtb-out),)
+	clean-files += $(t18x-dtb-out)
+endif
