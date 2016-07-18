@@ -221,6 +221,7 @@ struct sdhci_tegra {
 	unsigned int tuned_tap_delay;
 	unsigned int tuning_status;
 	#define TUNING_STATUS_DONE	1
+	#define TUNING_STATUS_RETUNE	2
 	struct sdhci_tegra_pll_parent pll_source[TEGRA_SDHCI_MAX_PLL_SOURCE];
 	bool is_parent_pll_source_1;
 	struct regulator *vdd_io_reg;
@@ -381,6 +382,31 @@ static void tegra_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
 		else
 			gap_ctrl &= ~0x8;
 		writeb(gap_ctrl, host->ioaddr + SDHCI_BLOCK_GAP_CONTROL);
+	}
+}
+
+static void sdhci_tegra_card_event(struct sdhci_host *sdhci)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	int present = sdhci->mmc->rem_card_present;
+	int err;
+
+	if (!present) {
+		/* turn off voltage rregulators */
+		err = tegra_sdhci_configure_regulators(sdhci,
+				CONFIG_REG_DIS, 0, 0);
+
+		/*
+		 * Set retune request as tuning should be done next time
+		 * a card is inserted.
+		 */
+		tegra_host->tuning_status = TUNING_STATUS_RETUNE;
+	} else {
+		/* turn on voltage regulators */
+		err = tegra_sdhci_configure_regulators(sdhci,
+				CONFIG_REG_EN, 0, 0);
+		tegra_host->calib_1v8_offsets_done = false;
 	}
 }
 
@@ -1223,6 +1249,8 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 	int ret = 0;
 	int signal_voltage = MMC_SIGNAL_VOLTAGE_330;
 
+	sdhci->mmc->rem_card_present = (mmc_gpio_get_cd(sdhci->mmc) == 0);
+
 	/* Setting the min identification clock of freq 400KHz */
 	tegra_sdhci_set_clock(sdhci, 400000);
 	if (tegra_host->vddio_max_uv < SDHOST_HIGH_VOLT_MIN)
@@ -1339,6 +1367,7 @@ static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
 
 static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_ro     = tegra_sdhci_get_ro,
+	.card_event = sdhci_tegra_card_event,
 	.read_w     = tegra_sdhci_readw,
 	.write_l    = tegra_sdhci_writel,
 	.set_clock  = tegra_sdhci_set_clock,
@@ -1428,6 +1457,7 @@ static const struct sdhci_pltfm_data sdhci_tegra186_pdata = {
 		SDHCI_QUIRK2_USE_64BIT_ADDR |
 		SDHCI_QUIRK2_DDR_FIXED_DIVISOR |
 		SDHCI_QUIRK2_SEL_SDR104_UHS_MODE_IN_SDR50 |
+		SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR |
 		SDHCI_QUIRK2_SKIP_TUNING,
 	.ops  = &tegra_sdhci_ops,
 };
@@ -1491,6 +1521,7 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	of_property_read_u32(np, "nvidia,ddr-tap-delay", &plat->ddr_tap_delay);
 	of_property_read_u32(np, "nvidia,ddr-trim-delay", &plat->ddr_trim_delay);
 	plat->pwrdet_support = of_property_read_bool(np, "pwrdet-support");
+	plat->cd_gpio = of_get_named_gpio(np, "cd-gpios", 0);
 	plat->disable_rtpm = of_property_read_bool(np, "nvidia,disable-rtpm");
 	plat->instance = of_alias_get_id(np, "sdhci");
 	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
@@ -1618,7 +1649,16 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "pad control get failed, error:%d\n", rc);
 		}
 	}
+	host->mmc->rem_card_present = (mmc_gpio_get_cd(host->mmc) == 0);
 
+	/*
+	 * If there is no card detect gpio, assume that the
+	 * card is always present.
+	 */
+	if (!gpio_is_valid(plat->cd_gpio))
+		host->mmc->rem_card_present = 1;
+
+	/* set_clock call from runtime resume uses mutex */
 	mutex_init(&tegra_host->set_clock_mutex);
 	clk = devm_clk_get(&pdev->dev, "sdmmc");
 	if (IS_ERR(clk)) {
@@ -1713,8 +1753,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 				" voltage switch failed in probe, err: %d\n"
 				, rc);
 		} else {
-			rc = tegra_sdhci_configure_regulators(host,
-				CONFIG_REG_EN, 0, 0);
+			if (host->mmc->rem_card_present)
+				rc = tegra_sdhci_configure_regulators(host,
+					CONFIG_REG_EN, 0, 0);
 			if (rc)
 				dev_err(&pdev->dev,
 					" voltage enable failed in probe, err: %d\n"

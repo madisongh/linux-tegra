@@ -59,6 +59,7 @@ struct tegra_sdhci_platform_data {
 	unsigned int trim_delay;
 	bool enable_hw_cq;
 	bool en_periodic_cflush; /* Enable periodic cache flush for eMMC */
+	int cd_gpio;
 };
 
 #endif
