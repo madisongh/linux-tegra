@@ -130,10 +130,6 @@ dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-t18x-interposer-p3310-1000-a00-00.d
 dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-t18x-interposer-e3301-1000-a00-00.dtb
 dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-maui.dtb
 
-ifeq ($(shell test -d $(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x && echo y),y)
-dtb-$(CONFIG_ARCH_TEGRA_19x_SOC) += tegra194-sim-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_19x_SOC) += tegra194-sim-vdk.dtb
-endif
 
 DTC_FLAGS := -i $(srctree)/arch/arm/boot/dts
 DTCCPP_FLAGS := -I$(srctree)/arch/arm/boot/dts
@@ -165,6 +161,17 @@ dtb-y := $(local-dtb)
 dtb-y += $(t18x-dtb)
 endif
 
+ifeq ($(shell test -f $(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x/Makefile && echo y),y)
+local-dtb := $(dtb-y)
+dtb-y :=
+include $(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x/Makefile
+t19xdts-path := ../../../../../t19x/arch/arm64/boot/dts/nvidia/t19x
+t19x-dtb := $(addprefix ../../../../../t19x/arch/arm64/boot/dts/nvidia/t19x/,$(dtb-y))
+t19x-dtb-out := $(addprefix $(O)/../t19x/arch/arm64/boot/dts/nvidia/t19x/,$(dtb-y))
+dtb-y := $(local-dtb)
+dtb-y += $(t19x-dtb)
+endif
+
 DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES))
 ifneq ($(DTB_NAMES),)
 DTB_LIST := $(addsuffix .dtb,$(DTB_NAMES))
@@ -177,8 +184,14 @@ dtbs: $(addprefix $(obj)/, $(DTB_LIST))
 ifneq ($(t18x-dtb-out),)
 	cp -u $(t18x-dtb-out) arch/arm64/boot/dts/
 endif
+ifneq ($(t19x-dtb-out),)
+	cp -u $(t19x-dtb-out) arch/arm64/boot/dts/
+endif
 
 clean-files := dts/*.dtb *.dtb
 ifneq ($(t18x-dtb-out),)
 	clean-files += $(t18x-dtb-out)
+endif
+ifneq ($(t19x-dtb-out),)
+	clean-files += $(t19x-dtb-out)
 endif
