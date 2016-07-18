@@ -43,9 +43,9 @@ Example:
 		compatible = "nvidia,tegra186-xhci";
 		mboxes = <&xusb_mbox>;
 		mbox-names = "xusb";
-		phys = <&padctl_uphy TEGRA_PADCTL_UPHY_UTMI_P(0)>, /* USB 2.0 micro-AB, J20 */
-			<&padctl_uphy TEGRA_PADCTL_UPHY_UTMI_P(1)>, /* USB 3.0 STD-A, J19 */
-			<&padctl_uphy TEGRA_PADCTL_UPHY_USB3_P(1)>; /* USB 3.0 STD-A, J19 */
+		phys = <&padctl TEGRA_PADCTL_PHY_UTMI_P(0)>, /* USB 2.0 micro-AB, J20 */
+			<&padctl TEGRA_PADCTL_PHY_UTMI_P(1)>, /* USB 3.0 STD-A, J19 */
+			<&padctl TEGRA_PADCTL_PHY_USB3_P(1)>; /* USB 3.0 STD-A, J19 */
 		phy-names = "utmi-0", "utmi-1", "usb3-1";
 
 		avddio_usb-supply = <&spmic_sd3_3v3>;
