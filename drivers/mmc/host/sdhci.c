@@ -2106,6 +2106,11 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 		}
 	}
 
+	if ((host->quirks2 & SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR) &&
+		(host->ops->get_max_tuning_loop_counter))
+		tuning_loop_counter =
+			host->ops->get_max_tuning_loop_counter(host);
+
 	hs400_tuning = host->flags & SDHCI_HS400_TUNING;
 	host->flags &= ~SDHCI_HS400_TUNING;
 

@@ -408,6 +408,7 @@ struct mmc_host {
 	struct timer_list	retune_timer;	/* for periodic re-tuning */
 
 	bool			trigger_card_event; /* card_event necessary */
+	bool			rem_card_present;   /* Removable card presence status */
 
 	struct mmc_card		*card;		/* device attached to this host */
 

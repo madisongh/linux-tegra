@@ -440,7 +440,7 @@ struct sdhci_host {
 /*Controller skips tuning if it is already done*/
 #define SDHCI_QUIRK2_SKIP_TUNING			(1<<20)
 #define SDHCI_QUIRK2_SEL_SDR104_UHS_MODE_IN_SDR50	(1<<21)
-
+#define SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR		(1<<22)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
