@@ -5,7 +5,7 @@
  * Author:
  *      Colin Cross <ccross@google.com>
  *
- * Copyright (c) 2010-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2010-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -104,7 +104,7 @@ void tegra_clk_init_from_table(struct tegra_clk_init_table *table)
 		tegra_clk_init_one_from_table(table);
 }
 
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+#if defined(CONFIG_ARCH_TEGRA_18x_SOC) || defined(CONFIG_ARCH_TEGRA_21x_SOC)
 void tegra_periph_reset_deassert(struct clk *c)
 {
 }
