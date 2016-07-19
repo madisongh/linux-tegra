@@ -402,7 +402,7 @@ static int max77620_probe(struct i2c_client *client,
 
 	max77620_top_irq_chip.pre_post_irq_data = chip;
 
-	ret = regmap_add_irq_chip(chip->rmap, client->irq,
+	ret = devm_regmap_add_irq_chip(chip->dev, chip->rmap, client->irq,
 				  IRQF_ONESHOT | IRQF_SHARED,
 				  chip->irq_base, &max77620_top_irq_chip,
 				  &chip->top_irq_data);
@@ -413,22 +413,18 @@ static int max77620_probe(struct i2c_client *client,
 
 	ret = max77620_initialise_fps(chip);
 	if (ret < 0)
-		goto fail_free_irq;
+		return ret;
 
 	ret =  mfd_add_devices(chip->dev, PLATFORM_DEVID_NONE,
 			       mfd_cells, n_mfd_cells, NULL, 0,
 			       regmap_irq_get_domain(chip->top_irq_data));
 	if (ret < 0) {
 		dev_err(chip->dev, "Failed to add sub devices: %d\n", ret);
-		goto fail_free_irq;
+		return ret;
 	}
 
+	dev_info(chip->dev, "max77620 probe successful");
 	return 0;
-
-fail_free_irq:
-	regmap_del_irq_chip(client->irq, chip->top_irq_data);
-
-	return ret;
 }
 
 static int max77620_remove(struct i2c_client *client)
