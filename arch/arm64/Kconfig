@@ -142,6 +142,9 @@ config ARCH_TEGRA_APE
 config ARCH_TEGRA_210_SOC
 	bool
 
+config ARCH_TEGRA_VIC
+        bool
+
 trysource ../t18x/arch/arm64/Kconfig
 trysource ../t18x/arch/arm64/Kconfig.t18x
 trysource arch/arm64/Kconfig.t18x
