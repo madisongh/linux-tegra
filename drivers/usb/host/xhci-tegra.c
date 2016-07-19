@@ -445,6 +445,8 @@ struct tegra_xhci_hcd {
 	struct mutex mbox_lock_ack;
 	u32 fw_ack; /* storing the mbox cmd_type from FW */
 	wait_queue_head_t fw_ack_wq; /* sleep support for FW to SW mbox ack */
+
+	struct work_struct oc_work;
 };
 
 static struct hc_driver __read_mostly tegra_xhci_hc_driver;
@@ -1618,6 +1620,17 @@ static int tegra_xhci_id_notifier(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
+static void tegra_xhci_oc_work(struct work_struct *work)
+{
+	struct tegra_xhci_hcd *tegra = container_of(work, struct tegra_xhci_hcd,
+						    oc_work);
+
+	/* it doesn't matter which phy instance we pass to this function
+	 * since it will handle all overcurrent events there
+	 */
+	tegra_phy_xusb_handle_overcurrent(tegra->phys[UTMI_PHY][0]);
+}
+
 static void tegra_xhci_probe_finish(const struct firmware *fw, void *context);
 
 static void tegra_firmware_retry_work(struct work_struct *work)
@@ -1863,6 +1876,25 @@ static void tegra_xhci_debugfs_deinit(struct tegra_xhci_hcd *tegra)
 static irqreturn_t tegra_xhci_padctl_irq(int irq, void *dev_id)
 {
 	struct tegra_xhci_hcd *tegra = dev_id;
+
+	if (XHCI_IS_T186(tegra)) {
+		unsigned i;
+		bool oc = false;
+
+		for (i = 0; i < tegra->soc_config->num_phys[UTMI_PHY]; i++) {
+			if (tegra_phy_xusb_overcurrent_detected(
+						tegra->phys[UTMI_PHY][i]) > 0) {
+				dev_warn(tegra->dev,
+					"over-current detected on UTMI pad %u\n",
+					i);
+				oc = true;
+			}
+		}
+
+		/* call padctl API to clear OC condition */
+		if (oc)
+			schedule_work(&tegra->oc_work);
+	}
 
 	pm_runtime_resume(tegra->dev);
 
@@ -2295,6 +2327,9 @@ skip_clocks:
 		goto unregister_extcon;
 	}
 
+	if (XHCI_IS_T186(tegra))
+		INIT_WORK(&tegra->oc_work, tegra_xhci_oc_work);
+
 	device_init_wakeup(tegra->dev, true);
 	return 0;
 
@@ -2336,6 +2371,9 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	struct tegra_xhci_hcd *tegra = platform_get_drvdata(pdev);
 	struct usb_hcd *hcd = tegra->hcd;
 	struct xhci_hcd *xhci;
+
+	if (XHCI_IS_T186(tegra))
+		cancel_work_sync(&tegra->oc_work);
 
 	cancel_delayed_work_sync(&tegra->firmware_retry_work);
 	pm_runtime_get_sync(tegra->dev);
@@ -2908,6 +2946,8 @@ static int tegra_xhci_suspend(struct device *dev)
 		return 0;
 
 	flush_work(&tegra->id_extcon_work);
+	if (XHCI_IS_T186(tegra))
+		flush_work(&tegra->oc_work);
 
 	mutex_lock(&tegra->lock);
 
