@@ -52,10 +52,6 @@
 #define SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK		0xFF
 #define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT		24
 #define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK		0x1F
-#define SDHCI_VNDR_CLK_CTRL_SDR50_TUNING		0x20
-#define SDHCI_VNDR_CLK_CTRL_PADPIPE_CLKEN_OVERRIDE	0x8
-#define SDHCI_VNDR_CLK_CTRL_SPI_MODE_CLKEN_OVERRIDE	0x4
-#define SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK		0x2
 #define SDHCI_VNDR_CLK_CTRL_SDMMC_CLK			0x1
 
 #define SDHCI_VNDR_SYS_SW_CTRL				0x104
@@ -75,40 +71,22 @@
 #define SDHCI_VNDR_DLLCAL_CFG_STATUS_DLL_ACTIVE		0x80000000
 
 #define SDHCI_VNDR_TUN_CTRL0_0				0x1c0
-/*MUL_M is defined in [12:6] bits*/
-#define SDHCI_VNDR_TUN_CTRL0_0_MUL_M			0x1FC0
-/* To Set value of [12:6] as 1 */
-#define SDHCI_VNDR_TUN_CTRL0_0_MUL_M_VAL		0x40
 #define SDHCI_VNDR_TUN_CTRL0_TUN_HW_TAP		0x20000
 
 #define SDHCI_VNDR_TUN_STATUS0_0			0x1c8
 #define TUNING_WORD_SEL_MASK 				0x7
 
-/*value 4 in 13 to 15 bits indicates 256 iterations*/
-#define SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS_MASK	0x7
-#define SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS_SHIFT	13
-/* Value 1 in NUM_TUNING_ITERATIONS indicates 64 iterations */
-#define HW_TUNING_64_TRIES				1
-/* Value 2 in NUM_TUNING_ITERATIONS indicates 128 iterations */
-#define HW_TUNING_128_TRIES				2
-/* Value 4 in NUM_TUNING_ITERATIONS indicates 256 iterations */
-#define HW_TUNING_256_TRIES				4
+#define SDMMC_SDMEMCOMPPADCTRL			0x1E0
+#define SDMMC_SDMEMCOMPPADCTRL_PAD_E_INPUT_OR_E_PWRD_MASK	0x80000000
 
-#define SDHCI_VNDR_TUN_CTRL1_TUN_STEP_SIZE		0x77
-
+#define SDMMC_AUTO_CAL_CONFIG	0x1E4
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START	0x80000000
 
 #define SDHCI_TEGRA_VENDOR_MISC_CTRL		0x120
 #define SDHCI_MISC_CTRL_ENABLE_SDR104		0x8
 #define SDHCI_MISC_CTRL_ENABLE_SDR50		0x10
 #define SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300	0x20
 #define SDHCI_MISC_CTRL_ENABLE_DDR50		0x200
-
-#define SDMMC_AUTO_CAL_CONFIG	0x1E4
-#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START	0x80000000
-#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE	0x20000000
-#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_SLW_OVERRIDE	0x10000000
-#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET_SHIFT	0x8
-#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_STEP_OFFSET_SHIFT	0x10
 
 #define SDMMC_AUTO_CAL_STATUS	0x1EC
 #define SDMMC_AUTO_CAL_STATUS_AUTO_CAL_ACTIVE	0x80000000
@@ -123,12 +101,6 @@
 #define NVQUIRK_DISABLE_DDR50		BIT(5)
 /* Do not enable auto calibration if the platform doesn't support */
 #define NVQUIRK_DISABLE_AUTO_CALIBRATION	BIT(6)
-/* ENAABLE FEEDBACK IO CLOCK */
-#define NVQUIRK_EN_FEEDBACK_CLK		BIT(7)
-/* Set trim delay */
-#define NVQUIRK_SET_TRIM_DELAY			BIT(8)
-/* Enable Frequency Tuning for SDR50 mode */
-#define NVQUIRK_ENABLE_SDR50_TUNING		BIT(9)
 #define NVQUIRK2_SET_PLL_CLK_PARENT		BIT(0)
 
 /* Common quirks for Tegra 12x and later versions of sdmmc controllers */
@@ -297,22 +269,29 @@ static bool tegra_sdhci_is_tuning_done(struct sdhci_host *sdhci)
 
 static int sdhci_tegra_get_max_tuning_loop_counter(struct sdhci_host *sdhci)
 {
-	u16 hw_tuning_iterations;
-	u32 vendor_ctrl;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	int err = 0;
 
 	if (sdhci->mmc->ios.timing == MMC_TIMING_UHS_SDR50)
-		hw_tuning_iterations = HW_TUNING_256_TRIES;
+		err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"tun-iterations-sdr50", tegra_host->prods);
+	else if (sdhci->mmc->ios.timing == MMC_TIMING_UHS_SDR104)
+		err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"tun-iterations-sdr104", tegra_host->prods);
 	else if (sdhci->mmc->caps2 & MMC_CAP2_HS533)
-		hw_tuning_iterations = HW_TUNING_64_TRIES;
-	else
-		hw_tuning_iterations = HW_TUNING_128_TRIES;
-
-	vendor_ctrl = sdhci_readl(sdhci, SDHCI_VNDR_TUN_CTRL0_0);
-	vendor_ctrl &=	~(SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS_MASK <<
-			SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS_SHIFT);
-	vendor_ctrl |= (hw_tuning_iterations <<
-			SDHCI_VNDR_TUN_CTRL0_TUN_ITERATIONS_SHIFT);
-	sdhci_writel(sdhci, vendor_ctrl, SDHCI_VNDR_TUN_CTRL0_0);
+		err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"tun-iterations-hs533", tegra_host->prods);
+	else if (sdhci->mmc->ios.timing == MMC_TIMING_MMC_HS400)
+		err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"tun-iterations-hs400", tegra_host->prods);
+	else if (sdhci->mmc->ios.timing == MMC_TIMING_MMC_HS200)
+		err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"tun-iterations-hs200", tegra_host->prods);
+	if (err)
+		dev_err(mmc_dev(sdhci->mmc),
+			"%s: error %d in tuning iteration update\n",
+			__func__, err);
 
 	return 257;
 }
@@ -474,7 +453,7 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
-	u32 misc_ctrl, vendor_ctrl;
+	u32 misc_ctrl;
 	int err;
 
 	sdhci_reset(host, mask);
@@ -482,32 +461,17 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	if (!(mask & SDHCI_RESET_ALL))
 		return;
 
-	vendor_ctrl = sdhci_readl(host, SDHCI_VNDR_CLK_CTRL);
-	vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_PADPIPE_CLKEN_OVERRIDE;
-	vendor_ctrl &= ~SDHCI_VNDR_CLK_CTRL_SPI_MODE_CLKEN_OVERRIDE;
-	/* Enable feedback/internal clock */
-	if (soc_data->nvquirks & NVQUIRK_EN_FEEDBACK_CLK)
-		vendor_ctrl &= ~SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK;
-	else
-		vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_INPUT_IO_CLK;
-	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDR50_TUNING)
-		vendor_ctrl |= SDHCI_VNDR_CLK_CTRL_SDR50_TUNING;
-	sdhci_writel(host, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
+	err = tegra_prod_set_by_name(&host->ioaddr, "prod-reset",
+			tegra_host->prods);
+	if (err)
+		dev_err(mmc_dev(host->mmc),
+			"%s: error %d in prod-reset update\n",
+			__func__, err);
 
 	/* Set the tap delay value */
 	if (!tegra_sdhci_is_tuning_done(host))
 		sdhci_tegra_set_tap_delay(host, plat->tap_delay,
 				SET_DEFAULT_TAP);
-
-	/* Set the trim delay value */
-	if (soc_data->nvquirks & NVQUIRK_SET_TRIM_DELAY) {
-		err = tegra_prod_set_by_name(&host->ioaddr,
-			"trim-delay-default", tegra_host->prods);
-		if (err < 0)
-			dev_err(mmc_dev(host->mmc),
-			"%s: error %d in prod settings\n",
-			__func__, err);
-	}
 
 	misc_ctrl = sdhci_readl(host, SDHCI_TEGRA_VENDOR_MISC_CTRL);
 	/* Erratum: Enable SDHCI spec v3.00 support */
@@ -917,19 +881,14 @@ static void tegra_sdhci_post_init(struct sdhci_host *sdhci)
 
 static void tegra_sdhci_configure_e_input(struct sdhci_host *sdhci, bool enable)
 {
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
-	int err;
+	u32 val;
 
+	val = sdhci_readl(sdhci, SDMMC_SDMEMCOMPPADCTRL);
 	if (enable)
-		err = tegra_prod_set_by_name(&sdhci->ioaddr,
-			"en-pad-ein-pwrd", tegra_host->prods);
+		val |= SDMMC_SDMEMCOMPPADCTRL_PAD_E_INPUT_OR_E_PWRD_MASK;
 	else
-		err = tegra_prod_set_by_name(&sdhci->ioaddr,
-			"dis-pad-ein-pwrd", tegra_host->prods);
-	if (err < 0)
-		dev_err(mmc_dev(sdhci->mmc),
-			"%s: error %d in prod settings\n",__func__, err);
+		val &= ~SDMMC_SDMEMCOMPPADCTRL_PAD_E_INPUT_OR_E_PWRD_MASK;
+	sdhci_writel(sdhci, val, SDMMC_SDMEMCOMPPADCTRL);
 	udelay(1);
 	return;
 }
@@ -1030,43 +989,62 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 			"comp-vref-1v8", tegra_host->prods);
 	if (err < 0)
 		dev_err(mmc_dev(sdhci->mmc),
-			"%s: error %d in comp vref settings\n",__func__, err);
+			"%s: error %d in comp vref settings\n",
+			__func__, err);
 
 	/* Wait for 1us after e_input is enabled*/
 	udelay(1);
 
 	/* Enable Auto Calibration*/
-	val = sdhci_readl(sdhci, SDMMC_AUTO_CAL_CONFIG);
-	val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE;
-	val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START;
-	if (tegra_host->plat->enable_autocal_slew_override)
-		val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_SLW_OVERRIDE;
+	err = tegra_prod_set_by_name(&sdhci->ioaddr,
+			"autocal-en", tegra_host->prods);
+	if (err < 0)
+		dev_err(mmc_dev(sdhci->mmc),
+			"%s: error %d in autocal-en settings\n",
+			__func__, err);
 
-	if (tegra_host->plat->auto_cal_step) {
-		val &= ~(0x7 <<
-			SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_STEP_OFFSET_SHIFT);
-		val |= (tegra_host->plat->auto_cal_step <<
-			SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_STEP_OFFSET_SHIFT);
-	}
+	val = sdhci_readl(sdhci, SDMMC_AUTO_CAL_CONFIG);
+	val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START;
 	sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
 
 	switch (signal_voltage) {
 	case MMC_SIGNAL_VOLTAGE_180:
-		if (timing == MMC_TIMING_UHS_SDR104)
+		if (timing == MMC_TIMING_MMC_HS400)
 			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"prod-sdr104-1v8", tegra_host->prods);
+				"autocal-pu-pd-offset-hs400-1v8",
+				tegra_host->prods);
+		else if (timing == MMC_TIMING_UHS_SDR104)
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"autocal-pu-pd-offset-sdr104-1v8",
+				tegra_host->prods);
+		else if (timing == MMC_TIMING_UHS_SDR50)
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"autocal-pu-pd-offset-sdr50-1v8",
+				tegra_host->prods);
+		else if (timing == MMC_TIMING_UHS_SDR25)
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"autocal-pu-pd-offset-hs-1v8",
+				tegra_host->prods);
 		else
 			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"prod-default-1v8", tegra_host->prods);
+				"autocal-pu-pd-offset-default-1v8",
+				tegra_host->prods);
 		break;
 	case MMC_SIGNAL_VOLTAGE_330:
-		err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"prod-default-3v3", tegra_host->prods);
+		if ((timing == MMC_TIMING_SD_HS) ||
+			(timing == MMC_TIMING_MMC_HS))
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"autocal-pu-pd-offset-hs-3v3",
+				tegra_host->prods);
+		else
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"autocal-pu-pd-offset-default-3v3",
+				tegra_host->prods);
 		break;
 	}
 	if (err < 0)
 		dev_err(mmc_dev(sdhci->mmc),
-			"error %d in prod settings\n", err);
+			"error %d in autocal-pu-pd-offset settings\n", err);
 
 	/* Wait for 2us after auto calibration is enabled*/
 	udelay(2);
@@ -1462,7 +1440,6 @@ static const struct sdhci_pltfm_data sdhci_tegra210_pdata = {
 
 static const struct sdhci_tegra_soc_data soc_data_tegra210 = {
 	.pdata = &sdhci_tegra210_pdata,
-	.nvquirks = NVQUIRK_SET_TRIM_DELAY,
 };
 
 static const struct of_device_id sdhci_tegra_dt_match[] = {
