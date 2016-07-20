@@ -23,116 +23,14 @@ dtb-$(CONFIG_OF_ALL_DTBS) := $(patsubst $(dtstree)/%.dts,%.dtb, $(foreach d,$(dt
 always		:= $(dtb-y)
 
 targets += dtbs
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-grenada.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-ers-e2190-1100-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-ers-e2220-1170-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-ers-e2220-1170-a00-dp-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-ers-e2220-1170-a00-01.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-l4t-ers-e2220-1170-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-ers-e2220-1180-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-l4t-ers-e2220-1180-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-ers-e2220-1199-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-ers-p2143-1170-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-ers-p2143-1170-a00-01.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-ers-p2143-1199-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-ers-p2143-1180-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-foster-e-p2530-0930-e00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-foster-e-p2530-0930-e01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-foster-e-p2530-0930-e02-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-foster-e-hdd-p2530-0932-e00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-foster-e-hdd-p2530-0932-e01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-foster-e-hdd-p2530-0932-e02-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-foster-e-hdd-rpmb-p2530-0931-e02-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-p2530-0031-e00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-p2530-0031-e01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-p2530-0031-e02-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-p2530-0031-e03-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-p2530-0030-e00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-p2530-0030-e01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-p2530-0030-e02-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-p2530-0030-e03-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-p2530-0131-e00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-p2530-0131-e01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-p2530-0131-e02-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm30t210.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-vcm30t210.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-e2580-0631-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-e2580-0631-a00-00-vm.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-e2580-0631-a00-00-vm1.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-e2580-0631-a00-00-vm2.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-e2379.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-p2382-0000-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-p2382-0000-a00-00-vm.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-p2382-0000-a00-00-vm1.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-p2382-0000-a00-00-vm2.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-p2382-0000-a00-00-hdmi-primary.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-p2382-0000-a00-00-p2393-1080p.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-p2382-0000-a00-00-p2393-25x16.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-e2379-0000-b00-00-a.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-e2379-0000-b00-00-b.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-flashing-kernel.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-foster-e-e2581-0930-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-foster-e-e2581-0930-a01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-e2581-0030-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-e2581-0030-a01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-e2581-0031-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-e2581-0031-a01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-e2581-0131-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-loki-e-e2581-0131-a01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-jetson-cv-base-p2597-2180-a00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-jetson-cv-p2597-2180-a00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-jetson-tx1-p2597-2180-a01-android-devkit.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-jetson-e-base-p2595-0000-a00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-jetson-e-p2595-0000-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-a00-wifi-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2302-a01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3302-a01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3303-a01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2303-a01-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2306-a01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3306-a01-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3303-a02-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2303-a02-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3306-a02-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2306-a02-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-ffpb-e2295-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3324-a03-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2324-a03-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3326-a03-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2326-a03-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-a00-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2302-a01-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2306-a01-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3302-a01-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3303-a01-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3306-a01-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3303-a02-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3306-a02-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3324-a03-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3326-a03-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3304-a03-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3304-a03-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2304-a03-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3306-a03-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3306-a03-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2306-a03-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3304-a04-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3304-a04-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3306-a04-00-base.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3306-a04-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3304-a04-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3306-a04-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2305-a05-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2306-a05-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2307-a05-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-t18x-interposer-p3310-1000-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-t18x-interposer-e3301-1000-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-maui.dtb
-
 
 DTC_FLAGS := -i $(srctree)/arch/arm/boot/dts
 DTCCPP_FLAGS := -I$(srctree)/arch/arm/boot/dts
+
+ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
+DTC_FLAGS += -i $(srctree)/arch/arm64/boot/dts/nvidia/t210
+DTCCPP_FLAGS += -I$(srctree)/arch/arm64/boot/dts/nvidia/t210
+endif
 
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
 DTC_FLAGS += -i $(srctree)/../t18x/include
@@ -148,6 +46,17 @@ DTC_FLAGS += -i $(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x
 DTCCPP_FLAGS += -I$(srctree)/../t19x/include
 DTCCPP_FLAGS += -I$(srctree)/../t18x/include
 DTCCPP_FLAGS += -I$(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x
+endif
+
+ifeq ($(shell test -f $(srctree)/arch/arm64/boot/dts/nvidia/t210/Makefile && echo y),y)
+local-dtb := $(dtb-y)
+dtb-y :=
+include $(srctree)/arch/arm64/boot/dts/nvidia/t210/Makefile
+t210dts-path := nvidia/t210
+t210-dtb := $(addprefix nvidia/t210/,$(dtb-y))
+t210-dtb-out := $(addprefix $(O)/arch/arm64/boot/dts/nvidia/t210/,$(dtb-y))
+dtb-y := $(local-dtb)
+dtb-y += $(t210-dtb)
 endif
 
 ifeq ($(shell test -f $(srctree)/../t18x/arch/arm64/boot/dts/nvidia/t18x/Makefile && echo y),y)
@@ -181,6 +90,9 @@ endif
 targets += $(DTB_LIST)
 
 dtbs: $(addprefix $(obj)/, $(DTB_LIST))
+ifneq ($(t210-dtb-out),)
+	cp -u $(t210-dtb-out) arch/arm64/boot/dts/
+endif
 ifneq ($(t18x-dtb-out),)
 	cp -u $(t18x-dtb-out) arch/arm64/boot/dts/
 endif
@@ -189,6 +101,9 @@ ifneq ($(t19x-dtb-out),)
 endif
 
 clean-files := dts/*.dtb *.dtb
+ifneq ($(t210-dtb-out),)
+	clean-files += $(t210-dtb-out)
+endif
 ifneq ($(t18x-dtb-out),)
 	clean-files += $(t18x-dtb-out)
 endif

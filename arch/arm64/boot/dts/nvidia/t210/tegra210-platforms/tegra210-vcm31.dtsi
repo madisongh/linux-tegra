@@ -29,7 +29,7 @@
 #include "tegra210-platforms/tegra210-vcm31t210-emc.dtsi"
 #include "tegra210-platforms/tegra210-ers-clk-init.dtsi"
 #include "tegra210-platforms/tegra210-pinmux-drive-sdmmc-common.dtsi"
-#include <panel-a-edp-1080p-14-0.dtsi>
+#include "panel-a-edp-1080p-14-0.dtsi"
 
 #include <dt-bindings/sound/tegra-asoc-alt.h>
 #include <dt-bindings/display/tegra-dc.h>
