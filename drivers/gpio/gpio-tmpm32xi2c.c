@@ -603,6 +603,7 @@ static int tmpm32xi2c_setup_gpio_irq(struct tmpm32xi2c_chip *chip,
 	if (client->irq) {
 		int i;
 		uint32_t gpio_num = 0;
+		unsigned long irq_flags;
 
 		mutex_init(&chip->irq_lock);
 		for (i = 0; i < ARRAY_SIZE(intr_map.iidg); i++) {
@@ -613,11 +614,12 @@ static int tmpm32xi2c_setup_gpio_irq(struct tmpm32xi2c_chip *chip,
 			}
 		}
 
+		irq_flags = IRQF_ONESHOT | IRQF_SHARED | IRQF_EARLY_RESUME;
 		ret = devm_request_threaded_irq(&client->dev,
 				client->irq,
 				NULL,
 				tmpm32xi2c_irq_handler,
-				chip->irq_flags | IRQF_ONESHOT | IRQF_SHARED,
+				chip->irq_flags | irq_flags,
 				dev_name(&client->dev), chip);
 		if (ret) {
 			dev_err(&client->dev, "failed to request irq %d\n",
