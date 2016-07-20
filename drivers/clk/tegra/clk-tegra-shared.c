@@ -148,7 +148,6 @@ static struct tegra_shared_clk shared_clks[] = {
 	SHARED_CLK("xbar.ape", "ape_master", 0, 0, 0, NULL, tegra_clk_xbar_ape),
 	SHARED_CLK("cap.vcore.ape", "ape_master", SHARED_CEILING, 0, 0, NULL, tegra_clk_cap_vcore_ape),
 	SHARED_CLK("override.ape", "ape_master", SHARED_OVERRIDE, 0, 0, NULL, tegra_clk_override_ape),
-	SHARED_CLK("adsp.cpu.abus", "abus", 0, 0, 0, NULL, tegra_clk_adsp_cpu_abus),
 	SHARED_CLK("cap.vcore.abus", "abus", SHARED_CEILING, 0, 0, NULL, tegra_clk_cap_vcore_abus),
 	SHARED_CLK("override.abus", "abus", SHARED_OVERRIDE, 0, 0, NULL, tegra_clk_override_abus),
 };

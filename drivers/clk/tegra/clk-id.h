@@ -424,7 +424,6 @@ enum clk_id {
 	tegra_clk_xbar_ape,
 	tegra_clk_cap_vcore_ape,
 	tegra_clk_override_ape,
-	tegra_clk_adsp_cpu_abus,
 	tegra_clk_cap_vcore_abus,
 	tegra_clk_override_abus,
 	tegra_clk_sor_safe,

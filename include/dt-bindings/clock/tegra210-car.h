@@ -399,9 +399,7 @@
 #define TEGRA210_CLK_SOR1_MUX 367
 #define TEGRA210_CLK_PD2VI 368
 #define TEGRA210_CLK_VI_OUTPUT 369
-/* 368 */
-/* 369 */
-/* 370 */
+#define TEGRA210_CLK_ACLK 370
 /* 371 */
 /* 372 */
 /* 373 */

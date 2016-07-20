@@ -2628,6 +2628,8 @@ static struct tegra_clk_periph tegra_sor1 =
 static struct tegra_clk_periph tegra_sor1_mux =
 	TEGRA_CLK_PERIPH(29, 7, 0, 0, 7, 1, 0, 0, TEGRA_PERIPH_NO_GATE, mux_sor1_idx, &sor1_lock);
 
+static const char *aclk_parents[] = { "pll_a1", "pll_c", "pll_p", "pll_a_out0", "pll_c2", "pll_c3", "clk_m" };
+
 static __init void tegra210_periph_clk_init(void __iomem *clk_base,
 					    void __iomem *pmc_base)
 {
@@ -2710,6 +2712,11 @@ static __init void tegra210_periph_clk_init(void __iomem *clk_base,
 	hw = __clk_get_hw(clks[TEGRA210_CLK_VI]);
 	periph_clk = to_clk_periph(hw);
 	periph_clk->mux.lock = &vi_lock;
+
+	clk = tegra_clk_register_super_clk("aclk", aclk_parents,
+				ARRAY_SIZE(aclk_parents), 0, clk_base + 0x6e0,
+				0, NULL);
+	clks[TEGRA210_CLK_ACLK] = clk;
 }
 
 static void __init tegra210_pll_init(void __iomem *clk_base,
@@ -2938,6 +2945,7 @@ static void __init tegra210_pll_init(void __iomem *clk_base,
 }
 
 static const char *cbus_parents[] = { "c2bus", "c3bus" };
+static const char *abus_parents[] = { "abus" };
 
 static __init void tegra210_shared_clk_init(void)
 {
@@ -2980,6 +2988,13 @@ static __init void tegra210_shared_clk_init(void)
 	clk = tegra_clk_register_shared("nvdec.cbus", &cbus_parents[1], 1, 0, 0,
 					0, "nvdec");
 	clks[TEGRA210_CLK_NVDEC_CBUS] = clk;
+
+	clk = tegra_clk_register_cbus("abus", "pll_a1", 0, "pll_p", 0, 1000000000);
+	clks[TEGRA210_CLK_ABUS] = clk;
+
+	clk = tegra_clk_register_shared("adsp.cpu.abus", &abus_parents[0] , 1,
+					0, 0, 0, "aclk");
+	clks[TEGRA210_CLK_ADSP_CPU_ABUS] = clk;
 
 	clk = tegra_clk_register_sbus_cmplx("sbus", "sclk", "sclk_mux", 0, "pclk",
 					"hclk", "pll_p_out2", "pll_c_out1",
@@ -3103,6 +3118,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
 	{ TEGRA210_CLK_SOC_THERM, TEGRA210_CLK_PLL_P, 51000000, 0 },
 	{ TEGRA210_CLK_CCLK_G, TEGRA210_CLK_CLK_MAX, 0, 1 },
 	{ TEGRA210_CLK_PLL_C4, TEGRA210_CLK_CLK_MAX, 1000*1000*1000, 0 },
+	{ TEGRA210_CLK_ACLK, TEGRA210_CLK_PLL_A1, 0, 0 },
 	/* This MUST be the last entry. */
 	{ TEGRA210_CLK_CLK_MAX, TEGRA210_CLK_CLK_MAX, 0, 0 },
 };
