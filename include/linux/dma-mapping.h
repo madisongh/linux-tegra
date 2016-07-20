@@ -323,6 +323,7 @@ static inline void *dma_alloc_writecombine(struct device *dev, size_t size,
 	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
 	return dma_alloc_attrs(dev, size, dma_addr, gfp, &attrs);
 }
+#define dma_alloc_wc dma_alloc_writecombine
 
 static inline void dma_free_writecombine(struct device *dev, size_t size,
 					 void *cpu_addr, dma_addr_t dma_addr)
@@ -331,6 +332,7 @@ static inline void dma_free_writecombine(struct device *dev, size_t size,
 	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
 	return dma_free_attrs(dev, size, cpu_addr, dma_addr, &attrs);
 }
+#define dma_free_wc dma_free_writecombine
 
 static inline int dma_mmap_writecombine(struct device *dev,
 					struct vm_area_struct *vma,
@@ -341,6 +343,8 @@ static inline int dma_mmap_writecombine(struct device *dev,
 	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
 	return dma_mmap_attrs(dev, vma, cpu_addr, dma_addr, size, &attrs);
 }
+#define dma_mmap_wc dma_mmap_writecombine
+
 #endif /* CONFIG_HAVE_DMA_ATTRS */
 
 #ifdef CONFIG_NEED_DMA_MAP_STATE
