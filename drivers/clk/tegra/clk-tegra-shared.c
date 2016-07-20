@@ -58,6 +58,7 @@ static struct tegra_shared_clk shared_clks[] = {
 	SHARED_CLK("cap.c3bus", "c3bus", SHARED_CEILING, 0, 0, NULL, tegra_clk_cap_c3bus),
 	SHARED_CLK("cap.throttle.c3bus", "c3bus", SHARED_CEILING, 0, 0, NULL, tegra_clk_cap_throttle_c3bus),
 	SHARED_CLK("override.c3bus", "c3bus", SHARED_OVERRIDE, 0, 0, NULL, tegra_clk_override_c3bus),
+	SHARED_CLK("floor.c3bus", "c3bus", SHARED_OVERRIDE, 0, 0, NULL, tegra_clk_floor_c3bus),
 	SHARED_CLK("cap.sclk", "sbus", SHARED_CEILING, 0, 0, NULL, tegra_clk_cap_sclk),
 	SHARED_CLK("cap.throttle.sclk", "sbus", SHARED_CEILING, 0, 0, NULL, tegra_clk_cap_throttle_sclk),
 	SHARED_CLK("floor.sclk", "sbus", 0, 0, 0, NULL, tegra_clk_floor_sclk),
@@ -150,6 +151,9 @@ static struct tegra_shared_clk shared_clks[] = {
 	SHARED_CLK("override.ape", "ape_master", SHARED_OVERRIDE, 0, 0, NULL, tegra_clk_override_ape),
 	SHARED_CLK("cap.vcore.abus", "abus", SHARED_CEILING, 0, 0, NULL, tegra_clk_cap_vcore_abus),
 	SHARED_CLK("override.abus", "abus", SHARED_OVERRIDE, 0, 0, NULL, tegra_clk_override_abus),
+	SHARED_CLK("vcm.sclk", "sbus", 0, 0, 0, NULL, tegra_clk_vcm_sclk),
+	SHARED_CLK("vcm.ahb.sclk", "sbus", 0, 0, 0, NULL, tegra_clk_vcm_ahb_sclk),
+	SHARED_CLK("vcm.apb.sclk", "sbus", 0, 0, 0, NULL, tegra_clk_vcm_apb_sclk),
 };
 
 void __init tegra_shared_clk_init(struct tegra_clk *tegra_clks)
