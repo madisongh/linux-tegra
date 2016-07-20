@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (c) 2010-2015, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2016, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -2219,6 +2219,10 @@ static unsigned long  tegra12x_hdmi_determine_parent(
 		f = m % 1000;  /* fractional parts */
 		f = (0 == f) ? f : (1000 - f);  /* round-up */
 		if (0 == f) {  /* exact match */
+			if ((ref / 2 * b) < 100000000) {
+				/* parent clock runs at a minumum of 100MHz */
+				continue;
+			}
 			b = n;
 			fr = f;
 			break;
