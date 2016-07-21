@@ -798,7 +798,7 @@ static void ufs_tegra_context_save(struct ufs_tegra_host *ufs_tegra)
 	len += reg_len;
 	if (ufs_tegra->x2config)
 		ufs_save_regs(ufs_tegra->mphy_l1_base,
-			mphy_context_save + reg_len, mphy_tx_apb, reg_len);
+			mphy_context_save + len, mphy_tx_apb, reg_len);
 }
 
 static void ufs_tegra_context_restore(struct ufs_tegra_host *ufs_tegra)
