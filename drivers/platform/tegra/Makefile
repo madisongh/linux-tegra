@@ -199,3 +199,6 @@ obj-$(CONFIG_DENVER_CPU)		+= denver-knobs.o
 obj-$(CONFIG_DENVER_DEBUG)		+= denver-hardwood.o
 
 obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
+
+obj-$(CONFIG_TEGRA_FIRMWARES_CLASS)	+= firmwares.o
+obj-$(CONFIG_TEGRA_FIRMWARES_INVENTORY)	+= firmwares-all.o
