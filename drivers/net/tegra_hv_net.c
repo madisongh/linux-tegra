@@ -3,7 +3,7 @@
  *
  * Very loosely based on virtio_net.c
  *
- * Copyright (C) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2014-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This file is licensed under the terms of the GNU General Public License
  * version 2.  This program is licensed "as is" without any warranty of any
@@ -702,12 +702,15 @@ static int tegra_hv_net_probe(struct platform_device *pdev)
 	ndev->priv_flags |= IFF_UNICAST_FLT | IFF_LIVE_ADDR_CHANGE;
 	ndev->hw_features = 0;	/* we're a really dumb device for now */
 	ndev->features |= ndev->hw_features;
-	/* get mac address from the DT */
 
+	/* get mac address from the DT */
 	hvn->mac_address = of_get_mac_address(dev->of_node);
 	if (hvn->mac_address == NULL) {
 		eth_hw_addr_random(ndev);
 		dev_warn(dev, "No valid mac-address found, using random\n");
+	} else {
+		/* Set the MAC address. */
+		ether_addr_copy(ndev->dev_addr, hvn->mac_address);
 	}
 
 	hvn->xmit_wq = alloc_workqueue("tgvnet-wq-%d",
