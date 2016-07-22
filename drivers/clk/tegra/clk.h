@@ -885,6 +885,17 @@ struct clk *tegra_clk_register_sbus_cmplx(const char *name,
 		unsigned long max_rate);
 void tegra_shared_clk_init(struct tegra_clk *tegra_clks);
 
+struct tegra_clk_skipper {
+	struct clk_hw hw;
+	void __iomem *reg;
+	spinlock_t *lock;
+};
+#define to_clk_skipper(_hw) container_of(_hw, struct tegra_clk_skipper, hw)
+
+struct clk *tegra_clk_register_skipper(const char *name,
+		const char *parent_name, void __iomem *reg,
+		unsigned long flags, spinlock_t *lock);
+
 void tegra114_clock_tune_cpu_trimmers_high(void);
 void tegra114_clock_tune_cpu_trimmers_low(void);
 void tegra114_clock_tune_cpu_trimmers_init(void);
