@@ -555,9 +555,10 @@ static ssize_t evdev_write(struct file *file, const char __user *buffer,
 			retval = -EFAULT;
 			goto out;
 		}
-	cnt = evdev_get_mask_cnt(event.type);
-	if (!cnt || event.code >= cnt)
-		goto out;
+
+		cnt = evdev_get_mask_cnt(event.type);
+		if (!cnt || event.code >= cnt)
+			goto out;
 
 		retval += input_event_size();
 
