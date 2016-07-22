@@ -1469,6 +1469,65 @@ static irqreturn_t adsp_wdt_handler(int irq, void *arg)
 	return IRQ_HANDLED;
 }
 
+void nvadsp_get_os_version(char *buf, int buf_size)
+{
+	struct nvadsp_drv_data *drv_data;
+	struct nvadsp_shared_mem *shared_mem;
+	struct nvadsp_os_info *os_info;
+
+	memset(buf, 0, buf_size);
+
+	if (!priv.pdev)
+		return;
+
+	drv_data = platform_get_drvdata(priv.pdev);
+	shared_mem = drv_data->shared_adsp_os_data;
+	os_info = &shared_mem->os_info;
+
+	strlcpy(buf, os_info->version, buf_size);
+}
+EXPORT_SYMBOL(nvadsp_get_os_version);
+
+#ifdef CONFIG_DEBUG_FS
+static int show_os_version(struct seq_file *s, void *data)
+{
+	char ver_buf[MAX_OS_VERSION_BUF] = "";
+
+	nvadsp_get_os_version(ver_buf, MAX_OS_VERSION_BUF);
+	seq_printf(s, "version=\"%s\"\n", ver_buf);
+
+	return 0;
+}
+
+static int os_version_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, show_os_version, inode->i_private);
+}
+
+static const struct file_operations version_fops = {
+	.open = os_version_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+#define RO_MODE S_IRUSR
+
+int adsp_create_os_version(struct dentry *adsp_debugfs_root)
+{
+	struct device *dev = &priv.pdev->dev;
+	struct dentry *d;
+
+	d = debugfs_create_file("adspos_version", RO_MODE, adsp_debugfs_root,
+				NULL, &version_fops);
+	if (!d) {
+		dev_err(dev, "failed to create adsp_version\n");
+		return -EINVAL;
+	}
+	return 0;
+}
+#endif
+
 int __init nvadsp_os_probe(struct platform_device *pdev)
 {
 	struct nvadsp_drv_data *drv_data = platform_get_drvdata(pdev);
@@ -1530,11 +1589,16 @@ int __init nvadsp_os_probe(struct platform_device *pdev)
 	priv.logger.dev = &pdev->dev;
 	if (adsp_create_debug_logger(drv_data->adsp_debugfs_root))
 		dev_err(dev, "unable to create adsp debug logger file\n");
+
 #ifdef CONFIG_TEGRA_ADSP_CONSOLE
 	priv.console.dev = &pdev->dev;
 	if (adsp_create_cnsl(drv_data->adsp_debugfs_root, &priv.console))
 		dev_err(dev, "unable to create adsp console file\n");
 #endif /* CONFIG_TEGRA_ADSP_CONSOLE */
+
+	if (adsp_create_os_version(drv_data->adsp_debugfs_root))
+		dev_err(dev, "unable to create adsp_version file\n");
+
 #endif /* CONFIG_DEBUG_FS */
 
 end:

@@ -124,10 +124,18 @@ struct nvadsp_os_args {
 	char		reserved[128];
 } __packed;
 
+/* ADSP OS info/status. Keep in sync with firmware. */
+#define MAX_OS_VERSION_BUF    32
+struct nvadsp_os_info {
+	char            version[MAX_OS_VERSION_BUF];
+	char            reserved[128];
+} __packed;
+
 /* ADSP OS shared memory */
 struct nvadsp_shared_mem {
 	struct nvadsp_app_shared_msg_pool app_shared_msg_pool;
 	struct nvadsp_os_args os_args;
+	struct nvadsp_os_info os_info;
 } __packed;
 
 
