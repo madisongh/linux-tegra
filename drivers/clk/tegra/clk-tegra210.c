@@ -2412,6 +2412,7 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_vcm_ahb_sclk] = { .dt_id = TEGRA210_CLK_VCM_AHB_SCLK, .present = true },
 	[tegra_clk_vcm_apb_sclk] = { .dt_id = TEGRA210_CLK_VCM_APB_SCLK, .present = true },
 	[tegra_clk_pll_a1] = { .dt_id = TEGRA210_CLK_PLL_A1, .present = true },
+	[tegra_clk_sclk_skipper] = { .dt_id = TEGRA210_CLK_SCLK_SKIPPER, .present = true },
 };
 
 static struct tegra_devclk devclks[] __initdata = {
@@ -3013,9 +3014,18 @@ static __init void tegra210_shared_clk_init(void)
 					0, 0, 0, "aclk");
 	clks[TEGRA210_CLK_ADSP_CPU_ABUS] = clk;
 
-	clk = tegra_clk_register_sbus_cmplx("sbus", "sclk", "sclk_mux", 0, "pclk",
-					"hclk", "pll_p_out2", "pll_c_out1",
-					108000000, 12000000, 384000000);
+	if (clks[TEGRA210_CLK_SCLK_SKIPPER]) {
+		clk = clks[TEGRA210_CLK_SCLK_SKIPPER];
+		clk = tegra_clk_register_sbus_cmplx("sbus",
+				__clk_get_name(clk), "sclk_mux", "sclk", 0,
+				"pclk", "hclk", "pll_p_out2", "pll_c_out1",
+				108000000, 12000000, 384000000);
+	} else {
+		clk = tegra_clk_register_sbus_cmplx("sbus", "sclk", "sclk_mux",
+				NULL, 0, "pclk", "hclk", "pll_p_out2",
+				"pll_c_out1", 108000000, 12000000,
+				384000000);
+	}
 	clk_register_clkdev(clk, "sbus", NULL);
 	clks[TEGRA210_CLK_SBUS] = clk;
 

@@ -822,11 +822,21 @@ enum shared_bus_users_mode {
 	SHARED_BW,
 	SHARED_ISO_BW,
 	SHARED_CEILING,
+	SHARED_CEILING_BUT_ISO,
 	SHARED_AUTO,
 	SHARED_OVERRIDE,
 };
 
 #define TEGRA_CLK_SHARED_MAGIC	0x18ce213d
+
+#define TEGRA_SHARED_BUS_RATE_LIMIT	BIT(0)
+#define TEGRA_SHARED_BUS_RETENTION	BIT(1)
+
+struct clk_div_sel {
+	struct clk_hw *src;
+	u32 div; /* stored as a 7.1 divider */
+	unsigned long rate;
+};
 
 struct tegra_clk_cbus_shared {
 	u32			magic;
@@ -838,18 +848,24 @@ struct tegra_clk_cbus_shared {
 	unsigned long		min_rate;
 	unsigned long		max_rate;
 	bool			rate_updating;
+	int			(*bus_update)(struct tegra_clk_cbus_shared *);
+	struct clk_hw		*top_user;
+	struct clk_hw		*slow_user;
+	struct clk		*top_clk;
+	unsigned long		override_rate;
 	union {
 		struct {
-			struct clk_hw	*top_user;
-			struct clk_hw	*slow_user;
-		} cbus;
-		struct {
 			struct clk_hw	*mux_clk;
+			struct clk_hw	*div_clk;
 			struct clk_hw	*pclk;
 			struct clk_hw	*hclk;
 			struct clk_hw	*sclk_low;
 			struct clk_hw	*sclk_high;
+			struct clk_hw	*apb_bus;
+			struct clk_hw	*ahb_bus;
 			unsigned long	threshold;
+			int round_table_size;
+			struct clk_div_sel *round_table;
 		} system;
 		struct {
 			struct list_head	node;
@@ -878,12 +894,15 @@ struct clk *tegra_clk_register_shared_master(const char *name,
 		const char *parent, unsigned long flags,
 		unsigned long min_rate, unsigned long max_rate);
 struct clk *tegra_clk_register_sbus_cmplx(const char *name,
-		const char *parent, const char *mux_clk,
+		const char *parent, const char *mux_clk, const char *div_clk,
 		unsigned long flags, const char *pclk, const char *hclk,
 		const char *sclk_low, const char *sclk_high,
 		unsigned long threshold, unsigned long min_rate,
 		unsigned long max_rate);
 void tegra_shared_clk_init(struct tegra_clk *tegra_clks);
+struct clk *tegra_clk_register_cascade_master(const char *name,
+		const char *parent, const char *topclkname,
+		unsigned long flags);
 
 struct tegra_clk_skipper {
 	struct clk_hw hw;
