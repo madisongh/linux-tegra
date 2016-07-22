@@ -430,6 +430,7 @@ enum clk_id {
 	tegra_clk_vcm_sclk,
 	tegra_clk_vcm_ahb_sclk,
 	tegra_clk_vcm_apb_sclk,
+	tegra_clk_sclk_skipper,
 	tegra_clk_max,
 };
 

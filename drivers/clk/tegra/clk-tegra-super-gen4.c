@@ -33,6 +33,7 @@
 #define CCLKG_BURST_POLICY 0x368
 #define CCLKLP_BURST_POLICY 0x370
 #define SCLK_BURST_POLICY 0x028
+#define SCLK_SKIPPER 0x02c
 #define SYSTEM_CLK_RATE 0x030
 #define SCLK_DIVIDER 0x2c
 
@@ -108,27 +109,33 @@ static void __init tegra_sclk_init(void __iomem *clk_base,
 				const struct tegra_super_gen_info *gen_info)
 {
 	struct clk *clk;
-	struct clk **dt_clk;
+	struct clk **dt_clk_mux, **dt_clk_skipper, **dt_clk;
 
 	/* SCLK_MUX */
-	dt_clk = tegra_lookup_dt_id(tegra_clk_sclk_mux, tegra_clks);
-	if (dt_clk) {
+	dt_clk_mux = tegra_lookup_dt_id(tegra_clk_sclk_mux, tegra_clks);
+	dt_clk_skipper = tegra_lookup_dt_id(tegra_clk_sclk_skipper, tegra_clks);
+	if (dt_clk_skipper || dt_clk_mux) {
 		clk = tegra_clk_register_super_mux("sclk_mux",
 						gen_info->sclk_parents,
 						gen_info->num_sclk_parents,
 						CLK_SET_RATE_PARENT,
 						clk_base + SCLK_BURST_POLICY,
 						0, 4, 0, 0, NULL);
-		*dt_clk = clk;
-
+		*dt_clk_mux = clk;
 
 		/* SCLK */
 		dt_clk = tegra_lookup_dt_id(tegra_clk_sclk, tegra_clks);
 		if (dt_clk) {
-			clk = clk_register_divider(NULL, "sclk", "sclk_mux", 0,
-						clk_base + SCLK_DIVIDER, 0, 8,
-						0, &sysrate_lock);
+			clk = tegra_clk_register_divider("sclk", "sclk_mux",
+						clk_base + SCLK_DIVIDER, 0, 0,
+						0, 8, 1, &sysrate_lock);
 			*dt_clk = clk;
+		}
+
+		if (dt_clk_skipper) {
+			clk = tegra_clk_register_skipper("sclk_skipper",
+				"sclk", clk_base + SCLK_SKIPPER, 0, NULL);
+			*dt_clk_skipper = clk;
 		}
 	} else {
 		/* SCLK */
