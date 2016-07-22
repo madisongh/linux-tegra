@@ -30,3 +30,4 @@ obj-$(CONFIG_ARCH_TEGRA_210_SOC)	+= clk-tegra210.o
 obj-$(CONFIG_ARCH_TEGRA_210_SOC)	+= clk-emc-t210.o
 obj-y					+= clk-cbus-shared.o
 obj-y					+= clk-skipper.o
+obj-y					+= div71.o

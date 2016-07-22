@@ -928,4 +928,7 @@ void tegra_clk_periph_force_on(u32 *clks_on, int count, void __iomem *clk_base);
 void tegra_clk_osc_resume(void __iomem *clk_base);
 #endif
 
+int div71_get(unsigned long rate, unsigned parent_rate, u8 width,
+	      u8 frac_width, u8 flags);
+
 #endif /* TEGRA_CLK_H */
