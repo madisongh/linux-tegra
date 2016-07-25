@@ -11,6 +11,11 @@
 #define _DT_BINDINGS_DRIVER_INFO_H
 
 /*
+ * kernel 4.4 definition
+ */
+#define KERNEL_VERSION_4_4
+
+/*
  * SDMMC core in kernel 4.4 handles the chip specific regulator and hence
  * provide all regulator with core name supply.
  */
