@@ -30,6 +30,7 @@ obj-$(CONFIG_PINCTRL_TEGRA114)	+= pinctrl-tegra114.o
 obj-$(CONFIG_PINCTRL_TEGRA124)	+= pinctrl-tegra124.o
 obj-$(CONFIG_PINCTRL_TEGRA210)	+= pinctrl-tegra210.o
 obj-$(CONFIG_PINCTRL_TEGRA_XUSB)	+= pinctrl-tegra-xusb.o
+obj-$(CONFIG_PINCTRL_TEGRA21x_PADCTL_UPHY) += pinctrl-tegra21x-padctl-uphy.o
 obj-$(CONFIG_PINCTRL_TZ1090)	+= pinctrl-tz1090.o
 obj-$(CONFIG_PINCTRL_TZ1090_PDC)	+= pinctrl-tz1090-pdc.o
 obj-$(CONFIG_PINCTRL_U300)	+= pinctrl-u300.o
