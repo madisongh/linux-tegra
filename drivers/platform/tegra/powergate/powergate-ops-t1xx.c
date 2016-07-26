@@ -84,7 +84,7 @@ static int __tegra1xx_unpowergate(int id, struct powergate_partition_info *pg_in
 		get_slcg_info(pg_info);
 
 	if (tegra_powergate_is_powered(id)) {
-		if (is_partition_clk_disabled(pg_info) && !clk_disable) {
+		if (!clk_disable) {
 			ret = partition_clk_enable(pg_info);
 			if (ret)
 				return ret;
