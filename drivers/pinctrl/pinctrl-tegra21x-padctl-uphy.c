@@ -1643,22 +1643,24 @@ static int tegra_padctl_uphy_pinconf_group_set(struct pinctrl_dev *pinctrl,
 			} else if (lane_is_otg(group)) {
 				int port = group - PIN_OTG_0;
 
+				if (!uphy->utmi_ports[port].used_by_xusb)
+					break;
+
 				uphy->utmi_ports[port].port_cap = value;
 				TRACE(dev, "UTMI port %d cap %lu\n",
-				      port, value);
+					  port, value);
 				if (value == OTG) {
 					if (uphy->utmi_otg_port_base_1)
-						dev_warn(dev, "enabling OTG on multiple UTMI ports\n");
+						dev_warn(dev,
+				"enabling OTG on multiple UTMI ports\n");
 
-					dev_info(dev, "using UTMI port %d for otg\n",
-						 port);
-
-					uphy->utmi_otg_port_base_1 =
-								port + 1;
+					dev_info(dev,
+					"using UTMI port %d for otg\n", port);
+					uphy->utmi_otg_port_base_1 = port + 1;
 				}
 			} else {
-				dev_err(dev, "port-cap not applicable for pin %d\n",
-					group);
+				dev_err(dev,
+				"port-cap not applicable for pin %d\n", group);
 				return -EINVAL;
 			}
 
@@ -2976,11 +2978,70 @@ static inline bool is_utmi_phy(struct phy *phy)
 	return phy->ops == &utmi_phy_ops;
 }
 
+static int tegra21x_snps_phy_init(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
+
+	TRACE(uphy->dev, "phy init SNPS\n");
+
+	return 0;
+}
+
+static int tegra21x_snps_phy_exit(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
+
+	TRACE(uphy->dev, "phy exit SNPS\n");
+
+	return 0;
+}
+
+static int tegra21x_snps_phy_power_on(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
+
+	mutex_lock(&uphy->lock);
+
+	TRACE(uphy->dev, "power on SNPS\n");
+
+	if (uphy->utmi_enable++ > 0) {
+		uphy->utmipll_use_count++;
+		goto out;
+	}
+
+	uphy->utmipll_use_count++;
+	tegra21x_utmipll_enable(uphy);
+	tegra21x_usb2_trk_on(uphy);
+
+out:
+	mutex_unlock(&uphy->lock);
+
+	return 0;
+}
+
+static int tegra21x_snps_phy_power_off(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
+
+	mutex_lock(&uphy->lock);
+
+	TRACE(uphy->dev, "power off SNPS\n");
+
+	if (--uphy->utmi_enable == 0)
+		tegra21x_usb2_trk_off(uphy);
+	if (--uphy->utmipll_use_count == 0)
+		tegra21x_utmipll_disable(uphy);
+
+	mutex_unlock(&uphy->lock);
+
+	return 0;
+}
+
 static const struct phy_ops snps_phy_ops = {
-	.init = tegra21x_utmi_phy_init,
-	.exit = tegra21x_utmi_phy_exit,
-	.power_on = tegra21x_utmi_phy_power_on,
-	.power_off = tegra21x_utmi_phy_power_off,
+	.init = tegra21x_snps_phy_init,
+	.exit = tegra21x_snps_phy_exit,
+	.power_on = tegra21x_snps_phy_power_on,
+	.power_off = tegra21x_snps_phy_power_off,
 	.owner = THIS_MODULE,
 };
 
@@ -3410,8 +3471,10 @@ static struct phy *tegra21x_padctl_uphy_xlate(struct device *dev,
 		(index < TEGRA_PADCTL_UPHY_SNPS_BASE + 16)) {
 
 		phy_index = index - TEGRA_PADCTL_UPHY_SNPS_BASE;
-		if (phy_index < TEGRA_SNPS_PHYS)
+		if (phy_index < TEGRA_SNPS_PHYS) {
 			phy = uphy->snps_phys[phy_index];
+			TRACE(dev, "returning snps_phys[%d]\n", phy_index);
+		}
 	}
 
 	return (phy) ? phy : ERR_PTR(-EINVAL);
