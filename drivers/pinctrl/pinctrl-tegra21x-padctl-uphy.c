@@ -29,6 +29,7 @@
 #include <linux/usb.h>
 #include <linux/tegra_prod.h>
 #include <linux/tegra-powergate.h>
+#include <linux/tegra-pmc.h>
 
 #include <soc/tegra/fuse.h>
 #include <soc/tegra/xusb.h>
@@ -464,6 +465,8 @@ struct tegra_padctl_uphy {
 
 	struct regulator_bulk_data *supplies;
 	struct padctl_context padctl_context;
+
+	struct tegra_utmi_pad_config utmi_pad_cfg;
 };
 
 #ifdef VERBOSE_DEBUG
@@ -2600,6 +2603,19 @@ static int utmi_phy_to_port(struct phy *phy)
 	return -EINVAL;
 }
 
+static void tegra21x_utmi_phy_get_pad_config(struct tegra_padctl_uphy *uphy,
+				int port, struct tegra_utmi_pad_config *config)
+{
+	u32 reg;
+
+	reg = padctl_readl(uphy, XUSB_PADCTL_USB2_BIAS_PAD_CTL_1);
+	config->tctrl = TCTRL_VALUE(reg);
+	config->pctrl = PCTRL_VALUE(reg);
+
+	reg = padctl_readl(uphy, XUSB_PADCTL_USB2_OTG_PADX_CTL_1(port));
+	config->rpd_ctrl = RPD_CTRL_VALUE(reg);
+}
+
 static bool tegra21x_utmi_phy_xusb_partitions_powergated(void)
 {
 	int partition_id_xusbb, partition_id_xusbc;
@@ -4123,12 +4139,15 @@ int tegra_phy_xusb_enable_sleepwalk(struct phy *phy,
 		port = utmi_phy_to_port(phy);
 		if (port < 0)
 			return -EINVAL;
-		return -EINVAL;
+		tegra21x_utmi_phy_get_pad_config(uphy, port,
+							&uphy->utmi_pad_cfg);
+		return tegra_pmc_utmi_phy_enable_sleepwalk(port, speed,
+							&uphy->utmi_pad_cfg);
 	} else if (is_hsic_phy(phy)) {
 		port = hsic_phy_to_port(phy);
 		if (port < 0)
 			return -EINVAL;
-		return -EINVAL;
+		return tegra_pmc_hsic_phy_enable_sleepwalk(port);
 	} else if (is_usb3_phy(phy)) {
 		port = usb3_phy_to_port(phy);
 		if (port < 0)
@@ -4148,12 +4167,12 @@ int tegra_phy_xusb_disable_sleepwalk(struct phy *phy)
 		port = utmi_phy_to_port(phy);
 		if (port < 0)
 			return -EINVAL;
-		return -EINVAL;
+		return tegra_pmc_utmi_phy_disable_sleepwalk(port);
 	} else if (is_hsic_phy(phy)) {
 		port = hsic_phy_to_port(phy);
 		if (port < 0)
 			return -EINVAL;
-		return -EINVAL;
+		return tegra_pmc_hsic_phy_disable_sleepwalk(port);
 	} else if (is_usb3_phy(phy)) {
 		port = usb3_phy_to_port(phy);
 		if (port < 0)

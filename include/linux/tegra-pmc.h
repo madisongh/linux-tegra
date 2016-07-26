@@ -1,7 +1,7 @@
 /*
  * PMC interface for NVIDIA SoCs Tegra
  *
- * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Laxman Dewangan <ldewangan@nvidia.com>
  *
@@ -25,6 +25,7 @@
 #include <linux/device.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/usb/ch9.h>
 
 extern void tegra_pmc_enable_wake_det(bool enable);
 extern void tegra_pmc_set_dpd_sample(void);
@@ -124,6 +125,18 @@ bool tegra_pmc_cpu_is_powered(int cpuid);
 int tegra_pmc_cpu_power_on(int cpuid);
 int tegra_pmc_cpu_remove_clamping(int cpuid);
 struct pmc_pm_data *tegra_get_pm_data(void);
+
+/* T210 SLEEPWALK APIs */
+struct tegra_utmi_pad_config {
+	u32 tctrl;
+	u32 pctrl;
+	u32 rpd_ctrl;
+};
+int tegra_pmc_utmi_phy_enable_sleepwalk(int port, enum usb_device_speed speed,
+					struct tegra_utmi_pad_config *config);
+int tegra_pmc_utmi_phy_disable_sleepwalk(int port);
+int tegra_pmc_hsic_phy_enable_sleepwalk(int port);
+int tegra_pmc_hsic_phy_disable_sleepwalk(int port);
 
 extern void tegra_pmc_config_thermal_trip(struct tegra_thermtrip_pmic_data *data);
 
