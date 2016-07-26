@@ -123,7 +123,7 @@ static inline u32 tegra_rtc_check_busy(struct tegra_rtc_info *info)
  * The behavior of this function allows us to make some assumptions without
  * introducing a race, because 250uS is plenty of time to read/write a value.
  */
-static int tegra_rtc_wait_while_busy(struct device *dev)
+static int tegra_rtc_wait_while_busy(struct device *dev, bool is_read)
 {
 	struct tegra_rtc_info *info = dev_get_drvdata(dev);
 
@@ -137,11 +137,17 @@ static int tegra_rtc_wait_while_busy(struct device *dev)
 		udelay(1);
 	}
 
+	/* Updated value can take nearly 250us to reflect in shadow
+	 * registers. Wait to read latest value.
+	 */
+	if (is_read)
+		udelay(250);
+
 	/* now we have about 250 us to manipulate registers */
 	return 0;
 
 retry_failed:
-	dev_err(dev, "write failed:retry count exceeded.\n");
+	dev_err(dev, "Timeout accessing RTC device.\n");
 	return -ETIMEDOUT;
 }
 
@@ -150,6 +156,12 @@ static int tegra_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	struct tegra_rtc_info *info = dev_get_drvdata(dev);
 	unsigned long sec, msec;
 	unsigned long sl_irq_flags;
+	int ret;
+
+	/* Ensure there is no pending write to get latest time */
+	ret = tegra_rtc_wait_while_busy(dev, true);
+	if (ret)
+		dev_warn(dev, "Reading old value\n");
 
 	/* RTC hardware copies seconds to shadow seconds when a read
 	 * of milliseconds occurs. use a lock to keep other threads out. */
@@ -199,7 +211,7 @@ static int tegra_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	);
 
 	/* seconds only written if wait succeeded. */
-	ret = tegra_rtc_wait_while_busy(dev);
+	ret = tegra_rtc_wait_while_busy(dev, false);
 	if (!ret)
 		writel(sec, info->rtc_base + TEGRA_RTC_REG_SECONDS);
 
@@ -214,7 +226,11 @@ static int tegra_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	struct tegra_rtc_info *info = dev_get_drvdata(dev);
 	unsigned long sec;
 	unsigned tmp;
+	int ret;
 
+	ret = tegra_rtc_wait_while_busy(dev, true);
+	if (ret)
+		dev_warn(dev, "Reading old value\n");
 	sec = readl(info->rtc_base + TEGRA_RTC_REG_SECONDS_ALARM0);
 
 	if (sec == 0) {
@@ -244,7 +260,7 @@ static int tegra_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
 	unsigned status;
 	unsigned long sl_irq_flags;
 
-	tegra_rtc_wait_while_busy(dev);
+	tegra_rtc_wait_while_busy(dev, false);
 	spin_lock_irqsave(&info->tegra_rtc_lock, sl_irq_flags);
 
 	/* read the original value, and OR in the flag. */
@@ -268,7 +284,7 @@ static int __tegra_rtc_set_alarm(struct device *dev, unsigned long period,
 	unsigned int sec, msec;
 	int ret;
 
-	ret = tegra_rtc_wait_while_busy(dev);
+	ret = tegra_rtc_wait_while_busy(dev, false);
 	if (ret) {
 		dev_err(dev, "Timeout accessing RTC\n");
 		return ret;
@@ -332,21 +348,21 @@ static irqreturn_t tegra_rtc_irq_handler(int irq, void *data)
 	mask &= ~status;
 	if (status) {
 		/* clear the interrupt masks and status on any irq. */
-		ret = tegra_rtc_wait_while_busy(dev);
-		if (ret) {
-			pr_err("Timeout accessing Tegra RTC\n");
+		ret = tegra_rtc_wait_while_busy(dev, false);
+		if (ret)
 			return ret;
-		}
 		spin_lock_irqsave(&info->tegra_rtc_lock, sl_irq_flags);
 		writel(mask, info->rtc_base + TEGRA_RTC_REG_INTR_MASK);
+		spin_unlock_irqrestore(&info->tegra_rtc_lock, sl_irq_flags);
+		ret = tegra_rtc_wait_while_busy(dev, false);
+		if (ret)
+			return ret;
+		spin_lock_irqsave(&info->tegra_rtc_lock, sl_irq_flags);
 		writel(status, info->rtc_base + TEGRA_RTC_REG_INTR_STATUS);
 		spin_unlock_irqrestore(&info->tegra_rtc_lock, sl_irq_flags);
 	}
 
-	if (status & TEGRA_RTC_INTR_STATUS_SEC_ALARM0)
-		rtc_aie_update_irq(info->rtc_dev);
-	else
-		rtc_update_irq(info->rtc_dev, 1, RTC_IRQF | RTC_UF);
+	rtc_update_irq(info->rtc_dev, 1, RTC_IRQF | RTC_UF);
 
 	return IRQ_HANDLED;
 }
@@ -383,11 +399,9 @@ void tegra_rtc_set_trigger(unsigned long cycles)
 	if (msec)
 		msec = 0x80000000UL | (0x0fffffff & msec);
 
-	ret = tegra_rtc_wait_while_busy(dev);
-	if (ret) {
-		pr_err("Timeout accessing Tegra RTC\n");
+	ret = tegra_rtc_wait_while_busy(dev, true);
+	if (ret)
 		return;
-	}
 	now = readl(info->rtc_base + TEGRA_RTC_REG_MILLI_SECONDS);
 	now += readl(info->rtc_base + TEGRA_RTC_REG_SHADOW_SECONDS) *
 						MSEC_PER_SEC;
@@ -396,11 +410,9 @@ void tegra_rtc_set_trigger(unsigned long cycles)
 	writel(msec, info->rtc_base + TEGRA_RTC_REG_MSEC_CDN_ALARM0);
 	trace_tegra_rtc_set_alarm(now, tgt);
 
-	ret = tegra_rtc_wait_while_busy(dev);
-	if (ret) {
-		pr_err("Timeout accessing Tegra RTC\n");
+	ret = tegra_rtc_wait_while_busy(dev, false);
+	if (ret)
 		return;
-	}
 
 	if (msec)
 		tegra_rtc_msec_alarm_irq_enable(info, 1);
@@ -511,13 +523,13 @@ static void tegra_rtc_follow_tsc(struct device *dev)
 	struct tegra_rtc_info *info = dev_get_drvdata(dev);
 	int ret;
 
-	ret = tegra_rtc_wait_while_busy(dev);
+	ret = tegra_rtc_wait_while_busy(dev, false);
 	if (ret < 0) {
 		dev_err(&info->pdev->dev, "Timeout accessing Tegra RTC\n");
 		return;
 	}
 	writel(TEGRA_RTC_RTCDR_USE_MTSC, info->rtc_base + TEGRA_RTC_RTCDR);
-	ret = tegra_rtc_wait_while_busy(dev);
+	ret = tegra_rtc_wait_while_busy(dev, false);
 	if (ret < 0) {
 		dev_err(&info->pdev->dev, "Timeout accessing Tegra RTC\n");
 		return;
@@ -573,8 +585,17 @@ static int __init tegra_rtc_probe(struct platform_device *pdev)
 	}
 
 	/* clear out the hardware. */
+	ret = tegra_rtc_wait_while_busy(&pdev->dev, false);
+	if (ret)
+		return ret;
 	writel(0, info->rtc_base + TEGRA_RTC_REG_MSEC_CDN_ALARM0);
+	ret = tegra_rtc_wait_while_busy(&pdev->dev, false);
+	if (ret)
+		return ret;
 	writel(0xffffffff, info->rtc_base + TEGRA_RTC_REG_INTR_STATUS);
+	ret = tegra_rtc_wait_while_busy(&pdev->dev, false);
+	if (ret)
+		return ret;
 	writel(0, info->rtc_base + TEGRA_RTC_REG_INTR_MASK);
 
 	if(cdata->follow_tsc)
@@ -624,7 +645,7 @@ static int tegra_rtc_suspend(struct device *dev)
 {
 	struct tegra_rtc_info *info = dev_get_drvdata(dev);
 
-	tegra_rtc_wait_while_busy(dev);
+	tegra_rtc_wait_while_busy(dev, false);
 
 	dev_vdbg(dev, "Suspend (device_may_wakeup=%d) irq:%d\n",
 		device_may_wakeup(dev), info->tegra_rtc_irq);
