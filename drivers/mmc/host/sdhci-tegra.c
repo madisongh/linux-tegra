@@ -919,17 +919,18 @@ static int tegra_sdhci_configure_regulators(struct sdhci_host *sdhci,
 	switch (option) {
 	case CONFIG_REG_GET:
 		tegra_host->vdd_io_reg = regulator_get(mmc_dev(sdhci->mmc),
-			"vqmmc");
+			"vddio_sdmmc");
 		if (IS_ERR_OR_NULL(tegra_host->vdd_io_reg)) {
 			dev_info(mmc_dev(sdhci->mmc), "%s regulator not found: %ld",
-				"vqmmc", PTR_ERR(tegra_host->vdd_io_reg));
+				"vddio_sdmmc", PTR_ERR(tegra_host->vdd_io_reg));
 			tegra_host->vdd_io_reg = NULL;
 		}
 		tegra_host->vdd_slot_reg = regulator_get(mmc_dev(sdhci->mmc),
-			"vmmc");
+			"vdd_sd_slot");
 		if (IS_ERR_OR_NULL(tegra_host->vdd_slot_reg)) {
-			dev_info(mmc_dev(sdhci->mmc), "%s regulator not found: %ld",
-				"vmmc" , PTR_ERR(tegra_host->vdd_slot_reg));
+			dev_info(mmc_dev(sdhci->mmc),
+				"%s regulator not found: %ld", "vdd_sd_slot",
+				PTR_ERR(tegra_host->vdd_slot_reg));
 			tegra_host->vdd_slot_reg = NULL;
 		}
 	break;
@@ -1113,6 +1114,9 @@ static int tegra_sdhci_signal_voltage_switch(struct sdhci_host *sdhci,
 	u16 ctrl;
 	unsigned int clock;
 
+	if (!tegra_host->vdd_io_reg)
+		return -ENOTSUPP;
+
 	ctrl = sdhci_readw(sdhci, SDHCI_HOST_CONTROL2);
 	if (signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
 		ctrl |= SDHCI_CTRL_VDD_180;
@@ -1171,14 +1175,21 @@ static void tegra_sdhci_pre_voltage_switch(struct sdhci_host *sdhci,
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	unsigned int min_uV;
 
-	if (!tegra_host || !(tegra_host->vdd_io_reg))
+	if (!tegra_host ||
+		(!tegra_host->vdd_io_reg && !sdhci->mmc->supply.vqmmc))
 		return;
 
 	min_uV = tegra_host->vddio_min_uv;
 	if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
 		min_uV = SDHOST_LOW_VOLT_MIN;
 
-	tegra_host->vddio_prev = regulator_get_voltage(tegra_host->vdd_io_reg);
+	if (tegra_host->vdd_io_reg)
+		tegra_host->vddio_prev =
+			regulator_get_voltage(tegra_host->vdd_io_reg);
+	else
+		tegra_host->vddio_prev =
+			regulator_get_voltage(sdhci->mmc->supply.vqmmc);
+
 	/* set pwrdet sdmmc1 before set 3.3 V */
 	if (signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
 		if ((tegra_host->vddio_prev < min_uV) &&
@@ -1187,24 +1198,33 @@ static void tegra_sdhci_pre_voltage_switch(struct sdhci_host *sdhci,
 				SDHOST_HIGH_VOLT_3V3);
 		}
 	}
+	tegra_host->check_pad_ctrl_setting = true;
 }
 
 static void tegra_sdhci_post_voltage_switch(struct sdhci_host *sdhci,
-	unsigned char signal_voltage)
+	unsigned char signal_voltage, int voltage_switch_status)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	int voltage;
-	bool set;
+	bool set, change_padctrl;
 
-	if (!tegra_host || !(tegra_host->vdd_io_reg))
+	if (!tegra_host ||
+		(!tegra_host->vdd_io_reg && !sdhci->mmc->supply.vqmmc))
 		return;
 
 	if (tegra_host->check_pad_ctrl_setting) {
-		voltage = regulator_get_voltage(tegra_host->vdd_io_reg);
+		if (tegra_host->vdd_io_reg) {
+			voltage = regulator_get_voltage(tegra_host->vdd_io_reg);
+			change_padctrl = tegra_host->set_1v8_status;
+		} else {
+			voltage = regulator_get_voltage(
+				sdhci->mmc->supply.vqmmc);
+			change_padctrl = voltage_switch_status;
+		}
 		set = (signal_voltage == MMC_SIGNAL_VOLTAGE_180) ? true : false;
 		if (set && (voltage <= tegra_host->vddio_prev) &&
-				tegra_host->set_1v8_status) {
+				change_padctrl) {
 			tegra_sdhci_set_padctrl(sdhci, SDHOST_LOW_VOLT_MAX);
 		}
 	}
@@ -1237,7 +1257,14 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 	if (!ret) {
 		tegra_sdhci_pre_voltage_switch(sdhci, signal_voltage);
 		ret = tegra_sdhci_signal_voltage_switch(sdhci, signal_voltage);
-		tegra_sdhci_post_voltage_switch(sdhci, signal_voltage);
+		/*
+		 * Ignore Not supported error as this means vmmc,vqmmc
+		 * regulators are being used.
+		 */
+		if ((ret == -ENOTSUPP) && !tegra_host->vdd_io_reg)
+			ret = 0;
+		tegra_sdhci_post_voltage_switch(sdhci, signal_voltage,
+			ret ? 0 : 1);
 	}
 
 	return ret;
@@ -1343,6 +1370,14 @@ static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
 	return 0;
 }
 
+static void tegra_sdhci_pre_regulator_config(struct sdhci_host *sdhci, int vdd)
+{
+	if (!vdd)
+		return;
+
+	tegra_sdhci_configure_e_input(sdhci, true);
+}
+
 static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_ro     = tegra_sdhci_get_ro,
 	.card_event = sdhci_tegra_card_event,
@@ -1367,6 +1402,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_max_tuning_loop_counter = sdhci_tegra_get_max_tuning_loop_counter,
 	.post_tuning	= tegra_sdhci_post_tuning,
 	.is_tuning_done		= tegra_sdhci_is_tuning_done,
+	.pre_regulator_config	= tegra_sdhci_pre_regulator_config,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -1709,6 +1745,11 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		tegra_host->vddio_max_uv = SDHOST_HIGH_VOLT_MAX;
 	}
 
+	if (plat->ocr_mask & SDHOST_1V8_OCR_MASK)
+		host->ocr_mask = MMC_VDD_165_195;
+	else
+		host->ocr_mask = MMC_VDD_27_36 | MMC_VDD_165_195;
+
 	rc = tegra_sdhci_configure_regulators(host, CONFIG_REG_GET, 0, 0);
 	if (!rc) {
 		tegra_sdhci_pre_voltage_switch(host, MMC_SIGNAL_VOLTAGE_330);
@@ -1727,7 +1768,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 				dev_err(&pdev->dev,
 					" voltage enable failed in probe, err: %d\n"
 					, rc);
-			tegra_sdhci_post_voltage_switch(host, signal_voltage);
+			tegra_sdhci_post_voltage_switch(host, signal_voltage,
+				rc);
 		}
 	}
 	if (plat->en_strobe)
