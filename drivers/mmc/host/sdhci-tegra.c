@@ -430,6 +430,13 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 			dev_err(mmc_dev(sdhci->mmc),
 				"%s: error %d in prod settings\n",
 				__func__, err);
+	} else {
+		ctrl = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
+		ctrl &= ~(SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK <<
+				SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
+		ctrl |= (tap_delay <<
+				SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
+		sdhci_writel(sdhci, ctrl, SDHCI_VNDR_CLK_CTRL);
 	}
 
 	ctrl = sdhci_readl(sdhci, SDHCI_VNDR_TUN_CTRL0_0);
