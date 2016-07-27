@@ -808,6 +808,15 @@ static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 				SET_DEFAULT_TAP);
 	}
 
+	if (timing == MMC_TIMING_MMC_HS200) {
+		err = tegra_prod_set_by_name(&host->ioaddr,
+				"trim-delay-hs200", tegra_host->prods);
+		if (err < 0)
+			dev_dbg(mmc_dev(host->mmc),
+				"%s: error %d in prod settings\n",
+				__func__, err);
+	}
+
 	if (set_1v8_calib_offsets && !tegra_host->calib_1v8_offsets_done) {
 		tegra_sdhci_do_calibration(host,
 			host->mmc->ios.signal_voltage);
