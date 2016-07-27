@@ -168,6 +168,7 @@ struct mmc_host_ops {
 	void	(*clear_cqe_intr)(struct mmc_host *host, u32 intmask);
 	void	(*discard_cqe_task)(struct mmc_host *host, u8 tag, bool all);
 	void	(*enable_host_int)(struct mmc_host *host, bool enable);
+	void	(*pre_regulator_config)(struct mmc_host *host, int vdd);
 };
 
 struct mmc_card;
@@ -309,6 +310,12 @@ struct mmc_host {
 #define MMC_VDD_33_34		0x00200000	/* VDD voltage 3.3 ~ 3.4 */
 #define MMC_VDD_34_35		0x00400000	/* VDD voltage 3.4 ~ 3.5 */
 #define MMC_VDD_35_36		0x00800000	/* VDD voltage 3.5 ~ 3.6 */
+
+#define MMC_VDD_27_36		(MMC_VDD_26_27 | MMC_VDD_27_28 |	\
+				MMC_VDD_28_29 | MMC_VDD_29_30 |	\
+				MMC_VDD_30_31 | MMC_VDD_31_32 |	\
+				MMC_VDD_32_33 | MMC_VDD_33_34 |	\
+				MMC_VDD_34_35 | MMC_VDD_35_36)
 
 	u32			caps;		/* Host capabilities */
 

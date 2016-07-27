@@ -2,6 +2,7 @@
  *  linux/drivers/mmc/sdio.c
  *
  *  Copyright 2006-2007 Pierre Ossman
+ *  Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1102,7 +1103,18 @@ int mmc_attach_sdio(struct mmc_host *host)
 		host->ocr_avail = host->ocr_avail_sdio;
 
 
-	rocr = mmc_select_voltage(host, ocr);
+	/*
+	 * SDIO devices can support 1.8V but SDIO spec doesn't define any bits
+	 * in OCR register for 1.8V voltage window. Bit 24 indicates 1.8V
+	 * voltage switching support only. As this is checked at a later point,
+	 * skip selecting voltages if the host indicates support only for 1.8V.
+	 * Also, if the host only supports low voltage(1.8V), mask 2.7-3.6V VDD
+	 * range from the card returned OCR.
+	 */
+	if (host->ocr_avail == MMC_VDD_165_195)
+		rocr = ((ocr | MMC_VDD_165_195) & ~MMC_VDD_27_36);
+	else
+		rocr = mmc_select_voltage(host, ocr);
 
 	/*
 	 * Can we support the voltage(s) of the card(s)?

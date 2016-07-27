@@ -59,6 +59,7 @@ static void sdhci_enable_preset_value(struct sdhci_host *host, bool enable);
 static int sdhci_pre_dma_transfer(struct sdhci_host *host,
 					struct mmc_data *data);
 static int sdhci_do_get_cd(struct sdhci_host *host);
+static void sdhci_regulator_config_pre(struct mmc_host *mmc, int vdd);
 
 #ifdef CONFIG_PM
 static int sdhci_runtime_pm_get(struct sdhci_host *host);
@@ -1386,6 +1387,7 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
 			break;
 		case MMC_VDD_32_33:
 		case MMC_VDD_33_34:
+		case MMC_VDD_35_36:
 			pwr = SDHCI_POWER_330;
 			break;
 		default:
@@ -1949,9 +1951,12 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 	u16 ctrl;
 	int ret;
 
-	if (host->ops->switch_signal_voltage)
-		return host->ops->switch_signal_voltage(host,
+	if (host->ops->switch_signal_voltage) {
+		ret = host->ops->switch_signal_voltage(host,
 			ios->signal_voltage);
+		if (ret != -ENOTSUPP)
+			return ret;
+	}
 
 	/*
 	 * Signal Voltage Switching is only applicable for Host Controllers
@@ -1962,6 +1967,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 
 	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 
+	sdhci_regulator_config_pre(mmc, ios->vdd);
 	switch (ios->signal_voltage) {
 	case MMC_SIGNAL_VOLTAGE_330:
 		/* Set 1.8V Signal Enable in the Host Control2 register to 0 */
@@ -2054,7 +2060,7 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
 	/* Do any post voltage switch platform specific configuration */
 	if  (host->ops->switch_signal_voltage_exit)
 		host->ops->switch_signal_voltage_exit(host,
-			ios->signal_voltage);
+			ios->signal_voltage, err ? 0 : 1);
 	sdhci_runtime_pm_put(host);
 	return err;
 }
@@ -2447,6 +2453,14 @@ static void sdhci_card_event(struct mmc_host *mmc)
 	spin_unlock_irqrestore(&host->lock, flags);
 }
 
+static void sdhci_regulator_config_pre(struct mmc_host *mmc, int vdd)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+
+	if (host->ops->pre_regulator_config)
+		host->ops->pre_regulator_config(host, vdd);
+}
+
 static const struct mmc_host_ops sdhci_ops = {
 	.request	= sdhci_request,
 	.post_req	= sdhci_post_req,
@@ -2466,6 +2480,7 @@ static const struct mmc_host_ops sdhci_ops = {
 	.clear_cqe_intr	= sdhci_clear_cqe_interrupt,
 	.discard_cqe_task	= sdhci_cqe_task_discard_rq,
 	.enable_host_int	= sdhci_enable_host_interrupts,
+	.pre_regulator_config	= sdhci_regulator_config_pre,
 };
 
 /*****************************************************************************\
@@ -3096,7 +3111,7 @@ EXPORT_SYMBOL_GPL(sdhci_runtime_suspend_host);
 int sdhci_runtime_resume_host(struct sdhci_host *host)
 {
 	unsigned long flags;
-	int host_flags = host->flags;
+	int host_flags = host->flags, err;
 
 	if (host_flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA)) {
 		if (host->ops->enable_dma)
@@ -3108,7 +3123,10 @@ int sdhci_runtime_resume_host(struct sdhci_host *host)
 	/* Force clock and power re-program */
 	host->pwr = 0;
 	host->clock = 0;
-	sdhci_do_start_signal_voltage_switch(host, &host->mmc->ios);
+	err = sdhci_do_start_signal_voltage_switch(host, &host->mmc->ios);
+	if (host->ops->switch_signal_voltage_exit)
+		host->ops->switch_signal_voltage_exit(host,
+			host->mmc->ios.signal_voltage, err ? 0 : 1);
 	sdhci_do_set_ios(host, &host->mmc->ios);
 
 	if ((host_flags & SDHCI_PV_ENABLED) &&
@@ -3550,6 +3568,7 @@ int sdhci_add_host(struct sdhci_host *host)
 
 	/* If vqmmc regulator and no 1.8V signalling, then there's no UHS */
 	if (!IS_ERR(mmc->supply.vqmmc)) {
+		sdhci_regulator_config_pre(mmc, 1);
 		ret = regulator_enable(mmc->supply.vqmmc);
 		if (!regulator_is_supported_voltage(mmc->supply.vqmmc, 1700000,
 						    1950000))
@@ -3679,13 +3698,13 @@ int sdhci_add_host(struct sdhci_host *host)
 				   SDHCI_MAX_CURRENT_MULTIPLIER;
 	}
 
-	/* If OCR set by host, use it instead. */
-	if (host->ocr_mask)
-		ocr_avail = host->ocr_mask;
-
 	/* If OCR set by external regulators, give it highest prio. */
 	if (mmc->ocr_avail)
 		ocr_avail = mmc->ocr_avail;
+
+	/* If OCR set by host, use it for masking unsupported voltages. */
+	if (host->ocr_mask)
+		ocr_avail &= host->ocr_mask;
 
 	mmc->ocr_avail = ocr_avail;
 	mmc->ocr_avail_sdio = ocr_avail;

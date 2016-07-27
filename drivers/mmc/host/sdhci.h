@@ -583,7 +583,8 @@ struct sdhci_ops {
 	void	(*switch_signal_voltage_enter)(struct sdhci_host *host,
 				unsigned char signal_voltage);
 	void	(*switch_signal_voltage_exit)(struct sdhci_host *host,
-				unsigned char signal_voltage);
+				unsigned char signal_voltage,
+				int voltage_switch_status);
 	int	(*suspend)(struct sdhci_host *host);
 	int	(*resume)(struct sdhci_host *host);
 	int	(*runtime_suspend)(struct sdhci_host *host);
@@ -594,6 +595,7 @@ struct sdhci_ops {
 	int	(*get_max_tuning_loop_counter)(struct sdhci_host *sdhci);
 	void	(*post_tuning)(struct sdhci_host *host);
 	bool	(*is_tuning_done)(struct sdhci_host *sdhci);
+	void	(*pre_regulator_config)(struct sdhci_host *sdhci, int vdd);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

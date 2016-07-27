@@ -1604,7 +1604,10 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
 	if (vdd_bit) {
 		mmc_ocrbitnum_to_vdd(vdd_bit, &min_uV, &max_uV);
 
-		result = regulator_set_voltage(supply, min_uV, max_uV);
+		if (mmc->ops->pre_regulator_config)
+			mmc->ops->pre_regulator_config(mmc, vdd_bit);
+		if (regulator_can_change_voltage(supply))
+			result = regulator_set_voltage(supply, min_uV, max_uV);
 		if (result == 0 && !mmc->regulator_enabled) {
 			result = regulator_enable(supply);
 			if (!result)
@@ -1711,20 +1714,20 @@ int mmc_regulator_get_supply(struct mmc_host *mmc)
 	mmc->supply.vmmc = devm_regulator_get_optional(dev, "vmmc");
 	mmc->supply.vqmmc = devm_regulator_get_optional(dev, "vqmmc");
 
-	if (IS_ERR(mmc->supply.vmmc)) {
-		if (PTR_ERR(mmc->supply.vmmc) == -EPROBE_DEFER)
+	if (IS_ERR(mmc->supply.vqmmc)) {
+		if (PTR_ERR(mmc->supply.vqmmc) == -EPROBE_DEFER)
 			return -EPROBE_DEFER;
 		dev_info(dev, "No vmmc regulator found\n");
 	} else {
-		ret = mmc_regulator_get_ocrmask(mmc->supply.vmmc);
+		ret = mmc_regulator_get_ocrmask(mmc->supply.vqmmc);
 		if (ret > 0)
 			mmc->ocr_avail = ret;
 		else
 			dev_warn(dev, "Failed getting OCR mask: %d\n", ret);
 	}
 
-	if (IS_ERR(mmc->supply.vqmmc)) {
-		if (PTR_ERR(mmc->supply.vqmmc) == -EPROBE_DEFER)
+	if (IS_ERR(mmc->supply.vmmc)) {
+		if (PTR_ERR(mmc->supply.vmmc) == -EPROBE_DEFER)
 			return -EPROBE_DEFER;
 		dev_info(dev, "No vqmmc regulator found\n");
 	}
@@ -1952,11 +1955,15 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
 	mmc_set_initial_state(host);
 
 	/* Try to set signal voltage to 3.3V but fall back to 1.8v or 1.2v */
-	if (__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330) == 0)
-		dev_dbg(mmc_dev(host), "Initial signal voltage of 3.3v\n");
-	else if (__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_180) == 0)
-		dev_dbg(mmc_dev(host), "Initial signal voltage of 1.8v\n");
-	else if (__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_120) == 0)
+	if (ocr & MMC_VDD_27_36) {
+		if (__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330) == 0)
+			dev_dbg(mmc_dev(host),
+				"Initial signal voltage of 3.3v\n");
+	} else if (ocr & MMC_VDD_165_195) {
+		if (__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_180) == 0)
+			dev_dbg(mmc_dev(host),
+				"Initial signal voltage of 1.8v\n");
+	} else if (__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_120) == 0)
 		dev_dbg(mmc_dev(host), "Initial signal voltage of 1.2v\n");
 
 	/*
