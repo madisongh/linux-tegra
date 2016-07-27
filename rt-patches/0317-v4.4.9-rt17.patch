@@ -1,0 +1,23 @@
+From 825e18d2a7fddb85eb7b442a1c5efd52e7d5061d Mon Sep 17 00:00:00 2001
+From: Thomas Gleixner <tglx@linutronix.de>
+Date: Fri, 8 Jul 2011 20:25:16 +0200
+Subject: [PATCH 317/317] v4.4.9-rt17
+X-NVConfidentiality: public
+
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Allen Martin <amartin@nvidia.com>
+---
+ localversion-rt | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 localversion-rt
+
+diff --git a/localversion-rt b/localversion-rt
+new file mode 100644
+index 000000000000..1e584b47c987
+--- /dev/null
++++ b/localversion-rt
+@@ -0,0 +1 @@
++-rt17
+-- 
+2.9.3
+

@@ -1,0 +1,30 @@
+From b5907e3fb0b353caae7e24bc30f6ab4ea4f3840c Mon Sep 17 00:00:00 2001
+From: Thomas Gleixner <tglx@linutronix.de>
+Date: Mon, 18 Jul 2011 17:10:12 +0200
+Subject: [PATCH 254/317] mips: Disable highmem on RT
+X-NVConfidentiality: public
+
+The current highmem handling on -RT is not compatible and needs fixups.
+
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Allen Martin <amartin@nvidia.com>
+---
+ arch/mips/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index db459612de44..bd8be6a0e745 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -2410,7 +2410,7 @@ config CPU_R4400_WORKAROUNDS
+ #
+ config HIGHMEM
+ 	bool "High Memory Support"
+-	depends on 32BIT && CPU_SUPPORTS_HIGHMEM && SYS_SUPPORTS_HIGHMEM && !CPU_MIPS32_3_5_EVA
++	depends on 32BIT && CPU_SUPPORTS_HIGHMEM && SYS_SUPPORTS_HIGHMEM && !CPU_MIPS32_3_5_EVA && !PREEMPT_RT_FULL
+ 
+ config CPU_SUPPORTS_HIGHMEM
+ 	bool
+-- 
+2.9.3
+

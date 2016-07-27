@@ -1,0 +1,41 @@
+From 7ea884b9842f0f5e3c82479025c574cf387c813d Mon Sep 17 00:00:00 2001
+From: Mike Galbraith <umgwanakikbuti@gmail.com>
+Date: Tue, 22 Mar 2016 11:16:09 +0100
+Subject: [PATCH 114/317] mm/zsmalloc: Use get/put_cpu_light in
+ zs_map_object()/zs_unmap_object()
+X-NVConfidentiality: public
+
+Otherwise, we get a ___might_sleep() splat.
+
+Signed-off-by: Mike Galbraith <umgwanakikbuti@gmail.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Allen Martin <amartin@nvidia.com>
+---
+ mm/zsmalloc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/mm/zsmalloc.c b/mm/zsmalloc.c
+index fc083996e40a..18cc59fb1bc6 100644
+--- a/mm/zsmalloc.c
++++ b/mm/zsmalloc.c
+@@ -1289,7 +1289,7 @@ void *zs_map_object(struct zs_pool *pool, unsigned long handle,
+ 	class = pool->size_class[class_idx];
+ 	off = obj_idx_to_offset(page, obj_idx, class->size);
+ 
+-	area = &get_cpu_var(zs_map_area);
++	area = per_cpu_ptr(&zs_map_area, get_cpu_light());
+ 	area->vm_mm = mm;
+ 	if (off + class->size <= PAGE_SIZE) {
+ 		/* this object is contained entirely within a page */
+@@ -1342,7 +1342,7 @@ void zs_unmap_object(struct zs_pool *pool, unsigned long handle)
+ 
+ 		__zs_unmap_object(area, pages, off, class->size);
+ 	}
+-	put_cpu_var(zs_map_area);
++	put_cpu_light();
+ 	unpin_tag(handle);
+ }
+ EXPORT_SYMBOL_GPL(zs_unmap_object);
+-- 
+2.9.3
+

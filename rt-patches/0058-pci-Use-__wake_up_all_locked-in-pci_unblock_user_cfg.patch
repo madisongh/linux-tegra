@@ -1,0 +1,33 @@
+From f2bbdea7f97d359c3654ab4ffd9aa479c87e1756 Mon Sep 17 00:00:00 2001
+From: Thomas Gleixner <tglx@linutronix.de>
+Date: Thu, 1 Dec 2011 00:07:16 +0100
+Subject: [PATCH 058/317] pci: Use __wake_up_all_locked in
+ pci_unblock_user_cfg_access()
+X-NVConfidentiality: public
+
+The waitqueue is protected by the pci_lock, so we can just avoid to
+lock the waitqueue lock itself. That prevents the
+might_sleep()/scheduling while atomic problem on RT
+
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Allen Martin <amartin@nvidia.com>
+---
+ drivers/pci/access.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pci/access.c b/drivers/pci/access.c
+index 59ac36fe7c42..7a45a20af78a 100644
+--- a/drivers/pci/access.c
++++ b/drivers/pci/access.c
+@@ -561,7 +561,7 @@ void pci_cfg_access_unlock(struct pci_dev *dev)
+ 	WARN_ON(!dev->block_cfg_access);
+ 
+ 	dev->block_cfg_access = 0;
+-	wake_up_all(&pci_cfg_wait);
++	wake_up_all_locked(&pci_cfg_wait);
+ 	raw_spin_unlock_irqrestore(&pci_lock, flags);
+ }
+ EXPORT_SYMBOL_GPL(pci_cfg_access_unlock);
+-- 
+2.9.3
+

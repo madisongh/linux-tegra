@@ -1,0 +1,31 @@
+From 2f72b3f3cbcea76e099a55c5c761f0de6bba5689 Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Tue, 14 Jul 2015 14:26:34 +0200
+Subject: [PATCH 307/317] gpu/i915: don't open code these things
+X-NVConfidentiality: public
+
+The opencode part is gone in 1f83fee0 ("drm/i915: clear up wedged transitions")
+the owner check is still there.
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Allen Martin <amartin@nvidia.com>
+---
+ drivers/gpu/drm/i915/i915_gem_shrinker.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/i915/i915_gem_shrinker.c b/drivers/gpu/drm/i915/i915_gem_shrinker.c
+index 425e721aac58..a23147d30cc7 100644
+--- a/drivers/gpu/drm/i915/i915_gem_shrinker.c
++++ b/drivers/gpu/drm/i915/i915_gem_shrinker.c
+@@ -40,7 +40,7 @@ static bool mutex_is_locked_by(struct mutex *mutex, struct task_struct *task)
+ 	if (!mutex_is_locked(mutex))
+ 		return false;
+ 
+-#if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_MUTEXES)
++#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_MUTEXES)) && !defined(CONFIG_PREEMPT_RT_BASE)
+ 	return mutex->owner == task;
+ #else
+ 	/* Since UP may be pre-empted, we cannot assume that we own the lock */
+-- 
+2.9.3
+
