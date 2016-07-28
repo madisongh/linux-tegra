@@ -159,7 +159,7 @@ int tegra_unpowergate_partition(int id);
 #else
 static inline bool tegra_powergate_is_powered(int id)
 {
-	return 0;
+	return 1;
 }
 
 static inline int tegra_powergate_partition(int id)
