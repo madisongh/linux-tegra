@@ -486,6 +486,10 @@ config TEGRA186_ADMA
 	  peripheral fifo or vice versa. It does not support memory to
 	  memory data transfer.
 
+config TEGRA_ADMA_WAR
+	def_bool y
+	depends on TEGRA186_ADMA || TEGRA210_ADMA
+
 config TIMB_DMA
 	tristate "Timberdale FPGA DMA support"
 	depends on MFD_TIMBERDALE

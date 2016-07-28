@@ -389,8 +389,23 @@ static void tegra_adma_start(struct tegra_adma_chan *tdc,
 	channel_write(tdc, ADMA_CH_LOWER_TARGET_ADDR, ch_regs->tgt_ptr);
 	channel_write(tdc, ADMA_CH_AHUB_FIFO_CTRL, ch_regs->ahub_fifo_ctrl);
 	channel_write(tdc, ADMA_CH_CONFIG, ch_regs->config);
+
+#if defined(CONFIG_TEGRA_ADMA_WAR)
+	if (tdc->tdma->is_virt == false) {
+		spin_lock(&tdc->tdma->global_lock);
+		global_write(tdc->tdma, ADMA_GLOBAL_CG, 0x0);
+	}
+#endif
+
 	/* Start ADMA */
 	channel_write(tdc, ADMA_CH_CMD, 1);
+
+#if defined(CONFIG_TEGRA_ADMA_WAR)
+	if (tdc->tdma->is_virt == false) {
+		global_write(tdc->tdma, ADMA_GLOBAL_CG, 0x7);
+		spin_unlock(&tdc->tdma->global_lock);
+	}
+#endif
 }
 
 static void tegra_adma_configure_for_next(struct tegra_adma_chan *tdc,
@@ -437,7 +452,18 @@ static void tegra_adma_configure_for_next(struct tegra_adma_chan *tdc,
 			nsg_req->ch_regs.ahub_fifo_ctrl);
 	channel_write(tdc, ADMA_CH_CONFIG, nsg_req->ch_regs.config);
 
+#if defined(CONFIG_TEGRA_ADMA_WAR)
+	if (tdc->tdma->is_virt == false)
+		global_write(tdc->tdma, ADMA_GLOBAL_CG, 0x0);
+#endif
+
 	channel_write(tdc, ADMA_CH_CMD, 1);
+
+#if defined(CONFIG_TEGRA_ADMA_WAR)
+	if (tdc->tdma->is_virt == false)
+		global_write(tdc->tdma, ADMA_GLOBAL_CG, 0x7);
+#endif
+
 	nsg_req->configured = true;
 
 	tegra_adma_resume(tdc);
