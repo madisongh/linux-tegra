@@ -25,6 +25,7 @@ phys_addr_t tegra_bootloader_fb_start;
 phys_addr_t tegra_bootloader_fb_size;
 phys_addr_t tegra_bootloader_fb2_start;
 phys_addr_t tegra_bootloader_fb2_size;
+static int usb_port_owner_info;
 
 bool soc_is_tegra(void)
 {
@@ -97,3 +98,19 @@ bool tegra_is_bl_display_initialized(int instance)
 			return false;
 	}
 }
+
+static int __init tegra_usb_port_owner_info(char *id)
+{
+	char *p = id;
+
+	usb_port_owner_info = memparse(p, &p);
+	return 1;
+}
+
+int tegra_get_usb_port_owner_info(void)
+{
+	return usb_port_owner_info;
+}
+EXPORT_SYMBOL(tegra_get_usb_port_owner_info);
+
+__setup("usb_port_owner_info=", tegra_usb_port_owner_info);
