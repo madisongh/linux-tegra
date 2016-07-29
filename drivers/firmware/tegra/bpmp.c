@@ -718,6 +718,19 @@ void __weak bpmp_setup_allocator(struct device *dev)
 {
 }
 
+static int bpmp_do_ping(void)
+{
+	unsigned long flags;
+	int ret;
+
+	local_irq_save(flags);
+	ret = __bpmp_do_ping();
+	local_irq_restore(flags);
+	pr_info("bpmp: ping status is %d\n", ret);
+
+	return ret;
+}
+
 static int bpmp_probe(struct platform_device *pdev)
 {
 	int r = 0;
@@ -734,6 +747,7 @@ static int bpmp_probe(struct platform_device *pdev)
 	r = r ?: bpmp_init_debug(pdev);
 	r = r ?: bpmp_init_modules(pdev);
 	r = r ?: bpmp_mail_init();
+	r = r ?: bpmp_do_ping();
 	r = r ?: bpmp_get_fwtag();
 	r = r ?: of_platform_populate(device->of_node, NULL, NULL, device);
 
