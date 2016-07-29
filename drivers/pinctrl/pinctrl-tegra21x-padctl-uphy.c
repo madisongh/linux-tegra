@@ -2868,6 +2868,15 @@ int tegra_phy_xusb_utmi_vbus_power_off(struct phy *phy)
 	return 0;
 }
 
+int tegra_phy_xusb_overcurrent_detected(struct phy *phy)
+{
+	return 0;
+}
+
+void tegra_phy_xusb_handle_overcurrent(struct phy *phy)
+{
+}
+
 static const struct phy_ops utmi_phy_ops = {
 	.init = tegra21x_utmi_phy_init,
 	.exit = tegra21x_utmi_phy_exit,

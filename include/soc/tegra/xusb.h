@@ -107,4 +107,7 @@ bool tegra_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy);
 
 int tegra_phy_xusb_utmi_vbus_power_on(struct phy *phy);
 int tegra_phy_xusb_utmi_vbus_power_off(struct phy *phy);
+
+int tegra_phy_xusb_overcurrent_detected(struct phy *phy);
+void tegra_phy_xusb_handle_overcurrent(struct phy *phy);
 #endif /* __SOC_TEGRA_XUSB_H__ */
