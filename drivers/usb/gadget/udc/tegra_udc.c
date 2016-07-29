@@ -172,19 +172,19 @@ static inline bool vbus_enabled(struct tegra_udc *udc)
 			extcon_get_cable_state(udc->vbus_extcon_dev, "USB"))
 			return true;
 
-		if (udc->aca_nv_extcon_cable &&
+		if (udc->aca_nv_extcon_dev &&
 			extcon_get_cable_state_(udc->aca_nv_extcon_dev,
-			udc->aca_nv_extcon_cable->cable_index))
+			EXTCON_USB_ACA_NV))
 			return true;
 
-		if (udc->aca_rid_b_ecable &&
-			extcon_get_cable_state_(udc->aca_rid_b_ecable->edev,
-			udc->aca_rid_b_ecable->cable_index))
+		if (udc->aca_rid_b_dev &&
+			extcon_get_cable_state_(udc->aca_rid_b_dev,
+			EXTCON_USB_ACA_RIDA))
 			return true;
 
-		if (udc->aca_rid_c_ecable &&
-			extcon_get_cable_state_(udc->aca_rid_c_ecable->edev,
-			udc->aca_rid_c_ecable->cable_index))
+		if (udc->aca_rid_c_dev &&
+			extcon_get_cable_state_(udc->aca_rid_c_dev,
+			EXTCON_USB_ACA_RIDC))
 			return true;
 	} else
 		status = (udc_readl(udc, VBUS_WAKEUP_REG_OFFSET)
@@ -1537,16 +1537,14 @@ static int tegra_usb_set_charging_current(struct tegra_udc *udc)
 
 static int tegra_detect_cable_type(struct tegra_udc *udc)
 {
-	int index;
-
 	if (!udc->charging_supported) {
 		tegra_udc_set_charger_type(udc, CONNECT_TYPE_SDP);
 		return 0;
 	}
 
-	if (udc->support_aca_nv_cable && udc->aca_nv_extcon_cable) {
-		index = udc->aca_nv_extcon_cable->cable_index;
-		if (extcon_get_cable_state_(udc->aca_nv_extcon_dev, index)) {
+	if (udc->support_aca_nv_cable && udc->aca_nv_extcon_dev) {
+		if (extcon_get_cable_state_(udc->aca_nv_extcon_dev,
+					EXTCON_USB_ACA_NV)) {
 			tegra_udc_set_charger_type(udc,
 					CONNECT_TYPE_ACA_NV_CHARGER);
 			tegra_usb_set_charging_current(udc);
@@ -1554,10 +1552,9 @@ static int tegra_detect_cable_type(struct tegra_udc *udc)
 		}
 	}
 
-	if (udc->support_aca_rid && udc->aca_rid_b_ecable) {
-		index = udc->aca_rid_b_ecable->cable_index;
-		if (extcon_get_cable_state_(udc->aca_rid_b_ecable->edev,
-					index)) {
+	if (udc->support_aca_rid && udc->aca_rid_b_dev) {
+		if (extcon_get_cable_state(udc->aca_rid_b_dev,
+					EXTCON_USB_ACA_RIDB)) {
 			tegra_udc_set_charger_type(udc,
 					CONNECT_TYPE_ACA_RID_B);
 			tegra_usb_set_charging_current(udc);
@@ -1566,10 +1563,9 @@ static int tegra_detect_cable_type(struct tegra_udc *udc)
 		}
 	}
 
-	if (udc->support_aca_rid && udc->aca_rid_c_ecable) {
-		index = udc->aca_rid_c_ecable->cable_index;
-		if (extcon_get_cable_state_(udc->aca_rid_c_ecable->edev,
-					index)) {
+	if (udc->support_aca_rid && udc->aca_rid_c_dev) {
+		if (extcon_get_cable_state(udc->aca_rid_c_dev,
+					EXTCON_USB_ACA_RIDC)) {
 			tegra_udc_set_charger_type(udc,
 					CONNECT_TYPE_ACA_RID_C);
 			tegra_usb_set_charging_current(udc);
@@ -1753,7 +1749,7 @@ static int tegra_pullup(struct usb_gadget *gadget, int is_on)
 
 	udc = container_of(gadget, struct tegra_udc, gadget);
 	udc->softconnect = (is_on != 0);
-	if (udc->transceiver && udc->transceiver->state !=
+	if (udc->transceiver && udc->transceiver->otg->state !=
 			OTG_STATE_B_PERIPHERAL)
 			return 0;
 
@@ -2748,7 +2744,7 @@ static int tegra_udc_start(struct usb_gadget *g,
 
 	/* Enable DR IRQ reg and Set usbcmd reg  Run bit */
 	if (vbus_enabled(udc) && !(udc->transceiver
-			&& udc->transceiver->state != OTG_STATE_B_PERIPHERAL))
+			&& udc->transceiver->otg->state != OTG_STATE_B_PERIPHERAL))
 		tegra_vbus_session(&udc->gadget, 1);
 
 	printk(KERN_INFO "%s: bind to driver %s\n",
@@ -3030,11 +3026,6 @@ static int __init tegra_udc_probe(struct platform_device *pdev)
 	int err = -ENODEV;
 	DBG("%s(%d) BEGIN\n", __func__, __LINE__);
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	if (tegra_bonded_out_dev(BOND_OUT_USBD))
-		return -ENODEV;
-#endif
-
 	the_udc = udc = devm_kzalloc(&pdev->dev,
 				sizeof(struct tegra_udc), GFP_KERNEL);
 	if (udc == NULL) {
@@ -3148,8 +3139,9 @@ static int __init tegra_udc_probe(struct platform_device *pdev)
 
 	udc->phy = tegra_usb_phy_open(pdev);
 	if (IS_ERR(udc->phy)) {
-		dev_err(&pdev->dev, "failed to open USB phy\n");
-		err = -ENXIO;
+		dev_err(&pdev->dev, "failed to open USB phy, err: %d\n",
+				PTR_ERR(udc->phy));
+		err = PTR_ERR(udc->phy);
 		goto err_irq;
 	}
 
@@ -3255,32 +3247,31 @@ static int __init tegra_udc_probe(struct platform_device *pdev)
 
 	if (udc->support_aca_nv_cable) {
 		if (pdev->dev.of_node)
-			udc->aca_nv_extcon_cable =
-				extcon_get_extcon_cable(&pdev->dev, "aca-nv");
-		if (IS_ERR(udc->aca_nv_extcon_cable)) {
-			dev_err(&pdev->dev,
-					"failed to get aca-nv extcon cable\n");
-			err = -EPROBE_DEFER;
-		} else
 			udc->aca_nv_extcon_dev =
-				udc->aca_nv_extcon_cable->edev;
+				extcon_get_extcon_dev_by_cable(&pdev->dev,
+								"aca-nv");
+		if (IS_ERR(udc->aca_nv_extcon_dev)) {
+			dev_err(&pdev->dev,
+					"failed to get aca-nv extcon dev\n");
+			err = -EPROBE_DEFER;
+		}
 	}
 
 	if (udc->support_aca_rid && pdev->dev.of_node) {
-		udc->aca_rid_b_ecable =
-			extcon_get_extcon_cable(&pdev->dev, "aca-rb");
-		if (IS_ERR(udc->aca_rid_b_ecable)) {
+		udc->aca_rid_b_dev =
+			extcon_get_extcon_dev_by_cable(&pdev->dev, "aca-rb");
+		if (IS_ERR(udc->aca_rid_b_dev)) {
 			dev_err(&pdev->dev,
-				"failed to get aca-rid-b extcon cable\n");
+				"failed to get aca-rid-b extcon dev\n");
 			err = -EPROBE_DEFER;
 			goto err_del_udc;
 		}
 
-		udc->aca_rid_c_ecable =
-			extcon_get_extcon_cable(&pdev->dev, "aca-rc");
-		if (IS_ERR(udc->aca_rid_c_ecable)) {
+		udc->aca_rid_c_dev =
+			extcon_get_extcon_dev_by_cable(&pdev->dev, "aca-rc");
+		if (IS_ERR(udc->aca_rid_c_dev)) {
 			dev_err(&pdev->dev,
-				"failed to get aca-rid-c extcon cable\n");
+				"failed to get aca-rid-c extcon dev\n");
 			err = -EPROBE_DEFER;
 			goto err_del_udc;
 		}
@@ -3400,7 +3391,6 @@ static int tegra_udc_prepare(struct device *dev)
 {
 	struct tegra_udc *udc = dev_get_drvdata(dev);
 	u32 temp;
-	int index;
 	DBG("%s(%d) BEGIN\n", __func__, __LINE__);
 
 	if (udc->support_pmu_vbus) {
@@ -3413,23 +3403,20 @@ static int tegra_udc_prepare(struct device *dev)
 			udc->vbus_in_lp0 = true;
 	}
 
-	if (udc->support_aca_nv_cable && udc->aca_nv_extcon_cable) {
-		index = udc->aca_nv_extcon_cable->cable_index;
-		if (extcon_get_cable_state_(udc->aca_nv_extcon_dev, index))
+	if (udc->support_aca_nv_cable && udc->aca_nv_extcon_dev) {
+		if (extcon_get_cable_state_(udc->aca_nv_extcon_dev, EXTCON_USB_ACA_NV))
 			udc->vbus_in_lp0 = true;
 	}
 
-	if (udc->support_aca_rid && udc->aca_rid_b_ecable) {
-		index = udc->aca_rid_b_ecable->cable_index;
-		if (extcon_get_cable_state_(udc->aca_rid_b_ecable->edev,
-						index))
+	if (udc->support_aca_rid && udc->aca_rid_b_dev) {
+		if (extcon_get_cable_state_(udc->aca_rid_b_dev,
+						EXTCON_USB_ACA_RIDB))
 			udc->vbus_in_lp0 = true;
 	}
 
-	if (udc->support_aca_rid && udc->aca_rid_c_ecable) {
-		index = udc->aca_rid_c_ecable->cable_index;
-		if (extcon_get_cable_state_(udc->aca_rid_c_ecable->edev,
-						index))
+	if (udc->support_aca_rid && udc->aca_rid_c_dev) {
+		if (extcon_get_cable_state_(udc->aca_rid_c_dev,
+						EXTCON_USB_ACA_RIDC))
 			udc->vbus_in_lp0 = true;
 	}
 	/* During driver resume sometimes connect_type_lp0 is
@@ -3497,19 +3484,18 @@ static int tegra_udc_resume(struct device *dev)
 	struct tegra_udc *udc = dev_get_drvdata(dev);
 	u32 temp;
 
-	int err = 0, index;
+	int err = 0;
 	DBG("%s(%d) BEGIN\n", __func__, __LINE__);
 
 	udc->vbus_in_lp0 = false;
 
 	/* Set Current limit to 0 if charger is disconnected in LP0 */
 	if (udc->vbus_reg != NULL) {
-		if (udc->support_aca_nv_cable && udc->aca_nv_extcon_cable &&
+		if (udc->support_aca_nv_cable && udc->aca_nv_extcon_dev &&
 			udc->connect_type_lp0 == CONNECT_TYPE_ACA_NV_CHARGER) {
-			index = udc->aca_nv_extcon_cable->cable_index;
 			if ((udc->connect_type_lp0 != CONNECT_TYPE_NONE) &&
 				!extcon_get_cable_state_(udc->aca_nv_extcon_dev,
-								index)) {
+								EXTCON_USB_ACA_NV)) {
 				tegra_udc_set_extcon_state(udc);
 				udc->connect_type_lp0 = CONNECT_TYPE_NONE;
 				regulator_set_current_limit(udc->vbus_reg,
@@ -3517,12 +3503,11 @@ static int tegra_udc_resume(struct device *dev)
 			}
 		}
 
-		if (udc->support_aca_rid && udc->aca_rid_b_ecable &&
+		if (udc->support_aca_rid && udc->aca_rid_b_dev &&
 			udc->connect_type_lp0 == CONNECT_TYPE_ACA_RID_B) {
-			index = udc->aca_rid_b_ecable->cable_index;
 			if ((udc->connect_type_lp0 == CONNECT_TYPE_ACA_RID_B) &&
 				!extcon_get_cable_state_(
-					udc->aca_rid_b_ecable->edev, index)) {
+					udc->aca_rid_b_dev, EXTCON_USB_ACA_RIDB)) {
 				tegra_udc_set_extcon_state(udc);
 				udc->connect_type_lp0 = CONNECT_TYPE_NONE;
 				regulator_set_current_limit(udc->vbus_reg,
@@ -3530,12 +3515,11 @@ static int tegra_udc_resume(struct device *dev)
 			}
 		}
 
-		if (udc->support_aca_rid && udc->aca_rid_c_ecable &&
+		if (udc->support_aca_rid && udc->aca_rid_c_dev &&
 			udc->connect_type_lp0 == CONNECT_TYPE_ACA_RID_C) {
-			index = udc->aca_rid_c_ecable->cable_index;
 			if ((udc->connect_type_lp0 != CONNECT_TYPE_ACA_RID_C) &&
 				!extcon_get_cable_state_(
-					udc->aca_rid_c_ecable->edev, index)) {
+					udc->aca_rid_c_dev, EXTCON_USB_ACA_RIDC)) {
 				tegra_udc_set_extcon_state(udc);
 				udc->connect_type_lp0 = CONNECT_TYPE_NONE;
 				regulator_set_current_limit(udc->vbus_reg,
@@ -3601,6 +3585,7 @@ static const struct dev_pm_ops tegra_udc_pm_ops = {
 
 static struct platform_driver tegra_udc_driver = {
 	.remove  = __exit_p(tegra_udc_remove),
+	.probe = tegra_udc_probe,
 	.driver  = {
 		.name = (char *)driver_name,
 		.owner = THIS_MODULE,
@@ -3614,7 +3599,7 @@ static struct platform_driver tegra_udc_driver = {
 static int __init udc_init(void)
 {
 	printk(KERN_INFO "%s (%s)\n", driver_desc, DRIVER_VERSION);
-	return platform_driver_probe(&tegra_udc_driver, tegra_udc_probe);
+	return platform_driver_register(&tegra_udc_driver);
 }
 module_init(udc_init);
 static void __exit udc_exit(void)

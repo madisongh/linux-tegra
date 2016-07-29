@@ -26,6 +26,7 @@ endif
 obj-$(CONFIG_USB_TEGRA_XUDC)	+= tegra-xudc.o
 tegra-xudc-$(CONFIG_ARCH_TEGRA_18x_SOC)	+= tegra_xudc.o
 CFLAGS_tegra_xudc.o		= -Werror
+obj-$(CONFIG_USB_TEGRA)		+= tegra_udc.o
 obj-$(CONFIG_USB_M66592)	+= m66592-udc.o
 obj-$(CONFIG_USB_R8A66597)	+= r8a66597-udc.o
 obj-$(CONFIG_USB_FSL_QE)	+= fsl_qe_udc.o
