@@ -837,7 +837,7 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 {
 	struct mmc_blk_ioc_data *idata;
 	struct mmc_blk_data *md;
-	struct mmc_card *card;
+	struct mmc_card *card = NULL;
 	int err = 0, ioc_err = 0;
 
 	/*
@@ -864,6 +864,11 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 		goto cmd_done;
 	}
 
+	if (mmc_card_cmdq(card)) {
+		mmc_claim_host(card->host);
+		mmc_cmdq_pause(card, true);
+	}
+
 	mmc_get_card(card);
 
 	if (idata->ic.opcode == MMC_FFU_INVOKE_OP) {
@@ -881,6 +886,11 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 cmd_done:
 	mmc_blk_put(md);
 cmd_err:
+	if (mmc_card_cmdq_pause(card)) {
+		mmc_cmdq_pause(card, false);
+		mmc_release_host(card->host);
+	}
+
 	kfree(idata->buf);
 	kfree(idata);
 	return ioc_err ? ioc_err : err;
@@ -891,7 +901,7 @@ static int mmc_blk_ioctl_multi_cmd(struct block_device *bdev,
 {
 	struct mmc_blk_ioc_data **idata = NULL;
 	struct mmc_ioc_cmd __user *cmds = user->cmds;
-	struct mmc_card *card;
+	struct mmc_card *card = NULL;
 	struct mmc_blk_data *md;
 	int i, err = 0, ioc_err = 0;
 	__u64 num_of_cmds;
@@ -934,6 +944,11 @@ static int mmc_blk_ioctl_multi_cmd(struct block_device *bdev,
 		goto cmd_done;
 	}
 
+	if (mmc_card_cmdq(card)) {
+		mmc_claim_host(card->host);
+		mmc_cmdq_pause(card, true);
+	}
+
 	mmc_get_card(card);
 
 	for (i = 0; i < num_of_cmds && !ioc_err; i++)
@@ -953,6 +968,10 @@ cmd_err:
 		kfree(idata[i]);
 	}
 	kfree(idata);
+	if (mmc_card_cmdq_pause(card)) {
+		mmc_cmdq_pause(card, false);
+		mmc_release_host(card->host);
+	}
 	return ioc_err ? ioc_err : err;
 }
 
@@ -1014,17 +1033,17 @@ static int mmc_blk_hw_cmdq_switch(struct mmc_card *card,
 			}
 		}
 
-		mmc_claim_host(card->host);
 		ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			 EXT_CSD_CMDQ_MODE_EN, enable,
 			 card->ext_csd.generic_cmd6_time);
 		if (ret) {
 			pr_err("%s: cmdq mode %sable failed %d\n",
 			       md->disk->disk_name, enable ? "en" : "dis", ret);
-			mmc_release_host(card->host);
 			goto out;
+		} else {
+			pr_err("%s: cmdq mode %sable successful %d\n",
+			       md->disk->disk_name, enable ? "en" : "dis", ret);
 		}
-		mmc_release_host(card->host);
 
 		/* enable host controller command queue engine */
 		if (enable)
@@ -1048,8 +1067,11 @@ static int mmc_blk_hw_cmdq_switch(struct mmc_card *card,
 
 	if (enable)
 		mmc_card_set_cmdq(card);
-	else
+	else {
+		if (card->host->ops && card->host->ops->enable_host_int)
+			card->host->ops->enable_host_int(card->host, true);
 		mmc_card_clr_cmdq(card);
+	}
 out:
 	return ret;
 }
@@ -2814,6 +2836,7 @@ static int mmc_blk_cmdq_issue_rq(struct mmc_queue *mq, struct request *req)
 	if (mmc_bus_needs_resume(card->host))
 		mmc_resume_bus(card->host);
 #endif
+	mmc_claim_host(card->host);
 	ret = mmc_blk_part_switch(card, md);
 	if (ret) {
 		pr_err("%s: %s: partition switch failed %d\n",
@@ -2822,15 +2845,18 @@ static int mmc_blk_cmdq_issue_rq(struct mmc_queue *mq, struct request *req)
 		goto switch_failure;
 	}
 
-	ret = mmc_blk_hw_cmdq_switch(card, md, true);
-	if (ret) {
-		/* TODO: put a limit on the number of requeues if switch fails
-		 * and if possible disable cmd queing for buggy cards.
-		 */
-		spin_lock_irq(mq->queue->queue_lock);
-		blk_requeue_request(mq->queue, req);
-		spin_unlock_irq(mq->queue->queue_lock);
-		goto switch_failure;
+	if (!mmc_card_cmdq(card)) {
+		ret = mmc_blk_hw_cmdq_switch(card, md, true);
+		if (ret) {
+			/* TODO: put a limit on the number of requeues if
+			 * switch fails and if possible disable cmd queuing
+			 * for buggy cards.
+			 */
+			spin_lock_irq(mq->queue->queue_lock);
+			blk_requeue_request(mq->queue, req);
+			spin_unlock_irq(mq->queue->queue_lock);
+			goto switch_failure;
+		}
 	}
 
 	if (cmd_flags & REQ_DISCARD) {
@@ -2844,6 +2870,7 @@ static int mmc_blk_cmdq_issue_rq(struct mmc_queue *mq, struct request *req)
 	}
 
 switch_failure:
+	mmc_release_host(card->host);
 	return ret;
 }
 

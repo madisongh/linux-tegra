@@ -689,6 +689,22 @@ int mmc_cmdq_discard(struct mmc_host *host, u32 tag, bool all)
 }
 EXPORT_SYMBOL(mmc_cmdq_discard);
 
+void mmc_cmdq_pause(struct mmc_card *card, bool pause)
+{
+	struct mmc_host *host = card->host;
+	struct mmc_cmdq_context_info *ctx_info = &host->cmdq_ctx;
+
+	if (pause) {
+		ctx_info->rpmb_in_wait = true;
+		mmc_card_set_cmdq_pause(card);
+		mmc_wait_hw_cmdq_empty(host);
+	} else {
+		ctx_info->rpmb_in_wait = false;
+		mmc_card_clr_cmdq_pause(card);
+	}
+}
+EXPORT_SYMBOL(mmc_cmdq_pause);
+
 int mmc_cmdq_start_req(struct mmc_host *host, struct mmc_cmdq_req *cmdq_req)
 {
 	struct mmc_request *mrq = &cmdq_req->mrq;
