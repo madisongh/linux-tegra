@@ -1610,6 +1610,7 @@ static int smmu_ptdump_show(struct seq_file *s, void *unused)
 	pte_t *pte;
 	int i, j, k, l;
 	unsigned long addr = 0;
+	unsigned long mapped = 0;
 
 	pgd = cfg->pgd;
 	for (i = 0; i < PTRS_PER_PGD;
@@ -1639,12 +1640,14 @@ static int smmu_ptdump_show(struct seq_file *s, void *unused)
 					seq_printf(s,
 						   "va=0x%016lx pa=%pap *pte=%pad\n",
 						   addr, &pa, &(*pte));
+					mapped += PAGE_SIZE;
 				}
 			}
 			if ((ulong)pgd != (ulong)pud)
 				addr += PUD_SIZE;
 		}
 	}
+	seq_printf(s, "total mapped iova=%luKB\n", mapped / SZ_1K);
 	return 0;
 }
 
