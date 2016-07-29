@@ -33,7 +33,31 @@
 
 #include "../../../arch/arm/mach-tegra/iomap.h"
 
-static void __iomem *pmc_base;
+struct resource xusb_padres[] = {
+	[0] = {
+		.start = 0x7009f000,
+		.end = 0x7009f000 + 0x1000 - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+struct resource pmcres[] = {
+	[0] = {
+		.start = 0x7000e400,
+		.end = 0x7000e400 + 0xc00 - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+struct resource usbres[] = {
+	[0] = {
+		.start = TEGRA_USB_BASE,
+		.end = TEGRA_USB_BASE + TEGRA_USB_SIZE -1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+void __iomem *pmc_base;
 static unsigned long flags;
 static DEFINE_SPINLOCK(pmc_lock);
 static u32 utmip_rctrl_val;
@@ -47,6 +71,9 @@ static void usb_phy_power_down_pmc(struct tegra_usb_pmc_data *pmc_data)
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, pmc_data->instance);
 
 	spin_lock_irqsave(&pmc_lock, flags);
+
+	if (!pmc_base)
+		pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 	/* power down all 3 UTMIP interfaces */
 	val = readl(pmc_base + PMC_UTMIP_MASTER_CONFIG);
@@ -106,38 +133,16 @@ EXPORT_SYMBOL_GPL(utmi_phy_update_trking_data);
 
 int utmi_phy_set_snps_trking_data(void)
 {
-	void __iomem *base = IO_ADDRESS(TEGRA_USB_BASE);
+	void __iomem *base = ioremap(usbres->start, resource_size(usbres));
 	u32 val;
-	struct clk *utmi_pad_clk;
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	void __iomem *car_base = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
-#endif
-
-	utmi_pad_clk = clk_get_sys("utmip-pad", NULL);
-	if (IS_ERR(utmi_pad_clk)) {
-		pr_err("%s: can't get utmip pad clock\n", __func__);
-		return PTR_ERR(utmi_pad_clk);
-	}
-
 	if (!pmc_base)
 		pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
 
-	clk_enable(utmi_pad_clk);
 	spin_lock_irqsave(&pmc_lock, flags);
 	/* Bias pad MASTER_ENABLE=1 */
 	val = readl(pmc_base + PMC_UTMIP_BIAS_MASTER_CNTRL);
 	val |= BIAS_MASTER_PROG_VAL;
 	writel(val, pmc_base + PMC_UTMIP_BIAS_MASTER_CNTRL);
-
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	val = readl(car_base + CLK_RST_CONTROLLER_CLK_OUT_ENB_Y);
-	val |= CLK_ENB_USB2_TRK;
-	writel(val, car_base + CLK_RST_CONTROLLER_CLK_OUT_ENB_Y);
-
-	val = readl(car_base + CLK_RST_CONTROLLER_CLK_SOURCE_USB2_HSIC_TRK);
-	val &= ~USB2_HSIC_TRK_CLK_DIVISOR(~0);
-	val |= USB2_HSIC_TRK_CLK_DIVISOR(0x6);
-	writel(val, car_base + CLK_RST_CONTROLLER_CLK_SOURCE_USB2_HSIC_TRK);
 
 	val = readl(base + UTMIP_BIAS_CFG1);
 	val &= ~UTMIP_BIAS_PDTRK_COUNT(~0);
@@ -151,13 +156,6 @@ int utmi_phy_set_snps_trking_data(void)
 	writel(val, base + UTMIP_BIAS_CFG0);
 
 	udelay(2);
-#else
-	/* Setting the tracking length time */
-	val = readl(base + UTMIP_BIAS_CFG1);
-	val &= ~UTMIP_BIAS_PDTRK_COUNT(~0);
-	val |= UTMIP_BIAS_PDTRK_COUNT(5);
-	writel(val, base + UTMIP_BIAS_CFG1);
-#endif
 
 	/* Bias PDTRK is Shared and MUST be done from USB1 ONLY, PD_TRK=0 */
 	val = readl(base + UTMIP_BIAS_CFG1);
@@ -195,9 +193,6 @@ int utmi_phy_set_snps_trking_data(void)
 	val &= ~UTMIP_BIAS_TRK_DONE;
 	writel(val, base + UTMIP_BIAS_CFG1);
 
-	val = readl(car_base + CLK_RST_CONTROLLER_CLK_OUT_ENB_Y);
-	val &= ~CLK_ENB_USB2_TRK;
-	writel(val, car_base + CLK_RST_CONTROLLER_CLK_OUT_ENB_Y);
 #else
 	/* Wait for 25usec */
 	udelay(25);
@@ -232,8 +227,6 @@ int utmi_phy_set_snps_trking_data(void)
 	writel(val, pmc_base + PMC_UTMIP_TERM_PAD_CFG);
 #endif
 	spin_unlock_irqrestore(&pmc_lock, flags);
-	clk_disable(utmi_pad_clk);
-	clk_put(utmi_pad_clk);
 
 	return 0;
 }
@@ -246,7 +239,10 @@ static void utmip_setup_pmc_wake_detect(struct tegra_usb_pmc_data *pmc_data)
 #ifdef CONFIG_ARCH_TEGRA_21x_SOC
 	unsigned long rpd_ctrl, tctrl, pctrl;
 #endif
+	void __iomem *xusb_pad;
 
+	pmc_base = ioremap(pmcres->start, resource_size(pmcres));
+	xusb_pad = ioremap(xusb_padres->start, resource_size(xusb_padres));
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, pmc_data->instance);
 
 	spin_lock_irqsave(&pmc_lock, flags);
@@ -390,8 +386,8 @@ static void utmip_setup_pmc_wake_detect(struct tegra_usb_pmc_data *pmc_data)
 	spin_lock_irqsave(&pmc_lock, flags);
 
 #ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	/* Program PCTRL_VAL, TCTRL_VAL into PMC space */
-	val = tegra_usb_pad_reg_read(XUSB_PADCTL_USB2_BIAS_PAD_CTL_1);
+	/* Program PCTRL_VAL, TCTRL_VAL into PMC space */ 
+	val = readl(xusb_pad + XUSB_PADCTL_USB2_BIAS_PAD_CTL_1);
 	tctrl = GET_TCTRL(val);
 	pctrl = GET_PCTRL(val);
 	val = readl(pmc_base + PMC_UTMIP_TERM_PAD_CFG);
@@ -400,7 +396,7 @@ static void utmip_setup_pmc_wake_detect(struct tegra_usb_pmc_data *pmc_data)
 	writel(val, pmc_base + PMC_UTMIP_TERM_PAD_CFG);
 
 	/* Program PRD_CTRL into PMC space */
-	val = tegra_usb_pad_reg_read(XUSB_PADCTL_USB2_OTG_PAD_CTL_1(inst));
+	val = readl(xusb_pad + XUSB_PADCTL_USB2_OTG_PAD_CTL_1(inst));
 	rpd_ctrl = GET_RPD_CTRL(val);
 	val = readl(pmc_base + PMC_UTMIP_PAD_CFG(inst));
 	val &= ~UTMIP_RPD_CTRL(~0);
@@ -446,6 +442,7 @@ static void utmip_phy_disable_pmc_bus_ctrl(struct tegra_usb_pmc_data *pmc_data,
 	void __iomem *usb_base;
 	unsigned  int inst = pmc_data->instance;
 	usb_base = pmc_data->usb_base;
+	pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, pmc_data->instance);
 
@@ -519,6 +516,9 @@ static void utmip_powerdown_pmc_wake_detect(struct tegra_usb_pmc_data *pmc_data)
 #ifdef CONFIG_ARCH_TEGRA_21x_SOC
 	unsigned long rpd_ctrl, tctrl, pctrl;
 #endif
+	void __iomem *xusb_pad;
+	xusb_pad = ioremap(xusb_padres->start, resource_size(xusb_padres));
+	pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, pmc_data->instance);
 
@@ -540,8 +540,8 @@ static void utmip_powerdown_pmc_wake_detect(struct tegra_usb_pmc_data *pmc_data)
 	writel(val, pmc_base + PMC_SLEEPWALK_REG(inst));
 
 #ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	/* Program PCTRL_VAL, TCTRL_VAL into PMC space */
-	val = tegra_usb_pad_reg_read(XUSB_PADCTL_USB2_BIAS_PAD_CTL_1);
+	/* Program PCTRL_VAL, TCTRL_VAL into PMC space */ 
+	val = readl(xusb_pad + XUSB_PADCTL_USB2_BIAS_PAD_CTL_1);
 	tctrl = GET_TCTRL(val);
 	pctrl = GET_PCTRL(val);
 	val = readl(pmc_base + PMC_UTMIP_TERM_PAD_CFG);
@@ -550,7 +550,7 @@ static void utmip_powerdown_pmc_wake_detect(struct tegra_usb_pmc_data *pmc_data)
 	writel(val, pmc_base + PMC_UTMIP_TERM_PAD_CFG);
 
 	/* Program PRD_CTRL into PMC space */
-	val = tegra_usb_pad_reg_read(XUSB_PADCTL_USB2_OTG_PAD_CTL_1(inst));
+	val = readl(xusb_pad + XUSB_PADCTL_USB2_OTG_PAD_CTL_1(inst));
 	rpd_ctrl = GET_RPD_CTRL(val);
 	val = readl(pmc_base + PMC_UTMIP_PAD_CFG(inst));
 	val &= ~UTMIP_RPD_CTRL(~0);
@@ -593,6 +593,7 @@ static void utmip_powerup_pmc_wake_detect(struct tegra_usb_pmc_data *pmc_data)
 {
 	unsigned long val;
 	unsigned  int inst = pmc_data->instance;
+	pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, pmc_data->instance);
 
@@ -629,9 +630,7 @@ int uhsic_phy_set_snps_trking_data(void)
 	void __iomem *base = IO_ADDRESS(TEGRA_USB2_BASE);
 	u32 val;
 	void __iomem *car_base = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
-
-	if (!pmc_base)
-		pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+	pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 	spin_lock_irqsave(&pmc_lock, flags);
 	/* Set CLK_ENB_HSIC_TRK*/
@@ -687,6 +686,7 @@ static void uhsic_powerup_pmc_wake_detect(struct tegra_usb_pmc_data *pmc_data)
 {
 	unsigned long val;
 	unsigned int inst = pmc_data->instance;
+	pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, pmc_data->instance);
 
@@ -710,6 +710,7 @@ static void uhsic_powerdown_pmc_wake_detect(struct tegra_usb_pmc_data *pmc_data)
 {
 	unsigned long val;
 	unsigned int inst = pmc_data->instance;
+	pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, pmc_data->instance);
 
@@ -739,6 +740,7 @@ static void uhsic_setup_pmc_wake_detect(struct tegra_usb_pmc_data *pmc_data)
 {
 	unsigned long val;
 	unsigned int inst = pmc_data->instance;
+	pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, pmc_data->instance);
 
@@ -857,6 +859,7 @@ static void uhsic_phy_disable_pmc_bus_ctrl(struct tegra_usb_pmc_data *pmc_data,
 	void __iomem *usb_base;
 	unsigned int inst = pmc_data->instance;
 	usb_base = pmc_data->usb_base;
+	pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, pmc_data->instance);
 
@@ -930,7 +933,7 @@ void tegra_usb_pmc_init(struct tegra_usb_pmc_data *pmc_data)
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, pmc_data->instance);
 
 	if (!pmc_base)
-		pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+		pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 #ifdef KERNEL_WARNING
 	pmc_data->pmc_ops.power_down_pmc = usb_phy_power_down_pmc;
@@ -944,8 +947,7 @@ void tegra_usb_pmc_reg_update(u32 reg_offset, u32 mask, u32 val)
 	u32 reg;
 
 	if (!pmc_base)
-		pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
-
+		pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 	spin_lock_irqsave(&pmc_lock, flags);
 
 	reg = readl(pmc_base + reg_offset);
@@ -962,7 +964,7 @@ u32 tegra_usb_pmc_reg_read(u32 reg_offset)
 	u32 reg;
 
 	if (!pmc_base)
-		pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+		pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 	spin_lock_irqsave(&pmc_lock, flags);
 	reg = readl(pmc_base + reg_offset);
@@ -975,7 +977,7 @@ EXPORT_SYMBOL_GPL(tegra_usb_pmc_reg_read);
 void tegra_usb_pmc_reg_write(u32 reg_offset, u32 val)
 {
 	if (!pmc_base)
-		pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+		pmc_base = ioremap(pmcres->start, resource_size(pmcres));
 
 	spin_lock_irqsave(&pmc_lock, flags);
 	writel(val, pmc_base + reg_offset);
