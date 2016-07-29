@@ -82,10 +82,13 @@ enum rtrace_event_type {
 };
 
 #ifdef CONFIG_PSTORE_RTRACE
+extern void pstore_rtrace_set_bypass(int bypass);
 extern void pstore_rtrace_call(enum rtrace_event_type log_type, void *data);
 #else
 static inline void
 pstore_rtrace_call(enum rtrace_event_type log_type, void *data)
+{ }
+static inline void pstore_rtrace_set_bypass(int bypass)
 { }
 #endif
 

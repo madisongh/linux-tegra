@@ -30,14 +30,22 @@
 struct rtrace_state {
 	int enabled;
 	int initialized;
+	int temp_bypass;
 };
 
 static struct rtrace_state rtrace;
 
 static int notrace pstore_rtrace_enabled(void)
 {
-	return rtrace.initialized && rtrace.enabled && (!oops_in_progress);
+	return rtrace.initialized && rtrace.enabled &&
+		(!oops_in_progress) && !rtrace.temp_bypass;
 }
+
+void pstore_rtrace_set_bypass(int bypass)
+{
+	rtrace.temp_bypass = bypass;
+}
+EXPORT_SYMBOL(pstore_rtrace_set_bypass);
 
 noinline void notrace pstore_rtrace_call(enum rtrace_event_type log_type,
 					void *data)
