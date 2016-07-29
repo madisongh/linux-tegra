@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #include <media/camera_common.h>
 #include <linux/of_graph.h>
 #include <linux/string.h>
@@ -31,8 +30,16 @@
 	 master->ops->op(master, __VA_ARGS__) : 0)
 
 static const struct camera_common_colorfmt camera_common_color_fmts[] = {
-	{MEDIA_BUS_FMT_SRGGB10_1X10, V4L2_COLORSPACE_SRGB},
-	{MEDIA_BUS_FMT_SRGGB8_1X8, V4L2_COLORSPACE_SRGB},
+	{
+		MEDIA_BUS_FMT_SRGGB10_1X10,
+		V4L2_COLORSPACE_SRGB,
+		V4L2_PIX_FMT_SRGGB10,
+	},
+	{
+		MEDIA_BUS_FMT_SRGGB8_1X8,
+		V4L2_COLORSPACE_SRGB,
+		V4L2_PIX_FMT_SRGGB8,
+	},
 };
 
 static struct tegra_io_dpd camera_common_csi_io[] = {
@@ -341,15 +348,43 @@ const struct camera_common_colorfmt *camera_common_find_datafmt(
 
 	return NULL;
 }
+EXPORT_SYMBOL(camera_common_find_datafmt);
 
 int camera_common_enum_mbus_code(struct v4l2_subdev *sd,
 				struct v4l2_subdev_pad_config *cfg,
 				struct v4l2_subdev_mbus_code_enum *code)
 {
-	if (code->pad || code->index >= ARRAY_SIZE(camera_common_color_fmts))
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	struct camera_common_data *s_data = to_camera_common_data(client);
+
+	if (s_data->num_color_fmts < 1 || !s_data->color_fmts) {
+		s_data->color_fmts = camera_common_color_fmts;
+		s_data->num_color_fmts = ARRAY_SIZE(camera_common_color_fmts);
+	}
+
+	if ((unsigned int)code->index >= s_data->num_color_fmts)
 		return -EINVAL;
 
-	code->code = camera_common_color_fmts[code->index].code;
+	code->code = s_data->color_fmts[code->index].code;
+	return 0;
+}
+EXPORT_SYMBOL(camera_common_enum_mbus_code);
+
+int camera_common_enum_fmt(struct v4l2_subdev *sd, unsigned int index,
+			unsigned int *code)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	struct camera_common_data *s_data = to_camera_common_data(client);
+
+	if (s_data->num_color_fmts < 1 || !s_data->color_fmts) {
+		s_data->color_fmts = camera_common_color_fmts;
+		s_data->num_color_fmts = ARRAY_SIZE(camera_common_color_fmts);
+	}
+
+	if ((unsigned int)index >= s_data->num_color_fmts)
+		return -EINVAL;
+
+	*code = s_data->color_fmts[index].code;
 	return 0;
 }
 
@@ -360,7 +395,7 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 	struct v4l2_control hdr_control;
 	const struct camera_common_frmfmt *frmfmt = s_data->frmfmt;
 	int hdr_en;
-	int err;
+	int err = 0;
 	int i;
 
 	dev_dbg(&client->dev, "%s: size %i x %i\n", __func__,
@@ -392,25 +427,31 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 		}
 	}
 
-	if (i == s_data->numfmts)
+	if (i == s_data->numfmts) {
+		mf->width = s_data->fmt_width;
+		mf->height = s_data->fmt_height;
 		dev_dbg(&client->dev,
 			"%s: invalid resolution supplied to set mode %d %d\n",
 			__func__, mf->width, mf->height);
+	}
 
 	if (mf->code != MEDIA_BUS_FMT_SRGGB8_1X8 &&
-		mf->code != MEDIA_BUS_FMT_SRGGB10_1X10)
+		mf->code != MEDIA_BUS_FMT_SRGGB10_1X10) {
 		mf->code = MEDIA_BUS_FMT_SRGGB10_1X10;
+		err = -EINVAL;
+	}
 
 	mf->field = V4L2_FIELD_NONE;
 	mf->colorspace = V4L2_COLORSPACE_SRGB;
 
-	return 0;
+	return err;
 }
 
 int camera_common_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	struct camera_common_data *s_data = to_camera_common_data(client);
+	int ret;
 
 	dev_dbg(&client->dev, "%s(%u) size %i x %i\n", __func__,
 			mf->code, mf->width, mf->height);
@@ -419,11 +460,11 @@ int camera_common_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 	if (!camera_common_find_datafmt(mf->code))
 		return -EINVAL;
 
-	camera_common_try_fmt(sd, mf);
+	ret = camera_common_try_fmt(sd, mf);
 
 	s_data->colorfmt = camera_common_find_datafmt(mf->code);
 
-	return 0;
+	return ret;
 }
 
 int camera_common_g_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
@@ -442,6 +483,95 @@ int camera_common_g_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 
 	return 0;
 }
+
+static int camera_common_evaluate_color_format(struct v4l2_subdev *sd,
+					       int pixelformat)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	struct camera_common_data *s_data = to_camera_common_data(client);
+	int i;
+
+	if (!s_data)
+		return -EINVAL;
+
+	if (s_data->num_color_fmts < 1 || !s_data->color_fmts) {
+		s_data->color_fmts = camera_common_color_fmts;
+		s_data->num_color_fmts = ARRAY_SIZE(camera_common_color_fmts);
+	}
+
+	for (i = 0; i < s_data->num_color_fmts; i++) {
+		if (s_data->color_fmts[i].pix_fmt == pixelformat)
+			break;
+	}
+
+	if (i >= s_data->num_color_fmts)
+		return -EINVAL;
+
+	return 0;
+}
+
+int camera_common_enum_framesizes(struct v4l2_subdev *sd,
+		struct v4l2_subdev_pad_config *cfg,
+		struct v4l2_subdev_frame_size_enum *fse)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	struct camera_common_data *s_data = to_camera_common_data(client);
+	int ret;
+
+	if (!s_data || !s_data->frmfmt)
+		return -EINVAL;
+
+	if (fse->index >= s_data->numfmts)
+		return -EINVAL;
+
+	ret = camera_common_evaluate_color_format(sd, fse->code);
+	if (ret)
+		return ret;
+
+	fse->min_width = fse->max_width =
+		s_data->frmfmt[fse->index].size.width;
+	fse->min_height = fse->max_height =
+		s_data->frmfmt[fse->index].size.height;
+	return 0;
+}
+EXPORT_SYMBOL(camera_common_enum_framesizes);
+
+int camera_common_enum_frameintervals(struct v4l2_subdev *sd,
+		struct v4l2_subdev_pad_config *cfg,
+		struct v4l2_subdev_frame_interval_enum *fie)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	struct camera_common_data *s_data = to_camera_common_data(client);
+	int i, ret;
+
+	if (!s_data || !s_data->frmfmt)
+		return -EINVAL;
+
+	/* Check color format */
+	ret = camera_common_evaluate_color_format(sd, fie->code);
+	if (ret)
+		return ret;
+
+	/* Check resolution sizes */
+	for (i = 0; i < s_data->numfmts; i++) {
+		if (s_data->frmfmt[i].size.width == fie->width &&
+		    s_data->frmfmt[i].size.height == fie->height)
+			break;
+	}
+	if (i >= s_data->numfmts)
+		return -EINVAL;
+
+	/* Check index is in the rage of framerates array index */
+	if (fie->index >= s_data->frmfmt[i].num_framerates)
+		return -EINVAL;
+
+	fie->interval.numerator = 1;
+	fie->interval.denominator =
+		s_data->frmfmt[i].framerates[fie->index];
+
+	return 0;
+}
+EXPORT_SYMBOL(camera_common_enum_frameintervals);
 
 static void camera_common_mclk_disable(struct camera_common_data *s_data)
 {
@@ -464,31 +594,22 @@ static int camera_common_mclk_enable(struct camera_common_data *s_data)
 	unsigned long mclk_init_rate = s_data->def_clk_freq;
 
 	if (!pw) {
-		dev_err(&s_data->i2c_client->dev, "%s: no device power rail\n",
+		dev_err(s_data->dev, "%s: no device power rail\n",
 			__func__);
-		return -EFAULT;
+		return -ENODEV;
 	}
 
-	dev_dbg(&s_data->i2c_client->dev, "%s: enable MCLK with %lu Hz\n",
+	dev_dbg(s_data->dev, "%s: enable MCLK with %lu Hz\n",
 		__func__, mclk_init_rate);
 
 	err = clk_set_rate(pw->mclk, mclk_init_rate);
-	if (err) {
-		dev_err(&s_data->i2c_client->dev, "%s: error set rate\n",
-			__func__);
-		return err;
-	}
-	err = clk_prepare_enable(pw->mclk);
-	if (err) {
-		dev_err(&s_data->i2c_client->dev, "%s: error prepare enable\n",
-			__func__);
-		return err;
-	}
+	if (!err)
+		err = clk_prepare_enable(pw->mclk);
 
-	return 0;
+	return err;
 }
 
-static void camera_common_dpd_disable(struct camera_common_data *s_data)
+void camera_common_dpd_disable(struct camera_common_data *s_data)
 {
 	int i;
 	int io_idx;
@@ -499,12 +620,12 @@ static void camera_common_dpd_disable(struct camera_common_data *s_data)
 	for (i = 0; i < numports; i++) {
 		io_idx = s_data->csi_port + i;
 		tegra_io_dpd_disable(&camera_common_csi_io[io_idx]);
-		dev_dbg(&s_data->i2c_client->dev,
+		dev_dbg(s_data->dev,
 			 "%s: csi %d\n", __func__, io_idx);
 	}
 }
 
-static void camera_common_dpd_enable(struct camera_common_data *s_data)
+void camera_common_dpd_enable(struct camera_common_data *s_data)
 {
 	int i;
 	int io_idx;
@@ -515,7 +636,7 @@ static void camera_common_dpd_enable(struct camera_common_data *s_data)
 	for (i = 0; i < numports; i++) {
 		io_idx = s_data->csi_port + i;
 		tegra_io_dpd_enable(&camera_common_csi_io[io_idx]);
-		dev_dbg(&s_data->i2c_client->dev,
+		dev_dbg(s_data->dev,
 			 "%s: csi %d\n", __func__, io_idx);
 	}
 }
@@ -535,14 +656,12 @@ int camera_common_s_power(struct v4l2_subdev *sd, int on)
 
 		err = call_s_op(s_data, power_on);
 		if (err) {
-			dev_err(&s_data->i2c_client->dev,
+			dev_err(s_data->dev,
 				"%s: error power on\n", __func__);
-			camera_common_dpd_enable(s_data);
 			camera_common_mclk_disable(s_data);
 		}
 	} else {
 		call_s_op(s_data, power_off);
-		camera_common_dpd_enable(s_data);
 		camera_common_mclk_disable(s_data);
 	}
 

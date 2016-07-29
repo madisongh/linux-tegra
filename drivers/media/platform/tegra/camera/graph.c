@@ -30,7 +30,8 @@
 #include <media/v4l2-of.h>
 #include <media/tegra_v4l2_camera.h>
 
-#include "mc_common.h"
+#include "camera/mc_common.h"
+#include "csi/csi.h"
 
 
 /* -----------------------------------------------------------------------------
@@ -119,7 +120,7 @@ static int tegra_vi_graph_build_one(struct tegra_mc_vi *vi,
 			dev_err(vi->dev, "no entity found for %s\n",
 				link.remote_node->full_name);
 			v4l2_of_put_link(&link);
-			ret = -ENODEV;
+			ret = -EINVAL;
 			break;
 		}
 
@@ -212,8 +213,14 @@ static int tegra_vi_graph_build_links(struct tegra_mc_vi *vi)
 			dev_err(vi->dev, "no entity found for %s\n",
 				link.remote_node->full_name);
 			v4l2_of_put_link(&link);
-			ret = -ENODEV;
+			ret = -EINVAL;
 			break;
+		}
+
+		if (NULL == ent->entity) {
+			dev_dbg(vi->dev, "entity not bounded %s\n",
+				link.remote_node->full_name);
+			continue;
 		}
 
 		source = ent->entity;
@@ -239,7 +246,7 @@ static int tegra_vi_graph_build_links(struct tegra_mc_vi *vi)
 			break;
 		}
 
-		tegra_channel_fmts_bitmap_init(chan, ent);
+		tegra_channel_init_subdevices(chan);
 	} while (next != NULL);
 
 	of_node_put(ep);
@@ -271,6 +278,8 @@ static int tegra_vi_graph_notify_complete(struct v4l2_async_notifier *notifier)
 	if (ret < 0)
 		dev_err(vi->dev, "failed to register subdev nodes\n");
 
+	vi->link_status++;
+
 	return ret;
 }
 
@@ -298,6 +307,7 @@ static int tegra_vi_graph_notify_bound(struct v4l2_async_notifier *notifier,
 		dev_dbg(vi->dev, "subdev %s bound\n", subdev->name);
 		entity->entity = &subdev->entity;
 		entity->subdev = subdev;
+		vi->subdevs_bound++;
 		return 0;
 	}
 
@@ -318,6 +328,68 @@ void tegra_vi_graph_cleanup(struct tegra_mc_vi *vi)
 	}
 }
 
+int tegra_vi_get_port_info(struct tegra_channel *chan,
+			struct device_node *node, unsigned int index)
+{
+	struct device_node *ep = NULL;
+	struct device_node *ports;
+	struct device_node *port;
+	int value = 0xFFFF;
+	int ret = 0, i;
+
+	ports = of_get_child_by_name(node, "ports");
+	if (ports == NULL)
+		ports = node;
+
+	for_each_child_of_node(ports, port) {
+		if (!port->name || of_node_cmp(port->name, "port"))
+			continue;
+
+		ret = of_property_read_u32(port, "reg", &value);
+		if (ret < 0)
+			continue;
+
+		if (value != index)
+			continue;
+
+		for_each_child_of_node(port, ep) {
+			if (!ep->name || of_node_cmp(ep->name, "endpoint"))
+				continue;
+
+			/* Get CSI port */
+			ret = of_property_read_u32(ep, "csi-port", &value);
+			if (ret < 0)
+				dev_err(&chan->video.dev, "csi port error\n");
+			chan->port[0] = value;
+
+			/* Get number of data lanes for the endpoint */
+			ret = of_property_read_u32(ep, "bus-width", &value);
+			if (ret < 0)
+				dev_err(&chan->video.dev, "num lanes error\n");
+			chan->numlanes = value;
+
+			if (value > 12) {
+				dev_err(&chan->video.dev, "num lanes >12!\n");
+				return -EINVAL;
+			}
+			/*
+			 * for numlanes greater than 4 multiple CSI bricks
+			 * are needed to capture the image, the logic below
+			 * checks for numlanes > 4 and add a new CSI brick
+			 * as a valid port. Loops around the three CSI
+			 * bricks to add as many ports necessary.
+			 */
+			value -= 4;
+			for (i = 1; value > 0; i++, value -= 4) {
+				int next_port = chan->port[i-1] + 2;
+				next_port = (next_port % (PORT_F + 1));
+				chan->port[i] = next_port;
+			}
+		}
+	}
+
+	return ret;
+}
 
 static int tegra_vi_graph_parse_one(struct tegra_mc_vi *vi,
 				struct device_node *node)
@@ -365,6 +437,44 @@ static int tegra_vi_graph_parse_one(struct tegra_mc_vi *vi,
 	} while (next);
 
 	return ret;
+}
+
+int tegra_vi_tpg_graph_init(struct tegra_mc_vi *mc_vi)
+{
+	int err = 0, i;
+	u32 link_flags = MEDIA_LNK_FL_ENABLED;
+	struct tegra_csi_device *csi = mc_vi->csi;
+	struct media_entity *source = &csi->subdev.entity;
+
+	mc_vi->num_subdevs = mc_vi->num_channels;
+	for (i = 0; i < mc_vi->num_channels; i++) {
+		struct tegra_channel *chan = &mc_vi->chans[i];
+		struct media_entity *sink = &chan->video.entity;
+		struct media_pad *source_pad = &csi->pads[i];
+		struct media_pad *sink_pad = &chan->pad;
+
+		/* Use non-bypass mode by default */
+		chan->bypass = 0;
+
+		/* Create the media link. */
+		dev_dbg(mc_vi->dev, "creating %s:%u -> %s:%u link\n",
+			source->name, source_pad->index,
+			sink->name, sink_pad->index);
+
+		err = media_entity_create_link(source, source_pad->index,
+					       sink, sink_pad->index,
+					       link_flags);
+		if (err < 0) {
+			dev_err(mc_vi->dev,
+				"failed to create %s:%u -> %s:%u link\n",
+				source->name, source_pad->index,
+				sink->name, sink_pad->index);
+			return err;
+		}
+		tegra_channel_init_subdevices(chan);
+	}
+
+	return 0;
 }
 
 int tegra_vi_graph_init(struct tegra_mc_vi *vi)
@@ -417,11 +527,22 @@ int tegra_vi_graph_init(struct tegra_mc_vi *vi)
 	vi->notifier.num_subdevs = num_subdevs;
 	vi->notifier.bound = tegra_vi_graph_notify_bound;
 	vi->notifier.complete = tegra_vi_graph_notify_complete;
+	vi->link_status = 0;
+	vi->subdevs_bound = 0;
 
 	ret = v4l2_async_notifier_register(&vi->v4l2_dev, &vi->notifier);
 	if (ret < 0) {
 		dev_err(vi->dev, "notifier registration failed\n");
 		goto done;
+	}
+
+	if (!vi->link_status) {
+		if (vi->subdevs_bound) {
+			ret = tegra_vi_graph_notify_complete(&vi->notifier);
+			if (ret < 0)
+				goto done;
+		}
+		tegra_clean_unlinked_channels(vi);
 	}
 
 	return 0;

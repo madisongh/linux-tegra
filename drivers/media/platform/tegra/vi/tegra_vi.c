@@ -31,8 +31,8 @@
 #include "nvhost_acm.h"
 #include "chip_support.h"
 #include "host1x/host1x.h"
-#include "vi.h"
-#include "vi_irq.h"
+#include "vi/vi.h"
+#include "vi/vi_irq.h"
 
 static DEFINE_MUTEX(la_lock);
 
@@ -76,24 +76,6 @@ int nvhost_vi_finalize_poweron(struct platform_device *dev)
 	/* Only do this for vi.0 not for slave device vi.1 */
 	if (dev->id == 0)
 		host1x_writel(dev, T12_VI_CFG_CG_CTRL, T12_CG_2ND_LEVEL_EN);
-#endif
-
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	{
-		void __iomem *reset_reg[3];
-		struct nvhost_device_data *pdata = dev->dev.platform_data;
-
-		reset_reg[0] = pdata->aperture[0] +
-			       T21_CSI_CILA_PAD_CONFIG0;
-		reset_reg[1] = pdata->aperture[0] +
-			       T21_CSI1_CILA_PAD_CONFIG0;
-		reset_reg[2] = pdata->aperture[0] +
-			       T21_CSI2_CILA_PAD_CONFIG0;
-
-		writel(readl(reset_reg[0]) & 0xfffcffff, reset_reg[0]);
-		writel(readl(reset_reg[1]) & 0xfffcffff, reset_reg[1]);
-		writel(readl(reset_reg[2]) & 0xfffcffff, reset_reg[2]);
-	}
 #endif
 
 	ret = vi_enable_irq(tegra_vi);
@@ -235,6 +217,21 @@ static int vi_set_la(u32 vi_bw)
 	return ret;
 }
 
+int vi_v4l2_set_la(struct vi *tegra_vi, u32 vi_bypass_bw, bool is_ioctl)
+{
+	int ret = 0;
+	unsigned long total_bw;
+
+	mutex_lock(&tegra_vi->update_la_lock);
+	if (is_ioctl)
+		tegra_vi->vi_bypass_bw = vi_bypass_bw;
+	total_bw = tegra_vi->mc_vi.aggregated_kbyteps + tegra_vi->vi_bypass_bw;
+	ret = vi_set_la(total_bw);
+	mutex_unlock(&tegra_vi->update_la_lock);
+	return ret;
+}
+EXPORT_SYMBOL(vi_v4l2_set_la);
+
 static long vi_ioctl(struct file *file,
 		unsigned int cmd, unsigned long arg)
 {
@@ -256,7 +253,7 @@ static long vi_ioctl(struct file *file,
 			return -EFAULT;
 		}
 
-		clk = clk_get(&tegra_vi->ndev->dev, "pll_d");
+		clk = clk_get(NULL, "pll_d");
 		if (IS_ERR(clk))
 			return -EINVAL;
 
@@ -306,7 +303,7 @@ static long vi_ioctl(struct file *file,
 			}
 
 		/* Set latency allowance for VI, BW is in MBps */
-		ret = vi_set_la(vi_la_bw);
+		ret = vi_v4l2_set_la(tegra_vi, vi_la_bw, 1);
 		if (ret) {
 			dev_err(&tegra_vi->ndev->dev,
 			"%s: failed to set la vi_bw %u MBps\n",

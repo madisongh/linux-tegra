@@ -556,9 +556,21 @@ exit:
 	return err;
 }
 
+static int ov23850_g_input_status(struct v4l2_subdev *sd, u32 *status)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct ov23850 *priv = (struct ov23850 *)s_data->priv;
+	struct camera_common_power_rail *pw = &priv->power;
+
+	*status = pw->state == SWITCH_ON;
+	return 0;
+}
+
 static struct v4l2_subdev_video_ops ov23850_subdev_video_ops = {
 	.s_stream	= ov23850_s_stream,
 	.g_mbus_config	= camera_common_g_mbus_config,
+	.g_input_status	= ov23850_g_input_status,
 };
 
 static struct v4l2_subdev_core_ops ov23850_subdev_core_ops = {
@@ -590,6 +602,8 @@ static struct v4l2_subdev_pad_ops ov23850_subdev_pad_ops = {
 	.set_fmt = ov23850_set_fmt,
 	.get_fmt = ov23850_get_fmt,
 	.enum_mbus_code = camera_common_enum_mbus_code,
+	.enum_frame_size	= camera_common_enum_framesizes,
+	.enum_frame_interval	= camera_common_enum_frameintervals,
 };
 
 static struct v4l2_subdev_ops ov23850_subdev_ops = {
@@ -986,10 +1000,12 @@ static int ov23850_otp_setup(struct ov23850 *priv)
 	if (err)
 		return -ENODEV;
 
-	ov23850_read_otp_manual(priv,
+	err = ov23850_read_otp_manual(priv,
 				otp_buf,
 				OV23850_OTP_START_ADDR,
 				OV23850_OTP_END_ADDR);
+	if (err)
+		return -ENODEV;
 
 	ctrl = v4l2_ctrl_find(&priv->ctrl_handler, V4L2_CID_OTP_DATA);
 	if (!ctrl) {
@@ -1021,10 +1037,12 @@ static int ov23850_fuse_id_setup(struct ov23850 *priv)
 	if (err)
 		return -ENODEV;
 
-	ov23850_read_otp_manual(priv,
+	err = ov23850_read_otp_manual(priv,
 				fuse_id,
 				OV23850_FUSE_ID_OTP_START_ADDR,
 				OV23850_FUSE_ID_OTP_END_ADDR);
+	if (err)
+		return -ENODEV;
 
 	ctrl = v4l2_ctrl_find(&priv->ctrl_handler, V4L2_CID_FUSE_ID);
 	if (!ctrl) {
@@ -1279,10 +1297,8 @@ static int ov23850_probe(struct i2c_client *client,
 {
 	struct camera_common_data *common_data;
 	struct ov23850 *priv;
-	struct device_node *node = client->dev.of_node;
 	char debugfs_name[10];
 	int err;
-	u32 port = 0;
 
 	pr_info("[OV23850]: probing v4l2 sensor at addr 0x%0x.\n",
 		client->addr);
@@ -1322,12 +1338,15 @@ static int ov23850_probe(struct i2c_client *client,
 	common_data->def_mode		= OV23850_DEFAULT_MODE;
 	common_data->def_width		= OV23850_DEFAULT_WIDTH;
 	common_data->def_height		= OV23850_DEFAULT_HEIGHT;
+	common_data->fmt_width		= common_data->def_width;
+	common_data->fmt_height		= common_data->def_height;
 	common_data->def_clk_freq	= OV23850_DEFAULT_CLK_FREQ;
 
 	priv->i2c_client		= client;
 	priv->s_data			= common_data;
 	priv->subdev			= &common_data->subdev;
 	priv->subdev->dev		= &client->dev;
+	priv->s_data->dev		= &client->dev;
 	priv->group_hold_prev		= 0;
 
 	err = ov23850_power_get(priv);

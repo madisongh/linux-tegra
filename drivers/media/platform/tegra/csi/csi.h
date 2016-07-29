@@ -18,6 +18,11 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-subdev.h>
 
+#include <media/camera_common.h>
+#include "../camera/registers.h"
+#include <linux/platform_device.h>
+
+
 enum tegra_csi_port_num {
 	PORT_A = 0,
 	PORT_B = 1,
@@ -25,6 +30,17 @@ enum tegra_csi_port_num {
 	PORT_D = 3,
 	PORT_E = 4,
 	PORT_F = 5,
+};
+
+#define csi_port_is_valid(port) \
+	(port < PORT_A ? 0 : (port > PORT_F ? 0 : 1))
+
+enum camera_gang_mode {
+	CAMERA_NO_GANG_MODE = 0,
+	CAMERA_GANG_L_R = 1,
+	CAMERA_GANG_T_B,
+	CAMERA_GANG_R_L,
+	CAMERA_GANG_B_T
 };
 
 struct tegra_csi_port {
@@ -42,14 +58,39 @@ struct tegra_csi_port {
 
 struct tegra_csi_device {
 	struct v4l2_subdev subdev;
+	struct vi *vi;
 	struct device *dev;
-	void __iomem *iomem;
+	void __iomem *iomem[3];
 	struct clk *clk;
+	struct clk *tpg_clk;
+	struct clk *cil[3];
 
+	struct camera_common_data s_data[6];
 	struct tegra_csi_port *ports;
 	struct media_pad *pads;
 
+	unsigned int clk_freq;
 	int num_ports;
+	int pg_mode;
+
+	struct tegra_csi_fops *fops;
+};
+
+struct tegra_csi_fops {
+	void (*soc_tpg_start_streaming)(struct tegra_csi_device *csi,
+			enum tegra_csi_port_num port_num);
+	void (*soc_start_streaming)(struct tegra_csi_device *csi,
+			enum tegra_csi_port_num port_num);
+	int (*soc_error)(struct tegra_csi_device *csi,
+			enum tegra_csi_port_num port_num);
+	void (*soc_status)(struct tegra_csi_device *csi,
+			enum tegra_csi_port_num port_num);
+	void (*soc_error_recover)(struct tegra_csi_device *csi,
+			enum tegra_csi_port_num port_num);
+	void (*soc_stop_streaming)(struct tegra_csi_device *csi,
+			enum tegra_csi_port_num port_num);
+	int (*soc_init)(struct tegra_csi_device *csi,
+			struct platform_device *pdev);
 };
 
 static inline struct tegra_csi_device *to_csi(struct v4l2_subdev *subdev)
@@ -57,6 +98,33 @@ static inline struct tegra_csi_device *to_csi(struct v4l2_subdev *subdev)
 	return container_of(subdev, struct tegra_csi_device, subdev);
 }
 
+void set_csi_portinfo(struct tegra_csi_device *csi,
+	unsigned int port, unsigned int numlanes);
+void tegra_csi_status(struct tegra_csi_device *csi,
+			enum tegra_csi_port_num port_num);
+int tegra_csi_error(struct tegra_csi_device *csi,
+			enum tegra_csi_port_num port_num);
+void tegra_csi_tpg_start_streaming(struct tegra_csi_device *csi,
+				enum tegra_csi_port_num port_num);
+void tegra_csi_start_streaming(struct tegra_csi_device *csi,
+				enum tegra_csi_port_num port_num);
+void tegra_csi_stop_streaming(struct tegra_csi_device *csi,
+				enum tegra_csi_port_num port_num);
+void tegra_csi_error_recover(struct tegra_csi_device *csi,
+				enum tegra_csi_port_num port_num);
+void tegra_csi_pad_control(struct tegra_csi_device *csi,
+				unsigned char *port_num, int enable);
+int tegra_csi_channel_power(struct tegra_csi_device *csi,
+				unsigned char *port, int enable);
+#define tegra_csi_channel_power_on(csi, port) \
+	tegra_csi_channel_power(csi, port, 1)
+#define tegra_csi_channel_power_off(csi, port) \
+	tegra_csi_channel_power(csi, port, 0)
+int tegra_csi_power(struct tegra_csi_device *csi, int enable);
+#define tegra_csi_power_on(csi) tegra_csi_power(csi, 1)
+#define tegra_csi_power_off(csi) tegra_csi_power(csi, 0)
+int tegra_csi_init(struct tegra_csi_device *csi,
+		struct platform_device *pdev);
 int tegra_csi_media_controller_init(struct tegra_csi_device *csi,
 				struct platform_device *pdev);
 int tegra_csi_media_controller_remove(struct tegra_csi_device *csi);

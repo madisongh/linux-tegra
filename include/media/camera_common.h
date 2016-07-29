@@ -44,12 +44,13 @@
 #define V4L2_CID_COARSE_TIME		(V4L2_CID_TEGRA_CAMERA_BASE+1)
 #define V4L2_CID_COARSE_TIME_SHORT	(V4L2_CID_TEGRA_CAMERA_BASE+2)
 #define V4L2_CID_GROUP_HOLD		(V4L2_CID_TEGRA_CAMERA_BASE+3)
-#define V4L2_CID_HDR_EN		(V4L2_CID_TEGRA_CAMERA_BASE+4)
+#define V4L2_CID_HDR_EN			(V4L2_CID_TEGRA_CAMERA_BASE+4)
 #define V4L2_CID_EEPROM_DATA		(V4L2_CID_TEGRA_CAMERA_BASE+5)
 #define V4L2_CID_OTP_DATA		(V4L2_CID_TEGRA_CAMERA_BASE+6)
 #define V4L2_CID_FUSE_ID		(V4L2_CID_TEGRA_CAMERA_BASE+7)
 
 #define V4L2_CID_TEGRA_CAMERA_LAST	(V4L2_CID_TEGRA_CAMERA_BASE+8)
+#define V4L2_CID_VI_BYPASS_MODE		(V4L2_CID_TEGRA_CAMERA_BASE+9)
 
 #define MAX_BUFFER_SIZE			32
 #define MAX_CID_CONTROLS		16
@@ -130,6 +131,8 @@ static const s64 switch_ctrl_qmenu[] = {
 
 struct camera_common_frmfmt {
 	struct v4l2_frmsize_discrete	size;
+	const int	*framerates;
+	int	num_framerates;
 	bool	hdr_en;
 	int	mode;
 };
@@ -137,6 +140,7 @@ struct camera_common_frmfmt {
 struct camera_common_colorfmt {
 	unsigned int			code;
 	enum v4l2_colorspace		colorspace;
+	int				pix_fmt;
 };
 
 struct camera_common_data;
@@ -154,8 +158,10 @@ struct camera_common_data {
 	struct camera_common_sensor_ops		*ops;
 	struct v4l2_ctrl_handler		*ctrl_handler;
 	struct i2c_client			*i2c_client;
+	struct device				*dev;
 	const struct camera_common_frmfmt	*frmfmt;
 	const struct camera_common_colorfmt	*colorfmt;
+	const struct camera_common_colorfmt	*color_fmts;
 	struct dentry				*debugdir;
 	struct camera_common_power_rail		*power;
 
@@ -164,10 +170,11 @@ struct camera_common_data {
 
 	void	*priv;
 	int	numctrls;
-	int csi_port;
-	int numlanes;
+	int	csi_port;
+	int	numlanes;
 	int	mode;
 	int	numfmts;
+	int	num_color_fmts;
 	int	def_mode, def_width, def_height;
 	int	def_clk_freq;
 	int	fmt_width, fmt_height;
@@ -244,7 +251,16 @@ int camera_common_try_fmt(struct v4l2_subdev *sd,
 			   struct v4l2_mbus_framefmt *mf);
 int camera_common_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf);
 int camera_common_g_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf);
+int camera_common_enum_framesizes(struct v4l2_subdev *sd,
+		struct v4l2_subdev_pad_config *cfg,
+		struct v4l2_subdev_frame_size_enum *fse);
+int camera_common_enum_frameintervals(struct v4l2_subdev *sd,
+		struct v4l2_subdev_pad_config *cfg,
+		struct v4l2_subdev_frame_interval_enum *fie);
+int camera_common_set_power(struct camera_common_data *data, int on);
 int camera_common_s_power(struct v4l2_subdev *sd, int on);
+void camera_common_dpd_disable(struct camera_common_data *s_data);
+void camera_common_dpd_enable(struct camera_common_data *s_data);
 int camera_common_g_mbus_config(struct v4l2_subdev *sd,
 			      struct v4l2_mbus_config *cfg);
 /* Focuser */

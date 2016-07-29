@@ -22,10 +22,12 @@
 #define __NVHOST_VI_H__
 
 #include <linux/platform/tegra/isomgr.h>
+#include <linux/tegra-powergate.h>
+#include <linux/clk/tegra.h>
 
-#include "../camera/mc_common.h"
-#include "camera_priv_defs.h"
+#include "camera/mc_common.h"
 #include "chip_support.h"
+#include "csi/csi.h"
 
 #define VI_CFG_INTERRUPT_MASK_0				0x8c
 #define VI_CFG_INTERRUPT_STATUS_0			0x98
@@ -82,13 +84,41 @@ struct tegra_vi_stats {
 };
 
 struct tegra_vi_mfi_ctx;
+struct tegra_vi_fops {
+	int (*soc_power_on)(struct tegra_mc_vi *vi);
+	void (*soc_power_off)(struct tegra_mc_vi *vi);
+};
+
+struct tegra_vi_channel_fops {
+	void (*soc_channel_ec_init)(struct tegra_channel *chan);
+	void (*soc_channel_ec_recover)(struct tegra_channel *chan);
+	int (*soc_channel_capture_setup)(struct tegra_channel *chan);
+	void (*soc_channel_capture_frame_init)(struct tegra_channel *chan,
+			struct tegra_channel_buffer *buf, u32 *thresh);
+	void (*soc_channel_capture_frame_enable)(struct tegra_channel *chan);
+	int (*soc_channel_capture_frame)(struct tegra_channel *chan,
+			struct timespec *ts, u32 *thresh);
+	int (*soc_channel_capture_done)(struct tegra_channel *chan,
+			struct tegra_channel_buffer *buf,
+			struct timespec *ts);
+	int (*soc_channel_error_status)(struct tegra_channel *chan);
+	int (*soc_channel_stop_streaming)(struct tegra_channel *chan);
+};
+
+struct tegra_vi_data {
+	struct nvhost_device_data *info;
+	struct tegra_vi_fops *vi_fops;
+	struct tegra_vi_channel_fops *channel_fops;
+	struct tegra_csi_fops *csi_fops;
+};
 
 struct vi {
 	struct tegra_camera *camera;
 	struct platform_device *ndev;
 	struct device *dev;
-	struct nvhost_device_data *ndata;
+	struct tegra_vi_data *data;
 	struct tegra_mc_vi mc_vi;
+	struct tegra_csi_device csi;
 
 	struct regulator *reg;
 	struct dentry *debugdir;
@@ -99,9 +129,13 @@ struct vi {
 	tegra_isomgr_handle isomgr_handle;
 #endif
 	int vi_irq;
-	uint vi_bw;
+	uint vi_bypass_bw;
 	uint max_bw;
+	struct mutex update_la_lock;
 	bool master_deinitialized;
+	bool tpg_opened;
+	bool sensor_opened;
+	bool bypass;
 };
 
 extern const struct file_operations tegra_vi_ctrl_ops;
@@ -109,6 +143,8 @@ int nvhost_vi_prepare_poweroff(struct platform_device *);
 int nvhost_vi_finalize_poweron(struct platform_device *);
 
 void nvhost_vi_reset_all(struct platform_device *);
+struct vi *tegra_vi_get(void);
+int vi_v4l2_set_la(struct vi *tegra_vi, u32 vi_bypass_bw, bool is_ioctl);
 
 int tegra_vi_register_mfi_cb(callback cb, void *cb_arg);
 int tegra_vi_unregister_mfi_cb(void);

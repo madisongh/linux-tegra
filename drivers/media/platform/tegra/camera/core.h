@@ -20,6 +20,10 @@
 #define TEGRA_MAX_WIDTH		32768U
 #define TEGRA_MIN_HEIGHT	32U
 #define TEGRA_MAX_HEIGHT	32768U
+/* Width alignment */
+#define TEGRA_WIDTH_ALIGNMENT	1
+/* Stride alignment is 64 */
+#define TEGRA_STRIDE_ALIGNMENT	64
 
 /* 1080p resolution as default resolution for test pattern generator */
 #define TEGRA_DEF_WIDTH		1920
@@ -60,7 +64,8 @@ enum tegra_image_format {
 
 	TEGRA_IMAGE_FORMAT_T_A2Y10U10V10 = 197,
 	TEGRA_IMAGE_FORMAT_T_V10U10Y10A2,
-	TEGRA_IMAGE_FORMAT_T_Y8_U8__Y8_V8,
+
+	TEGRA_IMAGE_FORMAT_T_Y8_U8__Y8_V8 = 200,
 	TEGRA_IMAGE_FORMAT_T_Y8_V8__Y8_U8,
 	TEGRA_IMAGE_FORMAT_T_U8_Y8__V8_Y8,
 	TEGRA_IMAGE_FORMAT_T_T_V8_Y8__U8_Y8,
@@ -142,6 +147,7 @@ struct tegra_video_format {
 	enum tegra_image_format img_fmt;
 	enum tegra_image_dt img_dt;
 	u32 fourcc;
+	__u8 description[32];
 };
 
 u32 tegra_core_get_fourcc_by_idx(unsigned int index);
@@ -153,4 +159,5 @@ const struct tegra_video_format *tegra_core_get_format_by_code(unsigned int
 const struct tegra_video_format *tegra_core_get_format_by_fourcc(u32 fourcc);
 u32 tegra_core_bytes_per_line(unsigned int width, unsigned int align,
 			      const struct tegra_video_format *fmt);
+void tegra_core_get_description_by_idx(unsigned int index, __u8 *description);
 #endif

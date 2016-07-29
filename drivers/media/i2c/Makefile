@@ -8,6 +8,8 @@ obj-$(CONFIG_VIDEO_CX25840) += cx25840/
 obj-$(CONFIG_VIDEO_M5MOLS)	+= m5mols/
 obj-y				+= soc_camera/
 
+ccflags-y	+= -Idrivers/video/tegra/camera
+
 obj-$(CONFIG_VIDEO_APTINA_PLL) += aptina-pll.o
 obj-$(CONFIG_VIDEO_TVAUDIO) += tvaudio.o
 obj-$(CONFIG_VIDEO_TDA7432) += tda7432.o
@@ -85,3 +87,5 @@ obj-$(CONFIG_VIDEO_OV10823) += ov10823.o
 obj-$(CONFIG_VIDEO_OV23850) += ov23850.o
 obj-$(CONFIG_VIDEO_LC898212) += lc898212.o
 obj-$(CONFIG_VIDEO_OV5693) += ov5693.o
+obj-$(CONFIG_VIDEO_IMX274) += imx274.o
+obj-$(CONFIG_VIDEO_TC358840)	+= tc358840.o
