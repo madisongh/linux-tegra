@@ -251,6 +251,8 @@ int tegra_bpmp_send(int mrq, void *data, int sz)
 }
 EXPORT_SYMBOL(tegra_bpmp_send);
 
+static int mail_inited;
+
 /* should be called with local irqs disabled */
 int tegra_bpmp_send_receive_atomic(int mrq, void *ob_data, int ob_sz,
 		void *ib_data, int ib_sz)
@@ -263,6 +265,9 @@ int tegra_bpmp_send_receive_atomic(int mrq, void *ob_data, int ob_sz,
 
 	if (!bpmp_valid_txfer(ob_data, ob_sz, ib_data, ib_sz))
 		return -EINVAL;
+
+	if (!mail_inited)
+		return -EAGAIN;
 
 	if (!connected)
 		return -ENODEV;
@@ -280,8 +285,6 @@ int tegra_bpmp_send_receive_atomic(int mrq, void *ob_data, int ob_sz,
 	return __bpmp_read_ch(ch, ib_data, ib_sz);
 }
 EXPORT_SYMBOL(tegra_bpmp_send_receive_atomic);
-
-static int mail_inited;
 
 int tegra_bpmp_send_receive(int mrq, void *ob_data, int ob_sz,
 		void *ib_data, int ib_sz)
