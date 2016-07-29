@@ -28,7 +28,7 @@
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/clk/tegra.h>
 #include <linux/tegra-soc.h>
-#include <linux/tegra-fuse.h>
+#include <soc/tegra/fuse.h>
 #include <mach/tegra_usb_pmc.h>
 #include <mach/tegra_usb_pad_ctrl.h>
 #include <linux/tegra_prod.h>
@@ -610,16 +610,17 @@ static unsigned int utmi_phy_xcvr_setup_value(struct tegra_usb_phy *phy)
 {
 	struct tegra_utmi_config *cfg = &phy->pdata->u_cfg.utmi;
 	signed long val;
+	int temp;
 
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, phy->inst);
 
 	if (cfg->xcvr_use_fuses) {
 		if (phy->inst == 0)
-			val = XCVR_SETUP_P0(tegra_fuse_readl(FUSE_USB_CALIB_0));
+			temp = XCVR_SETUP_P0(tegra_fuse_readl(FUSE_USB_CALIB_0, &val));
 		else if (phy->inst == 1)
-			val = XCVR_SETUP_P1(tegra_fuse_readl(FUSE_USB_CALIB_0));
+			temp = XCVR_SETUP_P1(tegra_fuse_readl(FUSE_USB_CALIB_0, &val));
 		else
-			val = XCVR_SETUP_P2(tegra_fuse_readl(FUSE_USB_CALIB_0));
+			temp = XCVR_SETUP_P2(tegra_fuse_readl(FUSE_USB_CALIB_0, &val));
 
 		if (cfg->xcvr_use_lsb) {
 			val = min((unsigned int) ((val & XCVR_SETUP_LSB_MASK)
@@ -668,12 +669,16 @@ static int utmi_phy_open(struct tegra_usb_phy *phy)
 	}
 #endif
 
-	phy->utmi_pad_clk = clk_get_sys("utmip-pad", NULL);
-	if (IS_ERR(phy->utmi_pad_clk)) {
-		pr_err("%s: can't get utmip pad clock\n", __func__);
-		return PTR_ERR(phy->utmi_pad_clk);
-	}
 	pmc_init(phy);
+
+	phy->pad_phy = devm_phy_get(&phy->pdev->dev, "snps-0");
+	if (IS_ERR(phy->pad_phy)) {
+		dev_err(&phy->pdev->dev, "Failed to get snps-0 phy, err: %d\n",
+			PTR_ERR(phy->pad_phy));
+		return PTR_ERR(phy->pad_phy);
+	} else {
+		phy_init(phy->pad_phy);
+	}
 
 	phy->utmi_xcvr_setup = utmi_phy_xcvr_setup_value(phy);
 
@@ -727,8 +732,6 @@ static void utmi_phy_close(struct tegra_usb_phy *phy)
 		phy->pmc_hotplug_wakeup = false;
 		PHY_DBG("%s DISABLE_PMC inst = %d\n", __func__, phy->inst);
 	}
-
-	clk_put(phy->utmi_pad_clk);
 }
 
 static int utmi_phy_irq(struct tegra_usb_phy *phy)
@@ -950,13 +953,7 @@ static int utmi_phy_power_off(struct tegra_usb_phy *phy)
 		writel(val, base + USB_SUSP_CTRL);
 	}
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	utmi_phy_pad_disable(phy->prod_list);
-#else
-	utmi_phy_pad_disable();
-#endif
-	utmi_phy_iddq_override(true);
-
+	phy_power_off(phy->pad_phy);
 	phy->phy_clk_on = false;
 	phy->hw_accessible = false;
 
@@ -1038,44 +1035,6 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	}
 
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	utmi_phy_pad_enable(phy->prod_list);
-	if (phy->prod_list) {
-		val = tegra_prod_set_by_name(&base, "prod", phy->prod_list);
-		if (val < 0) {
-			dev_err(&phy->pdev->dev,
-			"Failed to set prod settings with err %ld", val);
-			goto safe_settings;
-		}
-		if (tegra_chip_get_revision() >= TEGRA_REVISION_A02) {
-			val = tegra_prod_set_by_name(&base, "prod_a02",
-							phy->prod_list);
-			if (val < 0) {
-				dev_err(&phy->pdev->dev,
-				"Failed to set prod settings with err %ld",
-									val);
-				goto safe_settings;
-			}
-		}
-	} else {
-safe_settings:
-		val = readl(base + UTMIP_BIAS_CFG0);
-		val |= UTMIP_HSSQUELCH_LEVEL(0x2) | UTMIP_HSDISCON_LEVEL(0x3) |
-			UTMIP_HSDISCON_LEVEL_MSB;
-		writel(val, base + UTMIP_BIAS_CFG0);
-
-		val = readl(base + UTMIP_BIAS_CFG2);
-		val &= ~UTMIP_HSSQUELCH_LEVEL_NEW(~0);
-		if (tegra_chip_get_revision() >= TEGRA_REVISION_A02)
-			val |= UTMIP_HSSQUELCH_LEVEL_NEW(0);
-		else
-			val |= UTMIP_HSSQUELCH_LEVEL_NEW(2);
-		writel(val, base + UTMIP_BIAS_CFG2);
-	}
-#else
-	utmi_phy_pad_enable();
-#endif
-
 	val = readl(base + UTMIP_XCVR_CFG0);
 	val &= ~(UTMIP_XCVR_LSBIAS_SEL | UTMIP_FORCE_PD_POWERDOWN |
 		 UTMIP_FORCE_PD2_POWERDOWN | UTMIP_FORCE_PDZI_POWERDOWN |
@@ -1140,8 +1099,42 @@ safe_settings:
 	val |= UTMIP_PHY_ENABLE;
 	writel(val, base + USB_SUSP_CTRL);
 
-	/* Bring UTMIPLL out of IDDQ mode while exiting from reset/suspend */
-	utmi_phy_iddq_override(false);
+	/* Bring UTMIPLL out of IDDQ mode while exiting from reset/suspend 
+	utmi_phy_iddq_override(false);*/
+
+	phy_power_on(phy->pad_phy);
+	if (phy->prod_list) {
+		val = tegra_prod_set_by_name(&base, "prod", phy->prod_list);
+		if (val < 0) {
+			dev_err(&phy->pdev->dev,
+			"Failed to set prod settings with err %ld", val);
+			goto safe_settings;
+		}
+		if (tegra_chip_get_revision() >= TEGRA_REVISION_A02) {
+			val = tegra_prod_set_by_name(&base, "prod_a02",
+							phy->prod_list);
+			if (val < 0) {
+				dev_err(&phy->pdev->dev,
+				"Failed to set prod settings with err %ld",
+									val);
+				goto safe_settings;
+			}
+		}
+	} else {
+safe_settings:
+		val = readl(base + UTMIP_BIAS_CFG0);
+		val |= UTMIP_HSSQUELCH_LEVEL(0x2) | UTMIP_HSDISCON_LEVEL(0x3) |
+			UTMIP_HSDISCON_LEVEL_MSB;
+		writel(val, base + UTMIP_BIAS_CFG0);
+
+		val = readl(base + UTMIP_BIAS_CFG2);
+		val &= ~UTMIP_HSSQUELCH_LEVEL_NEW(~0);
+		if (tegra_chip_get_revision() >= TEGRA_REVISION_A02)
+			val |= UTMIP_HSSQUELCH_LEVEL_NEW(0);
+		else
+			val |= UTMIP_HSSQUELCH_LEVEL_NEW(2);
+		writel(val, base + UTMIP_BIAS_CFG2);
+	}
 
 	val = readl(base + USB_SUSP_CTRL);
 	val &= ~UTMIP_RESET;

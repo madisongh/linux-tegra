@@ -45,8 +45,11 @@
 #include <linux/debugfs.h>
 
 #include <mach/tegra_usb_pad_ctrl.h>
+#include <soc/tegra/common.h>
 #include "../../../arch/arm/mach-tegra/iomap.h"
 #include "../../../arch/arm/mach-tegra/board.h"
+
+#define INT_USB		20
 
 #define USB_PHY_WAKEUP		0x408
 #define  USB_ID_INT_EN		(1 << 0)
@@ -84,6 +87,10 @@ enum tegra_otg_aca_state {
 	RID_C,
 };
 
+/*
+FIX ME: Add code for unregister of extcon dev aca_nv, aca_rida, aca_ridb, aca_ridc
+*/
+
 struct tegra_otg {
 	struct platform_device *pdev;
 	struct device dev;
@@ -119,20 +126,12 @@ struct tegra_otg {
 	struct extcon_dev *vbus_extcon_dev;
 	struct extcon_dev *aca_nv_extcon_dev;
 	struct extcon_dev *y_extcon_dev;
+	struct extcon_dev *aca_rida_extcon_dev;
+	struct extcon_dev *aca_ridb_extcon_dev;
+	struct extcon_dev *aca_ridc_extcon_dev;
 	struct extcon_dev *edev;
 	struct notifier_block otg_aca_nv_nb;
 	struct notifier_block otg_y_nb;
-	struct extcon_cable *id_extcon_cable;
-	struct extcon_cable *vbus_extcon_cable;
-	struct extcon_cable *aca_nv_extcon_cable;
-	struct extcon_cable *y_extcon_cable;
-	struct extcon_specific_cable_nb id_extcon_obj;
-	struct extcon_specific_cable_nb vbus_extcon_obj;
-	struct extcon_specific_cable_nb aca_nv_extcon_obj;
-	struct extcon_specific_cable_nb y_extcon_obj;
-	struct tegra_otg_cables *rid_a;
-	struct tegra_otg_cables *rid_b;
-	struct tegra_otg_cables *rid_c;
 	enum tegra_otg_aca_state aca_state;
 };
 
@@ -152,6 +151,9 @@ static u64 tegra_ehci_dmamask = DMA_BIT_MASK(64);
 static struct tegra_otg *tegra_clone;
 static struct notifier_block otg_vbus_nb;
 static struct notifier_block otg_id_nb;
+static struct notifier_block aca_rida_nb;
+static struct notifier_block aca_ridb_nb;
+static struct notifier_block aca_ridc_nb;
 static struct wakeup_source *otg_work_wl;
 
 enum tegra_connect_type {
@@ -205,42 +207,40 @@ static void otg_notifications_of(struct tegra_otg *tegra)
 	bool vbus = false, id = false;
 
 	if (tegra->support_pmu_vbus) {
-		index = tegra->vbus_extcon_cable->cable_index;
-		if (extcon_get_cable_state_(tegra->vbus_extcon_dev, index))
+		if (extcon_get_cable_state_(tegra->vbus_extcon_dev, EXTCON_USB))
 			vbus = true;
 	}
 
 	if (tegra->support_aca_nv_cable) {
-		index = tegra->aca_nv_extcon_cable->cable_index;
-		if (extcon_get_cable_state_(tegra->aca_nv_extcon_dev, index))
+		if (extcon_get_cable_state_(tegra->aca_nv_extcon_dev,
+					EXTCON_USB_ACA_NV))
 			vbus = true;
 	}
 
 	if (tegra->support_y_cable) {
-		index = tegra->y_extcon_cable->cable_index;
-		if (extcon_get_cable_state_(tegra->y_extcon_dev, index)) {
+		if (extcon_get_cable_state_(tegra->y_extcon_dev,
+					EXTCON_USB_Y_CABLE)) {
 			vbus = true;
 			id = true;
 		}
 	}
 
 	if (tegra->support_pmu_id) {
-		index = tegra->id_extcon_cable->cable_index;
-		if (extcon_get_cable_state_(tegra->id_extcon_dev, index))
+		if (extcon_get_cable_state_(tegra->id_extcon_dev, EXTCON_USB_HOST))
 			id = true;
 	}
 
 	if (tegra->support_pmu_rid) {
-		if (extcon_get_cable_state_(tegra->rid_a->edev,
-			       tegra->rid_a->ecable->cable_index)) {
+		if (extcon_get_cable_state_(tegra->aca_rida_extcon_dev,
+			       EXTCON_USB_ACA_RIDA)) {
 			tegra->aca_state = RID_A;
 			id = true;
-		} else if (extcon_get_cable_state_(tegra->rid_b->edev,
-			       tegra->rid_b->ecable->cable_index)) {
+		} else if (extcon_get_cable_state_(tegra->aca_ridb_extcon_dev,
+			       EXTCON_USB_ACA_RIDB)) {
 			tegra->aca_state = RID_B;
 			vbus = true;
-		} else if (extcon_get_cable_state_(tegra->rid_c->edev,
-			       tegra->rid_c->ecable->cable_index)) {
+		} else if (extcon_get_cable_state_(tegra->aca_ridc_extcon_dev,
+			       EXTCON_USB_ACA_RIDC)) {
 			tegra->aca_state = RID_C;
 			vbus = true;
 		} else {
@@ -279,14 +279,14 @@ static void otg_notifications_pdata(struct tegra_otg *tegra)
 	unsigned long val;
 
 	if (tegra->support_pmu_vbus) {
-		if (extcon_get_cable_state(tegra->vbus_extcon_dev, "USB"))
+		if (extcon_get_cable_state_(tegra->vbus_extcon_dev, EXTCON_USB))
 			tegra->int_status |= USB_VBUS_STATUS ;
 		else
 			tegra->int_status &= ~USB_VBUS_STATUS;
 	}
 
 	if (tegra->support_pmu_id) {
-		if (extcon_get_cable_state(tegra->id_extcon_dev, "USB-Host")) {
+		if (extcon_get_cable_state_(tegra->id_extcon_dev, EXTCON_USB_HOST)) {
 			tegra->int_status &= ~USB_ID_STATUS;
 			tegra->int_status |= USB_ID_INT_EN;
 
@@ -394,8 +394,8 @@ static void tegra_otg_vbus_enable(struct tegra_otg *tegra, int on)
 		return;
 
 	if (tegra->support_pmu_rid &&
-		extcon_get_cable_state_(tegra->rid_a->edev,
-			       tegra->rid_a->ecable->cable_index))
+		extcon_get_cable_state_(tegra->aca_rida_extcon_dev,
+			       EXTCON_USB_ACA_RIDA))
 		return;
 
 	if (on && vbus_enable && !regulator_enable(tegra->vbus_reg))
@@ -416,12 +416,6 @@ static void tegra_start_host(struct tegra_otg *tegra)
 
 	if (tegra->pdev)
 		return;
-
-	if (pdata->is_xhci) {
-		tegra_xhci_release_otg_port(false);
-		return;
-	}
-
 	/* if this node is unavailable, we're unable to register it later */
 	if (ehci_node) {
 		if (!of_device_is_available(ehci_node)) {
@@ -493,10 +487,6 @@ static void tegra_stop_host(struct tegra_otg *tegra)
 
 	DBG("%s(%d) Begin\n", __func__, __LINE__);
 
-	if (tegra->pdata->is_xhci) {
-		tegra_xhci_release_otg_port(true);
-		return;
-	}
 	if (pdev) {
 		/* unregister host from otg */
 		if (!tegra->ehci_node)
@@ -576,7 +566,7 @@ static void tegra_change_otg_state(struct tegra_otg *tegra,
 				enum usb_otg_state to)
 {
 	struct usb_otg *otg = tegra->phy.otg;
-	enum usb_otg_state from = otg->phy->state;
+	enum usb_otg_state from = otg->state;
 
 	if (!tegra->interrupt_mode){
 		DBG("OTG: Vbus detection is disabled");
@@ -587,7 +577,7 @@ static void tegra_change_otg_state(struct tegra_otg *tegra,
 		__LINE__, tegra_state_name(from), tegra_state_name(to));
 
 	if (to != OTG_STATE_UNDEFINED && from != to) {
-		otg->phy->state = to;
+		otg->state = to;
 		pr_info("otg state changed: %s --> %s\n", tegra_state_name(from), tegra_state_name(to));
 
 		if (from == OTG_STATE_A_SUSPEND) {
@@ -646,7 +636,7 @@ static void irq_work(struct work_struct *work)
 	mutex_lock(&tegra->irq_work_mutex);
 
 	spin_lock_irqsave(&tegra->lock, flags);
-	from = otg->phy->state;
+	from = otg->state;
 	status = tegra->int_status;
 
 	/* Debug prints */
@@ -681,7 +671,7 @@ static irqreturn_t tegra_otg_irq(int irq, void *data)
 	unsigned long flags;
 	unsigned long val;
 	struct usb_hcd *hcd = bus_to_hcd(tegra->phy.otg->host);
-	enum usb_otg_state state = tegra->phy.state;
+	enum usb_otg_state state = tegra->phy.otg->state;
 
 	spin_lock_irqsave(&tegra->lock, flags);
 	val = otg_readl(tegra, USB_PHY_WAKEUP);
@@ -782,7 +772,7 @@ static ssize_t show_host_en(struct device *dev, struct device_attribute *attr,
 	struct usb_otg *otg = tegra->phy.otg;
 
 	*buf = ((!tegra->interrupt_mode) &&
-			(otg->phy->state == OTG_STATE_A_HOST)) ? '1' : '0';
+			(otg->state == OTG_STATE_A_HOST)) ? '1' : '0';
 
 	strcat(buf, "\n");
 	return strlen(buf);
@@ -823,7 +813,7 @@ static ssize_t show_device_en(struct device *dev, struct device_attribute *attr,
 	struct usb_otg *otg = tegra->phy.otg;
 
 	*buf = ((!tegra->interrupt_mode) &&
-			otg->phy->state == OTG_STATE_B_PERIPHERAL) ? '1' : '0';
+			otg->state == OTG_STATE_B_PERIPHERAL) ? '1' : '0';
 
 	strcat(buf, "\n");
 	return strlen(buf);
@@ -1146,24 +1136,23 @@ static int tegra_otg_conf(struct platform_device *pdev)
 	tegra->phy.label = "tegra-otg";
 	tegra->phy.set_suspend = tegra_otg_set_suspend;
 	tegra->phy.set_power = tegra_otg_set_power;
-	tegra->phy.state = OTG_STATE_A_SUSPEND;
+	tegra->phy.otg->state = OTG_STATE_A_SUSPEND;
 	tegra->phy.otg->phy = &tegra->phy;
 	tegra->phy.otg->set_host = tegra_otg_set_host;
 	tegra->phy.otg->set_peripheral = tegra_otg_set_peripheral;
 
 	if (tegra->support_pmu_vbus) {
 		if (pdev->dev.of_node) {
-			tegra->vbus_extcon_cable = extcon_get_extcon_cable(
+			tegra->vbus_extcon_dev = extcon_get_extcon_dev_by_cable(
 						&pdev->dev, "vbus");
-			if (IS_ERR(tegra->vbus_extcon_cable)) {
+			if (IS_ERR(tegra->vbus_extcon_dev)) {
 				err = -EPROBE_DEFER;
-				dev_err(&pdev->dev, "Cannot get vbus extcon cable\n");
+				dev_err(&pdev->dev, "Cannot get vbus extcon dev\n");
 				goto err_vbus_extcon;
 			}
-			tegra->vbus_extcon_dev = tegra->vbus_extcon_cable->edev;
 			otg_vbus_nb.notifier_call = otg_notifications;
-			extcon_register_cable_interest(&tegra->vbus_extcon_obj,
-					tegra->vbus_extcon_cable, &otg_vbus_nb);
+			extcon_register_notifier(tegra->vbus_extcon_dev,
+					EXTCON_USB, &otg_vbus_nb);
 		} else {
 			if (!pdata->ehci_pdata->vbus_extcon_dev_name) {
 				dev_err(&pdev->dev,
@@ -1181,23 +1170,22 @@ static int tegra_otg_conf(struct platform_device *pdev)
 			}
 			otg_vbus_nb.notifier_call = otg_notifications;
 			extcon_register_notifier(tegra->vbus_extcon_dev,
-								&otg_vbus_nb);
+						EXTCON_USB, &otg_vbus_nb);
 		}
 	}
 
 	if (tegra->support_pmu_id) {
 		if (pdev->dev.of_node) {
-			tegra->id_extcon_cable = extcon_get_extcon_cable(
+			tegra->id_extcon_dev = extcon_get_extcon_dev_by_cable(
 						&pdev->dev, "id");
-			if (IS_ERR(tegra->id_extcon_cable)) {
+			if (IS_ERR(tegra->id_extcon_dev)) {
 				err = -EPROBE_DEFER;
-				dev_err(&pdev->dev, "Cannot get id extcon cable\n");
+				dev_err(&pdev->dev, "Cannot get id extcon dev\n");
 				goto err_id_extcon;
 			}
-			tegra->id_extcon_dev = tegra->id_extcon_cable->edev;
 			otg_id_nb.notifier_call = otg_notifications;
-			extcon_register_cable_interest(&tegra->id_extcon_obj,
-					tegra->id_extcon_cable, &otg_id_nb);
+			extcon_register_notifier(tegra->id_extcon_dev,
+					EXTCON_USB_HOST, &otg_id_nb);
 		} else {
 			if (!pdata->ehci_pdata->id_extcon_dev_name) {
 				dev_err(&pdev->dev,
@@ -1213,78 +1201,68 @@ static int tegra_otg_conf(struct platform_device *pdev)
 				goto err_id_extcon;
 			}
 			otg_id_nb.notifier_call = otg_notifications;
-			extcon_register_notifier(tegra->id_extcon_dev, &otg_id_nb);
+			extcon_register_notifier(tegra->id_extcon_dev,
+					EXTCON_USB_HOST, &otg_id_nb);
 		}
 	}
 
 	if (tegra->support_pmu_rid && pdev->dev.of_node) {
-		tegra->rid_a = devm_kzalloc(&pdev->dev,
-				sizeof(struct tegra_otg_cables), GFP_KERNEL);
-		tegra->rid_a->ecable = extcon_get_extcon_cable(
+		tegra->aca_rida_extcon_dev = extcon_get_extcon_dev_by_cable(
 					&pdev->dev, "aca-ra");
-		if (IS_ERR(tegra->rid_a->ecable)) {
+		if (IS_ERR(tegra->aca_rida_extcon_dev)) {
 			err = -EPROBE_DEFER;
-			dev_err(&pdev->dev, "Cannot get rid-a extcon cable");
-			goto err_rid_a_extcon_cable;
+			dev_err(&pdev->dev, "Cannot get rid-a extcon dev");
+			goto err_rid_a_extcon_dev;
 		}
-		tegra->rid_a->edev = tegra->rid_a->ecable->edev;
-		tegra->rid_a->nb.notifier_call = otg_notifications;
-		extcon_register_cable_interest(&tegra->rid_a->extcon_obj,
-				tegra->rid_a->ecable, &tegra->rid_a->nb);
+		aca_rida_nb.notifier_call = otg_notifications;
+		extcon_register_notifier(tegra->aca_rida_extcon_dev,
+				EXTCON_USB_ACA_RIDA, &aca_rida_nb);
 
-		tegra->rid_b = devm_kzalloc(&pdev->dev,
-				sizeof(struct tegra_otg_cables), GFP_KERNEL);
-		tegra->rid_b->ecable = extcon_get_extcon_cable(
+		tegra->aca_ridb_extcon_dev = extcon_get_extcon_dev_by_cable(
 					&pdev->dev, "aca-rb");
-		if (IS_ERR(tegra->rid_b->ecable)) {
+		if (IS_ERR(tegra->aca_ridb_extcon_dev)) {
 			err = -EPROBE_DEFER;
-			dev_err(&pdev->dev, "Cannot get rid-b extcon cable");
-			goto err_rid_b_extcon_cable;
+			dev_err(&pdev->dev, "Cannot get rid-b extcon dev");
+			goto err_rid_b_extcon_dev;
 		}
-		tegra->rid_b->edev = tegra->rid_b->ecable->edev;
-		tegra->rid_b->nb.notifier_call = otg_notifications;
-		extcon_register_cable_interest(&tegra->rid_b->extcon_obj,
-				tegra->rid_b->ecable, &tegra->rid_b->nb);
+		aca_ridb_nb.notifier_call = otg_notifications;
+		extcon_register_notifier(tegra->aca_ridb_extcon_dev,
+				EXTCON_USB_ACA_RIDB, &aca_ridb_nb);
 
-		tegra->rid_c = devm_kzalloc(&pdev->dev,
-				sizeof(struct tegra_otg_cables), GFP_KERNEL);
-		tegra->rid_c->ecable = extcon_get_extcon_cable(
+		tegra->aca_ridc_extcon_dev = extcon_get_extcon_dev_by_cable(
 					&pdev->dev, "aca-rc");
-		if (IS_ERR(tegra->rid_c->ecable)) {
+		if (IS_ERR(tegra->aca_ridc_extcon_dev)) {
 			err = -EPROBE_DEFER;
-			dev_err(&pdev->dev, "Cannot get rid-c extcon cable");
-			goto err_rid_c_extcon_cable;
+			dev_err(&pdev->dev, "Cannot get rid-c extcon dev");
+			goto err_rid_c_extcon_dev;
 		}
-		tegra->rid_c->edev = tegra->rid_c->ecable->edev;
-		tegra->rid_c->nb.notifier_call = otg_notifications;
-		extcon_register_cable_interest(&tegra->rid_c->extcon_obj,
-				tegra->rid_c->ecable, &tegra->rid_c->nb);
+		aca_ridc_nb.notifier_call = otg_notifications;
+		extcon_register_notifier(tegra->aca_ridc_extcon_dev,
+				EXTCON_USB_ACA_RIDC, &aca_ridc_nb);
 	}
 
 	if (tegra->support_aca_nv_cable) {
-		tegra->aca_nv_extcon_cable = extcon_get_extcon_cable(&pdev->dev,
-							"aca-nv");
-		if (IS_ERR(tegra->aca_nv_extcon_cable)) {
+		tegra->aca_nv_extcon_dev = extcon_get_extcon_dev_by_cable
+					(&pdev->dev, "aca-nv");
+		if (IS_ERR(tegra->aca_nv_extcon_dev)) {
 			err = -EPROBE_DEFER;
-			dev_err(&pdev->dev, "Cannot get aca-nv extcon cable\n");
-			goto err_aca_nv_extcon_cable;
+			dev_err(&pdev->dev, "Cannot get aca-nv extcon dev\n");
+			goto err_aca_nv_extcon_dev;
 		}
-		tegra->aca_nv_extcon_dev = tegra->aca_nv_extcon_cable->edev;
 		tegra->otg_aca_nv_nb.notifier_call = otg_notifications;
-		extcon_register_cable_interest(&tegra->aca_nv_extcon_obj,
-			tegra->aca_nv_extcon_cable, &tegra->otg_aca_nv_nb);
+		extcon_register_notifier(tegra->aca_nv_extcon_dev,
+			EXTCON_USB_ACA_NV, &tegra->otg_aca_nv_nb);
 	}
 
 	if (tegra->support_y_cable) {
-		tegra->y_extcon_cable = extcon_get_extcon_cable(&pdev->dev,
+		tegra->y_extcon_dev = extcon_get_extcon_dev_by_cable(&pdev->dev,
 							"y-cable");
-		if (IS_ERR(tegra->y_extcon_cable)) {
-			dev_err(&pdev->dev, "Cannot get y cable extcon cable\n");
+		if (IS_ERR(tegra->y_extcon_dev)) {
+			dev_err(&pdev->dev, "Cannot get y cable extcon dev\n");
 		} else {
-			tegra->y_extcon_dev = tegra->y_extcon_cable->edev;
 			tegra->otg_y_nb.notifier_call = otg_notifications;
-			extcon_register_cable_interest(&tegra->y_extcon_obj,
-				tegra->y_extcon_cable, &tegra->otg_y_nb);
+			extcon_register_notifier(tegra->y_extcon_dev,
+				EXTCON_USB_Y_CABLE, &tegra->otg_y_nb);
 		}
 	}
 
@@ -1296,17 +1274,32 @@ static int tegra_otg_conf(struct platform_device *pdev)
 
 	return 0;
 err_set_trans:
-err_rid_a_extcon_cable:
-err_rid_b_extcon_cable:
-err_rid_c_extcon_cable:
-err_aca_nv_extcon_cable:
+	if (tegra->support_y_cable && tegra->y_extcon_dev)
+		extcon_unregister_notifier(tegra->y_extcon_dev,
+				EXTCON_USB_Y_CABLE, &tegra->otg_y_nb);
+	if (tegra->support_aca_nv_cable && tegra->aca_nv_extcon_dev)
+		extcon_unregister_notifier(tegra->aca_nv_extcon_dev,
+				EXTCON_USB_ACA_NV, &tegra->otg_aca_nv_nb);
+err_aca_nv_extcon_dev:
+	if (tegra->aca_ridc_extcon_dev)
+		extcon_unregister_notifier(tegra->aca_ridc_extcon_dev,
+			EXTCON_USB_ACA_RIDC, &aca_ridc_nb);
+err_rid_c_extcon_dev:
+	if (tegra->aca_ridb_extcon_dev)
+		extcon_unregister_notifier(tegra->aca_ridb_extcon_dev,
+			EXTCON_USB_ACA_RIDB, &aca_ridb_nb);
+err_rid_b_extcon_dev:
+	if (tegra->aca_ridc_extcon_dev)
+		extcon_unregister_notifier(tegra->aca_ridc_extcon_dev,
+			EXTCON_USB_ACA_RIDC, &aca_ridc_nb);
+err_rid_a_extcon_dev:
 	if (tegra->support_pmu_id && !pdev->dev.of_node)
 		extcon_unregister_notifier(tegra->id_extcon_dev,
-						&otg_id_nb);
+					EXTCON_USB_HOST, &otg_id_nb);
 err_id_extcon:
 	if (tegra->support_pmu_vbus && !pdev->dev.of_node)
 		extcon_unregister_notifier(tegra->vbus_extcon_dev,
-						&otg_vbus_nb);
+					EXTCON_USB, &otg_vbus_nb);
 err_vbus_extcon:
 	if (tegra->vbus_reg)
 		regulator_put(tegra->vbus_reg);
@@ -1321,11 +1314,11 @@ static int tegra_otg_start(struct platform_device *pdev)
 	int err;
 
 	tegra = container_of(otg_trans, struct tegra_otg, phy);
-	tegra->clk = clk_get(&pdev->dev, NULL);
+	tegra->clk = devm_clk_get(&pdev->dev, "usbd");
 	if (IS_ERR(tegra->clk)) {
 		dev_err(&pdev->dev, "Failed to get otg clock\n");
 		err = PTR_ERR(tegra->clk);
-		goto err_clk;
+		goto err_io;
 	}
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -1388,8 +1381,6 @@ static int tegra_otg_start(struct platform_device *pdev)
 err_irq:
 	iounmap(tegra->regs);
 err_io:
-	clk_put(tegra->clk);
-err_clk:
 	if (tegra->vbus_reg)
 		regulator_put(tegra->vbus_reg);
 	if (tegra->support_y_cable && tegra->vbus_bat_reg)
@@ -1466,11 +1457,24 @@ static int __exit tegra_otg_remove(struct platform_device *pdev)
 		regulator_put(tegra->vbus_bat_reg);
 
 	if (tegra->support_pmu_id && !pdev->dev.of_node)
-		extcon_unregister_notifier(tegra->id_extcon_dev, &otg_id_nb);
+		extcon_unregister_notifier(tegra->id_extcon_dev,
+					EXTCON_USB_HOST, &otg_id_nb);
 
 	if (tegra->support_pmu_vbus && !pdev->dev.of_node)
 		extcon_unregister_notifier(tegra->vbus_extcon_dev,
-							&otg_vbus_nb);
+						EXTCON_USB, &otg_vbus_nb);
+
+	if (tegra->aca_ridc_extcon_dev)
+		extcon_unregister_notifier(tegra->aca_ridc_extcon_dev,
+					EXTCON_USB_ACA_RIDC, &aca_ridc_nb);
+
+	if (tegra->aca_ridb_extcon_dev)
+		extcon_unregister_notifier(tegra->aca_ridb_extcon_dev,
+					EXTCON_USB_ACA_RIDB, &aca_ridb_nb);
+
+	if (tegra->aca_rida_extcon_dev)
+		extcon_unregister_notifier(tegra->aca_rida_extcon_dev,
+					EXTCON_USB_ACA_RIDA, &aca_rida_nb);
 
 	if (tegra->edev != NULL) {
 		extcon_dev_unregister(tegra->edev);
@@ -1493,7 +1497,7 @@ static int tegra_otg_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_otg *tegra = platform_get_drvdata(pdev);
-	enum usb_otg_state from = tegra->phy.state;
+	enum usb_otg_state from = tegra->phy.otg->state;
 	unsigned int val;
 	int err = 0;
 
@@ -1501,7 +1505,7 @@ static int tegra_otg_suspend(struct device *dev)
 
 	mutex_lock(&tegra->irq_work_mutex);
 	DBG("%s(%d) BEGIN state : %s\n", __func__, __LINE__,
-				tegra_state_name(tegra->phy.state));
+				tegra_state_name(tegra->phy->otg->state));
 
 	pm_runtime_get_sync(dev);
 	clk_prepare_enable(tegra->clk);
