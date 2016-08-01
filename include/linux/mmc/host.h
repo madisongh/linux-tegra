@@ -377,6 +377,7 @@ struct mmc_host {
 #define MMC_CAP2_HW_CQ		(1 << 23)	/* support eMMC command queue */
 #define MMC_CAP2_CMDQ_QBR	(1 << 24)	/* CMDQ Queue barrier supported */
 #define MMC_CAP2_PERIODIC_CACHE_FLUSH	(1 << 26)
+#define MMC_CAP2_NO_EXTENDED_GP		(1 << 27) /* EXT GP support broken */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
