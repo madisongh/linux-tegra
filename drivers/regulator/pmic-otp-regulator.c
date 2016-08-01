@@ -1,7 +1,7 @@
 /*
  * PMIC-OTP Regulator driver
  *
- * Copyright (C) 2015 NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2015-2016 NVIDIA CORPORATION. All rights reserved.
  *
  * Author: Laxman Dewangan <ldewangan@nvidia.com>
  *
@@ -127,10 +127,6 @@ static int pmic_otp_regulator_probe(struct platform_device *pdev)
 	pmic_otp->dev = &pdev->dev;
 	platform_set_drvdata(pdev, pmic_otp);
 
-	pmic_otp->ridata = of_get_regulator_init_data(&pdev->dev, np, rdesc);
-	pmic_otp->ridata->constraints.always_on = 1;
-	pmic_otp->ridata->constraints.valid_ops_mask &= ~REGULATOR_CHANGE_STATUS;
-
 	rdesc = &pmic_otp->rdesc;
 	rdesc->type = REGULATOR_VOLTAGE;
 	rdesc->owner = THIS_MODULE;
@@ -139,6 +135,11 @@ static int pmic_otp_regulator_probe(struct platform_device *pdev)
 	rdesc->id = 0;
 	rdesc->min_uV = 0;
 	rdesc->uV_step = 10000;
+
+	pmic_otp->ridata = of_get_regulator_init_data(&pdev->dev, np, rdesc);
+	pmic_otp->ridata->constraints.always_on = 1;
+	pmic_otp->ridata->constraints.valid_ops_mask &= ~REGULATOR_CHANGE_STATUS;
+
 	rdesc->n_voltages = DIV_ROUND_UP(pmic_otp->ridata->constraints.max_uV,
 					rdesc->uV_step) + 1;
 
