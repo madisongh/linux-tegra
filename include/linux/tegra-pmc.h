@@ -27,6 +27,11 @@
 #include <linux/of_device.h>
 #include <linux/usb/ch9.h>
 
+/* Define reboot-reset mode */
+#define RECOVERY_MODE           BIT(31)
+#define BOOTLOADER_MODE         BIT(30)
+#define FORCED_RECOVERY_MODE    BIT(1)
+
 extern void tegra_pmc_enable_wake_det(bool enable);
 extern void tegra_pmc_set_dpd_sample(void);
 extern void tegra_pmc_clear_dpd_sample(void);
@@ -207,6 +212,8 @@ extern void tegra186_pmc_enable_nvcsi_brick_dpd(void);
 extern void tegra_pmc_sata_pwrgt_update(unsigned long mask,
 		unsigned long val);
 extern unsigned long tegra_pmc_sata_pwrgt_get(void);
+int tegra_pmc_set_reboot_reason(u32 reboot_reason);
+int tegra_pmc_clear_reboot_reason(u32 reboot_reason);
 #else
 static inline void tegra_pmc_sata_pwrgt_update(unsigned long mask,
 		unsigned long val)
@@ -216,6 +223,16 @@ static inline void tegra_pmc_sata_pwrgt_update(unsigned long mask,
 static inline unsigned long tegra_pmc_sata_pwrgt_get(void)
 {
 	return -EINVAL;
+}
+
+static inline int tegra_pmc_set_reboot_reason(u32 reboot_reason)
+{
+	return -ENOTSUPP;
+}
+
+static inline int tegra_pmc_clear_reboot_reason(u32 reboot_reason)
+{
+	return -ENOTSUPP;
 }
 #endif
 
