@@ -1513,7 +1513,7 @@ static const struct file_operations version_fops = {
 
 #define RO_MODE S_IRUSR
 
-int adsp_create_os_version(struct dentry *adsp_debugfs_root)
+static int adsp_create_os_version(struct dentry *adsp_debugfs_root)
 {
 	struct device *dev = &priv.pdev->dev;
 	struct dentry *d;
