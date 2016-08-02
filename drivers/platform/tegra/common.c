@@ -821,7 +821,6 @@ void __init tegra20_init_early(void)
 {
 	tegra_apb_io_init();
 	tegra_perf_init();
-	tegra_init_fuse();
 	tegra_init_cache(true);
 	tegra_powergate_init();
 	tegra20_hotplug_init();
@@ -838,7 +837,6 @@ void __init tegra30_init_early(void)
 	display_tegra_dt_info();
 	tegra_apb_io_init();
 	tegra_perf_init();
-	tegra_init_fuse();
 	/*
 	 * Store G/LP cluster L2 latencies to IRAM and DRAM
 	 */
@@ -875,7 +873,6 @@ void __init tegra11x_init_early(void)
 	display_tegra_dt_info();
 	tegra_apb_io_init();
 	tegra_perf_init();
-	tegra_init_fuse();
 	tegra_ramrepair_init();
 	tegra11x_init_clocks();
 	tegra11x_init_dvfs();
@@ -901,7 +898,6 @@ void __init tegra12x_init_early(void)
 	display_tegra_dt_info();
 	tegra_apb_io_init();
 	tegra_perf_init();
-	tegra_init_fuse();
 	tegra_ramrepair_init();
 	tegra12x_init_clocks();
 #ifdef CONFIG_ARCH_TEGRA_13x_SOC

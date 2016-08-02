@@ -1608,27 +1608,6 @@ u32 tegra_get_bct_strapping(void)
 	return tegra_chip_bct_strapping;
 }
 
-void tegra_init_fuse(void)
-{
-	u32 sku_id;
-
-	tegra_fuse_cfg_reg_visible();
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	tegra_fuse_override_chip_option_regs();
-#endif
-	tegra_set_sku_id();
-	sku_id = tegra_get_sku_id();
-	tegra_set_bct_strapping();
-	tegra_set_chip_id();
-	tegra_revision = tegra_chip_get_revision();
-	tegra_fuse_tsosc_init();
-	tegra_init_speedo_data();
-	pr_info("Tegra Revision: %s SKU: 0x%x CPU Process: %d Core Process: %d\n",
-		tegra_revision_name[tegra_revision],
-		sku_id, tegra_cpu_process_id(),
-		tegra_core_process_id());
-}
-
 static struct tegra_fuse_chip_data tegra114_fuse_chip_data = {
 	.ext_regulator = true,
 	.power_down_mode = false,
