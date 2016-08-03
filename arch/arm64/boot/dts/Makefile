@@ -48,12 +48,13 @@ DTCCPP_FLAGS += -I$(srctree)/../t18x/include
 DTCCPP_FLAGS += -I$(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x
 endif
 
-ifneq ($(wildcard $(kbuild-dir)/arch/arm64/boot/dts/nvidia/t210/Makefile),)
+ifeq ($(shell test -f $(srctree)/arch/arm64/boot/dts/nvidia/t210/Makefile && echo y),y)
 local-dtb := $(dtb-y)
 dtb-y :=
-include $(kbuild-dir)/arch/arm64/boot/dts/nvidia/t210/Makefile
+include $(srctree)/arch/arm64/boot/dts/nvidia/t210/Makefile
+t210dts-path := nvidia/t210
 t210-dtb := $(addprefix nvidia/t210/,$(dtb-y))
-t210-dtb-out := $(addprefix $(O)/arch/arm64/boot/dts/,$(t210-dtb))
+t210-dtb-out := $(addprefix $(O)/arch/arm64/boot/dts/nvidia/t210/,$(dtb-y))
 dtb-y := $(local-dtb)
 dtb-y += $(t210-dtb)
 endif
@@ -88,7 +89,7 @@ targets += $(DTB_LIST)
 
 dtbs: $(addprefix $(obj)/, $(DTB_LIST))
 ifneq ($(t210-dtb-out),)
-	cp -u $(t210-dtb-out) $(O)/arch/arm64/boot/dts/
+	cp -u $(t210-dtb-out) arch/arm64/boot/dts/
 endif
 ifneq ($(t18x-dtb-out),)
 	cp -u $(t18x-dtb-out) $(O)/arch/arm64/boot/dts/
