@@ -923,6 +923,7 @@ struct tegra_dc_hdr {
 	u8		static_metadata[24];
 };
 
+#ifdef CONFIG_TEGRA_NVDISPLAY
 struct tegra_dc_imp_head_results {
 	u32	num_windows;
 	u8	cursor_active;
@@ -941,6 +942,22 @@ struct tegra_dc_imp_head_results {
 	u32	cursor_slots_value;
 	u64     required_total_bw_kbps;
 };
+
+struct tegra_dc_tg_req {
+	int	dc_idx;
+	u32	num_wins;
+	u32	win_ids[DC_N_WINDOWS];
+	u32	tgs[DC_N_WINDOWS];
+};
+
+struct tegra_dc_imp_settings {
+	struct tegra_dc_imp_head_results	imp_results[TEGRA_MAX_DC];
+	struct tegra_dc_tg_req			tg_reqs[DC_N_WINDOWS];
+	bool					update_mempool[TEGRA_MAX_DC];
+	bool					program_mempool_before_update;
+	struct list_head			imp_node;
+};
+#endif
 
 struct tegra_dc_win {
 	u8			idx;
