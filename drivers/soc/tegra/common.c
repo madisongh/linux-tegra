@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2014-2016 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -55,8 +55,7 @@ static int __init tegra_bootloader_fb_arg(char *options)
 		tegra_bootloader_fb_start = memparse(p+1, &p);
 
 	pr_info("Found tegra_fbmem: %08llx@%08llx\n",
-			(u64)tegra_bootloader_fb_size,
-			(u64)tegra_bootloader_fb_start);
+		(u64)tegra_bootloader_fb_size, (u64)tegra_bootloader_fb_start);
 
 	return 0;
 }
@@ -71,26 +70,12 @@ static int __init tegra_bootloader_fb2_arg(char *options)
 		tegra_bootloader_fb2_start = memparse(p+1, &p);
 
 	pr_info("Found tegra_fbmem2: %08llx@%08llx\n",
-			(u64)tegra_bootloader_fb2_size,
-			(u64)tegra_bootloader_fb2_start);
+		(u64)tegra_bootloader_fb2_size,
+		(u64)tegra_bootloader_fb2_start);
 
 	return 0;
 }
 early_param("tegra_fbmem2", tegra_bootloader_fb2_arg);
-
-void tegra_get_fb_resource(struct resource *fb_res)
-{
-	fb_res->start = (resource_size_t) tegra_bootloader_fb_start;
-	fb_res->end = fb_res->start +
-		(resource_size_t) tegra_bootloader_fb_size - 1;
-}
-
-void tegra_get_fb2_resource(struct resource *fb2_res)
-{
-	fb2_res->start = (resource_size_t) tegra_bootloader_fb2_start;
-	fb2_res->end = fb2_res->start +
-		(resource_size_t) tegra_bootloader_fb2_size - 1;
-}
 
 /* returns true if bl initialized the display */
 bool tegra_is_bl_display_initialized(int instance)
@@ -99,15 +84,41 @@ bool tegra_is_bl_display_initialized(int instance)
 	 * fb size is passed from bl to kernel
 	 */
 	switch (instance) {
-		case 0:
-			return tegra_bootloader_fb_start &&
-				tegra_bootloader_fb_size;
-		case 1:
-			return tegra_bootloader_fb2_start &&
-				tegra_bootloader_fb2_size;
-		default:
-			return false;
+	case 0:
+		return tegra_bootloader_fb_start && tegra_bootloader_fb_size;
+	case 1:
+		return tegra_bootloader_fb2_start && tegra_bootloader_fb2_size;
+	default:
+		pr_err("Could not find DC instance %d\n", instance);
+		return false;
 	}
+}
+
+void tegra_get_fb_resource(struct resource *fb_res, int instance)
+{
+	if (!tegra_is_bl_display_initialized(instance)) {
+		fb_res->start = 0;
+		fb_res->end = 0;
+	} else {
+		switch (instance) {
+		case 0:
+			fb_res->start =
+				(resource_size_t) tegra_bootloader_fb_start;
+			fb_res->end = fb_res->start +
+				(resource_size_t) tegra_bootloader_fb_size - 1;
+			break;
+		case 1:
+			fb_res->start =
+				(resource_size_t) tegra_bootloader_fb2_start;
+			fb_res->end = fb_res->start +
+				(resource_size_t) tegra_bootloader_fb2_size - 1;
+			break;
+		default:
+			pr_err("Could not find DC instance %d\n", instance);
+			break;
+		}
+	}
+
 }
 
 static int __init tegra_usb_port_owner_info(char *id)

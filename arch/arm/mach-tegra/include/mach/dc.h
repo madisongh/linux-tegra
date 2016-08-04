@@ -1290,8 +1290,7 @@ static inline void find_dc_node(struct device_node **dc1_node,
 	pr_err("%s: function is unimplemented\n", __func__);
 }
 
-void tegra_get_fb_resource(struct resource *fb_res);
-void tegra_get_fb2_resource(struct resource *fb2_res);
+void tegra_get_fb_resource(struct resource *fb_res, int instance);
 unsigned tegra_dc_out_flags_from_dev(struct device *dev);
 bool tegra_dc_initialized(struct device *dev);
 bool tegra_dc_is_ext_dp_panel(const struct tegra_dc *dc);
