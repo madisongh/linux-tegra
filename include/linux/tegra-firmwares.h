@@ -32,6 +32,10 @@ struct device *devm_tegrafw_register(struct device *dev,
 			const char *string);
 void devm_tegrafw_unregister(struct device *dev, struct device *fwdev);
 void tegrafw_invalidate(struct device *fwdev);
+struct device *devm_tegrafw_register_dt_string(struct device *dev,
+						const char *name,
+						const char *path,
+						const char *property);
 #else
 
 static inline struct device *tegrafw_register(const char *name,
@@ -64,6 +68,15 @@ static inline void devm_tegrafw_unregister(struct device *dev,
 {
 }
 
+static inline
+struct device *devm_tegrafw_register_dt_string(struct device *dev,
+						const char *name,
+						const char *path,
+						const char *property)
+{
+	return ERR_PTR(-ENOTSUPP);
+}
+
 #endif /* IS_ENABLED(...) */
 
 enum {
@@ -83,6 +96,13 @@ static inline struct device *devm_tegrafw_register_string(struct device *dev,
 						     const char *string)
 {
 	return devm_tegrafw_register(dev, name, TFW_NORMAL, NULL, string);
+}
+
+static inline struct device *tegrafw_register_dt_string(const char *name,
+							const char *path,
+							const char *property)
+{
+	return devm_tegrafw_register_dt_string(NULL, name, path, property);
 }
 
 #endif /* __TEGRA_FIRMWARES_CLASS */

@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/slab.h>
+#include <linux/of.h>
 #include <linux/tegra-firmwares.h>
 
 struct tegrafw_data {
@@ -239,6 +240,9 @@ struct device *devm_tegrafw_register(struct device *dev, const char *name,
 {
 	struct device **ptr, *fwdev;
 
+	if (dev == NULL)
+		return tegrafw_register(name, flags, reader, string);
+
 	ptr = devres_alloc(devm_tegrafw_release, sizeof(*ptr), GFP_KERNEL);
 	if (!ptr)
 		return ERR_PTR(-ENOMEM);
@@ -269,6 +273,24 @@ void devm_tegrafw_unregister(struct device *dev, struct device *fwdev)
 				devm_tegrafw_match, fwdev));
 }
 EXPORT_SYMBOL(devm_tegrafw_unregister);
+
+struct device *devm_tegrafw_register_dt_string(struct device *dev,
+						const char *name,
+						const char *path,
+						const char *property)
+{
+	struct device_node *dn;
+	const char *data;
+
+	dn = of_find_node_by_path(path);
+	if (!dn)
+		return ERR_PTR(-ENODEV);
+	if (of_property_read_string(dn, property, &data))
+		return ERR_PTR(-ENOENT);
+	of_node_put(dn);
+	return devm_tegrafw_register(dev, name, TFW_NORMAL, NULL, data);
+}
+EXPORT_SYMBOL(devm_tegrafw_register_dt_string);
 
 static void tegrafw_exit(void)
 {
