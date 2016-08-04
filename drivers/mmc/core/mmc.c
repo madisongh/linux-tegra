@@ -372,6 +372,7 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	card->ext_csd.raw_sectors[1] = ext_csd[EXT_CSD_SEC_CNT + 1];
 	card->ext_csd.raw_sectors[2] = ext_csd[EXT_CSD_SEC_CNT + 2];
 	card->ext_csd.raw_sectors[3] = ext_csd[EXT_CSD_SEC_CNT + 3];
+
 	if (card->ext_csd.rev >= 2) {
 		card->ext_csd.sectors =
 			ext_csd[EXT_CSD_SEC_CNT + 0] << 0 |
@@ -748,6 +749,9 @@ MMC_DEV_ATTR(enhanced_area_size, "%u\n", card->ext_csd.enhanced_area_size);
 MMC_DEV_ATTR(raw_rpmb_size_mult, "%#x\n", card->ext_csd.raw_rpmb_size_mult);
 MMC_DEV_ATTR(rel_sectors, "%#x\n", card->ext_csd.rel_sectors);
 MMC_DEV_ATTR(cmdq_status, "%s\n", mmc_card_cmdq(card) ? "enabled" : "disabled");
+MMC_DEV_ATTR(bkops_status, "%u\n", card->ext_csd.raw_bkops_status);
+MMC_DEV_ATTR(hpi_support, "%u\n", card->ext_csd.hpi);
+MMC_DEV_ATTR(power_on_notify, "%u\n", card->ext_csd.power_off_notification);
 
 static ssize_t mmc_fwrev_show(struct device *dev,
 			      struct device_attribute *attr,
@@ -784,6 +788,9 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_raw_rpmb_size_mult.attr,
 	&dev_attr_rel_sectors.attr,
 	&dev_attr_cmdq_status.attr,
+	&dev_attr_bkops_status.attr,
+	&dev_attr_hpi_support.attr,
+	&dev_attr_power_on_notify.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(mmc_std);
