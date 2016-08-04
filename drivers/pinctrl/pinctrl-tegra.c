@@ -317,6 +317,9 @@ static int tegra_pinctrl_set_mux(struct pinctrl_dev *pctldev,
 	val = pmx_readl(pmx, g->mux_bank, g->mux_reg);
 	val &= ~(0x3 << g->mux_bit);
 	val |= i << g->mux_bit;
+	/* Set the SFIO/GPIO selection to SFIO when under pinmux control*/
+	if (pmx->soc->is_gpio_reg_support)
+		val |= (1 << g->gpio_bit);
 	pmx_writel(pmx, val, g->mux_bank, g->mux_reg);
 
 	return 0;
@@ -374,12 +377,38 @@ static int tegra_pinctrl_gpio_set_direction(struct pinctrl_dev *pctldev,
 	return ret;
 }
 
+void tegra_pinctrl_gpio_disable_free(struct pinctrl_dev *pctldev,
+		struct pinctrl_gpio_range *range, unsigned offset)
+{
+	struct tegra_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
+	unsigned group;
+	const unsigned *pins;
+	unsigned num_pins;
+	int ret;
+
+	if (pmx->soc->is_gpio_reg_support) {
+		for (group = 0; group < pmx->soc->ngroups; ++group) {
+			ret = tegra_pinctrl_get_group_pins(pctldev, group,
+					&pins, &num_pins);
+			if (ret < 0 || num_pins != 1)
+				continue;
+			if (offset == pins[0])
+				break;
+		}
+		ret = tegra_pinconfig_group_set(pctldev, group,
+				TEGRA_PINCONF_PARAM_GPIO_MODE, 1);
+		if (ret != 0)
+			dev_err(pctldev->dev, "GPIO/SFIO bit cannot be set\n");
+	}
+}
+
 static const struct pinmux_ops tegra_pinmux_ops = {
 	.get_functions_count = tegra_pinctrl_get_funcs_count,
 	.get_function_name = tegra_pinctrl_get_func_name,
 	.get_function_groups = tegra_pinctrl_get_func_groups,
 	.set_mux = tegra_pinctrl_set_mux,
 	.gpio_request_enable = tegra_pinctrl_gpio_request_enable,
+	.gpio_disable_free = tegra_pinctrl_gpio_disable_free,
 	.gpio_set_direction = tegra_pinctrl_gpio_set_direction,
 };
 
