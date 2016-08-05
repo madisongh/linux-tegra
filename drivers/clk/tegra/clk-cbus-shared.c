@@ -250,7 +250,8 @@ static int _clk_shared_bus_update(struct clk *bus)
 		struct clk_hw *hw_emc = __clk_get_hw(clk_get_parent(bus));
 
 		emc = container_of(hw_emc, struct tegra_clk_emc, hw);
-		if (!IS_ERR(emc) && emc->emc_ops->emc_apply_efficiency) {
+		if (!IS_ERR(emc) && emc->emc_ops &&
+		     emc->emc_ops->emc_apply_efficiency) {
 			bw = emc->emc_ops->emc_apply_efficiency(
 				bw, iso_bw, cbus->max_rate, usage_flags,
 				&iso_bw_min);
