@@ -14,6 +14,7 @@
 #include <linux/errno.h>
 #include <linux/bug.h>
 #include <linux/tegra-soc.h>
+#include <linux/io.h>
 #include "guest_sysinfo.h"
 #include "syscalls.h"
 
