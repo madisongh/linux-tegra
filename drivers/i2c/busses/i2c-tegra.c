@@ -293,6 +293,7 @@ struct tegra_i2c_dev {
 	int rx_dma_len;
 	dma_cookie_t rx_cookie;
 	bool disable_dma_mode;
+	bool is_clkon_always;
 };
 
 static void dvc_writel(struct tegra_i2c_dev *i2c_dev, u32 val, unsigned long reg)
@@ -874,6 +875,7 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
 		dev_err(i2c_dev->dev, "Clock enable failed %d\n", err);
 		return err;
 	}
+
 	if (i2c_dev->hw->has_sw_reset_reg) {
 		if (i2c_dev->is_periph_reset_done) {
 			/* If already controller reset is done through */
@@ -1598,6 +1600,9 @@ static void tegra_i2c_parse_dt(struct tegra_i2c_dev *i2c_dev)
 
 	i2c_dev->disable_dma_mode = of_property_read_bool(np,
 			"nvidia,disable-dma-mode");
+
+	i2c_dev->is_clkon_always = of_property_read_bool(np,
+			"nvidia,clock-always-on");
 }
 
 static const struct i2c_algorithm tegra_i2c_algo = {
@@ -1842,8 +1847,11 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 		goto unprepare_fast_clk;
 	}
 
-	if (i2c_dev->is_multimaster_mode) {
-		ret = clk_enable(i2c_dev->div_clk);
+	if (i2c_dev->is_multimaster_mode)
+		i2c_dev->is_clkon_always = true;
+
+	if (i2c_dev->is_clkon_always) {
+		ret = tegra_i2c_clock_enable(i2c_dev);
 		if (ret < 0) {
 			dev_err(i2c_dev->dev, "div_clk enable failed %d\n",
 				ret);
@@ -1854,23 +1862,23 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	if (!i2c_dev->disable_dma_mode) {
 		ret = tegra_i2c_init_dma_param(i2c_dev, true);
 		if (ret && (ret != -EPROBE_DEFER) && (ret != -ENODEV))
-			goto disable_div_clk;
+			goto disable_clk;
 		ret = tegra_i2c_init_dma_param(i2c_dev, false);
 		if (ret && (ret != -EPROBE_DEFER) && (ret != -ENODEV))
-			goto disable_div_clk;
+			goto disable_clk;
 	}
 
 	ret = tegra_i2c_init(i2c_dev);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to initialize i2c controller");
-		goto disable_div_clk;
+		goto disable_clk;
 	}
 
 	ret = devm_request_irq(&pdev->dev, i2c_dev->irq,
 			tegra_i2c_isr, 0, dev_name(&pdev->dev), i2c_dev);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to request irq %i\n", i2c_dev->irq);
-		goto disable_div_clk;
+		goto disable_clk;
 	}
 
 	pm_runtime_enable(&pdev->dev);
@@ -1891,7 +1899,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	ret = i2c_add_numbered_adapter(&i2c_dev->adapter);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to add I2C adapter\n");
-		goto disable_div_clk;
+		goto disable_clk;
 	}
 	i2c_dev->cont_id = i2c_dev->adapter.nr & PACKET_HEADER0_CONT_ID_MASK;
 	pm_runtime_enable(&i2c_dev->adapter.dev);
@@ -1899,9 +1907,8 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 
 	return 0;
 
-disable_div_clk:
-	if (i2c_dev->is_multimaster_mode)
-		clk_disable(i2c_dev->div_clk);
+disable_clk:
+	tegra_i2c_clock_disable(i2c_dev);
 
 unprepare_div_clk:
 	clk_unprepare(i2c_dev->div_clk);
@@ -1925,8 +1932,8 @@ static int tegra_i2c_remove(struct platform_device *pdev)
 	if (i2c_dev->rx_dma_chan)
 		tegra_i2c_deinit_dma_param(i2c_dev, true);
 
-	if (i2c_dev->is_multimaster_mode)
-		clk_disable(i2c_dev->div_clk);
+	if (i2c_dev->is_clkon_always)
+		tegra_i2c_clock_disable(i2c_dev);
 	pm_runtime_disable(&pdev->dev);
 
 	clk_unprepare(i2c_dev->div_clk);
@@ -1952,6 +1959,10 @@ static int tegra_i2c_suspend(struct device *dev)
 
 	i2c_lock_adapter(&i2c_dev->adapter);
 	i2c_dev->is_suspended = true;
+
+	if (i2c_dev->is_clkon_always)
+		tegra_i2c_clock_disable(i2c_dev);
+
 	i2c_unlock_adapter(&i2c_dev->adapter);
 
 	return 0;
@@ -1971,8 +1982,15 @@ static int tegra_i2c_resume(struct device *dev)
 		return ret;
 	}
 
+	if (i2c_dev->is_clkon_always) {
+		ret = tegra_i2c_clock_enable(i2c_dev);
+		if (ret < 0) {
+			dev_err(i2c_dev->dev, "clock enable failed %d\n",
+				ret);
+			return ret;
+		}
+	}
 	i2c_dev->is_suspended = false;
-
 	i2c_unlock_adapter(&i2c_dev->adapter);
 
 	return 0;
