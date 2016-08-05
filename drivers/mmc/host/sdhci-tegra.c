@@ -39,6 +39,7 @@
 #include <linux/padctrl/padctrl.h>
 #include <linux/mmc/cmdq_hci.h>
 #include <linux/pm_runtime.h>
+#include <linux/tegra-soc.h>
 
 #include "sdhci-pltfm.h"
 
@@ -694,6 +695,9 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	u8 vendor_ctrl;
 	int ret = 0;
+
+	if (tegra_platform_is_vdk())
+		return;
 
 	mutex_lock(&tegra_host->set_clock_mutex);
 	pr_debug("%s %s %u enabled=%u\n", __func__,
@@ -1667,7 +1671,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	if (IS_ERR(clk)) {
 		dev_err(mmc_dev(host->mmc), "clk err\n");
 		rc = PTR_ERR(clk);
-		goto err_clk_get;
+		if (!tegra_platform_is_vdk())
+			goto err_clk_get;
 	}
 
 	tegra_host->emc_clk =
@@ -1681,8 +1686,12 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 			"Client registration for eMC Successful\n");
 
 	pltfm_host->clk = clk;
-	if (clk_get_parent(pltfm_host->clk) == tegra_host->pll_source[0].pll)
-		tegra_host->is_parent_pll_source_1 = true;
+	if (!tegra_platform_is_vdk()) {
+		if (clk_get_parent(pltfm_host->clk)
+					== tegra_host->pll_source[0].pll)
+			tegra_host->is_parent_pll_source_1 = true;
+	}
+
 	if (tegra_host->soc_data->nvquirks2 & NVQUIRK2_SET_PLL_CLK_PARENT) {
 		sdmmc_default_parent = devm_clk_get(&pdev->dev, "pll_p");
 		clk_set_parent(pltfm_host->clk, sdmmc_default_parent);
@@ -1723,6 +1732,15 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 	tegra_host->max_clk_limit = plat->max_clk_limit;
 	host->mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY;
+
+	/*
+	 * We don't support Extended GP in VDK even if the EXT_CSD might
+	 * indicate that it does. Explicitly mark no support in case we
+	 * are running on VDK.
+	 */
+	if (tegra_platform_is_vdk()) {
+		host->mmc->caps2 |= MMC_CAP2_NO_EXTENDED_GP;
+	}
 
 	if (plat->ocr_mask & SDHOST_1V8_OCR_MASK) {
 		tegra_host->vddio_min_uv = SDHOST_LOW_VOLT_MIN;
