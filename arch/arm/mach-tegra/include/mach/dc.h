@@ -1392,7 +1392,7 @@ struct nvdisp_isoclient_bw_info {
 	tegra_isomgr_handle	isomgr_handle;
 	u32			available_bw;
 	u32			reserved_bw_kbps;
-	u32			new_bw_kbps;
+	u32			realized_bw_kbps;
 };
 #endif
 #endif
