@@ -48,15 +48,18 @@ DTCCPP_FLAGS += -I$(srctree)/../t18x/include
 DTCCPP_FLAGS += -I$(srctree)/../t19x/arch/arm64/boot/dts/nvidia/t19x
 endif
 
-ifeq ($(shell test -f $(srctree)/arch/arm64/boot/dts/nvidia/t210/Makefile && echo y),y)
+ifneq ($(wildcard $(srctree)/arch/arm64/boot/dts/nvidia/t210/Makefile),)
 local-dtb := $(dtb-y)
 dtb-y :=
 include $(srctree)/arch/arm64/boot/dts/nvidia/t210/Makefile
-t210dts-path := nvidia/t210
+ifneq ($(dtb-y),)
 t210-dtb := $(addprefix nvidia/t210/,$(dtb-y))
-t210-dtb-out := $(addprefix $(O)/arch/arm64/boot/dts/nvidia/t210/,$(dtb-y))
+t210-dtb-out := $(addprefix $(O)/arch/arm64/boot/dts/,$(t210-dtb))
 dtb-y := $(local-dtb)
 dtb-y += $(t210-dtb)
+else
+dtb-y := $(local-dtb)
+endif
 endif
 
 ifneq ($(wildcard $(kbuild-dir)/$(call tegra-path,t18x,arch/arm64/boot/dts/nvidia/t18x/Makefile)),)
