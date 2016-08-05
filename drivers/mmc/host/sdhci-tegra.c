@@ -1382,6 +1382,18 @@ static void tegra_sdhci_pre_regulator_config(struct sdhci_host *sdhci, int vdd)
 	tegra_sdhci_configure_e_input(sdhci, true);
 }
 
+static int tegra_sdhci_enable_dma(struct sdhci_host *host)
+{
+	/*
+	 * QUIRK2_BROKEN_64_BIT_DMA is to be taken care by the driver. Handle it
+	 * here so that we don't fall back to PIO mode.
+	 */
+	if (host->quirks2 & SDHCI_QUIRK2_BROKEN_64_BIT_DMA)
+		host->flags &= (~SDHCI_USE_64_BIT_DMA);
+
+	return 0;
+}
+
 static const struct sdhci_ops tegra_sdhci_ops = {
 	.get_ro     = tegra_sdhci_get_ro,
 	.card_event = sdhci_tegra_card_event,
@@ -1407,6 +1419,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.post_tuning	= tegra_sdhci_post_tuning,
 	.is_tuning_done		= tegra_sdhci_is_tuning_done,
 	.pre_regulator_config	= tegra_sdhci_pre_regulator_config,
+	.enable_dma		= tegra_sdhci_enable_dma,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -1480,9 +1493,20 @@ static const struct sdhci_pltfm_data sdhci_tegra186_pdata = {
 	.ops  = &tegra_sdhci_ops,
 };
 
+static const struct sdhci_pltfm_data sdhci_tegra194_pdata = {
+	.quirks = TEGRA_SDHCI_QUIRKS,
+	.quirks2 = TEGRA_SDHCI_QUIRKS2 |
+		SDHCI_QUIRK2_BROKEN_64_BIT_DMA,
+	.ops  = &tegra_sdhci_ops,
+};
+
 static struct sdhci_tegra_soc_data soc_data_tegra186 = {
 	.pdata = &sdhci_tegra186_pdata,
 	.nvquirks2 = NVQUIRK2_SET_PLL_CLK_PARENT,
+};
+
+static struct sdhci_tegra_soc_data soc_data_tegra194 = {
+	.pdata = &sdhci_tegra194_pdata,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra210_pdata = {
@@ -1499,6 +1523,7 @@ static const struct sdhci_tegra_soc_data soc_data_tegra210 = {
 };
 
 static const struct of_device_id sdhci_tegra_dt_match[] = {
+	{ .compatible = "nvidia,tegra194-sdhci", .data = &soc_data_tegra194 },
 	{ .compatible = "nvidia,tegra186-sdhci", .data = &soc_data_tegra186 },
 	{ .compatible = "nvidia,tegra210-sdhci", .data = &soc_data_tegra210 },
 	{ .compatible = "nvidia,tegra124-sdhci", .data = &soc_data_tegra114 },
