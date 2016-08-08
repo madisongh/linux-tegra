@@ -1536,20 +1536,20 @@ static int __init ip_auto_config(void)
 		&ic_myaddr, &ic_netmask, &ic_gateway);
 	pr_info("     host=%s, domain=%s, nis-domain=%s\n",
 		utsname()->nodename, ic_domain, utsname()->domainname);
-	pr_info("     bootserver=%pI4, rootserver=%pI4, rootpath=%s",
+	pr_info("     bootserver=%pI4, rootserver=%pI4, rootpath=%s\n",
 		&ic_servaddr, &root_server_addr, root_server_path);
 	if (ic_dev_mtu)
-		pr_cont(", mtu=%d", ic_dev_mtu);
+		pr_info("     mtu=%d\n", ic_dev_mtu);
 	for (i = 0; i < CONF_NAMESERVERS_MAX; i++)
 		if (ic_nameservers[i] != NONE) {
-			pr_info("     nameserver%u=%pI4",
+			pr_info("     nameserver%u=%pI4\n",
 				i, &ic_nameservers[i]);
 			break;
 		}
 	for (i++; i < CONF_NAMESERVERS_MAX; i++)
 		if (ic_nameservers[i] != NONE)
-			pr_cont(", nameserver%u=%pI4", i, &ic_nameservers[i]);
-	pr_cont("\n");
+			pr_info("     nameserver%u=%pI4\n",
+						i, &ic_nameservers[i]);
 #endif /* !SILENT */
 
 	return 0;
