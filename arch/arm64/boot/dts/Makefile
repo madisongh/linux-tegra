@@ -28,7 +28,9 @@ DTC_FLAGS :=
 DTCCPP_FLAGS :=
 
 ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
+DTC_FLAGS += -i $(srctree)/arch/arm64/boot/dts/nvidia
 DTC_FLAGS += -i $(srctree)/arch/arm64/boot/dts/nvidia/t210
+DTCCPP_FLAGS += -I$(srctree)/arch/arm64/boot/dts/nvidia
 DTCCPP_FLAGS += -I$(srctree)/arch/arm64/boot/dts/nvidia/t210
 endif
 

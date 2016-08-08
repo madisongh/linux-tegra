@@ -21,7 +21,7 @@
 
 #include "tegra210-t18x-interposer-common.dtsi"
 #include "tegra210-platforms/tegra210-sdhci.dtsi"
-#include "panel-s-wuxga-8-0.dtsi"
+#include <common/panels/panel-s-wuxga-8-0.dtsi>
 
 / {
 	#address-cells = <2>;
