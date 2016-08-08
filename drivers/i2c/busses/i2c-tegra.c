@@ -38,6 +38,7 @@
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
 #include <linux/dmapool.h>
+#include <linux/pm_runtime.h>
 
 #include <asm/unaligned.h>
 
@@ -1526,9 +1527,11 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	if (i2c_dev->is_shutdown && i2c_dev->bit_banging_xfer_after_shutdown)
 		return tegra_i2c_gpio_xfer(adap, msgs, num);
 
+	pm_runtime_get_sync(&adap->dev);
 	ret = tegra_i2c_clock_enable(i2c_dev);
 	if (ret < 0) {
 		dev_err(i2c_dev->dev, "Clock enable failed %d\n", ret);
+		pm_runtime_put(&adap->dev);
 		return ret;
 	}
 
@@ -1556,6 +1559,7 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 			break;
 	}
 	tegra_i2c_clock_disable(i2c_dev);
+	pm_runtime_put(&adap->dev);
 	return ret ?: i;
 }
 
@@ -1869,6 +1873,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 		goto disable_div_clk;
 	}
 
+	pm_runtime_enable(&pdev->dev);
 	i2c_set_adapdata(&i2c_dev->adapter, i2c_dev);
 	i2c_dev->adapter.owner = THIS_MODULE;
 	i2c_dev->adapter.class = I2C_CLASS_DEPRECATED;
@@ -1889,6 +1894,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 		goto disable_div_clk;
 	}
 	i2c_dev->cont_id = i2c_dev->adapter.nr & PACKET_HEADER0_CONT_ID_MASK;
+	pm_runtime_enable(&i2c_dev->adapter.dev);
 	tegra_i2c_gpio_init(i2c_dev);
 
 	return 0;
@@ -1912,6 +1918,7 @@ static int tegra_i2c_remove(struct platform_device *pdev)
 	struct tegra_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
 
 	i2c_del_adapter(&i2c_dev->adapter);
+	pm_runtime_disable(&i2c_dev->adapter.dev);
 
 	if (i2c_dev->tx_dma_chan)
 		tegra_i2c_deinit_dma_param(i2c_dev, false);
@@ -1920,6 +1927,7 @@ static int tegra_i2c_remove(struct platform_device *pdev)
 
 	if (i2c_dev->is_multimaster_mode)
 		clk_disable(i2c_dev->div_clk);
+	pm_runtime_disable(&pdev->dev);
 
 	clk_unprepare(i2c_dev->div_clk);
 	if (!i2c_dev->hw->has_single_clk_source)
