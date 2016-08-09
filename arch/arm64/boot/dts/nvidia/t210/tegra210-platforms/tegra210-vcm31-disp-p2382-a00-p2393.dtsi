@@ -15,7 +15,7 @@
  */
 
 #include "panel-a-edp-1080p-14-0.dtsi"
-#include "tegra210-display-p2393-0000-a00-panel-dsi-1080p.dtsi"
+#include "panel-dsi-1080p.dtsi"
 #include <dt-bindings/display/tegra-dc.h>
 #include <dt-bindings/display/tegra-panel.h>
 
