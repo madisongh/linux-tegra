@@ -871,6 +871,8 @@ static void set_best_clk_source(struct tegra_spi_data *tspi,
 
 	pclk = clk_get_parent(tspi->clk);
 	crate = clk_get_rate(tspi->clk);
+	if (!crate)
+		return;
 	prate = clk_get_rate(pclk);
 	cdiv = DIV_ROUND_UP(prate, crate);
 	if (cdiv < tspi->min_div) {
