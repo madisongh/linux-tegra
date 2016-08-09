@@ -102,8 +102,8 @@ config ARCH_TEGRA_21x_SOC
         select CPU_V8
         select ARM_GIC
         select ARCH_REQUIRE_GPIOLIB
-#        select USB_ARCH_HAS_EHCI if USB_SUPPORT
-#        select USB_EHCI_TEGRA if USB_SUPPORT
+        select USB_ARCH_HAS_EHCI if USB_SUPPORT
+        select USB_EHCI_TEGRA if USB_SUPPORT
         select REPORT_PRESENT_CPUS if TEGRA_CPUQUIET
         select ARCH_SUPPORTS_MSI if PCI_TEGRA
         select PCI_MSI if PCI_TEGRA
