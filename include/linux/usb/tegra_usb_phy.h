@@ -27,10 +27,6 @@ enum tegra_usb_phy_port_speed {
 	TEGRA_USB_PHY_PORT_SPEED_HIGH,
 };
 
-void tegra_usb_phy_preresume(struct usb_phy *phy);
-
-void tegra_usb_phy_postresume(struct usb_phy *phy);
-
 /**
  * Opens the usb phy associated to the USB platform device
  * tegra usb phy open must be called before accessing any phy APIs
