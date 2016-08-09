@@ -24,8 +24,8 @@ always		:= $(dtb-y)
 
 targets += dtbs
 
-DTC_FLAGS := -i $(srctree)/arch/arm/boot/dts
-DTCCPP_FLAGS := -I$(srctree)/arch/arm/boot/dts
+DTC_FLAGS :=
+DTCCPP_FLAGS :=
 
 ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
 DTC_FLAGS += -i $(srctree)/arch/arm64/boot/dts/nvidia/t210
