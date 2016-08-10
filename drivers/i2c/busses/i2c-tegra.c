@@ -950,8 +950,9 @@ skip_periph_reset:
 		0 << I2C_FIFO_CONTROL_RX_TRIG_SHIFT;
 	i2c_writel(i2c_dev, val, I2C_FIFO_CONTROL);
 
-	if (tegra_i2c_flush_fifos(i2c_dev))
-		err = -ETIMEDOUT;
+	err = tegra_i2c_flush_fifos(i2c_dev);
+	if (err)
+		goto err;
 
 	if (i2c_dev->is_multimaster_mode && i2c_dev->hw->has_slcg_override_reg)
 		i2c_writel(i2c_dev, I2C_MST_CORE_CLKEN_OVR, I2C_CLKEN_OVERRIDE);
