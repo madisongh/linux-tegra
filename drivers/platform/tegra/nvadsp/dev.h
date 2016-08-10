@@ -143,7 +143,7 @@ struct nvadsp_drv_data {
 };
 
 #define ADSP_CONFIG	0x04
-#define MAXCLKLATENCY	(3 << 8)
+#define MAXCLKLATENCY	(3 << 29)
 #define UART_BAUD_RATE	9600
 
 status_t nvadsp_mbox_init(struct platform_device *pdev);
