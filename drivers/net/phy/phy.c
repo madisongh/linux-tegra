@@ -1041,7 +1041,7 @@ void phy_state_machine(struct work_struct *work)
 	dev_dbg(&phydev->dev, "PHY state change %s -> %s\n",
 		phy_state_to_str(old_state), phy_state_to_str(phydev->state));
 
-	if (phydev->irq == PHY_POLL)
+	if (phydev->irq == PHY_POLL || phydev->state == PHY_AN)
 		queue_delayed_work(system_power_efficient_wq, &phydev->state_queue,
 			   		PHY_STATE_TIME * HZ);
 }
