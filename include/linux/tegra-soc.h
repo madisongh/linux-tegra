@@ -247,6 +247,11 @@ static inline bool tegra_platform_is_vdk(void)
 	int plat = tegra_get_platform();
 	return plat == TEGRA_PLATFORM_VDK;
 }
+static inline bool tegra_platform_is_sim(void)
+{
+	return tegra_platform_is_linsim() ||
+		tegra_platform_is_vdk();
+}
 
 bool tegra_bonded_out_dev(enum tegra_bondout_dev);
 
