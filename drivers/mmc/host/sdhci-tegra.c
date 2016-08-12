@@ -192,6 +192,7 @@ struct sdhci_tegra {
 	bool set_1v8_status;
 	struct padctrl *sdmmc_padctrl;
 	bool calib_1v8_offsets_done;
+	unsigned char timing;
 };
 
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
@@ -777,6 +778,7 @@ static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 	case MMC_TIMING_UHS_SDR50:
 	case MMC_TIMING_UHS_SDR104:
 	case MMC_TIMING_MMC_HS200:
+	case MMC_TIMING_MMC_HS400:
 	set_1v8_calib_offsets = true;
 
 		break;
@@ -828,10 +830,12 @@ static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 				__func__, err);
 	}
 
-	if (set_1v8_calib_offsets && !tegra_host->calib_1v8_offsets_done) {
+	if (set_1v8_calib_offsets && ((timing > tegra_host->timing) ||
+				(!tegra_host->calib_1v8_offsets_done))) {
 		tegra_sdhci_do_calibration(host,
 			host->mmc->ios.signal_voltage);
 		tegra_host->calib_1v8_offsets_done = true;
+		tegra_host->timing = timing;
 	}
 }
 
