@@ -36,6 +36,7 @@
 #include <linux/jiffies.h>
 #include <linux/timex.h>
 #include <linux/interrupt.h>
+
 #include "tcrypt.h"
 
 /*
@@ -44,8 +45,8 @@
 #define TVMEMSIZE	4
 
 /*
-* Used by test_cipher_speed()
-*/
+ * Used by test_cipher_speed()
+ */
 #define ENCRYPT 1
 #define DECRYPT 0
 
@@ -61,7 +62,8 @@
  */
 static unsigned int sec;
 static unsigned long dsize;
-
+static unsigned int bsize;
+static unsigned int bcnt;
 static char *alg = NULL;
 static u32 type;
 static u32 mask;
@@ -94,14 +96,14 @@ static void tcrypt_complete(struct crypto_async_request *req, int err)
 }
 
 static int test_cipher_jiffies(struct blkcipher_desc *desc, int enc,
-			       struct scatterlist *sg, int blen, int secs)
+				struct scatterlist *sg, int blen, int secs)
 {
 	unsigned long start, end;
 	int bcount;
 	int ret;
 
 	for (start = jiffies, end = start + secs * HZ, bcount = 0;
-	     time_before(jiffies, end); bcount++) {
+		time_before(jiffies, end); bcount++) {
 		if (enc)
 			ret = crypto_blkcipher_encrypt(desc, sg, sg, blen);
 		else
@@ -111,13 +113,13 @@ static int test_cipher_jiffies(struct blkcipher_desc *desc, int enc,
 			return ret;
 	}
 
-	printk("%d operations in %d seconds (%ld bytes)\n",
-	       bcount, secs, (long)bcount * blen);
+	pr_info("%d operations in %d seconds (%ld bytes)\n",
+		bcount, secs, (long)bcount * blen);
 	return 0;
 }
 
 static int test_cipher_cycles(struct blkcipher_desc *desc, int enc,
-			      struct scatterlist *sg, int blen)
+			struct scatterlist *sg, int blen)
 {
 	unsigned long cycles = 0;
 	int ret = 0;
@@ -157,8 +159,8 @@ out:
 	local_irq_enable();
 
 	if (ret == 0)
-		printk("1 operation in %lu cycles (%d bytes)\n",
-		       (cycles + 4) / 8, blen);
+		pr_info("1 operation in %lu cycles (%d bytes)\n",
+			(cycles + 4) / 8, blen);
 
 	return ret;
 }
@@ -185,7 +187,7 @@ static int test_aead_jiffies(struct aead_request *req, int enc,
 	int ret;
 
 	for (start = jiffies, end = start + secs * HZ, bcount = 0;
-	     time_before(jiffies, end); bcount++) {
+		time_before(jiffies, end); bcount++) {
 		if (enc)
 			ret = do_one_aead_op(req, crypto_aead_encrypt(req));
 		else
@@ -195,8 +197,8 @@ static int test_aead_jiffies(struct aead_request *req, int enc,
 			return ret;
 	}
 
-	printk("%d operations in %d seconds (%ld bytes)\n",
-	       bcount, secs, (long)bcount * blen);
+	pr_info("%d operations in %d seconds (%ld bytes)\n",
+		bcount, secs, (long)bcount * blen);
 	return 0;
 }
 
@@ -240,13 +242,13 @@ out:
 	local_irq_enable();
 
 	if (ret == 0)
-		printk("1 operation in %lu cycles (%d bytes)\n",
-		       (cycles + 4) / 8, blen);
+		pr_info("1 operation in %lu cycles (%d bytes)\n",
+			(cycles + 4) / 8, blen);
 
 	return ret;
 }
 
-static u32 block_sizes[] = { 16, 64, 256, 1024, 8192, 0 };
+static u32 block_sizes[] = { 16, 64, 256, 512, 1024, 8192, 0 };
 static u32 aead_sizes[] = { 16, 64, 256, 512, 1024, 2048, 4096, 8192, 0 };
 
 #define XBUFSIZE 8
@@ -301,9 +303,9 @@ static void sg_init_aead(struct scatterlist *sg, char *xbuf[XBUFSIZE],
 }
 
 static void test_aead_speed(const char *algo, int enc, unsigned int secs,
-			    struct aead_speed_template *template,
-			    unsigned int tcount, u8 authsize,
-			    unsigned int aad_size, u8 *keysize)
+			struct aead_speed_template *template,
+			unsigned int tcount, u8 authsize,
+			unsigned int aad_size, u8 *keysize)
 {
 	unsigned int i, j;
 	struct crypto_aead *tfm;
@@ -357,7 +359,7 @@ static void test_aead_speed(const char *algo, int enc, unsigned int secs,
 	}
 
 	init_completion(&result.completion);
-	printk(KERN_INFO "\ntesting speed of %s (%s) %s\n", algo,
+	pr_info("\ntesting speed of %s (%s) %s\n", algo,
 			get_driver_name(crypto_aead, tfm), e);
 
 	req = aead_request_alloc(tfm, GFP_KERNEL);
@@ -378,8 +380,8 @@ static void test_aead_speed(const char *algo, int enc, unsigned int secs,
 			memset(assoc, 0xff, aad_size);
 
 			if ((*keysize + *b_size) > TVMEMSIZE * PAGE_SIZE) {
-				pr_err("template (%u) too big for tvmem (%lu)\n",
-				       *keysize + *b_size,
+				pr_err("template(%u) too big for tvmem (%lu)\n",
+					*keysize + *b_size,
 					TVMEMSIZE * PAGE_SIZE);
 				goto out;
 			}
@@ -399,7 +401,7 @@ static void test_aead_speed(const char *algo, int enc, unsigned int secs,
 				memset(iv, 0xff, iv_len);
 
 			crypto_aead_clear_flags(tfm, ~0);
-			printk(KERN_INFO "test %u (%d bit key, %d byte blocks): ",
+			pr_info("test %u (%d bit key,%d byte blocks):",
 					i, *keysize * 8, *b_size);
 
 
@@ -457,8 +459,8 @@ out_noxbuf:
 }
 
 static void test_cipher_speed(const char *algo, int enc, unsigned int secs,
-			      struct cipher_speed_template *template,
-			      unsigned int tcount, u8 *keysize)
+				struct cipher_speed_template *template,
+				unsigned int tcount, u8 *keysize)
 {
 	unsigned int ret, i, j, iv_len;
 	const char *key;
@@ -469,21 +471,21 @@ static void test_cipher_speed(const char *algo, int enc, unsigned int secs,
 	u32 *b_size;
 
 	if (enc == ENCRYPT)
-	        e = "encryption";
+		e = "encryption";
 	else
 		e = "decryption";
 
 	tfm = crypto_alloc_blkcipher(algo, 0, CRYPTO_ALG_ASYNC);
 
 	if (IS_ERR(tfm)) {
-		printk("failed to load transform for %s: %ld\n", algo,
-		       PTR_ERR(tfm));
+		pr_info("failed to load transform for %s: %ld\n", algo,
+			PTR_ERR(tfm));
 		return;
 	}
 	desc.tfm = tfm;
 	desc.flags = 0;
 
-	printk(KERN_INFO "\ntesting speed of %s (%s) %s\n", algo,
+	pr_info("\ntesting speed of %s (%s) %s\n", algo,
 			get_driver_name(crypto_blkcipher, tfm), e);
 
 	i = 0;
@@ -494,14 +496,14 @@ static void test_cipher_speed(const char *algo, int enc, unsigned int secs,
 			struct scatterlist sg[TVMEMSIZE];
 
 			if ((*keysize + *b_size) > TVMEMSIZE * PAGE_SIZE) {
-				printk("template (%u) too big for "
-				       "tvmem (%lu)\n", *keysize + *b_size,
-				       TVMEMSIZE * PAGE_SIZE);
+				pr_info("template %u too big for tvmem (%lu)\n",
+					*keysize + *b_size,
+					TVMEMSIZE * PAGE_SIZE);
 				goto out;
 			}
 
-			printk("test %u (%d bit key, %d byte blocks): ", i,
-					*keysize * 8, *b_size);
+			pr_info("test %u (%d bit key, %d byte blocks): ",
+					i, *keysize * 8, *b_size);
 
 			memset(tvmem[0], 0xff, PAGE_SIZE);
 
@@ -516,14 +518,14 @@ static void test_cipher_speed(const char *algo, int enc, unsigned int secs,
 
 			ret = crypto_blkcipher_setkey(tfm, key, *keysize);
 			if (ret) {
-				printk("setkey() failed flags=%x\n",
+				pr_info("setkey() failed flags=%x\n",
 					crypto_blkcipher_get_flags(tfm));
 				goto out;
 			}
 
 			sg_init_table(sg, TVMEMSIZE);
 			sg_set_buf(sg, tvmem[0] + *keysize,
-				   PAGE_SIZE - *keysize);
+				PAGE_SIZE - *keysize);
 			for (j = 1; j < TVMEMSIZE; j++) {
 				sg_set_buf(sg + j, tvmem[j], PAGE_SIZE);
 				memset (tvmem[j], 0xff, PAGE_SIZE);
@@ -537,13 +539,14 @@ static void test_cipher_speed(const char *algo, int enc, unsigned int secs,
 
 			if (secs)
 				ret = test_cipher_jiffies(&desc, enc, sg,
-							  *b_size, secs);
+							*b_size, secs);
 			else
 				ret = test_cipher_cycles(&desc, enc, sg,
-							 *b_size);
+							*b_size);
 
 			if (ret) {
-				printk("%s() failed flags=%x\n", e, desc.flags);
+				pr_info("%s() failed flags=%x\n",
+					e, desc.flags);
 				break;
 			}
 			b_size++;
@@ -557,28 +560,28 @@ out:
 }
 
 static int test_hash_jiffies_digest(struct hash_desc *desc,
-				    struct scatterlist *sg, int blen,
-				    char *out, int secs)
+				struct scatterlist *sg, int blen,
+				char *out, int secs)
 {
 	unsigned long start, end;
 	int bcount;
 	int ret;
 
 	for (start = jiffies, end = start + secs * HZ, bcount = 0;
-	     time_before(jiffies, end); bcount++) {
+		time_before(jiffies, end); bcount++) {
 		ret = crypto_hash_digest(desc, sg, blen, out);
 		if (ret)
 			return ret;
 	}
 
-	printk("%6u opers/sec, %9lu bytes/sec\n",
-	       bcount / secs, ((long)bcount * blen) / secs);
+	pr_info("%6u opers/sec, %9lu bytes/sec\n",
+		bcount / secs, ((long)bcount * blen) / secs);
 
 	return 0;
 }
 
 static int test_hash_jiffies(struct hash_desc *desc, struct scatterlist *sg,
-			     int blen, int plen, char *out, int secs)
+			int blen, int plen, char *out, int secs)
 {
 	unsigned long start, end;
 	int bcount, pcount;
@@ -588,7 +591,7 @@ static int test_hash_jiffies(struct hash_desc *desc, struct scatterlist *sg,
 		return test_hash_jiffies_digest(desc, sg, blen, out, secs);
 
 	for (start = jiffies, end = start + secs * HZ, bcount = 0;
-	     time_before(jiffies, end); bcount++) {
+		time_before(jiffies, end); bcount++) {
 		ret = crypto_hash_init(desc);
 		if (ret)
 			return ret;
@@ -603,14 +606,14 @@ static int test_hash_jiffies(struct hash_desc *desc, struct scatterlist *sg,
 			return ret;
 	}
 
-	printk("%6u opers/sec, %9lu bytes/sec\n",
-	       bcount / secs, ((long)bcount * blen) / secs);
+	pr_info("%6u opers/sec, %9lu bytes/sec\n",
+		bcount / secs, ((long)bcount * blen) / secs);
 
 	return 0;
 }
 
 static int test_hash_cycles_digest(struct hash_desc *desc,
-				   struct scatterlist *sg, int blen, char *out)
+				struct scatterlist *sg, int blen, char *out)
 {
 	unsigned long cycles = 0;
 	int i;
@@ -646,14 +649,14 @@ out:
 	if (ret)
 		return ret;
 
-	printk("%6lu cycles/operation, %4lu cycles/byte\n",
-	       cycles / 8, cycles / (8 * blen));
+	pr_info("%6lu cycles/operation, %4lu cycles/byte\n",
+		cycles / 8, cycles / (8 * blen));
 
 	return 0;
 }
 
 static int test_hash_cycles(struct hash_desc *desc, struct scatterlist *sg,
-			    int blen, int plen, char *out)
+				int blen, int plen, char *out)
 {
 	unsigned long cycles = 0;
 	int i, pcount;
@@ -708,8 +711,8 @@ out:
 	if (ret)
 		return ret;
 
-	printk("%6lu cycles/operation, %4lu cycles/byte\n",
-	       cycles / 8, cycles / (8 * blen));
+	pr_info("%6lu cycles/operation, %4lu cycles/byte\n",
+		cycles / 8, cycles / (8 * blen));
 
 	return 0;
 }
@@ -732,7 +735,7 @@ static void test_hash_sg_init(struct scatterlist *sg, unsigned long dsize)
 }
 
 static void test_hash_speed(const char *algo, unsigned int secs,
-			    struct hash_speed *speed)
+			struct hash_speed *speed)
 {
 	struct scatterlist sg[TVMEMSIZE];
 	struct crypto_hash *tfm;
@@ -744,53 +747,50 @@ static void test_hash_speed(const char *algo, unsigned int secs,
 	tfm = crypto_alloc_hash(algo, 0, CRYPTO_ALG_ASYNC);
 
 	if (IS_ERR(tfm)) {
-		printk(KERN_ERR "failed to load transform for %s: %ld\n", algo,
-		       PTR_ERR(tfm));
+		pr_info("failed to load transform for %s: %ld\n", algo,
+			PTR_ERR(tfm));
 		return;
 	}
 
-	printk(KERN_INFO "\ntesting speed of %s (%s)\n", algo,
+	pr_info("\ntesting speed of %s (%s)\n", algo,
 			get_driver_name(crypto_hash, tfm));
 
 	desc.tfm = tfm;
 	desc.flags = 0;
 
 	if (crypto_hash_digestsize(tfm) > sizeof(output)) {
-		printk(KERN_ERR "digestsize(%u) > outputbuffer(%zu)\n",
-		       crypto_hash_digestsize(tfm), sizeof(output));
+		pr_info("digestsize(%u) > outputbuffer(%zu)\n",
+			crypto_hash_digestsize(tfm), sizeof(output));
 		goto out;
 	}
 
 	test_hash_sg_init(sg, 0);
 	for (i = 0; speed[i].blen != 0; i++) {
 		if (speed[i].blen > TVMEMSIZE * PAGE_SIZE) {
-			printk(KERN_ERR
-			       "template (%u) too big for tvmem (%lu)\n",
-			       speed[i].blen, TVMEMSIZE * PAGE_SIZE);
+			pr_info(
+				"template (%u) too big for tvmem (%lu)\n",
+				speed[i].blen, TVMEMSIZE * PAGE_SIZE);
 			goto out;
 		}
 
 		if (speed[i].klen)
 			crypto_hash_setkey(tfm, tvmem[0], speed[i].klen);
 
-		printk(KERN_INFO "test%3u "
-		       "(%5u byte blocks,%5u bytes per update,%4u updates): ",
+		pr_info(
+		"test%3u (%5u byte blocks,%5u bytes per update,%4u updates): ",
 			i, speed[i].blen, speed[i].plen,
 			speed[i].blen / speed[i].plen);
-
 		if (secs)
 			ret = test_hash_jiffies(&desc, sg, speed[i].blen,
 						speed[i].plen, output, secs);
 		else
 			ret = test_hash_cycles(&desc, sg, speed[i].blen,
-					       speed[i].plen, output);
-
+						speed[i].plen, output);
 		if (ret) {
-			printk(KERN_ERR "hashing failed ret=%d\n", ret);
+			pr_info("hashing failed ret=%d\n", ret);
 			break;
 		}
 	}
-
 out:
 	crypto_free_hash(tfm);
 }
@@ -808,27 +808,27 @@ static inline int do_one_ahash_op(struct ahash_request *req, int ret)
 }
 
 static int test_ahash_jiffies_digest(struct ahash_request *req, int blen,
-				     char *out, int secs)
+					char *out, int secs)
 {
 	unsigned long start, end;
 	int bcount;
 	int ret;
 
 	for (start = jiffies, end = start + secs * HZ, bcount = 0;
-	     time_before(jiffies, end); bcount++) {
+		time_before(jiffies, end); bcount++) {
 		ret = do_one_ahash_op(req, crypto_ahash_digest(req));
 		if (ret)
 			return ret;
 	}
 
-	printk("%6u opers/sec, %9lu bytes/sec\n",
-	       bcount / secs, ((long)bcount * blen) / secs);
+	pr_info("%6u opers/sec, %9lu bytes/sec\n",
+		bcount / secs, ((long)bcount * blen) / secs);
 
 	return 0;
 }
 
 static int test_ahash_jiffies(struct ahash_request *req, int blen,
-			      int plen, char *out, int secs)
+				int plen, char *out, int secs)
 {
 	unsigned long start, end;
 	int bcount, pcount;
@@ -838,7 +838,7 @@ static int test_ahash_jiffies(struct ahash_request *req, int blen,
 		return test_ahash_jiffies_digest(req, blen, out, secs);
 
 	for (start = jiffies, end = start + secs * HZ, bcount = 0;
-	     time_before(jiffies, end); bcount++) {
+		time_before(jiffies, end); bcount++) {
 		ret = do_one_ahash_op(req, crypto_ahash_init(req));
 		if (ret)
 			return ret;
@@ -899,7 +899,7 @@ static int test_ahash_perf(struct ahash_request *req, unsigned long dsize)
 }
 
 static int test_ahash_cycles_digest(struct ahash_request *req, int blen,
-				    char *out)
+				char *out)
 {
 	unsigned long cycles = 0;
 	int ret, i;
@@ -937,7 +937,7 @@ out:
 }
 
 static int test_ahash_cycles(struct ahash_request *req, int blen,
-			     int plen, char *out)
+			int plen, char *out)
 {
 	unsigned long cycles = 0;
 	int i, pcount, ret;
@@ -1006,16 +1006,16 @@ static void test_ahash_speed(const char *algo, unsigned int secs,
 	tfm = crypto_alloc_ahash(algo, 0, 0);
 	if (IS_ERR(tfm)) {
 		pr_err("failed to load transform for %s: %ld\n",
-		       algo, PTR_ERR(tfm));
+			algo, PTR_ERR(tfm));
 		return;
 	}
 
-	printk(KERN_INFO "\ntesting speed of async %s (%s)\n", algo,
+	pr_info("\ntesting speed of async %s (%s)\n", algo,
 			get_driver_name(crypto_ahash, tfm));
 
 	if (crypto_ahash_digestsize(tfm) > MAX_DIGEST_SIZE) {
 		pr_err("digestsize(%u) > %d\n", crypto_ahash_digestsize(tfm),
-		       MAX_DIGEST_SIZE);
+			MAX_DIGEST_SIZE);
 		goto out;
 	}
 
@@ -1029,7 +1029,7 @@ static void test_ahash_speed(const char *algo, unsigned int secs,
 
 	init_completion(&tresult.completion);
 	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
-				   tcrypt_complete, &tresult);
+				tcrypt_complete, &tresult);
 
 	output = kmalloc(MAX_DIGEST_SIZE, GFP_KERNEL);
 	if (!output)
@@ -1038,20 +1038,20 @@ static void test_ahash_speed(const char *algo, unsigned int secs,
 	for (i = 0; (!dsize && speed[i].blen != 0); i++) {
 		if (speed[i].blen > TVMEMSIZE * PAGE_SIZE) {
 			pr_err("template (%u) too big for tvmem (%lu)\n",
-			       speed[i].blen, TVMEMSIZE * PAGE_SIZE);
+				speed[i].blen, TVMEMSIZE * PAGE_SIZE);
 			break;
 		}
 
 		pr_info("test%3u "
 			"(%5u byte blocks,%5u bytes per update,%4u updates): ",
-			i, speed[i].blen, speed[i].plen,
-			speed[i].blen / speed[i].plen);
+				i, speed[i].blen, speed[i].plen,
+				speed[i].blen / speed[i].plen);
 
 		ahash_request_set_crypt(req, sg, output, speed[i].plen);
 
 		if (secs)
 			ret = test_ahash_jiffies(req, speed[i].blen,
-						 speed[i].plen, output, secs);
+						speed[i].plen, output, secs);
 		else
 			ret = test_ahash_cycles(req, speed[i].blen,
 						speed[i].plen, output);
@@ -1099,14 +1099,13 @@ static int test_acipher_jiffies(struct ablkcipher_request *req, int enc,
 	int ret;
 
 	for (start = jiffies, end = start + secs * HZ, bcount = 0;
-	     time_before(jiffies, end); bcount++) {
+		time_before(jiffies, end); bcount++) {
 		if (enc)
 			ret = do_one_acipher_op(req,
 						crypto_ablkcipher_encrypt(req));
 		else
 			ret = do_one_acipher_op(req,
 						crypto_ablkcipher_decrypt(req));
-
 		if (ret)
 			return ret;
 	}
@@ -1117,7 +1116,7 @@ static int test_acipher_jiffies(struct ablkcipher_request *req, int enc,
 }
 
 static int test_acipher_cycles(struct ablkcipher_request *req, int enc,
-			       int blen)
+				int blen)
 {
 	unsigned long cycles = 0;
 	int ret = 0;
@@ -1143,10 +1142,10 @@ static int test_acipher_cycles(struct ablkcipher_request *req, int enc,
 		start = get_cycles();
 		if (enc)
 			ret = do_one_acipher_op(req,
-						crypto_ablkcipher_encrypt(req));
+					crypto_ablkcipher_encrypt(req));
 		else
 			ret = do_one_acipher_op(req,
-						crypto_ablkcipher_decrypt(req));
+					crypto_ablkcipher_decrypt(req));
 		end = get_cycles();
 
 		if (ret)
@@ -1163,9 +1162,198 @@ out:
 	return ret;
 }
 
+#define CUSTOMIZED_ACIPHER_SPEED_TEST_BLOCK_AMOUNT (32*512)
+#define CUSTOMIZED_ACIPHER_SPEED_TEST_BLOCK_SIZE (1024/2)
+#define CUSTOMIZED_ACIPHER_SPEED_TEST_TOTAL_BYTES \
+		(CUSTOMIZED_ACIPHER_SPEED_TEST_BLOCK_AMOUNT * \
+		CUSTOMIZED_ACIPHER_SPEED_TEST_BLOCK_SIZE)
+#define CUSTOMIZED_ACIPHER_SPEED_TEST_KEY_SIZE 16
+#define CUSTOMIZED_ACIPHER_SPEED_TEST_MAX_OUTSTANDING_BLOCKS 1024
+
+static atomic_t atomic_counter;
+
+struct customized_tcrypt_result {
+	u8 iv[CUSTOMIZED_ACIPHER_SPEED_TEST_KEY_SIZE];
+	u8 *block;
+	struct completion completion;
+	struct completion restart;
+	struct ablkcipher_request *req;
+	struct scatterlist sg;
+	int err;
+};
+
+static void customized_tcrypt_complete(struct crypto_async_request *req,
+					int err)
+{
+	struct customized_tcrypt_result *res = req->data;
+
+	if (err == -EINPROGRESS) {
+		complete(&res->restart);
+		return;
+	}
+
+	res->err = err;
+	atomic_add(1, &atomic_counter);
+	ablkcipher_request_free(res->req);
+	kfree(res->block);
+}
+
+static unsigned int customized_blocks[] = {
+		1024 / 2,
+		1024,
+		1024 * 2,
+		1024 * 4,
+		1024 * 8,
+		1024 * 16,
+		1024 * 32,
+		1024 * 64
+};
+
+static void customized_test_acipher_speed(const char *algo, int enc,
+					unsigned int bsize, unsigned int bcnt)
+{
+	unsigned int ret, k;
+	const char *e;
+	struct crypto_ablkcipher *tfm;
+	u8 keysize = CUSTOMIZED_ACIPHER_SPEED_TEST_KEY_SIZE;
+	u32 blocksize = customized_blocks[bsize];
+	char key[32] = { 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa,
+		0xb, 0xc, 0xd, 0xe, 0xf, 0xf, 0xe, 0xd, 0xc, 0xb, 0xa, 0x9, 0x8,
+		0x7, 0x6, 0x5, 0x4, 0x3, 0x2, 0x1, 0x0 };
+	struct timespec before, after;
+	unsigned long before_a, after_a, diff_in_ms;
+	unsigned long blocks_to_test =
+		CUSTOMIZED_ACIPHER_SPEED_TEST_BLOCK_AMOUNT * bcnt;
+	unsigned long bytes_tested = blocks_to_test * blocksize;
+	unsigned long bytes_per_ms;
+	u32 val = 0;
+
+	atomic_set(&atomic_counter, 0);
+
+	if (enc == ENCRYPT) {
+		e = "encryption";
+		pr_info("Testing Encryption\n");
+	} else {
+		e = "decryption";
+		pr_info("Testing Decryption\n");
+	}
+
+	tfm = crypto_alloc_ablkcipher(algo, 0, 0);
+	if (IS_ERR(tfm)) {
+		pr_err("failed to load transform for %s: %ld\n", algo,
+				PTR_ERR(tfm));
+		return;
+	}
+
+	pr_info("testing speed of async %s (%s) %s\n", algo,
+			get_driver_name(crypto_ablkcipher, tfm), e);
+	pr_info("testing  (%d bit key, %d byte blocks)\n",
+			keysize * 8, blocksize);
+
+	memset(tvmem[0], 0xff, PAGE_SIZE);
+
+	crypto_ablkcipher_clear_flags(tfm, ~0);
+
+	ret = crypto_ablkcipher_setkey(tfm, key, keysize);
+	if (ret) {
+		pr_err("setkey() failed flags=%x\n",
+				crypto_ablkcipher_get_flags(tfm));
+		goto out;
+	}
+
+	getnstimeofday(&before);
+
+	for (k = 0; k < blocks_to_test; k++) {
+		struct ablkcipher_request *req;
+		u8 *alloc_addr;
+		struct customized_tcrypt_result *tresult;
+		struct scatterlist *sg;
+		u8 *block, *iv;
+
+		alloc_addr = kmalloc(((blocksize / PAGE_SIZE) + 1) * PAGE_SIZE,
+				GFP_KERNEL);
+		tresult = (struct customized_tcrypt_result *)
+						(alloc_addr + blocksize);
+		if (!tresult) {
+			pr_err("out of memory?\n");
+			goto out;
+		}
+		tresult->block = alloc_addr;
+
+		init_completion(&tresult->completion);
+		init_completion(&tresult->restart);
+
+		req = ablkcipher_request_alloc(tfm, GFP_KERNEL);
+		if (!req) {
+			pr_err(
+			"tcrypt: skcipher:Failed to allocate request for %s\n",
+				algo);
+			goto out;
+		}
+
+		ablkcipher_request_set_callback(req,
+			CRYPTO_TFM_REQ_MAY_BACKLOG | CRYPTO_TFM_REQ_MAY_SLEEP,
+			customized_tcrypt_complete, tresult);
+		tresult->req = req;
+
+		sg = &tresult->sg;
+		block = tresult->block;
+		iv = tresult->iv;
+		sg_init_table(sg, 1);
+		sg_set_buf(sg, block, blocksize);
+
+		memset(iv, k % CUSTOMIZED_ACIPHER_SPEED_TEST_KEY_SIZE,
+			CUSTOMIZED_ACIPHER_SPEED_TEST_KEY_SIZE);
+
+		ablkcipher_request_set_crypt(req, sg, sg, blocksize, iv);
+		if (enc)
+			ret = crypto_ablkcipher_encrypt(req);
+		else
+			ret = crypto_ablkcipher_decrypt(req);
+
+		switch (ret) {
+		/* async */
+		case -EBUSY:
+			wait_for_completion_interruptible(&tresult->restart);
+			reinit_completion(&tresult->restart);
+			break;
+		case -EINPROGRESS:
+			break;
+			/* sync */
+		case 0:
+			customized_tcrypt_complete(&req->base, 0);
+			break;
+			/* error */
+		default:
+			pr_err("error detected\n");
+			return;
+		}
+	}
+
+	while (val < blocks_to_test)
+		val = atomic_read(&atomic_counter);
+
+	getnstimeofday(&after);
+	before_a = before.tv_nsec;
+	after_a = ((after.tv_sec - before.tv_sec) * 1000000000) + after.tv_nsec;
+	diff_in_ms = (after_a - before_a) / 1000000;
+
+	pr_info("difference: %ld(ms)\n", diff_in_ms);
+	pr_info("bytes tested: %ldMB %ldKB %ldB\n",
+		bytes_tested / 1024 / 1024, (bytes_tested / 1024) % 1024,
+		bytes_tested % 1024);
+
+	bytes_per_ms = bytes_tested / diff_in_ms;
+	pr_info("Test speed: %ld.%03ld(MB/s)\n",
+		(bytes_per_ms * 1000) / (1024 * 1024),
+		((bytes_per_ms * 1000) / 1024) % 1024);
+out:
+	crypto_free_ablkcipher(tfm);
+}
+
 static void test_acipher_speed(const char *algo, int enc, unsigned int secs,
-			       struct cipher_speed_template *template,
-			       unsigned int tcount, u8 *keysize)
+				struct cipher_speed_template *template,
+				unsigned int tcount, u8 *keysize)
 {
 	unsigned int ret, i, j, k, iv_len;
 	struct tcrypt_result tresult;
@@ -1187,7 +1375,7 @@ static void test_acipher_speed(const char *algo, int enc, unsigned int secs,
 
 	if (IS_ERR(tfm)) {
 		pr_err("failed to load transform for %s: %ld\n", algo,
-		       PTR_ERR(tfm));
+			PTR_ERR(tfm));
 		return;
 	}
 
@@ -1197,7 +1385,7 @@ static void test_acipher_speed(const char *algo, int enc, unsigned int secs,
 	req = ablkcipher_request_alloc(tfm, GFP_KERNEL);
 	if (!req) {
 		pr_err("tcrypt: skcipher: Failed to allocate request for %s\n",
-		       algo);
+			algo);
 		goto out;
 	}
 
@@ -1212,9 +1400,10 @@ static void test_acipher_speed(const char *algo, int enc, unsigned int secs,
 			struct scatterlist sg[TVMEMSIZE];
 
 			if ((*keysize + *b_size) > TVMEMSIZE * PAGE_SIZE) {
-				pr_err("template (%u) too big for "
-				       "tvmem (%lu)\n", *keysize + *b_size,
-				       TVMEMSIZE * PAGE_SIZE);
+				pr_err(
+				"template (%u) too big for tvmem (%lu)\n",
+					*keysize + *b_size,
+					TVMEMSIZE * PAGE_SIZE);
 				goto out_free_req;
 			}
 
@@ -1246,7 +1435,7 @@ static void test_acipher_speed(const char *algo, int enc, unsigned int secs,
 
 			if (k > PAGE_SIZE) {
 				sg_set_buf(sg, tvmem[0] + *keysize,
-				   PAGE_SIZE - *keysize);
+					PAGE_SIZE - *keysize);
 				k -= PAGE_SIZE;
 				j = 1;
 				while (k > PAGE_SIZE) {
@@ -1269,10 +1458,10 @@ static void test_acipher_speed(const char *algo, int enc, unsigned int secs,
 
 			if (secs)
 				ret = test_acipher_jiffies(req, enc,
-							   *b_size, secs);
+							*b_size, secs);
 			else
 				ret = test_acipher_cycles(req, enc,
-							  *b_size);
+							*b_size);
 
 			if (ret) {
 				pr_err("%s() failed flags=%x\n", e,
@@ -1296,9 +1485,9 @@ static void test_available(void)
 	char **name = check;
 
 	while (*name) {
-		printk("alg %s ", *name);
-		printk(crypto_has_alg(*name, 0, 0) ?
-		       "found\n" : "not found\n");
+		pr_info("alg %s %s", *name,
+			crypto_has_alg(*name, 0, 0) ?
+			"found\n" : "not found\n");
 		name++;
 	}
 }
@@ -1514,11 +1703,11 @@ static int do_test(const char *alg, u32 type, u32 mask, int m)
 		ret += tcrypt_test("cts(cbc(aes))");
 		break;
 
-        case 39:
+	case 39:
 		ret += tcrypt_test("rmd128");
 		break;
 
-        case 40:
+	case 40:
 		ret += tcrypt_test("rmd160");
 		break;
 
@@ -1724,28 +1913,28 @@ static int do_test(const char *alg, u32 type, u32 mask, int m)
 
 	case 203:
 		test_cipher_speed("ecb(blowfish)", ENCRYPT, sec, NULL, 0,
-				  speed_template_8_32);
+				speed_template_8_32);
 		test_cipher_speed("ecb(blowfish)", DECRYPT, sec, NULL, 0,
-				  speed_template_8_32);
+				speed_template_8_32);
 		test_cipher_speed("cbc(blowfish)", ENCRYPT, sec, NULL, 0,
-				  speed_template_8_32);
+				speed_template_8_32);
 		test_cipher_speed("cbc(blowfish)", DECRYPT, sec, NULL, 0,
-				  speed_template_8_32);
+				speed_template_8_32);
 		test_cipher_speed("ctr(blowfish)", ENCRYPT, sec, NULL, 0,
-				  speed_template_8_32);
+				speed_template_8_32);
 		test_cipher_speed("ctr(blowfish)", DECRYPT, sec, NULL, 0,
-				  speed_template_8_32);
+				speed_template_8_32);
 		break;
 
 	case 204:
 		test_cipher_speed("ecb(des)", ENCRYPT, sec, NULL, 0,
-				  speed_template_8);
+				speed_template_8);
 		test_cipher_speed("ecb(des)", DECRYPT, sec, NULL, 0,
-				  speed_template_8);
+				speed_template_8);
 		test_cipher_speed("cbc(des)", ENCRYPT, sec, NULL, 0,
-				  speed_template_8);
+				speed_template_8);
 		test_cipher_speed("cbc(des)", DECRYPT, sec, NULL, 0,
-				  speed_template_8);
+				speed_template_8);
 		break;
 
 	case 205:
@@ -1773,73 +1962,73 @@ static int do_test(const char *alg, u32 type, u32 mask, int m)
 
 	case 206:
 		test_cipher_speed("salsa20", ENCRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		break;
 
 	case 207:
 		test_cipher_speed("ecb(serpent)", ENCRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("ecb(serpent)", DECRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("cbc(serpent)", ENCRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("cbc(serpent)", DECRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("ctr(serpent)", ENCRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("ctr(serpent)", DECRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("lrw(serpent)", ENCRYPT, sec, NULL, 0,
-				  speed_template_32_48);
+				speed_template_32_48);
 		test_cipher_speed("lrw(serpent)", DECRYPT, sec, NULL, 0,
-				  speed_template_32_48);
+				speed_template_32_48);
 		test_cipher_speed("xts(serpent)", ENCRYPT, sec, NULL, 0,
-				  speed_template_32_64);
+				speed_template_32_64);
 		test_cipher_speed("xts(serpent)", DECRYPT, sec, NULL, 0,
-				  speed_template_32_64);
+				speed_template_32_64);
 		break;
 
 	case 208:
 		test_cipher_speed("ecb(arc4)", ENCRYPT, sec, NULL, 0,
-				  speed_template_8);
+				speed_template_8);
 		break;
 
 	case 209:
 		test_cipher_speed("ecb(cast5)", ENCRYPT, sec, NULL, 0,
-				  speed_template_8_16);
+				speed_template_8_16);
 		test_cipher_speed("ecb(cast5)", DECRYPT, sec, NULL, 0,
-				  speed_template_8_16);
+				speed_template_8_16);
 		test_cipher_speed("cbc(cast5)", ENCRYPT, sec, NULL, 0,
-				  speed_template_8_16);
+				speed_template_8_16);
 		test_cipher_speed("cbc(cast5)", DECRYPT, sec, NULL, 0,
-				  speed_template_8_16);
+				speed_template_8_16);
 		test_cipher_speed("ctr(cast5)", ENCRYPT, sec, NULL, 0,
-				  speed_template_8_16);
+				speed_template_8_16);
 		test_cipher_speed("ctr(cast5)", DECRYPT, sec, NULL, 0,
-				  speed_template_8_16);
+				speed_template_8_16);
 		break;
 
 	case 210:
 		test_cipher_speed("ecb(cast6)", ENCRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("ecb(cast6)", DECRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("cbc(cast6)", ENCRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("cbc(cast6)", DECRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("ctr(cast6)", ENCRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("ctr(cast6)", DECRYPT, sec, NULL, 0,
-				  speed_template_16_32);
+				speed_template_16_32);
 		test_cipher_speed("lrw(cast6)", ENCRYPT, sec, NULL, 0,
-				  speed_template_32_48);
+				speed_template_32_48);
 		test_cipher_speed("lrw(cast6)", DECRYPT, sec, NULL, 0,
-				  speed_template_32_48);
+				speed_template_32_48);
 		test_cipher_speed("xts(cast6)", ENCRYPT, sec, NULL, 0,
-				  speed_template_32_64);
+				speed_template_32_64);
 		test_cipher_speed("xts(cast6)", DECRYPT, sec, NULL, 0,
-				  speed_template_32_64);
+				speed_template_32_64);
 		break;
 
 	case 211:
@@ -2059,210 +2248,215 @@ static int do_test(const char *alg, u32 type, u32 mask, int m)
 
 	case 500:
 		test_acipher_speed("ecb(aes)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("ecb(aes)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("cbc(aes)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("cbc(aes)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("lrw(aes)", ENCRYPT, sec, NULL, 0,
-				   speed_template_32_40_48);
+				speed_template_32_40_48);
 		test_acipher_speed("lrw(aes)", DECRYPT, sec, NULL, 0,
-				   speed_template_32_40_48);
+				speed_template_32_40_48);
 		test_acipher_speed("xts(aes)", ENCRYPT, sec, NULL, 0,
-				   speed_template_32_48_64);
+				speed_template_32_48_64);
 		test_acipher_speed("xts(aes)", DECRYPT, sec, NULL, 0,
-				   speed_template_32_48_64);
+				speed_template_32_48_64);
 		test_acipher_speed("ctr(aes)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("ctr(aes)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("cfb(aes)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("cfb(aes)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("ofb(aes)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("ofb(aes)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("rfc3686(ctr(aes))", ENCRYPT, sec, NULL, 0,
-				   speed_template_20_28_36);
+				speed_template_20_28_36);
 		test_acipher_speed("rfc3686(ctr(aes))", DECRYPT, sec, NULL, 0,
-				   speed_template_20_28_36);
+				speed_template_20_28_36);
 		break;
 
 	case 501:
 		test_acipher_speed("ecb(des3_ede)", ENCRYPT, sec,
-				   des3_speed_template, DES3_SPEED_VECTORS,
-				   speed_template_24);
+				des3_speed_template, DES3_SPEED_VECTORS,
+				speed_template_24);
 		test_acipher_speed("ecb(des3_ede)", DECRYPT, sec,
-				   des3_speed_template, DES3_SPEED_VECTORS,
-				   speed_template_24);
+				des3_speed_template, DES3_SPEED_VECTORS,
+				speed_template_24);
 		test_acipher_speed("cbc(des3_ede)", ENCRYPT, sec,
-				   des3_speed_template, DES3_SPEED_VECTORS,
-				   speed_template_24);
+				des3_speed_template, DES3_SPEED_VECTORS,
+				speed_template_24);
 		test_acipher_speed("cbc(des3_ede)", DECRYPT, sec,
-				   des3_speed_template, DES3_SPEED_VECTORS,
-				   speed_template_24);
+				des3_speed_template, DES3_SPEED_VECTORS,
+				speed_template_24);
 		test_acipher_speed("cfb(des3_ede)", ENCRYPT, sec,
-				   des3_speed_template, DES3_SPEED_VECTORS,
-				   speed_template_24);
+				des3_speed_template, DES3_SPEED_VECTORS,
+				speed_template_24);
 		test_acipher_speed("cfb(des3_ede)", DECRYPT, sec,
-				   des3_speed_template, DES3_SPEED_VECTORS,
-				   speed_template_24);
+				des3_speed_template, DES3_SPEED_VECTORS,
+				speed_template_24);
 		test_acipher_speed("ofb(des3_ede)", ENCRYPT, sec,
-				   des3_speed_template, DES3_SPEED_VECTORS,
-				   speed_template_24);
+				des3_speed_template, DES3_SPEED_VECTORS,
+				speed_template_24);
 		test_acipher_speed("ofb(des3_ede)", DECRYPT, sec,
-				   des3_speed_template, DES3_SPEED_VECTORS,
-				   speed_template_24);
+				des3_speed_template, DES3_SPEED_VECTORS,
+				speed_template_24);
 		break;
 
 	case 502:
 		test_acipher_speed("ecb(des)", ENCRYPT, sec, NULL, 0,
-				   speed_template_8);
+				speed_template_8);
 		test_acipher_speed("ecb(des)", DECRYPT, sec, NULL, 0,
-				   speed_template_8);
+				speed_template_8);
 		test_acipher_speed("cbc(des)", ENCRYPT, sec, NULL, 0,
-				   speed_template_8);
+				speed_template_8);
 		test_acipher_speed("cbc(des)", DECRYPT, sec, NULL, 0,
-				   speed_template_8);
+				speed_template_8);
 		test_acipher_speed("cfb(des)", ENCRYPT, sec, NULL, 0,
-				   speed_template_8);
+				speed_template_8);
 		test_acipher_speed("cfb(des)", DECRYPT, sec, NULL, 0,
-				   speed_template_8);
+				speed_template_8);
 		test_acipher_speed("ofb(des)", ENCRYPT, sec, NULL, 0,
-				   speed_template_8);
+				speed_template_8);
 		test_acipher_speed("ofb(des)", DECRYPT, sec, NULL, 0,
-				   speed_template_8);
+				speed_template_8);
 		break;
 
 	case 503:
 		test_acipher_speed("ecb(serpent)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("ecb(serpent)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("cbc(serpent)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("cbc(serpent)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("ctr(serpent)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("ctr(serpent)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("lrw(serpent)", ENCRYPT, sec, NULL, 0,
-				   speed_template_32_48);
+				speed_template_32_48);
 		test_acipher_speed("lrw(serpent)", DECRYPT, sec, NULL, 0,
-				   speed_template_32_48);
+				speed_template_32_48);
 		test_acipher_speed("xts(serpent)", ENCRYPT, sec, NULL, 0,
-				   speed_template_32_64);
+				speed_template_32_64);
 		test_acipher_speed("xts(serpent)", DECRYPT, sec, NULL, 0,
-				   speed_template_32_64);
+				speed_template_32_64);
 		break;
 
 	case 504:
 		test_acipher_speed("ecb(twofish)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("ecb(twofish)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("cbc(twofish)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("cbc(twofish)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("ctr(twofish)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("ctr(twofish)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_24_32);
+				speed_template_16_24_32);
 		test_acipher_speed("lrw(twofish)", ENCRYPT, sec, NULL, 0,
-				   speed_template_32_40_48);
+				speed_template_32_40_48);
 		test_acipher_speed("lrw(twofish)", DECRYPT, sec, NULL, 0,
-				   speed_template_32_40_48);
+				speed_template_32_40_48);
 		test_acipher_speed("xts(twofish)", ENCRYPT, sec, NULL, 0,
-				   speed_template_32_48_64);
+				speed_template_32_48_64);
 		test_acipher_speed("xts(twofish)", DECRYPT, sec, NULL, 0,
-				   speed_template_32_48_64);
+				speed_template_32_48_64);
 		break;
 
 	case 505:
 		test_acipher_speed("ecb(arc4)", ENCRYPT, sec, NULL, 0,
-				   speed_template_8);
+				speed_template_8);
 		break;
 
 	case 506:
 		test_acipher_speed("ecb(cast5)", ENCRYPT, sec, NULL, 0,
-				   speed_template_8_16);
+				speed_template_8_16);
 		test_acipher_speed("ecb(cast5)", DECRYPT, sec, NULL, 0,
-				   speed_template_8_16);
+				speed_template_8_16);
 		test_acipher_speed("cbc(cast5)", ENCRYPT, sec, NULL, 0,
-				   speed_template_8_16);
+				speed_template_8_16);
 		test_acipher_speed("cbc(cast5)", DECRYPT, sec, NULL, 0,
-				   speed_template_8_16);
+				speed_template_8_16);
 		test_acipher_speed("ctr(cast5)", ENCRYPT, sec, NULL, 0,
-				   speed_template_8_16);
+				speed_template_8_16);
 		test_acipher_speed("ctr(cast5)", DECRYPT, sec, NULL, 0,
-				   speed_template_8_16);
+				speed_template_8_16);
 		break;
 
 	case 507:
 		test_acipher_speed("ecb(cast6)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("ecb(cast6)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("cbc(cast6)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("cbc(cast6)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("ctr(cast6)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("ctr(cast6)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("lrw(cast6)", ENCRYPT, sec, NULL, 0,
-				   speed_template_32_48);
+				speed_template_32_48);
 		test_acipher_speed("lrw(cast6)", DECRYPT, sec, NULL, 0,
-				   speed_template_32_48);
+				speed_template_32_48);
 		test_acipher_speed("xts(cast6)", ENCRYPT, sec, NULL, 0,
-				   speed_template_32_64);
+				speed_template_32_64);
 		test_acipher_speed("xts(cast6)", DECRYPT, sec, NULL, 0,
-				   speed_template_32_64);
+				speed_template_32_64);
 		break;
 
 	case 508:
 		test_acipher_speed("ecb(camellia)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("ecb(camellia)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("cbc(camellia)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("cbc(camellia)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("ctr(camellia)", ENCRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("ctr(camellia)", DECRYPT, sec, NULL, 0,
-				   speed_template_16_32);
+				speed_template_16_32);
 		test_acipher_speed("lrw(camellia)", ENCRYPT, sec, NULL, 0,
-				   speed_template_32_48);
+				speed_template_32_48);
 		test_acipher_speed("lrw(camellia)", DECRYPT, sec, NULL, 0,
-				   speed_template_32_48);
+				speed_template_32_48);
 		test_acipher_speed("xts(camellia)", ENCRYPT, sec, NULL, 0,
-				   speed_template_32_64);
+				speed_template_32_64);
 		test_acipher_speed("xts(camellia)", DECRYPT, sec, NULL, 0,
-				   speed_template_32_64);
+				speed_template_32_64);
 		break;
 
 	case 509:
 		test_acipher_speed("ecb(blowfish)", ENCRYPT, sec, NULL, 0,
-				   speed_template_8_32);
+				speed_template_8_32);
 		test_acipher_speed("ecb(blowfish)", DECRYPT, sec, NULL, 0,
-				   speed_template_8_32);
+				speed_template_8_32);
 		test_acipher_speed("cbc(blowfish)", ENCRYPT, sec, NULL, 0,
-				   speed_template_8_32);
+				speed_template_8_32);
 		test_acipher_speed("cbc(blowfish)", DECRYPT, sec, NULL, 0,
-				   speed_template_8_32);
+				speed_template_8_32);
 		test_acipher_speed("ctr(blowfish)", ENCRYPT, sec, NULL, 0,
-				   speed_template_8_32);
+				speed_template_8_32);
 		test_acipher_speed("ctr(blowfish)", DECRYPT, sec, NULL, 0,
-				   speed_template_8_32);
+				speed_template_8_32);
+		break;
+
+	case 555:
+		customized_test_acipher_speed("cbc(aes)", ENCRYPT, bsize, bcnt);
+		customized_test_acipher_speed("cbc(aes)", DECRYPT, bsize, bcnt);
 		break;
 
 	case 1000:
@@ -2293,7 +2487,7 @@ static int __init tcrypt_mod_init(void)
 	err = do_test(alg, type, mask, mode);
 
 	if (err) {
-		printk(KERN_ERR "tcrypt: one or more tests failed!\n");
+		pr_info("tcrypt: one or more tests failed!\n");
 		goto err_free_tv;
 	}
 
@@ -2322,8 +2516,12 @@ module_param(mask, uint, 0);
 module_param(mode, int, 0);
 module_param(sec, uint, 0);
 module_param(dsize, ulong, 0);
-MODULE_PARM_DESC(sec, "Length in seconds of speed tests "
-		      "(defaults to zero which uses CPU cycles instead)");
+module_param(bsize, uint, 0);
+module_param(bcnt, uint, 0);
+/* When this parameter (sec) is not supplied,
+ * it calculates in CPU cycles instead
+ */
+MODULE_PARM_DESC(sec, "Length in seconds of speed tests");
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Quick & dirty crypto testing module");
