@@ -676,13 +676,14 @@ static int tegra_uart_handle_rx_pio(struct tegra_uart_port *tup,
 
 		if (!uart_handle_sysrq_char(&tup->uport, ch) && tty) {
 			copied  = tty_insert_flip_char(tty, ch, flag);
-			if (copied != 1)
+			if (copied != 1) {
 				dev_err(tup->uport.dev, "RxData PIO to tty layer failed\n");
 				tegra_uart_disable_rx_irqs(tup);
 				mod_timer(&tup->error_timer,
 					jiffies + tup->error_timer_timeout_jiffies);
 				return -ENOSPC;
 			}
+		}
 	} while (max_rx_count--);
 
 	return 0;
@@ -780,7 +781,7 @@ static int tegra_uart_rx_buffer_push(struct tegra_uart_port *tup,
 	if (ret)
 		goto skip_pio;
 
-	tegra_uart_handle_rx_pio(tup, port);
+	ret = tegra_uart_handle_rx_pio(tup, port);
 skip_pio:
 	if (tty) {
 		tty_flip_buffer_push(port);
