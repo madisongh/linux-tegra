@@ -97,18 +97,6 @@ static DEVICE_ATTR(aid, 0444, tegra_fuse_show, NULL);
 #endif
 #define RAM_CODE_SHIFT 4
 
-static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
-	[TEGRA_REVISION_UNKNOWN] = "unknown",
-	[TEGRA_REVISION_A01]     = "A01",
-	[TEGRA_REVISION_A01q]    = "A01Q",
-	[TEGRA_REVISION_A02]     = "A02",
-	[TEGRA_REVISION_A02p]     = "A02P",
-	[TEGRA_REVISION_A03]     = "A03",
-	[TEGRA_REVISION_A03p]    = "A03 prime",
-	[TEGRA_REVISION_A04]     = "A04",
-	[TEGRA_REVISION_A04p]    = "A04 prime",
-};
-
 static void __iomem *fuse_base;
 
 struct tegra_id {
@@ -618,42 +606,15 @@ void tegra_set_tegraid(u32 chipid, u32 major, u32 minor,
 	}
 }
 
-static void tegra_fuse_cfg_reg_visible(void)
-{
-	/* Make all fuse registers visible */
-	u32 reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
-	reg |= BIT(28);
-	writel(reg, IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
-}
-
 /* Overridable by implementation of future platforms */
 __weak void tegra_get_tegraid_from_hw(void)
 {
 	u32 cid;
 	u32 nlist;
 	char *priv = NULL;
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-	u32 opt_subrevision;
-	char prime;
-#endif
 
 	cid = tegra_read_chipid();
 	nlist = tegra_read_apb_misc_reg(0x860);
-
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-	tegra_fuse_cfg_reg_visible();
-	opt_subrevision = tegra_get_fuse_opt_subrevision();
-	if (opt_subrevision == 1) {
-		prime = 'p';
-		priv = &prime;
-	} else if (opt_subrevision == 2) {
-		prime = 'q';
-		priv = &prime;
-	} else if (opt_subrevision == 3) {
-		prime = 'r';
-		priv = &prime;
-	}
-#endif
 
 	tegra_set_tegraid((cid >> 8) & 0xff,
 			  (cid >> 4) & 0xf,
@@ -1556,26 +1517,6 @@ static void tegra_set_sku_id(void)
 #endif
 		tegra_chip_sku_id = reg & 0xFF;
 
-}
-
-static void tegra_set_chip_id(void)
-{
-	u32 id;
-
-	id = tegra_read_chipid();
-	tegra_chip_id = (id >> 8) & 0xff;
-}
-
-static void tegra_set_bct_strapping(void)
-{
-	u32 reg;
-
-#if defined(CONFIG_ARCH_TEGRA_12x_SOC)
-	reg = tegra_read_pmc_reg(STRAP_OPT);
-#else
-	reg = tegra_read_apb_misc_reg(STRAP_OPT);
-#endif
-	tegra_chip_bct_strapping = (reg & RAM_ID_MASK) >> RAM_CODE_SHIFT;
 }
 
 u32 tegra_get_fuse_opt_subrevision(void)
