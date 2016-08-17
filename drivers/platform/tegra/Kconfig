@@ -90,6 +90,12 @@ config TEGRA_CORE_VOLT_CAP
 	help
 	  Enable Tegra core voltage cap support.
 
+config TEGRA_BOND_OUT
+	bool "Tegra bond out support"
+	default n
+	help
+	  Enable Tegra bond out support
+
 config TEGRA_BOARD_COMMON
 	bool "Tegra common board support"
 	default y

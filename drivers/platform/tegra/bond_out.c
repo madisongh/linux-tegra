@@ -35,6 +35,7 @@ EXPORT_SYMBOL(tegra_bonded_out_dev);
 
 bool tegra_bonded_out_dev(enum tegra_bondout_dev dev)
 {
+#ifdef CONFIG_TEGRA_BOND_OUT
 	void __iomem *clk_base = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 	u32 index, offset, reg;
 	u32 bondout_offset[] = {
@@ -51,5 +52,8 @@ bool tegra_bonded_out_dev(enum tegra_bondout_dev dev)
 	offset = dev & 0x1f;
 	reg = readl_relaxed(clk_base + bondout_offset[index]);
 	return reg & (1 << offset);
+#else
+	return false;
+#endif
 }
 
