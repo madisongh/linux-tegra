@@ -378,8 +378,8 @@ static int tegra_pinctrl_gpio_set_direction(struct pinctrl_dev *pctldev,
 	return ret;
 }
 
-void tegra_pinctrl_gpio_disable_free(struct pinctrl_dev *pctldev,
-		struct pinctrl_gpio_range *range, unsigned offset)
+static void tegra_pinctrl_gpio_disable_free(struct pinctrl_dev *pctldev,
+	struct pinctrl_gpio_range *range, unsigned offset)
 {
 	struct tegra_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
 	unsigned group;
