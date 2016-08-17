@@ -76,3 +76,5 @@ obj-$(CONFIG_NVS_DFSH)		+= nvs-dfsh/
 obj-$(CONFIG_SAF775x_HWDEP)	+= saf775x/
 obj-$(CONFIG_SAF36XX_HWDEP) += saf775x/
 obj-$(CONFIG_TEGRA_PROFILER)	+= tegra-profiler/
+
+GCOV_PROFILE_cpuload.o := y
