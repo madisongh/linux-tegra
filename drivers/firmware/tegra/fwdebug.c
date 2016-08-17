@@ -528,7 +528,7 @@ int bpmp_fwdebug_init(struct dentry *root)
 {
 	dma_addr_t phys;
 	void *virt;
-	const int sz = SZ_128K;
+	const int sz = SZ_256K;
 	int ret;
 
 	if (WARN_ON(!root))
