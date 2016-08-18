@@ -70,18 +70,37 @@ static ssize_t tegrafw_read_denver(struct device *dev,
 	return v - version;
 }
 
-/* FIXME: the array size is specified explicitly */
-static struct device *firmwares[10];
+#define FIRMWARES_SIZE  10
+static struct device *firmwares[FIRMWARES_SIZE];
+#define check_out_of_bounds(dev, err) \
+	if ((dev) - firmwares >= ARRAY_SIZE(firmwares)) { \
+		pr_err("Cannot register 'legacy' firmware info: increase " \
+			"firmwares array size"); \
+		return (err); \
+	}
 
 static int __init tegra_firmwares_init(void)
 {
 	struct device **dev = firmwares;
+	char *versions[] = { "mb1", "mb2", "mb1-bct", "qb", "osl" };
+	int v;
 
+	check_out_of_bounds(dev, 0);
 	*dev++ = tegrafw_register("MTS", TFW_NORMAL, tegrafw_read_denver, NULL);
+
+	check_out_of_bounds(dev, 0);
 	*dev++ = tegrafw_register("trusty", TFW_DONT_CACHE,
 				tegrafw_read_trusty, NULL);
+
+	check_out_of_bounds(dev, 0);
 	*dev++ = tegrafw_register("APE", TFW_DONT_CACHE,
 				tegrafw_read_adsp, NULL);
+
+	for (v = 0; v < ARRAY_SIZE(versions); v++) {
+		check_out_of_bounds(dev, 0);
+		*dev++ = tegrafw_register_dt_string(versions[v],
+			"/tegra-firmwares", versions[v]);
+	}
 	return 0;
 }
 
