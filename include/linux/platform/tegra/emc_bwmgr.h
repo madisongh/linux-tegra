@@ -108,6 +108,15 @@ unsigned long tegra_bwmgr_get_emc_rate(void);
 unsigned long tegra_bwmgr_get_max_emc_rate(void);
 
 /**
+ * tegra_bwmgr_get_core_emc_rate - get the actual emc frequency calculated
+ *			using the dram frequency and emc_to_dram
+ *			conversion factor.
+ *
+ * Returns the core emc rate in Hz.
+ */
+unsigned long tegra_bwmgr_get_core_emc_rate(void);
+
+/**
  * tegra_bwmgr_round_rate - round up to next EMC rate which can be provided
  *
  * @bw		Input rate
@@ -232,6 +241,10 @@ static inline unsigned long tegra_bwmgr_get_max_emc_rate(void)
 	return clk_round_rate(bwmgr_emc_clk, LONG_MAX);
 }
 
+static inline unsigned long tegra_bwmgr_get_core_emc_rate(void)
+{
+	return 0;
+}
 static inline unsigned long tegra_bwmgr_round_rate(unsigned long bw)
 {
 	static struct clk *bwmgr_emc_clk;
