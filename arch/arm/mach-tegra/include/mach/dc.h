@@ -1022,6 +1022,7 @@ struct tegra_dc_win {
 	} syncpt;
 
 	bool		is_scaler_coeff_set;
+	bool		color_expand_enable;
 };
 
 #define TEGRA_WIN_PPFLAG_CP_ENABLE	(1 << 0) /* enable RGB color lut */
