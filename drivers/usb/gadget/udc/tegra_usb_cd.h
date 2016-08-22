@@ -18,6 +18,7 @@
 
 #include <linux/phy/phy.h>
 #include <linux/usb/tegra_usb_charger.h>
+#include <linux/wakelock.h>
 
 /* Charger current limits, as per BC1.2 spec */
 #define USB_CHARGING_DCP_CURRENT_LIMIT_UA 1500000u
@@ -65,6 +66,11 @@ struct tegra_usb_cd {
 
 struct tegra_usb_cd_soc_data {
 	int (*init_hw_ops)(struct tegra_usb_cd *ucd);
+};
+
+struct vbus_lock {
+	struct wake_lock wakelock;
+	bool held;
 };
 
 #ifdef CONFIG_ARCH_TEGRA_18x_SOC

@@ -29,6 +29,38 @@
 
 #include "tegra_usb_cd.h"
 
+static bool vbus_wakelock = true;
+static DEFINE_SPINLOCK(wl_spinlock);
+static struct vbus_lock lock;
+
+static void vbus_hold_wl(struct vbus_lock *lock)
+{
+	if (!lock->held) {
+		wake_lock(&lock->wakelock);
+		lock->held = true;
+		pr_debug("[hold VBUS wakelock]\n");
+	}
+}
+
+#define TEMPORARY_WAKELOCK_HOLD_TIME	2000
+static void vbus_hold_temp_wl(struct vbus_lock *lock)
+{
+	wake_lock_timeout(&lock->wakelock,
+			  msecs_to_jiffies(TEMPORARY_WAKELOCK_HOLD_TIME));
+	lock->held = false;
+	pr_debug("[hold temporary VBUS wakelock for %d ms]\n",
+		 TEMPORARY_WAKELOCK_HOLD_TIME);
+}
+
+static void vbus_drop_wl(struct vbus_lock *lock)
+{
+	if (lock->held) {
+		wake_unlock(&lock->wakelock);
+		lock->held = false;
+		pr_debug("[drop VBUS wakelock]\n");
+	}
+}
+
 static const unsigned int tegra_usb_cd_extcon_cable[] = {
 	CONNECT_TYPE_SDP, /* USB */
 	CONNECT_TYPE_DCP, /* TA */
@@ -42,7 +74,31 @@ static const unsigned int tegra_usb_cd_extcon_cable[] = {
 	CONNECT_TYPE_NONE,
 };
 
-static void tegra_usb_cd_set_extcon_state(struct tegra_usb_cd *ucd)
+static void tegra_usb_cd_update_wakelock(struct tegra_usb_cd *ucd)
+{
+	unsigned long flags;
+
+	if (!vbus_wakelock)
+		return;
+
+	spin_lock_irqsave(&wl_spinlock, flags);
+
+	switch (ucd->connect_type) {
+	case CONNECT_TYPE_SDP:
+	case CONNECT_TYPE_CDP:
+		vbus_hold_wl(&lock);
+		break;
+	case CONNECT_TYPE_NONE:
+		vbus_drop_wl(&lock);
+		break;
+	default:
+		vbus_hold_temp_wl(&lock);
+	};
+
+	spin_unlock_irqrestore(&wl_spinlock, flags);
+}
+
+static void tegra_usb_cd_update_charging_extcon_state(struct tegra_usb_cd *ucd)
 {
 	struct extcon_dev *edev = ucd->edev;
 	u32 old_state, new_state;
@@ -75,7 +131,7 @@ static int tegra_usb_cd_set_current_limit(struct tegra_usb_cd *ucd, int max_ua)
 	return ret;
 }
 
-static int tegra_usb_cd_set_charging_current(struct tegra_usb_cd *ucd)
+static int tegra_usb_cd_update_charging_current(struct tegra_usb_cd *ucd)
 {
 	int max_ua = 0, ret = 0;
 
@@ -154,7 +210,7 @@ static enum tegra_usb_connect_type
 			ucd->connect_type = CONNECT_TYPE_DCP_MAXIM;
 		else if (ucd->qc2_voltage) {
 			ucd->connect_type = CONNECT_TYPE_NON_STANDARD_CHARGER;
-			tegra_usb_cd_set_charging_current(ucd);
+			tegra_usb_cd_update_charging_current(ucd);
 			if (ucd->hw_ops->qc2_cd &&
 				ucd->hw_ops->qc2_cd(ucd))
 				ucd->connect_type = CONNECT_TYPE_DCP_QC2;
@@ -176,8 +232,9 @@ static enum tegra_usb_connect_type
 
 	ucd->hw_ops->power_off(ucd);
 
-	tegra_usb_cd_set_extcon_state(ucd);
-	tegra_usb_cd_set_charging_current(ucd);
+	tegra_usb_cd_update_charging_extcon_state(ucd);
+	tegra_usb_cd_update_charging_current(ucd);
+	tegra_usb_cd_update_wakelock(ucd);
 
 	return ucd->connect_type;
 }
@@ -188,9 +245,13 @@ static enum tegra_usb_connect_type
 void tegra_ucd_set_charger_type(struct tegra_usb_cd *ucd,
 				enum tegra_usb_connect_type connect_type)
 {
+	if (ucd == NULL)
+		return;
+
 	ucd->connect_type = connect_type;
-	tegra_usb_cd_set_extcon_state(ucd);
-	tegra_usb_cd_set_charging_current(ucd);
+	tegra_usb_cd_update_charging_extcon_state(ucd);
+	tegra_usb_cd_update_charging_current(ucd);
+	tegra_usb_cd_update_wakelock(ucd);
 }
 EXPORT_SYMBOL_GPL(tegra_ucd_set_charger_type);
 
@@ -256,7 +317,7 @@ void tegra_ucd_set_sdp_cdp_current(struct tegra_usb_cd *ucd, int current_ma)
 	}
 
 	ucd->sdp_cdp_current_limit_ma = current_ma;
-	tegra_usb_cd_set_charging_current(ucd);
+	tegra_usb_cd_update_charging_current(ucd);
 }
 EXPORT_SYMBOL_GPL(tegra_ucd_set_sdp_cdp_current);
 
@@ -329,7 +390,7 @@ static int tegra_usb_cd_probe(struct platform_device *pdev)
 		return PTR_ERR(ucd->edev);
 	}
 
-	err = extcon_dev_register(ucd->edev);
+	err = devm_extcon_dev_register(&pdev->dev, ucd->edev);
 	if (err) {
 		dev_err(&pdev->dev, "failed to register extcon device\n");
 		return err;
@@ -355,6 +416,8 @@ static int tegra_usb_cd_probe(struct platform_device *pdev)
 		return err;
 	}
 
+	wake_lock_init(&lock.wakelock, WAKE_LOCK_SUSPEND, "vbus-wakelock");
+
 	return 0;
 }
 
@@ -371,8 +434,7 @@ static int tegra_usb_cd_remove(struct platform_device *pdev)
 	if (ucd->hw_ops != NULL && ucd->hw_ops->close)
 		ucd->hw_ops->close(ucd);
 
-	if (ucd->edev != NULL)
-		extcon_dev_unregister(ucd->edev);
+	wake_lock_destroy(&lock.wakelock);
 
 	return 0;
 }
@@ -399,6 +461,34 @@ static void __exit tegra_usb_cd_exit(void)
 
 device_initcall(tegra_usb_cd_init);
 module_exit(tegra_usb_cd_exit);
+
+static int set_vbus_wakelock(const char *val, const struct kernel_param *kp)
+{
+	int rv = param_set_bool(val, kp);
+	unsigned long flags;
+
+	if (rv)
+		return rv;
+
+	/* release wakelock if held */
+	if (!*(bool *)kp->arg) {
+		spin_lock_irqsave(&wl_spinlock, flags);
+		vbus_drop_wl(&lock);
+		spin_unlock_irqrestore(&wl_spinlock, flags);
+	}
+
+	return 0;
+}
+
+static struct kernel_param_ops vbus_wakelock_param_ops = {
+	.set = set_vbus_wakelock,
+	.get = param_get_bool,
+};
+
+module_param_cb(vbus_wakelock, &vbus_wakelock_param_ops, &vbus_wakelock,
+		S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(vbus_wakelock,
+		 "enable wakelock when detected as USB downstream port");
 
 MODULE_DESCRIPTION("Tegra USB charger detection driver");
 MODULE_AUTHOR("Rakesh Babu Bodla <rbodla@nvidia.com>");
