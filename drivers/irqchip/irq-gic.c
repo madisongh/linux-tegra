@@ -79,7 +79,6 @@ union gic_base {
 struct gic_chip_data {
 	union gic_base dist_base;
 	union gic_base cpu_base;
-#ifdef CONFIG_CPU_PM
 	struct notifier_block pm_notifier_block;
 	u32 saved_spi_enable[DIV_ROUND_UP(1020, 32)];
 	u32 saved_spi_active[DIV_ROUND_UP(1020, 32)];
@@ -89,7 +88,6 @@ struct gic_chip_data {
 	u32 __percpu *saved_ppi_enable;
 	u32 __percpu *saved_ppi_active;
 	u32 __percpu *saved_ppi_conf;
-#endif
 	struct irq_domain *domain;
 	unsigned int gic_irqs;
 #ifdef CONFIG_GIC_NON_BANKED
@@ -157,9 +155,7 @@ static inline void gic_set_base_accessor(struct gic_chip_data *data,
 
 static struct gic_chip_data *tegra_agic;
 static bool tegra_agic_suspended;
-#ifdef CONFIG_CPU_PM
 static int gic_notifier(struct notifier_block *, unsigned long, void *);
-#endif
 
 bool tegra_agic_irq_is_pending(int irq)
 {
@@ -302,7 +298,6 @@ int tegra_agic_route_interrupt(int irq, enum tegra_agic_cpu cpu)
 }
 EXPORT_SYMBOL_GPL(tegra_agic_route_interrupt);
 
-#ifdef CONFIG_CPU_PM
 void tegra_agic_save_registers(void)
 {
 	BUG_ON(!tegra_agic);
@@ -320,7 +315,6 @@ void tegra_agic_restore_registers(void)
 			MOD_DOMAIN_POWER_ON, NULL);
 }
 EXPORT_SYMBOL_GPL(tegra_agic_restore_registers);
-#endif
 #endif
 
 static inline bool gic_data_fiq_enable(struct gic_chip_data *data)
@@ -907,7 +901,6 @@ int gic_cpu_if_down(unsigned int gic_nr)
 	return 0;
 }
 
-#ifdef CONFIG_CPU_PM
 /*
  * Saves the GIC distributor registers during suspend or idle.  Must be called
  * with interrupts disabled but before powering down the GIC.  After calling
@@ -1158,14 +1151,11 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
 
 	gic->pm_notifier_block.notifier_call = gic_notifier;
 
+#ifdef CONFIG_CPU_PM
 	if (gic->is_percpu)
 		cpu_pm_register_notifier(&gic->pm_notifier_block);
-}
-#else
-static void __init gic_pm_init(struct gic_chip_data *gic)
-{
-}
 #endif
+}
 
 #ifdef CONFIG_SMP
 static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
