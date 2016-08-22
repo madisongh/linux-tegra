@@ -718,9 +718,14 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 			sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 			/* power up / active state */
 			vendor_trim_clear_sel_vreg(sdhci, true);
-			if (tegra_host->emc_clk)
-				tegra_bwmgr_set_emc(tegra_host->emc_clk,
+			if (tegra_host->emc_clk) {
+				ret = tegra_bwmgr_set_emc(tegra_host->emc_clk,
 				SDMMC_EMC_MAX_FREQ, TEGRA_BWMGR_SET_EMC_SHARED_BW);
+				if (ret)
+					dev_err(mmc_dev(sdhci->mmc),
+					"enabling eMC clock failed, ret: %d\n",
+					ret);
+			}
 		}
 		tegra_sdhci_set_clk_rate(sdhci, clock);
 		sdhci_set_clock(sdhci, clock);
@@ -732,9 +737,13 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 		sdhci_writeb(sdhci, vendor_ctrl, SDHCI_VNDR_CLK_CTRL);
 		clk_disable_unprepare(pltfm_host->clk);
 		tegra_host->clk_enabled = false;
-		if (tegra_host->emc_clk)
-			tegra_bwmgr_set_emc(tegra_host->emc_clk, 0,
+		if (tegra_host->emc_clk) {
+			ret = tegra_bwmgr_set_emc(tegra_host->emc_clk, 0,
 				TEGRA_BWMGR_SET_EMC_SHARED_BW);
+			if (ret)
+				dev_err(mmc_dev(sdhci->mmc),
+				"disabling eMC clock failed, ret: %d\n", ret);
+		}
 	}
 	mutex_unlock(&tegra_host->set_clock_mutex);
 }
