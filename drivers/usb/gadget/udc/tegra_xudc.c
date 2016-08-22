@@ -530,7 +530,7 @@ struct tegra_xudc {
 	/* charger detection */
 	struct tegra_usb_cd *ucd;
 	enum tegra_usb_connect_type connect_type;
-#define NON_STD_CHARGER_DET_TIME_MS 1000
+#define NON_STD_CHARGER_DET_TIME_MS 2000
 #define USB_ANDROID_SUSPEND_CURRENT_MA 2
 	struct work_struct set_charging_current_work;
 	struct delayed_work non_std_charger_work;
@@ -634,6 +634,7 @@ static inline void dump_trb(struct tegra_xudc *xudc, const char *type,
 static void tegra_xudc_device_mode_on(struct tegra_xudc *xudc)
 {
 	unsigned long flags;
+	enum tegra_usb_connect_type type;
 
 	spin_lock_irqsave(&xudc->lock, flags);
 	if (xudc->device_mode) {
@@ -644,11 +645,14 @@ static void tegra_xudc_device_mode_on(struct tegra_xudc *xudc)
 
 	/* charger detection should be done when b_idle->b_peripheral only */
 	if (xudc->ucd && !xudc->gadget.is_a_peripheral) {
-		xudc->connect_type =
-			tegra_ucd_detect_cable_and_set_current(xudc->ucd);
-		if (xudc->connect_type == CONNECT_TYPE_SDP)
+		type = tegra_ucd_detect_cable_and_set_current(xudc->ucd);
+
+		spin_lock_irqsave(&xudc->lock, flags);
+		xudc->connect_type = type;
+		if (xudc->connect_type == CONNECT_TYPE_SDP && xudc->pullup)
 			schedule_delayed_work(&xudc->non_std_charger_work,
 				msecs_to_jiffies(NON_STD_CHARGER_DET_TIME_MS));
+		spin_unlock_irqrestore(&xudc->lock, flags);
 	}
 
 	pm_runtime_get_sync(xudc->dev);
@@ -677,6 +681,7 @@ static void tegra_xudc_device_mode_off(struct tegra_xudc *xudc)
 	dev_info(xudc->dev, "device mode off\n");
 
 	if (xudc->ucd) {
+		xudc->connect_type = CONNECT_TYPE_NONE;
 		cancel_delayed_work(&xudc->non_std_charger_work);
 		xudc->current_ma = 0;
 	}
@@ -713,6 +718,9 @@ static void tegra_xudc_device_mode_off(struct tegra_xudc *xudc)
 
 	/* Make sure interrupt handler has completed before powergating. */
 	synchronize_irq(xudc->irq);
+
+	if (xudc->ucd)
+		tegra_ucd_set_charger_type(xudc->ucd, CONNECT_TYPE_NONE);
 
 	pm_runtime_put(xudc->dev);
 }
@@ -1869,6 +1877,10 @@ static int tegra_xudc_gadget_pullup(struct usb_gadget *gadget, int is_on)
 		xudc_writel(xudc, val, CTRL);
 	}
 	xudc->pullup = is_on;
+	if (xudc->ucd && xudc->device_mode &&
+	    xudc->connect_type == CONNECT_TYPE_SDP && is_on)
+		schedule_delayed_work(&xudc->non_std_charger_work,
+			msecs_to_jiffies(NON_STD_CHARGER_DET_TIME_MS));
 	spin_unlock_irqrestore(&xudc->lock, flags);
 	pm_runtime_put(xudc->dev);
 
@@ -3276,10 +3288,15 @@ static void tegra_xudc_non_std_charger_work(struct work_struct *work)
 	struct delayed_work *dwork = to_delayed_work(work);
 	struct tegra_xudc *xudc = container_of(dwork, struct tegra_xudc,
 					       non_std_charger_work);
+	unsigned long flags;
 
-	if (xudc->ucd)
+	if (xudc->ucd) {
+		spin_lock_irqsave(&xudc->lock, flags);
+		xudc->connect_type = CONNECT_TYPE_NON_STANDARD_CHARGER;
+		spin_unlock_irqrestore(&xudc->lock, flags);
 		tegra_ucd_set_charger_type(xudc->ucd,
 					   CONNECT_TYPE_NON_STANDARD_CHARGER);
+	}
 }
 
 static const char * const tegra210_xudc_supply_names[] = {
@@ -3548,6 +3565,7 @@ static int tegra_xudc_probe(struct platform_device *pdev)
 				  tegra_xudc_set_charging_current_work);
 			INIT_DELAYED_WORK(&xudc->non_std_charger_work,
 					  tegra_xudc_non_std_charger_work);
+			xudc->connect_type = CONNECT_TYPE_NONE;
 		}
 	}
 
