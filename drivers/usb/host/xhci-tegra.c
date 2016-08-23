@@ -2493,6 +2493,7 @@ static int tegra_xhci_powergate(struct tegra_xhci_hcd *tegra, bool runtime)
 			if (i == UTMI_PHY) {
 				offset = tegra->soc_config->utmi_port_offset;
 				speed = port_speed(tegra, offset + j);
+				tegra_phy_xusb_utmi_pad_power_down(phy);
 			}
 
 			if (i == HSIC_PHY)
