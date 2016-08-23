@@ -39,6 +39,7 @@
 #include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/i2c-mux.h>
+#include <linux/regulator/consumer.h>
 #include <linux/i2c/pca954x.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -63,6 +64,8 @@ struct pca954x {
 	struct i2c_adapter *virt_adaps[PCA954X_MAX_NCHANS];
 
 	u8 last_chan;		/* last register value */
+	struct regulator *lp_reg;
+	const char *lp_reg_name;
 };
 
 struct chip_desc {
@@ -202,6 +205,27 @@ static int pca954x_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	i2c_set_clientdata(client, data);
+
+	if (client->dev.of_node) {
+		ret = of_property_read_string(client->dev.of_node, "vcc_lp",
+					&data->lp_reg_name);
+		if (!ret) {
+			data->lp_reg = devm_regulator_get(&client->dev,
+							data->lp_reg_name);
+			if (IS_ERR(data->lp_reg)) {
+				dev_info(&client->dev, "lp_reg get fail\n");
+				return -ENOMEM;
+			}
+
+			ret = regulator_enable(data->lp_reg);
+			if (ret) {
+				dev_err(&client->dev, "%s: lp_reg failed to enable\n",
+					__func__);
+				return -ENOMEM;
+			}
+		} else
+			data->lp_reg_name = NULL;
+	}
 
 	/* Get the mux out of reset if a reset GPIO is specified. */
 	gpio = devm_gpiod_get_optional(&client->dev, "reset", GPIOD_OUT_LOW);
