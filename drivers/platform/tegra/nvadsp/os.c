@@ -1490,9 +1490,12 @@ void nvadsp_get_os_version(char *buf, int buf_size)
 
 	drv_data = platform_get_drvdata(priv.pdev);
 	shared_mem = drv_data->shared_adsp_os_data;
-	os_info = &shared_mem->os_info;
-
-	strlcpy(buf, os_info->version, buf_size);
+	if (shared_mem) {
+		os_info = &shared_mem->os_info;
+		strlcpy(buf, os_info->version, buf_size);
+	} else {
+		strlcpy(buf, "unavailable", buf_size);
+	}
 }
 EXPORT_SYMBOL(nvadsp_get_os_version);
 
