@@ -79,10 +79,10 @@ static void tegra18x_usb_vbus_pad_protection(struct tegra_usb_cd *ucd,
 			ucd->current_limit_ma <= 899)
 		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 0);
 	else if (ucd->current_limit_ma >= 900 &&
-			ucd->current_limit_ma >= 1499)
+			ucd->current_limit_ma <= 1499)
 		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 1);
 	else if (ucd->current_limit_ma >= 1500 &&
-			ucd->current_limit_ma >= 1999)
+			ucd->current_limit_ma <= 1999)
 		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 2);
 	else if (ucd->current_limit_ma >= 2000)
 		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 3);

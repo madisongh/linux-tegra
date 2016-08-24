@@ -684,6 +684,7 @@ static void tegra_xudc_device_mode_off(struct tegra_xudc *xudc)
 		xudc->connect_type = CONNECT_TYPE_NONE;
 		cancel_delayed_work(&xudc->non_std_charger_work);
 		xudc->current_ma = 0;
+		schedule_work(&xudc->set_charging_current_work);
 	}
 
 	connected = !!(xudc_readl(xudc, PORTSC) & PORTSC_CCS);
