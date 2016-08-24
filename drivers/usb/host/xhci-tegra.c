@@ -2409,6 +2409,7 @@ static int tegra_xhci_wait_for_ports_enter_u3(struct tegra_xhci_hcd *tegra)
 	writel(usbcmd, &xhci->op_regs->command);
 
 	for (i = 0; i < num_ports; i++) {
+		bool is_busy = true;
 		char devname[16];
 		u32 portsc = read_portsc(tegra, i);
 
@@ -2419,11 +2420,32 @@ static int tegra_xhci_wait_for_ports_enter_u3(struct tegra_xhci_hcd *tegra)
 			continue;
 
 		get_rootport_name(tegra, i, devname, sizeof(devname));
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+		if (DEV_SUPERSPEED(portsc)) {
+			unsigned long end = jiffies + msecs_to_jiffies(200);
+			while (time_before(jiffies, end)) {
+				if ((portsc & PORT_PLS_MASK) == XDEV_RESUME)
+					break;
+				spin_unlock_irqrestore(&xhci->lock, flags);
+				msleep(20);
+				spin_lock_irqsave(&xhci->lock, flags);
 
-		dev_info(dev, "%s is not suspended: %08x\n", devname,
-			portsc);
-		ret = -EBUSY;
-		break;
+				portsc = read_portsc(tegra, i);
+				if ((portsc & PORT_PLS_MASK) == XDEV_U3) {
+					dev_info(dev, "%s is suspended\n",
+						devname);
+					is_busy = false;
+					break;
+				}
+			}
+		}
+#endif
+		if (is_busy) {
+			dev_info(dev, "%s is not suspended: %08x\n", devname,
+				portsc);
+			ret = -EBUSY;
+			break;
+		}
 	}
 
 	spin_unlock_irqrestore(&xhci->lock, flags);
