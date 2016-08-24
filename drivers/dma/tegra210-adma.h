@@ -151,6 +151,21 @@
 #define TEGRA_ADMA_STATUS_COUNT_MASK		0xFFFC
 #define CH_REG_SIZE	0x80
 
+#define ADMA_GLOBAL_CG_DISABLE		0x00
+#define ADMA_GLOBAL_CG_ENABLE		0x07
+/* Share Semaphore registers */
+#define AMISC_SHRD_SMP_STA		0x1c
+#define AMISC_SHRD_SMP_STA_SET		0x20
+#define AMISC_SHRD_SMP_STA_CLR		0x24
+#define SHRD_SMP_STA			AMISC_SHRD_SMP_STA
+#define SHRD_SMP_STA_SET		AMISC_SHRD_SMP_STA_SET
+#define SHRD_SMP_STA_CLR		AMISC_SHRD_SMP_STA_CLR
+/* Make sure ADSP using 2nd SMP bit */
+#define ADMA_SHRD_SMP_CPU		0x1
+#define ADMA_SHRD_SMP_ADSP		0x2
+#define ADMA_SHRD_SMP_BITS		(ADMA_SHRD_SMP_CPU | ADMA_SHRD_SMP_ADSP)
+#define ADMA_SHRD_SEM_WAIT_COUNT	50
+
 enum tegra_adma_fetching_policy {
 	BURST_BASED = 0,
 	THRESHOLD_BASED = 1,
@@ -159,6 +174,9 @@ enum tegra_adma_fetching_policy {
 enum tegra_adma_addr {
 	ADDR1,
 	GLOBAL_REG,
+#if defined(CONFIG_TEGRA_ADMA_WAR)
+	SHRD_SMP_REG,
+#endif
 	ADMA_MAX_ADDR,
 };
 enum tegra_adma_burst_size {

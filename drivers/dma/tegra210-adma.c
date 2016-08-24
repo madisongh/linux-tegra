@@ -374,6 +374,33 @@ static void tegra_adma_stop(struct tegra_adma_chan *tdc)
 	tdc->busy = false;
 }
 
+#if defined(CONFIG_TEGRA_ADMA_WAR)
+static void adsp_shrd_sem_wait(struct tegra_adma_chan *tdc)
+{
+	int val, count = ADMA_SHRD_SEM_WAIT_COUNT;
+
+	/* Acquire Semaphore */
+	writel(ADMA_SHRD_SMP_CPU, tdc->tdma->adma_addr[SHRD_SMP_REG] +
+			SHRD_SMP_STA_SET);
+
+	do {
+		val = readl(tdc->tdma->adma_addr[SHRD_SMP_REG] + SHRD_SMP_STA);
+		val = val & ADMA_SHRD_SMP_BITS;
+		count--;
+	} while ((val != ADMA_SHRD_SMP_CPU) && count);
+
+	if (!count)
+		dev_warn(tdc2dev(tdc),
+			"ADSP Shared SMP waiting timeout, SMP = %x \n", val);
+}
+
+static void cpu_shrd_sem_release(struct tegra_adma_chan *tdc)
+{
+	writel(ADMA_SHRD_SMP_CPU, tdc->tdma->adma_addr[SHRD_SMP_REG] +
+			SHRD_SMP_STA_CLR);
+}
+#endif
+
 static void tegra_adma_start(struct tegra_adma_chan *tdc,
 		struct tegra_adma_sg_req *sg_req)
 {
@@ -393,7 +420,10 @@ static void tegra_adma_start(struct tegra_adma_chan *tdc,
 #if defined(CONFIG_TEGRA_ADMA_WAR)
 	if (tdc->tdma->is_virt == false) {
 		spin_lock(&tdc->tdma->global_lock);
-		global_write(tdc->tdma, ADMA_GLOBAL_CG, 0x0);
+		/* Wait for the ADSP semaphore to be cleared */
+		adsp_shrd_sem_wait(tdc);
+
+		global_write(tdc->tdma, ADMA_GLOBAL_CG, ADMA_GLOBAL_CG_DISABLE);
 	}
 #endif
 
@@ -402,7 +432,10 @@ static void tegra_adma_start(struct tegra_adma_chan *tdc,
 
 #if defined(CONFIG_TEGRA_ADMA_WAR)
 	if (tdc->tdma->is_virt == false) {
-		global_write(tdc->tdma, ADMA_GLOBAL_CG, 0x7);
+		global_write(tdc->tdma, ADMA_GLOBAL_CG, ADMA_GLOBAL_CG_ENABLE);
+		/* Clear CPU Semaphore */
+		cpu_shrd_sem_release(tdc);
+
 		spin_unlock(&tdc->tdma->global_lock);
 	}
 #endif
@@ -453,15 +486,22 @@ static void tegra_adma_configure_for_next(struct tegra_adma_chan *tdc,
 	channel_write(tdc, ADMA_CH_CONFIG, nsg_req->ch_regs.config);
 
 #if defined(CONFIG_TEGRA_ADMA_WAR)
-	if (tdc->tdma->is_virt == false)
-		global_write(tdc->tdma, ADMA_GLOBAL_CG, 0x0);
+	if (tdc->tdma->is_virt == false) {
+		/* Wait for the ADSP semaphore to be cleared */
+		adsp_shrd_sem_wait(tdc);
+
+		global_write(tdc->tdma, ADMA_GLOBAL_CG, ADMA_GLOBAL_CG_DISABLE);
+	}
 #endif
 
 	channel_write(tdc, ADMA_CH_CMD, 1);
 
 #if defined(CONFIG_TEGRA_ADMA_WAR)
-	if (tdc->tdma->is_virt == false)
-		global_write(tdc->tdma, ADMA_GLOBAL_CG, 0x7);
+	if (tdc->tdma->is_virt == false) {
+		global_write(tdc->tdma, ADMA_GLOBAL_CG, ADMA_GLOBAL_CG_ENABLE);
+		/* Clear CPU Semaphore */
+		cpu_shrd_sem_release(tdc);
+	}
 #endif
 
 	nsg_req->configured = true;
@@ -1300,7 +1340,15 @@ static int tegra_adma_probe(struct platform_device *pdev)
 			return -EINVAL;
 		}
 
-		tdma->adma_addr[i] = devm_ioremap_resource(&pdev->dev, res);
+#if defined(CONFIG_TEGRA_ADMA_WAR)
+		if (i == SHRD_SMP_REG)
+			tdma->adma_addr[i] = devm_ioremap_nocache(&pdev->dev,
+							  res->start,
+							  resource_size(res));
+		else
+#endif
+			tdma->adma_addr[i] =
+				devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(tdma->adma_addr[i]))
 			return PTR_ERR(tdma->adma_addr[i]);
 	}
