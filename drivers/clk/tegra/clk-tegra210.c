@@ -2309,7 +2309,6 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_nvdec] = { .dt_id = TEGRA210_CLK_NVDEC, .present = true },
 	[tegra_clk_nvenc] = { .dt_id = TEGRA210_CLK_NVENC, .present = true },
 	[tegra_clk_nvjpg] = { .dt_id = TEGRA210_CLK_NVJPG, .present = true },
-	[tegra_clk_pll_c4_out0] = { .dt_id = TEGRA210_CLK_PLL_C4_OUT0, .present = true },
 	[tegra_clk_pll_c4_out1] = { .dt_id = TEGRA210_CLK_PLL_C4_OUT1, .present = true },
 	[tegra_clk_pll_c4_out2] = { .dt_id = TEGRA210_CLK_PLL_C4_OUT2, .present = true },
 	[tegra_clk_pll_c4_out3] = { .dt_id = TEGRA210_CLK_PLL_C4_OUT3, .present = true },
@@ -2330,7 +2329,6 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_usbd_sclk] = { .dt_id = TEGRA210_CLK_USBD_SCLK, .present = true },
 	[tegra_clk_usb1_sclk] = { .dt_id = TEGRA210_CLK_USB1_SCLK, .present = true },
 	[tegra_clk_usb2_sclk] = { .dt_id = TEGRA210_CLK_USB2_SCLK, .present = true },
-	[tegra_clk_usb3_sclk] = { .dt_id = TEGRA210_CLK_USB3_SCLK, .present = true },
 	[tegra_clk_wake_sclk] = { .dt_id = TEGRA210_CLK_WAKE_SCLK, .present = true },
 	[tegra_clk_camera_sclk] = { .dt_id = TEGRA210_CLK_CAMERA_SCLK, .present = true },
 	[tegra_clk_mon_avp] = { .dt_id = TEGRA210_CLK_MON_AVP, .present = true },
@@ -2345,6 +2343,7 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_sbc4_sclk] = { .dt_id = TEGRA210_CLK_SBC4_SCLK, .present = true },
 	[tegra_clk_qspi_sclk] = { .dt_id = TEGRA210_CLK_QSPI_SCLK, .present = true },
 	[tegra_clk_boot_apb_sclk] = { .dt_id = TEGRA210_CLK_BOOT_APB_SCLK, .present = true },
+	[tegra_clk_sdmmc4_ahb_sclk] = { .dt_id = TEGRA210_CLK_SDMMC4_AHB_SCLK, .present = true },
 	[tegra_clk_avp_emc] = { .dt_id = TEGRA210_CLK_AVP_EMC, .present = true },
 	[tegra_clk_cpu_emc] = { .dt_id = TEGRA210_CLK_CPU_EMC, .present = true },
 	[tegra_clk_disp1_emc] = { .dt_id = TEGRA210_CLK_DISP1_EMC, .present = true },
@@ -2902,13 +2901,6 @@ static void __init tegra210_pll_init(void __iomem *clk_base,
 	clk_register_clkdev(clk, "pll_c4_vco", NULL);
 	clks[TEGRA210_CLK_PLL_C4] = clk;
 
-	/* PLLC4_OUT0 */
-	clk = clk_register_divider_table(NULL, "pll_c4_out0", "pll_c4_vco", 0,
-					 clk_base + PLLC4_BASE, 19, 4, 0,
-					 pll_vco_post_div_table, NULL);
-	clk_register_clkdev(clk, "pll_c4_out0", NULL);
-	clks[TEGRA210_CLK_PLL_C4_OUT0] = clk;
-
 	/* PLLC4_OUT1 */
 	clk = clk_register_fixed_factor(NULL, "pll_c4_out1", "pll_c4_vco",
 					CLK_SET_RATE_PARENT, 1, 3);
@@ -2965,9 +2957,13 @@ static void __init tegra210_pll_init(void __iomem *clk_base,
 static const char *cbus_parents[] = { "c2bus", "c3bus" };
 static const char *abus_parents[] = { "abus" };
 
-static __init void tegra210_shared_clk_init(void)
+static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 {
 	struct clk *clk;
+	struct tegra_clk_cbus_shared *sbus_cbus;
+
+	clk_set_rate(clks[TEGRA210_CLK_PLL_C4], pll_c4_vco_params.fixed_rate);
+	clk_set_rate(clks[TEGRA210_CLK_PLL_C4_OUT3], pll_c4_vco_params.fixed_rate);
 
 	clk = tegra_clk_register_cbus("c2bus", "pll_c2", 0, "pll_p", 0,
 					1000000000);
@@ -3018,16 +3014,17 @@ static __init void tegra210_shared_clk_init(void)
 		clk = clks[TEGRA210_CLK_SCLK_SKIPPER];
 		clk = tegra_clk_register_sbus_cmplx("sbus",
 				__clk_get_name(clk), "sclk_mux", "sclk", 0,
-				"pclk", "hclk", "pll_p_out2", "pll_c_out1",
-				108000000, 12000000, 384000000);
+				"pclk", "hclk", "pll_p", sclk_high_clk,
+				204000000, 12000000, 384000000);
 	} else {
 		clk = tegra_clk_register_sbus_cmplx("sbus", "sclk", "sclk_mux",
-				NULL, 0, "pclk", "hclk", "pll_p_out2",
-				"pll_c_out1", 108000000, 12000000,
+				NULL, 0, "pclk", "hclk", sclk_high_clk,
+				"pll_c_out1", 204000000, 12000000,
 				384000000);
 	}
 	clk_register_clkdev(clk, "sbus", NULL);
 	clks[TEGRA210_CLK_SBUS] = clk;
+	sbus_cbus = to_clk_cbus_shared(__clk_get_hw(clk));
 
 	clk = tegra_clk_register_shared_master("emc_master", "emc", 0,
 						12750000, 1800000000);
@@ -3049,7 +3046,68 @@ static __init void tegra210_shared_clk_init(void)
 						12000000, 408000000);
 	clks[TEGRA210_CLK_APE_MASTER] = clk;
 
+	clk = tegra_clk_register_cascade_master("ahb.sclk", "sbus", NULL, 0);
+
+	clks[TEGRA210_CLK_AHB_SCLK] = clk;
+	sbus_cbus->u.system.ahb_bus = __clk_get_hw(clk);
+
+	clk = tegra_clk_register_cascade_master("apb.sclk", "ahb.sclk",
+						"sbus", 0);
+
+	clks[TEGRA210_CLK_APB_SCLK] = clk;
+	sbus_cbus->u.system.apb_bus = __clk_get_hw(clk);
+
 	tegra_shared_clk_init(tegra210_clks);
+}
+
+static char *tegra210_determine_pllc4_rate(void)
+{
+	struct device_node *node;
+	u32 val;
+	int out0_ratio, i;
+	unsigned long sdmmc_max_rate = 0;
+	struct clk *clk;
+	char *sclk_high_clk;
+
+	for_each_compatible_node(node, NULL, "nvidia,tegra210-sdhci") {
+		if (!of_device_is_available(node))
+			continue;
+
+		if (!of_property_read_u32(node, "max-clk-limit", &val)
+			&& val > sdmmc_max_rate)
+			sdmmc_max_rate = val;
+	}
+
+	switch (sdmmc_max_rate) {
+		case 266000000:
+			sclk_high_clk = "pll_c4_out1";
+			pll_c4_vco_params.fixed_rate = 798000000;
+			out0_ratio = 4;
+			break;
+		default:
+			sclk_high_clk = "pll_c4_out3";
+			pll_c4_vco_params.fixed_rate = 1000000000;
+			out0_ratio = 1;
+			break;
+	}
+
+	pll_c4_vco_params.fixed_rate /= pll_ref_freq;
+	pll_c4_vco_params.fixed_rate *= pll_ref_freq;
+	pll_c4_vco_params.flags |= TEGRA_PLL_FIXED;
+
+	val = readl(clk_base + PLLC4_BASE);
+	for (i = 0; i < ARRAY_SIZE(pll_vco_post_div_table); i++)
+		if (pll_vco_post_div_table[i].div >= out0_ratio)
+			break;
+	val &= ~GENMASK(23, 19);
+	val |= pll_vco_post_div_table[i].val << 19;
+	writel(val, clk_base + PLLC4_BASE);
+
+	clk = clk_register_fixed_factor(NULL, "pll_c4_out0", "pll_c4_vco", 0,
+					1, pll_vco_post_div_table[i].div);
+	clks[TEGRA210_CLK_PLL_C4_OUT0] = clk;
+
+	return sclk_high_clk;
 }
 
 /* Tegra210 CPU clock and reset control functions */
@@ -3144,7 +3202,6 @@ static struct tegra_clk_init_table init_table[] __initdata = {
 	{ TEGRA210_CLK_PLL_DP, TEGRA210_CLK_CLK_MAX, 270000000, 0 },
 	{ TEGRA210_CLK_SOC_THERM, TEGRA210_CLK_PLL_P, 51000000, 0 },
 	{ TEGRA210_CLK_CCLK_G, TEGRA210_CLK_CLK_MAX, 0, 1 },
-	{ TEGRA210_CLK_PLL_C4, TEGRA210_CLK_CLK_MAX, 1000*1000*1000, 0 },
 	{ TEGRA210_CLK_ACLK, TEGRA210_CLK_PLL_A1, 0, 0 },
 	{ TEGRA210_CLK_TIMER, TEGRA210_CLK_CLK_MAX, 0, 1 },
 	/* This MUST be the last entry. */
@@ -3578,6 +3635,7 @@ static int tegra210_reset_deassert(unsigned long id)
 static void __init tegra210_clock_init(struct device_node *np)
 {
 	struct device_node *node;
+	char *sclk_high_clk;
 	u32 value, clk_m_div;
 
 	clk_base = of_iomap(np, 0);
@@ -3613,6 +3671,8 @@ static void __init tegra210_clock_init(struct device_node *np)
 			       &osc_freq, &pll_ref_freq) < 0)
 		return;
 
+	sclk_high_clk = tegra210_determine_pllc4_rate();
+
 	tegra_fixed_clk_init(tegra210_clks);
 	tegra210_pll_init(clk_base, pmc_base);
 	tegra210_periph_clk_init(clk_base, pmc_base);
@@ -3633,7 +3693,7 @@ static void __init tegra210_clock_init(struct device_node *np)
 	tegra_init_special_resets(1, tegra210_reset_assert,
 				tegra210_reset_deassert);
 
-	tegra210_shared_clk_init();
+	tegra210_shared_clk_init(sclk_high_clk);
 
 	tegra_add_of_provider(np);
 	tegra_register_devclks(devclks, ARRAY_SIZE(devclks));
