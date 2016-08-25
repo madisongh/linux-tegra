@@ -4,12 +4,12 @@ subdir-ccflags-y := -Werror
 #
 # Makefile for the video capture/playback device drivers.
 #
-obj-y				+= csi/
 ifndef CONFIG_ARCH_TEGRA_210_SOC
-obj-y				+= camera/
+obj-y	+= csi/
+obj-y	+= camera/
 endif
-obj-y				+= vi/
-obj-$(CONFIG_VIDEO_ISC)	+= auto/
+obj-y	+= vi/
+obj-$(CONFIG_VIDEO_ISC)		+= auto/
 obj-$(CONFIG_VIDEO_CAMERA)	+= regmap_util.o
 obj-$(CONFIG_VIDEO_TEGRA_VI_TPG) += tpg/
 
