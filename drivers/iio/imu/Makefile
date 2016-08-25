@@ -17,3 +17,4 @@ obj-y += inv_mpu6050/
 obj-$(CONFIG_KMX61) += kmx61.o
 obj-y += inv_mpu/
 obj-y += nvi_mpu/
+obj-y += tsfw_icm20628/
