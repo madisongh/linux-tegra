@@ -24,21 +24,29 @@ always		:= $(dtb-y)
 
 targets += dtbs
 
-DTC_FLAGS :=
-DTCCPP_FLAGS :=
+DTC_FLAGS := -i $(tegra-dtstree)/platform/tegra/common/kernel-dts
+DTCCPP_FLAGS := -I$(tegra-dtstree)/platform/tegra/common/kernel-dts
 
 ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
 DTC_FLAGS += -i $(srctree)/arch/arm64/boot/dts/nvidia
 DTC_FLAGS += -i $(srctree)/arch/arm64/boot/dts/nvidia/t210
+DTC_FLAGS += -i $(tegra-dtstree)/soc/t210/kernel-dts
+DTC_FLAGS += -i $(tegra-dtstree)/platform/t210/common/kernel-dts
 DTCCPP_FLAGS += -I$(srctree)/arch/arm64/boot/dts/nvidia
 DTCCPP_FLAGS += -I$(srctree)/arch/arm64/boot/dts/nvidia/t210
+DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t210/kernel-dts
+DTCCPP_FLAGS += -I$(tegra-dtstree)/platform/t210/common/kernel-dts
 endif
 
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
 DTC_FLAGS += -i $(srctree)/../t18x/include
 DTC_FLAGS += -i $(srctree)/../t18x/arch/arm64/boot/dts/nvidia/t18x
+DTC_FLAGS += -i $(tegra-dtstree)/soc/t18x/kernel-dts
+DTC_FLAGS += -i $(tegra-dtstree)/platform/t18x/common/kernel-dts
 DTCCPP_FLAGS += -I$(srctree)/../t18x/include
 DTCCPP_FLAGS += -I$(srctree)/../t18x/arch/arm64/boot/dts/nvidia/t18x
+DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t18x/kernel-dts
+DTCCPP_FLAGS += -I$(tegra-dtstree)/platform/t18x/common/kernel-dts
 endif
 
 ifeq ($(CONFIG_ARCH_TEGRA_19x_SOC),y)
