@@ -779,10 +779,17 @@ static int tegra_i2c_wait_for_config_load(struct tegra_i2c_dev *i2c_dev)
 		int err;
 
 		i2c_writel(i2c_dev, I2C_MSTR_CONFIG_LOAD, I2C_CONFIG_LOAD);
-		err = readx_poll_timeout(readl, i2c_dev->base +
-					 tegra_i2c_reg_addr(i2c_dev,
-					 I2C_CONFIG_LOAD), val, val == 0,
-					 1000, I2C_CONFIG_LOAD_TIMEOUT);
+		if (!in_atomic())
+			err = readx_poll_timeout(readl, i2c_dev->base +
+						tegra_i2c_reg_addr(i2c_dev,
+						I2C_CONFIG_LOAD), val, val == 0,
+						1000, I2C_CONFIG_LOAD_TIMEOUT);
+		else
+			err = readx_poll_timeout_atomic(readl, i2c_dev->base +
+						tegra_i2c_reg_addr(i2c_dev,
+						I2C_CONFIG_LOAD), val, val == 0,
+						1000, I2C_CONFIG_LOAD_TIMEOUT);
+
 		if (err) {
 			dev_warn(i2c_dev->dev,
 				 "timeout waiting for config load\n");
