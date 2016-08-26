@@ -856,6 +856,8 @@ static int pca953x_remove(struct i2c_client *client)
 		if (ret < 0)
 			dev_err(&client->dev, "%s failed, %d\n",
 					"teardown", ret);
+	} else {
+		ret = 0;
 	}
 
 	regulator_disable(chip->regulator);
