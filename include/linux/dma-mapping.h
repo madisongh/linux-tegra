@@ -33,11 +33,6 @@ struct dma_map_ops {
 			       enum dma_data_direction dir,
 			       struct dma_attrs *attrs);
 
-	dma_addr_t (*map_pages)(struct device *dev, struct page **pages,
-				  dma_addr_t dma_handle, size_t count,
-				  enum dma_data_direction dir,
-				  struct dma_attrs *attrs);
-
 	dma_addr_t (*map_page_at)(struct device *dev, struct page *page,
 				  dma_addr_t dma_handle,
 				  unsigned long offset, size_t size,
@@ -76,17 +71,8 @@ struct dma_map_ops {
 #ifdef ARCH_HAS_DMA_GET_REQUIRED_MASK
 	u64 (*get_required_mask)(struct device *dev);
 #endif
-	dma_addr_t (*iova_alloc)(struct device *dev, size_t size,
-				 struct dma_attrs *attrs);
 	dma_addr_t (*iova_alloc_at)(struct device *dev, dma_addr_t *dma_addr,
 				    size_t size, struct dma_attrs *attrs);
-	void (*iova_free)(struct device *dev, dma_addr_t addr, size_t size,
-			  struct dma_attrs *attrs);
-	size_t (*iova_get_free_total)(struct device *dev);
-	size_t (*iova_get_free_max)(struct device *dev);
-
-	phys_addr_t (*iova_to_phys)(struct device *dev, dma_addr_t iova);
-
 	int is_phys;
 };
 
@@ -323,7 +309,6 @@ static inline void *dma_alloc_writecombine(struct device *dev, size_t size,
 	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
 	return dma_alloc_attrs(dev, size, dma_addr, gfp, &attrs);
 }
-#define dma_alloc_wc dma_alloc_writecombine
 
 static inline void dma_free_writecombine(struct device *dev, size_t size,
 					 void *cpu_addr, dma_addr_t dma_addr)
@@ -332,7 +317,6 @@ static inline void dma_free_writecombine(struct device *dev, size_t size,
 	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
 	return dma_free_attrs(dev, size, cpu_addr, dma_addr, &attrs);
 }
-#define dma_free_wc dma_free_writecombine
 
 static inline int dma_mmap_writecombine(struct device *dev,
 					struct vm_area_struct *vma,
@@ -343,8 +327,6 @@ static inline int dma_mmap_writecombine(struct device *dev,
 	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
 	return dma_mmap_attrs(dev, vma, cpu_addr, dma_addr, size, &attrs);
 }
-#define dma_mmap_wc dma_mmap_writecombine
-
 #endif /* CONFIG_HAVE_DMA_ATTRS */
 
 #ifdef CONFIG_NEED_DMA_MAP_STATE

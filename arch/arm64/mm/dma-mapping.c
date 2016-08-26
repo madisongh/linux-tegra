@@ -1620,67 +1620,6 @@ static int pg_iommu_map_sg(struct dma_iommu_mapping *mapping, unsigned long iova
 	return err;
 }
 
-static size_t arm_iommu_iova_get_free_total(struct device *dev)
-{
-	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-	unsigned long flags;
-	size_t size = 0;
-	size_t start = 0;
-	int i;
-
-	BUG_ON(!dev);
-	BUG_ON(!mapping);
-
-	spin_lock_irqsave(&mapping->lock, flags);
-	for (i = 0; i < mapping->nr_bitmaps; i++) {
-		start = 0;
-
-		while (1) {
-			size_t end;
-
-			start = bitmap_find_next_zero_area(mapping->bitmaps[i],
-							   mapping->bits, start, 1, 0);
-			if (start > mapping->bits)
-				break;
-
-			end = find_next_bit(mapping->bitmaps[i], mapping->bits, start);
-			size += end - start;
-			start = end;
-		}
-	}
-	spin_unlock_irqrestore(&mapping->lock, flags);
-	return size << PAGE_SHIFT;
-}
-
-static size_t arm_iommu_iova_get_free_max(struct device *dev)
-{
-	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-	unsigned long flags;
-	size_t max_free = 0;
-	size_t start = 0;
-	int i;
-
-	spin_lock_irqsave(&mapping->lock, flags);
-	for (i = 0; i < mapping->nr_bitmaps; i++) {
-		start = 0;
-
-		while (1) {
-			size_t end;
-
-			start = bitmap_find_next_zero_area(mapping->bitmaps[i],
-							   mapping->bits, start, 1, 0);
-			if (start > mapping->bits)
-				break;
-
-			end = find_next_bit(mapping->bitmaps[i], mapping->bits, start);
-			max_free = max_t(size_t, max_free, end - start);
-			start = end;
-		}
-	}
-	spin_unlock_irqrestore(&mapping->lock, flags);
-	return max_free << PAGE_SHIFT;
-}
-
 static int extend_iommu_mapping(struct dma_iommu_mapping *mapping);
 
 static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
@@ -1836,14 +1775,6 @@ static dma_addr_t arm_iommu_iova_alloc_at(struct device *dev, dma_addr_t *iova,
 	return __alloc_iova_at(mapping, iova, size, attrs);
 }
 
-static dma_addr_t arm_iommu_iova_alloc(struct device *dev, size_t size,
-				       struct dma_attrs *attrs)
-{
-	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-
-	return __alloc_iova(mapping, size, attrs);
-}
-
 static inline void __free_iova(struct dma_iommu_mapping *mapping,
 			       dma_addr_t addr, size_t size,
 			       struct dma_attrs *attrs)
@@ -1882,14 +1813,6 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
 	spin_lock_irqsave(&mapping->lock, flags);
 	bitmap_clear(mapping->bitmaps[bitmap_index], start, count);
 	spin_unlock_irqrestore(&mapping->lock, flags);
-}
-
-static void arm_iommu_iova_free(struct device *dev, dma_addr_t addr,
-				size_t size, struct dma_attrs *attrs)
-{
-	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-
-	__free_iova(mapping, addr, size, attrs);
 }
 
 static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
@@ -2724,13 +2647,6 @@ int arm_iommu_mapping_error(struct device *dev, dma_addr_t dev_addr)
 	return dev_addr == DMA_ERROR_CODE;
 }
 
-static phys_addr_t arm_iommu_iova_to_phys(struct device *dev, dma_addr_t iova)
-{
-	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-
-	return iommu_iova_to_phys(mapping->domain, iova);
-}
-
 struct dma_map_ops iommu_ops = {
 	.alloc		= arm_iommu_alloc_attrs,
 	.free		= arm_iommu_free_attrs,
@@ -2749,13 +2665,7 @@ struct dma_map_ops iommu_ops = {
 	.sync_sg_for_cpu	= arm_iommu_sync_sg_for_cpu,
 	.sync_sg_for_device	= arm_iommu_sync_sg_for_device,
 
-	.iova_alloc		= arm_iommu_iova_alloc,
 	.iova_alloc_at		= arm_iommu_iova_alloc_at,
-	.iova_free		= arm_iommu_iova_free,
-	.iova_get_free_total	= arm_iommu_iova_get_free_total,
-	.iova_get_free_max	= arm_iommu_iova_get_free_max,
-
-	.iova_to_phys		= arm_iommu_iova_to_phys,
 
 	.dma_supported	= arm_dma_supported,
 };
@@ -2854,23 +2764,9 @@ static void __dummy_sync_sg_for_device(struct device *dev,
 				       enum dma_data_direction dir)
 { __dummy_common(); }
 
-static dma_addr_t __dummy_iova_alloc(struct device *dev, size_t size,
-				     struct dma_attrs *attrs)
-{ __dummy_common(); return DMA_ERROR_CODE; }
-
 static dma_addr_t __dummy_iova_alloc_at(struct device *dev, dma_addr_t *dma_addr,
 					size_t size, struct dma_attrs *attrs)
 { __dummy_common(); return DMA_ERROR_CODE; }
-
-static void __dummy_iova_free(struct device *dev, dma_addr_t addr, size_t size,
-			      struct dma_attrs *attrs)
-{ __dummy_common(); }
-
-static size_t __dummy_iova_get_free_total(struct device *dev)
-{ __dummy_common(); return 0; }
-
-static size_t __dummy_iova_get_free_max(struct device *dev)
-{ __dummy_common(); return 0; }
 
 static struct dma_map_ops __dummy_ops = {
 	.alloc		= __dummy_alloc_attrs,
@@ -2889,11 +2785,7 @@ static struct dma_map_ops __dummy_ops = {
 	.sync_sg_for_cpu	= __dummy_sync_sg_for_cpu,
 	.sync_sg_for_device	= __dummy_sync_sg_for_device,
 
-	.iova_alloc		= __dummy_iova_alloc,
 	.iova_alloc_at		= __dummy_iova_alloc_at,
-	.iova_free		= __dummy_iova_free,
-	.iova_get_free_total	= __dummy_iova_get_free_total,
-	.iova_get_free_max	= __dummy_iova_get_free_max,
 };
 
 void set_dummy_dma_ops(struct device *dev)
