@@ -99,7 +99,7 @@
 		power-gpios = <&gpio TEGRA_GPIO(C,6) 0 &gpio TEGRA_GPIO(BB,1) 0>;
 		uhs-mask = <0x7C>;
 		mmc-ocr-mask = <0x3>;
-		vqmmc-supply = <&vdd_dummy_1v8>;
+		vddio_sdmmc-supply = <&vdd_dummy_1v8>;
 		cap-sdio-irq;
 		disable-clock-gate;
 		status = "okay";
@@ -116,7 +116,7 @@
 		power-gpios = <&gpio TEGRA_GPIO(C,5) 0>;
 		uhs-mask = <0x7C>;
 		mmc-ocr-mask = <0x3>;
-		vqmmc-supply = <&vdd_dummy_1v8>;
+		vddio_sdmmc-supply = <&vdd_dummy_1v8>;
 		cap-sdio-irq;
 		disable-clock-gate;
 		status = "okay";

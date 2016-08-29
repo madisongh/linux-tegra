@@ -82,17 +82,17 @@
 	};
 
 	sdhci@700b0600 {
-		vqmmc-supply = <&vdd_dummy_1v8>;
+		vddio_sdmmc-supply = <&vdd_dummy_1v8>;
 	};
 
 	sdhci@700b0400 {
-		vqmmc-supply = <&max20024_ldo5>;
-		vmmc-supply = <&en_vdd_sdcard3>;
+		vddio_sdmmc-supply = <&max20024_ldo5>;
+		vddio_sd_slot-supply = <&en_vdd_sdcard3>;
 	};
 
 	sdhci@700b0000 {
-		vqmmc-supply = <&max20024_ldo3>;
-		vmmc-supply = <&en_vdd_sdcard1>;
+		vddio_sdmmc-supply = <&max20024_ldo3>;
+		vddio_sd_slot-supply = <&en_vdd_sdcard1>;
 	};
 
 	sata@70020000 {

@@ -93,8 +93,8 @@
 
 	sdhci@700b0400 {
 		uhs-mask = <0x1c>;
-		vqmmc-supply = <&max77620_sd3>;
-		vmmc-supply = <&en_vdd_sd3>;
+		vddio_sdmmc-supply = <&max77620_sd3>;
+		vddio_sd_slot-supply = <&en_vdd_sd3>;
 		power-off-rail;
 		status = "disabled";
 	};

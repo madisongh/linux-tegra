@@ -195,25 +195,25 @@
 
 	/* SDMMC 4 for EMMC */
 	sdhci@700b0600 {
-		vqmmc-supply = <&max77620_sd3>;
+		vddio_sdmmc-supply = <&max77620_sd3>;
 	};
 
 	/* SDMMC 3 for 2nd wifi */
 	sdhci@700b0400 {
-		vqmmc-supply = <&max77620_sd3>;
-		vmmc-supply = <&vdd_3v3>;
+		vddio_sdmmc-supply = <&max77620_sd3>;
+		vddio_sd_slot-supply = <&vdd_3v3>;
 	};
 
 	/* SDMMC 2 for wifi */
 	sdhci@700b0200 {
-		vqmmc-supply = <&vdd_dummy>;
-		vmmc-supply = <&vdd_dummy>;
+		vddio_sdmmc-supply = <&vdd_dummy>;
+		vddio_sd_slot-supply = <&vdd_dummy>;
 	};
 
 	/* SDMMC 1 for SD Card */
 	sdhci@700b0000 {
-		vqmmc-supply = <&max77620_ldo2>;
-		vmmc-supply = <&en_vdd_sd>;
+		vddio_sdmmc-supply = <&max77620_ldo2>;
+		vddio_sd_slot-supply = <&en_vdd_sd>;
 	};
 
 	sata@70020000 {

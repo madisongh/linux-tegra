@@ -194,23 +194,23 @@
 	};
 
 	sdhci@700b0600 {
-		vqmmc-supply = <&max77620_sd3>; /* SDMMC4 for EMMC on hawkeye */
-		vmmc-supply = <&vdd_3v3>;
+		vddio_sdmmc-supply = <&max77620_sd3>; /* SDMMC4 for EMMC on hawkeye */
+		vddio_sd_slot-supply = <&vdd_3v3>;
 	};
 
 	sdhci@700b0400 {
-		vqmmc-supply = <&max77620_ldo2>; /* SDMMC3 for SD card on hawkeye */
-		vmmc-supply = <&vdd_sdcard>;
+		vddio_sdmmc-supply = <&max77620_ldo2>; /* SDMMC3 for SD card on hawkeye */
+		vddio_sd_slot-supply = <&vdd_sdcard>;
 	};
 
 	sdhci@700b0200 {
-		vqmmc-supply = <&max77620_sd3>; /* SDMMC2 for Wifi on hawkeye */
-		vmmc-supply = <&vdd_3v3>;
+		vddio_sdmmc-supply = <&max77620_sd3>; /* SDMMC2 for Wifi on hawkeye */
+		vddio_sd_slot-supply = <&vdd_3v3>;
 	};
 
 	sdhci@700b0000 {
-		vqmmc-supply = <&max77620_sd3>; /* SDMMC1 for 2nd Wifi on hawkeye */
-		vmmc-supply = <&vdd_3v3>;
+		vddio_sdmmc-supply = <&max77620_sd3>; /* SDMMC1 for 2nd Wifi on hawkeye */
+		vddio_sd_slot-supply = <&vdd_3v3>;
 	};
 
 	host1x {

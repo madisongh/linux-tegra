@@ -315,8 +315,8 @@
 	};
 
 	sdhci@700b0600 {
-		vqmmc-supply = <&max77620_sd3>; /* SDMMC4 for EMMC */
-		vmmc-supply = <&vdd_3v3>;
+		vddio_sdmmc-supply = <&max77620_sd3>; /* SDMMC4 for EMMC */
+		vddio_sd_slot-supply = <&vdd_3v3>;
 	};
 
 	sdhci@700b0400 { /* SDMMC3 NOT USE */
