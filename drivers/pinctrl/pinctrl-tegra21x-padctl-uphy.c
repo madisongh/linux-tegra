@@ -3584,7 +3584,6 @@ static const struct tegra_padctl_uphy_lane tegra21x_lanes[] = {
 	TEGRA21x_LANE("otg-2",  0x004,  4, 0x3, otg),
 	TEGRA21x_LANE("otg-3",  0x004,  6, 0x3, otg),
 	TEGRA21x_LANE("hsic-0", 0x004, 20, 0x1, hsic),
-	TEGRA21x_LANE("hsic-1", 0x004, 21, 0x1, hsic),
 	/* XUSB_PADCTL_USB3_PAD_MUX_0 */
 	TEGRA21x_LANE("uphy-lane-0", 0x28, 12, 0x3, uphy),
 	TEGRA21x_LANE("uphy-lane-1", 0x28, 14, 0x3, uphy),
