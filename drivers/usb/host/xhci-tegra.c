@@ -1205,8 +1205,8 @@ static void tegra_xhci_mbox_work(struct work_struct *work)
 		resp.data = msg->data;
 		resp.cmd = MBOX_CMD_ACK;
 		break;
-#ifndef CONFIG_ARCH_TEGRA_21x_SOC
 	case MBOX_CMD_SET_BW:
+#ifndef CONFIG_ARCH_TEGRA_21x_SOC
 		/* fw sends bw request in MByte/sec, convert to HZ */
 		freq_khz = bwmgr_bw_to_freq(msg->data << 10);
 		ret = tegra_bwmgr_set_emc(tegra->bwmgr_handle,
@@ -1215,10 +1215,9 @@ static void tegra_xhci_mbox_work(struct work_struct *work)
 			dev_warn(tegra->dev,
 				"failed to set EMC khz=%lu errno=%d\n",
 				freq_khz, ret);
-
+#endif
 		resp.cmd = MBOX_CMD_COMPL;
 		break;
-#endif
 	default:
 		break;
 	}
