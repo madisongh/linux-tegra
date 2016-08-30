@@ -4007,6 +4007,12 @@ static int tegra21x_padctl_uphy_probe(struct platform_device *pdev)
 	uphy->desc.confops = &tegra_padctl_uphy_pinconf_ops;
 	uphy->desc.owner = THIS_MODULE;
 
+	/* initialize uphy_lane as non-zero value otherwise
+	 * uphy-lane-0 might be mapped to incorrect port
+	 */
+	for (i = 0; i < TEGRA_USB3_PHYS; i++)
+		uphy->usb3_ports[i].uphy_lane = T21x_UPHY_LANES;
+
 	uphy->pinctrl = pinctrl_register(&uphy->desc, &pdev->dev, uphy);
 	if (!uphy->pinctrl) {
 		dev_err(&pdev->dev, "failed to register pinctrl\n");
