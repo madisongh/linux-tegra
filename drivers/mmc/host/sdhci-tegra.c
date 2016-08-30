@@ -194,6 +194,8 @@ struct sdhci_tegra {
 	struct padctrl *sdmmc_padctrl;
 	bool calib_1v8_offsets_done;
 	unsigned char timing;
+	unsigned int cd_irq;
+	bool wake_enable_failed;
 };
 
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
@@ -1107,7 +1109,6 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 		clk |= SDHCI_CLOCK_CARD_EN;
 		sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
 	}
-
 }
 
 static void tegra_sdhci_set_padctrl(struct sdhci_host *sdhci, int voltage)
@@ -1256,9 +1257,24 @@ static void tegra_sdhci_post_voltage_switch(struct sdhci_host *sdhci,
 
 static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	struct platform_device *pdev = to_platform_device(mmc_dev(sdhci->mmc));
+
 	int ret = 0;
 
 	ret = tegra_sdhci_configure_regulators(sdhci, CONFIG_REG_DIS, 0, 0);
+
+	/* Enable wake irq at end of suspend */
+	if (device_may_wakeup(&pdev->dev)) {
+		if (enable_irq_wake(tegra_host->cd_irq)) {
+			dev_err(mmc_dev(sdhci->mmc),
+				"enable wake irq=%u failed, err: %d\n",
+				tegra_host->cd_irq, ret);
+			tegra_host->wake_enable_failed = true;
+		}
+	}
+
 	return ret;
 }
 
@@ -1266,8 +1282,19 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	struct platform_device *pdev = to_platform_device(mmc_dev(sdhci->mmc));
 	int ret = 0;
 	int signal_voltage = MMC_SIGNAL_VOLTAGE_330;
+
+	/* Disable wake capability at start of resume */
+	if (device_may_wakeup(&pdev->dev)) {
+		if (!tegra_host->wake_enable_failed)
+			ret = disable_irq_wake(tegra_host->cd_irq);
+		if (ret)
+			dev_err(mmc_dev(sdhci->mmc),
+				"disable wake irq=%u failed, err: %d\n",
+				tegra_host->cd_irq, ret);
+	}
 
 	sdhci->mmc->rem_card_present = (mmc_gpio_get_cd(sdhci->mmc) == 0);
 
@@ -1607,6 +1634,8 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 		}
 	}
 
+	plat->cd_wakeup_capable = of_property_read_bool(np, "nvidia,cd-wakeup-capable");
+
 	tegra_host->plat = plat;
 	return mmc_of_parse(host->mmc);
 }
@@ -1699,6 +1728,20 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "pad control get failed, error:%d\n", rc);
 		}
 	}
+
+	if (gpio_is_valid(plat->cd_gpio) && plat->cd_wakeup_capable) {
+		tegra_host->cd_irq = gpio_to_irq(plat->cd_gpio);
+		if (tegra_host->cd_irq <= 0) {
+			dev_err(&pdev->dev, "gpio_to_irq failed, err:%d\n",
+				tegra_host->cd_irq);
+			tegra_host->cd_irq = 0;
+		} else {
+			device_init_wakeup(&pdev->dev, 1);
+			dev_info(&pdev->dev, "device wakeup init success\n",
+				tegra_host->cd_irq);
+		}
+	}
+
 	host->mmc->rem_card_present = (mmc_gpio_get_cd(host->mmc) == 0);
 
 	/*
