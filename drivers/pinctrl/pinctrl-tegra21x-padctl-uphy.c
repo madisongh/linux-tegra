@@ -3626,7 +3626,6 @@ static const struct of_device_id tegra_padctl_uphy_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, tegra_padctl_uphy_of_match);
 
-#define FUSE_USB_CALIB_EXT_0 0x250
 static int tegra_xusb_read_fuse_calibration(struct tegra_padctl_uphy *uphy)
 {
 	struct platform_device *pdev = to_platform_device(uphy->dev);
@@ -3635,8 +3634,8 @@ static int tegra_xusb_read_fuse_calibration(struct tegra_padctl_uphy *uphy)
 	u32 reg;
 	s32 v;
 
-	tegra_fuse_readl(FUSE_SKU_USB_CALIB_0, &reg);
-	dev_info(uphy->dev, "FUSE_SKU_USB_CALIB_0 0x%x\n", reg);
+	tegra_fuse_readl(TEGRA_FUSE_SKU_CALIB_0, &reg);
+	dev_info(uphy->dev, "TEGRA_FUSE_SKU_CALIB_0 0x%x\n", reg);
 	for (i = 0; i < TEGRA_UTMI_PHYS; i++) {
 		uphy->calib.hs_curr_level[i] =
 			(reg >> HS_CURR_LEVEL_PADX_SHIFT(i)) &
@@ -3646,8 +3645,8 @@ static int tegra_xusb_read_fuse_calibration(struct tegra_padctl_uphy *uphy)
 	uphy->calib.hs_term_range_adj = (reg >> HS_TERM_RANGE_ADJ_SHIFT) &
 					HS_TERM_RANGE_ADJ_MASK;
 
-	tegra_fuse_readl(FUSE_USB_CALIB_EXT_0, &reg);
-	dev_info(uphy->dev, "FUSE_USB_CALIB_EXT_0 0x%x\n", reg);
+	tegra_fuse_readl(TEGRA_FUSE_USB_CALIB_EXT_0, &reg);
+	dev_info(uphy->dev, "TEGRA_FUSE_USB_CALIB_EXT_0 0x%x\n", reg);
 	uphy->calib.rpd_ctrl = (reg >> RPD_CTRL_SHIFT) & RPD_CTRL_MASK;
 
 	if (of_property_read_s32(np, "nvidia,hs_curr_level_offset", &v) == 0) {
