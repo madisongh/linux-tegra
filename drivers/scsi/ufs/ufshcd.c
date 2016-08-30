@@ -70,7 +70,7 @@
  * fDeviceInit query response time for some devices is too large that default
  * QUERY_REQ_TIMEOUT may not be enough for such devices.
  */
-#define QUERY_FDEVICEINIT_REQ_TIMEOUT 600 /* msec */
+#define QUERY_FDEVICEINIT_REQ_TIMEOUT 1000 /* msec */
 
 /* Task management command timeout */
 #define TM_CMD_TIMEOUT	100 /* msecs */
