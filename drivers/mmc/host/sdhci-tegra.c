@@ -1048,6 +1048,10 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 			err = tegra_prod_set_by_name(&sdhci->ioaddr,
 				"autocal-pu-pd-offset-hs400-1v8",
 				tegra_host->prods);
+		else if (timing == MMC_TIMING_MMC_HS200)
+			err = tegra_prod_set_by_name(&sdhci->ioaddr,
+				"autocal-pu-pd-offset-hs200-1v8",
+				tegra_host->prods);
 		else if (timing == MMC_TIMING_UHS_SDR104)
 			err = tegra_prod_set_by_name(&sdhci->ioaddr,
 				"autocal-pu-pd-offset-sdr104-1v8",
