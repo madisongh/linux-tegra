@@ -92,6 +92,19 @@ dtb-y := $(local-dtb)
 dtb-y += $(t19x-dtb)
 endif
 
+dts_makefile=$(foreach d,$(wildcard $1*), $(call dts_makefile,$(d)/,$(2)) $(if $(findstring Makefile,$(d)),$(d)))
+dts_mfiles = $(call dts_makefile, $(tegra-dtstree)/platform/, Makefile)
+ifneq ($(dts_mfiles),)
+tegra-dts-relpath := $(call _TEGRA_REL_PATH)/../hardware/nvidia
+non-plat-dtbs := $(dtb-y)
+dtb-y :=
+include $(dts_mfiles)
+plat-dtbs := $(addprefix $(tegra-dts-relpath)/,$(dtb-y))
+plat-dtbs-out := $(addprefix $(O)/arch/arm64/boot/dts/,$(plat-dtbs))
+dtb-y := $(non-plat-dtbs)
+dtb-y += $(plat-dtbs)
+endif
+
 DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES))
 ifneq ($(DTB_NAMES),)
 DTB_LIST := $(addsuffix .dtb,$(DTB_NAMES))
@@ -110,6 +123,9 @@ endif
 ifneq ($(t19x-dtb-out),)
 	cp -u $(t19x-dtb-out) $(O)/arch/arm64/boot/dts/
 endif
+ifneq ($(plat-dtbs),)
+	cp -u $(plat-dtbs-out) $(O)/arch/arm64/boot/dts/
+endif
 
 clean-files := dts/*.dtb *.dtb
 ifneq ($(t210-dtb-out),)
@@ -120,4 +136,7 @@ ifneq ($(t18x-dtb-out),)
 endif
 ifneq ($(t19x-dtb-out),)
 	clean-files += $(t19x-dtb-out)
+endif
+ifneq ($(plat-dtbs-out),)
+	clean-files += $(plat-dtbs-out)
 endif
