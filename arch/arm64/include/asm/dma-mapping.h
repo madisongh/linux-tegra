@@ -29,6 +29,8 @@
 #include <asm/xen/hypervisor.h>
 
 #define DMA_ERROR_CODE	(~(dma_addr_t)0)
+extern struct dma_map_ops dummy_dma_ops;
+
 extern struct dma_map_ops *dma_ops;
 extern struct dma_map_ops coherent_swiotlb_dma_ops;
 extern struct dma_map_ops noncoherent_swiotlb_dma_ops;
