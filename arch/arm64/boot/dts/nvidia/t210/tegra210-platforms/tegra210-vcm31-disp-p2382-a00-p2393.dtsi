@@ -14,8 +14,8 @@
  * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <common/panels/panel-a-edp-1080p-14-0.dtsi>
-#include <common/panels/panel-dsi-1080p.dtsi>
+#include "panels/panel-a-edp-1080p-14-0.dtsi"
+#include "panels/panel-dsi-1080p.dtsi"
 #include <dt-bindings/display/tegra-dc.h>
 #include <dt-bindings/display/tegra-panel.h>
 
