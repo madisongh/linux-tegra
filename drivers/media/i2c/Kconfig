@@ -510,6 +510,16 @@ config VIDEO_OV7670
 	  OV7670 VGA camera.  It currently only works with the M88ALP01
 	  controller.
 
+config VIDEO_OV9281
+	tristate "OmniVision OV9281 camera sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	---help---
+	  This is a Video4Linux2 sensor driver for the OmniVision
+	  OV9281 camera sensor, for use with the tegra isp.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called ov9281.
+
 config VIDEO_OV9650
 	tristate "OmniVision OV9650/OV9652 sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
