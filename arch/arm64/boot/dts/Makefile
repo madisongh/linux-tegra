@@ -95,11 +95,10 @@ endif
 dts_makefile=$(foreach d,$(wildcard $1*), $(call dts_makefile,$(d)/,$(2)) $(if $(findstring Makefile,$(d)),$(d)))
 dts_mfiles = $(call dts_makefile, $(tegra-dtstree)/platform/, Makefile)
 ifneq ($(dts_mfiles),)
-tegra-dts-relpath := $(call _TEGRA_REL_PATH)/../hardware/nvidia
 non-plat-dtbs := $(dtb-y)
 dtb-y :=
 include $(dts_mfiles)
-plat-dtbs := $(addprefix $(tegra-dts-relpath)/,$(dtb-y))
+plat-dtbs := $(addprefix $(tegra-rel-dtstree)/hardware/nvidia/,$(dtb-y))
 plat-dtbs-out := $(addprefix $(O)/arch/arm64/boot/dts/,$(plat-dtbs))
 dtb-y := $(non-plat-dtbs)
 dtb-y += $(plat-dtbs)
