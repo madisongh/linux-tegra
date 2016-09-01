@@ -1,6 +1,8 @@
 config RTL8822BE
 	tristate "Realtek 8822B PCIE WiFi"
-	depends on PCIE
+	depends on PCI
 	---help---
-	  Help message of RTL8822BE
+	  This module adds supports for Realtek RTL8822BE wireless
+	  chipset.
 
+	  The driver module will be called wlan. Use M if unsure.

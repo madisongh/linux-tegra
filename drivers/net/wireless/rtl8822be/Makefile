@@ -90,7 +90,7 @@ CONFIG_RTW_SDIO_PM_KEEP_POWER = y
 ###################### MP HW TX MODE FOR VHT #######################
 CONFIG_MP_VHT_HW_TX_MODE = n
 ###################### Platform Related #######################
-CONFIG_PLATFORM_I386_PC = y
+CONFIG_PLATFORM_I386_PC = n
 CONFIG_PLATFORM_ANDROID_X86 = n
 CONFIG_PLATFORM_ANDROID_INTEL_X86 = n
 CONFIG_PLATFORM_JB_X86 = n
@@ -144,6 +144,7 @@ CONFIG_PLATFORM_NOVATEK_NT72668 = n
 CONFIG_PLATFORM_HISILICON = n
 CONFIG_PLATFORM_NV_TK1 = n
 CONFIG_PLATFORM_RTL8197D = n
+CONFIG_PLATFORM_TEGRA186 = y
 ###############################################################
 
 CONFIG_DRVEXT_MODULE = n
@@ -235,7 +236,7 @@ _BTC_FILES += hal/btc/halbtc8192e1ant.o \
 				hal/btc/halbtc8821c2ant.o
 endif
 
-include $(TopDIR)/hal/phydm/phydm.mk
+include $(srctree)/drivers/net/wireless/rtl8822be/hal/phydm/phydm.mk
 ########### HAL_RTL8188E #################################
 ifeq ($(CONFIG_RTL8188E), y)
 
@@ -716,7 +717,7 @@ endif
 
 ########### HAL_RTL8822B #################################
 ifeq ($(CONFIG_RTL8822B), y)
-include $(TopDIR)/rtl8822b.mk
+include $(srctree)/drivers/net/wireless/rtl8822be/rtl8822b.mk
 endif
 
 ########### HAL_RTL8821C #################################
@@ -819,7 +820,7 @@ ifeq ($(CONFIG_LOAD_PHY_PARA_FROM_FILE), y)
 EXTRA_CFLAGS += -DCONFIG_LOAD_PHY_PARA_FROM_FILE
 #EXTRA_CFLAGS += -DREALTEK_CONFIG_PATH_WITH_IC_NAME_FOLDER
 #EXTRA_CFLAGS += -DREALTEK_CONFIG_PATH=\"/lib/firmware/\"
-EXTRA_CFLAGS += -DREALTEK_CONFIG_PATH=\"\"
+EXTRA_CFLAGS += -DREALTEK_CONFIG_PATH=\"/system/vendor/firmware/\"
 endif
 
 ifeq ($(CONFIG_TXPWR_BY_RATE_EN), n)
@@ -947,7 +948,7 @@ ifeq ($(CONFIG_PLATFORM_I386_PC), y)
 EXTRA_CFLAGS += -mhard-float
 else
 ## For ARM ToolChain use Hardware FLOATING
-EXTRA_CFLAGS += -mfloat-abi=hard
+#EXTRA_CFLAGS += -mfloat-abi=hard
 endif
 endif
 
@@ -972,6 +973,20 @@ KVER  := $(shell uname -r)
 KSRC := /lib/modules/$(KVER)/build
 MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/
 INSTALL_PREFIX :=
+endif
+
+ifeq ($(CONFIG_PLATFORM_TEGRA186), y)
+ARCH = arm
+KVER := $(shell uname -r)
+KSRC := /lib/modules/$(KVER)/build
+EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN
+EXTRA_CFLAGS += -DCONFIG_IOCTL_CFG80211 -DRTW_USE_CFG80211_STA_EVENT
+EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE
+EXTRA_CFLAGS += -DRTW_P2P_GROUP_INTERFACE=1
+EXTRA_CFLAGS += -DCONFIG_PLATFORM_TEGRA186
+EXTRA_CFLAGS += -DCONFIG_PCI_ASPM
+EXTRA_CFLAGS += -Wno-error=date-time
+MODULE_NAME = wlan
 endif
 
 ifeq ($(CONFIG_PLATFORM_NV_TK1), y)

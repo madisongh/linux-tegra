@@ -63,3 +63,4 @@ obj-$(CONFIG_RSI_91X)	+= rsi/
 
 obj-$(CONFIG_BCMDHD_SDIO)       += bcmdhd/
 obj-$(CONFIG_BCMDHD_PCIE)       += bcmdhd_pcie/
+obj-$(CONFIG_RTL8822BE)	+= rtl8822be/

@@ -1,6 +1,7 @@
 /******************************************************************************
  *
  * Copyright(c) 2007 - 2017 Realtek Corporation.
+ * Copyright (c) 2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -1754,6 +1755,18 @@ static int rtw_drv_init(struct pci_dev *pdev, const struct pci_device_id *pdid)
 	_adapter *padapter = NULL;
 	struct dvobj_priv *dvobj;
 	struct net_device *pnetdev;
+	struct device_node *np;
+
+	np = of_find_compatible_node(NULL, NULL, "android,rltk_wlan");
+	if (!np) {
+		pr_err("%s(): DT node is undefined. Abort registration\n", __func__);
+		goto exit;
+	} else {
+		if (!of_device_is_available(np)) {
+			pr_err("%s(): DT node is disabled. Abort registration\n", __func__);
+			goto exit;
+		}
+	}
 
 	/* RTW_INFO("+rtw_drv_init\n"); */
 
