@@ -219,6 +219,7 @@ struct tegra_spi_data {
 	unsigned				irq;
 	bool					clock_always_on;
 	bool					polling_mode;
+	bool					boost_reg_access;
 	u32					cur_speed;
 	unsigned				min_div;
 
@@ -275,6 +276,7 @@ struct tegra_spi_data {
 static int tegra_spi_runtime_suspend(struct device *dev);
 static int tegra_spi_runtime_resume(struct device *dev);
 static int tegra_spi_status_poll(struct tegra_spi_data *tspi);
+static int tegra_spi_set_clock_rate(struct tegra_spi_data *tspi, u32 speed);
 
 static inline u32 tegra_spi_readl(struct tegra_spi_data *tspi,
 		unsigned long reg)
@@ -681,6 +683,12 @@ static int tegra_spi_start_dma_based_transfer(
 	if (command1 != tspi->command1_reg)
 		tegra_spi_writel(tspi, command1, SPI_COMMAND1);
 
+	if (tspi->boost_reg_access) {
+		ret = tegra_spi_set_clock_rate(tspi, t->speed_hz);
+		if (ret < 0)
+			return ret;
+	}
+
 	val |= SPI_DMA_EN;
 	tegra_spi_writel(tspi, val, SPI_DMA_CTL);
 	return ret;
@@ -715,6 +723,12 @@ static int tegra_spi_start_cpu_based_transfer(
 		tegra_spi_writel(tspi, val, SPI_DMA_CTL);
 	}
 	tspi->dma_control_reg = val;
+
+	if (tspi->boost_reg_access) {
+		ret = tegra_spi_set_clock_rate(tspi, t->speed_hz);
+		if (ret < 0)
+			return ret;
+	}
 
 	tspi->is_curr_dma_xfer = false;
 	val = tspi->command1_reg;
@@ -1036,7 +1050,11 @@ static u32 tegra_spi_setup_transfer_one(struct spi_device *spi,
 	int req_mode;
 	int ret;
 
-	ret = tegra_spi_set_clock_rate(tspi, speed);
+	if (tspi->boost_reg_access)
+		ret = tegra_spi_set_clock_rate(tspi,
+					       tspi->master->max_speed_hz);
+	else
+		ret = tegra_spi_set_clock_rate(tspi, speed);
 	if (ret < 0)
 		return ret;
 
@@ -1607,6 +1625,15 @@ static int tegra_spi_status_poll(struct tegra_spi_data *tspi)
 {
 	unsigned int status;
 	unsigned long timeout;
+	int ret;
+
+	if (tspi->boost_reg_access) {
+		/* set max clock for faster register access */
+		ret = tegra_spi_set_clock_rate(tspi,
+					       tspi->master->max_speed_hz);
+		if (ret < 0)
+			return ret;
+	}
 
 	timeout = SPI_POLL_TIMEOUT;
 	/*
@@ -1648,6 +1675,15 @@ static int tegra_spi_status_poll(struct tegra_spi_data *tspi)
 static irqreturn_t tegra_spi_isr_thread(int irq, void *context_data)
 {
 	struct tegra_spi_data *tspi = context_data;
+	int ret;
+
+	if (tspi->boost_reg_access) {
+		/* set max clock for faster register access */
+		ret = tegra_spi_set_clock_rate(tspi,
+					       tspi->master->max_speed_hz);
+		if (ret < 0)
+			return ret;
+	}
 
 	if (!tspi->is_curr_dma_xfer)
 		return handle_cpu_based_xfer(tspi);
@@ -1699,6 +1735,9 @@ static void tegra_spi_parse_dt(struct tegra_spi_data *tspi)
 
 	if (of_find_property(np, "nvidia,polling-mode", NULL))
 		tspi->polling_mode = true;
+
+	if (of_find_property(np, "nvidia,boost-reg-access", NULL))
+		tspi->boost_reg_access = true;
 
 	if (of_property_read_u32(np, "spi-max-frequency",
 				 &tspi->master->max_speed_hz))
