@@ -383,7 +383,7 @@ static inline int sdhci_tegra_set_dqs_trim_delay(struct sdhci_host *sdhci,
 {
 	u32 vend_ovrds;
 
-	if ((dqs_trim_delay > SDHCI_TEGRA_MAX_DQS_TRIM_VALUES) &&
+	if ((dqs_trim_delay > SDHCI_TEGRA_MAX_DQS_TRIM_VALUES) ||
 		(dqs_trim_delay < 0)) {
 		dev_err(mmc_dev(sdhci->mmc), "Invalid dqs trim value\n");
 		return -1;
@@ -407,7 +407,7 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 	u32 ctrl;
 	bool card_clk_enabled;
 	int err;
-	if ((tap_delay > SDHCI_TEGRA_MAX_TAP_VALUES) && (tap_delay < 0)){
+	if ((tap_delay > SDHCI_TEGRA_MAX_TAP_VALUES) || (tap_delay < 0)){
 		dev_err(mmc_dev(sdhci->mmc), "Invalid tap value\n");
 		return -1;
 	}
