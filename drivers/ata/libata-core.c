@@ -722,7 +722,8 @@ u64 ata_tf_read_block(struct ata_taskfile *tf, struct ata_device *dev)
 			sect = 1; /* oh well */
 		}
 
-		block = (cyl * dev->heads + head) * dev->sectors + sect - 1;
+		block = ((u64)cyl * dev->heads + head) *
+			dev->sectors + sect - 1;
 	}
 
 	return block;
