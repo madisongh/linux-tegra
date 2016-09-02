@@ -74,6 +74,23 @@ static inline int set_arch_dma_coherent_ops(struct device *dev)
 
 void set_dummy_dma_ops(struct device *dev);
 
+void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+			struct iommu_ops *iommu, bool coherent);
+#define arch_setup_dma_ops	arch_setup_dma_ops
+
+#ifdef CONFIG_IOMMU_DMA
+void arch_teardown_dma_ops(struct device *dev);
+#define arch_teardown_dma_ops	arch_teardown_dma_ops
+#endif
+
+/* do not use this function in a driver */
+static inline bool is_device_dma_coherent(struct device *dev)
+{
+	if (!dev)
+		return false;
+	return dev->archdata.dma_coherent;
+}
+
 #include <asm-generic/dma-mapping-common.h>
 
 static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
