@@ -235,3 +235,43 @@ static int __init tegra_smmu_init(void)
 	return 0;
 }
 postcore_initcall(tegra_smmu_init);
+
+struct iommu_linear_map_mapping {
+	const char * const name;
+	struct iommu_linear_map *map;
+};
+
+static struct iommu_linear_map_mapping t186_linear_map[] = {
+	{
+		.name = "15200000.nvdisplay",
+		.map = tegra_fb_linear_map,
+	},
+	{},
+};
+
+int iommu_get_linear_map(struct device *dev, struct iommu_linear_map **map)
+{
+	const char *s;
+	struct iommu_linear_map_mapping *table;
+
+	if (!dev)
+		return 0;
+
+	switch (tegra_get_chipid()) {
+	case TEGRA_CHIPID_TEGRA18:
+		table = t186_linear_map;
+		break;
+	default:
+		return 0;
+	}
+
+	while ((s = table->name) != NULL) {
+		if (!strncmp(s, dev_name(dev), strlen(s))) {
+			*map = table->map;
+			return 1;
+		}
+		table++;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(iommu_get_linear_map);

@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2007-2008 Advanced Micro Devices, Inc.
+ * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ *
  * Author: Joerg Roedel <joerg.roedel@amd.com>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -44,6 +46,16 @@ struct notifier_block;
 
 typedef int (*iommu_fault_handler_t)(struct iommu_domain *,
 			struct device *, unsigned long, int, void *);
+
+struct iommu_linear_map {
+	dma_addr_t start;
+	size_t size;
+};
+
+extern int iommu_get_linear_map(struct device *dev,
+			struct iommu_linear_map **map);
+
+extern void tegra_fb_linear_set(struct iommu_linear_map *map);
 
 struct iommu_domain_geometry {
 	dma_addr_t aperture_start; /* First address that can be mapped    */

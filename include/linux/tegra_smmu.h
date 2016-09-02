@@ -1,7 +1,7 @@
 /*
  * include/linux/tegra_smmu.h
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -17,6 +17,8 @@
 #ifndef __INCLUDE_LINUX_TEGRA_SMMU_H
 #define __INCLUDE_LINUX_TEGRA_SMMU_H
 
+#include <linux/iommu.h>
+
 #if defined(CONFIG_TEGRA_IOMMU_SMMU)
 int tegra_smmu_save(void);
 int tegra_smmu_restore(void);
@@ -24,11 +26,6 @@ int tegra_smmu_restore(void);
 static inline int tegra_smmu_save(void) { return 0; }
 static inline int tegra_smmu_restore(void) { return 0; }
 #endif
-
-struct iommu_linear_map {
-	dma_addr_t start;
-	size_t size;
-};
 
 #ifdef CONFIG_PLATFORM_ENABLE_IOMMU
 /* Maximum number of iommu address spaces in the system */
