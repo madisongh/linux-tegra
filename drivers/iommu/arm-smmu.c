@@ -776,7 +776,6 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
 			return -ERANGE;
 		}
 		master->cfg->streamids[i] = streamid;
-		platform_override_streamid(streamid);
 	}
 
 	return insert_smmu_master(smmu, master);
@@ -1820,7 +1819,7 @@ static void add_smmu_master_debugfs(struct iommu_domain *domain,
 
 static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 {
-	int ret;
+	int ret, i;
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	struct arm_smmu_device *smmu, *dom_smmu;
 	struct arm_smmu_master_cfg *cfg;
@@ -1868,6 +1867,10 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		add_smmu_master_debugfs(domain, dev,
 				find_smmu_master(smmu, dev_get_dev_node(dev)));
 	}
+
+	/* Enable stream Id override, which enables SMMU translation for dev */
+	for (i = 0; i < cfg->num_streamids; i++)
+		platform_override_streamid(cfg->streamids[i]);
 	return ret;
 }
 
