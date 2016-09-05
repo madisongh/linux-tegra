@@ -356,6 +356,22 @@ static struct reset_controller_dev rst_ctlr = {
 	.of_reset_n_cells = 1,
 };
 
+void tegra_rst_assertv(unsigned long *id, int num)
+{
+	int i;
+
+	for (i = 0; i < num; i++, id++)
+		tegra_clk_rst_assert(&rst_ctlr, *id);
+}
+
+void tegra_rst_deassertv(unsigned long *id, int num)
+{
+	int i;
+
+	for (i = 0; i < num; i++, id++)
+		tegra_clk_rst_deassert(&rst_ctlr, *id);
+}
+
 void __init tegra_add_of_provider(struct device_node *np)
 {
 	int i;
