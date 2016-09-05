@@ -258,6 +258,8 @@ bool tegra_bonded_out_dev(enum tegra_bondout_dev);
 extern void tegra_set_tegraid(u32 chipid, u32 major, u32 minor,
 	u32 nlist, u32 patch, const char *priv);
 extern void tegra_get_tegraid_from_hw(void);
+extern u32 tegra_read_emu_revid(void);
+extern void tegra_set_tegraid_from_hw(void);
 
 #endif /* __ASSEMBLY__ */
 
