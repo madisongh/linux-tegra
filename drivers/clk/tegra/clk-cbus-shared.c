@@ -879,7 +879,7 @@ struct clk *tegra_clk_register_sbus_cmplx(const char *name,
 
 	system->min_rate = min_rate;
 	system->max_rate = max_rate;
-	system->bus_update = _simple_shared_update;
+	system->bus_update = _sbus_update;
 
 	INIT_LIST_HEAD(&system->shared_bus_list);
 
@@ -922,7 +922,7 @@ struct clk *tegra_clk_register_cbus(const char *name,
 	cbus->shared_bus_backup = backup_clk;
 	cbus->min_rate = min_rate;
 	cbus->max_rate = max_rate;
-	cbus->bus_update = _sbus_update;
+	cbus->bus_update = _simple_shared_update;
 
 	INIT_LIST_HEAD(&cbus->shared_bus_list);
 
