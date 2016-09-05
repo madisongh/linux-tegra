@@ -21,6 +21,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/clk.h>
+#include <linux/clk-provider.h>
 #include <linux/clk/tegra.h>
 #include <linux/string.h>
 #include <linux/debugfs.h>
@@ -31,17 +32,20 @@
 #include <linux/seq_file.h>
 #include <linux/spinlock.h>
 #include <linux/tegra-powergate.h>
-#include <linux/tegra-soc.h>
 #include <soc/tegra/fuse.h>
+#include <soc/tegra/reset.h>
 #include <trace/events/power.h>
 #include <asm/atomic.h>
 
-#include <linux/platform/tegra/clock.h>
-#include <linux/platform/tegra/common.h>
 #include "board.h"
 #include "powergate-priv.h"
 
+#define TEGRA_PMC_BASE	0x7000E400
+#define TEGRA_MC_BASE	0x70019000
+
 static struct powergate_ops *pg_ops;
+void __iomem *tegra_mc;
+void __iomem *tegra_pmc;
 
 #if !defined(CONFIG_ARCH_TEGRA_18x_SOC)
 static spinlock_t *tegra_get_powergate_lock(void)
@@ -233,7 +237,7 @@ int partition_clk_enable(struct powergate_partition_info *pg_info)
 	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
 		clk_info = &pg_info->clk_info[idx];
 		clk = clk_info->clk_ptr;
-		if (!clk)
+		if (IS_ERR(clk))
 			break;
 
 		if (clk_info->clk_type != RST_ONLY) {
@@ -282,8 +286,8 @@ void get_clk_info(struct powergate_partition_info *pg_info)
 		if (!pg_info->clk_info[idx].clk_name)
 			break;
 
-		pg_info->clk_info[idx].clk_ptr = tegra_get_clock_by_name(
-			pg_info->clk_info[idx].clk_name);
+		pg_info->clk_info[idx].clk_ptr =
+			clk_get_sys(NULL, pg_info->clk_info[idx].clk_name);
 
 		if (IS_ERR_OR_NULL(pg_info->clk_info[idx].clk_ptr))
 			WARN(1, "Could not find clock %s for %s partition\n",
@@ -304,10 +308,9 @@ void powergate_partition_assert_reset(struct powergate_partition_info *pg_info)
 
 		if (!clk_ptr)
 			break;
-
-		if (clk_info->clk_type != CLK_ONLY)
-			tegra_periph_reset_assert(clk_ptr);
 	}
+
+	tegra_rst_assertv(&pg_info->reset_id[0], pg_info->reset_id_num);
 }
 
 void powergate_partition_deassert_reset(struct powergate_partition_info *pg_info)
@@ -322,10 +325,9 @@ void powergate_partition_deassert_reset(struct powergate_partition_info *pg_info
 
 		if (!clk_ptr)
 			break;
-
-		if (clk_info->clk_type != CLK_ONLY)
-			tegra_periph_reset_deassert(clk_ptr);
 	}
+
+	tegra_rst_deassertv(&pg_info->reset_id[0], pg_info->reset_id_num);
 }
 
 int tegra_powergate_reset_module(struct powergate_partition_info *pg_info)
@@ -360,7 +362,7 @@ int slcg_clk_enable(struct powergate_partition_info *pg_info)
 	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
 		slcg_info = &pg_info->slcg_info[idx];
 		clk = slcg_info->clk_ptr;
-		if (!clk)
+		if (IS_ERR(clk))
 			break;
 
 		ret = clk_prepare_enable(clk);
@@ -390,7 +392,7 @@ void slcg_clk_disable(struct powergate_partition_info *pg_info)
 		slcg_info = &pg_info->slcg_info[idx];
 		clk = slcg_info->clk_ptr;
 
-		if (!clk)
+		if (IS_ERR(clk))
 			break;
 
 		clk_disable_unprepare(clk);
@@ -405,8 +407,8 @@ void get_slcg_info(struct powergate_partition_info *pg_info)
 		if (!pg_info->slcg_info[idx].clk_name)
 			break;
 
-		pg_info->slcg_info[idx].clk_ptr = tegra_get_clock_by_name(
-			pg_info->slcg_info[idx].clk_name);
+		pg_info->slcg_info[idx].clk_ptr =
+			clk_get_sys(NULL, pg_info->slcg_info[idx].clk_name);
 
 		if (IS_ERR_OR_NULL(pg_info->slcg_info[idx].clk_ptr))
 			pr_err("### Could not find clock %s for %s partition\n",
@@ -735,6 +737,8 @@ static int tegra_powergate_init_refcount(void)
 
 int __init tegra_powergate_init(void)
 {
+	tegra_pmc = ioremap(TEGRA_PMC_BASE, 4096);
+	tegra_mc = ioremap(TEGRA_MC_BASE, 4096);
 	switch (tegra_get_chip_id()) {
 		case TEGRA20:
 			pg_ops = tegra2_powergate_init_chip_support();
@@ -783,7 +787,7 @@ int __init tegra_powergate_init(void)
 
 	return (pg_ops ? 0 : -EINVAL);
 }
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_18x_SOC) || defined (CONFIG_ARCH_TEGRA_210_SOC)
 arch_initcall(tegra_powergate_init);
 #endif
 
@@ -909,7 +913,7 @@ err_out:
 	debugfs_remove_recursive(pg_debugfs_root);
 	return -ENOMEM;
 }
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_18x_SOC) || defined (CONFIG_ARCH_TEGRA_210_SOC)
 late_initcall(tegra_powergate_debugfs_init);
 #endif
 

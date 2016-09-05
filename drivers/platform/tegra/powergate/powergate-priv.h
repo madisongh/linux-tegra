@@ -24,9 +24,6 @@
 #include <linux/io.h>
 #include <linux/tegra-powergate.h>
 
-#include <linux/platform/tegra/clock.h>
-#include "../../../../arch/arm/mach-tegra/iomap.h"
-
 #define MAX_CLK_EN_NUM			15
 #define MAX_HOTRESET_CLIENT_NUM		4
 
@@ -37,27 +34,27 @@
 #define PWRGATE_STATUS		0x38
 
 /* MC register read/write */
-static void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
+extern void __iomem *tegra_mc;
 static inline u32 mc_read(unsigned long reg)
 {
-	return readl(mc + reg);
+	return readl(tegra_mc + reg);
 }
 
 static inline void mc_write(u32 val, unsigned long reg)
 {
-	writel_relaxed(val, mc + reg);
+	writel_relaxed(val, tegra_mc + reg);
 }
 
 /* PMC register read/write */
-static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+extern void __iomem *tegra_pmc;
 static inline u32 pmc_read(unsigned long reg)
 {
-	return readl(pmc + reg);
+	return readl(tegra_pmc + reg);
 }
 
 static inline void pmc_write(u32 val, unsigned long reg)
 {
-	writel_relaxed(val, pmc + reg);
+	writel_relaxed(val, tegra_pmc + reg);
 }
 
 enum clk_type {
@@ -76,6 +73,8 @@ struct powergate_partition_info {
 	const char *name;
 	struct partition_clk_info clk_info[MAX_CLK_EN_NUM];
 	struct partition_clk_info slcg_info[MAX_CLK_EN_NUM];
+	unsigned long reset_id[MAX_CLK_EN_NUM];
+	int reset_id_num;
 	struct raw_notifier_head slcg_notifier;
 	int refcount;
 	bool disable_after_boot;

@@ -12,13 +12,14 @@
  *
  */
 
+#include <dt-bindings/clock/tegra210-car.h>
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 #include <linux/regulator/consumer.h>
 #include <linux/tegra-powergate.h>
 #include <linux/tegra-soc.h>
-#include <linux/platform/tegra/dvfs.h>
 #include <linux/tegra_soctherm.h>
+#include <soc/tegra/tegra-dvfs.h>
 #include <trace/events/power.h>
 
 #include "powergate-priv.h"
@@ -173,10 +174,10 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 	[TEGRA_POWERGATE_VE] = {
 		.name = "ve",
 		.clk_info = {
-			[0] = { .clk_name = "ispa", .clk_type = CLK_AND_RST },
-			[1] = { .clk_name = "vi", .clk_type = CLK_AND_RST },
-			[2] = { .clk_name = "csi", .clk_type = CLK_AND_RST },
-			[3] = { .clk_name = "vii2c", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "ispa", .clk_type = CLK_ONLY },
+			[1] = { .clk_name = "vi", .clk_type = CLK_ONLY },
+			[2] = { .clk_name = "csi", .clk_type = CLK_ONLY },
+			[3] = { .clk_name = "vii2c", .clk_type = CLK_ONLY },
 			[4] = { .clk_name = "cilab", .clk_type = CLK_ONLY },
 			[5] = { .clk_name = "cilcd", .clk_type = CLK_ONLY },
 			[6] = { .clk_name = "cile", .clk_type = CLK_ONLY },
@@ -190,15 +191,20 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[5] = { .clk_name = "vi_slcg_ovr" },
 			[6] = { .clk_name = "ispa_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_ISP, TEGRA210_CLK_VI,
+			      TEGRA210_CLK_CSI, TEGRA210_CLK_VI_I2C },
+		.reset_id_num = 4,
 	},
 #ifdef CONFIG_ARCH_TEGRA_HAS_PCIE
 	[TEGRA_POWERGATE_PCIE] = {
 		.name = "pcie",
 		.clk_info = {
-			[0] = { .clk_name = "afi", .clk_type = CLK_AND_RST },
-			[1] = { .clk_name = "pcie", .clk_type = CLK_AND_RST },
-			[2] = { .clk_name = "pciex", .clk_type = RST_ONLY },
+			[0] = { .clk_name = "afi", .clk_type = CLK_ONLY },
+			[1] = { .clk_name = "pcie", .clk_type = CLK_ONLY },
 		},
+		.reset_id = { TEGRA210_CLK_AFI, TEGRA210_CLK_PCIE,
+			      TEGRA210_CLK_PCIEX },
+		.reset_id_num = 3,
 		.skip_reset = true,
 	},
 #endif
@@ -207,11 +213,10 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.name = "sata",
 		.disable_after_boot = true,
 		.clk_info = {
-			[0] = { .clk_name = "sata_oob", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "sata_oob", .clk_type = CLK_ONLY },
 			[1] = { .clk_name = "cml1", .clk_type = CLK_ONLY },
-			[2] = { .clk_name = "sata_cold", .clk_type = RST_ONLY },
 			[3] = { .clk_name = "sata_aux", .clk_type = CLK_ONLY },
-			[4] = { .clk_name = "sata", .clk_type = CLK_AND_RST },
+			[4] = { .clk_name = "sata", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -222,12 +227,15 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[5] = { .clk_name = "sata_slcg_ovr_ipfs" },
 			[6] = { .clk_name = "sata_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_SATA_OOB, TEGRA210_CLK_SATA_COLD,
+			      TEGRA210_CLK_SATA },
+		.reset_id_num = 3,
 	},
 #endif
 	[TEGRA_POWERGATE_NVENC] = {
 		.name = "nvenc",
 		.clk_info = {
-			[0] = { .clk_name = "msenc.cbus", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "msenc.cbus", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -236,15 +244,17 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[3] = { .clk_name = "mc_cdpa" },
 			[4] = { .clk_name = "msenc_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_NVENC },
+		.reset_id_num = 1,
 	},
 	[TEGRA_POWERGATE_SOR] = {
 		.name = "sor",
 		.clk_info = {
-			[0] = { .clk_name = "sor0", .clk_type = CLK_AND_RST },
-			[1] = { .clk_name = "dsia", .clk_type = CLK_AND_RST },
-			[2] = { .clk_name = "dsib", .clk_type = CLK_AND_RST },
-			[3] = { .clk_name = "sor1", .clk_type = CLK_AND_RST },
-			[4] = { .clk_name = "mipi-cal", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "sor0", .clk_type = CLK_ONLY },
+			[1] = { .clk_name = "dsia", .clk_type = CLK_ONLY },
+			[2] = { .clk_name = "dsib", .clk_type = CLK_ONLY },
+			[3] = { .clk_name = "sor1", .clk_type = CLK_ONLY },
+			[4] = { .clk_name = "mipi-cal", .clk_type = CLK_ONLY },
 			[5] = { .clk_name = "dpaux", .clk_type = CLK_ONLY },
 			[6] = { .clk_name = "dpaux1", .clk_type = CLK_ONLY },
 		},
@@ -260,11 +270,15 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[8] = { .clk_name = "disp1_slcg_ovr" },
 			[9] = { .clk_name = "disp2_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_SOR0, TEGRA210_CLK_DISP1,
+			      TEGRA210_CLK_DSIB, TEGRA210_CLK_SOR1,
+			      TEGRA210_CLK_MIPI_CAL },
+		.reset_id_num = 5,
 	},
 	[TEGRA_POWERGATE_DISA] = {
 		.name = "disa",
 		.clk_info = {
-			[0] = { .clk_name = "disp1", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "disp1", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -275,12 +289,14 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[5] = { .clk_name = "host1x" },
 			[6] = { .clk_name = "disp1_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_DISP1 },
+		.reset_id_num = 1,
 	},
 	[TEGRA_POWERGATE_DISB] = {
 		.name = "disb",
 		.disable_after_boot = true,
 		.clk_info = {
-			[0] = { .clk_name = "disp2", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "disp2", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -291,11 +307,13 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[5] = { .clk_name = "host1x" },
 			[6] = { .clk_name = "disp2_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_DISP2 },
+		.reset_id_num = 1,
 	},
 	[TEGRA_POWERGATE_XUSBA] = {
 		.name = "xusba",
 		.clk_info = {
-			[0] = { .clk_name = "xusb_ss", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "xusb_ss", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -307,11 +325,13 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[6] = { .clk_name = "xusb_host_slcg_ovr" },
 			[7] = { .clk_name = "xusb_dev_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_XUSB_SS },
+		.reset_id_num = 1,
 	},
 	[TEGRA_POWERGATE_XUSBB] = {
 		.name = "xusbb",
 		.clk_info = {
-			[0] = { .clk_name = "xusb_dev", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "xusb_dev", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -323,11 +343,13 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[6] = { .clk_name = "xusb_host_slcg_ovr" },
 			[7] = { .clk_name = "xusb_dev_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_XUSB_DEV },
+		.reset_id_num = 1,
 	},
 	[TEGRA_POWERGATE_XUSBC] = {
 		.name = "xusbc",
 		.clk_info = {
-			[0] = { .clk_name = "xusb_host", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "xusb_host", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -339,12 +361,14 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[6] = { .clk_name = "xusb_dev_slcg_ovr" },
 			[7] = { .clk_name = "xusb_host_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_XUSB_HOST },
+		.reset_id_num = 1,
 	},
 #ifdef CONFIG_ARCH_TEGRA_VIC
 	[TEGRA_POWERGATE_VIC] = {
 		.name = "vic",
 		.clk_info = {
-			[0] = { .clk_name = "vic03.cbus", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "vic03.cbus", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -354,12 +378,14 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[4] = { .clk_name = "vic03_slcg_ovr" },
 			[5] = { .clk_name = "host1x" },
 		},
+		.reset_id = { TEGRA210_CLK_VIC03 },
+		.reset_id_num = 1,
 	},
 #endif
 	[TEGRA_POWERGATE_NVDEC] = {
 		.name = "nvdec",
 		.clk_info = {
-			[0] = { .clk_name = "nvdec", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "nvdec", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -370,11 +396,13 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[5] = { .clk_name = "nvjpg" },
 			[6] = { .clk_name = "nvjpg_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_NVDEC },
+		.reset_id_num = 1,
 	},
 	[TEGRA_POWERGATE_NVJPG] = {
 		.name = "nvjpg",
 		.clk_info = {
-			[0] = { .clk_name = "nvjpg", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "nvjpg", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -385,11 +413,13 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[5] = { .clk_name = "nvdec" },
 			[6] = { .clk_name = "nvdec_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_NVJPG },
+		.reset_id_num = 1,
 	},
 	[TEGRA_POWERGATE_APE] = {
 		.name = "ape",
 		.clk_info = {
-			[0] = { .clk_name = "ape", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "ape", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -409,11 +439,13 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[14] = { .clk_name = "d_audio_slcg_ovr" },
 
 		},
+		.reset_id = { TEGRA210_CLK_APE },
+		.reset_id_num = 1,
 	},
 	[TEGRA_POWERGATE_VE2] = {
 		.name = "ve2",
 		.clk_info = {
-			[0] = { .clk_name = "ispb", .clk_type = CLK_AND_RST },
+			[0] = { .clk_name = "ispb", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
@@ -422,6 +454,8 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[3] = { .clk_name = "mc_cdpa" },
 			[4] = { .clk_name = "ispb_slcg_ovr" },
 		},
+		.reset_id = { TEGRA210_CLK_ISPB },
+		.reset_id_num = 1,
 	},
 	[TEGRA_POWERGATE_GPU] = {
 		.name = "gpu",
