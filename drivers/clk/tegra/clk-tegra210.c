@@ -2583,6 +2583,12 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "mc_cbpa", .dt_id = TEGRA210_CLK_MC_CBPA },
 	{ .con_id = "mc_ccpa", .dt_id = TEGRA210_CLK_MC_CCPA },
 	{ .con_id = "mc_cdpa", .dt_id = TEGRA210_CLK_MC_CDPA },
+	{ .con_id = "xusb_ss", .dt_id = TEGRA210_CLK_XUSB_SS, },
+	{ .con_id = "xusb_dev", .dt_id = TEGRA210_CLK_XUSB_DEV, },
+	{ .con_id = "xusb_host", .dt_id = TEGRA210_CLK_XUSB_HOST, },
+	{ .con_id = "vic03_slcg_ovr", .dt_id = TEGRA210_CLK_VIC03_SLCG_OVR, },
+	{ .con_id = "vic03.cbus", .dt_id = TEGRA210_CLK_VIC03_CBUS, },
+	{ .con_id = "msenc.cbus", .dt_id = TEGRA210_CLK_MSENC_CBUS, },
 };
 
 static struct tegra_audio_clk_info tegra210_audio_plls[] = {
