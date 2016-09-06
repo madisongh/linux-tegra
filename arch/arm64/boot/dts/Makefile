@@ -77,7 +77,8 @@ local-dtb := $(dtb-y)
 dtb-y :=
 include $(kbuild-dir)/$(call tegra-path,t18x,arch/arm64/boot/dts/nvidia/t18x/Makefile)
 t18x-dtb := $(addprefix $(call tegra-path,t18x,arch/arm64/boot/dts/nvidia/t18x/),$(dtb-y))
-t18x-dtb-out := $(addprefix $(O)/arch/arm64/boot/dts/,$(t18x-dtb))
+_t18x-dtb-out := $(addprefix $(O)/arch/arm64/boot/dts/,$(t18x-dtb))
+t18x-dtb-out := $(call replace_ddot,$(_t18x-dtb-out))
 dtb-y := $(local-dtb)
 dtb-y += $(t18x-dtb)
 endif
@@ -87,7 +88,8 @@ local-dtb := $(dtb-y)
 dtb-y :=
 include $(kbuild-dir)/$(call tegra-path,t19x,arch/arm64/boot/dts/nvidia/t19x/Makefile)
 t19x-dtb := $(addprefix $(call tegra-path,t19x,arch/arm64/boot/dts/nvidia/t19x/),$(dtb-y))
-t19x-dtb-out := $(addprefix $(O)/arch/arm64/boot/dts/,$(t19x-dtb))
+_t19x-dtb-out := $(addprefix $(O)/arch/arm64/boot/dts/,$(t19x-dtb))
+t19x-dtb-out := $(call replace_ddot,$(_t19x-dtb-out))
 dtb-y := $(local-dtb)
 dtb-y += $(t19x-dtb)
 endif
@@ -99,7 +101,8 @@ non-plat-dtbs := $(dtb-y)
 dtb-y :=
 include $(dts_mfiles)
 plat-dtbs := $(addprefix $(tegra-rel-dtstree)/hardware/nvidia/,$(dtb-y))
-plat-dtbs-out := $(addprefix $(O)/arch/arm64/boot/dts/,$(plat-dtbs))
+_plat-dtbs-out := $(addprefix $(O)/arch/arm64/boot/dts/,$(plat-dtbs))
+plat-dtbs-out := $(call replace_ddot,$(_plat-dtbs-out))
 dtb-y := $(non-plat-dtbs)
 dtb-y += $(plat-dtbs)
 endif
@@ -115,7 +118,18 @@ DTB_OBJS := $(addprefix $(obj)/,$(DTB_LIST))
 
 targets += $(DTB_LIST)
 
-dtbs: $(DTB_OBJS)
+define _define_dtb_rule
+$(obj)/$(call replace_ddot,$(1)): $(src)/$(patsubst %.dtb,%.dts,$(1))
+endef
+
+$(foreach _dtb, $(DTB_LIST), $(eval $(call _define_dtb_rule,$(_dtb))))
+
+DTB_OBJS := $(call replace_ddot,$(DTB_OBJS))
+
+$(DTB_OBJS):
+	$(call if_changed_dep,dtc)
+
+dtbs: $(DTB_OBJS) FORCE
 ifneq ($(t210-dtb-out),)
 	cp -u $(t210-dtb-out) arch/arm64/boot/dts/
 endif
