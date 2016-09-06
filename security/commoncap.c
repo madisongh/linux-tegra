@@ -7,6 +7,10 @@
  *
  */
 
+/*
+ *  Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
+ */
+
 #include <linux/capability.h>
 #include <linux/audit.h>
 #include <linux/module.h>
@@ -34,6 +38,19 @@
 #ifdef CONFIG_ANDROID_PARANOID_NETWORK
 #include <linux/android_aid.h>
 #endif
+
+u8 disable_android_paranoid_network;
+EXPORT_SYMBOL(disable_android_paranoid_network);
+
+static int __init disable_android_paranoid_network_feature(char *s)
+{
+	disable_android_paranoid_network = 1;
+
+	return 1;
+}
+
+__setup("disable_android_paranoid_network",
+		disable_android_paranoid_network_feature);
 
 /*
  * If a non-root user executes a setuid-root binary in
@@ -78,10 +95,12 @@ int cap_capable(const struct cred *cred, struct user_namespace *targ_ns,
 	struct user_namespace *ns = targ_ns;
 
 #ifdef CONFIG_ANDROID_PARANOID_NETWORK
-	if (cap == CAP_NET_RAW && in_egroup_p(AID_NET_RAW))
-		return 0;
-	if (cap == CAP_NET_ADMIN && in_egroup_p(AID_NET_ADMIN))
-		return 0;
+	if (!disable_android_paranoid_network) {
+		if (cap == CAP_NET_RAW && in_egroup_p(AID_NET_RAW))
+			return 0;
+		if (cap == CAP_NET_ADMIN && in_egroup_p(AID_NET_ADMIN))
+			return 0;
+	}
 #endif
 
 	/* See if cred has the capability in the target user namespace

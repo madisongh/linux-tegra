@@ -37,6 +37,10 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
+
+/* Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
+ */
+
 #ifndef _SOCK_H
 #define _SOCK_H
 
@@ -68,6 +72,8 @@
 #include <net/checksum.h>
 #include <net/tcp_states.h>
 #include <linux/net_tstamp.h>
+
+extern u8 disable_android_paranoid_network;
 
 struct cgroup;
 struct cgroup_subsys;

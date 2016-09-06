@@ -34,6 +34,9 @@
  *    Modifications for 2.3.99-pre5 kernel.
  */
 
+/* Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
+ */
+
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #define DRV_NAME	"tun"
@@ -1889,8 +1892,9 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 	int ret;
 
 #ifdef CONFIG_ANDROID_PARANOID_NETWORK
-	if (cmd != TUNGETIFF && !capable(CAP_NET_ADMIN)) {
-		return -EPERM;
+	if (!disable_android_paranoid_network) {
+		if (cmd != TUNGETIFF && !capable(CAP_NET_ADMIN))
+			return -EPERM;
 	}
 #endif
 
