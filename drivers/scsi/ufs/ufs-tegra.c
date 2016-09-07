@@ -1050,6 +1050,8 @@ static int ufs_tegra_pwr_change_notify(struct ufs_hba *hba,
 			dev_req_params->pwr_tx = SLOWAUTO_MODE;
 			dev_req_params->hs_rate = 0;
 		}
+		memcpy(&hba->max_pwr_info.info, dev_req_params,
+			sizeof(struct ufs_pa_layer_attr));
 		break;
 	case POST_CHANGE:
 		ufs_tegra_print_power_mode_config(hba, dev_req_params);
