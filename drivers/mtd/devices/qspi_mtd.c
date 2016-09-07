@@ -3,7 +3,7 @@
  *
  * Author: Mike Lavender, mike@steroidmicros.com
  * Copyright (c) 2005, Intec Automation Inc.
- * Copyright (c) 2013-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -849,17 +849,6 @@ static int qspi_read(struct mtd_info *mtd, loff_t from, size_t len,
 	}
 
 	spi_sync(flash->spi, &m);
-
-	/* Disable QUAD bit before doing QUAD i/o operation */
-	if (flash->cmd_table.qdata.bus_width == X4) {
-		err = qspi_quad_flag_set(flash, FALSE);
-		if (err) {
-			mutex_unlock(&flash->lock);
-			return err;
-		}
-	}
-
-
 	*retlen = m.actual_length -
 		(flash->cmd_table.qaddr.len + 1 +
 		(flash->cmd_table.qaddr.dummy_cycles/8));
