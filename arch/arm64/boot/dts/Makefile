@@ -122,7 +122,7 @@ endif
 ifneq ($(t19x-dtb-out),)
 	cp -u $(t19x-dtb-out) $(O)/arch/arm64/boot/dts/
 endif
-ifneq ($(plat-dtbs),)
+ifneq ($(plat-dtbs-out),)
 	cp -u $(plat-dtbs-out) $(O)/arch/arm64/boot/dts/
 endif
 
