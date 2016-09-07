@@ -110,9 +110,12 @@ DTB_LIST := $(addsuffix .dtb,$(DTB_NAMES))
 else
 DTB_LIST := $(dtb-y)
 endif
+
+DTB_OBJS := $(addprefix $(obj)/,$(DTB_LIST))
+
 targets += $(DTB_LIST)
 
-dtbs: $(addprefix $(obj)/, $(DTB_LIST))
+dtbs: $(DTB_OBJS)
 ifneq ($(t210-dtb-out),)
 	cp -u $(t210-dtb-out) arch/arm64/boot/dts/
 endif
