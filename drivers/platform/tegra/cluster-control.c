@@ -43,19 +43,8 @@
 #define DISABLE_SLOW_CLUSTER_BIT	5
 
 static DEFINE_MUTEX(cluster_switch_lock);
-static unsigned long pg_core_arg, pg_cluster_arg;
-
-static struct psci_power_state core_pg __initdata = {
-	.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-	.id = 30,
-	.affinity_level = 1,
-};
-
-static struct psci_power_state cluster_pg __initdata = {
-	.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-	.id = 31,
-	.affinity_level = 1,
-};
+static unsigned long pg_core_arg = (PSCI_POWER_STATE_TYPE_POWER_DOWN << 30) | 30;
+static unsigned long pg_cluster_arg = (PSCI_POWER_STATE_TYPE_POWER_DOWN << 30) | 31;
 
 static DEFINE_PER_CPU(struct cpu_stop_work, shutdown_core_work);
 
@@ -240,9 +229,6 @@ static void setup_debugfs(void) {}
 
 static int __init tegra210_cluster_control_init(void)
 {
-	pg_core_arg = psci_power_state_pack(core_pg);
-	pg_cluster_arg = psci_power_state_pack(cluster_pg);
-
 	slow_cluster_enabled = cluster_switch_supported();
 
 	setup_debugfs();
