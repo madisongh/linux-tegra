@@ -37,8 +37,10 @@ endif
 obj-$(CONFIG_TEGRA_PMC) += pmc.o
 obj-$(CONFIG_TEGRA210_BOOTROM_PMC) += tegra-bootrom-pmc-config.o
 obj-$(CONFIG_TEGRA_DYNAMIC_PWRDET)	+= tegra-pmc-powerdetect.o
+ifeq ($(CONFIG_PM),y)
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC)	+= tegra21-pmc-iopower.o
-obj-y += pm.o
+endif
+obj-$(CONFIG_PM) += pm.o
 
 obj-$(CONFIG_TEGRA_MC_DOMAINS) += pm_domains.o
 
@@ -125,8 +127,9 @@ obj-$(CONFIG_COMMON_CLK) += common_clock.o
 
 
 obj-$(CONFIG_TEGRA3_PM) += pm-t3.o
+ifeq ($(CONFIG_PM_SLEEP),y)
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += wakeups-t21x.o
-
+endif
 
 obj-$(CONFIG_TEGRA_KFUSE) += tegra_kfuse.o
 obj-y += apbio.o
