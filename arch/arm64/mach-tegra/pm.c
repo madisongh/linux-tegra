@@ -416,16 +416,11 @@ static void save_pll_state(void)
 
 static int tegra_psci_suspend_cpu(long unsigned int val)
 {
-	struct psci_power_state pps;
-
+	u32 state = (PSCI_POWER_STATE_TYPE_POWER_DOWN << 30) |
+		    TEGRA_ID_CPU_SUSPEND_LP0;
 	if (tegra_cpu_is_secure()) {
-		if (psci_ops.cpu_suspend) {
-			pps.id = TEGRA_ID_CPU_SUSPEND_LP0;
-			pps.type = PSCI_POWER_STATE_TYPE_POWER_DOWN;
-			pps.affinity_level = TEGRA_PWR_DN_AFFINITY_SYSTEM;
-
-			psci_ops.cpu_suspend(pps, __pa(cpu_resume));
-		}
+		if (psci_ops.cpu_suspend)
+			psci_ops.cpu_suspend(state, __pa(cpu_resume));
 	}
 
 	return 0;
@@ -647,12 +642,7 @@ static void tegra_bpmp_enable_suspend(int mode, int flags)
 static int tegra210_suspend_dram(enum tegra_suspend_mode mode)
 {
 	int err = 0;
-	unsigned long arg;
-	struct psci_power_state ps = {
-		.id = TEGRA210_CPUIDLE_SC7,
-		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-		.affinity_level = 2,
-	};
+	u32 power_state = (PSCI_POWER_STATE_TYPE_POWER_DOWN << 30);
 
 	if (WARN_ON(mode <= TEGRA_SUSPEND_NONE ||
 		mode >= TEGRA_MAX_SUSPEND_MODE)) {
@@ -667,14 +657,12 @@ static int tegra210_suspend_dram(enum tegra_suspend_mode mode)
 
 	if (mode == TEGRA_SUSPEND_LP1) {
 		tegra_bpmp_enable_suspend(TEGRA_PM_SC4, 0);
-		ps.id = TEGRA210_CPUIDLE_CC7;
-		ps.affinity_level = 1;
 
 		trace_cpu_suspend(CPU_SUSPEND_START, tegra_rtc_read_ms());
 		tegra_get_suspend_time();
 
-		arg = psci_power_state_pack(ps);
-		cpu_suspend(arg, NULL);
+		power_state |= TEGRA210_CPUIDLE_CC7;
+		cpu_suspend(power_state, NULL);
 
 		resume_entry_time = tegra_read_usec_raw();
 		trace_cpu_suspend(CPU_SUSPEND_DONE, tegra_rtc_read_ms());
@@ -687,8 +675,8 @@ static int tegra210_suspend_dram(enum tegra_suspend_mode mode)
 	trace_cpu_suspend(CPU_SUSPEND_START, tegra_rtc_read_ms());
 	tegra_get_suspend_time();
 
-	arg = psci_power_state_pack(ps);
-	cpu_suspend(arg, NULL);
+	power_state |= TEGRA210_CPUIDLE_SC7;
+	cpu_suspend(power_state, NULL);
 
 	resume_entry_time = tegra_read_usec_raw();
 	trace_cpu_suspend(CPU_SUSPEND_DONE, tegra_rtc_read_ms());
