@@ -1,7 +1,7 @@
 /*
  * Maxim DS1050 Pulse-Width Modulator/Backlight Driver
  *
- * Copyright (C) 2015 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2015-2016 NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -74,6 +74,7 @@ static int ds1050_backlight_register(struct ds1050 *ds)
 	struct backlight_properties props;
 	const char *name = DEFAULT_BL_NAME;
 
+	memset(&props, 0, sizeof(props));
 	props.type = BACKLIGHT_PLATFORM;
 	props.max_brightness = MAX_BRIGHTNESS;
 	props.brightness = MAX_BRIGHTNESS / 2;
