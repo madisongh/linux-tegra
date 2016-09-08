@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2003-2008 David Brownell
  * Copyright (C) 2008 by Nokia Corporation
+ * Copyright (c) 2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -593,13 +594,9 @@ DECLARE_USB_FUNCTION(Loopback, loopback_alloc_instance, loopback_alloc);
 
 int __init lb_modinit(void)
 {
-	int ret;
-
-	ret = usb_function_register(&Loopbackusb_func);
-	if (ret)
-		return ret;
-	return ret;
+	return usb_function_register(&Loopbackusb_func);
 }
+
 void __exit lb_modexit(void)
 {
 	usb_function_unregister(&Loopbackusb_func);
