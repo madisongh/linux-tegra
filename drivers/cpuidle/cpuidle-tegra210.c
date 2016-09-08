@@ -140,12 +140,8 @@ static struct syscore_ops tegra210_syscore_ops = {
 
 static void __tegra210_enter_c7(int cpu)
 {
-	struct psci_power_state ps = {
-		.id = TEGRA210_CPUIDLE_C7,
-		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-		.affinity_level = 1,
-	};
-	unsigned long arg = psci_power_state_pack(ps);
+	unsigned long arg = (PSCI_POWER_STATE_TYPE_POWER_DOWN << 30) |
+			    TEGRA210_CPUIDLE_C7;
 
 	cpu_pm_enter();
 
@@ -179,12 +175,7 @@ static int tegra210_enter_cc_state(struct cpuidle_device *dev,
 		int cc_state_tolerance, int sc_state_tolerance,
 		int state_id, int idx)
 {
-	struct psci_power_state ps = {
-		.id = state_id,
-		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-		.affinity_level = 1,
-	};
-	unsigned long arg = psci_power_state_pack(ps);
+	unsigned long arg = (PSCI_POWER_STATE_TYPE_POWER_DOWN << 30) | state_id;
 
 	if (tegra_bpmp_do_idle(dev->cpu, cc_state_tolerance,
 			sc_state_tolerance)) {
@@ -252,16 +243,9 @@ static int tegra210_enter_sc7(struct cpuidle_device *dev,
 {
 	int err = idx;
 	int cpu;
-	unsigned long arg;
+	unsigned long arg = PSCI_POWER_STATE_TYPE_POWER_DOWN << 30;
 	u64 sleep_time = ULONG_MAX;
 	u64 next_event;
-
-	/* Assume C7 config by default */
-	struct psci_power_state ps = {
-		.id = 0,
-		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-		.affinity_level = 0,
-	};
 
 	if (csite_dbg_nopwrdown())
 		return 0;
@@ -282,8 +266,7 @@ static int tegra210_enter_sc7(struct cpuidle_device *dev,
 		 * We are the last core standing and bpmp says GO.
 		 * Change to CCx config.
 		 */
-		ps.id = TEGRA210_CPUIDLE_SC7;
-		ps.affinity_level = 2;
+		arg |= TEGRA210_CPUIDLE_SC7;
 
 		tegra_rtc_set_trigger(sleep_time);
 
@@ -302,12 +285,13 @@ static int tegra210_enter_sc7(struct cpuidle_device *dev,
 		err = tegra_pm_prepare_sc7();
 
 		restore_sc7 = true;
+	} else {
+		arg |= TEGRA210_CPUIDLE_C7;
 	}
 
-	if (ps.id == 0)
+	if (!restore_sc7)
 		cpu_pm_enter();
 
-	arg = psci_power_state_pack(ps);
 	cpu_suspend(arg, NULL);
 
 	if (!restore_sc7) {
