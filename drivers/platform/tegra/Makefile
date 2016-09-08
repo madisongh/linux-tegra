@@ -141,10 +141,6 @@ CFLAGS_tegra21_dvfs.o = -Werror -Wno-unused-function -Wno-unused-variable
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra21_dvfs.o
 endif
 
-obj-$(CONFIG_ARCH_TEGRA_13x_SOC)        += tegra13_speedo.o
-obj-$(CONFIG_ARCH_TEGRA_21x_SOC)        += tegra21_speedo.o
-
-
 obj-$(CONFIG_TEGRA_MC_DOMAINS) += pm_domains.o
 obj-y += bond_out.o
 
