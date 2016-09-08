@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * this program is free software; you can redistribute it and/or modify
  * it under the terms of the gnu general public license as published by
@@ -120,7 +120,7 @@ DEVICE_ATTR(odm_lock, 0440, tegra_fuse_show, tegra_fuse_store);
 int tegra_fuse_get_tsensor_calibration_data(u32 *calib)
 {
 	/* tsensor calibration fuse */
-	*calib = tegra_fuse_readl(FUSE_TSENSOR_CALIB_0);
+	tegra_fuse_readl(FUSE_TSENSOR_CALIB_0, calib);
 	return 0;
 }
 
@@ -135,8 +135,8 @@ int tegra_fuse_get_tsensor_spare_bits(u32 *spare_bits)
 	*spare_bits = 0;
 	/* spare bits 0-27 */
 	for (i = 0; i < NUM_TSENSOR_SPARE_BITS; i++) {
-		value = tegra_fuse_readl(FUSE_SPARE_BIT +
-			(i << 2));
+		tegra_fuse_readl(FUSE_SPARE_BIT +
+			(i << 2), &value);
 		if (value)
 			*spare_bits |= BIT(i);
 	}
@@ -186,13 +186,17 @@ unsigned long long tegra_chip_uid(void)
 	/* chip id is 1 for tegra 11x */
 	cid = 1;
 
-	vendor = tegra_fuse_readl(FUSE_VENDOR_CODE) & FUSE_VENDOR_CODE_MASK;
-	fab = tegra_fuse_readl(FUSE_FAB_CODE) & FUSE_FAB_CODE_MASK;
+	tegra_fuse_readl(FUSE_VENDOR_CODE, &vendor);
+	vendor &= FUSE_VENDOR_CODE_MASK;
+
+	tegra_fuse_readl(FUSE_FAB_CODE, &fab);
+	fab &= FUSE_FAB_CODE_MASK;
 
 	/* Lot code must be re-encoded from a 5 digit base-36 'BCD' number
 	   to a binary number. */
 	lot = 0;
-	reg = tegra_fuse_readl(FUSE_LOT_CODE_0) << 2;
+	tegra_fuse_readl(FUSE_LOT_CODE_0, &reg);
+	reg = reg << 2;
 
 	for (i = 0; i < 5; ++i) {
 		u32 digit = (reg & 0xFC000000) >> 26;
@@ -202,9 +206,12 @@ unsigned long long tegra_chip_uid(void)
 		reg <<= 6;
 	}
 
-	wafer = tegra_fuse_readl(FUSE_WAFER_ID) & FUSE_WAFER_ID_MASK;
-	x = tegra_fuse_readl(FUSE_X_COORDINATE) & FUSE_X_COORDINATE_MASK;
-	y = tegra_fuse_readl(FUSE_Y_COORDINATE) & FUSE_Y_COORDINATE_MASK;
+	tegra_fuse_readl(FUSE_WAFER_ID, &wafer);
+	wafer &= FUSE_WAFER_ID_MASK;
+	tegra_fuse_readl(FUSE_X_COORDINATE, &x);
+	x &= FUSE_X_COORDINATE_MASK;
+	tegra_fuse_readl(FUSE_Y_COORDINATE, &y);
+	y &= FUSE_Y_COORDINATE_MASK;
 
 	uid = ((unsigned long long)cid  << 60ull)
 	    | ((unsigned long long)vendor << 56ull)
@@ -219,8 +226,9 @@ unsigned long long tegra_chip_uid(void)
 int tegra_fuse_calib_base_get_cp(u32 *base_cp, s32 *shifted_cp)
 {
 	s32 cp;
-	u32 val = tegra_fuse_readl(FUSE_VSENSOR_CALIB_0);
+	u32 val;
 
+	tegra_fuse_readl(FUSE_VSENSOR_CALIB_0, &val);
 	if (!val)
 		return -EINVAL;
 
@@ -242,8 +250,9 @@ int tegra_fuse_calib_base_get_cp(u32 *base_cp, s32 *shifted_cp)
 int tegra_fuse_calib_base_get_ft(u32 *base_ft, s32 *shifted_ft)
 {
 	s32 ft;
-	u32 val = tegra_fuse_readl(FUSE_VSENSOR_CALIB_0);
+	u32 val;
 
+	tegra_fuse_readl(FUSE_VSENSOR_CALIB_0, &val);
 	if (!val)
 		return -EINVAL;
 
@@ -277,7 +286,7 @@ int tegra_fuse_get_tsensor_calib(int index, u32 *calib)
 {
 	if (index < 0 || index >= ARRAY_SIZE(tsensor_calib_offset))
 		return -EINVAL;
-	*calib = tegra_fuse_readl(tsensor_calib_offset[index]);
+	tegra_fuse_readl(tsensor_calib_offset[index], calib);
 	return 0;
 }
 

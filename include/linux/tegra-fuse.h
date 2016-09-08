@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 Google, Inc.
- * Copyright (c) 2010-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -32,7 +32,7 @@ unsigned long long tegra_chip_uid(void);
 #if defined(CONFIG_TEGRA_FUSE)
 bool tegra_spare_fuse(int bit);
 u32 tegra_get_chip_id(void);
-u32 tegra_fuse_readl(unsigned long offset);
+int tegra_fuse_readl(unsigned long offset, u32 *val);
 int tegra_get_sku_override(void);
 u32 tegra_get_sku_id(void);
 #endif

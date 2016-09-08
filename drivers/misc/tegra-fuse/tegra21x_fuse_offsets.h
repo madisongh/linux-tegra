@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * this program is free software; you can redistribute it and/or modify
  * it under the terms of the gnu general public license as published by
@@ -362,8 +362,7 @@ static int tegra_fuse_override_chip_option_regs(void)
 	u32 patch_header, num_cam_entries;
 	int count, ret;
 
-	patch_record_size = tegra_fuse_readl(
-			FUSE_FIRST_BOOTROM_PATCH_SIZE_REG);
+	tegra_fuse_readl(FUSE_FIRST_BOOTROM_PATCH_SIZE_REG, &patch_record_size);
 	if (patch_record_size > FUSE_MAX_PATCH_PAYLOAD) {
 		pr_err("%s - patch_record_size is more than allocated\n",
 				__func__);

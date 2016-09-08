@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -146,13 +146,16 @@ unsigned long long tegra_chip_uid(void)
 	/* chip id is 3 for tegra 12x */
 	cid = 3;
 
-	vendor = tegra_fuse_readl(FUSE_VENDOR_CODE) & FUSE_VENDOR_CODE_MASK;
-	fab = tegra_fuse_readl(FUSE_FAB_CODE) & FUSE_FAB_CODE_MASK;
+	tegra_fuse_readl(FUSE_VENDOR_CODE, &vendor);
+	vendor &= FUSE_VENDOR_CODE_MASK;
+	tegra_fuse_readl(FUSE_FAB_CODE, &fab);
+	fab &= FUSE_FAB_CODE_MASK;
 
 	/* Lot code must be re-encoded from a 5 digit base-36 'BCD' number
 	   to a binary number. */
 	lot = 0;
-	reg = tegra_fuse_readl(FUSE_LOT_CODE_0) << 2;
+	tegra_fuse_readl(FUSE_LOT_CODE_0, &reg);
+	reg = reg << 2;
 
 	for (i = 0; i < 5; ++i) {
 		u32 digit = (reg & 0xFC000000) >> 26;
@@ -162,9 +165,12 @@ unsigned long long tegra_chip_uid(void)
 		reg <<= 6;
 	}
 
-	wafer = tegra_fuse_readl(FUSE_WAFER_ID) & FUSE_WAFER_ID_MASK;
-	x = tegra_fuse_readl(FUSE_X_COORDINATE) & FUSE_X_COORDINATE_MASK;
-	y = tegra_fuse_readl(FUSE_Y_COORDINATE) & FUSE_Y_COORDINATE_MASK;
+	tegra_fuse_readl(FUSE_WAFER_ID, &wafer);
+	wafer &= FUSE_WAFER_ID_MASK;
+	tegra_fuse_readl(FUSE_X_COORDINATE, &x);
+	x &= FUSE_X_COORDINATE_MASK;
+	tegra_fuse_readl(FUSE_Y_COORDINATE, &y);
+	y &= FUSE_Y_COORDINATE_MASK;
 
 	uid = ((unsigned long long)cid  << 60ull)
 	    | ((unsigned long long)vendor << 56ull)
