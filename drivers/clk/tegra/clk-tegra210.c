@@ -2589,6 +2589,21 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "vic03_slcg_ovr", .dt_id = TEGRA210_CLK_VIC03_SLCG_OVR, },
 	{ .con_id = "vic03.cbus", .dt_id = TEGRA210_CLK_VIC03_CBUS, },
 	{ .con_id = "msenc.cbus", .dt_id = TEGRA210_CLK_MSENC_CBUS, },
+	{ .con_id = "disp1_slcg_ovr", .dt_id = TEGRA210_CLK_DISP1_SLCG_OVR },
+	{ .con_id = "disp2_slcg_ovr", .dt_id = TEGRA210_CLK_DISP2_SLCG_OVR },
+	{ .con_id = "vi_slcg_ovr", .dt_id = TEGRA210_CLK_VI_SLCG_OVR },
+	{ .con_id = "ispa_slcg_ovr", .dt_id = TEGRA210_CLK_ISPA_SLCG_OVR },
+	{ .con_id = "ispb_slcg_ovr", .dt_id = TEGRA210_CLK_ISPB_SLCG_OVR },
+	{ .con_id = "nvdec_slcg_ovr", .dt_id = TEGRA210_CLK_NVDEC_SLCG_OVR },
+	{ .con_id = "msenc_slcg_ovr", .dt_id = TEGRA210_CLK_MSENC_SLCG_OVR },
+	{ .con_id = "nvjpg_slcg_ovr", .dt_id = TEGRA210_CLK_NVJPG_SLCG_OVR },
+	{ .con_id = "xusb_dev_slcg", .dt_id = TEGRA210_CLK_XUSB_DEV_SLCG_OVR },
+	{ .con_id = "xusb_host_slcg", .dt_id = TEGRA210_CLK_XUSB_HOST_SLCG_OVR },
+	{ .con_id = "d_audio_slcg_ovr", .dt_id = TEGRA210_CLK_D_AUDIO_SLCG_OVR },
+	{ .con_id = "ape_slcg_ovr", .dt_id = TEGRA210_CLK_APE_SLCG_OVR },
+	{ .con_id = "sata_slcg_ovr", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR },
+	{ .con_id = "sata_slcg_ipfs", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR_IPFS },
+	{ .con_id = "sata_slcg_fpci", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR_FPCI },
 };
 
 static struct tegra_audio_clk_info tegra210_audio_plls[] = {
