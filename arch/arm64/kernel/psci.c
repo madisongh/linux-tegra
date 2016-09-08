@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -67,30 +67,6 @@ static int psci_to_linux_errno(int errno)
 	return -EINVAL;
 }
 
-static u32 psci_power_state_pack(struct psci_power_state state)
-{
-	return ((state.id << PSCI_0_2_POWER_STATE_ID_SHIFT)
-			& PSCI_0_2_POWER_STATE_ID_MASK) |
-		((state.type << PSCI_0_2_POWER_STATE_TYPE_SHIFT)
-		 & PSCI_0_2_POWER_STATE_TYPE_MASK) |
-		((state.affinity_level << PSCI_0_2_POWER_STATE_AFFL_SHIFT)
-		 & PSCI_0_2_POWER_STATE_AFFL_MASK);
-}
-
-struct psci_power_state to_psci_power_state(unsigned long arg)
-{
-	struct psci_power_state ps;
-
-	ps.id = (arg >> PSCI_POWER_STATE_ID_SHIFT)
-			& PSCI_POWER_STATE_ID_MASK;
-	ps.type = (arg >> PSCI_POWER_STATE_TYPE_SHIFT)
-			& PSCI_POWER_STATE_TYPE_MASK;
-	ps.affinity_level = (arg >> PSCI_POWER_STATE_AFFL_SHIFT)
-			& PSCI_POWER_STATE_AFFL_MASK;
-
-	return ps;
-}
-
 /*
  * The following two functions are invoked via the invoke_psci_fn pointer
  * and will not be inlined, allowing us to piggyback on the AAPCS.
@@ -133,26 +109,23 @@ static int psci_get_version(void)
 	return err;
 }
 
-static int psci_cpu_suspend(struct psci_power_state state,
-			    unsigned long entry_point)
+static int psci_cpu_suspend(u32 power_state, unsigned long entry_point)
 {
 	int err;
-	u32 fn, power_state;
+	u32 fn;
 
 	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
-	power_state = psci_power_state_pack(state);
 	err = invoke_psci_fn(fn, power_state, entry_point, 0);
 	return psci_to_linux_errno(err);
 }
 
-static int psci_cpu_off(struct psci_power_state state)
+static int psci_cpu_off(void)
 {
 	int err;
-	u32 fn, power_state;
+	u32 fn;
 
 	fn = psci_function_id[PSCI_FN_CPU_OFF];
-	power_state = psci_power_state_pack(state);
-	err = invoke_psci_fn(fn, power_state, 0, 0);
+	err = invoke_psci_fn(fn, 0, 0, 0);
 	return psci_to_linux_errno(err);
 }
 
@@ -353,6 +326,7 @@ out_put_node:
 static const struct of_device_id psci_of_match[] __initconst = {
 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
+	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
 	{},
 };
 
@@ -409,15 +383,8 @@ static int cpu_psci_cpu_disable(unsigned int cpu)
 static void cpu_psci_cpu_die(unsigned int cpu)
 {
 	int ret;
-	/*
-	 * There are no known implementations of PSCI actually using the
-	 * power state field, pass a sensible default for now.
-	 */
-	struct psci_power_state state = {
-		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-	};
 
-	ret = psci_ops.cpu_off(state);
+	ret = psci_ops.cpu_off();
 
 	pr_debug("unable to power off CPU%u (%d)\n", cpu, ret);
 }
@@ -455,9 +422,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
 #ifdef CONFIG_ARM64_CPU_SUSPEND
 static int cpu_psci_cpu_suspend(unsigned long arg)
 {
-	struct psci_power_state ps = to_psci_power_state(arg);
-
-	return psci_ops.cpu_suspend(ps, __pa(cpu_resume));
+	return psci_ops.cpu_suspend(arg, __pa(cpu_resume));
 }
 #endif
 
