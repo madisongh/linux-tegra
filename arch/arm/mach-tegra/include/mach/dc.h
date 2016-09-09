@@ -835,6 +835,7 @@ struct tegra_dc_out {
 #define V_BLANK_FLIP		0
 #define V_BLANK_NVSD		1
 #define V_BLANK_USER		2
+#define V_BLANK_IMP		3
 
 #define V_PULSE2_FLIP		0
 #define V_PULSE2_NVSD		1
