@@ -36,8 +36,11 @@
 	nvidia,dtbbuildtime = __DATE__, __TIME__;
 
 	chosen {
-		bootargs ="mem=1024M@2048M earlycon=uart8250,mmio32,0x70006000";
+		bootargs ="mem=1024M@2048M earlycon=uart8250,mmio32,0x70006000 console=ttyS0,2400 maxcpus=1";
 		stdout-path = &uarta;
+		/* set for an image exactly 2999552 bytes */
+		linux,initrd-start = <0x81200000>;
+		linux,initrd-end = <0x814dc500>;
         };
 
 	/* chosen */
@@ -100,18 +103,19 @@
 	};
 
 	serial@70006000 {
-		compatible = "nvidia,tegra210-uart";
+		compatible = "nvidia,tegra210-uart", "nvidia,tegra114-hsuart";
 		console-port;
 		status = "okay";
+		clock-frequency = < 25500000 >;
 	};
 
 	serial@70006040 {
-		compatible = "nvidia,tegra210-uart";
-		status = "okay";
+		compatible = "nvidia,tegra114-hsuart";
+		 status = "okay";
 	};
 
 	serial@70006200 {
-		compatible = "nvidia,tegra210-uart";
+		compatible = "nvidia,tegra114-hsuart";
 		status = "okay";
 	};
 
