@@ -72,15 +72,6 @@ endif
 obj-$(CONFIG_ARCH_TEGRA_HAS_CL_DVFS) += tegra_cl_dvfs.o
 endif
 
-# FIXME: Bug 1211919:
-# Remove CFLAGS_common.o flag for common.o when common.c
-# becomes stabilized for t210.
-
-ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
-CFLAGS_common.o = -Werror -Wno-unused-function
-endif
-
-obj-$(CONFIG_TEGRA_COMMON) += common.o
 obj-$(CONFIG_TEGRA_EDP_LIMITS)          += cpu-edp.o # must precede cpu-tegra.o
 
 ifeq ($(CONFIG_CPU_FREQ),y)
