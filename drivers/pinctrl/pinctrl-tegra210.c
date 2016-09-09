@@ -1595,7 +1595,12 @@ static struct platform_driver tegra210_pinctrl_driver = {
 	.probe = tegra210_pinctrl_probe,
 	.remove = tegra_pinctrl_remove,
 };
-module_platform_driver(tegra210_pinctrl_driver);
+
+static int __init tegra_pinctrl_init(void)
+{
+        return platform_driver_register(&tegra210_pinctrl_driver);
+}
+postcore_initcall(tegra_pinctrl_init);
 
 MODULE_AUTHOR("NVIDIA");
 MODULE_DESCRIPTION("NVIDIA Tegra210 pinctrl driver");
