@@ -2901,6 +2901,20 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 }
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
+
+#ifdef CONFIG_TASK_WEIGHT
+void task_decayed_load(struct task_struct *p, struct sched_avg *avg)
+{
+        *avg = p->se.avg;
+        /* If the task is on rq, the loads are updated frequently enough */
+        if (!p->on_rq) {
+                int cpu = task_cpu(p);
+                u64 now = cpu_rq(cpu)->clock_task;
+                __update_load_avg(now, cpu, avg, 0, 0, 0);
+        }
+}
+#endif
+
 /*
  * Updating tg's load_avg is necessary before update_cfs_share (which is done)
  * and effective_load (which is not done because it is too costly).
