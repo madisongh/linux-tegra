@@ -2065,8 +2065,7 @@ skip_clocks:
 			tegra->usb3_otg_port_base_1 - 1);
 	} else
 		dev_info(&pdev->dev, "No USB3 port has OTG_CAP\n");
-/* WAR for T210 on K44 since powergate driver is not yet ready */
-#ifndef CONFIG_ARCH_TEGRA_21x_SOC
+
 	if (tegra_platform_is_silicon()) {
 		ret = tegra_unpowergate_partition_with_clk_on(tegra->pgid_ss);
 		if (ret) {
@@ -2080,7 +2079,7 @@ skip_clocks:
 			goto powergate_ss;
 		}
 	}
-#endif
+
 	tegra_xhci_cfg(tegra);
 
 	ret = tegra_xhci_phy_enable(tegra);
