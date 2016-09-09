@@ -111,7 +111,6 @@ asflags-y += -I$(srctree)/arch/arm/mach-tegra/include \
 
 
 
-obj-$(CONFIG_TEGRA_DEVICES) += devices.o
 obj-$(CONFIG_TEGRA_CLK_FRAMEWORK) += tegra_clocks_pll.o
 ifeq ($(CONFIG_TEGRA_CLK_FRAMEWORK),y)
 

@@ -43,12 +43,6 @@ config TEGRA_WAKEUP_MONITOR
 	  send out wakeup source and uevents which indicate suspend_prepare and
 	  post_suspend.
 
-config TEGRA_DEVICES
-	bool "Tegra devices"
-	default y
-	help
-	  Enable misc Tegra devices.
-
 config TEGRA3_PM
 	bool "Tegra3 power and cluster management"
 	default y
