@@ -94,6 +94,7 @@ targets += $(DTB_LIST)
 
 define _define_dtb_rule
 $(obj)/$(call replace_ddot,$(1)): $(src)/$(patsubst %.dtb,%.dts,$(1)) FORCE
+	 rm -f $@
 endef
 
 $(foreach _dtb, $(DTB_LIST), $(eval $(call _define_dtb_rule,$(_dtb))))
@@ -105,6 +106,7 @@ $(DTB_OBJS):
 
 dtbs: $(DTB_OBJS) FORCE
 	cp -u $(DTB_OBJS) arch/arm64/boot/dts/
+	rm -rf $(dir $(DTB_OBJS))
 
 clean-files := dts/*.dtb *.dtb
 clean-dirs := dts/_ddot_
