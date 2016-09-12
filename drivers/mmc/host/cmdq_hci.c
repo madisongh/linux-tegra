@@ -368,6 +368,8 @@ static void cmdq_disable(struct mmc_host *mmc, bool soft)
 {
 	struct cmdq_host *cq_host = (struct cmdq_host *)mmc_cmdq_private(mmc);
 
+	if (cq_host->ops->runtime_pm_get)
+		cq_host->ops->runtime_pm_get(mmc);
 	if (soft) {
 		cmdq_writel(cq_host, cmdq_readl(
 				    cq_host, CQCFG) & ~(CQ_ENABLE),
@@ -383,6 +385,8 @@ static void cmdq_disable(struct mmc_host *mmc, bool soft)
 				cq_host->trans_desc_dma_base);
 	}
 	cq_host->enabled = false;
+	if (cq_host->ops->runtime_pm_put)
+		cq_host->ops->runtime_pm_put(mmc);
 }
 
 static void cmdq_prep_task_desc(struct mmc_request *mrq,
