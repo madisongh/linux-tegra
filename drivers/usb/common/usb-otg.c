@@ -2,7 +2,7 @@
  * drivers/usb/common/usb-otg.c - USB OTG core
  *
  * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com
- * Copyright (c) 2017-2018, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2020, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Roger Quadros <rogerq@ti.com>
  *
@@ -483,6 +483,14 @@ int usb_otg_unregister_hcd(struct usb_hcd *hcd)
 	}
 
 	mutex_lock(&otg->fsm.lock);
+
+	/* stop FSM & Host
+	 * call usb_otg_stop_fsm() first before setting otg->hcd = NULL;
+	 * as usb_otg_stop_fsm() will use data from otg->hcd
+	 */
+	usb_otg_stop_fsm(otg);
+	otg->host = NULL;
+
 	if (hcd == otg->hcd) {
 		otg->hcd = NULL;
 		dev_info(otg_dev, "otg: host %s unregistered\n",
@@ -493,11 +501,6 @@ int usb_otg_unregister_hcd(struct usb_hcd *hcd)
 			dev_name(hcd_dev));
 		return -EINVAL;
 	}
-
-	/* stop FSM & Host */
-	usb_otg_stop_fsm(otg);
-	otg->host = NULL;
-
 	mutex_unlock(&otg->fsm.lock);
 
 	return 0;

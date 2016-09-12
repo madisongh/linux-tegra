@@ -1,7 +1,7 @@
 /*
 * tegra-xotg.c - Nvidia XUSB OTG Controller Driver
 *
-* Copyright (c) 2017-2018, NVIDIA CORPORATION.  All rights reserved.
+* Copyright (c) 2017-2020, NVIDIA CORPORATION.  All rights reserved.
 *
 * This program is free software; you can redistribute it and/or modify it
 * under the terms and conditions of the GNU General Public License,
@@ -572,9 +572,14 @@ static void tegra_xotg_del_timer(struct usb_otg *otg, enum otg_fsm_timer id)
 static int tegra_xotg_start_host(struct usb_otg *otg, int on)
 {
 	struct device *dev = otg->dev;
+	struct usb_hcd *hcd = otg->hcd;
 	int ret;
 
 	dev_dbg(dev, "host %s\n", on ? "on" : "off");
+
+	/* don't stop or start host if its already in reinit process */
+	if (hcd && hcd->self.otg_hcd_reinit)
+		return 0;
 
 	ret = usb_otg_start_host(otg, on);
 	otg->fsm.power_up = on;
@@ -587,9 +592,14 @@ static int tegra_xotg_start_host(struct usb_otg *otg, int on)
 static int tegra_xotg_start_gadget(struct usb_otg *otg, int on)
 {
 	struct device *dev = otg->dev;
+	struct usb_hcd *hcd = otg->hcd;
 	int ret;
 
 	dev_dbg(dev, "gadget %s\n", on ? "on" : "off");
+
+	/* don't stop or start gadget if host is in reinit process */
+	if (hcd && hcd->self.otg_hcd_reinit)
+		return 0;
 
 	ret = usb_otg_start_gadget(otg, on);
 

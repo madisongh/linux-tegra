@@ -1,7 +1,7 @@
 /*
  * NVIDIA Tegra XUSB mailbox driver
  *
- * Copyright (C) 2014-2016, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2014-2020, NVIDIA Corporation.  All rights reserved.
  * Copyright (C) 2014 Google, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -249,6 +249,14 @@ static irqreturn_t tegra_xusb_mbox_irq(int irq, void *p)
 				mbox_readl(mbox, XUSB_CFG_ARU_MBOX_DATA_IN));
 		dev_err(dev, "XUSB_CFG_ARU_MBOX_DATA_OUT 0x%x\n",
 				mbox_readl(mbox, XUSB_CFG_ARU_MBOX_DATA_OUT));
+		/* send this message so that xhci hcd can re-initialize */
+		msg.cmd = MBOX_CMD_FW_RELOAD;
+		for (i = 0; i < XUSB_MBOX_NUM_CHANS; i++) {
+			if (mbox->mbox.chans[i].cl) {
+				mbox_chan_received_data(&mbox->mbox.chans[i],
+							&msg);
+			}
+		}
 		goto exit;
 	}
 

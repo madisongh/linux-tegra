@@ -1,4 +1,4 @@
-/* Copyright (c) 2019, NVIDIA CORPORATION.  All rights reserved. */
+/* Copyright (c) 2019-2020, NVIDIA CORPORATION.  All rights reserved. */
 
 #ifndef __LINUX_USB_H
 #define __LINUX_USB_H
@@ -367,6 +367,7 @@ struct usb_bus {
 					 * irrespective of host_request_flag
 					 */
 	unsigned otg_quick_hnp:1;	/* OTG: quick hnp is set by device */
+	unsigned otg_hcd_reinit:1;	/* OTG: hcd reinit set by host */
 	unsigned otg_vbus_off:1;	/*
 					 * OTG: feature bit to turn off VBUS
 					 * after B-device disconnects within

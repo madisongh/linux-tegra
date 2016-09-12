@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2017, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2014-2020, NVIDIA Corporation.  All rights reserved.
  * Copyright (C) 2014 Google, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -38,7 +38,12 @@ enum tegra_xusb_mbox_cmd {
 	/* Response message to above commands */
 	MBOX_CMD_ACK = 128,
 	MBOX_CMD_NAK,
-	MBOX_CMD_COMPL /* mailbox completed without sending ACK/NAK */
+	MBOX_CMD_COMPL, /* mailbox completed without sending ACK/NAK */
+	/* MBOX_CMD_FW_RELOAD used only by driver to send reload msg
+	 * from mbox framework to tegra-xhci host controller to start
+	 * driver reinit process
+	 */
+	MBOX_CMD_FW_RELOAD
 };
 
 struct tegra_xusb_mbox_msg {

@@ -1,7 +1,7 @@
 /*
  * NVIDIA Tegra xHCI host controller driver for T186/future chips
  *
- * Copyright (C) 2015-2018, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2015-2020, NVIDIA Corporation.  All rights reserved.
  * Copyright (C) 2014 Google, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -42,6 +42,13 @@
 #include <linux/platform/tegra/bwmgr_mc.h>
 
 #include "xhci.h"
+
+static bool reinit_started;
+static bool en_hcd_reinit = true;
+module_param(en_hcd_reinit, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(en_hcd_reinit, "Enable hcd reinit when hc died");
+static void xhci_reinit_work(struct work_struct *work);
+static int tegra_xhci_hcd_reinit(struct usb_hcd *hcd);
 
 #ifdef DEBUG
 #define reg_dump(_dev, _base, _reg) \
@@ -408,6 +415,8 @@ struct tegra_xhci_hcd {
 	int padctl_irq;
 
 	void __iomem *fpci_base;
+	resource_size_t fpci_start;
+	resource_size_t fpci_len;
 
 	const struct tegra_xhci_soc_config *soc_config;
 
@@ -1422,9 +1431,11 @@ static void tegra_xhci_mbox_rx(struct mbox_client *cl, void *data)
 	struct tegra_xhci_hcd *tegra = dev_get_drvdata(cl->dev);
 	struct tegra_xusb_mbox_msg *msg = data;
 
-	if (is_host_mbox_message(msg->cmd) || true) {
+	if (is_host_mbox_message(msg->cmd)) {
 		tegra->mbox_req = *msg;
 		queue_work(tegra->mbox_wq, &tegra->mbox_req_work);
+	} else if (msg->cmd == MBOX_CMD_FW_RELOAD) {
+		tegra_xhci_hcd_reinit(tegra->hcd);
 	}
 }
 
@@ -2052,6 +2063,11 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 		/* if there is any OTG port, register to otg core */
 		if (tegra->utmi_otg_port_base_1) {
 			tegra->hcd->otg_dev = of_usb_get_otg(dev->of_node);
+			/* we don't want otg driver to restart gadget driver
+			 * while hcd is in process of reinit.
+			 */
+			if (reinit_started == true)
+				tegra->hcd->self.otg_hcd_reinit = true;
 			ret = usb_otg_register_hcd(tegra->hcd,
 						   &tegra_xhci_otg_hcd_ops);
 			if (ret) {
@@ -2087,6 +2103,11 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	val = readl(&xhci->op_regs->command);
 	val |= CMD_PM_INDEX;
 	writel(val, &xhci->op_regs->command);
+
+	INIT_WORK(&xhci->tegra_xhci_reinit_work, xhci_reinit_work);
+	xhci->pdev = to_platform_device(dev);
+	tegra->hcd->self.otg_hcd_reinit = false;
+	reinit_started = false;
 
 	return;
 
@@ -2396,6 +2417,9 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		goto put_hcd;
 	}
 	tegra->fpci_base = devm_ioremap_resource(&pdev->dev, res);
+	tegra->fpci_start = res->start;
+	tegra->fpci_len = resource_size(res);
+
 	if (IS_ERR(tegra->fpci_base)) {
 		ret = PTR_ERR(tegra->fpci_base);
 		dev_warn(&pdev->dev, "can't map fpci mmio (%d)\n", ret);
@@ -2696,6 +2720,7 @@ powergate_ss:
 put_mbox:
 	mbox_free_channel(tegra->mbox_chan);
 disable_regulator:
+	devm_free_irq(&pdev->dev, tegra->padctl_irq, tegra);
 	if (tegra_platform_is_silicon())
 		regulator_bulk_disable(tegra->num_supplies, tegra->supplies);
 disable_xhci_clk:
@@ -2737,8 +2762,15 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 		usb_remove_hcd(xhci->shared_hcd);
 		usb_put_hcd(xhci->shared_hcd);
 		usb_remove_hcd(hcd);
+
+		devm_iounmap(&pdev->dev, tegra->fpci_base);
+		devm_release_mem_region(&pdev->dev, tegra->fpci_start,
+			tegra->fpci_len);
+		devm_iounmap(&pdev->dev, tegra->hcd->regs);
+		devm_release_mem_region(&pdev->dev, tegra->hcd->rsrc_start,
+			tegra->hcd->rsrc_len);
+
 		usb_put_hcd(hcd);
-		kfree(xhci);
 	} else if (hcd) {
 		/* Unbound after probe(), but before firmware loading. */
 		usb_put_hcd(hcd);
@@ -2767,6 +2799,7 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 
 	pm_runtime_disable(tegra->dev);
 	pm_runtime_put(tegra->dev);
+	devm_free_irq(&pdev->dev, tegra->padctl_irq, tegra);
 
 	tegra_xhci_debugfs_deinit(tegra);
 
@@ -3861,6 +3894,8 @@ static int __init tegra_xhci_init(void)
 			tegra_xhci_endpoint_soft_retry;
 	tegra_xhci_hc_driver.is_u0_ts1_detect_disabled =
 			tegra_xhci_is_u0_ts1_detect_disabled;
+	tegra_xhci_hc_driver.hcd_reinit = tegra_xhci_hcd_reinit;
+
 	return platform_driver_register(&tegra_xhci_driver);
 }
 fs_initcall(tegra_xhci_init);
@@ -3870,6 +3905,68 @@ static void __exit tegra_xhci_exit(void)
 	platform_driver_unregister(&tegra_xhci_driver);
 }
 module_exit(tegra_xhci_exit);
+
+static void xhci_reinit_work(struct work_struct *work)
+{
+	unsigned long flags;
+	struct xhci_hcd *xhci = container_of(work,
+			struct xhci_hcd, tegra_xhci_reinit_work);
+	struct platform_device *pdev = xhci->pdev;
+	struct tegra_xhci_hcd *tegra = platform_get_drvdata(pdev);
+	unsigned long target;
+	bool has_active_slots = true;
+	int j;
+
+	for (j = 0; j < tegra->soc_config->num_phys[UTMI_PHY]; j++) {
+		/* turn off VBUS to disconnect all devices */
+		if (tegra->soc_config->utmi_vbus_power_off)
+			tegra->soc_config->utmi_vbus_power_off(
+					tegra->phys[UTMI_PHY][j]);
+	}
+
+	target = jiffies + msecs_to_jiffies(1000);
+	/* wait until all slots have been disabled */
+	while (has_active_slots && time_is_after_jiffies(target)) {
+		has_active_slots = false;
+		for (j = 1; j < MAX_HC_SLOTS; j++) {
+			if (xhci->devs[j])
+				has_active_slots = true;
+		}
+		msleep(300);
+	}
+
+	spin_lock_irqsave(&xhci->lock, flags);
+	xhci->xhc_state |= XHCI_STATE_RECOVERY | XHCI_STATE_DYING;
+	spin_unlock_irqrestore(&xhci->lock, flags);
+
+	/* we don't want otg driver to stop gadget driver while hcd
+	 * is in process of reinit.
+	 */
+	tegra->hcd->self.otg_hcd_reinit = true;
+	tegra_xhci_remove(pdev);
+	usleep_range(10, 20);
+	tegra_xhci_probe(pdev);
+}
+
+static int tegra_xhci_hcd_reinit(struct usb_hcd *hcd)
+{
+	struct tegra_xhci_hcd *tegra = hcd_to_tegra_xhci(hcd);
+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+
+	if (en_hcd_reinit && (reinit_started == false)) {
+		reinit_started = true;
+#ifdef CONFIG_USB_OTG_WAKELOCK
+		/* make sure system doesn't enter suspend
+		 * temporary wakelock is help for 2 seconds.
+		 */
+		otgwl_acquire_temp_lock();
+#endif
+		schedule_work(&xhci->tegra_xhci_reinit_work);
+	} else {
+		dev_info(tegra->dev, "hcd_reinit is disabled or in progress\n");
+	}
+	return 0;
+}
 
 MODULE_AUTHOR("Andrew Bresticker <abrestic@chromium.org>");
 MODULE_AUTHOR("JC Kuo <jckuo@nvidia.com>");

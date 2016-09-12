@@ -1,7 +1,7 @@
 /*
  * xHCI host controller driver
  *
- * Copyright (c) 2015-2019, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2020, NVIDIA CORPORATION.  All rights reserved.
  * Copyright (C) 2008 Intel Corp.
  *
  * Author: Sarah Sharp
@@ -984,6 +984,9 @@ void xhci_stop_endpoint_command_watchdog(unsigned long arg)
 	usb_hc_died(xhci_to_hcd(xhci));
 	xhci_dbg_trace(xhci, trace_xhci_dbg_cancel_urb,
 			"xHCI host controller is dead.");
+	if ((xhci_to_hcd(xhci)->driver) &&
+		(xhci_to_hcd(xhci))->driver->hcd_reinit)
+		xhci_to_hcd(xhci)->driver->hcd_reinit(xhci_to_hcd(xhci));
 }
 
 
@@ -1329,7 +1332,10 @@ void xhci_handle_command_timeout(struct work_struct *work)
 			spin_unlock_irqrestore(&xhci->lock, flags);
 			usb_hc_died(xhci_to_hcd(xhci)->primary_hcd);
 			xhci_dbg(xhci, "xHCI host controller is dead.\n");
-
+			if ((xhci_to_hcd(xhci)->driver) &&
+				(xhci_to_hcd(xhci))->driver->hcd_reinit)
+				xhci_to_hcd(xhci)->driver->hcd_reinit(
+					xhci_to_hcd(xhci));
 			return;
 		}
 
@@ -2860,9 +2866,18 @@ irqreturn_t xhci_irq(struct usb_hcd *hcd)
 		spin_unlock(&xhci->lock);
 		return IRQ_NONE;
 	}
-	if (status & STS_FATAL) {
-		xhci_warn(xhci, "WARNING: Host System Error\n");
+	if (status & (STS_FATAL | STS_HCE)) {
+		if (status & STS_FATAL)
+			xhci_warn(xhci, "WARNING: Host System Error\n");
+		else if (status & STS_HCE)
+			xhci_warn(xhci, "WARNING: Host Controller Error\n");
 		xhci_halt(xhci);
+		if ((xhci_to_hcd(xhci)->driver) &&
+				(xhci_to_hcd(xhci))->driver->hcd_reinit)
+			xhci_to_hcd(xhci)->driver->hcd_reinit(
+				xhci_to_hcd(xhci));
+		else
+			xhci_warn(xhci, "Couldn't recover from failure\n");
 hw_died:
 		spin_unlock(&xhci->lock);
 		return IRQ_HANDLED;

@@ -3,7 +3,7 @@
  * xHCI host controller driver
  *
  * Copyright (C) 2008 Intel Corp.
- * Copyright (c) 2017-2019, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2017-2020, NVIDIA CORPORATION. All rights reserved.
  *
  * Author: Sarah Sharp
  * Some code borrowed from the Linux EHCI driver.
@@ -1612,6 +1612,7 @@ struct xhci_hcd {
 #define XHCI_STATE_DYING	(1 << 0)
 #define XHCI_STATE_HALTED	(1 << 1)
 #define XHCI_STATE_REMOVING	(1 << 2)
+#define XHCI_STATE_RECOVERY	(1 << 3)
 	/* Statistics */
 	int			error_bitmask;
 	unsigned int		quirks;
@@ -1673,6 +1674,9 @@ struct xhci_hcd {
 	u32			port_status_u0;
 /* Compliance Mode Timer Triggered every 2 seconds */
 #define COMP_MODE_RCVRY_MSECS 2000
+	/* Error collecting struct for sysfs */
+	struct work_struct tegra_xhci_reinit_work;
+	struct platform_device *pdev;
 };
 
 /* Platform specific overrides to generic XHCI hc_driver ops */
