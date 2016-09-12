@@ -28,10 +28,12 @@ DTC_FLAGS := -i $(tegra-dtstree)/platform/tegra/common/kernel-dts
 DTCCPP_FLAGS := -I$(tegra-dtstree)/platform/tegra/common/kernel-dts
 
 ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
+DTC_FLAGS += -i $(srctree)/arch/arm64/boot/dts/include
 DTC_FLAGS += -i $(srctree)/arch/arm64/boot/dts/nvidia
 DTC_FLAGS += -i $(srctree)/arch/arm64/boot/dts/nvidia/t210
 DTC_FLAGS += -i $(tegra-dtstree)/soc/t210/kernel-dts
 DTC_FLAGS += -i $(tegra-dtstree)/platform/t210/common/kernel-dts
+DTCCPP_FLAGS += -I$(srctree)/arch/arm64/boot/dts/include
 DTCCPP_FLAGS += -I$(srctree)/arch/arm64/boot/dts/nvidia
 DTCCPP_FLAGS += -I$(srctree)/arch/arm64/boot/dts/nvidia/t210
 DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t210/kernel-dts
