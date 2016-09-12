@@ -98,7 +98,7 @@ DTB_OBJS := $(addprefix $(obj)/,$(DTB_LIST))
 targets += $(DTB_LIST)
 
 define _define_dtb_rule
-$(obj)/$(call replace_ddot,$(1)): $(src)/$(patsubst %.dtb,%.dts,$(1))
+$(obj)/$(call replace_ddot,$(1)): $(src)/$(patsubst %.dtb,%.dts,$(1)) FORCE
 endef
 
 $(foreach _dtb, $(DTB_LIST), $(eval $(call _define_dtb_rule,$(_dtb))))
