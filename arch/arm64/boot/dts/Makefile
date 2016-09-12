@@ -42,11 +42,9 @@ endif
 
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
 DTC_FLAGS += -i $(srctree)/../t18x/include
-DTC_FLAGS += -i $(srctree)/../t18x/arch/arm64/boot/dts/nvidia/t18x
 DTC_FLAGS += -i $(tegra-dtstree)/soc/t18x/kernel-dts
 DTC_FLAGS += -i $(tegra-dtstree)/platform/t18x/common/kernel-dts
 DTCCPP_FLAGS += -I$(srctree)/../t18x/include
-DTCCPP_FLAGS += -I$(srctree)/../t18x/arch/arm64/boot/dts/nvidia/t18x
 DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t18x/kernel-dts
 DTCCPP_FLAGS += -I$(tegra-dtstree)/platform/t18x/common/kernel-dts
 endif
@@ -66,13 +64,6 @@ dtb-y :=
 ifneq ($(wildcard $(srctree)/arch/arm64/boot/dts/nvidia/t210/Makefile),)
 include $(srctree)/arch/arm64/boot/dts/nvidia/t210/Makefile
 dtb-y := $(addprefix nvidia/t210/,$(dtb-y))
-endif
-DTB_LIST += $(dtb-y)
-
-dtb-y :=
-ifneq ($(wildcard $(kbuild-dir)/$(call tegra-path,t18x,arch/arm64/boot/dts/nvidia/t18x/Makefile)),)
-include $(kbuild-dir)/$(call tegra-path,t18x,arch/arm64/boot/dts/nvidia/t18x/Makefile)
-dtb-y := $(addprefix $(call tegra-path,t18x,arch/arm64/boot/dts/nvidia/t18x/),$(dtb-y))
 endif
 DTB_LIST += $(dtb-y)
 
