@@ -3884,7 +3884,9 @@ ncls:
 
 	if (skb_vlan_tag_present(skb)) {
 		if (pt_prev) {
+#ifndef CONFIG_DISABLE_VLAN_FWD_TO_REAL_IF
 			ret = deliver_skb(skb, pt_prev, orig_dev);
+#endif
 			pt_prev = NULL;
 		}
 		if (vlan_do_receive(&skb))
