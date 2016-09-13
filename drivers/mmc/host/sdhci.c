@@ -2602,8 +2602,9 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask, u32 *mask)
 		host->cmd->error = -ETIMEDOUT;
 	else if (intmask & SDHCI_INT_CRC) {
 		host->cmd->error = -EILSEQ;
-		pr_err("\n%s:  %s  %d   SDHCI_INT_CRC ",
-				mmc_hostname(host->mmc), __func__, __LINE__);
+		pr_err("%s: %s %d SDHCI_INT_CRC intmask: %x Interface clock = %uHz\n",
+			mmc_hostname(host->mmc), __func__, __LINE__,
+			intmask, host->max_clk);
 		sdhci_dumpregs(host);
 	} else if (intmask & SDHCI_INT_END_BIT) {
 		host->cmd->error = -EILSEQ;
