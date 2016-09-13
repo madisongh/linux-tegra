@@ -1024,6 +1024,12 @@ struct tegra_dc_win {
 
 	bool		is_scaler_coeff_set;
 	bool		color_expand_enable;
+
+#ifdef CONFIG_TEGRA_NVDISPLAY
+	bool		precomp_caps_read;
+	u32		precomp_capc;
+	u32		precomp_cape;
+#endif
 };
 
 #define TEGRA_WIN_PPFLAG_CP_ENABLE	(1 << 0) /* enable RGB color lut */
