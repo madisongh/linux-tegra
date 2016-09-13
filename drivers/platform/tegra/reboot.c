@@ -1,7 +1,7 @@
  /*
  * drivers/platform/tegra/reboot.c
  *
- * Copyright (c) 2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,37 +21,29 @@
 #include <linux/of.h>
 #include <linux/bitops.h>
 #include <linux/pm.h>
+#include <linux/tegra-pmc.h>
 #include <linux/tegra-soc.h>
 
 #include <asm/io.h>
 #include <asm/system_misc.h>
-
-#include "iomap.h"
-#include "pm.h"
 
 #define NEVER_RESET		0
 #define RECOVERY_MODE		BIT(31)
 #define BOOTLOADER_MODE		BIT(30)
 #define FORCED_RECOVERY_MODE	BIT(1)
 
-#define PMC_SCRATCH0            0x50
+#define PMC_SCRATCH0		0x50
 #define SYS_RST_OK		1
 
 #ifndef CONFIG_ARCH_TEGRA_18x_SOC
 static int program_reboot_reason(const char *cmd)
 {
-	void __iomem *reset = IO_ADDRESS(TEGRA_PMC_BASE);
-	u32 reg;
+	u32 reg = 0;
 
 	if (tegra_platform_is_fpga() || NEVER_RESET) {
 		pr_info("tegra_assert_system_reset() ignored.....");
 		do { } while (1);
 	}
-
-	/* clean up */
-	reg = readl_relaxed(reset + PMC_SCRATCH0);
-	reg &= ~(BOOTLOADER_MODE | RECOVERY_MODE | FORCED_RECOVERY_MODE);
-	writel_relaxed(reg, reset + PMC_SCRATCH0);
 
 	/* valid command? */
 	if (!cmd || (strlen(cmd) == 0))
@@ -59,23 +51,21 @@ static int program_reboot_reason(const char *cmd)
 
 	/* Writing recovery kernel or Bootloader mode in SCRATCH0 31:30:1 */
 	if (!strcmp(cmd, "recovery"))
-		reg |= RECOVERY_MODE;
+		reg = RECOVERY_MODE;
 	else if (!strcmp(cmd, "bootloader"))
-		reg |= BOOTLOADER_MODE;
+		reg = BOOTLOADER_MODE;
 	else if (!strcmp(cmd, "forced-recovery"))
-		reg |= FORCED_RECOVERY_MODE;
+		reg = FORCED_RECOVERY_MODE;
 
 	/* write the restart command */
-	writel_relaxed(reg, reset + PMC_SCRATCH0);
+	tegra_pmc_register_update(PMC_SCRATCH0, ~(u32)0, reg);
 
 	return 0;
 }
 
 static void tegra_reboot_handler(enum reboot_mode mode, const char *cmd)
 {
-	void __iomem *reset = IO_ADDRESS(TEGRA_PMC_BASE);
 	int ret;
-	u32 reg;
 
 	/* program reboot reason for the bootloader */
 	ret = program_reboot_reason(cmd);
@@ -84,9 +74,7 @@ static void tegra_reboot_handler(enum reboot_mode mode, const char *cmd)
 		pm_power_reset();
 	} else {
 		pr_info("%s: using PMC\n", __func__);
-		reg = readl_relaxed(reset);
-		reg |= 0x10;
-		writel_relaxed(reg, reset);
+		tegra_pmc_reset_system();
 	}
 }
 
