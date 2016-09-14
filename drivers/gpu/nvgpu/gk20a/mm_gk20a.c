@@ -3,7 +3,7 @@
  *
  * GK20A memory management
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -2489,6 +2489,9 @@ int gk20a_vm_map_buffer(struct gk20a_as_share *as_share,
 
 	/* get ref to the mem handle (released on unmap_locked) */
 	dmabuf = dma_buf_get(dmabuf_fd);
+	if (IS_ERR(dmabuf))
+		return PTR_ERR(dmabuf);
+
 	if (!dmabuf)
 		return 0;
 
