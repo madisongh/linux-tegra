@@ -75,6 +75,7 @@ include $(dts_mfiles)
 dtb-y := $(addprefix $(tegra-rel-dtstree)/hardware/nvidia/,$(dtb-y))
 endif
 DTB_LIST += $(dtb-y)
+DTB_NEW_RULE_LIST := $(dtb-y)
 
 # Now save DTB_LIST to dtb-y
 dtb-y := $(DTB_LIST)
@@ -85,19 +86,19 @@ targets += $(DTB_LIST)
 
 define _define_dtb_rule
 $(obj)/$(call replace_ddot,$(1)): $(src)/$(patsubst %.dtb,%.dts,$(1)) FORCE
-	 rm -f $@
 endef
 
-$(foreach _dtb, $(DTB_LIST), $(eval $(call _define_dtb_rule,$(_dtb))))
+$(foreach _dtb, $(DTB_NEW_RULE_LIST), $(eval $(call _define_dtb_rule,$(_dtb))))
 
 DTB_OBJS := $(call replace_ddot,$(DTB_OBJS))
+DTB_NEW_RULE_LIST := $(addprefix $(obj)/,$(DTB_NEW_RULE_LIST))
+DTB_NEW_RULE_LIST := $(call replace_ddot,$(DTB_NEW_RULE_LIST))
 
-$(DTB_OBJS):
+$(DTB_NEW_RULE_LIST):
 	$(call if_changed_dep,dtc)
 
 dtbs: $(DTB_OBJS) FORCE
 	cp -u $(DTB_OBJS) arch/arm64/boot/dts/
-	rm -rf $(dir $(DTB_OBJS))
 
 clean-files := dts/*.dtb *.dtb
 clean-dirs := dts/_ddot_
