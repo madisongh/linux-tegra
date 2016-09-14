@@ -31,7 +31,8 @@
 phys_addr_t __weak tegra_fb_start, tegra_fb_size,
 	tegra_fb2_start, tegra_fb2_size,
 	tegra_bootloader_fb_start, tegra_bootloader_fb_size,
-	tegra_bootloader_fb2_start, tegra_bootloader_fb2_size;
+	tegra_bootloader_fb2_start, tegra_bootloader_fb2_size,
+	tegra_bootloader_lut_start, tegra_bootloader_lut_size;
 
 static struct iommu_linear_map tegra_fb_linear_map[16]; /* Terminated with 0 */
 
@@ -80,6 +81,7 @@ void tegra_fb_linear_set(struct iommu_linear_map *map)
 	LINEAR_MAP_ADD(tegra_fb2);
 	LINEAR_MAP_ADD(tegra_bootloader_fb);
 	LINEAR_MAP_ADD(tegra_bootloader_fb2);
+	LINEAR_MAP_ADD(tegra_bootloader_lut);
 #ifdef CONFIG_TEGRA_NVMAP
 	if (!tegra_vpr_resize) {
 		LINEAR_MAP_ADD(tegra_vpr);
