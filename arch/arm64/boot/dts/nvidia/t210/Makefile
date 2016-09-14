@@ -101,6 +101,4 @@ dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-3306-a04-00-wifi.dtb
 dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2305-a05-00-wifi.dtb
 dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2306-a05-00-wifi.dtb
 dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-hawkeye-p2290-2307-a05-00-wifi.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-t18x-interposer-p3310-1000-a00-00.dtb
-dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-t18x-interposer-e3301-1000-a00-00.dtb
 dtb-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra210-vcm31-maui.dtb
