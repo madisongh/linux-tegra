@@ -28,11 +28,11 @@
 #define FUSE_USB_CALIB_EXT_0	0x350
 
 unsigned long long tegra_chip_uid(void);
+int tegra_fuse_readl(unsigned long offset, u32 *val);
 
 #if defined(CONFIG_TEGRA_FUSE)
 bool tegra_spare_fuse(int bit);
 u32 tegra_get_chip_id(void);
-int tegra_fuse_readl(unsigned long offset, u32 *val);
 int tegra_get_sku_override(void);
 u32 tegra_get_sku_id(void);
 #endif
