@@ -1762,7 +1762,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 			tegra_host->cd_irq = 0;
 		} else {
 			device_init_wakeup(&pdev->dev, 1);
-			dev_info(&pdev->dev, "device wakeup init success\n",
+			dev_info(&pdev->dev, "wakeup init done, cd_irq: %d\n",
 				tegra_host->cd_irq);
 		}
 	}

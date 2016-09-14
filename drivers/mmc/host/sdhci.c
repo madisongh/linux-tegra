@@ -3288,12 +3288,12 @@ static void sdhci_cmdq_dump_vendor_regs(struct mmc_host *mmc)
 static int sdhci_cmdq_init(struct sdhci_host *host, struct mmc_host *mmc,
 					   bool dma64)
 {
-		return -ENOSYS;
+	return -ENOTSUPP;
 }
 
 static int sdhci_cmdq_enable(struct sdhci_host *host)
 {
-
+	return -ENOTSUPP;
 }
 
 static void sdhci_cmdq_runtime_pm_get(struct mmc_host *mmc)
