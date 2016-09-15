@@ -708,11 +708,14 @@ static int pca953x_probe(struct i2c_client *client,
 		dev_info(&client->dev,
 			"no regulator found for vcc, Assuming vcc is always powered");
 		chip->vcc_reg = NULL;
+	} else if (PTR_ERR(chip->vcc_reg) == -EPROBE_DEFER) {
+		ret = -EPROBE_DEFER;
+		goto fail;
 	} else if (IS_ERR(chip->vcc_reg)) {
 		ret = PTR_ERR(chip->vcc_reg);
 		dev_err(&client->dev,
 			"vcc regulator get failed, err %ld\n", ret);
-		return ret;
+		goto fail;
 	}
 
 	if (chip->vcc_reg) {
@@ -756,8 +759,11 @@ static int pca953x_probe(struct i2c_client *client,
 	return 0;
 
 fail:
-	if (chip->vcc_reg)
+	devm_kfree(&client->dev, chip);
+
+	if (!IS_ERR_OR_NULL(chip->vcc_reg))
 		regulator_disable(chip->vcc_reg);
+	chip->vcc_reg = NULL;
 
 	return ret;
 }
