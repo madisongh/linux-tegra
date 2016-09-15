@@ -343,7 +343,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[6] = { .clk_name = "xusb_host_slcg" },
 			[7] = { .clk_name = "xusb_dev_slcg" },
 		},
-		.reset_id = { TEGRA210_CLK_XUSB_DEV },
+		.reset_id = { 95 },
 		.reset_id_num = 1,
 	},
 	[TEGRA_POWERGATE_XUSBC] = {
