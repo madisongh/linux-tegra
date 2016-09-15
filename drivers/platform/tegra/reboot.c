@@ -57,8 +57,10 @@ static int program_reboot_reason(const char *cmd)
 	else if (!strcmp(cmd, "forced-recovery"))
 		reg = FORCED_RECOVERY_MODE;
 
+#ifdef CONFIG_TEGRA_PMC
 	/* write the restart command */
 	tegra_pmc_register_update(PMC_SCRATCH0, ~(u32)0, reg);
+#endif
 
 	return 0;
 }
@@ -73,8 +75,10 @@ static void tegra_reboot_handler(enum reboot_mode mode, const char *cmd)
 		pr_info("%s: using %pF()\n", __func__, pm_power_reset);
 		pm_power_reset();
 	} else {
+#ifdef CONFIG_TEGRA_PMC
 		pr_info("%s: using PMC\n", __func__);
 		tegra_pmc_reset_system();
+#endif
 	}
 }
 
