@@ -2604,6 +2604,10 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "sata_slcg_ovr", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR },
 	{ .con_id = "sata_slcg_ipfs", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR_IPFS },
 	{ .con_id = "sata_slcg_fpci", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR_FPCI },
+	{ .con_id = "xusb_ssp_src", .dt_id = TEGRA210_CLK_XUSB_SSP_SRC },
+	{ .con_id = "xusb_hs_src", .dt_id = TEGRA210_CLK_XUSB_HS_SRC },
+	{ .con_id = "xusb_fs_src", .dt_id = TEGRA210_CLK_XUSB_FS_SRC },
+	{ .con_id = "xusb_dev_src", .dt_id = TEGRA210_CLK_XUSB_FS_SRC },
 };
 
 static struct tegra_audio_clk_info tegra210_audio_plls[] = {
