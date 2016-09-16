@@ -91,13 +91,27 @@ struct ivc_info_page {
 	struct ivc_shared_area areas[];
 
 	/*
-	 * Following this array is an array of queue data structures with an
-	 * entry per queue that is accessible in the current guest. This array
-	 * is terminated by an entry with no frames.
+	 * Following the shared array is an array of queue data structures with
+	 * an entry per queue that is assigned to the guest. This  array is
+	 * terminated by an entry with no frames.
 	 *
 	 * struct tegra_hv_queue_data queue_data[nr_queues];
 	 */
+
+	/*
+	 * Following the queue data array is an array of mempool structures
+	 * with an entry per mempool assigned to the guest.
+	 *
+	 * struct ivc_mempool[nr_mempools];
+	 */
 };
+
+static inline struct ivc_shared_area *ivc_shared_area_addr(
+		const struct ivc_info_page *info, uint32_t area_num)
+{
+	return ((struct ivc_shared_area *) (((uintptr_t) info) + sizeof(*info)))
+		+ area_num;
+}
 
 static inline const struct tegra_hv_queue_data *ivc_info_queue_array(
 		const struct ivc_info_page *info)
@@ -303,7 +317,8 @@ static inline uint64_t hyp_sysinfo_ipa(void)
 int hyp_read_gid(unsigned int *gid);
 int hyp_read_nguests(unsigned int *nguests);
 int hyp_read_ivc_info(uint64_t *ivc_info_page_pa);
-int hyp_read_ipa_pa_info(struct hyp_ipa_pa_info *info, int guestid, u64 ipa);
+int hyp_read_ipa_pa_info(struct hyp_ipa_pa_info *info, int guestid,
+		uint64_t ipa);
 int hyp_raise_irq(unsigned int irq, unsigned int vmid);
 uint64_t hyp_sysinfo_ipa(void);
 
