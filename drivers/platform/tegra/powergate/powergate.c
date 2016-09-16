@@ -237,7 +237,7 @@ int partition_clk_enable(struct powergate_partition_info *pg_info)
 	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
 		clk_info = &pg_info->clk_info[idx];
 		clk = clk_info->clk_ptr;
-		if (IS_ERR(clk))
+		if (IS_ERR(clk) || !clk)
 			break;
 
 		if (clk_info->clk_type != RST_ONLY) {
@@ -270,7 +270,7 @@ void partition_clk_disable(struct powergate_partition_info *pg_info)
 		clk_info = &pg_info->clk_info[idx];
 		clk = clk_info->clk_ptr;
 
-		if (!clk)
+		if (IS_ERR(clk) || !clk)
 			break;
 
 		if (clk_info->clk_type != RST_ONLY)
@@ -298,35 +298,11 @@ void get_clk_info(struct powergate_partition_info *pg_info)
 
 void powergate_partition_assert_reset(struct powergate_partition_info *pg_info)
 {
-	u32 idx;
-	struct clk *clk_ptr;
-	struct partition_clk_info *clk_info;
-
-	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
-		clk_info = &pg_info->clk_info[idx];
-		clk_ptr = clk_info->clk_ptr;
-
-		if (!clk_ptr)
-			break;
-	}
-
 	tegra_rst_assertv(&pg_info->reset_id[0], pg_info->reset_id_num);
 }
 
 void powergate_partition_deassert_reset(struct powergate_partition_info *pg_info)
 {
-	u32 idx;
-	struct clk *clk_ptr;
-	struct partition_clk_info *clk_info;
-
-	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
-		clk_info = &pg_info->clk_info[idx];
-		clk_ptr = clk_info->clk_ptr;
-
-		if (!clk_ptr)
-			break;
-	}
-
 	tegra_rst_deassertv(&pg_info->reset_id[0], pg_info->reset_id_num);
 }
 
@@ -362,7 +338,7 @@ int slcg_clk_enable(struct powergate_partition_info *pg_info)
 	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
 		slcg_info = &pg_info->slcg_info[idx];
 		clk = slcg_info->clk_ptr;
-		if (IS_ERR(clk))
+		if (IS_ERR(clk) || !clk)
 			break;
 
 		ret = clk_prepare_enable(clk);
@@ -392,7 +368,7 @@ void slcg_clk_disable(struct powergate_partition_info *pg_info)
 		slcg_info = &pg_info->slcg_info[idx];
 		clk = slcg_info->clk_ptr;
 
-		if (IS_ERR(clk))
+		if (IS_ERR(clk) || !clk)
 			break;
 
 		clk_disable_unprepare(clk);
