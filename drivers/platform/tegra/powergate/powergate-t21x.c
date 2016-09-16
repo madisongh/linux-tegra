@@ -314,6 +314,10 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.name = "xusba",
 		.clk_info = {
 			[0] = { .clk_name = "xusb_ss", .clk_type = CLK_ONLY },
+			[1] = { .clk_name = "xusb_ssp_src", .clk_type = CLK_ONLY },
+			[2] = { .clk_name = "xusb_hs_src", .clk_type = CLK_ONLY },
+			[3] = { .clk_name = "xusb_fs_src", .clk_type = CLK_ONLY },
+			[4] = { .clk_name = "xusb_dev_src", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
