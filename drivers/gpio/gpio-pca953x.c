@@ -795,6 +795,8 @@ static int pca953x_probe(struct i2c_client *client,
 	}
 
 	mutex_init(&chip->i2c_lock);
+	lockdep_set_subclass(&chip->i2c_lock,
+			     i2c_adapter_depth(client->adapter));
 
 	/* initialize cached registers from their original values.
 	 * we can't share this chip with another i2c master.
