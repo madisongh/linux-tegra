@@ -62,9 +62,6 @@ ifeq ($(CONFIG_TEGRA_CLK_FRAMEWORK),y)
 obj-y += dvfs.o
 obj-$(CONFIG_TEGRA_CLK_FRAMEWORK) += clock.o tegra-non-dt-clock-reset.o
 obj-$(CONFIG_DEBUG_FS) += clocks_stats.o
-ifeq ($(CONFIG_ARCH_TEGRA_13x_SOC),y)
-obj-y += tegra13_dvfs.o
-endif
 obj-$(CONFIG_ARCH_TEGRA_HAS_CL_DVFS) += tegra_cl_dvfs.o
 endif
 
@@ -72,14 +69,12 @@ obj-$(CONFIG_TEGRA_EDP_LIMITS)          += cpu-edp.o # must precede cpu-tegra.o
 
 ifeq ($(CONFIG_CPU_FREQ),y)
 #obj-$(CONFIG_ARCH_TEGRA_21x_SOC)                  += cpu-tegra.o
-obj-$(CONFIG_ARCH_TEGRA_13x_SOC)                  += cpu-tegra.o
 ifeq ($(CONFIG_TEGRA_CLK_FRAMEWORK),y)
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += cpu-tegra21.o
 endif
 endif
 
 obj-y += flowctrl.o
-obj-$(CONFIG_TEGRA3_PM) += pm-t3.o
 obj-$(CONFIG_TEGRA_CLUSTER_CONTROL) += sysfs-cluster.o
 obj-$(CONFIG_TEGRA_HMP_CLUSTER_CONTROL) += sysfs-cluster.o
 
@@ -117,7 +112,6 @@ endif
 obj-$(CONFIG_COMMON_CLK) += common_clock.o
 
 
-obj-$(CONFIG_TEGRA3_PM) += pm-t3.o
 ifeq ($(CONFIG_PM_SLEEP),y)
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += wakeups-t21x.o
 endif
@@ -139,11 +133,9 @@ obj-$(CONFIG_TEGRA_MC_DOMAINS) += pm_domains.o
 obj-y += bond_out.o
 
 ifeq ($(CONFIG_TEGRA_SOCTHERM),y)
-obj-$(CONFIG_ARCH_TEGRA_13x_SOC) += tegra_soctherm.o
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra_soctherm.o
 endif
 obj-$(CONFIG_TEGRA_USE_SIMON)    += tegra_simon.o
-obj-$(CONFIG_ARCH_TEGRA_13x_SOC) += tegra13_edp.o
 
 obj-$(CONFIG_TEGRA_HMP_CLUSTER_CONTROL)      += cluster-control.o
 
@@ -165,7 +157,6 @@ obj-y					+= reboot.o
 obj-y					+= tegra-hv-mode.o
 
 obj-$(CONFIG_DENVER_MCA)		+= denver_mca.o
-obj-$(CONFIG_TEGRA_13x_SERROR)		+= tegra13_serr.o
 
 obj-$(CONFIG_DENVER_CPU)		+= denver-knobs.o
 obj-$(CONFIG_DENVER_DEBUG)		+= denver-hardwood.o
