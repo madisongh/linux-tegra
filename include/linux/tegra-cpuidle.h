@@ -62,38 +62,17 @@ int tegra12_cpu_g_idle_rate_exchange(unsigned long *rate);
 
 static inline int tegra_cpuidle_init_soc(struct tegra_cpuidle_ops *ops)
 {
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
-	return tegra2_cpuidle_init_soc(ops);
-#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
-	return tegra3_cpuidle_init_soc(ops);
-#elif defined(CONFIG_ARCH_TEGRA_11x_SOC) || \
-	defined(CONFIG_ARCH_TEGRA_12x_SOC)
-	return tegra11x_cpuidle_init_soc(ops);
-#else
 	return 0;
-#endif
 }
 
 static inline int tegra_cpu_g_idle_rate_exchange(unsigned long *rate)
 {
-#if defined(CONFIG_ARCH_TEGRA_11x_SOC)
-	return tegra11_cpu_g_idle_rate_exchange(rate);
-#elif defined(CONFIG_ARCH_TEGRA_12x_SOC)
-	return tegra12_cpu_g_idle_rate_exchange(rate);
-#else
 	return -ENOSYS;
-#endif
 }
 
 static inline int tegra_cpu_lp_idle_rate_exchange(unsigned long *rate)
 {
-#if defined(CONFIG_ARCH_TEGRA_11x_SOC)
-	return tegra11_cpu_lp_idle_rate_exchange(rate);
-#elif defined(CONFIG_ARCH_TEGRA_12x_SOC)
-	return tegra12_cpu_lp_idle_rate_exchange(rate);
-#else
 	return -ENOSYS;
-#endif
 }
 
 static inline void tegra_pd_set_global_latency(struct cpuidle_state *state)
@@ -108,8 +87,7 @@ void tegra_pd_update_target_residency(struct cpuidle_state *state);
 
 #endif /* CONFIG_PM_SLEEP */
 
-#if defined(CONFIG_CPU_IDLE) && defined(CONFIG_PM_SLEEP) \
-	&& defined(CONFIG_ARCH_TEGRA_12x_SOC)
+#if defined(CONFIG_CPU_IDLE) && defined(CONFIG_PM_SLEEP)
 void tegra_pd_in_idle(bool enable);
 #else
 static inline void tegra_pd_in_idle(bool enable) {}

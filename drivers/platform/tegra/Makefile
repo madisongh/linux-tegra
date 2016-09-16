@@ -26,7 +26,6 @@ obj-$(CONFIG_TEGRA_NVADSP)		+= nvadsp/
 obj-$(CONFIG_TEGRA_MC) += mc/
 
 ifeq ($(CONFIG_TEGRA_PTM),y)
-obj-$(CONFIG_ARCH_TEGRA_12x_SOC)         += tegra_ptm_t124.o
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC)         += tegra_ptm_t210.o
 endif
 
@@ -52,24 +51,19 @@ obj-y += powergate/
 # from arch/arm/tegra area.
 ifeq ($(CONFIG_TEGRA_SOCTHERM),y)
 ccflags-y += -I$(srctree)/arch/arm/mach-tegra
-obj-$(CONFIG_ARCH_TEGRA_12x_SOC) += tegra_soctherm.o
 endif
 
 ifeq ($(CONFIG_TEGRA_THERMAL_THROTTLE),y)
 ccflags-y += -I$(srctree)/arch/arm/mach-tegra
-obj-$(CONFIG_ARCH_TEGRA_12x_SOC)        += tegra_throttle.o
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC)        += tegra_throttle.o
 endif
 
 ifeq ($(CONFIG_TEGRA_CLK_FRAMEWORK),y)
 obj-y += dvfs.o
 obj-$(CONFIG_TEGRA_CLK_FRAMEWORK) += clock.o tegra-non-dt-clock-reset.o
-obj-$(CONFIG_ARCH_TEGRA_12x_SOC) += tegra12_clocks.o
 obj-$(CONFIG_DEBUG_FS) += clocks_stats.o
 ifeq ($(CONFIG_ARCH_TEGRA_13x_SOC),y)
 obj-y += tegra13_dvfs.o
-else
-obj-$(CONFIG_ARCH_TEGRA_12x_SOC) += tegra12_dvfs.o
 endif
 obj-$(CONFIG_ARCH_TEGRA_HAS_CL_DVFS) += tegra_cl_dvfs.o
 endif
@@ -77,11 +71,9 @@ endif
 obj-$(CONFIG_TEGRA_EDP_LIMITS)          += cpu-edp.o # must precede cpu-tegra.o
 
 ifeq ($(CONFIG_CPU_FREQ),y)
-obj-$(CONFIG_ARCH_TEGRA_12x_SOC)                  += cpu-tegra.o
 #obj-$(CONFIG_ARCH_TEGRA_21x_SOC)                  += cpu-tegra.o
 obj-$(CONFIG_ARCH_TEGRA_13x_SOC)                  += cpu-tegra.o
 ifeq ($(CONFIG_TEGRA_CLK_FRAMEWORK),y)
-obj-$(CONFIG_ARCH_TEGRA_12x_SOC) += cpu-tegra12.o
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += cpu-tegra21.o
 endif
 endif
@@ -101,7 +93,6 @@ obj-$(CONFIG_TEGRA_CPU_VOLT_CAP)	+= tegra_volt_cap.o
 
 ifeq ($(CONFIG_PM_SLEEP),y)
 obj-y += tegra-wakeups.o
-obj-$(CONFIG_ARCH_TEGRA_12x_SOC) += wakeups-t12x.o
 endif
 
 ifneq ($(CONFIG_ARM64),)
@@ -152,7 +143,6 @@ obj-$(CONFIG_ARCH_TEGRA_13x_SOC) += tegra_soctherm.o
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra_soctherm.o
 endif
 obj-$(CONFIG_TEGRA_USE_SIMON)    += tegra_simon.o
-obj-$(CONFIG_ARCH_TEGRA_12x_SOC) += tegra12_edp.o
 obj-$(CONFIG_ARCH_TEGRA_13x_SOC) += tegra13_edp.o
 
 obj-$(CONFIG_TEGRA_HMP_CLUSTER_CONTROL)      += cluster-control.o
