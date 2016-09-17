@@ -3671,7 +3671,7 @@ static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 		if (tegra_dc_update_mode(dc))
 			need_disable = 1; /* force display off on error */
 
-	if (status & FRAME_END_INT)
+	if (status & FRAME_END_INT) {
 		dc->dbg_fe_count++;
 		if (dc->disp_active_dirty) {
 			tegra_dc_writel(dc, dc->mode.h_active |
@@ -3681,6 +3681,7 @@ static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 
 			dc->disp_active_dirty = false;
 		}
+	}
 
 	tegra_dc_put(dc);
 	mutex_unlock(&dc->lock);
