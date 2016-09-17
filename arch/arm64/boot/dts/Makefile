@@ -71,8 +71,13 @@ dtb-y :=
 dts_makefile=$(foreach d,$(wildcard $1*), $(call dts_makefile,$(d)/,$(2)) $(if $(findstring Makefile,$(d)),$(d)))
 dts_mfiles = $(call dts_makefile, $(tegra-dtstree)/platform/, Makefile)
 ifneq ($(dts_mfiles),)
+dts-include :=
 include $(dts_mfiles)
 dtb-y := $(addprefix $(tegra-rel-dtstree)/hardware/nvidia/,$(dtb-y))
+ifneq ($(dts-include),)
+DTC_FLAGS += $(addprefix -i ,$(dts-include))
+DTCCPP_FLAGS += $(addprefix -I,$(dts-include))
+endif
 endif
 DTB_LIST += $(dtb-y)
 DTB_NEW_RULE_LIST := $(dtb-y)
