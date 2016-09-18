@@ -75,8 +75,8 @@ dts-include :=
 include $(dts_mfiles)
 dtb-y := $(addprefix $(tegra-rel-dtstree)/hardware/nvidia/,$(dtb-y))
 ifneq ($(dts-include),)
-DTC_FLAGS += $(addprefix -i ,$(dts-include))
-DTCCPP_FLAGS += $(addprefix -I,$(dts-include))
+DTC_FLAGS += $(addprefix -i $(tegra-dtstree)/,$(dts-include))
+DTCCPP_FLAGS += $(addprefix -I$(tegra-dtstree)/,$(dts-include))
 endif
 endif
 DTB_LIST += $(dtb-y)
