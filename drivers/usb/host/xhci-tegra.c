@@ -1110,9 +1110,6 @@ static int tegra_xhci_phy_enable(struct tegra_xhci_hcd *tegra)
 		}
 	}
 
-	for (i = 0; i < tegra->soc_config->num_phys[UTMI_PHY]; i++)
-		tegra_phy_xusb_utmi_pad_power_down(tegra->phys[UTMI_PHY][i]);
-
 	return 0;
 disable_phy:
 	for (; j > 0; j--) {
