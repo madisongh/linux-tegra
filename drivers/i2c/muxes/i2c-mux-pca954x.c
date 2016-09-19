@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2008-2009 Rodolfo Giometti <giometti@linux.it>
  * Copyright (c) 2008-2009 Eurotech S.p.A. <info@eurotech.it>
+ * Copyright (C) 2016 NVIDIA CORPORATION.  All rights reserved.
  *
  * This module supports the PCA954x series of I2C multiplexer/switch chips
  * made by Philips Semiconductors.
@@ -45,6 +46,8 @@
 #include <linux/of.h>
 #include <linux/pm.h>
 #include <linux/slab.h>
+#include <linux/err.h>
+#include <linux/delay.h>
 
 #define PCA954X_MAX_NCHANS 8
 
@@ -66,6 +69,8 @@ struct pca954x {
 	u8 last_chan;		/* last register value */
 	struct regulator *lp_reg;
 	const char *lp_reg_name;
+	struct regulator *vcc_reg;
+	struct regulator *pullup_reg;
 };
 
 struct chip_desc {
@@ -127,6 +132,27 @@ static int pca954x_reg_write(struct i2c_adapter *adap,
 			     struct i2c_client *client, u8 val)
 {
 	int ret = -ENODEV;
+	struct pca954x *data = i2c_get_clientdata(client);
+
+	/* Increase ref count for pca954x vcc */
+	if (data->vcc_reg) {
+		ret = regulator_enable(data->vcc_reg);
+		if (ret) {
+			dev_err(&client->dev, "%s: failed to enable vcc\n",
+				__func__);
+			goto vcc_regulator_failed;
+		}
+	}
+	/* Increase ref count for pca954x vcc-pullup */
+	if (data->pullup_reg) {
+		ret = regulator_enable(data->pullup_reg);
+		if (ret) {
+			dev_err(&client->dev,
+				"%s: failed to enable vcc-pullup\n",
+				__func__);
+			goto pullup_regulator_failed;
+		}
+	}
 
 	if (adap->algo->master_xfer) {
 		struct i2c_msg msg;
@@ -146,6 +172,15 @@ static int pca954x_reg_write(struct i2c_adapter *adap,
 					     val, I2C_SMBUS_BYTE, &data);
 	}
 
+	/* Decrease ref count for pca954x vcc-pullup */
+	if (data->pullup_reg)
+		regulator_disable(data->pullup_reg);
+
+pullup_regulator_failed:
+	/* Decrease ref count for pca954x vcc */
+	if (data->vcc_reg)
+		regulator_disable(data->vcc_reg);
+vcc_regulator_failed:
 	return ret;
 }
 
@@ -232,14 +267,62 @@ static int pca954x_probe(struct i2c_client *client,
 	if (IS_ERR(gpio))
 		return PTR_ERR(gpio);
 
+	/* Get regulator pointer for pca954x vcc */
+	data->vcc_reg = devm_regulator_get(&client->dev, "vcc");
+	if (PTR_ERR(data->vcc_reg) == -EPROBE_DEFER)
+		data->vcc_reg = NULL;
+	else if (IS_ERR(data->vcc_reg)) {
+		ret = PTR_ERR(data->vcc_reg);
+		dev_err(&client->dev, "vcc regualtor get failed, %d\n", ret);
+		return ret;
+	}
+
+	/* Get regulator pointer for pca954x vcc-pullup */
+	data->pullup_reg = devm_regulator_get(&client->dev, "vcc-pullup");
+	if (IS_ERR(data->pullup_reg)) {
+		dev_info(&client->dev, "vcc-pullup regulator not found\n");
+		data->pullup_reg = NULL;
+	}
+
+	/* Increase ref count for pca954x vcc */
+	if (data->vcc_reg) {
+		ret = regulator_enable(data->vcc_reg);
+		if (ret < 0) {
+			dev_err(&client->dev, "failed to enable vcc\n");
+			return ret;
+		}
+	}
+	/* Increase ref count for pca954x vcc-pullup */
+	if (data->pullup_reg) {
+		ret = regulator_enable(data->pullup_reg);
+		if (ret < 0) {
+			dev_err(&client->dev, "failed to enable vcc-pullup\n");
+			return ret;
+		}
+	}
+
+	/*
+	 * Power-On Reset takes time.
+	 * I2C is ready after Power-On Reset.
+	 */
+	msleep(1);
+
 	/* Write the mux register at addr to verify
 	 * that the mux is in fact present. This also
 	 * initializes the mux to disconnected state.
 	 */
-	if (i2c_smbus_write_byte(client, 0) < 0) {
-		dev_warn(&client->dev, "probe failed\n");
-		return -ENODEV;
+	ret = i2c_smbus_write_byte(client, 0);
+	if (ret < 0) {
+		dev_err(&client->dev, "Write to  device failed: %d\n", ret);
+		goto exit_regulator_disable;
 	}
+
+	/* Decrease ref count for pca954x vcc */
+	if (data->vcc_reg)
+		regulator_disable(data->vcc_reg);
+	/* Decrease ref count for pca954x vcc-pullup */
+	if (data->pullup_reg)
+		regulator_disable(data->pullup_reg);
 
 	data->type = id->driver_data;
 	data->last_chan = 0;		   /* force the first selection */
@@ -289,6 +372,11 @@ static int pca954x_probe(struct i2c_client *client,
 virt_reg_failed:
 	for (num--; num >= 0; num--)
 		i2c_del_mux_adapter(data->virt_adaps[num]);
+exit_regulator_disable:
+	if (data->pullup_reg)
+		regulator_disable(data->pullup_reg);
+	if (data->vcc_reg)
+		regulator_disable(data->vcc_reg);
 	return ret;
 }
 
