@@ -1602,12 +1602,7 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	pm_runtime_use_autosuspend(dev);
 	pm_runtime_set_autosuspend_delay(dev, 2000);
 	pm_runtime_set_active(dev);
-/* T210 K44 WAR: disable suspend/resume
- * due to powergate driver not ready yet
- */
-#ifndef CONFIG_ARCH_TEGRA_21x_SOC
 	pm_runtime_enable(dev);
-#endif
 
 	/* Enable EU3S bit of USBCMD */
 	val = readl(&xhci->op_regs->command);
