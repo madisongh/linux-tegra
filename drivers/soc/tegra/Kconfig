@@ -1,6 +1,7 @@
 config TEGRA_DVFS
 	bool
 	depends on ARCH_TEGRA
+	select PM_OPP
 	help
 	  This adds Tegra DVFS support. There could be several power
 	  rails involved and there might be rails dependency based
