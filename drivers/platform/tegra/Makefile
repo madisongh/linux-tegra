@@ -58,20 +58,10 @@ ccflags-y += -I$(srctree)/arch/arm/mach-tegra
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC)        += tegra_throttle.o
 endif
 
-ifeq ($(CONFIG_TEGRA_CLK_FRAMEWORK),y)
-obj-y += dvfs.o
-obj-$(CONFIG_TEGRA_CLK_FRAMEWORK) += clock.o tegra-non-dt-clock-reset.o
-obj-$(CONFIG_DEBUG_FS) += clocks_stats.o
-obj-$(CONFIG_ARCH_TEGRA_HAS_CL_DVFS) += tegra_cl_dvfs.o
-endif
-
 obj-$(CONFIG_TEGRA_EDP_LIMITS)          += cpu-edp.o # must precede cpu-tegra.o
 
 ifeq ($(CONFIG_CPU_FREQ),y)
 #obj-$(CONFIG_ARCH_TEGRA_21x_SOC)                  += cpu-tegra.o
-ifeq ($(CONFIG_TEGRA_CLK_FRAMEWORK),y)
-obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += cpu-tegra21.o
-endif
 endif
 
 obj-y += flowctrl.o
@@ -99,16 +89,6 @@ asflags-y += -I$(srctree)/arch/arm/mach-tegra/include \
 
 
 
-obj-$(CONFIG_TEGRA_CLK_FRAMEWORK) += tegra_clocks_pll.o
-ifeq ($(CONFIG_TEGRA_CLK_FRAMEWORK),y)
-
-# FIXME: Bug 1211919:
-# Remove CFLAGS_tegra21_clocks.o flag when tegra21_clocks.c becomes
-# stabilized.
-CFLAGS_tegra21_clocks.o = -Werror -Wno-unused-function -Wno-unused-variable
-
-obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra21_clocks.o
-endif
 obj-$(CONFIG_COMMON_CLK) += common_clock.o
 
 
@@ -118,16 +98,6 @@ endif
 
 obj-$(CONFIG_TEGRA_KFUSE) += tegra_kfuse.o
 obj-y += apbio.o
-
-ifeq ($(CONFIG_TEGRA_CLK_FRAMEWORK),y)
-
-# FIXME: Bug 1211919:
-# Remove CFLAGS_tegra21_dvfs.o flag when tegra21_dvfs.c becomes
-# stabilized.
-CFLAGS_tegra21_dvfs.o = -Werror -Wno-unused-function -Wno-unused-variable
-
-obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra21_dvfs.o
-endif
 
 obj-$(CONFIG_TEGRA_MC_DOMAINS) += pm_domains.o
 obj-y += bond_out.o
