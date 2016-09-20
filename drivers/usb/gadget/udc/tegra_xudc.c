@@ -29,6 +29,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/pci.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
@@ -202,14 +203,21 @@
 #define IPFS_XUSB_DEV_INTR_MASK 0x188
 #define  IPFS_XUSB_DEV_INTR_MASK_IP_INT_MASK BIT(16)
 
+#define PCI_VENDOR_ID_NVIDIA 0x10de
 /* Device ID */
 #define XUDC_DEVICE_ID_T210     0x0fad
 #define XUDC_DEVICE_ID_T186     0x10e2
+#define XUDC_DEVICE_ID_T194     0x10ff
 
 #define XUDC_IS_T210(t) \
-	(t->soc ? (t->soc->device_id == XUDC_DEVICE_ID_T210) : false)
+	(t->soc ? (t->soc->device_id == XUDC_DEVICE_ID_T210) :	\
+	(t->pci ? (t->pci->device == XUDC_DEVICE_ID_T210) : false))
 #define XUDC_IS_T186(t) \
-	(t->soc ? (t->soc->device_id == XUDC_DEVICE_ID_T186) : false)
+	(t->soc ? (t->soc->device_id == XUDC_DEVICE_ID_T186) :	\
+	(t->pci ? (t->pci->device == XUDC_DEVICE_ID_T186) : false))
+#define XUDC_IS_T194(t) \
+	(t->soc ? (t->soc->device_id == XUDC_DEVICE_ID_T194) :	\
+	(t->pci ? (t->pci->device == XUDC_DEVICE_ID_T194) : false))
 
 #if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
 static struct of_device_id tegra_xusba_pd[] = {
@@ -290,6 +298,7 @@ BUILD_EP_CONTEXT_RW(data_offset, rsvd[2], 0, 0x1ffff)
 BUILD_EP_CONTEXT_RW(numtrbs, rsvd[2], 22, 0x1f)
 BUILD_EP_CONTEXT_RW(devaddr, rsvd[6], 0, 0x7f)
 
+static const char const driver_name[] = "tegra-xudc-new";
 static inline u64 ep_ctx_read_deq_ptr(struct tegra_xudc_ep_context *ctx)
 {
 	return ((u64)ep_ctx_read_deq_hi(ctx) << 32) |
@@ -460,6 +469,8 @@ struct tegra_xudc {
 	struct usb_gadget gadget;
 	struct usb_gadget_driver *driver;
 
+	struct pci_dev *pci;
+	bool pci_enabled;
 #define XUDC_NR_EVENT_RINGS 2
 #define XUDC_EVENT_RING_SIZE 4096
 	struct tegra_xudc_trb *event_ring[XUDC_NR_EVENT_RINGS];
@@ -499,6 +510,7 @@ struct tegra_xudc {
 
 	void __iomem *base;
 	resource_size_t phys_base;
+	resource_size_t phys_len;
 	void __iomem *ipfs;
 	void __iomem *fpci;
 
@@ -3175,7 +3187,7 @@ static void tegra_xudc_device_params_init(struct tegra_xudc *xudc)
 	xudc_writel(xudc, val, SSPX_CORE_CNT30);
 
 	/*
-	 * Compliacne suite appears to be violating polling LFPS tBurst max
+	 * Compliance suite appears to be violating polling LFPS tBurst max
 	 * of 1.4us.  Send 1.45us instead.
 	 */
 	val = xudc_readl(xudc, SSPX_CORE_CNT32);
@@ -3223,12 +3235,19 @@ static void tegra_xudc_device_params_init(struct tegra_xudc *xudc)
 	xudc_writel(xudc, val, CFG_DEV_FE);
 
 	/*
-	 * Enable INFINITE_SS_RETRY to prevent device from entering
-	 * Disabled.Error when attached to buggy SuperSpeed hubs.
+	 * On PCI Unit Emulation this code is causing enumeration problems in
+	 * High Speed. TODO: find out why
 	 */
-	val = xudc_readl(xudc, CFG_DEV_FE);
-	val |= CFG_DEV_FE_INFINITE_SS_RETRY;
-	xudc_writel(xudc, val, CFG_DEV_FE);
+	if (!xudc->pci_enabled) {
+		/*
+		 * Enable INFINITE_SS_RETRY to prevent device from entering
+		 * Disabled.Error when attached to buggy SuperSpeed hubs.
+		 */
+		val = xudc_readl(xudc, CFG_DEV_FE);
+		val |= CFG_DEV_FE_INFINITE_SS_RETRY;
+		xudc_writel(xudc, val, CFG_DEV_FE);
+	}
+
 
 	/* Set interrupt moderation. */
 	imod = XUDC_INTERRUPT_MODERATION_US * 4;
@@ -3353,6 +3372,16 @@ static struct tegra_xudc_soc_data tegra186_xudc_soc_data = {
 	.invalid_seq_num = false,
 };
 
+static struct tegra_xudc_soc_data tegra194_xudc_soc_data = {
+	.device_id = XUDC_DEVICE_ID_T194,
+	.supply_names = tegra186_xudc_supply_names, /* TODO */
+	.num_supplies = ARRAY_SIZE(tegra186_xudc_supply_names), /* TODO */
+	.u1_enable = false,
+	.u2_enable = false,
+	.lpm_enable = false,
+	.invalid_seq_num = false,
+};
+
 static struct of_device_id tegra_xudc_of_match[] = {
 	{
 		.compatible = "nvidia,tegra210-xudc",
@@ -3361,6 +3390,10 @@ static struct of_device_id tegra_xudc_of_match[] = {
 	{
 		.compatible = "nvidia,tegra186-xudc",
 		.data = &tegra186_xudc_soc_data
+	},
+	{
+		.compatible = "nvidia,tegra194-xudc",
+		.data = &tegra194_xudc_soc_data
 	},
 	{ }
 };
@@ -3866,6 +3899,134 @@ static int tegra_xudc_runtime_resume(struct device *dev)
 }
 #endif
 
+static void tegra_xudc_remove_pci(struct pci_dev *pdev)
+{
+	struct tegra_xudc *xudc;
+
+	xudc = pci_get_drvdata(pdev);
+	if (xudc) {
+		cancel_delayed_work(&xudc->plc_reset_work);
+		usb_del_gadget_udc(&xudc->gadget);
+		tegra_xudc_free_eps(xudc);
+		tegra_xudc_free_event_ring(xudc);
+		if (xudc->pci_enabled)
+			pci_disable_device(pdev);
+		pci_set_drvdata(pdev, NULL);
+	}
+}
+
+static int tegra_xudc_probe_pci(struct pci_dev *pdev,
+				const struct pci_device_id *id)
+{
+	int err;
+	struct tegra_xudc *xudc;
+	struct resource *region;
+
+	xudc = devm_kzalloc(&pdev->dev, sizeof(*xudc), GFP_ATOMIC);
+	if (!xudc)
+		return -ENOMEM;
+	xudc->dev = &pdev->dev;
+	xudc->pci = pdev;
+	pci_set_drvdata(pdev, xudc);
+
+	/* set soc data */
+	if (XUDC_IS_T210(xudc))
+		xudc->soc = &tegra210_xudc_soc_data;
+	else if (XUDC_IS_T186(xudc))
+		xudc->soc = &tegra186_xudc_soc_data;
+	else if (XUDC_IS_T194(xudc))
+		xudc->soc = &tegra194_xudc_soc_data;
+
+	/* set module parameter default values from soc data */
+	if (xudc->soc) {
+		u1_enable = xudc->soc->u1_enable;
+		u2_enable = xudc->soc->u2_enable;
+		lpm_enable = xudc->soc->lpm_enable;
+	}
+
+	xudc->pullup = 1;
+
+	err = pci_enable_device(pdev);
+	if (err < 0) {
+		dev_err(xudc->dev, "failed to enable PCI device: %d\n", err);
+		return -ENODEV;
+	}
+	xudc->pci_enabled = true;
+	dev_info(xudc->dev, "PCI device enabled\n");
+
+	/* request PCI memory resources */
+	xudc->phys_base = pci_resource_start(pdev, 0);
+	xudc->phys_len = pci_resource_len(pdev, 0);
+
+	region = devm_request_mem_region(xudc->dev, xudc->phys_base,
+					 xudc->phys_len, driver_name);
+	if (IS_ERR(region)) {
+		dev_err(xudc->dev, "failed to request PCI mem region: %ld\n",
+			PTR_ERR(region));
+		err = -EBUSY;
+		goto disable_pci;
+	}
+
+	xudc->base = devm_ioremap_nocache(xudc->dev, xudc->phys_base,
+					  xudc->phys_len);
+	if (IS_ERR(xudc->base)) {
+		dev_err(xudc->dev, "failed to ioremap: %ld\n",
+			PTR_ERR(xudc->base));
+		err = -EFAULT;
+		goto disable_pci;
+	}
+
+	tegra_xudc_device_params_init(xudc);
+	err = tegra_xudc_alloc_event_ring(xudc);
+	if (err)
+		goto disable_pci;
+
+	tegra_xudc_init_event_ring(xudc);
+	err = tegra_xudc_alloc_eps(xudc);
+	if (err)
+		goto free_event_ring;
+	tegra_xudc_init_eps(xudc);
+	spin_lock_init(&xudc->lock);
+
+	xudc->gadget.ops = &tegra_xudc_gadget_ops;
+	xudc->gadget.ep0 = &xudc->ep[0].usb_ep;
+	xudc->gadget.name = "tegra-xudc";
+	xudc->gadget.max_speed = USB_SPEED_SUPER;
+
+	err = usb_add_gadget_udc(&pdev->dev, &xudc->gadget);
+	if (err) {
+		dev_err(&pdev->dev, "failed to usb_add_gadget_udc %d\n", err);
+		goto free_eps;
+	}
+	init_completion(&xudc->disconnect_complete);
+
+	INIT_DELAYED_WORK(&xudc->plc_reset_work, tegra_xudc_plc_reset_work);
+
+	/* Get the IRQ Resource */
+	err = devm_request_irq(&pdev->dev, pdev->irq, tegra_xudc_irq,
+			       IRQF_SHARED, driver_name, xudc);
+	if (err < 0) {
+		dev_err(xudc->dev, "failed to claim irq %d\n", err);
+		goto remove_gadget;
+	}
+	xudc->irq = pdev->irq;
+	pci_set_master(pdev);
+
+	return 0;
+
+remove_gadget:
+	usb_del_gadget_udc(&xudc->gadget);
+free_eps:
+	tegra_xudc_free_eps(xudc);
+free_event_ring:
+	tegra_xudc_free_event_ring(xudc);
+disable_pci:
+	pci_disable_device(pdev);
+	pci_set_drvdata(pdev, NULL);
+
+	return err;
+}
+
 static const struct dev_pm_ops tegra_xudc_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(tegra_xudc_suspend, tegra_xudc_resume)
 	SET_RUNTIME_PM_OPS(tegra_xudc_runtime_suspend,
@@ -3881,7 +4042,63 @@ static struct platform_driver tegra_xudc_driver = {
 		.of_match_table = tegra_xudc_of_match,
 	},
 };
-module_platform_driver(tegra_xudc_driver);
+
+static const struct pci_device_id nvpci_ids[] = {
+	{
+		PCI_DEVICE(PCI_VENDOR_ID_NVIDIA, XUDC_DEVICE_ID_T210),
+		.class = ((PCI_CLASS_SERIAL_USB << 8) | 0xfe),
+		.class_mask = ~0,
+	},
+	{
+		PCI_DEVICE(PCI_VENDOR_ID_NVIDIA, XUDC_DEVICE_ID_T186),
+		.class = ((PCI_CLASS_SERIAL_USB << 8) | 0xfe),
+		.class_mask = ~0,
+	},
+	{
+		PCI_DEVICE(PCI_VENDOR_ID_NVIDIA, XUDC_DEVICE_ID_T194),
+		.class = ((PCI_CLASS_SERIAL_USB << 8) | 0xfe),
+		.class_mask = ~0,
+	},
+	{} /* end */
+};
+MODULE_DEVICE_TABLE(pci, nvpci_ids);
+
+static struct pci_driver tegra_xudc_pci_driver = {
+	.name = driver_name,
+	.id_table = nvpci_ids,
+	.probe = tegra_xudc_probe_pci,
+	.remove = tegra_xudc_remove_pci,
+};
+
+static int __init tegra_xudc_init(void)
+{
+	int err;
+
+	err = platform_driver_register(&tegra_xudc_driver);
+	if (err) {
+		pr_err("%s failed to register platform driver %d\n",
+		       __func__, err);
+		return err;
+	}
+
+	err = pci_register_driver(&tegra_xudc_pci_driver);
+	if (err) {
+		pr_err("%s failed to register pci driver %d\n",
+		       __func__, err);
+		platform_driver_unregister(&tegra_xudc_driver);
+		return err;
+	}
+
+	return 0;
+}
+module_init(tegra_xudc_init);
+
+static void __exit tegra_xudc_exit(void)
+{
+	pci_unregister_driver(&tegra_xudc_pci_driver);
+	platform_driver_unregister(&tegra_xudc_driver);
+}
+module_exit(tegra_xudc_exit);
 
 MODULE_DESCRIPTION("NVIDIA Tegra XUSB Device Controller");
 MODULE_AUTHOR("Andrew Bresticker <abrestic@chromium.org>");
