@@ -48,6 +48,7 @@ struct denver_mca_bank {
 	u64 (*addr)(void);
 	u64 (*msc1)(void);
 	u64 (*msc2)(void);
+	u8 processed;
 };
 
 /* Helper macro for filling in struct denver_mca_bank */
