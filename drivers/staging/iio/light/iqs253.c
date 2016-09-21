@@ -28,6 +28,7 @@
 #include <linux/delay.h>
 #include <linux/irqchip/tegra.h>
 #include <linux/input.h>
+#include <linux/interrupt.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
 #include <linux/iio/light/ls_sysfs.h>
@@ -90,6 +91,7 @@ struct iqs253_chip {
 	const struct i2c_device_id	*id;
 	u32			rdy_gpio;
 	u32			wake_gpio;
+	int			wake_irq;
 	u32			sar_gpio;
 	u32			mode;
 	u32			value;
@@ -462,7 +464,7 @@ static int iqs253_suspend(struct device *dev)
 		chip->id->name, __func__, __LINE__);
 		return ret;
 	}
-	return tegra_pm_irq_set_wake(tegra_gpio_to_wake(chip->wake_gpio), 1);
+	return enable_irq_wake(chip->wake_irq);;
 }
 
 static int iqs253_resume(struct device *dev)
@@ -655,7 +657,14 @@ static int iqs253_probe(struct i2c_client *client,
 	}
 	iqs253_chip->rdy_gpio = rdy_gpio;
 	iqs253_chip->wake_gpio = wake_gpio;
+	iqs253_chip->wake_irq = gpio_to_irq(wake_gpio);
 	iqs253_chip->sar_gpio = sar_gpio;
+
+	if (iqs253_chip->wake_irq < 0) {
+		dev_err(&client->dev, "Failed to get irq from GPIO %d\n",
+			wake_gpio);
+		goto err_gpio_request;
+	}
 
 	ret = regulator_enable(iqs253_chip->vddhi);
 	if (ret) {
