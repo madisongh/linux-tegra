@@ -1734,7 +1734,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	pltfm_host->priv = tegra_host;
 	rc = sdhci_tegra_parse_dt(&pdev->dev);
 	if (rc)
-		goto err_parse_dt;
+		goto err_alloc_tegra_host;
 
 	plat = tegra_host->plat;
 
@@ -1755,7 +1755,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 			dev_err(mmc_dev(host->mmc),
 					"clk[%d] error in getting %s: %d\n",
 					i, parent_clk_list[i], rc);
-			goto err_power_req;
+			goto err_alloc_tegra_host;
 		}
 		tegra_host->pll_source[i].pll_rate =
 			clk_get_rate(tegra_host->pll_source[i].pll);
@@ -1808,7 +1808,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		dev_err(mmc_dev(host->mmc), "clk err\n");
 		rc = PTR_ERR(clk);
 		if (!tegra_platform_is_vdk())
-			goto err_clk_get;
+			goto err_alloc_tegra_host;
 	}
 
 	tegra_host->emc_clk =
@@ -1847,7 +1847,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	/* enable clocks first time */
 		rc = clk_prepare_enable(pltfm_host->clk);
 		if (rc != 0)
-			goto err_clk_put;
+			goto err_alloc_tegra_host;
 	} else {
 
 	/* clock enable call is removed but the below runtime call sequence
@@ -1962,13 +1962,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 	return 0;
 
 err_add_host:
+	if(!plat->disable_rtpm)
+		pm_runtime_disable(mmc_dev(host->mmc));
 	clk_disable_unprepare(pltfm_host->clk);
-err_clk_put:
-	if (pltfm_host->clk)
-		clk_put(pltfm_host->clk);
-err_clk_get:
-err_power_req:
-err_parse_dt:
 err_alloc_tegra_host:
 	sdhci_pltfm_free(pdev);
 	return rc;
