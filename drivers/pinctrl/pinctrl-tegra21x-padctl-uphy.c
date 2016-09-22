@@ -2497,7 +2497,7 @@ static int tegra21x_usb3_phy_power_on(struct phy *phy)
 		port, uphy_lane);
 
 	sprintf(prod_name, "prod_c_ss%d", port);
-	err = tegra_prod_set_by_name(uphy->uphy_lane_regs, prod_name,
+	err = tegra_prod_set_by_name(&uphy->padctl_regs, prod_name,
 				     uphy->prod_list);
 	if (err) {
 		dev_info(dev, "failed to apply prod for ss pad%d (%d)\n",
