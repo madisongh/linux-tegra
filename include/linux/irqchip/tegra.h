@@ -54,28 +54,18 @@ int tegra_read_wake_status(u32 *wake_status);
 int tegra_pm_irq_set_wake(int wake, int enable);
 int tegra_pm_irq_set_wake_type(int wake, int flow_type);
 bool tegra_pm_irq_lp0_allowed(void);
-int tegra_set_wake_gpio(unsigned int wake, int gpio);
-int tegra_set_wake_irq(unsigned int wake, int irq);
 int tegra_gpio_to_wake(int gpio);
 void tegra_irq_to_wake(int irq, int *wak_list, int *wak_size);
 int tegra_wake_to_irq(int wake);
 int tegra_wake_to_gpio(int wake);
-int tegra_set_wake_source(int wake, int wake_int);
-int tegra_disable_wake_source(int wake);
+void tegra_pm_update_gpio_wakeup_table(int base, int *gpio_wakeup_list,
+				       int nlist);
 #else
 static inline int tegra_wakeup_table_init(void)
 {
 	tegra_gpio_wake_table = NULL;
 	tegra_irq_wake_table = NULL;
 	tegra_wake_table_len = 0;
-	return 0;
-}
-static inline int tegra_set_wake_gpio(unsigned int wake, int gpio)
-{
-	return 0;
-}
-static inline int tegra_set_wake_irq(unsigned int wake, int irq)
-{
 	return 0;
 }
 static inline int tegra_pm_irq_set_wake(int wake, int enable)
@@ -96,13 +86,10 @@ void tegra_irq_to_wake(int irq, int *wak_list, int *wak_size)
 	*wak_size = 0;
 	return;
 }
-static inline int tegra_set_wake_source(int wake, int wake_int)
+static inline void tegra_pm_update_gpio_wakeup_table(int base,
+						     int *gpio_wakeup_list,
+						     int nlist)
 {
-	return 0;
-}
-static inline int tegra_disable_wake_source(int wake)
-{
-	return 0;
 }
 #endif
 

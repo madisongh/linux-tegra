@@ -42,27 +42,6 @@ EXPORT_SYMBOL_GPL(tegra_wake_table_len);
 
 static int last_gpio = -1;
 
-int tegra_set_wake_gpio(unsigned int wake, int gpio)
-{
-	if (wake >= tegra_wake_table_len)
-		return -EINVAL;
-
-	tegra_irq_wake_table[wake] = -EAGAIN;
-	tegra_gpio_wake_table[wake] = gpio;
-
-	return 0;
-}
-
-int tegra_set_wake_irq(unsigned int wake, int irq)
-{
-	if (wake >= tegra_wake_table_len)
-		return -EINVAL;
-
-	tegra_irq_wake_table[wake] = irq;
-
-	return 0;
-}
-
 int tegra_gpio_to_wake(int gpio)
 {
 	int i;
@@ -76,6 +55,24 @@ int tegra_gpio_to_wake(int gpio)
 	}
 
 	return -EINVAL;
+}
+
+void tegra_pm_update_gpio_wakeup_table(int base, int *gpio_wakeup_list,
+				       int nlist)
+{
+	int i;
+
+	for (i = 0; i < nlist; ++i) {
+		if (gpio_wakeup_list[i] == -ENOENT)
+			continue;
+
+		if (gpio_wakeup_list[i] < 0) {
+			tegra_gpio_wake_table[i] = gpio_wakeup_list[i];
+		} else {
+			tegra_gpio_wake_table[i] = base + gpio_wakeup_list[i];
+			tegra_irq_wake_table[i] = -EAGAIN;
+		}
+	}
 }
 
 #ifndef CONFIG_ARCH_TEGRA_210_SOC
@@ -144,24 +141,6 @@ int tegra_wake_to_irq(int wake)
 	}
 
 	return ret;
-}
-
-int tegra_set_wake_source(int wake, int irq)
-{
-	if (wake < 0)
-		return -EINVAL;
-
-	if (wake >= tegra_wake_table_len)
-		return -EINVAL;
-
-	tegra_irq_wake_table[wake] = irq;
-	return 0;
-}
-EXPORT_SYMBOL_GPL(tegra_set_wake_source);
-
-int tegra_disable_wake_source(int wake)
-{
-	return tegra_set_wake_source(wake, -EINVAL);
 }
 
 int get_wakeup_reason_irq(void)
