@@ -1242,7 +1242,8 @@ static void tegra_sdhci_pre_voltage_switch(struct sdhci_host *sdhci,
 	unsigned int min_uV;
 
 	if (!tegra_host ||
-		(!tegra_host->vdd_io_reg && !sdhci->mmc->supply.vqmmc))
+		(!tegra_host->vdd_io_reg &&
+		IS_ERR_OR_NULL(sdhci->mmc->supply.vqmmc)))
 		return;
 
 	min_uV = tegra_host->vddio_min_uv;
@@ -1276,7 +1277,8 @@ static void tegra_sdhci_post_voltage_switch(struct sdhci_host *sdhci,
 	bool set, change_padctrl;
 
 	if (!tegra_host ||
-		(!tegra_host->vdd_io_reg && !sdhci->mmc->supply.vqmmc))
+		(!tegra_host->vdd_io_reg &&
+		IS_ERR_OR_NULL(sdhci->mmc->supply.vqmmc)))
 		return;
 
 	if (tegra_host->check_pad_ctrl_setting) {
