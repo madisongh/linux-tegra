@@ -153,6 +153,14 @@
 #define  BCM54XX_SHD_SCR3_DLLAPD_DIS	0x0002
 #define  BCM54XX_SHD_SCR3_TRDDAPD	0x0004
 
+/* Broadcom IDDQ-LP regs */
+#define MII_BCM54XX_SHD		0x1c
+#define MII_BCM54XX_SHD_IDDQ		0x3000
+#define MII_BCM54XX_IDDQ_LP		0x0001
+#define MII_BCM54XX_EXT_CTL_WR_ENABLE	0X8000
+
+#define BCM_IDDQ_EN			1
+
 /* 01010: Auto Power-Down */
 #define BCM54XX_SHD_APD			0x0a
 #define  BCM_APD_CLR_MASK		0xFE9F /* clear bits 5, 6 & 8 */

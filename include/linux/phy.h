@@ -589,6 +589,11 @@ struct phy_driver {
 	int (*module_eeprom)(struct phy_device *dev,
 			     struct ethtool_eeprom *ee, u8 *data);
 
+	/* A function provided by phy speicific driver to support Low-power
+	 * mode
+	 */
+	void (*low_power_mode)(struct phy_device *dev, bool lp_mode_en);
+
 	struct device_driver driver;
 };
 #define to_phy_driver(d) container_of(d, struct phy_driver, driver)

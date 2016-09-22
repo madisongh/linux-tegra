@@ -431,6 +431,38 @@ static void bcm89xx_enable_oob(struct phy_device *phydev)
 	phy_write(phydev, 0x18, 0x0400);
 }
 
+void bcm_phy_ultra_low_power(struct phy_device *phydev)
+{
+	unsigned int reg = 0;
+
+	reg |= MII_BCM54XX_SHD_IDDQ | MII_BCM54XX_IDDQ_LP |
+		MII_BCM54XX_EXT_CTL_WR_ENABLE;
+
+	phy_write(phydev, MII_BCM54XX_SHD, reg);
+
+	phydev->dev_flags |= BCM_IDDQ_EN;
+}
+
+static int bcm54xx_low_power_mode(struct phy_device *phydev,
+			 bool lp_mode_en)
+{
+	if (lp_mode_en) {
+		if (phydev->dev_flags & BCM_IDDQ_EN) {
+			pr_debug("%s(): bcm-phy already in iddq-lp mode\n",
+				 __func__);
+			return 0;
+		}
+		pr_info("%s(): put phy in iddq-lp mode\n", __func__);
+		bcm_phy_ultra_low_power(phydev);
+	} else {
+		pr_debug("%s(): re-initialze phy after exiting "
+					"from iddq-lp mode\n", __func__);
+		phy_init_hw(phydev);
+		phydev->dev_flags &= ~BCM_IDDQ_EN;
+	}
+	return 0;
+}
+
 static int bcm54xx_config_init(struct phy_device *phydev)
 {
 	int reg, err;
@@ -952,6 +984,7 @@ static struct phy_driver broadcom_drivers[] = {
 	.config_init	= bcm54xx_config_init,
 	.config_aneg	= genphy_config_aneg,
 	.read_status	= genphy_read_status,
+	.low_power_mode	= bcm54xx_low_power_mode,
 	.ack_interrupt	= bcm54xx_ack_interrupt,
 	.config_intr	= bcm54xx_config_intr,
 	.driver		= { .owner = THIS_MODULE },
