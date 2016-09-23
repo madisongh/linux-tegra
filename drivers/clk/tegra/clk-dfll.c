@@ -1524,7 +1524,7 @@ static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
 	n_voltages = regulator_count_voltages(td->vdd_reg);
 
 	for (i = 0; i < n_voltages; i++) {
-		reg_volt = regulator_list_voltage(td->vdd_reg, i) /
+		reg_volt = regulator_list_voltage_unlocked(td->vdd_reg, i) /
 					td->soc->alignment;
 
 		if (reg_volt < 0)
@@ -1550,7 +1550,7 @@ static int find_vdd_map_entry_min(struct tegra_dfll *td, int uV)
 	n_voltages = regulator_count_voltages(td->vdd_reg);
 
 	for (i = 0; i < n_voltages; i++) {
-		reg_volt = regulator_list_voltage(td->vdd_reg, i) /
+		reg_volt = regulator_list_voltage_unlocked(td->vdd_reg, i) /
 					td->soc->alignment;
 
 		if (reg_volt < 0)
