@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2013 Google, Inc.
+ * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -32,6 +33,8 @@ struct trusty_state {
 	char *version_str;
 	u32 api_version;
 };
+
+#define TRUSTY_DEV_COMP "android,trusty-smc-v1"
 
 #ifdef CONFIG_ARM64
 #define SMC_ARG0		"x0"
@@ -78,6 +81,9 @@ s32 trusty_fast_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 
+	if (!is_trusty_dev_enabled())
+		return SM_ERR_UNDEFINED_SMC;
+
 	BUG_ON(!s);
 	BUG_ON(!SMC_IS_FASTCALL(smcnr));
 	BUG_ON(SMC_IS_SMC64(smcnr));
@@ -90,6 +96,9 @@ EXPORT_SYMBOL(trusty_fast_call32);
 s64 trusty_fast_call64(struct device *dev, u64 smcnr, u64 a0, u64 a1, u64 a2)
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+
+	if (!is_trusty_dev_enabled())
+		return SM_ERR_UNDEFINED_SMC;
 
 	BUG_ON(!s);
 	BUG_ON(!SMC_IS_FASTCALL(smcnr));
@@ -178,6 +187,9 @@ s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 	int ret;
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 
+	if (!is_trusty_dev_enabled())
+		return SM_ERR_UNDEFINED_SMC;
+
 	BUG_ON(SMC_IS_FASTCALL(smcnr));
 	BUG_ON(SMC_IS_SMC64(smcnr));
 
@@ -215,6 +227,9 @@ int trusty_call_notifier_register(struct device *dev, struct notifier_block *n)
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 
+	if (!is_trusty_dev_enabled())
+		return -ENODEV;
+
 	return atomic_notifier_chain_register(&s->notifier, n);
 }
 EXPORT_SYMBOL(trusty_call_notifier_register);
@@ -223,6 +238,9 @@ int trusty_call_notifier_unregister(struct device *dev,
 				    struct notifier_block *n)
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+
+	if (!is_trusty_dev_enabled())
+		return -ENODEV;
 
 	return atomic_notifier_chain_unregister(&s->notifier, n);
 }
@@ -247,6 +265,9 @@ DEVICE_ATTR(trusty_version, S_IRUSR, trusty_version_show, NULL);
 const char *trusty_version_str_get(struct device *dev)
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+
+	if (!is_trusty_dev_enabled())
+		return NULL;
 
 	return s->version_str;
 }
@@ -292,6 +313,9 @@ u32 trusty_get_api_version(struct device *dev)
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 
+	if (!is_trusty_dev_enabled())
+		return 0;
+
 	return s->api_version;
 }
 EXPORT_SYMBOL(trusty_get_api_version);
@@ -315,6 +339,36 @@ static int trusty_init_api_version(struct trusty_state *s, struct device *dev)
 	s->api_version = api_version;
 
 	return 0;
+}
+
+static inline struct device_node *get_trusty_device_node(void)
+{
+	struct device_node *node;
+
+	node = of_find_compatible_node(NULL, NULL, TRUSTY_DEV_COMP);
+
+	if (!node)
+		pr_info("Trusty DT node not present in FDT.\n");
+
+	return node;
+}
+
+int is_trusty_dev_enabled(void)
+{
+	static int trusty_dev_status = TRUSTY_DEV_UNINIT;
+	struct device_node *node;
+
+	if (unlikely(trusty_dev_status == TRUSTY_DEV_UNINIT)) {
+		trusty_dev_status = TRUSTY_DEV_ENABLED;
+
+		node = get_trusty_device_node();
+		if (!node || !of_device_is_available(node))
+			trusty_dev_status = TRUSTY_DEV_DISABLED;
+
+		of_node_put(node);
+	}
+
+	return trusty_dev_status;
 }
 
 static int trusty_probe(struct platform_device *pdev)
@@ -380,7 +434,7 @@ static int trusty_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id trusty_of_match[] = {
-	{ .compatible = "android,trusty-smc-v1", },
+	{ .compatible = TRUSTY_DEV_COMP, },
 	{},
 };
 

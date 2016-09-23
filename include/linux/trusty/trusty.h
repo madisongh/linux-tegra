@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2013 Google, Inc.
+ * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -19,6 +20,12 @@
 #include <linux/device.h>
 #include <linux/pagemap.h>
 
+enum {
+	TRUSTY_DEV_UNINIT = -1,
+
+	TRUSTY_DEV_DISABLED = 0,
+	TRUSTY_DEV_ENABLED
+};
 
 #ifdef CONFIG_TRUSTY
 s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2);
@@ -71,5 +78,7 @@ int trusty_encode_page_info(struct ns_mem_page_info *inf,
 int trusty_call32_mem_buf(struct device *dev, u32 smcnr,
 			  struct page *page,  u32 size,
 			  pgprot_t pgprot);
+
+int is_trusty_dev_enabled(void);
 
 #endif
