@@ -115,6 +115,7 @@ struct dvfs_rail {
 	int therm_cap_idx;
 
 	bool is_ready;
+	bool leave_disabled_at_boot;
 };
 
 enum dfll_range {
