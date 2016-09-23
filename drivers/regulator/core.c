@@ -2668,6 +2668,13 @@ int regulator_list_voltage(struct regulator *regulator, unsigned selector)
 }
 EXPORT_SYMBOL_GPL(regulator_list_voltage);
 
+int regulator_list_voltage_unlocked(struct regulator *regulator,
+				    unsigned selector)
+{
+	return _regulator_list_voltage(regulator, selector, 0);
+}
+EXPORT_SYMBOL_GPL(regulator_list_voltage_unlocked);
+
 /**
  * regulator_get_regmap - get the regulator's register map
  * @regulator: regulator source
