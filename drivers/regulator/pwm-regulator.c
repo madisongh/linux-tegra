@@ -195,7 +195,8 @@ static struct regulator_desc pwm_regulator_desc = {
 };
 
 static int pwm_regulator_init_table(struct platform_device *pdev,
-				    struct pwm_regulator_data *drvdata)
+				    struct pwm_regulator_data *drvdata,
+				    struct regulator_desc **desc)
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct pwm_voltages *duty_cycle_table;
@@ -216,6 +217,11 @@ static int pwm_regulator_init_table(struct platform_device *pdev,
 	if (!duty_cycle_table)
 		return -ENOMEM;
 
+	*desc = devm_kzalloc(&pdev->dev, sizeof(**desc), GFP_KERNEL);
+	if (!*desc)
+		return -ENOMEM;
+	**desc = pwm_regulator_desc;
+
 	ret = of_property_read_u32_array(np, "voltage-table",
 					 (u32 *)duty_cycle_table,
 					 length / sizeof(u32));
@@ -225,17 +231,23 @@ static int pwm_regulator_init_table(struct platform_device *pdev,
 	}
 
 	drvdata->duty_cycle_table	= duty_cycle_table;
-	pwm_regulator_desc.ops		= &pwm_regulator_voltage_table_ops;
-	pwm_regulator_desc.n_voltages	= length / sizeof(*duty_cycle_table);
+	(*desc)->ops			= &pwm_regulator_voltage_table_ops;
+	(*desc)->n_voltages		= length / sizeof(*duty_cycle_table);
 
 	return 0;
 }
 
 static int pwm_regulator_init_continuous(struct platform_device *pdev,
-					 struct pwm_regulator_data *drvdata)
+					 struct pwm_regulator_data *drvdata,
+					 struct regulator_desc **desc)
 {
-	pwm_regulator_desc.ops = &pwm_regulator_voltage_continuous_ops;
-	pwm_regulator_desc.continuous_voltage_range = true;
+	*desc = devm_kzalloc(&pdev->dev, sizeof(**desc), GFP_KERNEL);
+	if (!*desc)
+		return -ENOMEM;
+	**desc = pwm_regulator_desc;
+
+	(*desc)->ops = &pwm_regulator_voltage_continuous_ops;
+	(*desc)->continuous_voltage_range = true;
 
 	return 0;
 }
@@ -247,6 +259,7 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 	struct regulator_dev *regulator;
 	struct regulator_config config = { };
 	struct device_node *np = pdev->dev.of_node;
+	struct regulator_desc *desc;
 	enum gpiod_flags gpio_flags;
 	int ret;
 
@@ -260,9 +273,10 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	if (of_find_property(np, "voltage-table", NULL))
-		ret = pwm_regulator_init_table(pdev, drvdata);
+		ret = pwm_regulator_init_table(pdev, drvdata, &desc);
 	else
-		ret = pwm_regulator_init_continuous(pdev, drvdata);
+		ret = pwm_regulator_init_continuous(pdev, drvdata, &desc);
+
 	if (ret)
 		return ret;
 
@@ -295,8 +309,7 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 		return PTR_ERR(drvdata->pwm);
 	}
 
-	regulator = devm_regulator_register(&pdev->dev,
-					    &pwm_regulator_desc, &config);
+	regulator = devm_regulator_register(&pdev->dev, desc, &config);
 	if (IS_ERR(regulator)) {
 		dev_err(&pdev->dev, "Failed to register regulator %s\n",
 			pwm_regulator_desc.name);
