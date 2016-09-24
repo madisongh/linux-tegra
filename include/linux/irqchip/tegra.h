@@ -54,7 +54,6 @@ int tegra_read_wake_status(u32 *wake_status);
 int tegra_pm_irq_set_wake(int wake, int enable);
 int tegra_pm_irq_set_wake_type(int wake, int flow_type);
 bool tegra_pm_irq_lp0_allowed(void);
-int tegra_gpio_to_wake(int gpio);
 void tegra_irq_to_wake(int irq, int *wak_list, int *wak_size);
 int tegra_wake_to_irq(int wake);
 int tegra_wake_to_gpio(int wake);
@@ -73,10 +72,6 @@ static inline int tegra_pm_irq_set_wake(int wake, int enable)
 	return 0;
 }
 static inline int tegra_pm_irq_set_wake_type(int wake, int flow_type)
-{
-	return 0;
-}
-static inline int tegra_gpio_to_wake(int gpio)
 {
 	return 0;
 }

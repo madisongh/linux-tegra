@@ -40,23 +40,6 @@ EXPORT_SYMBOL_GPL(tegra_irq_wake_table);
 int tegra_wake_table_len;
 EXPORT_SYMBOL_GPL(tegra_wake_table_len);
 
-static int last_gpio = -1;
-
-int tegra_gpio_to_wake(int gpio)
-{
-	int i;
-
-	for (i = 0; i < tegra_wake_table_len; i++) {
-		if (tegra_gpio_wake_table[i] == gpio) {
-			pr_info("gpio wake%d for gpio=%d\n", i, gpio);
-			last_gpio = i;
-			return i;
-		}
-	}
-
-	return -EINVAL;
-}
-
 void tegra_pm_update_gpio_wakeup_table(int base, int *gpio_wakeup_list,
 				       int nlist)
 {
@@ -79,7 +62,6 @@ void tegra_pm_update_gpio_wakeup_table(int base, int *gpio_wakeup_list,
 void tegra_irq_to_wake(int irq, int *wak_list, int *wak_size)
 {
 	int i;
-	int bank_irq;
 
 	*wak_size = 0;
 	for (i = 0; i < tegra_wake_table_len; i++) {
@@ -89,29 +71,6 @@ void tegra_irq_to_wake(int irq, int *wak_list, int *wak_size)
 			*wak_size = *wak_size + 1;
 		}
 	}
-	if (*wak_size)
-		goto out;
-
-	/* The gpio set_wake code bubbles the set_wake call up to the irq
-	 * set_wake code. This insures that the nested irq set_wake call
-	 * succeeds, even though it doesn't have to do any pm setup for the
-	 * bank.
-	 *
-	 * This is very fragile - there's no locking, so two callers could
-	 * cause issues with this.
-	 */
-	if (last_gpio < 0)
-		goto out;
-
-	bank_irq = tegra_gpio_get_bank_int_nr(tegra_gpio_wake_table[last_gpio]);
-	if (bank_irq == irq) {
-		pr_info("gpio bank wake found: wake%d for irq=%d\n", i, irq);
-		wak_list[*wak_size] = last_gpio;
-		*wak_size = 1;
-	}
-
-out:
-	return;
 }
 #endif
 
