@@ -520,7 +520,7 @@ static inline void writel(u32 val, volatile void __iomem *virt_addr)
 	u32 offset;
 	volatile void __iomem *ctl_addr;
 
-	if (!tegra_platform_is_linsim()) {
+	if (!tegra_platform_is_sim()) {
 		__writel(val, virt_addr);
 		return;
 	}
@@ -542,7 +542,7 @@ static inline u32 readl_relaxed(const volatile void __iomem *virt_addr)
 	u32 val, offset;
 	volatile void __iomem *ctl_addr;
 
-	if (!tegra_platform_is_linsim())
+	if (!tegra_platform_is_sim())
 		return __readl_relaxed(virt_addr);
 
 	ctl_addr = mc_base + ARM_SMMU_CONTROL_ADDRESS;
@@ -600,7 +600,7 @@ static void parse_driver_options(struct arm_smmu_device *smmu)
 	} while (arm_smmu_options[++i].opt);
 
 	/* FIXME: remove if linsim is fixed */
-	if (tegra_platform_is_linsim())
+	if (tegra_platform_is_sim())
 		smmu->options |= ARM_SMMU_OPT_SECURE_CFG_ACCESS;
 	else
 		smmu->options &= ~ARM_SMMU_OPT_BROKEN_SIM_IRQ;
@@ -822,7 +822,7 @@ static void arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
 	int count = 0;
 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
 
-	if (tegra_platform_is_linsim() || arm_smmu_gr0_tlbiallnsnh)
+	if (tegra_platform_is_sim() || arm_smmu_gr0_tlbiallnsnh)
 		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
 
 	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_sTLBGSYNC);
@@ -1568,7 +1568,7 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
 		writel_relaxed(s2cr, gr0_base + ARM_SMMU_GR0_S2CR(idx));
 
 		if (config_enabled(CONFIG_ARM_SMMU_WAR) &&
-		    tegra_platform_is_linsim())
+		    tegra_platform_is_sim())
 			tegra_smmu_conf_swgroup(smmu, cfg->streamids[i],
 						smmu_domain->cfg.cbndx);
 	}
@@ -2387,7 +2387,7 @@ static int arm_smmu_add_device(struct device *dev)
 				       &cfg->streamids[0]);
 	}
 
-	if (tegra_platform_is_linsim() &&
+	if (tegra_platform_is_sim() &&
 		(swgids == BIT(TEGRA_SWGROUP_BPMP))) {
 		dev_info(dev, "No support BPMP(SMMU) in linsim\n");
 		return 0;
@@ -3251,7 +3251,7 @@ static int __init arm_smmu_init(void)
 	int ret;
 
 #ifdef CONFIG_ARM_SMMU_WAR
-	if (tegra_platform_is_linsim()) {
+	if (tegra_platform_is_sim()) {
 		mc_base = ioremap_nocache(MC_BASE, MC_SIZE);
 		if (!mc_base)
 			return -EINVAL;
