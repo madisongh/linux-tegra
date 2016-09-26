@@ -346,6 +346,16 @@ config CRYPTO_DEV_S5P
 	  Select this to offload Samsung S5PV210 or S5PC110, Exynos from AES
 	  algorithms execution.
 
+config CRYPTO_DEV_TEGRA_PKA1_SE
+	tristate "Tegra SE for Elliptic PKA1 crypto algorithms"
+	depends on ARCH_TEGRA_21x_SOC
+	help
+	   This option allows you to have support of Security Engine
+	   for Elliptic PKA1 Crypto Algorithms. This includes PKA1
+	   supported by Elliptic IP. PKA1 supports Public Key Algorithms,
+	   RSA (upto 4K bits) and ECC (Elliptic Curve Cryptography, upto 521 bits)
+	   features internally.
+
 config CRYPTO_DEV_TEGRA_SE
         tristate "Tegra SE driver for crypto algorithms"
         depends on !ARCH_TEGRA_2x_SOC
