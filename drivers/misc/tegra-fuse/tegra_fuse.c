@@ -75,13 +75,23 @@ static DEVICE_ATTR(odm_reserved, 0440, tegra_fuse_show, tegra_fuse_store);
 static DEVICE_ATTR(aid, 0444, tegra_fuse_show, NULL);
 #endif
 
-#define MINOR_QT		0
-#define MINOR_FPGA		1
-#define MINOR_ASIM_QT		2
-#define MINOR_ASIM_LINSIM	3
-#define MINOR_DSIM_ASIM_LINSIM	4
-#define MINOR_UNIT_FPGA		5
-#define MINOR_VDK		6
+/* Tegra macros defining HIDREV MINORREV */
+#define MINOR_QT                0
+#define MINOR_FPGA              1
+#define MINOR_ASIM_QT           2
+#define MINOR_ASIM_LINSIM       3
+#define MINOR_DSIM_ASIM_LINSIM  4
+#define MINOR_UNIT_FPGA         5
+#define MINOR_VDK               6
+
+/* Tegra macros defining HIDREV PRE_SI_PLATFORM */
+#define PRE_SI_QT		1
+#define PRE_SI_FPGA		2
+#define PRE_SI_UNIT_FPGA	3
+#define PRE_SI_ASIM_QT		4
+#define PRE_SI_ASIM_LINSIM	5
+#define PRE_SI_DSIM_ASIM_LINSIM	6
+#define PRE_SI_VDK		8
 
 #define FUSE_SKU_INFO       0x110
 #define FUSE_SKU_MSB_MASK	0xFF00
@@ -568,7 +578,7 @@ static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
 }
 
 void tegra_set_tegraid(u32 chipid, u32 major, u32 minor,
-	u32 nlist, u32 patch, const char *priv)
+	u32 pre_si_plat, u32 nlist, u32 patch, const char *priv)
 {
 	tegra_id.chipid  = (enum tegra_chipid) chipid;
 	tegra_id.major   = major;
@@ -577,30 +587,77 @@ void tegra_set_tegraid(u32 chipid, u32 major, u32 minor,
 	tegra_id.patch   = patch;
 	tegra_id.priv    = (char *)priv;
 	tegra_id.revision = tegra_decode_revision(&tegra_id);
-
+	/* for backward compatibility */
 	if (tegra_id.major == 0) {
-		if (tegra_id.minor == MINOR_QT) {
+		switch (tegra_id.minor) {
+		case MINOR_QT:
 			cpu_is_asim = false;
 			tegra_platform = TEGRA_PLATFORM_QT;
-		} else if (tegra_id.minor == MINOR_FPGA) {
+			break;
+		case MINOR_FPGA:
 			cpu_is_asim = false;
 			tegra_platform = TEGRA_PLATFORM_FPGA;
-		} else if (tegra_id.minor == MINOR_ASIM_QT) {
+			break;
+		case MINOR_ASIM_QT:
 			cpu_is_asim = true;
 			tegra_platform = TEGRA_PLATFORM_QT;
-		} else if (tegra_id.minor == MINOR_ASIM_LINSIM) {
+			break;
+		case MINOR_ASIM_LINSIM:
 			cpu_is_asim = true;
 			tegra_platform = TEGRA_PLATFORM_LINSIM;
-		} else if (tegra_id.minor == MINOR_DSIM_ASIM_LINSIM) {
+			break;
+		case MINOR_DSIM_ASIM_LINSIM:
 			cpu_is_asim = true;
 			cpu_is_dsim = true;
 			tegra_platform = TEGRA_PLATFORM_LINSIM;
-		} else if (tegra_id.minor == MINOR_UNIT_FPGA) {
+			break;
+		case MINOR_UNIT_FPGA:
 			cpu_is_asim = true;
 			tegra_platform = TEGRA_PLATFORM_UNIT_FPGA;
-		} else if (tegra_id.minor == MINOR_VDK) {
+			break;
+		case MINOR_VDK:
 			cpu_is_asim = true;
 			tegra_platform = TEGRA_PLATFORM_VDK;
+			break;
+		default:
+			pr_err("%s: Invalid pre_si_platform MINOREV=%d\n",
+				__func__, tegra_id.minor);
+		}
+	} else if (pre_si_plat > 0) {
+	/* New way to detect pre-silicon platforms T194 onwards */
+		switch (pre_si_plat) {
+		case PRE_SI_QT:
+			cpu_is_asim = false;
+			tegra_platform = TEGRA_PLATFORM_QT;
+			break;
+		case PRE_SI_FPGA:
+			cpu_is_asim = false;
+			tegra_platform = TEGRA_PLATFORM_FPGA;
+			break;
+		case PRE_SI_UNIT_FPGA:
+			cpu_is_asim = true;
+			tegra_platform = TEGRA_PLATFORM_UNIT_FPGA;
+			break;
+		case PRE_SI_ASIM_QT:
+			cpu_is_asim = true;
+			tegra_platform = TEGRA_PLATFORM_QT;
+			break;
+		case PRE_SI_ASIM_LINSIM:
+			cpu_is_asim = true;
+			tegra_platform = TEGRA_PLATFORM_LINSIM;
+			break;
+		case PRE_SI_DSIM_ASIM_LINSIM:
+			cpu_is_asim = true;
+			cpu_is_dsim = true;
+			tegra_platform = TEGRA_PLATFORM_LINSIM;
+			break;
+		case PRE_SI_VDK:
+			cpu_is_asim = true;
+			tegra_platform = TEGRA_PLATFORM_VDK;
+			break;
+		default:
+			pr_err("%s: Invalid pre_si_platform=%d\n",
+				__func__, pre_si_plat);
 		}
 	} else {
 		cpu_is_asim = false;
@@ -618,12 +675,13 @@ __weak void tegra_get_tegraid_from_hw(void)
 	cid = tegra_read_chipid();
 	nlist = tegra_read_apb_misc_reg(0x860);
 
-	tegra_set_tegraid((cid >> 8) & 0xff,
-			  (cid >> 4) & 0xf,
-			  (cid >> 16) & 0xf,
-			  (nlist >> 0) & 0xffff,
-			  (nlist >> 16) & 0xffff,
-			  priv);
+	tegra_set_tegraid(tegra_hidrev_get_chipid(cid),
+			tegra_hidrev_get_majorrev(cid),
+			tegra_hidrev_get_minorrev(cid),
+			tegra_hidrev_get_pre_si_plat(cid),
+			(nlist >> 0) & 0xffff,
+			(nlist >> 16) & 0xffff,
+			priv);
 }
 
 enum tegra_chipid tegra_get_chipid(void)

@@ -30,6 +30,37 @@
 
 #include <linux/of.h>
 
+/* Tegra HIDREV/ChipID helper macros */
+#define HIDREV_CHIPID_SHIFT		0x8
+#define HIDREV_CHIPID_MASK		0xff
+#define HIDREV_MAJORREV_SHIFT		0x4
+#define HIDREV_MAJORREV_MASK		0xf
+#define HIDREV_MINORREV_SHIFT		0x10
+#define HIDREV_MINORREV_MASK		0xf
+#define HIDREV_PRE_SI_PLAT_SHIFT	0x14
+#define HIDREV_PRE_SI_PLAT_MASK		0xf
+
+/* Helper functions to read HIDREV fields */
+static inline u32 tegra_hidrev_get_chipid(u32 chipid)
+{
+	return (chipid >> HIDREV_CHIPID_SHIFT) & HIDREV_CHIPID_MASK;
+}
+
+static inline u32 tegra_hidrev_get_majorrev(u32 chipid)
+{
+	return (chipid >> HIDREV_MAJORREV_SHIFT) & HIDREV_MAJORREV_MASK;
+}
+
+static inline u32 tegra_hidrev_get_minorrev(u32 chipid)
+{
+	return (chipid >> HIDREV_MINORREV_SHIFT) & HIDREV_MINORREV_MASK;
+}
+
+static inline u32 tegra_hidrev_get_pre_si_plat(u32 chipid)
+{
+	return (chipid >> HIDREV_PRE_SI_PLAT_SHIFT) & HIDREV_PRE_SI_PLAT_MASK;
+}
+
 u32 tegra_read_chipid(void);
 
 enum tegra_revision {
@@ -256,7 +287,7 @@ static inline bool tegra_platform_is_sim(void)
 bool tegra_bonded_out_dev(enum tegra_bondout_dev);
 
 extern void tegra_set_tegraid(u32 chipid, u32 major, u32 minor,
-	u32 nlist, u32 patch, const char *priv);
+	u32 pre_si_plat, u32 nlist, u32 patch, const char *priv);
 extern void tegra_get_tegraid_from_hw(void);
 extern u32 tegra_read_emu_revid(void);
 extern void tegra_set_tegraid_from_hw(void);
