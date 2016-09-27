@@ -203,6 +203,7 @@ struct dvfs_rail *tegra_dvfs_get_rail_by_name(char *name);
 bool tegra_dvfs_is_rail_up(struct dvfs_rail *rail);
 int tegra_dvfs_rail_power_down(struct dvfs_rail *rail);
 int tegra_dvfs_rail_power_up(struct dvfs_rail *rail);
+unsigned long tegra_dvfs_round_rate(struct clk *c, unsigned long rate);
 #else
 static inline int tegra_dvfs_dfll_mode_set(struct clk *c, unsigned long rate)
 { return -EINVAL; }
@@ -261,6 +262,9 @@ static inline int tegra_dvfs_rail_power_down(struct dvfs_rail *rail)
 { return -EINVAL; }
 static inline int tegra_dvfs_rail_power_up(struct dvfs_rail *rail)
 { return -EINVAL; }
+static inline unsigned long tegra_dvfs_round_rate(struct clk *c,
+						  unsigned long rate)
+{ return rate; }
 #endif
 
 #ifdef CONFIG_TEGRA_124_DVFS
