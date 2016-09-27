@@ -55,13 +55,6 @@ endif
 # dtb-list will contain all dtb-y
 DTB_LIST := $(dtb-y)
 dtb-y :=
-ifneq ($(wildcard $(srctree)/arch/arm64/boot/dts/nvidia/t210/Makefile),)
-include $(srctree)/arch/arm64/boot/dts/nvidia/t210/Makefile
-dtb-y := $(addprefix nvidia/t210/,$(dtb-y))
-endif
-DTB_LIST += $(dtb-y)
-
-dtb-y :=
 dts_makefile=$(foreach d,$(wildcard $1*), $(call dts_makefile,$(d)/,$(2)) $(if $(findstring Makefile,$(d)),$(d)))
 dts_mfiles = $(call dts_makefile, $(tegra-dtstree)/platform/, Makefile)
 ifneq ($(dts_mfiles),)
