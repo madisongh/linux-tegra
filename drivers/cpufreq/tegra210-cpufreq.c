@@ -23,6 +23,7 @@
 #include <linux/of.h>
 #include <linux/cpufreq.h>
 #include <linux/platform_device.h>
+#include <linux/pm_qos.h>
 
 #include <linux/platform/tegra/cpu-tegra.h>
 
@@ -50,9 +51,48 @@ struct tegra_cpufreq_priv {
 	struct platform_device *pdev;
 	struct tegra_cpufreq_table_data tfrqtbl;
 	u32 cpu_freq[CONFIG_NR_CPUS];
+	struct notifier_block min_freq_notifier;
+	struct notifier_block max_freq_notifier;
 	struct clk *cpu_clk;
 };
 static struct tegra_cpufreq_priv *tfreq_priv;
+
+static int cpu_freq_notify(struct notifier_block *b,
+			   unsigned long l, void *v)
+{
+	u32 qmin, qmax, cpu;
+
+	qmin = (u32)pm_qos_read_min_bound(PM_QOS_CPU_FREQ_BOUNDS);
+	qmax = (u32)pm_qos_read_max_bound(PM_QOS_CPU_FREQ_BOUNDS);
+
+	pr_debug("PM QoS %s %lu\n",
+		b == &tfreq_priv->min_freq_notifier ? "min" : "max", l);
+
+	for_each_online_cpu(cpu) {
+		struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+
+		if (policy) {
+			policy->user_policy.min = qmin;
+			policy->user_policy.max = qmax;
+			cpufreq_update_policy(policy->cpu);
+			cpufreq_cpu_put(policy);
+		} else
+			return -EINVAL;
+	}
+	return NOTIFY_OK;
+}
+
+static void pm_qos_register_notifier(void)
+{
+	tfreq_priv->min_freq_notifier.notifier_call =
+		tfreq_priv->max_freq_notifier.notifier_call =
+			cpu_freq_notify;
+
+	pm_qos_add_min_notifier(PM_QOS_CPU_FREQ_BOUNDS,
+		&tfreq_priv->min_freq_notifier);
+	pm_qos_add_max_notifier(PM_QOS_CPU_FREQ_BOUNDS,
+		&tfreq_priv->max_freq_notifier);
+}
 
 static struct device_node *of_get_scaling_node(const char *name)
 {
@@ -340,6 +380,7 @@ static int tegra_cpufreq_probe(struct platform_device *pdev)
 	ret = cpufreq_register_driver(&tegra_cpufreq_driver);
 	if (ret)
 		goto err_out;
+	pm_qos_register_notifier();
 
 	dev_dbg(dev, "probe()...completed\n");
 	return 0;
