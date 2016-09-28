@@ -65,7 +65,6 @@ obj-$(CONFIG_TEGRA_CLUSTER_CONTROL) += sysfs-cluster.o
 obj-$(CONFIG_TEGRA_HMP_CLUSTER_CONTROL) += sysfs-cluster.o
 
 obj-y += io.o
-obj-$(CONFIG_TEGRA_CORE_VOLT_CAP) += tegra_core_volt_cap.o
 ifneq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
 obj-y += ahb.o
 endif

@@ -65,13 +65,6 @@ config TEGRA_POWERGATE
 	help
 	  Enable Tegra powergate support.
 
-config TEGRA_CORE_VOLT_CAP
-	bool "Tegra core voltage cap support."
-	depends on TEGRA_CLK_FRAMEWORK
-	default y
-	help
-	  Enable Tegra core voltage cap support.
-
 config TEGRA_BOND_OUT
 	bool "Tegra bond out support"
 	default n
