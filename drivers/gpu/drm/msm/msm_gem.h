@@ -29,6 +29,11 @@ struct msm_gem_object {
 
 	uint32_t flags;
 
+	/**
+	 * Advice: are the backing pages purgeable?
+	 */
+	uint8_t madv;
+
 	/* And object is either:
 	 *  inactive - on priv->inactive_list
 	 *  active   - on one one of the gpu's active_list..  well, at
@@ -72,7 +77,11 @@ static inline bool is_active(struct msm_gem_object *msm_obj)
 	return msm_obj->gpu != NULL;
 }
 
-#define MAX_CMDS 4
+static inline bool is_purgeable(struct msm_gem_object *msm_obj)
+{
+	return (msm_obj->madv == MSM_MADV_DONTNEED) && msm_obj->sgt &&
+			!msm_obj->base.dma_buf && !msm_obj->base.import_attach;
+}
 
 /* Created per submit-ioctl, to track bo's and cmdstream bufs, etc,
  * associated with the cmdstream submission for synchronization (and
@@ -95,7 +104,7 @@ struct msm_gem_submit {
 		uint32_t size;  /* in dwords */
 		uint32_t iova;
 		uint32_t idx;   /* cmdstream buffer idx in bos[] */
-	} cmd[MAX_CMDS];
+	} *cmd;  /* array of size nr_cmds */
 	struct {
 		uint32_t flags;
 		struct msm_gem_object *obj;
