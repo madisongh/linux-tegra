@@ -63,6 +63,7 @@
 #define TEGRA_SNPS_PHYS		(1)
 #define T21x_UPHY_PLLS		(2)
 #define T21x_UPHY_LANES		(8)
+#define SATA_LANE_MASK		BIT(7)
 
 
 
@@ -781,7 +782,8 @@ static int uphy_pll_hw_sequencer_enable(struct tegra_padctl_uphy *uphy, int pll,
 						pll, func);
 
 	if (func == TEGRA21x_FUNC_SATA) {
-		for_each_set_bit(uphy_lane, uphy->pcie_lanes, T21x_UPHY_LANES) {
+		for_each_set_bit(uphy_lane, &uphy->sata_lanes,
+					T21x_UPHY_LANES) {
 			value = uphy_lane_readl(uphy, uphy_lane,
 						UPHY_MISC_PAD_CTL_1);
 			value &= ~AUX_RX_IDLE_TH(~0);
@@ -789,6 +791,8 @@ static int uphy_pll_hw_sequencer_enable(struct tegra_padctl_uphy *uphy, int pll,
 					AUX_RX_IDLE_EN);
 			uphy_lane_writel(uphy, uphy_lane, value,
 						UPHY_MISC_PAD_CTL_1);
+
+			udelay(200);
 
 			value = uphy_lane_readl(uphy, uphy_lane,
 						UPHY_MISC_PAD_CTL_4);
@@ -1040,7 +1044,10 @@ static int uphy_pll_init(struct tegra_padctl_uphy *uphy,
 		break;
 	case TEGRA21x_FUNC_USB3:
 		rc = uphy_pll_init_full(uphy, 0, func);
-		rc = uphy_pll_init_full(uphy, 1, func);
+		if (rc)
+			return rc;
+		if (uphy->usb3_lanes & SATA_LANE_MASK)
+			rc = uphy_pll_init_full(uphy, 1, func);
 		break;
 	default:
 		rc = -EINVAL;
@@ -1054,7 +1061,8 @@ static int uphy_pll_init(struct tegra_padctl_uphy *uphy,
 			uphy->uphy_pll_users[1] |= BIT(func);
 		} else if (func == TEGRA21x_FUNC_USB3) {
 			uphy->uphy_pll_users[0] |= BIT(func);
-			uphy->uphy_pll_users[1] |= BIT(func);
+			if (uphy->usb3_lanes & SATA_LANE_MASK)
+				uphy->uphy_pll_users[1] |= BIT(func);
 		}
 		for (i = 0; i < T21x_UPHY_PLLS; i++) {
 			TRACE(dev, "PLL%d users 0x%lx\n", i,
