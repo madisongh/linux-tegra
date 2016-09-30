@@ -81,16 +81,53 @@ static struct device_node *of_get_scaling_node(const char *name)
 
 static int enable_cpu_clk(void)
 {
-	struct device *dev = &tfreq_priv->pdev->dev;
+	struct device *cpu_dev;
+	struct device_node *np;
+	struct clk *cpu_g, *old_parent;
+	int ret;
 
-	tfreq_priv->cpu_clk = devm_clk_get(dev, "pll_p");
+	cpu_dev = get_cpu_device(0);
+	if (!cpu_dev)
+		return -ENODEV;
+
+	np = of_cpu_device_node_get(0);
+	if (!np)
+		return -ENODEV;
+
+	tfreq_priv->cpu_clk = of_clk_get_by_name(np, "dfll");
 	if (IS_ERR(tfreq_priv->cpu_clk)) {
-		dev_err(dev, "missing pll_p_out_cpu clock\n");
-		return PTR_ERR(tfreq_priv->cpu_clk);
+		ret = -EPROBE_DEFER;
+		goto dfll_fail;
 	}
 
-	return clk_prepare_enable(tfreq_priv->cpu_clk);
+	cpu_g = of_clk_get_by_name(np, "cpu_g");
+	if (IS_ERR(cpu_g)) {
+		ret = PTR_ERR(cpu_g);
+		goto cpu_clk_fail;
+	}
+
+	ret = clk_set_rate(tfreq_priv->cpu_clk, clk_get_rate(cpu_g));
+	if (ret < 0)
+		goto set_rate_fail;
+
+	old_parent = clk_get_parent(cpu_g);
+
+	ret = clk_set_parent(cpu_g, tfreq_priv->cpu_clk);
+	if (!ret) {
+		clk_put(cpu_g);
+		return 0;
+	}
+
+set_rate_fail:
+	clk_put(cpu_g);
+cpu_clk_fail:
+	clk_put(tfreq_priv->cpu_clk);
+dfll_fail:
+	of_node_put(np);
+
+	return ret;
 }
+
 static int cpufreq_table_make_from_dt(void)
 {
 	struct device_node *np = NULL;
