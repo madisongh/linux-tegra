@@ -203,7 +203,7 @@ static void tegra_bo_free(struct drm_device *drm, struct tegra_bo *bo)
 		sg_free_table(bo->sgt);
 		kfree(bo->sgt);
 	} else if (bo->vaddr) {
-		dma_free_wc(drm->dev->parent, bo->gem.size, bo->vaddr, 
+		dma_free_writecombine(drm->dev->parent, bo->gem.size, bo->vaddr, 
 				bo->paddr);
 	}
 }
@@ -261,7 +261,7 @@ static int tegra_bo_alloc(struct drm_device *drm, struct tegra_bo *bo)
 	} else {
 		size_t size = bo->gem.size;
 
-		bo->vaddr = dma_alloc_wc(drm->dev->parent, size, &bo->paddr,
+		bo->vaddr = dma_alloc_writecombine(drm->dev->parent, size, &bo->paddr,
 					 GFP_KERNEL | __GFP_NOWARN);
 		if (!bo->vaddr) {
 			dev_err(drm->dev,
@@ -506,7 +506,7 @@ int tegra_drm_mmap(struct file *file, struct vm_area_struct *vma)
 		vma->vm_flags &= ~VM_PFNMAP;
 		vma->vm_pgoff = 0;
 
-		ret = dma_mmap_wc(gem->dev->dev, vma, bo->vaddr, bo->paddr,
+		ret = dma_mmap_writecombine(gem->dev->dev, vma, bo->vaddr, bo->paddr,
 				  gem->size);
 		if (ret) {
 			drm_gem_vm_close(vma);
