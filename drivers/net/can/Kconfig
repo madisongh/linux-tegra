@@ -147,6 +147,15 @@ config CAN_XILINXCAN
 	  Xilinx CAN driver. This driver supports both soft AXI CAN IP and
 	  Zynq CANPS IP.
 
+config TEGRA_HV_SECCAN
+	tristate "Tegra Hypervisor sec CAN"
+	depends on TEGRA_HV_MANAGER
+	---help---
+	  Add support for emulating a socketCAN device on tegra hypervisor systems.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called nvhvseccan.
+
 source "drivers/net/can/mscan/Kconfig"
 
 source "drivers/net/can/sja1000/Kconfig"
