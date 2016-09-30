@@ -9,7 +9,7 @@
  * Author:
  *	Colin Cross <ccross@android.com>
  *
- * Copyright (C) 2010,2013, NVIDIA Corporation
+ * Copyright (c) 2010-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -142,11 +142,11 @@ static void ack_doorbell(unsigned int hwirq)
 	write_doorbell_irq(hwirq, ICTLR_CPU_IEP_FIR_CLR);
 }
 
-static irqreturn_t doorbell_handler(int hwirq, void *data)
+static irqreturn_t doorbell_handler(int irq, void *data)
 {
 	struct tegra_doorbell *doorbell = (struct tegra_doorbell *)data;
 
-	ack_doorbell(hwirq);
+	ack_doorbell(doorbell->hwirq);
 	if (doorbell->handler)
 		(doorbell->handler)(doorbell->data);
 
