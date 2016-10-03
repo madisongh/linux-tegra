@@ -35,7 +35,6 @@ obj-$(CONFIG_PM_SLEEP) += pm-irq.o
 endif
 obj-$(CONFIG_TEGRA_PMC) += pmc.o
 obj-$(CONFIG_TEGRA210_BOOTROM_PMC) += tegra-bootrom-pmc-config.o
-obj-$(CONFIG_TEGRA_DYNAMIC_PWRDET)	+= tegra-pmc-powerdetect.o
 ifeq ($(CONFIG_PM),y)
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC)	+= tegra21-pmc-iopower.o
 endif
