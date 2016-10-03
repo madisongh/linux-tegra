@@ -551,6 +551,13 @@ config UID_CPUTIME
 	help
 	  Per UID based cpu time statistics exported to /proc/uid_cputime
 
+config TEGRA_CPC
+	bool "Tegra content protection controller"
+	depends on I2C
+	help
+	  This driver allows authenticated IO access to storage blocks on
+	  CPC controller via i2c.
+
 config MODS
 	tristate "NVIDIA MODS driver"
 	default n

@@ -77,6 +77,7 @@ obj-$(CONFIG_SAF775x_HWDEP)	+= saf775x/
 obj-$(CONFIG_SAF36XX_HWDEP) += saf775x/
 obj-$(CONFIG_EQOS_APE_HWDEP)    += eqos_ape/
 obj-$(CONFIG_TEGRA_PROFILER)	+= tegra-profiler/
+obj-$(CONFIG_TEGRA_CPC)		+= tegra_cpc.o
 
 GCOV_PROFILE_cpuload.o := y
 obj-y				+= inter-tegra/

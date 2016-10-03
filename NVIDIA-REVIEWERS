@@ -418,6 +418,12 @@ F:	drivers/platform/tegra/io.c
 F:	drivers/pwm/pwm-tegra.c
 F:	drivers/watchdog/*
 
+TEGRA CPC DRIVER
+M:      Vinayak Pane <vpane@nvidia.com>
+M:      Sang-Hun Lee <sanlee@nvidia.com>
+S:      Supported
+F:      drivers/misc/tegra_cpc.c
+
 TOUCHSCREEN
 M:	David Pu <dpu@nvidia.com>
 L:	sw-mobile-touch@exchange.nvidia.com
