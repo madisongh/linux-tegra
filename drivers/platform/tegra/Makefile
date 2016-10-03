@@ -105,7 +105,6 @@ obj-y += bond_out.o
 ifeq ($(CONFIG_TEGRA_SOCTHERM),y)
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra_soctherm.o
 endif
-obj-$(CONFIG_TEGRA_USE_SIMON)    += tegra_simon.o
 
 obj-$(CONFIG_TEGRA_HMP_CLUSTER_CONTROL)      += cluster-control.o
 

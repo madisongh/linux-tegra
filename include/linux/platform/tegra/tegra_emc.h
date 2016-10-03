@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/tegra_emc.h
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -98,17 +98,6 @@ long tegra_emc_round_rate_updown(unsigned long rate, bool up);
 struct clk *tegra_emc_predict_parent(unsigned long rate, u32 *div_value);
 void tegra_emc_timing_invalidate(void);
 void tegra_mc_divider_update(struct clk *emc);
-
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-int tegra_emc_backup(unsigned long rate);
-void tegra_init_dram_bit_map(const u32 *bit_map, int map_size);
-#endif
-
-#ifdef CONFIG_ARCH_TEGRA_14x_SOC
-#define TEGRA_EMC_DSR_NORMAL	0x0
-#define TEGRA_EMC_DSR_OVERRIDE	0x1
-int tegra_emc_dsr_override(int override);
-#endif
 
 #ifdef CONFIG_PM_SLEEP
 void tegra_mc_timing_restore(void);

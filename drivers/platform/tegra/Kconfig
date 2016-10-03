@@ -164,7 +164,7 @@ config TEGRA_IVC
 
 config TEGRA_USB_SHARED_PAD
 	bool "Enable shared pad control for Tegra11x/Tegra12x/Tegra13x/Tegra21x"
-	depends on ARCH_TEGRA_11x_SOC || ARCH_TEGRA_12x_SOC || ARCH_TEGRA_13x_SOC || ARCH_TEGRA_21x_SOC
+	depends on ARCH_TEGRA_21x_SOC
 	default y
 	help
 	  Add shared pad controls for pcie, sata, and usb.
@@ -179,7 +179,7 @@ config TEGRA_FIQ_DEBUGGER
 
 config TEGRA_NVDUMPER
 	bool "Enable nvdumper"
-	depends on ARCH_TEGRA_11x_SOC || ARCH_TEGRA_12x_SOC || ARCH_TEGRA_13x_SOC || ARCH_TEGRA_21x_SOC || ARCH_TEGRA_18x_SOC
+	depends on ARCH_TEGRA_21x_SOC || ARCH_TEGRA_18x_SOC
 	default y
 	help
 	  This is debug feature to dump whole memory when system crashes.

@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/tegra_throttle.c
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -48,7 +48,7 @@ static struct {
 	struct clk *cap_clk;
 	unsigned long cap_freq;
 } cap_freqs_table[] = {
-#if defined(CONFIG_ARCH_TEGRA_12x_SOC) || defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 	{ .cap_name = "cap.throttle.gbus" },
 #endif
 #ifdef CONFIG_TEGRA_GPU_DVFS

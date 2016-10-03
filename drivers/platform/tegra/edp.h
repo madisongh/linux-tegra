@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/include/mach/edp.h
  *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION. All Rights Reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -18,22 +18,6 @@
 
 #ifndef __MACH_EDP_H
 #define __MACH_EDP_H
-
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-#error "tegra2x: no support"
-#endif
-
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-#error "tegra3x: no support"
-#endif
-
-#ifdef CONFIG_ARCH_TEGRA_11x_SOC
-#error "tegra11x: no support"
-#endif
-
-#ifdef CONFIG_ARCH_TEGRA_14x_SOC
-#error "tegra14x: no support"
-#endif
 
 #include <linux/debugfs.h>
 #include <linux/edp.h>

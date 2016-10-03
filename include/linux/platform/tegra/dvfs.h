@@ -5,7 +5,7 @@
  * Author:
  *	Colin Cross <ccross@google.com>
  *
- * Copyright (c) 2010-2015 NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2016 NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -327,13 +327,7 @@ static inline int of_tegra_dvfs_rail_get_cdev_trips(
 { return -ENODEV; }
 #endif
 
-void tegra11x_init_dvfs(void);
-void tegra12x_init_dvfs(void);
-void tegra13x_init_dvfs(void);
 void tegra21x_init_dvfs(void);
-void tegra12x_vdd_cpu_align(int step_uv, int offset_uv);
-void tegra13x_vdd_cpu_align(int step_uv, int offset_uv);
-void tegra_init_dvfs_one(struct dvfs *d, int max_freq_index);
 int dvfs_debugfs_init(struct dentry *clk_debugfs_root);
 int tegra_dvfs_rail_connect_regulators(void);
 int tegra_dvfs_rail_register_notifiers(void);
@@ -387,14 +381,6 @@ struct tegra_cooling_device *tegra_dvfs_get_core_vmin_cdev(void);
 struct tegra_cooling_device *tegra_dvfs_get_gpu_vmin_cdev(void);
 struct tegra_cooling_device *tegra_dvfs_get_gpu_vts_cdev(void);
 struct tegra_cooling_device *tegra_dvfs_get_cpu_clk_switch_cdev(void);
-#ifdef CONFIG_TEGRA_USE_SIMON
-void tegra_dvfs_rail_init_simon_vmin_offsets(
-	int *offsets, int offs_num, struct dvfs_rail *rail);
-#else
-static inline void tegra_dvfs_rail_init_simon_vmin_offsets(
-	int *offsets, int offs_num, struct dvfs_rail *rail)
-{ }
-#endif
 void tegra_dvfs_rail_init_vmin_thermal_profile(
 	int *therm_trips_table, int *therm_floors_table,
 	struct dvfs_rail *rail, struct dvfs_dfll_data *d);
@@ -428,15 +414,10 @@ static inline int tegra_dvfs_rail_get_override_floor(struct dvfs_rail *rail)
 { return 0; }
 #endif
 
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-int tegra_dvfs_rail_disable_prepare(struct dvfs_rail *rail);
-int tegra_dvfs_rail_post_enable(struct dvfs_rail *rail);
-#else
 static inline int tegra_dvfs_rail_disable_prepare(struct dvfs_rail *rail)
 { return 0; }
 static inline int tegra_dvfs_rail_post_enable(struct dvfs_rail *rail)
 { return 0; }
-#endif
 
 bool tegra_dvfs_is_dfll_bypass(void);
 

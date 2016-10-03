@@ -6,7 +6,7 @@
  * Author:
  *	Colin Cross <ccross@google.com>
  *
- * Copyright (c) 2010-2015, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2010-2016, NVIDIA Corporation.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -22,19 +22,11 @@
 #ifndef __MACH_TEGRA_CLOCK_H
 #define __MACH_TEGRA_CLOCK_H
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-#define USE_PLL_LOCK_BITS 0	/* Never use lock bits on Tegra2 */
-#else
 #define USE_PLL_LOCK_BITS 1	/* Use lock bits for PLL stabiliation */
 #define USE_PLLE_SS 1		/* Use spread spectrum coefficients for PLLE */
 #define PLL_PRE_LOCK_DELAY  2	/* Delay 1st lock bit read after pll enabled */
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-#define PLL_POST_LOCK_DELAY 50	/* Safety delay after lock is detected */
-#else
 #define USE_PLLE_SWCTL 0	/* Use s/w controls for PLLE */
 #define PLL_POST_LOCK_DELAY 10	/* Safety delay after lock is detected */
-#endif
-#endif
 
 #define RESET_PROPAGATION_DELAY	5
 
@@ -488,12 +480,7 @@ void tegra3_set_cpu_skipper_delay(int delay);
 unsigned long tegra_clk_measure_input_freq(void);
 int clk_enable_locked(struct clk *c);
 void clk_disable_locked(struct clk *c);
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-static inline bool tegra_clk_is_parent_allowed(struct clk *c, struct clk *p)
-{ return true; }
-#else
 bool tegra_clk_is_parent_allowed(struct clk *c, struct clk *p);
-#endif
 #endif /* !CONFIG_COMMON_CLK */
 
 struct tegra_sku_rate_limit {
