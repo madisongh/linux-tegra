@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -140,47 +140,6 @@ static inline void slcg_clk_disable(struct powergate_partition_info *pg_info)
 #endif
 
 /* INIT APIs: New SoC needs to add its support here */
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
-struct powergate_ops *tegra2_powergate_init_chip_support(void);
-#else
-static inline struct powergate_ops *tegra2_powergate_init_chip_support(void)
-{
-	return NULL;
-}
-#endif
-
-#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
-struct powergate_ops *tegra3_powergate_init_chip_support(void);
-#else
-static inline struct powergate_ops *tegra3_powergate_init_chip_support(void)
-{
-	return NULL;
-}
-#endif
-
-#if defined(CONFIG_ARCH_TEGRA_11x_SOC)
-struct powergate_ops *tegra11x_powergate_init_chip_support(void);
-#else
-static inline struct powergate_ops *tegra11x_powergate_init_chip_support(void)
-{
-	return NULL;
-}
-#endif
-
-static inline struct powergate_ops *tegra12x_powergate_init_chip_support(void)
-{
-	return NULL;
-}
-
-#if defined(CONFIG_ARCH_TEGRA_14x_SOC)
-struct powergate_ops *tegra14x_powergate_init_chip_support(void);
-#else
-static inline struct powergate_ops *tegra14x_powergate_init_chip_support(void)
-{
-	return NULL;
-}
-#endif
-
 #if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 struct powergate_ops *tegra210_powergate_init_chip_support(void);
 #else

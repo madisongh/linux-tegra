@@ -2,7 +2,7 @@
  * arch/arm/mach-tegra/powergate.c
  *
  * Copyright (c) 2010 Google, Inc
- * Copyright (c) 2011 - 2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011 - 2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@google.com>
@@ -95,7 +95,6 @@ int tegra_powergate_set(int id, bool new_state)
 		return 0;
 	}
 
-#if !defined(CONFIG_ARCH_TEGRA_3x_SOC)
 	/* Wait if PMC is already processing some other power gating request */
 	do {
 		udelay(1);
@@ -107,12 +106,10 @@ int tegra_powergate_set(int id, bool new_state)
 		pr_err(" Timed out waiting for PMC to submit \
 				new power gate request \n");
 	contention_timeout = 100;
-#endif
 
 	/* Submit power gate request */
 	pmc_write(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
 
-#if !defined(CONFIG_ARCH_TEGRA_3x_SOC)
 	/* Wait while PMC accepts the request */
 	do {
 		udelay(1);
@@ -124,7 +121,6 @@ int tegra_powergate_set(int id, bool new_state)
 		pr_err(" Timed out waiting for PMC to accept \
 				new power gate request \n");
 	contention_timeout = 100;
-#endif
 
 	/* Check power gate status */
 	do {
@@ -152,7 +148,6 @@ int tegra_powergate_set(int id, bool new_state)
 	return 0;
 }
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 static int is_clk_enabled(struct clk *clk)
 {
 	return __clk_is_enabled(clk);
@@ -162,17 +157,6 @@ static const char *clk_get_name(struct clk *clk)
 {
 	return __clk_get_name(clk);
 }
-#else
-static int is_clk_enabled(struct clk *clk)
-{
-	return tegra_is_clk_enabled(clk);
-}
-
-static const char *clk_get_name(struct clk *clk)
-{
-	return clk->name;
-}
-#endif
 
 int is_partition_clk_disabled(struct powergate_partition_info *pg_info)
 {
@@ -327,7 +311,6 @@ int tegra_powergate_reset_module(struct powergate_partition_info *pg_info)
 	return 0;
 }
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 int slcg_clk_enable(struct powergate_partition_info *pg_info)
 {
 	int ret;
@@ -392,7 +375,6 @@ void get_slcg_info(struct powergate_partition_info *pg_info)
 				pg_info->name);
 	}
 }
-#endif
 
 bool tegra_powergate_check_clamping(int id)
 {
@@ -716,30 +698,6 @@ int __init tegra_powergate_init(void)
 	tegra_pmc = ioremap(TEGRA_PMC_BASE, 4096);
 	tegra_mc = ioremap(TEGRA_MC_BASE, 4096);
 	switch (tegra_get_chip_id()) {
-		case TEGRA20:
-			pg_ops = tegra2_powergate_init_chip_support();
-			break;
-
-		case TEGRA30:
-			pg_ops = tegra3_powergate_init_chip_support();
-			break;
-
-		case TEGRA114:
-			pg_ops = tegra11x_powergate_init_chip_support();
-			break;
-
-		case TEGRA148:
-			pg_ops = tegra14x_powergate_init_chip_support();
-			break;
-
-		case TEGRA124:
-			pg_ops = tegra12x_powergate_init_chip_support();
-			break;
-
-		case TEGRA132:
-			pg_ops = tegra12x_powergate_init_chip_support(); /* FIXME */
-			break;
-
 		case TEGRA210:
 			pg_ops = tegra210_powergate_init_chip_support();
 			break;
@@ -763,9 +721,7 @@ int __init tegra_powergate_init(void)
 
 	return (pg_ops ? 0 : -EINVAL);
 }
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC) || defined (CONFIG_ARCH_TEGRA_210_SOC)
 arch_initcall(tegra_powergate_init);
-#endif
 
 #ifdef CONFIG_DEBUG_FS
 
@@ -889,8 +845,6 @@ err_out:
 	debugfs_remove_recursive(pg_debugfs_root);
 	return -ENOMEM;
 }
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC) || defined (CONFIG_ARCH_TEGRA_210_SOC)
 late_initcall(tegra_powergate_debugfs_init);
-#endif
 
 #endif
