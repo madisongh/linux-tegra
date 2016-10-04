@@ -206,6 +206,8 @@ bool tegra_dvfs_is_rail_up(struct dvfs_rail *rail);
 int tegra_dvfs_rail_power_down(struct dvfs_rail *rail);
 int tegra_dvfs_rail_power_up(struct dvfs_rail *rail);
 unsigned long tegra_dvfs_round_rate(struct clk *c, unsigned long rate);
+int tegra_dvfs_add_alt_freqs(struct clk *c, struct dvfs *d);
+int tegra_dvfs_use_alt_freqs_on_clk(struct clk *c, bool use_alt_freq);
 #else
 static inline int tegra_dvfs_dfll_mode_set(struct clk *c, unsigned long rate)
 { return -EINVAL; }
@@ -267,6 +269,11 @@ static inline int tegra_dvfs_rail_power_up(struct dvfs_rail *rail)
 static inline unsigned long tegra_dvfs_round_rate(struct clk *c,
 						  unsigned long rate)
 { return rate; }
+static inline int tegra_dvfs_add_alt_freqs(struct clk *c, struct dvfs *d)
+{ return -EINVAL; }
+static inline int tegra_dvfs_use_alt_freqs_on_clk(struct clk *c,
+						  bool use_alt_freq)
+{ return -EINVAL; }
 #endif
 
 #ifdef CONFIG_TEGRA_124_DVFS
