@@ -132,6 +132,7 @@ struct dvfs {
 
 	int freqs_mult;
 	unsigned long freqs[MAX_DVFS_FREQS];
+	unsigned long *alt_freqs;
 	const int *millivolts;
 	const int *dfll_millivolts;
 	struct dvfs_rail *dvfs_rail;
@@ -147,6 +148,7 @@ struct dvfs {
 	unsigned long cur_rate;
 	struct list_head node;
 	struct list_head reg_node;
+	bool use_alt_freqs;
 };
 
 static inline bool tegra_dvfs_rail_is_dfll_mode(struct dvfs_rail *rail)
