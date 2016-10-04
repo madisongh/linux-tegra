@@ -1331,6 +1331,32 @@ int gpiod_is_active_low(const struct gpio_desc *desc)
 }
 EXPORT_SYMBOL_GPL(gpiod_is_active_low);
 
+/**
+ * gpiod_is_enabled - Test whether a GPIO is enabled or not.
+ * @desc: the gpio descriptor to check.
+ *
+ * Returns 1 if the GPIO is enabled, 0 if not and error if any
+ * failure.
+ */
+int gpiod_is_enabled(const struct gpio_desc *desc)
+{
+	struct gpio_chip *chip;
+
+	if (!desc || !desc->chip) {
+		pr_warn("%s: invalid GPIO\n", __func__);
+		return -EINVAL;
+	}
+
+	chip = desc->chip;
+	if (!chip->is_enabled) {
+		gpiod_dbg(desc, "%s: missing is_enabled() ops\n", __func__);
+		return -ENOTSUPP;
+	}
+
+	return chip->is_enabled(chip, gpio_chip_hwgpio(desc));
+}
+EXPORT_SYMBOL_GPL(gpiod_is_enabled);
+
 /* I/O calls are only valid after configuration completed; the relevant
  * "is this a valid GPIO" error checks should already have been done.
  *

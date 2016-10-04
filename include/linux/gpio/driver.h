@@ -117,6 +117,9 @@ struct gpio_chip {
 						unsigned offset,
 						unsigned debounce);
 
+	int			(*is_enabled)(struct gpio_chip *chip,
+						unsigned offset);
+
 	int			(*to_irq)(struct gpio_chip *chip,
 						unsigned offset);
 
