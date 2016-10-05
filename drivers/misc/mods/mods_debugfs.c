@@ -44,7 +44,7 @@ static int mods_dc_color_formats_show(struct seq_file *s, void *unused)
 	struct tegra_dc *dc = s->private;
 	u32 i, j;
 
-	for (i = 0; i < DC_N_WINDOWS; i++) {
+	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *fmt_masks;
 		win = tegra_dc_get_window(dc, i);
@@ -78,7 +78,7 @@ static int mods_dc_blend_gen_show(struct seq_file *s, void *unused)
 	struct tegra_dc *dc = s->private;
 	u32 i;
 
-	for (i = 0; i < DC_N_WINDOWS; i++) {
+	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *blend_gen;
 		win = tegra_dc_get_window(dc, i);
@@ -111,7 +111,7 @@ static int mods_dc_layout_show(struct seq_file *s, void *unused)
 	u32 i;
 
 	seq_puts(s, "          Pitch Tiled Block\n");
-	for (i = 0; i < DC_N_WINDOWS; i++) {
+	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *layouts;
 		win = tegra_dc_get_window(dc, i);
@@ -146,7 +146,7 @@ static int mods_dc_invert_show(struct seq_file *s, void *unused)
 	u32 i;
 
 	seq_puts(s, "          FlipH FlipV ScanColumn\n");
-	for (i = 0; i < DC_N_WINDOWS; i++) {
+	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *invert_data;
 		win = tegra_dc_get_window(dc, i);
@@ -186,7 +186,7 @@ static int mods_dc_interlaced_show(struct seq_file *s, void *unused)
 #endif
 
 	seq_printf(s, "head: %u\n", head_interlaced);
-	for (i = 0; i < DC_N_WINDOWS; i++) {
+	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *interlaced;
 		win = tegra_dc_get_window(dc, i);
@@ -237,7 +237,7 @@ static int mods_dc_scaling_show(struct seq_file *s, void *unused)
 	u32 i;
 
 	seq_puts(s, "          UpH UpV DownH DownV\n");
-	for (i = 0; i < DC_N_WINDOWS; i++) {
+	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *scaling;
 		win = tegra_dc_get_window(dc, i);
@@ -645,8 +645,15 @@ int mods_create_debugfs(struct miscdevice *modsdev)
 	struct dentry *retval;
 #ifdef CONFIG_TEGRA_DC
 	unsigned dc_idx;
+	int nheads = tegra_dc_get_numof_dispheads();
 #endif
 	int err = 0;
+
+	if (nheads <= 0) {
+		pr_err("%s: max heads:%d cannot be negative or zero\n",
+			__func__, nheads);
+		return -EINVAL;
+	}
 
 	mods_debugfs_dir = debugfs_create_dir(dev_name(modsdev->this_device),
 		NULL);
@@ -679,7 +686,7 @@ int mods_create_debugfs(struct miscdevice *modsdev)
 #endif
 
 #ifdef CONFIG_TEGRA_DC
-	for (dc_idx = 0; dc_idx < TEGRA_MAX_DC; dc_idx++) {
+	for (dc_idx = 0; dc_idx < nheads; dc_idx++) {
 		struct dentry *dc_debugfs_dir;
 #ifdef CONFIG_TEGRA_NVSD
 		struct dentry *sd_debugfs_dir;

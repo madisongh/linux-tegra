@@ -24,7 +24,6 @@
 #endif
 #include <video/tegra_dc_ext_kernel.h>
 #include <linux/platform/tegra/mc.h>
-
 #include "mods_internal.h"
 
 static void mods_tegra_dc_set_windowattr_basic(struct tegra_dc_win *win,
@@ -83,7 +82,7 @@ int esc_mods_tegra_dc_config_possible(struct file *fp,
 
 	LOG_ENT();
 
-	BUG_ON(args->win_num > DC_N_WINDOWS);
+	BUG_ON(args->win_num > tegra_dc_get_numof_dispwindows());
 
 	if (!dc) {
 		LOG_EXT();
@@ -151,21 +150,8 @@ int esc_mods_tegra_dc_config_possible(struct file *fp,
 }
 
 #ifdef CONFIG_TEGRA_NVSD
-static struct tegra_dc_sd_settings mods_sd_settings[TEGRA_MAX_DC] = {
-	{
-		.enable = 0,
-		.sd_brightness = NULL,
-		.bl_device_name = NULL,
-		.bl_device = NULL,
-	},
-	{
-		.enable = 0,
-		.sd_brightness = NULL,
-		.bl_device_name = NULL,
-		.bl_device = NULL,
-	}
-};
-static struct tegra_dc_sd_settings *tegra_dc_saved_sd_settings[TEGRA_MAX_DC];
+static struct tegra_dc_sd_settings *mods_sd_settings;
+static struct tegra_dc_sd_settings **tegra_dc_saved_sd_settings;
 #endif
 
 #define SD_KINIT_BIAS(x)  (((x) & 0x3) << 29)
@@ -183,7 +169,7 @@ int esc_mods_tegra_dc_setup_sd(struct file *fp,
 	u32 bw_idx;
 	LOG_ENT();
 
-	BUG_ON(args->head > TEGRA_MAX_DC);
+	BUG_ON(args->head > tegra_dc_get_numof_dispheads());
 
 	sd_settings->enable = args->enable ? 1 : 0;
 	sd_settings->use_auto_pwm = false;
@@ -284,13 +270,36 @@ int esc_mods_tegra_dc_setup_sd(struct file *fp,
 int mods_init_tegradc(void)
 {
 #if defined(CONFIG_TEGRA_NVSD)
-	int i;
+	int i, nheads;
 	int ret = 0;
+
 	LOG_ENT();
-	for (i = 0; i < TEGRA_MAX_DC; i++) {
+	nheads = tegra_dc_get_numof_dispheads();
+
+	mods_sd_settings = kzalloc(nheads *
+		sizeof(struct tegra_dc_sd_settings), GFP_KERNEL);
+	if (!mods_sd_settings) {
+		ret = -ENOMEM;
+		goto err_mods_init;
+	}
+
+	tegra_dc_saved_sd_settings = kzalloc(nheads *
+		sizeof(struct tegra_dc_sd_settings *), GFP_KERNEL);
+	if (!tegra_dc_saved_sd_settings) {
+		ret = -ENOMEM;
+		goto err_free_sd;
+	}
+
+	for (i = 0; i < nheads; i++) {
 		struct tegra_dc *dc = tegra_dc_get_dc(i);
+
 		if (!dc)
 			continue;
+
+		mods_sd_settings[i].enable = 0;
+		mods_sd_settings[i].sd_brightness = NULL;
+		mods_sd_settings[i].bl_device_name = NULL;
+		mods_sd_settings[i].bl_device = NULL;
 
 		tegra_dc_saved_sd_settings[i] = dc->out->sd_settings;
 		dc->out->sd_settings = &mods_sd_settings[i];
@@ -298,9 +307,19 @@ int mods_init_tegradc(void)
 		if (dc->enabled)
 			nvsd_init(dc, dc->out->sd_settings);
 
-		if (!tegra_dc_saved_sd_settings[i])
+		if (!tegra_dc_saved_sd_settings[i]) {
 			ret = nvsd_create_sysfs(&dc->ndev->dev);
+			if (!ret)
+				goto err_free_saved_sd;
+		}
 	}
+	LOG_EXT();
+	return 0;
+err_free_saved_sd:
+	kfree(tegra_dc_saved_sd_settings);
+err_free_sd:
+	kfree(mods_sd_settings);
+err_mods_init:
 	LOG_EXT();
 	return ret;
 #else
@@ -313,7 +332,7 @@ void mods_exit_tegradc(void)
 #if defined(CONFIG_TEGRA_NVSD)
 	int i;
 	LOG_ENT();
-	for (i = 0; i < TEGRA_MAX_DC; i++) {
+	for (i = 0; i < tegra_dc_get_numof_dispheads(); i++) {
 		struct tegra_dc *dc = tegra_dc_get_dc(i);
 		if (!dc)
 			continue;
@@ -323,5 +342,7 @@ void mods_exit_tegradc(void)
 		if (dc->enabled)
 			nvsd_init(dc, dc->out->sd_settings);
 	}
+	kfree(mods_sd_settings);
+	kfree(tegra_dc_saved_sd_settings);
 #endif
 }
