@@ -182,3 +182,6 @@ ifneq ($(wildcard $(srctree)/../t18x/drivers/Makefile.*),)
 obj-$(CONFIG_ARCH_TEGRA_18x_SOC) += ../../t18x/drivers/
 endif
 
+ifneq ($(wildcard $(srctree)/../t19x/drivers/Makefile.*),)
+obj-$(CONFIG_ARCH_TEGRA_19x_SOC) += ../../t19x/drivers/
+endif
