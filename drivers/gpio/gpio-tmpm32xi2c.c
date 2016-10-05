@@ -158,7 +158,7 @@ static inline int tmpm32xi2c_write_read(struct tmpm32xi2c_chip *chip,
 
 	ret = i2c_transfer(chip->client->adapter, msg, msg_num);
 	if (ret < 0) {
-		dev_err(&chip->client->dev,
+		dev_err_ratelimited(&chip->client->dev,
 			"failed to transfer data, CMD[0x%02x]\n",
 			tx_buf ? tx_buf[0] : 0);
 		return ret;
