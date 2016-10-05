@@ -3138,6 +3138,36 @@ static dma_addr_t arm_iommu_map_page_at(struct device *dev, struct page *page,
 	return dma_addr + offset;
 }
 
+dma_addr_t arm_iommu_linear_map(struct device *dev, phys_addr_t phys,
+			      size_t size, enum dma_data_direction dir,
+			      struct dma_attrs *attrs)
+{
+	dma_addr_t iova, ret;
+	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+
+	iova = phys;
+	ret = __alloc_iova_at(mapping, &iova, size, attrs);
+
+	if (iova == -ENXIO) {
+		/* Linear map request is out side iova window.
+		 * It usually happens when an SMMU client need to
+		 * access physcial memory and IOVA range is not overlapping
+		 * with it. The client would need mapping to be able to access
+		 * desired phys memory. Map request should be carried out even
+		 * without successful IOVA allocation.
+		 */
+		iova = phys;
+	} else if (ret == DMA_ERROR_CODE) {
+		return ret;
+	} else if (iova != phys) {
+		__free_iova(mapping, iova, size, attrs);
+		return DMA_ERROR_CODE;
+	}
+
+	return arm_iommu_map_page_at(dev, phys_to_page(phys), iova,
+				     0, size, dir, attrs);
+}
+
 /**
  * arm_coherent_iommu_unmap_page
  * @dev: valid struct device pointer
@@ -3253,6 +3283,7 @@ struct dma_map_ops iommu_ops = {
 	.dma_supported	= arm_dma_supported,
 	.mapping_error	= arm_iommu_mapping_error,
 
+	.linear_map	= arm_iommu_linear_map,
 	.iova_alloc_at		= arm_iommu_iova_alloc_at,
 	.map_page_at		= arm_iommu_map_page_at,
 };
