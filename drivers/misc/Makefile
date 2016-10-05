@@ -70,7 +70,6 @@ CFLAGS_tegra-throughput.o        = -Werror
 ifeq ($(CONFIG_ARM64),y)
 CFLAGS_tegra-throughput.o       += -Iarch/arm/mach-tegra/include
 endif
-obj-$(CONFIG_TEGRA_THROUGHPUT)  += tegra-throughput.o
 obj-$(CONFIG_CPULOAD_MONITOR)   += cpuload.o
 obj-$(CONFIG_FAN_THERM_EST)	+= therm_fan_est.o
 obj-$(CONFIG_NVS_DFSH)		+= nvs-dfsh/
