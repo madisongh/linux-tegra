@@ -155,13 +155,6 @@ config TEGRA_IVC
 	  Enable the Tegra IVC library, which implements a lockless, shared-
 	  memory queue.
 
-config TEGRA_USB_SHARED_PAD
-	bool "Enable shared pad control for Tegra11x/Tegra12x/Tegra13x/Tegra21x"
-	depends on ARCH_TEGRA_21x_SOC
-	default y
-	help
-	  Add shared pad controls for pcie, sata, and usb.
-
 config TEGRA_FIQ_DEBUGGER
         bool "Enable the FIQ serial debugger on Tegra"
         default n
