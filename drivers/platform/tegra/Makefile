@@ -61,7 +61,6 @@ ifeq ($(CONFIG_CPU_FREQ),y)
 #obj-$(CONFIG_ARCH_TEGRA_21x_SOC)                  += cpu-tegra.o
 endif
 
-obj-y += flowctrl.o
 obj-$(CONFIG_TEGRA_CLUSTER_CONTROL) += sysfs-cluster.o
 obj-$(CONFIG_TEGRA_HMP_CLUSTER_CONTROL) += sysfs-cluster.o
 
