@@ -1,6 +1,7 @@
 obj-y += fuse/
 
 obj-y += common.o
+obj-y += flowctrl.o
 obj-y += pmc.o
 
 obj-$(CONFIG_TEGRA_DVFS)       += tegra-dvfs.o
