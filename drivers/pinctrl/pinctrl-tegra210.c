@@ -1,7 +1,7 @@
 /*
  * Pinctrl data for the NVIDIA Tegra210 pinmux
  *
- * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1315,6 +1315,7 @@ static struct tegra_function tegra210_functions[] = {
 		.lock_bit = 7,						\
 		.ioreset_bit = -1,					\
 		.rcv_sel_bit = PINGROUP_BIT_##e_io_hv(10),		\
+		.e_io_hv_bit = PINGROUP_BIT_##e_io_hv(10),		\
 		.hsm_bit = PINGROUP_BIT_##hsm(9),			\
 		.schmitt_bit = 12,					\
 		.drvtype_bit = PINGROUP_BIT_##drvtype(13),		\
@@ -1349,6 +1350,7 @@ static struct tegra_function tegra210_functions[] = {
 		.lock_bit = -1,						\
 		.ioreset_bit = -1,					\
 		.rcv_sel_bit = -1,					\
+		.e_io_hv_bit = -1,					\
 		.parked_bit = -1,					\
 		.hsm_bit = -1,					\
 		.schmitt_bit = -1,				\
