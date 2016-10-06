@@ -74,15 +74,19 @@
 
 #define SDHCI_VNDR_TUN_CTRL0_0				0x1c0
 #define SDHCI_VNDR_TUN_CTRL0_TUN_HW_TAP		0x20000
+#define SDHCI_VNDR_TUN_CTRL0_0_TUN_ITER_MASK		0x000E000
 
 #define SDHCI_VNDR_TUN_STATUS0_0			0x1c8
 #define TUNING_WORD_SEL_MASK 				0x7
 
 #define SDMMC_SDMEMCOMPPADCTRL			0x1E0
 #define SDMMC_SDMEMCOMPPADCTRL_PAD_E_INPUT_OR_E_PWRD_MASK	0x80000000
+#define SDMMC_SDMEMCOMPPADCTRL_SDMEMCOMP_VREF_SEL	0x0000000F
 
 #define SDMMC_AUTO_CAL_CONFIG	0x1E4
 #define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START	0x80000000
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_EN	0x20000000
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PUPD_OFFSETS	0x00007F7F
 
 #define SDHCI_TEGRA_VENDOR_MISC_CTRL		0x120
 #define SDHCI_MISC_CTRL_ENABLE_SDR104		0x8
@@ -158,6 +162,20 @@ enum tegra_regulator_config_ops {
 	CONFIG_REG_EN,
 	CONFIG_REG_DIS,
 	CONFIG_REG_SET_VOLT,
+};
+
+static char prod_device_states[MMC_TIMING_COUNTER][20] = {
+	"prod_c_ds", /* MMC_TIMING_LEGACY */
+	"prod_c_hs", /* MMC_TIMING_MMC_HS */
+	"prod_c_hs", /* MMC_TIMING_SD_HS */
+	"prod_c_sdr12", /* MMC_TIMING_UHS_SDR12 */
+	"prod_c_sdr25", /* MMC_TIMING_UHS_SDR25 */
+	"prod_c_sdr50", /* MMC_TIMING_UHS_SDR50 */
+	"prod_c_sdr104", /* MMC_TIMING_UHS_SDR104 */
+	"prod_c_ddr52", /* MMC_TIMING_UHS_DDR50 */
+	"prod_c_ddr52", /* MMC_TIMING_MMC_DDR52 */
+	"prod_c_hs200", /* MMC_TIMING_MMC_HS200 */
+	"prod_c_hs400", /* MMC_TIMING_MMC_HS400 */
 };
 
 struct sdhci_tegra_soc_data {
@@ -288,21 +306,10 @@ static int sdhci_tegra_get_max_tuning_loop_counter(struct sdhci_host *sdhci)
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	int err = 0;
 
-	if (sdhci->mmc->ios.timing == MMC_TIMING_UHS_SDR50)
-		err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"tun-iterations-sdr50", tegra_host->prods);
-	else if (sdhci->mmc->ios.timing == MMC_TIMING_UHS_SDR104)
-		err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"tun-iterations-sdr104", tegra_host->prods);
-	else if (sdhci->mmc->caps2 & MMC_CAP2_HS533)
-		err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"tun-iterations-hs533", tegra_host->prods);
-	else if (sdhci->mmc->ios.timing == MMC_TIMING_MMC_HS400)
-		err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"tun-iterations-hs400", tegra_host->prods);
-	else if (sdhci->mmc->ios.timing == MMC_TIMING_MMC_HS200)
-		err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"tun-iterations-hs200", tegra_host->prods);
+	err = tegra_prod_set_by_name_partially(&sdhci->ioaddr,
+			prod_device_states[sdhci->mmc->ios.timing],
+			tegra_host->prods, 0, SDHCI_VNDR_TUN_CTRL0_0,
+			SDHCI_VNDR_TUN_CTRL0_0_TUN_ITER_MASK);
 	if (err)
 		dev_err(mmc_dev(sdhci->mmc),
 			"%s: error %d in tuning iteration update\n",
@@ -459,16 +466,15 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 	sdhci_writel(sdhci, ctrl, SDHCI_VNDR_TUN_CTRL0_0);
 
 	if (type & (SET_DDR_TAP | SET_DEFAULT_TAP)) {
-		if (type == SET_DDR_TAP)
-			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"tap-delay-ddr", tegra_host->prods);
-		else
-			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"tap-delay-default", tegra_host->prods);
+		err = tegra_prod_set_by_name_partially(&sdhci->ioaddr,
+				prod_device_states[sdhci->mmc->ios.timing],
+				tegra_host->prods, 0, SDHCI_VNDR_CLK_CTRL,
+				SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK <<
+				SDHCI_VNDR_CLK_CTRL_TAP_VALUE_SHIFT);
 		if (err < 0)
 			dev_err(mmc_dev(sdhci->mmc),
-				"%s: error %d in prod settings\n",
-				__func__, err);
+				"%s: error %d in tap settings, timing: %d\n",
+				__func__, err, sdhci->mmc->ios.timing);
 	} else {
 		ctrl = sdhci_readl(sdhci, SDHCI_VNDR_CLK_CTRL);
 		ctrl &= ~(SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK <<
@@ -507,7 +513,7 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	if (!(mask & SDHCI_RESET_ALL))
 		return;
 
-	err = tegra_prod_set_by_name(&host->ioaddr, "prod-reset",
+	err = tegra_prod_set_by_name(&host->ioaddr, "prod",
 			tegra_host->prods);
 	if (err)
 		dev_err(mmc_dev(host->mmc),
@@ -864,12 +870,15 @@ static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
 		sdhci_tegra_set_tap_delay(host, plat->ddr_tap_delay,
 				SET_DDR_TAP);
-		err = tegra_prod_set_by_name(&host->ioaddr,
-			"trim-delay-ddr", tegra_host->prods);
+		err = tegra_prod_set_by_name_partially(&host->ioaddr,
+				prod_device_states[timing],
+				tegra_host->prods, 0, SDHCI_VNDR_CLK_CTRL,
+				SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK <<
+				SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
 		if (err < 0)
 			dev_err(mmc_dev(host->mmc),
-				"%s: error %d in prod settings\n",
-				__func__, err);
+				"%s: error %d in trim settings, timing: %d\n",
+				__func__, err, timing);
 	} else if (((timing == MMC_TIMING_MMC_HS200) ||
 		(timing == MMC_TIMING_UHS_SDR104) ||
 		(timing == MMC_TIMING_MMC_HS400) ||
@@ -883,12 +892,15 @@ static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 	}
 
 	if (timing == MMC_TIMING_MMC_HS200) {
-		err = tegra_prod_set_by_name(&host->ioaddr,
-				"trim-delay-hs200", tegra_host->prods);
+		err = tegra_prod_set_by_name_partially(&host->ioaddr,
+				prod_device_states[timing],
+				tegra_host->prods, 0, SDHCI_VNDR_CLK_CTRL,
+				SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK <<
+				SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT);
 		if (err < 0)
 			dev_dbg(mmc_dev(host->mmc),
-				"%s: error %d in prod settings\n",
-				__func__, err);
+				"%s: error %d in trim settings, timing: %d\n",
+				__func__, err, timing);
 	}
 
 	if (set_1v8_calib_offsets && ((timing > tegra_host->timing) ||
@@ -1070,12 +1082,10 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	}
 
 	tegra_sdhci_configure_e_input(sdhci, true);
-	if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
-		err = tegra_prod_set_by_name(&sdhci->ioaddr,
-			"comp-vref-3v3", tegra_host->prods);
-	else if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
-		err = tegra_prod_set_by_name(&sdhci->ioaddr,
-			"comp-vref-1v8", tegra_host->prods);
+	err = tegra_prod_set_by_name_partially(&sdhci->ioaddr,
+			prod_device_states[timing],
+			tegra_host->prods, 0, SDMMC_SDMEMCOMPPADCTRL,
+			SDMMC_SDMEMCOMPPADCTRL_SDMEMCOMP_VREF_SEL);
 	if (err < 0)
 		dev_err(mmc_dev(sdhci->mmc),
 			"%s: error %d in comp vref settings\n",
@@ -1085,8 +1095,10 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	udelay(1);
 
 	/* Enable Auto Calibration*/
-	err = tegra_prod_set_by_name(&sdhci->ioaddr,
-			"autocal-en", tegra_host->prods);
+	err = tegra_prod_set_by_name_partially(&sdhci->ioaddr,
+			prod_device_states[timing],
+			tegra_host->prods, 0, SDMMC_AUTO_CAL_CONFIG,
+			SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_EN);
 	if (err < 0)
 		dev_err(mmc_dev(sdhci->mmc),
 			"%s: error %d in autocal-en settings\n",
@@ -1096,45 +1108,10 @@ static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_START;
 	sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
 
-	switch (signal_voltage) {
-	case MMC_SIGNAL_VOLTAGE_180:
-		if (timing == MMC_TIMING_MMC_HS400)
-			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"autocal-pu-pd-offset-hs400-1v8",
-				tegra_host->prods);
-		else if (timing == MMC_TIMING_MMC_HS200)
-			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"autocal-pu-pd-offset-hs200-1v8",
-				tegra_host->prods);
-		else if (timing == MMC_TIMING_UHS_SDR104)
-			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"autocal-pu-pd-offset-sdr104-1v8",
-				tegra_host->prods);
-		else if (timing == MMC_TIMING_UHS_SDR50)
-			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"autocal-pu-pd-offset-sdr50-1v8",
-				tegra_host->prods);
-		else if (timing == MMC_TIMING_UHS_SDR25)
-			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"autocal-pu-pd-offset-hs-1v8",
-				tegra_host->prods);
-		else
-			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"autocal-pu-pd-offset-default-1v8",
-				tegra_host->prods);
-		break;
-	case MMC_SIGNAL_VOLTAGE_330:
-		if ((timing == MMC_TIMING_SD_HS) ||
-			(timing == MMC_TIMING_MMC_HS))
-			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"autocal-pu-pd-offset-hs-3v3",
-				tegra_host->prods);
-		else
-			err = tegra_prod_set_by_name(&sdhci->ioaddr,
-				"autocal-pu-pd-offset-default-3v3",
-				tegra_host->prods);
-		break;
-	}
+	err = tegra_prod_set_by_name_partially(&sdhci->ioaddr,
+			prod_device_states[timing],
+			tegra_host->prods, 0, SDMMC_AUTO_CAL_CONFIG,
+			SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PUPD_OFFSETS);
 	if (err < 0)
 		dev_err(mmc_dev(sdhci->mmc),
 			"error %d in autocal-pu-pd-offset settings\n", err);
