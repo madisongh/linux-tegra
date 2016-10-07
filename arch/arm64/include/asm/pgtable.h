@@ -245,6 +245,24 @@ struct vm_area_struct;
 
 extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
 
+#ifndef LOWEST_ADDR
+#define LOWEST_ADDR (UL(0xffffffffffffffff) << VA_BITS)
+#endif
+
+static inline bool allow_pte_rdonly_update(unsigned long addr,
+						pte_t pte)
+{
+	/* if not kernel address */
+	if (addr < LOWEST_ADDR)  {
+		if (pte_valid(pte))
+			return true;
+	} else if (pte_present(pte)) {
+		return true;
+	}
+
+	return false;
+}
+
 /*
  * PTE bits configuration in the presence of hardware Dirty Bit Management
  * (PTE_WRITE == PTE_DBM):
@@ -263,7 +281,7 @@ extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
 static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
 			      pte_t *ptep, pte_t pte)
 {
-	if (pte_present(pte)) {
+	if (allow_pte_rdonly_update(addr, pte)) {
 		if (pte_sw_dirty(pte) && pte_write(pte))
 			pte_val(pte) &= ~PTE_RDONLY;
 		else
