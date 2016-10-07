@@ -122,9 +122,35 @@
 #define   AUX_MUX_LP0_CLAMP_EN_EARLY		BIT(30)
 #define   AUX_MUX_LP0_VCORE_DOWN		BIT(31)
 
+#define XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(x)	(0x80 + (x) * 0x40)
+#define   PD_CHG                                (1 << 0)
+#define   VDCD_DET_FILTER_EN                    (1 << 4)
+#define   VDAT_DET                              (1 << 5)
+#define   VDAT_DET_FILTER_EN                    (1 << 8)
+#define   OP_SINK_EN                            (1 << 9)
+#define   OP_SRC_EN                             (1 << 10)
+#define   ON_SINK_EN                            (1 << 11)
+#define   ON_SRC_EN                             (1 << 12)
+#define   OP_I_SRC_EN                           (1 << 13)
+#define   ZIP_FILTER_EN                         (1 << 21)
+#define   ZIN_FILTER_EN                         (1 << 25)
+#define   DCD_DETECTED                          (1 << 26)
+#define   SRP_DETECT_EN                         (1 << 28)
+#define   SRP_DETECTED                          (1 << 29)
+#define   SRP_INTR_EN                           (1 << 30)
+#define   GENERATE_SRP                          (1 << 31)
+
 #define XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(x)	(0x84 + (x) * 0x40)
-#define   VREG_LEV(x)				(((x) & 0x3) << 7)
 #define   VREG_FIX18				BIT(6)
+#define   VREG_LEV(x)                           (((x) & 0x3) << 7)
+#define   USBOP_RPD_OVRD                        (1 << 16)
+#define   USBOP_RPD_OVRD_VAL                    (1 << 17)
+#define   USBOP_RPU_OVRD                        (1 << 18)
+#define   USBOP_RPU_OVRD_VAL                    (1 << 19)
+#define   USBON_RPD_OVRD                        (1 << 20)
+#define   USBON_RPD_OVRD_VAL                    (1 << 21)
+#define   USBON_RPU_OVRD                        (1 << 22)
+#define   USBON_RPU_OVRD_VAL                    (1 << 23)
 
 #define XUSB_PADCTL_USB2_OTG_PADX_CTL_0(x)	(0x88 + (x) * 0x40)
 #define   HS_CURR_LEVEL(x)			((x) & 0x3f)
@@ -263,6 +289,9 @@
 /* FUSE_USB_CALIB_EXT_0 */
 #define RPD_CTRL_SHIFT				(0)
 #define RPD_CTRL_MASK				(0x1f)
+
+#define XUSB_PADCTL_USB2_BATTERY_CHRG_TDCD_DBNC_TIMER_0 (0x280)
+#define   TDCD_DBNC(x)                          (((x) & 0x7ff) << 0)
 
 static const struct of_device_id tegra_xusbb_pd[] = {
 		{ .compatible = "nvidia,tegra210-xusbb-pd", },
@@ -468,6 +497,9 @@ struct tegra_padctl_uphy {
 	struct padctl_context padctl_context;
 
 	struct tegra_utmi_pad_config utmi_pad_cfg;
+
+	/* ref count for bias pad */
+	int bias_pad_enable;
 };
 
 #ifdef VERBOSE_DEBUG
@@ -2719,6 +2751,8 @@ static inline void tegra21x_usb2_trk(struct tegra_padctl_uphy *uphy, bool on)
 
 	/* BIAS PAD */
 	if (on) {
+		if (uphy->bias_pad_enable++ > 0)
+			return;
 		reg = padctl_readl(uphy, XUSB_PADCTL_USB2_BIAS_PAD_CTL_1);
 		reg &= ~USB2_TRK_START_TIMER(~0);
 		reg |= USB2_TRK_START_TIMER(0x1e);
@@ -2740,6 +2774,10 @@ static inline void tegra21x_usb2_trk(struct tegra_padctl_uphy *uphy, bool on)
 
 		usleep_range(50, 60);
 	} else {
+		if (WARN_ON(uphy->bias_pad_enable == 0))
+			return;
+		if (--uphy->bias_pad_enable > 0)
+			return;
 		reg = padctl_readl(uphy, XUSB_PADCTL_USB2_BIAS_PAD_CTL_0);
 		reg |= BIAS_PAD_PD;
 		padctl_writel(uphy, reg, XUSB_PADCTL_USB2_BIAS_PAD_CTL_0);
@@ -4192,6 +4230,324 @@ void tegra_phy_xusb_utmi_pad_power_down(struct phy *phy)
 	padctl_writel(uphy, reg, XUSB_PADCTL_USB2_OTG_PADX_CTL_1(port));
 }
 EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_power_down);
+
+void tegra_phy_xusb_set_dcd_debounce_time(struct phy *phy, u32 val)
+{
+	struct tegra_padctl_uphy *uphy;
+	u32 reg;
+
+	if (!phy)
+		return;
+
+	uphy = phy_get_drvdata(phy);
+
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_TDCD_DBNC_TIMER_0);
+	reg &= ~TDCD_DBNC(~0);
+	reg |= TDCD_DBNC(val);
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_TDCD_DBNC_TIMER_0);
+}
+EXPORT_SYMBOL_GPL(tegra_phy_xusb_set_dcd_debounce_time);
+
+void tegra_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy;
+	int port;
+	u32 reg;
+
+	if (!phy)
+		return;
+
+	uphy = phy_get_drvdata(phy);
+	port = utmi_phy_to_port(phy);
+
+	/* power up necessary stuff */
+	tegra21x_usb2_trk_on(uphy);
+	tegra_phy_xusb_utmi_pad_power_on(phy);
+
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+	reg |= (USB2_OTG_PD2 | USB2_OTG_PD2_OVRD_EN);
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	reg &= ~PD_CHG;
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+
+	/* Set DP/DN Pull up/down to zero by default */
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+	reg |= (USBOP_RPD_OVRD | USBOP_RPU_OVRD |
+	USBON_RPD_OVRD | USBON_RPU_OVRD);
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+	reg &= ~(USBOP_RPD_OVRD_VAL | USBOP_RPU_OVRD_VAL |
+	USBON_RPD_OVRD_VAL | USBON_RPU_OVRD_VAL);
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+
+	/* Disable DP/DN as src/sink */
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	reg &= ~(OP_SRC_EN | ON_SINK_EN |
+	ON_SRC_EN | OP_SINK_EN);
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+}
+EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_charger_detect_on);
+
+void tegra_phy_xusb_utmi_pad_charger_detect_off(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy;
+	int port;
+	u32 reg;
+
+	if (!phy)
+		return;
+
+	uphy = phy_get_drvdata(phy);
+	port = utmi_phy_to_port(phy);
+
+	reg = padctl_readl(uphy, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+	reg &= ~USB2_OTG_PD2_OVRD_EN;
+	padctl_writel(uphy, reg, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+
+	/* power down necessary stuff */
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	reg |= PD_CHG;
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+	reg &= ~(USBOP_RPD_OVRD | USBOP_RPU_OVRD |
+	USBON_RPD_OVRD | USBON_RPU_OVRD);
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+
+	tegra_phy_xusb_utmi_pad_power_down(phy);
+	tegra21x_usb2_trk_off(uphy);
+}
+EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_charger_detect_off);
+
+void tegra_phy_xusb_utmi_pad_enable_detect_filters(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy;
+	int port;
+	u32 reg;
+
+	if (!phy)
+		return;
+
+	uphy = phy_get_drvdata(phy);
+	port = utmi_phy_to_port(phy);
+
+	reg = padctl_readl(uphy,
+	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	reg |= (VDCD_DET_FILTER_EN | VDAT_DET_FILTER_EN |
+	ZIP_FILTER_EN | ZIN_FILTER_EN);
+	padctl_writel(uphy, reg,
+	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+}
+EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_enable_detect_filters);
+
+void tegra_phy_xusb_utmi_pad_disable_detect_filters(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy;
+	int port;
+	u32 reg;
+
+	if (!phy)
+		return;
+
+	uphy = phy_get_drvdata(phy);
+	port = utmi_phy_to_port(phy);
+
+	reg = padctl_readl(uphy,
+	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	reg &= ~(VDCD_DET_FILTER_EN | VDAT_DET_FILTER_EN |
+	ZIP_FILTER_EN | ZIN_FILTER_EN);
+	padctl_writel(uphy, reg,
+	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+}
+EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_disable_detect_filters);
+
+bool tegra_phy_xusb_utmi_pad_primary_charger_detect(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy;
+	int port;
+	u32 reg;
+	bool ret;
+
+	if (!phy)
+		return false;
+
+	uphy = phy_get_drvdata(phy);
+	port = utmi_phy_to_port(phy);
+
+	/* Source D+ to D- */
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	reg |= OP_SRC_EN | ON_SINK_EN;
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+
+	/* Wait for TVDPSRC_ON */
+	msleep(40);
+
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	ret = !!(reg & VDAT_DET);
+
+	/* Turn off OP_SRC, ON_SINK, clear VDAT, ZIN status change */
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	reg &= ~(OP_SRC_EN | ON_SINK_EN);
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_primary_charger_detect);
+
+bool tegra_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy;
+	int port;
+	u32 reg;
+	bool ret;
+
+	if (!phy)
+		return false;
+
+	uphy = phy_get_drvdata(phy);
+	port = utmi_phy_to_port(phy);
+
+	/* Source D- to D+ */
+	reg = padctl_readl(uphy,
+	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	reg |= ON_SRC_EN | OP_SINK_EN;
+	padctl_writel(uphy, reg,
+	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+
+	/* Wait for TVDPSRC_ON */
+	msleep(40);
+
+	reg = padctl_readl(uphy,
+	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	ret = !(reg & VDAT_DET);
+
+	/* Turn off ON_SRC, OP_SINK, clear VDAT, ZIP status change */
+	reg = padctl_readl(uphy,
+	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	reg &= ~(ON_SRC_EN | OP_SINK_EN);
+	padctl_writel(uphy, reg,
+	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_secondary_charger_detect);
+
+
+void tegra_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level)
+{
+	struct tegra_padctl_uphy *uphy;
+	int port;
+	u32 reg;
+
+	if (!phy)
+		return;
+
+	uphy = phy_get_drvdata(phy);
+	port = utmi_phy_to_port(phy);
+
+	reg = padctl_readl(uphy,
+	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+	if (level < 0) {
+		/* disable pad protection */
+		reg |= VREG_FIX18;
+		reg &= ~VREG_LEV(~0);
+	} else {
+		reg &= ~VREG_FIX18;
+		reg &= ~VREG_LEV(~0);
+		reg |= VREG_LEV(level);
+	}
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+}
+EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_set_protection_level);
+
+bool tegra_phy_xusb_utmi_pad_dcd(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy;
+	int port;
+	u32 reg;
+	int dcd_timeout_ms = 0;
+	bool ret = false;
+
+	if (!phy)
+		return false;
+
+	uphy = phy_get_drvdata(phy);
+	port = utmi_phy_to_port(phy);
+
+	/* data contact detection */
+	/* Turn on IDP_SRC */
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	reg |= OP_I_SRC_EN;
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+
+	/* Turn on D- pull-down resistor */
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+	reg |= USBON_RPD_OVRD_VAL;
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+
+	/* Wait for TDCD_DBNC */
+	usleep_range(10000, 120000);
+
+	while (dcd_timeout_ms < 900) {
+		reg = padctl_readl(uphy,
+			XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+		if (reg & DCD_DETECTED) {
+			dev_dbg(uphy->dev, "USB2 port %d DCD successful\n",
+				port);
+			ret = true;
+			break;
+		}
+		usleep_range(20000, 22000);
+		dcd_timeout_ms += 22;
+	}
+
+	/* Turn off IP_SRC, clear DCD DETECTED*/
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	reg &= ~OP_I_SRC_EN;
+	reg |= DCD_DETECTED;
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+
+	/* Turn off D- pull-down resistor */
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+	reg &= ~USBON_RPD_OVRD_VAL;
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_dcd);
 
 bool tegra_phy_get_lane_rdet(struct phy *phy, u8 lane_num)
 {
