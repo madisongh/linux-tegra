@@ -77,4 +77,8 @@ struct vbus_lock {
 int tegra18x_usb_cd_init_ops(struct tegra_usb_cd *ucd);
 #endif
 
+#ifdef CONFIG_ARCH_TEGRA_21x_SOC
+int tegra21x_usb_cd_init_ops(struct tegra_usb_cd *ucd);
+#endif
+
 #endif /* __TEGRA_USB_CD_H */

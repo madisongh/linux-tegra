@@ -322,12 +322,25 @@ void tegra_ucd_set_sdp_cdp_current(struct tegra_usb_cd *ucd, int current_ma)
 }
 EXPORT_SYMBOL_GPL(tegra_ucd_set_sdp_cdp_current);
 
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
 static struct tegra_usb_cd_soc_data tegra186_soc_config = {
 	.init_hw_ops = tegra18x_usb_cd_init_ops,
 };
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_21x_SOC
+static struct tegra_usb_cd_soc_data tegra210_soc_config = {
+	.init_hw_ops = tegra21x_usb_cd_init_ops,
+};
+#endif
 
 static const struct of_device_id tegra_usb_cd_of_match[] = {
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
 	{.compatible = "nvidia,tegra186-usb-cd", .data = &tegra186_soc_config,},
+#endif
+#ifdef CONFIG_ARCH_TEGRA_21x_SOC
+	{.compatible = "nvidia,tegra210-usb-cd", .data = &tegra210_soc_config,},
+#endif
 	{},
 };
 MODULE_DEVICE_TABLE(of, tegra_usb_cd_of_match);

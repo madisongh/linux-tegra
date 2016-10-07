@@ -25,6 +25,9 @@ obj-$(CONFIG_USB_TEGRA_CD)		+= tegra_usb_cd.o
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC), y)
 obj-$(CONFIG_USB_TEGRA_CD)		+= tegra18x_usb_cd.o
 endif
+ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC), y)
+obj-$(CONFIG_USB_TEGRA_CD)		+= tegra21x_usb_cd.o
+endif
 obj-$(CONFIG_USB_TEGRA_XUDC)	+= tegra_xudc.o
 CFLAGS_tegra_xudc.o		= -Werror
 obj-$(CONFIG_USB_TEGRA)		+= tegra_udc.o
