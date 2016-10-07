@@ -532,7 +532,7 @@ struct tegra_xudc {
 	enum tegra_usb_connect_type connect_type;
 #define NON_STD_CHARGER_DET_TIME_MS 2000
 #define USB_ANDROID_SUSPEND_CURRENT_MA 2
-	struct work_struct set_charging_current_work;
+	struct work_struct set_sdp_dcp_charging_current_work;
 	struct delayed_work non_std_charger_work;
 	u32 current_ma;
 };
@@ -680,13 +680,6 @@ static void tegra_xudc_device_mode_off(struct tegra_xudc *xudc)
 
 	dev_info(xudc->dev, "device mode off\n");
 
-	if (xudc->ucd) {
-		xudc->connect_type = CONNECT_TYPE_NONE;
-		cancel_delayed_work(&xudc->non_std_charger_work);
-		xudc->current_ma = 0;
-		schedule_work(&xudc->set_charging_current_work);
-	}
-
 	connected = !!(xudc_readl(xudc, PORTSC) & PORTSC_CCS);
 	reinit_completion(&xudc->disconnect_complete);
 
@@ -720,8 +713,14 @@ static void tegra_xudc_device_mode_off(struct tegra_xudc *xudc)
 	/* Make sure interrupt handler has completed before powergating. */
 	synchronize_irq(xudc->irq);
 
-	if (xudc->ucd)
+	if (xudc->ucd) {
+		cancel_delayed_work(&xudc->non_std_charger_work);
+		/* clear charger type */
+		spin_lock_irqsave(&xudc->lock, flags);
+		xudc->connect_type = CONNECT_TYPE_NONE;
+		spin_unlock_irqrestore(&xudc->lock, flags);
 		tegra_ucd_set_charger_type(xudc->ucd, CONNECT_TYPE_NONE);
+	}
 
 	pm_runtime_put(xudc->dev);
 }
@@ -1965,10 +1964,11 @@ static int tegra_xudc_gadget_stop(struct usb_gadget *gadget)
 	return 0;
 }
 
-static void tegra_xudc_set_charging_current_work(struct work_struct *work)
+static void tegra_xudc_set_sdp_dcp_charging_current_work(
+		struct work_struct *work)
 {
 	struct tegra_xudc *xudc = container_of(work, struct tegra_xudc,
-				  set_charging_current_work);
+				  set_sdp_dcp_charging_current_work);
 
 	dev_dbg(xudc->dev, "%s\n", __func__);
 	tegra_ucd_set_sdp_cdp_current(xudc->ucd, xudc->current_ma);
@@ -1982,7 +1982,7 @@ static int tegra_xudc_gadget_vbus_draw(struct usb_gadget *gadget, unsigned m_a)
 
 	if (xudc->ucd && xudc->current_ma != m_a) {
 		xudc->current_ma = m_a;
-		schedule_work(&xudc->set_charging_current_work);
+		schedule_work(&xudc->set_sdp_dcp_charging_current_work);
 	}
 
 	return 0;
@@ -3569,8 +3569,8 @@ static int tegra_xudc_probe(struct platform_device *pdev)
 			xudc->ucd = NULL;
 		} else {
 			xudc->current_ma = USB_ANDROID_SUSPEND_CURRENT_MA;
-			INIT_WORK(&xudc->set_charging_current_work,
-				  tegra_xudc_set_charging_current_work);
+			INIT_WORK(&xudc->set_sdp_dcp_charging_current_work,
+				  tegra_xudc_set_sdp_dcp_charging_current_work);
 			INIT_DELAYED_WORK(&xudc->non_std_charger_work,
 					  tegra_xudc_non_std_charger_work);
 			xudc->connect_type = CONNECT_TYPE_NONE;
@@ -3621,7 +3621,7 @@ static int tegra_xudc_remove(struct platform_device *pdev)
 	cancel_delayed_work(&xudc->plc_reset_work);
 
 	if (xudc->ucd) {
-		cancel_work_sync(&xudc->set_charging_current_work);
+		cancel_work_sync(&xudc->set_sdp_dcp_charging_current_work);
 		cancel_delayed_work_sync(&xudc->non_std_charger_work);
 		tegra_usb_release_ucd(xudc->ucd);
 	}

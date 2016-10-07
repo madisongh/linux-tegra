@@ -312,7 +312,8 @@ void tegra_ucd_set_sdp_cdp_current(struct tegra_usb_cd *ucd, int current_ma)
 	if (ucd->connect_type != CONNECT_TYPE_SDP
 			&& ucd->connect_type != CONNECT_TYPE_CDP) {
 		dev_err(ucd->dev,
-			"trying to set current for non SDP/CDP port");
+			"%s: ignore the request to set %dmA for non SDP/CDP port",
+			__func__, current_ma);
 		return;
 	}
 
