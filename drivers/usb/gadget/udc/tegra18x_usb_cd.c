@@ -15,6 +15,11 @@
 #include <soc/tegra/xusb.h>
 #include "tegra_usb_cd.h"
 
+#define VON_DIV2P0_DET BIT(0)
+#define VON_DIV2P7_DET BIT(1)
+#define VOP_DIV2P0_DET BIT(2)
+#define VOP_DIV2P7_DET BIT(3)
+
 static bool tegra18x_usb_dcp_charger_detect(struct tegra_usb_cd *ucd)
 {
 	bool status;
@@ -44,6 +49,21 @@ static bool tegra18x_usb_cdp_charger_detect(struct tegra_usb_cd *ucd)
 	dev_dbg(ucd->dev, "Secondary detection: %d\n", status);
 
 	return status;
+}
+
+static int tegra18x_usb_apple_charger_detect(struct tegra_usb_cd *ucd)
+{
+	u32 val;
+
+	val = tegra_phy_xusb_noncompliant_div_detect(ucd->phy);
+	if ((val & VOP_DIV2P0_DET) && (val & VON_DIV2P0_DET))
+		return APPLE_500MA;
+	if ((val & VOP_DIV2P0_DET) && (val & VON_DIV2P7_DET))
+		return APPLE_1000MA;
+	if (((val & VOP_DIV2P7_DET) && (val & VON_DIV2P0_DET))
+		|| ((val & VOP_DIV2P7_DET) && (val & VON_DIV2P7_DET)))
+		return APPLE_2000MA;
+	return -1;
 }
 
 static int tegra18x_pad_power_on(struct tegra_usb_cd *ucd)
@@ -96,6 +116,7 @@ static struct tegra_usb_cd_ops tegra18_ucd_ops = {
 	.power_off = tegra18x_pad_power_off,
 	.dcp_cd = tegra18x_usb_dcp_charger_detect,
 	.cdp_cd = tegra18x_usb_cdp_charger_detect,
+	.apple_cd = tegra18x_usb_apple_charger_detect,
 	.vbus_pad_protection = tegra18x_usb_vbus_pad_protection,
 };
 
