@@ -2201,8 +2201,8 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_cilab] = { .dt_id = TEGRA210_CLK_CILAB, .present = true },
 	[tegra_clk_cilcd] = { .dt_id = TEGRA210_CLK_CILCD, .present = true },
 	[tegra_clk_cile] = { .dt_id = TEGRA210_CLK_CILE, .present = true },
-	[tegra_clk_dsialp] = { .dt_id = TEGRA210_CLK_DSIALP, .present = true },
-	[tegra_clk_dsiblp] = { .dt_id = TEGRA210_CLK_DSIBLP, .present = true },
+	[tegra_clk_dsia_lp] = { .dt_id = TEGRA210_CLK_DSIALP, .present = true },
+	[tegra_clk_dsib_lp] = { .dt_id = TEGRA210_CLK_DSIBLP, .present = true },
 	[tegra_clk_entropy_8] = { .dt_id = TEGRA210_CLK_ENTROPY, .present = true },
 	[tegra_clk_xusb_ss] = { .dt_id = TEGRA210_CLK_XUSB_SS, .present = true },
 	[tegra_clk_i2c6] = { .dt_id = TEGRA210_CLK_I2C6, .present = true },
@@ -2536,8 +2536,10 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "cilab", .dt_id = TEGRA210_CLK_CILAB },
 	{ .con_id = "cilcd", .dt_id = TEGRA210_CLK_CILCD },
 	{ .con_id = "cile", .dt_id = TEGRA210_CLK_CILE },
-	{ .con_id = "dsialp", .dt_id = TEGRA210_CLK_DSIALP },
-	{ .con_id = "dsiblp", .dt_id = TEGRA210_CLK_DSIBLP },
+	{ .con_id = "dsi", .dt_id = TEGRA210_CLK_DSIA },
+	{ .con_id = "dsia_lp", .dt_id = TEGRA210_CLK_DSIALP },
+	{ .con_id = "dsib", .dt_id = TEGRA210_CLK_DSIB },
+	{ .con_id = "dsib_lp", .dt_id = TEGRA210_CLK_DSIBLP },
 	{ .con_id = "sor1", .dt_id = TEGRA210_CLK_SOR1 },
 	{ .con_id = "i2s0", .dt_id = TEGRA210_CLK_I2S0 },
 	{ .con_id = "i2s1", .dt_id = TEGRA210_CLK_I2S1 },
@@ -2885,7 +2887,7 @@ static __init void tegra210_periph_clk_init(void __iomem *clk_base,
 	clks[TEGRA210_CLK_PLL_D_DSI_OUT] = clk;
 
 	/* dsia */
-	clk = tegra_clk_register_periph_gate("dsia", "pll_d_dsi_out", 0,
+	clk = tegra_clk_register_periph_gate("dsi", "pll_d_dsi_out", 0,
 					     clk_base, 0, 48,
 					     periph_clk_enb_refcnt);
 	clks[TEGRA210_CLK_DSIA] = clk;

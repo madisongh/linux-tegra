@@ -92,6 +92,8 @@
 #define CLK_SOURCE_CILAB 0x614
 #define CLK_SOURCE_CILCD 0x618
 #define CLK_SOURCE_CILE 0x61c
+#define CLK_SOURCE_DSIA 0xd0
+#define CLK_SOURCE_DSIB 0x4b8
 #define CLK_SOURCE_DSIALP 0x620
 #define CLK_SOURCE_DSIBLP 0x624
 #define CLK_SOURCE_TSENSOR 0x3b8
@@ -586,6 +588,11 @@ static u32 mux_pllm_pllc2_c_c3_pllp_plla_pllc4_idx[] = {
 	[0] = 0, [1] = 1, [2] = 2, [3] = 3, [4] = 4, [5] = 6, [6] = 7,
 };
 
+static const char *mux_plld_out0[] = {
+	"pll_d_out0",
+};
+#define mux_plld_out0_idx NULL
+
 /* SOR1 mux'es */
 static const char *mux_pllp_plld_plld2_clkm[] = {
 	"pll_p", "pll_d_out0", "pll_d2_out0", "clk_m"
@@ -687,8 +694,10 @@ static struct tegra_periph_init_data periph_clks[] = {
 	MUX("cilab", mux_pllp_pllc_clkm, CLK_SOURCE_CILAB, 144, 0, tegra_clk_cilab),
 	MUX("cilcd", mux_pllp_pllc_clkm, CLK_SOURCE_CILCD, 145, 0, tegra_clk_cilcd),
 	MUX("cile", mux_pllp_pllc_clkm, CLK_SOURCE_CILE, 146, 0, tegra_clk_cile),
-	MUX("dsialp", mux_pllp_pllc_clkm, CLK_SOURCE_DSIALP, 147, 0, tegra_clk_dsialp),
-	MUX("dsiblp", mux_pllp_pllc_clkm, CLK_SOURCE_DSIBLP, 148, 0, tegra_clk_dsiblp),
+	MUX("dsi", mux_plld_out0, CLK_SOURCE_DSIA, 48, 0, tegra_clk_dsi),
+	MUX("dsia_lp", mux_pllp_pllc_clkm, CLK_SOURCE_DSIALP, 147, 0, tegra_clk_dsia_lp),
+	MUX("dsib", mux_plld_out0, CLK_SOURCE_DSIB, 82, 0, tegra_clk_dsib),
+	MUX("dsib_lp", mux_pllp_pllc_clkm, CLK_SOURCE_DSIBLP, 148, 0, tegra_clk_dsib_lp),
 	MUX("tsensor", mux_pllp_pllc_clkm_clk32, CLK_SOURCE_TSENSOR, 100, TEGRA_PERIPH_ON_APB, tegra_clk_tsensor),
 	MUX("actmon", mux_pllp_pllc_clk32_clkm, CLK_SOURCE_ACTMON, 119, 0, tegra_clk_actmon),
 	MUX("dfll_ref", mux_pllp_clkm, CLK_SOURCE_DFLL_REF, 155, TEGRA_PERIPH_ON_APB, tegra_clk_dfll_ref),
