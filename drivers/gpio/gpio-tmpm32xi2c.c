@@ -98,14 +98,17 @@ struct tmpm32xi2c_chip {
 	/* for interrupt */
 	struct mutex irq_lock;
 	uint8_t reg_direction_intr[TMPM_MAX_INTR_BANK];
+	uint8_t irq_mask_cache[TMPM_MAX_INTR_BANK];
 	uint8_t irq_mask[TMPM_MAX_INTR_BANK];
 	uint8_t irq_trig_raise[TMPM_MAX_INTR_BANK];
 	uint8_t irq_trig_fall[TMPM_MAX_INTR_BANK];
 	unsigned long irq_flags;
 
 	/* for direction output */
-	uint8_t dir_output[TMPM_MAX_PORT];
-	uint8_t output_val[TMPM_MAX_PORT];
+	uint8_t dir_output[TMPM_MAX_BANK];
+	uint8_t dir_output_init[TMPM_MAX_BANK];
+	uint8_t output_val[TMPM_MAX_BANK];
+	uint8_t output_val_init[TMPM_MAX_BANK];
 
 	uint8_t cmd_ver;
 	uint8_t fw_ver[2];
@@ -173,9 +176,19 @@ static int __tmpm32xi2c_gpio_direction_input(struct tmpm32xi2c_chip *chip,
 	int ret;
 	uint32_t intr_num;
 	u8 tx_buf[] = { CMD_PIN_IN, 0 /*pin*/ };
+	int update = 0;
 
 	dev_dbg(&chip->client->dev, "(%s:%d) offset[%u]\n",
 			__func__, __LINE__, offset);
+
+	if (!TMPM_TEST_BIT(chip->dir_output_init, offset))
+		update = 1;
+	else if (TMPM_TEST_BIT(chip->dir_output, offset))
+		update = 1;
+
+	if (!update)
+		return 0;
+
 	tx_buf[1] = (u8)offset;
 	ret = tmpm32xi2c_write_read(chip, tx_buf, sizeof(tx_buf), NULL, 0);
 	if (ret)
@@ -185,6 +198,7 @@ static int __tmpm32xi2c_gpio_direction_input(struct tmpm32xi2c_chip *chip,
 	intr_num = TMPM_GET_INTR_NUM(offset);
 	if (intr_num != ~0)
 		TMPM_SET_BIT(chip->reg_direction_intr, intr_num);
+	TMPM_SET_BIT(chip->dir_output_init, offset);
 
 	ret = 0;
 
@@ -210,9 +224,19 @@ static int __tmpm32xi2c_gpio_direction_output(struct tmpm32xi2c_chip *chip,
 	int ret;
 	uint32_t intr_num;
 	u8 tx_buf[] = { CMD_PIN_OUT, 0 /*pin*/, 0 /*val*/ };
+	int update = 0;
 
 	dev_dbg(&chip->client->dev, "(%s:%d) offset[%u], val[%d]\n",
 			__func__, __LINE__, offset, val);
+
+	if (!TMPM_TEST_BIT(chip->dir_output_init, offset))
+		update = 1;
+	else if (!TMPM_TEST_BIT(chip->dir_output, offset))
+		update = 1;
+
+	if (!update)
+		return 0;
+
 	tx_buf[1] = (u8)offset;
 	tx_buf[2] = val ? 1 : 0;
 
@@ -225,7 +249,7 @@ static int __tmpm32xi2c_gpio_direction_output(struct tmpm32xi2c_chip *chip,
 	intr_num = TMPM_GET_INTR_NUM(offset);
 	if (intr_num != ~0)
 		TMPM_CLR_BIT(chip->reg_direction_intr, intr_num);
-
+	TMPM_SET_BIT(chip->dir_output_init, offset);
 	ret = 0;
 
 exit:
@@ -289,9 +313,21 @@ static void __tmpm32xi2c_gpio_set_value(struct tmpm32xi2c_chip *chip,
 		unsigned offset, int val)
 {
 	u8 tx_buf[] = { CMD_PIN_WR, 0 /*pin*/, 0 /*val*/};
+	int update = 0;
 
 	dev_dbg(&chip->client->dev, "(%s:%d) offset[%u], val[%d]\n",
 			__func__, __LINE__, offset, val);
+
+	if (!TMPM_TEST_BIT(chip->output_val_init, offset))
+		update = 1;
+	else if (TMPM_TEST_BIT(chip->output_val, offset) && !val)
+		update = 1;
+	else if (!TMPM_TEST_BIT(chip->output_val, offset) && val)
+		update = 1;
+
+	if (!update)
+		return;
+
 	tx_buf[1] = (u8)offset;
 	tx_buf[2] = val ? 1 : 0;
 
@@ -302,6 +338,7 @@ static void __tmpm32xi2c_gpio_set_value(struct tmpm32xi2c_chip *chip,
 		TMPM_SET_BIT(chip->output_val, offset);
 	else
 		TMPM_CLR_BIT(chip->output_val, offset);
+	TMPM_SET_BIT(chip->output_val_init, offset);
 }
 
 static void tmpm32xi2c_gpio_set_value(struct gpio_chip *gc,
@@ -442,7 +479,7 @@ static uint8_t tmpm32xi2c_irq_pending(struct tmpm32xi2c_chip *chip,
 		uint8_t irq_trig_raise, irq_trig_fall;
 
 		cur_stat = (rx_buf[i * 2] & chip->reg_direction_intr[i]) &
-			   chip->irq_mask[i];
+			   chip->irq_mask_cache[i];
 		trig_raise = cur_stat & rx_buf[i * 2 + 1];
 		trig_fall = cur_stat & ~(rx_buf[i * 2 + 1]);
 		irq_trig_raise = cur_stat & chip->irq_trig_raise[i];
@@ -496,13 +533,14 @@ static irqreturn_t tmpm32xi2c_irq_handler(int irq, void *devid)
 static void tmpm32xi2c_update_interrupt_mask_reg(struct tmpm32xi2c_chip *chip)
 {
 	uint8_t tx_mask[] = { CMD_INT_MASK, 0x0 /*value*/ };
+	uint8_t irq_mask_cache;
 	uint8_t level;
 	uint8_t new_irqs;
-	int ret;
 	int i;
 
 	for (i = 0; i < TMPM_MAX_INTR_BANK; i++) {
-		new_irqs = chip->irq_mask[i] & ~chip->reg_direction_intr[i];
+		irq_mask_cache = chip->irq_mask_cache[i];
+		new_irqs = ~irq_mask_cache & chip->reg_direction_intr[i];
 
 		mutex_lock(&chip->i2c_lock);
 		while (new_irqs) {
@@ -512,9 +550,11 @@ static void tmpm32xi2c_update_interrupt_mask_reg(struct tmpm32xi2c_chip *chip)
 			new_irqs &= ~(1 << level);
 		}
 
-		tx_mask[1] = chip->irq_mask[i];
-		ret = tmpm32xi2c_write_read(chip, tx_mask, sizeof(tx_mask),
-				NULL, 0);
+		if (irq_mask_cache != chip->irq_mask[i]) {
+			tx_mask[1] = chip->irq_mask[i] = irq_mask_cache;
+			tmpm32xi2c_write_read(chip, tx_mask, sizeof(tx_mask),
+					      NULL, 0);
+		}
 		mutex_unlock(&chip->i2c_lock);
 	}
 }
@@ -525,7 +565,7 @@ static void tmpm32xi2c_irq_mask(struct irq_data *d)
 	struct tmpm32xi2c_chip *chip = to_tmpm32xi2c(gc);
 	uint32_t intr_num = TMPM_GET_INTR_NUM(d->hwirq);
 
-	TMPM_CLR_BIT(chip->irq_mask, intr_num);
+	TMPM_CLR_BIT(chip->irq_mask_cache, intr_num);
 }
 
 static void tmpm32xi2c_irq_unmask(struct irq_data *d)
@@ -534,7 +574,7 @@ static void tmpm32xi2c_irq_unmask(struct irq_data *d)
 	struct tmpm32xi2c_chip *chip = to_tmpm32xi2c(gc);
 	uint32_t intr_num = TMPM_GET_INTR_NUM(d->hwirq);
 
-	TMPM_SET_BIT(chip->irq_mask, intr_num);
+	TMPM_SET_BIT(chip->irq_mask_cache, intr_num);
 }
 
 static void tmpm32xi2c_irq_bus_lock(struct irq_data *d)
@@ -611,6 +651,18 @@ static int tmpm32xi2c_setup_gpio_irq(struct tmpm32xi2c_chip *chip,
 			if (gpio_num != ~0) {
 				TMPM_SET_BIT(chip->irq_available, gpio_num);
 				intr_map.igdi[gpio_num] = i;
+			}
+		}
+
+		for (i = 0; i < TMPM_MAX_INTR_BANK; i++) {
+			uint8_t tx_mask[] = { CMD_INT_MASK, 0x0 /*value*/ };
+			chip->irq_mask[i] = 0;
+			ret = tmpm32xi2c_write_read(chip, tx_mask,
+						sizeof(tx_mask), NULL, 0);
+			if (ret < 0) {
+				dev_err(&client->dev,
+					"failed to init interrupt mask\n");
+				return ret;
 			}
 		}
 
