@@ -163,23 +163,25 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
 }
 
 static DEFINE_PER_CPU(unsigned long, cpu_capacity);
+static DEFINE_PER_CPU(unsigned long, cpu_ipc);
 
 unsigned long arm64_arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
 {
 	unsigned long cap = per_cpu(cpu_capacity, cpu);
 
-	if (!cap)
+	if (!cap || cap > SCHED_CAPACITY_SCALE)
 		return SCHED_CAPACITY_SCALE;
 
 	return cap;
 }
 
-static void update_cpu_capacity(int cpu, unsigned long cap)
+static void update_cpu_ipc(int cpu, unsigned long ipc)
 {
-	if (cap > SCHED_CAPACITY_SCALE)
-		cap = SCHED_CAPACITY_SCALE;
+	if (ipc > SCHED_CAPACITY_SCALE)
+		ipc = SCHED_CAPACITY_SCALE;
 
-	per_cpu(cpu_capacity, cpu) = cap;
+	per_cpu(cpu_ipc, cpu) = ipc;
+	per_cpu(cpu_capacity, cpu) = ipc;
 }
 
 static void __init init_cpu_capacity(void)
@@ -197,15 +199,15 @@ static void __init init_cpu_capacity(void)
 			return;
 		}
 
-		if (of_property_read_u32(cn, "cpu-capacity", &val)) {
-			pr_err("%s: Missing cpu-capacity property\n",
+		if (of_property_read_u32(cn, "cpu-ipc", &val)) {
+			pr_err("%s: Missing cpu-ipc property\n",
 				cn->full_name);
 			continue;
 		}
 
-		pr_info("CPU%d capacity=%u\n", cpu, val);
+		pr_info("CPU%d ipc=%u\n", cpu, val);
 
-		update_cpu_capacity(cpu, val);
+		update_cpu_ipc(cpu, val);
 	}
 }
 
@@ -324,9 +326,11 @@ topology_populated:
 
 #ifdef CONFIG_CPU_FREQ
 
+static DEFINE_MUTEX(capacity_update_lock);
 static DEFINE_PER_CPU(unsigned long, cur_freq);
 static DEFINE_PER_CPU(unsigned long, max_freq);
 static DEFINE_PER_CPU(unsigned long, freq_cap);
+static DEFINE_PER_CPU(unsigned long, raw_cpu_capacity);
 
 unsigned long arm64_arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
 {
@@ -336,6 +340,49 @@ unsigned long arm64_arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
 		return SCHED_CAPACITY_SCALE;
 
 	return freq_capacity;
+}
+
+static void update_raw_cpu_capacity(int cpu)
+{
+	unsigned long ipc = per_cpu(cpu_ipc, cpu);
+	unsigned long max = per_cpu(max_freq, cpu);
+
+	if (!ipc || !max)
+		return;
+
+	per_cpu(raw_cpu_capacity, cpu) = ipc * max;
+}
+
+/*
+ * Normalize raw cpu capacities relative to max raw cpu capacity
+ * Must be called with capacity_update_lock held.
+ */
+static void update_cpu_capacities(void)
+{
+	unsigned long max_raw_capacity = 0;
+	int i;
+
+	for_each_online_cpu(i) {
+		unsigned long capacity = per_cpu(raw_cpu_capacity, i);
+
+		if (capacity > max_raw_capacity)
+			max_raw_capacity = capacity;
+	}
+
+	if (!max_raw_capacity)
+		return;
+
+	for_each_possible_cpu(i) {
+		unsigned long capacity = per_cpu(raw_cpu_capacity, i);
+
+		capacity *= SCHED_CAPACITY_SCALE;
+		capacity /= max_raw_capacity;
+		if (capacity > SCHED_CAPACITY_SCALE)
+			capacity = SCHED_CAPACITY_SCALE;
+
+		per_cpu(cpu_capacity, i) = capacity;
+		pr_debug("%s: cpu=%d capacity=%lu\n", __func__, i, capacity);
+	}
 }
 
 static void update_freq_capacity(int cpu)
@@ -348,7 +395,10 @@ static void update_freq_capacity(int cpu)
 		return;
 	}
 
-	per_cpu(freq_cap, cpu) = (cur * SCHED_CAPACITY_SCALE) / max;
+	if (cur >= max)
+		per_cpu(freq_cap, cpu) = SCHED_CAPACITY_SCALE;
+	else
+		per_cpu(freq_cap, cpu) = (cur * SCHED_CAPACITY_SCALE) / max;
 }
 
 static int cpufreq_callback(struct notifier_block *nb,
@@ -375,18 +425,27 @@ static int cpufreq_policy_callback(struct notifier_block *nb,
 {
 	int i;
 	struct cpufreq_policy *policy = data;
+	bool need_update = false;
 
-	if (val != CPUFREQ_NOTIFY || !policy)
+	if ((val != CPUFREQ_NOTIFY && val != CPUFREQ_START) || !policy)
 		return NOTIFY_OK;
 
-	for_each_cpu(i, policy->cpus) {
-		/* max achievable freq. doesn't change after boot */
-		if (per_cpu(max_freq, i))
-			continue;
+	mutex_lock(&capacity_update_lock);
 
-		per_cpu(max_freq, i) = policy->cpuinfo.max_freq;
+	for_each_cpu(i, policy->cpus) {
+		if (policy->max == per_cpu(max_freq, i))
+			continue;
+		per_cpu(max_freq, i) = policy->max;
 		update_freq_capacity(i);
+		update_raw_cpu_capacity(i);
+		need_update = true;
 	}
+
+	/* Re-normalize capacities */
+	if (need_update)
+		update_cpu_capacities();
+
+	mutex_unlock(&capacity_update_lock);
 
 	return NOTIFY_OK;
 }
@@ -395,7 +454,28 @@ static struct notifier_block cpufreq_policy_notifier = {
 	.notifier_call = cpufreq_policy_callback,
 };
 
-static int __init register_cpufreq_notifier(void)
+static int cpu_hotplug_callback(struct notifier_block *nb,
+					unsigned long action, void *hcpu)
+{
+	unsigned int cpu = (unsigned long)hcpu;
+
+	if (action != CPU_DEAD && action != CPU_DEAD_FROZEN)
+		return NOTIFY_OK;
+
+	mutex_lock(&capacity_update_lock);
+	per_cpu(max_freq, cpu) = 0;
+	per_cpu(raw_cpu_capacity, cpu) = 0;
+	update_cpu_capacities();
+	mutex_unlock(&capacity_update_lock);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block cpu_hotplug_notifier = {
+	.notifier_call = cpu_hotplug_callback,
+};
+
+static int __init register_notifiers(void)
 {
 	int ret;
 
@@ -406,9 +486,12 @@ static int __init register_cpufreq_notifier(void)
 
 	ret = cpufreq_register_notifier(&cpufreq_policy_notifier,
 						CPUFREQ_POLICY_NOTIFIER);
-	return ret;
+	if (ret)
+		return ret;
+
+	return register_cpu_notifier(&cpu_hotplug_notifier);
 }
-core_initcall(register_cpufreq_notifier);
+core_initcall(register_notifiers);
 #endif
 
 static void __init reset_cpu_topology(void)

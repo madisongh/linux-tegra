@@ -1094,6 +1094,8 @@ static int cpufreq_add_policy_cpu(struct cpufreq_policy *policy, unsigned int cp
 
 	down_write(&policy->rwsem);
 	cpumask_set_cpu(cpu, policy->cpus);
+	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
+			CPUFREQ_NOTIFY, policy);
 	up_write(&policy->rwsem);
 
 	if (has_target()) {
