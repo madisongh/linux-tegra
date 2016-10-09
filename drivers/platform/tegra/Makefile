@@ -44,12 +44,6 @@ obj-$(CONFIG_TEGRA_WAKEUP_MONITOR)      += tegra_wakeup_monitor.o
 
 obj-y += powergate/
 
-# tempporarily support soctherm platform driver for T12x with include files
-# from arch/arm/tegra area.
-ifeq ($(CONFIG_TEGRA_SOCTHERM),y)
-ccflags-y += -I$(srctree)/arch/arm/mach-tegra
-endif
-
 ifeq ($(CONFIG_TEGRA_THERMAL_THROTTLE),y)
 ccflags-y += -I$(srctree)/arch/arm/mach-tegra
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC)        += tegra_throttle.o
@@ -92,10 +86,6 @@ obj-y += apbio.o
 
 obj-$(CONFIG_TEGRA_MC_DOMAINS) += pm_domains.o
 obj-y += bond_out.o
-
-ifeq ($(CONFIG_TEGRA_SOCTHERM),y)
-obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += tegra_soctherm.o
-endif
 
 obj-$(CONFIG_TEGRA_HMP_CLUSTER_CONTROL)      += cluster-control.o
 
