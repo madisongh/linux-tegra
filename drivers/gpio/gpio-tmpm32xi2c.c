@@ -104,6 +104,9 @@ struct tmpm32xi2c_chip {
 	uint8_t irq_trig_fall[TMPM_MAX_INTR_BANK];
 	unsigned long irq_flags;
 
+	uint8_t irq_pendings[TMPM_MAX_BANK];
+	uint8_t irq_is_pending;
+
 	/* for direction output */
 	uint8_t dir_output[TMPM_MAX_BANK];
 	uint8_t dir_output_init[TMPM_MAX_BANK];
@@ -507,25 +510,26 @@ static uint8_t tmpm32xi2c_irq_pending(struct tmpm32xi2c_chip *chip,
 static irqreturn_t tmpm32xi2c_irq_handler(int irq, void *devid)
 {
 	struct tmpm32xi2c_chip *chip = (struct tmpm32xi2c_chip *)devid;
-	uint8_t pending[TMPM_MAX_BANK] = { 0, };
 	unsigned int nhandled = 0;
 	unsigned int gpio_irq = 0;
 	uint8_t level;
 	int i;
 
-	if (!tmpm32xi2c_irq_pending(chip, pending))
+	if (!chip->irq_is_pending &&
+			!tmpm32xi2c_irq_pending(chip, chip->irq_pendings))
 		return IRQ_NONE;
 
 	for (i = 0; i < TMPM_MAX_INTR_BANK; i++) {
-		while (pending[i]) {
-			level = __ffs(pending[i]);
+		while (chip->irq_pendings[i]) {
+			level = __ffs(chip->irq_pendings[i]);
 			gpio_irq = irq_find_mapping(chip->gpio_chip.irqdomain,
 					TMPM_GET_GPIO_NUM(level));
 			handle_nested_irq(gpio_irq);
-			pending[i] &= ~(1 << level);
+			chip->irq_pendings[i] &= ~(1 << level);
 			nhandled++;
 		}
 	}
+	chip->irq_is_pending = 0;
 
 	return (nhandled > 0) ? IRQ_HANDLED : IRQ_NONE;
 }
@@ -918,12 +922,20 @@ static int tmpm32xi2c_resume(struct device *dev)
 	if (device_may_wakeup(dev))
 		disable_irq_wake(chip->client->irq);
 
+	/* If there is any pending irq, invoke the irq handler. */
+	if (tmpm32xi2c_irq_pending(chip, chip->irq_pendings)) {
+		local_irq_disable();
+		chip->irq_is_pending = 1;
+		generic_handle_irq(chip->client->irq);
+		local_irq_enable();
+	}
+
 	return 0;
 }
 
 static const struct dev_pm_ops tmpm32xi2c_pm = {
-	.suspend_late = tmpm32xi2c_suspend,
-	.resume_early = tmpm32xi2c_resume,
+	.suspend = tmpm32xi2c_suspend,
+	.resume = tmpm32xi2c_resume,
 };
 #endif
 
@@ -944,10 +956,10 @@ static int __init tmpm32xi2c_init(void)
 {
 	return i2c_add_driver(&tmpm32xi2c_driver);
 }
-/* register after i2c postcore initcall and before
- * subsys initcalls that may rely on these GPIOs
+/* register after postcore initcall and subsys initcall that may rely
+   on these GPIOs and I2C.
  */
-subsys_initcall(tmpm32xi2c_init);
+subsys_initcall_sync(tmpm32xi2c_init);
 
 static void __exit tmpm32xi2c_exit(void)
 {
