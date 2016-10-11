@@ -45,7 +45,7 @@ config TEGRA3_PM
 
 config TEGRA_PMC
 	bool "Tegra PMC"
-	default y
+	default n
 	help
 	  Enable Tegra PMC.
 
