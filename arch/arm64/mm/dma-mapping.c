@@ -3258,8 +3258,10 @@ struct dma_map_ops iommu_coherent_ops = {
 bool device_is_iommuable(struct device *dev)
 {
 	return (dev->archdata.dma_ops == &iommu_ops) ||
-		(dev->archdata.dma_ops == &iommu_coherent_ops) ||
-		(dev->archdata.dma_ops == &iommu_dma_ops);
+#if ENABLE_IOMMU_DMA_OPS
+		(dev->archdata.dma_ops == &iommu_dma_ops) ||
+#endif
+		(dev->archdata.dma_ops == &iommu_coherent_ops);
 }
 EXPORT_SYMBOL(device_is_iommuable);
 
