@@ -3,7 +3,7 @@
  *
  * Based on tegra-pmc-iopower.c
  *
- * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,7 +26,8 @@
 #include <linux/regulator/consumer.h>
 #include <linux/module.h>
 #include <linux/padctrl/padctrl.h>
-#include <linux/tegra-pmc.h>
+
+#include <soc/tegra/pmc.h>
 
 #define PMC_PWR_NO_IOPOWER	0x44
 
