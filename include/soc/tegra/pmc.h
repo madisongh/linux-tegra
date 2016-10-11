@@ -112,6 +112,7 @@ int tegra_pmc_cpu_remove_clamping(int cpuid);
 #define BOOTLOADER_MODE         BIT(30)
 #define FORCED_RECOVERY_MODE    BIT(1)
 
+#ifndef CONFIG_TEGRA_POWERGATE
 #if defined CONFIG_ARCH_TEGRA || CONFIG_PLATFORM_TEGRA
 int tegra_powergate_is_powered(int id);
 int tegra_powergate_power_on(int id);
@@ -173,5 +174,6 @@ static inline int tegra_pmc_clear_reboot_reason(u32 reboot_reason)
 	return -ENOTSUPP;
 }
 #endif /* CONFIG_ARCH_TEGRA || CONFIG_PLATFORM_TEGRA */
+#endif /* CONFIG_TEGRA_POWERGATE */
 
 #endif /* __SOC_TEGRA_PMC_H__ */
