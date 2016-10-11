@@ -30,9 +30,6 @@ obj-$(CONFIG_ARCH_TEGRA_21x_SOC)         += tegra_ptm_t210.o
 endif
 
 obj-y += nvdumper/
-ifneq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
-obj-$(CONFIG_PM_SLEEP) += pm-irq.o
-endif
 obj-$(CONFIG_TEGRA_PMC) += pmc.o
 obj-$(CONFIG_TEGRA210_BOOTROM_PMC) += tegra-bootrom-pmc-config.o
 ifeq ($(CONFIG_PM),y)
@@ -90,10 +87,6 @@ asflags-y += -I$(srctree)/arch/arm/mach-tegra/include \
 
 obj-$(CONFIG_COMMON_CLK) += common_clock.o
 
-
-ifeq ($(CONFIG_PM_SLEEP),y)
-obj-$(CONFIG_ARCH_TEGRA_21x_SOC) += wakeups-t21x.o
-endif
 
 obj-$(CONFIG_TEGRA_KFUSE) += tegra_kfuse.o
 obj-y += apbio.o
