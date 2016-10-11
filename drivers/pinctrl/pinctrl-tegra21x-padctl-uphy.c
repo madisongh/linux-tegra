@@ -29,9 +29,9 @@
 #include <linux/usb.h>
 #include <linux/tegra_prod.h>
 #include <linux/tegra-powergate.h>
-#include <linux/tegra-pmc.h>
 
 #include <soc/tegra/fuse.h>
+#include <soc/tegra/pmc.h>
 #include <soc/tegra/xusb.h>
 
 #include <dt-bindings/pinctrl/pinctrl-tegra21x-padctl-uphy.h>
