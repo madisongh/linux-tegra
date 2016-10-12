@@ -1,7 +1,7 @@
 /*
  * Tegra host1x driver
  *
- * Copyright (c) 2010-2013, NVIDIA Corporation.
+ * Copyright (C) 2010-2016 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -24,10 +24,14 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/dma-mapping.h>
+#include <linux/reset.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/host1x.h>
 
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+#include "dev_t186.h"
+#endif
 #include "bus.h"
 #include "dev.h"
 #include "intr.h"
@@ -70,6 +74,7 @@ static const struct host1x_info host1x01_info = {
 	.init = host1x01_init,
 	.sync_offset = 0x3000,
 	.dma_mask = DMA_BIT_MASK(32),
+	.gather_filter_enabled = false,
 };
 
 static const struct host1x_info host1x02_info = {
@@ -80,6 +85,7 @@ static const struct host1x_info host1x02_info = {
 	.init = host1x02_init,
 	.sync_offset = 0x3000,
 	.dma_mask = DMA_BIT_MASK(32),
+	.gather_filter_enabled = false,
 };
 
 static const struct host1x_info host1x04_info = {
@@ -90,6 +96,7 @@ static const struct host1x_info host1x04_info = {
 	.init = host1x04_init,
 	.sync_offset = 0x2100,
 	.dma_mask = DMA_BIT_MASK(34),
+	.gather_filter_enabled = true,
 };
 
 static const struct host1x_info host1x05_info = {
@@ -100,9 +107,13 @@ static const struct host1x_info host1x05_info = {
 	.init = host1x05_init,
 	.sync_offset = 0x2100,
 	.dma_mask = DMA_BIT_MASK(34),
+	.gather_filter_enabled = true,
 };
 
 static const struct of_device_id host1x_of_match[] = {
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+	{ .compatible = "nvidia,tegra186-host1x", .data = &host1x06_info, },
+#endif
 	{ .compatible = "nvidia,tegra210-host1x", .data = &host1x05_info, },
 	{ .compatible = "nvidia,tegra124-host1x", .data = &host1x04_info, },
 	{ .compatible = "nvidia,tegra114-host1x", .data = &host1x02_info, },
@@ -112,12 +123,27 @@ static const struct of_device_id host1x_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, host1x_of_match);
 
+static int host1x_update_chara(struct host1x *host1x)
+{
+	host1x->host1x_chara.flags = 0;
+	host1x->host1x_chara.num_syncpts = host1x->info->nb_pts;
+
+	return 0;
+}
+
+struct host1x_characteristics *host1x_get_chara(struct host1x *host1x)
+{
+	return &host1x->host1x_chara;
+}
+EXPORT_SYMBOL(host1x_get_chara);
+
 static int host1x_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *id;
 	struct host1x *host;
 	struct resource *regs;
 	int syncpt_irq;
+	int general_irq;
 	int err;
 
 	id = of_match_device(host1x_of_match, &pdev->dev);
@@ -132,7 +158,13 @@ static int host1x_probe(struct platform_device *pdev)
 
 	syncpt_irq = platform_get_irq(pdev, 0);
 	if (syncpt_irq < 0) {
-		dev_err(&pdev->dev, "failed to get IRQ\n");
+		dev_err(&pdev->dev, "failed to get syncpt IRQ\n");
+		return -ENXIO;
+	}
+
+	general_irq = platform_get_irq(pdev, 1);
+	if (general_irq < 0) {
+		dev_err(&pdev->dev, "failed to get general IRQ\n");
 		return -ENXIO;
 	}
 
@@ -145,6 +177,9 @@ static int host1x_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&host->list);
 	host->dev = &pdev->dev;
 	host->info = id->data;
+
+	pdev->dev.dma_parms = &host->dma_parms;
+	dma_set_max_seg_size(&pdev->dev, UINT_MAX);
 
 	/* set common host1x device data */
 	platform_set_drvdata(pdev, host);
@@ -168,6 +203,10 @@ static int host1x_probe(struct platform_device *pdev)
 		return err;
 	}
 
+	host->reset_control = devm_reset_control_get(&pdev->dev, NULL);
+	if (IS_ERR(host->reset_control))
+		host->reset_control = NULL;
+
 	err = host1x_channel_list_init(host);
 	if (err) {
 		dev_err(&pdev->dev, "failed to initialize channel list\n");
@@ -180,13 +219,18 @@ static int host1x_probe(struct platform_device *pdev)
 		return err;
 	}
 
+	if (host->reset_control)
+		reset_control_reset(host->reset_control);
+
+	host1x_hw_load_regs(host);
+
 	err = host1x_syncpt_init(host);
 	if (err) {
 		dev_err(&pdev->dev, "failed to initialize syncpts\n");
 		goto fail_unprepare_disable;
 	}
 
-	err = host1x_intr_init(host, syncpt_irq);
+	err = host1x_intr_init(host, general_irq, syncpt_irq);
 	if (err) {
 		dev_err(&pdev->dev, "failed to initialize interrupts\n");
 		goto fail_deinit_syncpt;
@@ -197,6 +241,8 @@ static int host1x_probe(struct platform_device *pdev)
 	err = host1x_register(host);
 	if (err < 0)
 		goto fail_deinit_intr;
+
+	host1x_update_chara(host);
 
 	return 0;
 
@@ -249,7 +295,7 @@ static int __init tegra_host1x_init(void)
 
 	return err;
 }
-module_init(tegra_host1x_init);
+rootfs_initcall(tegra_host1x_init);
 
 static void __exit tegra_host1x_exit(void)
 {

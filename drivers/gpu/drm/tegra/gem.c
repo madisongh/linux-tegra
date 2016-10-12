@@ -2,7 +2,7 @@
  * NVIDIA Tegra DRM GEM helper functions
  *
  * Copyright (C) 2012 Sascha Hauer, Pengutronix
- * Copyright (C) 2013 NVIDIA CORPORATION, All rights reserved.
+ * Copyright (C) 2013-2015 NVIDIA CORPORATION, All rights reserved.
  *
  * Based on the GEM/CMA helpers
  *
@@ -47,23 +47,51 @@ static void *tegra_bo_mmap(struct host1x_bo *bo)
 {
 	struct tegra_bo *obj = host1x_to_tegra_bo(bo);
 
-	return obj->vaddr;
+	if (obj->vaddr)
+		return obj->vaddr;
+	else if (obj->gem.import_attach)
+		return dma_buf_vmap(obj->gem.import_attach->dmabuf);
+	else
+		return vmap(obj->pages, obj->num_pages, VM_MAP,
+			    pgprot_writecombine(PAGE_KERNEL));
 }
 
 static void tegra_bo_munmap(struct host1x_bo *bo, void *addr)
 {
+	struct tegra_bo *obj = host1x_to_tegra_bo(bo);
+
+	if (obj->vaddr)
+		return;
+	else if (obj->gem.import_attach)
+		dma_buf_vunmap(obj->gem.import_attach->dmabuf, addr);
+	else
+		vunmap(addr);
 }
 
 static void *tegra_bo_kmap(struct host1x_bo *bo, unsigned int page)
 {
 	struct tegra_bo *obj = host1x_to_tegra_bo(bo);
 
-	return obj->vaddr + page * PAGE_SIZE;
+	if (obj->vaddr)
+		return obj->vaddr + page * PAGE_SIZE;
+	else if (obj->gem.import_attach)
+		return dma_buf_kmap(obj->gem.import_attach->dmabuf, page);
+	else
+		return vmap(obj->pages + page, 1, VM_MAP,
+			    pgprot_writecombine(PAGE_KERNEL));
 }
 
 static void tegra_bo_kunmap(struct host1x_bo *bo, unsigned int page,
 			    void *addr)
 {
+	struct tegra_bo *obj = host1x_to_tegra_bo(bo);
+
+	if (obj->vaddr)
+		return;
+	else if (obj->gem.import_attach)
+		dma_buf_kunmap(obj->gem.import_attach->dmabuf, page, addr);
+	else
+		vunmap(addr);
 }
 
 static struct host1x_bo *tegra_bo_get(struct host1x_bo *bo)
@@ -175,7 +203,8 @@ static void tegra_bo_free(struct drm_device *drm, struct tegra_bo *bo)
 		sg_free_table(bo->sgt);
 		kfree(bo->sgt);
 	} else if (bo->vaddr) {
-		dma_free_wc(drm->dev, bo->gem.size, bo->vaddr, bo->paddr);
+		dma_free_writecombine(drm->dev->parent, bo->gem.size, bo->vaddr, 
+				bo->paddr);
 	}
 }
 
@@ -232,7 +261,7 @@ static int tegra_bo_alloc(struct drm_device *drm, struct tegra_bo *bo)
 	} else {
 		size_t size = bo->gem.size;
 
-		bo->vaddr = dma_alloc_wc(drm->dev, size, &bo->paddr,
+		bo->vaddr = dma_alloc_writecombine(drm->dev->parent, size, &bo->paddr,
 					 GFP_KERNEL | __GFP_NOWARN);
 		if (!bo->vaddr) {
 			dev_err(drm->dev,
@@ -309,7 +338,11 @@ static struct tegra_bo *tegra_bo_import(struct drm_device *drm,
 	if (IS_ERR(bo))
 		return bo;
 
+#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
+	attach = dma_buf_attach(buf, drm->dev->parent);
+#else
 	attach = dma_buf_attach(buf, drm->dev);
+#endif
 	if (IS_ERR(attach)) {
 		err = PTR_ERR(attach);
 		goto free;
@@ -333,10 +366,12 @@ static struct tegra_bo *tegra_bo_import(struct drm_device *drm,
 		if (err < 0)
 			goto detach;
 	} else {
+#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 		if (bo->sgt->nents > 1) {
 			err = -EINVAL;
 			goto detach;
 		}
+#endif
 
 		bo->paddr = sg_dma_address(bo->sgt->sgl);
 	}
@@ -471,7 +506,7 @@ int tegra_drm_mmap(struct file *file, struct vm_area_struct *vma)
 		vma->vm_flags &= ~VM_PFNMAP;
 		vma->vm_pgoff = 0;
 
-		ret = dma_mmap_wc(gem->dev->dev, vma, bo->vaddr, bo->paddr,
+		ret = dma_mmap_writecombine(gem->dev->dev, vma, bo->vaddr, bo->paddr,
 				  gem->size);
 		if (ret) {
 			drm_gem_vm_close(vma);

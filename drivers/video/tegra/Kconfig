@@ -3,7 +3,7 @@ trysource "../nvhost/drivers/video/tegra/Kconfig.nvhost"
 trysource "drivers/video/tegra/Kconfig.nvhost"
 
 config TEGRA_GRHOST_SYNC
-	depends on TEGRA_GRHOST || TEGRA_HOST1X
+	depends on TEGRA_GRHOST || TEGRA_HOST1X
 	bool "Tegra host synchronization objects"
 	default y
 	select SYNC
