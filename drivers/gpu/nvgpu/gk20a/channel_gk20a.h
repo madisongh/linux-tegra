@@ -132,6 +132,7 @@ struct channel_gk20a {
 	struct dma_buf *error_notifier_ref;
 	struct nvhost_notification *error_notifier;
 	void *error_notifier_va;
+	struct mutex error_notifier_mutex;
 
 	struct gk20a_channel_sync *sync;
 };
