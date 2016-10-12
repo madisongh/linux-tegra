@@ -25,6 +25,7 @@
 #include <linux/pm.h>
 #include <linux/types.h>
 #include <linux/fb.h>
+#include <linux/platform/tegra/emc_bwmgr.h>
 #include <linux/platform/tegra/isomgr.h>
 #include <drm/drm_fixed.h>
 
@@ -1349,14 +1350,28 @@ struct tegra_dp_out {
 
 /*
  * On T18x, isohub is the only memclient that's relevant to display.
- * This struct keeps track of its isoclient info.
+ * The following structs keep track of its isoclient info.
  */
 #if defined(CONFIG_TEGRA_NVDISPLAY) && defined(CONFIG_TEGRA_ISOMGR)
+struct nvdisp_bandwidth_config {
+	u32 iso_bw;		/* KB/s */
+	u32 total_bw;		/* KB/s */
+	u32 emc_la_floor;	/* Hz */
+	u32 hubclk;		/* Hz */
+};
+
 struct nvdisp_isoclient_bw_info {
-	tegra_isomgr_handle	isomgr_handle;
-	u32			available_bw;
-	u32			reserved_bw_kbps;
-	u32			realized_bw_kbps;
+	tegra_isomgr_handle		isomgr_handle;
+	struct tegra_bwmgr_client	*bwmgr_handle;
+
+	struct nvdisp_bandwidth_config	*max_config;
+	struct nvdisp_bandwidth_config	cur_config;
+
+	u32				available_bw;		/* KB/s */
+	u32				reserved_bw;		/* KB/s */
+
+	u32				emc_at_res_bw;		/* Hz */
+	u32				hubclk_at_res_bw;	/* Hz */
 };
 #endif
 #endif
