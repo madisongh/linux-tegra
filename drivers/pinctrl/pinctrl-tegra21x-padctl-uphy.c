@@ -1211,7 +1211,7 @@ static int lane_to_pcie_controller(struct tegra_padctl_uphy *uphy,
 	unsigned int i;
 
 	for (i = 0; i < TEGRA_PCIE_PHYS; i++) {
-		if (uphy->pcie_controllers[i].uphy_lane_bitmap | BIT(uphy_lane))
+		if (uphy->pcie_controllers[i].uphy_lane_bitmap & BIT(uphy_lane))
 			return i;
 	}
 
