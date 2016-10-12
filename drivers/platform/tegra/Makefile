@@ -121,7 +121,6 @@ obj-$(CONFIG_TEGRA_WDT_RECOVERY)        += wdt-recovery.o
 
 obj-y					+= tegra_prod.o
 
-obj-y					+= reboot.o
 obj-y					+= tegra-hv-mode.o
 
 obj-$(CONFIG_DENVER_MCA)		+= denver_mca.o
