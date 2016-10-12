@@ -1439,7 +1439,7 @@ void __init dma_contiguous_remap(void)
 		if (start >= end)
 			continue;
 
-		map.type = MT_MEMORY_KERNEL_EXEC;
+		map.type = PAGE_KERNEL_EXEC;
 
 		/*
 		 * Clear previous low-memory mapping

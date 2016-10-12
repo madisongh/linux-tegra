@@ -34,7 +34,7 @@
 /*
  * VMALLOC and SPARSEMEM_VMEMMAP ranges.
  *
- * VMEMAP_SIZE: allows the whole linear region to be covered by a struct page array
+ * VMEMAP_SIZE: allows the whole VA space to be covered by a struct page array
  *	(rounded up to PUD_SIZE).
  * VMALLOC_START: beginning of the kernel VA space
  * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
@@ -51,9 +51,7 @@
 
 #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
 
-#define VMEMMAP_START		(VMALLOC_END + SZ_64K)
-#define vmemmap			((struct page *)VMEMMAP_START - \
-				 SECTION_ALIGN_DOWN(memstart_addr >> PAGE_SHIFT))
+#define vmemmap			((struct page *)(VMALLOC_END + SZ_64K))
 
 #define FIRST_USER_ADDRESS	0UL
 
@@ -78,7 +76,6 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
 #define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
 #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
 #define PROT_SECT_NORMAL_EXEC	(PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
-#define PROT_SECT_NORMAL_NC	(PROT_SECT_DEFAULT | PMD_ATTRINDX(MT_NORMAL_NC))
 
 #define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
 
@@ -124,11 +121,11 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
  * ZERO_PAGE is a global shared page that is always zero: used
  * for zero-mapped memory areas etc..
  */
-extern unsigned long empty_zero_page;
+extern struct page *empty_zero_page;
 extern unsigned long zero_page_mask;
 
 #define ZERO_PAGE(vaddr) \
-	(virt_to_page((void *)(empty_zero_page + (((unsigned long)(vaddr)) & zero_page_mask))))
+	((empty_zero_page + ((((unsigned long)(vaddr)) & zero_page_mask) >> PAGE_SHIFT)))
 #define __HAVE_COLOR_ZERO_PAGE
 
 #define pte_ERROR(pte)		__pte_error(__FILE__, __LINE__, pte_val(pte))

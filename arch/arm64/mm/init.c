@@ -118,11 +118,9 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
 }
 
 #ifdef CONFIG_HAVE_ARCH_PFN_VALID
-#define PFN_MASK ((1UL << (64 - PAGE_SHIFT)) - 1)
-
 int pfn_valid(unsigned long pfn)
 {
-	return (pfn & PFN_MASK) == pfn && memblock_is_memory(pfn << PAGE_SHIFT);
+	return memblock_is_memory(pfn << PAGE_SHIFT);
 }
 EXPORT_SYMBOL(pfn_valid);
 #endif
@@ -132,7 +130,7 @@ static void arm64_memory_present(void)
 {
 }
 #else
-static void __init arm64_memory_present(void)
+static void arm64_memory_present(void)
 {
 	struct memblock_region *reg;
 
@@ -286,6 +284,7 @@ void __init mem_init(void)
 #ifdef CONFIG_SWIOTLB
 	swiotlb_init(1);
 #endif
+
 	set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
 
 #ifndef CONFIG_SPARSEMEM_VMEMMAP
@@ -322,8 +321,8 @@ void __init mem_init(void)
 #endif
 		  MLG(VMALLOC_START, VMALLOC_END),
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
-		  MLG(VMEMMAP_START,
-		      VMEMMAP_START + VMEMMAP_SIZE),
+		  MLG((unsigned long)vmemmap,
+		      (unsigned long)vmemmap + VMEMMAP_SIZE),
 		  MLM((unsigned long)virt_to_page(PAGE_OFFSET),
 		      (unsigned long)virt_to_page(high_memory)),
 #endif

@@ -18,19 +18,7 @@ struct map_desc {
 	unsigned long virtual;
 	unsigned long pfn;
 	unsigned long length;
-	unsigned int type;
+	unsigned long type;
 };
-
-#define MT_MEMORY_KERNEL_EXEC 5
-#define MT_MEMORY_KERNEL_EXEC_RDONLY 6
-#define MT_MEMORY_KERNEL 7
-
-#ifdef CONFIG_MMU
-extern void iotable_init(struct map_desc *, int);
-#else
-#define iotable_init(map,num)	do { } while (0)
-#endif
-
-static inline void debug_ll_io_init(void) {}
 
 #endif
