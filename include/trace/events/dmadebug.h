@@ -68,6 +68,8 @@ DECLARE_EVENT_CLASS(dmadebug,
 	TP_ARGS(dev, dma_addr, size, page) \
 )
 
+DMADEBUGEVENT(dmadebug_alloc_attrs);
+DMADEBUGEVENT(dmadebug_free_attrs);
 DMADEBUGEVENT(dmadebug_map_page);
 DMADEBUGEVENT(dmadebug_unmap_page);
 DMADEBUGEVENT(dmadebug_map_sg);

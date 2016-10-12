@@ -2682,6 +2682,7 @@ static void *__iommu_alloc_atomic(struct device *dev, size_t size,
 		goto err_mapping;
 
 	dev_dbg(dev, "%s() %16llx(%zx)\n", __func__, *handle, size);
+	trace_dmadebug_alloc_attrs(dev, *handle, size, pages[0]);
 	return addr;
 
 err_mapping:
@@ -2692,6 +2693,7 @@ err_mapping:
 static void __iommu_free_atomic(struct device *dev, struct page **pages,
 				dma_addr_t handle, size_t size, struct dma_attrs *attrs)
 {
+	trace_dmadebug_free_attrs(dev, handle, size, pages[0]);
 	__iommu_remove_mapping(dev, handle, size, attrs);
 	__free_from_pool(page_address(pages[0]), size);
 	dev_dbg(dev, "%s() %16llx(%zx)\n", __func__, handle, size);
@@ -2729,6 +2731,7 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
 	if (*handle == DMA_ERROR_CODE)
 		goto err_buffer;
 
+	trace_dmadebug_alloc_attrs(dev, *handle, size, pages[0]);
 	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
 		return pages;
 
@@ -2797,6 +2800,7 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 		vunmap(cpu_addr);
 	}
 
+	trace_dmadebug_free_attrs(dev, handle, size, NULL);
 	__iommu_remove_mapping(dev, handle, size, attrs);
 	__iommu_free_buffer(dev, pages, size, attrs);
 }
