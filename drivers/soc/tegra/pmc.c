@@ -31,6 +31,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
+#include <linux/psci.h>
 #include <linux/reboot.h>
 #include <linux/reset.h>
 #include <linux/seq_file.h>
@@ -39,6 +40,8 @@
 #include <soc/tegra/common.h>
 #include <soc/tegra/fuse.h>
 #include <soc/tegra/pmc.h>
+
+#include <asm/system_misc.h>
 
 #define PMC_CNTRL			0x0
 #define  PMC_CNTRL_SYSCLK_POLARITY	(1 << 10)  /* sys clk polarity */
@@ -379,10 +382,8 @@ int tegra_pmc_cpu_remove_clamping(int cpuid)
 }
 #endif /* CONFIG_SMP */
 
-static int tegra_pmc_restart_notify(struct notifier_block *this,
-				    unsigned long action, void *data)
+static void tegra_pmc_program_reboot_reason(const char *cmd)
 {
-	const char *cmd = data;
 	u32 value;
 
 	value = tegra_pmc_readl(PMC_SCRATCH0);
@@ -400,6 +401,15 @@ static int tegra_pmc_restart_notify(struct notifier_block *this,
 	}
 
 	tegra_pmc_writel(value, PMC_SCRATCH0);
+}
+
+static int tegra_pmc_restart_notify(struct notifier_block *this,
+				    unsigned long action, void *data)
+{
+	const char *cmd = data;
+	u32 value;
+
+	tegra_pmc_program_reboot_reason(cmd);
 
 	value = tegra_pmc_readl(0);
 	value |= 0x10;
@@ -846,6 +856,10 @@ static int tegra_pmc_probe(struct platform_device *pdev)
 			err);
 		return err;
 	}
+
+	/* handle PMC reboot reason with PSCI */
+	if (arm_pm_restart)
+		psci_handle_reboot_cmd = tegra_pmc_program_reboot_reason;
 
 	return 0;
 }
