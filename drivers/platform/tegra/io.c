@@ -118,11 +118,3 @@ static struct map_desc tegra_io_desc[] __maybe_unused __initdata = {
 #endif
 };
 
-void __init tegra_map_common_io(void)
-{
-	debug_ll_io_init();
-	/* 
-	 * TEMP: disable this until memory changes are ready
-	 * iotable_init(tegra_io_desc, ARRAY_SIZE(tegra_io_desc));
-	 */
-}
