@@ -892,6 +892,8 @@ static void tegra_pinctrl_resume(void)
 static struct syscore_ops pinctrl_syscore_ops = {
 	.suspend = tegra_pinctrl_suspend,
 	.resume = tegra_pinctrl_resume,
+	.save = tegra_pinctrl_suspend,
+	.restore = tegra_pinctrl_resume,
 };
 
 int tegra_pinctrl_probe(struct platform_device *pdev,
