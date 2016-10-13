@@ -171,6 +171,12 @@ int __init bwmgr_init(void);
 
 void __exit bwmgr_exit(void);
 
+/*
+ * Initialize pmqos bwmgr code which registers pmqos as bwmgr client and
+ * registers a notifier which gets called on update to PMQOS_EMC_FREQ_MIN.
+ */
+int __init pmqos_bwmgr_init(void);
+
 #else /* CONFIG_TEGRA_BWMGR */
 
 static inline struct tegra_bwmgr_client *tegra_bwmgr_register(
