@@ -24,6 +24,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/workqueue.h>
 #include <linux/clk.h>
+#include <linux/clk/tegra.h>
 #include <linux/reset.h>
 #include <linux/slab.h>
 #include <linux/usb.h>
@@ -264,15 +265,10 @@
 
 /* CAR registers */
 #define CLK_RST_CONTROLLER_XUSBIO_SATA_PLL_CFG0(_pll)	(_pll ? 0x490 : 0x51c)
-#define   PADPLL_RESET_SWCTL			BIT(0)
-#define   XUSBIO_CLK_ENABLE_SWCTL		BIT(2) /* XUSBIO only */
 #define   SATA_SEQ_IN_SWCTL			BIT(4)
 #define   SATA_SEQ_RESET_INPUT_VALUE		BIT(5)
 #define   SATA_SEQ_LANE_PD_INPUT_VALUE		BIT(6)
-#define   SEQ_PADPLL_USE_LOCKDET(_pll)		BIT((_pll) ? 2 : 6)
 #define   SATA_SEQ_PADPLL_PD_INPUT_VALUE	BIT(7)
-#define   PADPLL_SLEEP_IDDQ			BIT(13)
-#define   SEQ_ENABLE				BIT(24)
 
 #define CLK_RST_CONTROLLER_UTMIPLL_HW_PWRDN_CFG0	(0x52c)
 #define   UTMIPLL_IDDQ_SWCTL			BIT(0)
@@ -838,48 +834,24 @@ static int uphy_pll_hw_sequencer_enable(struct tegra_padctl_uphy *uphy, int pll,
 		}
 	}
 
-	value = car_readl(uphy, CLK_RST_CONTROLLER_XUSBIO_SATA_PLL_CFG0(pll));
-	value &= ~PADPLL_RESET_SWCTL;
-	if (pll == 0)
-		value &= ~XUSBIO_CLK_ENABLE_SWCTL;
-	value |= (PADPLL_SLEEP_IDDQ | SEQ_PADPLL_USE_LOCKDET(pll));
-	car_writel(uphy, value, CLK_RST_CONTROLLER_XUSBIO_SATA_PLL_CFG0(pll));
+	if (pll)
+		tegra210_sata_pll_hw_control_enable();
+	else
+		tegra210_xusb_pll_hw_control_enable();
 
 	/* remove SW overrides to allow HW sequencer to run */
 	uphy_pll_clear_sw_overrides(uphy, pll, func);
 
 	usleep_range(10, 20);
 
-	value = car_readl(uphy, CLK_RST_CONTROLLER_XUSBIO_SATA_PLL_CFG0(pll));
-	value |= SEQ_ENABLE;
-	car_writel(uphy, value, CLK_RST_CONTROLLER_XUSBIO_SATA_PLL_CFG0(pll));
+	if (pll)
+		tegra210_sata_pll_hw_sequence_start();
+	else
+		tegra210_xusb_pll_hw_sequence_start();
 
 	uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_UP_HW_SEQ;
 
 	/* FIXME: enable PLLE Power sequencer */
-
-	return 0;
-}
-
-/* caller must hold uphy->lock */
-static int uphy_pll_hw_sequencer_disable(struct tegra_padctl_uphy *uphy, int pll
-					, enum tegra21x_function func)
-{
-	struct device *dev = uphy->dev;
-	u32 value;
-
-	/* FIXME: disable PLLE hardware power sequencer */
-
-	uphy_pll_set_sw_overrides(uphy, pll, func);
-
-	value = car_readl(uphy, CLK_RST_CONTROLLER_XUSBIO_SATA_PLL_CFG0(pll));
-	value &= ~SEQ_ENABLE;
-	car_writel(uphy, value, CLK_RST_CONTROLLER_XUSBIO_SATA_PLL_CFG0(pll));
-
-	/* get back to software control */
-	TRACE(dev, "disable PLL%d hardware power sequencer\n", pll);
-
-	uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_UP_FULL;
 
 	return 0;
 }
@@ -1131,9 +1103,6 @@ int uphy_pll_deinit(struct tegra_padctl_uphy *uphy,
 		TRACE(dev, "PLL%d users 0x%lx\n", i, uphy->uphy_pll_users[i]);
 		if (uphy->uphy_pll_users[i] == 0) {
 			/* TODO error handling */
-			rc = uphy_pll_hw_sequencer_disable(uphy, i, func);
-			if (rc)
-				return rc;
 			rc = uphy_pll_power_down(uphy, i, func);
 			if (rc)
 				return rc;
