@@ -41,28 +41,24 @@ static bool tegra18x_usb_cdp_charger_detect(struct tegra_usb_cd *ucd)
 	if (status)
 		dev_dbg(ucd->dev, "No Voltage from D- to D+, CDP detected\n");
 
-	dev_info(ucd->dev, "Secondary detection: %d\n", status);
+	dev_dbg(ucd->dev, "Secondary detection: %d\n", status);
 
 	return status;
 }
 
 static int tegra18x_pad_power_on(struct tegra_usb_cd *ucd)
 {
-	tegra_phy_xusb_utmi_pad_pd2_assert(ucd->phy);
-	tegra_phy_xusb_utmi_pad_chg_power_on(ucd->phy);
-	tegra_phy_xusb_set_idcd_dbnc(ucd->phy, 0xa);
-	tegra_phy_xusb_utmi_pad_battery_charge_on(ucd->phy);
-	tegra_phy_xusb_utmi_pad_enable_charger_filters(ucd->phy);
+	tegra_phy_xusb_utmi_pad_charger_detect_on(ucd->phy);
+	tegra_phy_xusb_set_dcd_debounce_time(ucd->phy, 0xa);
+	tegra_phy_xusb_utmi_pad_enable_detect_filters(ucd->phy);
 
 	return 0;
 }
 
 static int tegra18x_pad_power_off(struct tegra_usb_cd *ucd)
 {
-	tegra_phy_xusb_utmi_pad_pd2_deassert(ucd->phy);
-	tegra_phy_xusb_utmi_pad_chg_power_down(ucd->phy);
-	tegra_phy_xusb_utmi_pad_battery_charge_off(ucd->phy);
-	tegra_phy_xusb_utmi_pad_disable_charger_filters(ucd->phy);
+	tegra_phy_xusb_utmi_pad_disable_detect_filters(ucd->phy);
+	tegra_phy_xusb_utmi_pad_charger_detect_off(ucd->phy);
 
 	return 0;
 }
