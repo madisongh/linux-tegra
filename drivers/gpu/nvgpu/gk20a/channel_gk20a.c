@@ -669,7 +669,7 @@ void gk20a_free_channel(struct channel_gk20a *ch, bool finish)
 	memset(&ch->ramfc, 0, sizeof(struct mem_desc_sub));
 
 	/* free gpfifo */
-	if (ch->gpfifo.gpu_va)
+	if (ch->vm && ch->gpfifo.gpu_va)
 		gk20a_gmmu_unmap(ch_vm, ch->gpfifo.gpu_va,
 			ch->gpfifo.size, gk20a_mem_flag_none);
 	if (ch->gpfifo.cpu_va)
@@ -698,8 +698,9 @@ unbind:
 	channel_gk20a_unbind(ch);
 	channel_gk20a_free_inst(g, ch);
 
-	ch->vpr = false;
+	gk20a_vm_put(ch->vm); /* Don't use VM after this. */
 	ch->vm = NULL;
+	ch->vpr = false;
 	WARN_ON(ch->sync);
 
 	/* unlink all debug sessions */
