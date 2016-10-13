@@ -2264,7 +2264,6 @@ void intel_cleanup_engine(struct intel_engine_cs *engine)
 	if (engine->buffer) {
 		intel_stop_engine(engine);
 		WARN_ON(!IS_GEN2(dev_priv) && (I915_READ_MODE(engine) & MODE_IDLE) == 0);
-
 		intel_unpin_ringbuffer_obj(engine->buffer);
 		intel_ringbuffer_free(engine->buffer);
 		engine->buffer = NULL;
