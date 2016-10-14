@@ -714,7 +714,7 @@ static int pca953x_probe(struct i2c_client *client,
 	} else if (IS_ERR(chip->vcc_reg)) {
 		ret = PTR_ERR(chip->vcc_reg);
 		dev_err(&client->dev,
-			"vcc regulator get failed, err %ld\n", ret);
+			"vcc regulator get failed, err %d\n", ret);
 		goto fail;
 	}
 
