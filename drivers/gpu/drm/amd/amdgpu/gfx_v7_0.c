@@ -3051,7 +3051,7 @@ static int gfx_v7_0_cp_resume(struct amdgpu_device *adev)
 static void gfx_v7_0_ring_emit_pipeline_sync(struct amdgpu_ring *ring)
 {
 	int usepfp = (ring->type == AMDGPU_RING_TYPE_GFX);
-	uint32_t seq = ring->fence_drv.sync_seq;
+	uint32_t seq = ring->fence_drv.sync_seq[ring->idx];
 	uint64_t addr = ring->fence_drv.gpu_addr;
 
 	amdgpu_ring_write(ring, PACKET3(PACKET3_WAIT_REG_MEM, 5));
