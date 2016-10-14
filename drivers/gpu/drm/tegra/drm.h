@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2012 Avionic Design GmbH
- * Copyright (C) 2012-2013 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2012-2016 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -67,16 +67,23 @@ struct tegra_drm_context {
 	struct tegra_drm_client *client;
 	struct host1x_channel *channel;
 	struct list_head list;
+
+	struct host1x_bo *error_notifier_bo;
+	u64 error_notifier_offset;
 };
 
 struct tegra_drm_client_ops {
 	int (*open_channel)(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context);
 	void (*close_channel)(struct tegra_drm_context *context);
-	int (*is_addr_reg)(struct device *dev, u32 class, u32 offset);
+	void (*reset)(struct device *dev);
+	int (*is_addr_reg)(struct device *dev, u32 class, u32 offset, u32 val);
 	int (*submit)(struct tegra_drm_context *context,
 		      struct drm_tegra_submit *args, struct drm_device *drm,
 		      struct drm_file *file);
+	int (*load_regs)(struct tegra_drm_client *client);
+	int (*finalize_poweron)(struct tegra_drm_client *client);
+	int (*prepare_poweroff)(struct tegra_drm_client *client);
 };
 
 int tegra_drm_submit(struct tegra_drm_context *context,
@@ -285,5 +292,12 @@ extern struct platform_driver tegra_dpaux_driver;
 extern struct platform_driver tegra_sor_driver;
 extern struct platform_driver tegra_gr2d_driver;
 extern struct platform_driver tegra_gr3d_driver;
+extern struct platform_driver tegra_vic_driver;
+extern struct platform_driver tegra_nvdec_driver;
+extern struct platform_driver tegra_nvjpg_driver;
+extern struct platform_driver tegra_nvenc_driver;
+extern struct platform_driver tegra_tsec_driver;
+extern struct platform_driver tegra_isp_driver;
+extern struct platform_driver tegra_vi_driver;
 
 #endif /* HOST1X_DRM_H */
