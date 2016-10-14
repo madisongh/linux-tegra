@@ -240,14 +240,14 @@ int tegra_bpmp_send(int mrq, void *data, int sz)
 	if (!connected)
 		return -ENODEV;
 
-	local_irq_save(flags);
+	raw_local_irq_save(flags);
 
 	ch = bpmp_ob_channel();
 	r = bpmp_write_ch(ch, mrq, 0, data, sz);
 	if (!r)
 		bpmp_ring_doorbell(ch);
 
-	local_irq_restore(flags);
+	raw_local_irq_restore(flags);
 	return r;
 }
 EXPORT_SYMBOL(tegra_bpmp_send);

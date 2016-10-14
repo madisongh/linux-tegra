@@ -328,16 +328,18 @@ int bpmp_get_fwtag(void)
 	size_t sz = sizeof(firmware_tag);
 	char fmt[sz + 1];
 
-	spin_lock_irqsave(&shared_lock, flags);
+	spin_lock(&shared_lock);
+	local_irq_save(flags);
 	r = tegra_bpmp_send_receive_atomic(MRQ_QUERY_TAG,
 			&shared_phys, sizeof(shared_phys), NULL, 0);
+	local_irq_restore(flags);
 	if (!r) {
 		memcpy(firmware_tag, shared_virt, sz);
 		memcpy(fmt, firmware_tag, sz);
 		fmt[sz] = 0;
 		dev_info(device, "firmware tag is %s\n", fmt);
 	}
-	spin_unlock_irqrestore(&shared_lock, flags);
+	spin_unlock(&shared_lock);
 
 	return r;
 }
