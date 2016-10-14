@@ -19,8 +19,9 @@
 #include <linux/init.h>
 #include <linux/of.h>
 #include <linux/slab.h>
-#include <linux/tegra-pmc.h>
 #include <linux/power/reset/system-pmic.h>
+
+#include <soc/tegra/pmc.h>
 
 #define PMC_REG_8bit_MASK			0xFF
 #define PMC_REG_16bit_MASK			0xFFFF
