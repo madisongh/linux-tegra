@@ -12,9 +12,10 @@
  */
 
 #include <linux/padctrl/padctrl.h>
-#include <linux/tegra-pmc.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+
+#include <soc/tegra/pmc.h>
 
 /* IO PAD group */
 #define TEGRA_IO_PAD_GROUP_AUDIO	0
