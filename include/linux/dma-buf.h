@@ -37,6 +37,9 @@ struct device;
 struct dma_buf;
 struct dma_buf_attachment;
 
+#define DMABUF_CAN_DEFER_UNMAP		BIT(0)
+#define DMABUF_SKIP_CACHE_SYNC		BIT(1)
+
 /**
  * struct dma_buf_ops - operations possible on struct dma_buf
  * @attach: [optional] allows different devices to 'attach' themselves to the
@@ -135,6 +138,7 @@ struct dma_buf {
 	unsigned vmapping_counter;
 	void *vmap_ptr;
 	const char *exp_name;
+	unsigned long flags;
 	struct module *owner;
 	struct list_head list_node;
 	void *priv;
@@ -167,6 +171,9 @@ struct dma_buf_attachment {
 	struct device *dev;
 	struct list_head node;
 	void *priv;
+	struct sg_table *sg_table;
+	atomic_t ref;
+	atomic_t maps;
 };
 
 /**
@@ -188,6 +195,7 @@ struct dma_buf_export_info {
 	const struct dma_buf_ops *ops;
 	size_t size;
 	int flags;
+	int exp_flags;
 	struct reservation_object *resv;
 	void *priv;
 };
