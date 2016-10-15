@@ -322,6 +322,10 @@ static inline int dev_pm_qos_add_request(struct device *dev,
 static inline int dev_pm_qos_update_request(struct dev_pm_qos_request *req,
 					    s32 new_value)
 			{ return 0; }
+static inline int dev_pm_qos_update_request_timeout(struct dev_pm_qos_request *req,
+						    s32 new_value,
+						    unsigned long timeout_us)
+			{ return 0; }
 static inline int dev_pm_qos_remove_request(struct dev_pm_qos_request *req)
 			{ return 0; }
 static inline int dev_pm_qos_add_notifier(struct device *dev,
