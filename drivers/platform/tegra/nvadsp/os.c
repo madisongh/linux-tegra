@@ -1338,7 +1338,6 @@ void nvadsp_os_stop(void)
 {
 	struct nvadsp_drv_data *drv_data;
 	struct device *dev;
-	int err;
 
 	if (!priv.pdev) {
 		pr_err("ADSP Driver is not initialized\n");
@@ -1358,8 +1357,7 @@ void nvadsp_os_stop(void)
 	priv.os_running = drv_data->adsp_os_running = false;
 
 #ifdef CONFIG_PM
-	err = pm_runtime_put_sync(dev);
-	if (err)
+	if (pm_runtime_put_sync(dev))
 		dev_err(dev, "failed in pm_runtime_put_sync\n");
 #endif
 end:
@@ -1369,7 +1367,6 @@ EXPORT_SYMBOL(nvadsp_os_stop);
 
 int nvadsp_os_suspend(void)
 {
-	struct device *dev = &priv.pdev->dev;
 	struct nvadsp_drv_data *drv_data;
 	int ret = -EINVAL;
 
@@ -1396,6 +1393,7 @@ int nvadsp_os_suspend(void)
 	ret = __nvadsp_os_suspend();
 	if (!ret) {
 #ifdef CONFIG_PM
+		struct device *dev = &priv.pdev->dev;
 		ret = pm_runtime_put_sync(&priv.pdev->dev);
 		if (ret)
 			dev_err(dev, "failed in pm_runtime_put_sync\n");

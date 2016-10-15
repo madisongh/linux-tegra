@@ -365,8 +365,10 @@ static int nvadsp_remove(struct platform_device *pdev)
 
 	pm_runtime_disable(&pdev->dev);
 
+#ifdef CONFIG_PM
 	if (!pm_runtime_status_suspended(&pdev->dev))
 		nvadsp_runtime_suspend(&pdev->dev);
+#endif
 
 	tegra_pd_remove_device(&pdev->dev);
 
