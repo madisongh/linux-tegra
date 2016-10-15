@@ -103,14 +103,25 @@ struct tegra_suspend_platform_data {
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 
+#ifdef CONFIG_PM
 int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags);
 
 int tegra_register_pm_notifier(struct notifier_block *nb);
 int tegra_unregister_pm_notifier(struct notifier_block *nb);
 int tegra_pm_notifier_call_chain(unsigned int val);
-int tegra_pm_prepare_sc7(void);
-int tegra_pm_post_sc7(void);
 void tegra_log_suspend_entry_time(void);
 void tegra_log_resume_time(void);
+#else
+static inline int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
+	{ return 0; }
+static inline int tegra_register_pm_notifier(struct notifier_block *nb)
+	{ return 0; }
+static inline int tegra_unregister_pm_notifier(struct notifier_block *nb)
+	{ return 0; }
+static inline int tegra_pm_notifier_call_chain(unsigned int val)
+	{ return 0; }
+static inline void tegra_log_suspend_entry_time(void) { }
+static inline void tegra_log_resume_time(void) { }
+#endif
 
 #endif /* _LINUX_TEGRA_PM_H_ */
