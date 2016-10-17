@@ -1944,7 +1944,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		if (IS_ERR(host->cq_host))
 			pr_err("CMDQ: Error in cmdq_platfm_init function\n");
 		else
-			pr_err("CMDQ: cmdq_platfm_init successful\n");
+			pr_info("CMDQ: cmdq_platfm_init successful\n");
 	}
 #endif
 	if (plat->en_periodic_calib)
