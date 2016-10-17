@@ -57,7 +57,9 @@ static unsigned int num_ictlrs;
 
 struct tegra_ictlr_soc {
 	unsigned int num_ictlrs;
+	bool has_bpmpl;
 };
+static const struct tegra_ictlr_soc *soc;
 
 static const struct tegra_ictlr_soc tegra20_ictlr_soc = {
 	.num_ictlrs = 4,
@@ -69,6 +71,7 @@ static const struct tegra_ictlr_soc tegra30_ictlr_soc = {
 
 static const struct tegra_ictlr_soc tegra210_ictlr_soc = {
 	.num_ictlrs = 6,
+	.has_bpmpl = true,
 };
 
 static const struct of_device_id ictlr_matches[] = {
@@ -275,7 +278,8 @@ static int tegra_ictlr_suspend(void)
 		lic->cop_iep[i] = readl_relaxed(ictlr + ICTLR_COP_IEP_CLASS);
 
 		/* Disable COP interrupts */
-		writel_relaxed(~0ul, ictlr + ICTLR_COP_IER_CLR);
+		if (!soc->has_bpmpl)
+			writel_relaxed(~0ul, ictlr + ICTLR_COP_IER_CLR);
 
 		/* Disable CPU interrupts */
 		writel_relaxed(~0ul, ictlr + ICTLR_CPU_IER_CLR);
@@ -443,7 +447,6 @@ static int __init tegra_ictlr_init(struct device_node *node,
 {
 	struct irq_domain *parent_domain, *domain;
 	const struct of_device_id *match;
-	const struct tegra_ictlr_soc *soc;
 	unsigned int idx, i;
 	int err;
 
