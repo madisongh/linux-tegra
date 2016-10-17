@@ -318,6 +318,8 @@ static void tegra_ictlr_resume(void)
 static struct syscore_ops tegra_ictlr_syscore_ops = {
 	.suspend	= tegra_ictlr_suspend,
 	.resume		= tegra_ictlr_resume,
+	.save		= tegra_ictlr_suspend,
+	.restore	= tegra_ictlr_resume,
 };
 
 static void tegra_ictlr_syscore_init(void)
