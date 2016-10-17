@@ -421,6 +421,7 @@ void tegra_rtc_set_trigger(unsigned long cycles)
 }
 EXPORT_SYMBOL(tegra_rtc_set_trigger);
 
+#ifdef CONFIG_PM_SLEEP
 static void tegra_rtc_debug_set_alarm(struct device *dev, unsigned int period)
 {
 	struct tegra_rtc_info *info = dev_get_drvdata(dev);
@@ -432,6 +433,7 @@ static void tegra_rtc_debug_set_alarm(struct device *dev, unsigned int period)
 	if (ret < 0)
 		pr_err("Tegra RTC: setting debug alarm failed\n");
 }
+#endif
 
 static struct rtc_class_ops tegra_rtc_ops = {
 	.read_time	= tegra_rtc_read_time,
@@ -542,7 +544,7 @@ static int __init tegra_rtc_probe(struct platform_device *pdev)
 	struct tegra_rtc_info *info;
 	struct resource *res;
 	const struct of_device_id *match;
-	const struct tegra_rtc_chip_data *cdata;
+	const struct tegra_rtc_chip_data *cdata = NULL;
 	struct clk *clk;
 	int ret;
 
@@ -556,6 +558,9 @@ static int __init tegra_rtc_probe(struct platform_device *pdev)
 		if (match)
 			cdata = match->data;
 	}
+
+	if (!cdata)
+		return -EINVAL;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	info->rtc_base = devm_ioremap_resource(&pdev->dev, res);
