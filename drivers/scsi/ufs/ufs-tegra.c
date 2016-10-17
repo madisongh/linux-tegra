@@ -103,93 +103,6 @@ static void ufs_tegra_cfg_vendor_registers(struct ufs_hba *hba)
 	ufshcd_writel(hba, UFS_VNDR_HCLKDIV_1US_TICK, REG_UFS_VNDR_HCLKDIV);
 }
 
-static int ufs_tegra_host_regulator_get(struct device *dev,
-		const char *name, struct regulator **regulator_out)
-{
-	int err = 0;
-	struct regulator *regulator;
-
-	regulator = devm_regulator_get(dev, name);
-	if (IS_ERR(regulator)) {
-		err = PTR_ERR(regulator);
-		dev_err(dev, "%s: failed to get %s err %d",
-				__func__, name, err);
-	} else {
-		*regulator_out = regulator;
-	}
-
-	return err;
-}
-
-static int ufs_tegra_init_regulators(struct ufs_tegra_host *ufs_tegra)
-{
-	int err = 0;
-	struct device *dev = ufs_tegra->hba->dev;
-
-	err = ufs_tegra_host_regulator_get(dev, "vddio-ufs",
-			&ufs_tegra->vddio_ufs);
-	if (err)
-		return err;
-
-	ufs_tegra_host_regulator_get(dev, "vddio-ufs-ap",
-			&ufs_tegra->vddio_ufs_ap);
-
-	return err;
-}
-
-static int ufs_tegra_enable_regulators(struct ufs_tegra_host *ufs_tegra)
-{
-	int err = 0;
-	struct device *dev = ufs_tegra->hba->dev;
-
-	if (ufs_tegra->vddio_ufs) {
-		err = regulator_enable(ufs_tegra->vddio_ufs);
-		if (err) {
-			dev_err(dev, "%s: vddio-ufs enable failed, err=%d\n",
-					__func__, err);
-			goto out;
-		}
-	}
-	if (ufs_tegra->vddio_ufs_ap) {
-		err = regulator_enable(ufs_tegra->vddio_ufs_ap);
-		if (err) {
-			dev_err(dev, "%s: vddio-ufs-ap enable failed err = %d\n",
-					__func__, err);
-			goto disable_vddio_ufs;
-		}
-	}
-	return err;
-
-disable_vddio_ufs:
-	regulator_disable(ufs_tegra->vddio_ufs);
-out:
-	return err;
-}
-
-static int ufs_tegra_disable_regulators(struct ufs_tegra_host *ufs_tegra)
-{
-	int err = 0;
-	struct device *dev = ufs_tegra->hba->dev;
-
-	if (ufs_tegra->vddio_ufs) {
-		err = regulator_disable(ufs_tegra->vddio_ufs);
-		if (err) {
-			dev_err(dev, "%s: vddio-ufs disable failed, err=%d\n",
-					__func__, err);
-			return err;
-		}
-	}
-	if (ufs_tegra->vddio_ufs_ap) {
-		err = regulator_disable(ufs_tegra->vddio_ufs_ap);
-		if (err) {
-			dev_err(dev, "%s: vddio-ufs-ap disable failed err = %d\n",
-					__func__, err);
-			return err;
-		}
-	}
-	return err;
-}
-
 static int ufs_tegra_host_clk_get(struct device *dev,
 		const char *name, struct clk **clk_out)
 {
@@ -915,8 +828,6 @@ static int ufs_tegra_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 
 	ufs_tegra->ufshc_state = UFSHC_RESUME;
 
-	ufs_tegra_enable_regulators(ufs_tegra);
-
 	ret = ufs_tegra_enable_ufs_clks(ufs_tegra);
 	if (ret)
 		return ret;
@@ -1232,21 +1143,13 @@ static int ufs_tegra_init(struct ufs_hba *hba)
 	}
 
 	if (tegra_platform_is_silicon()) {
-		err = ufs_tegra_init_regulators(ufs_tegra);
-		if (err) {
-			goto out_host_free;
-		} else {
-			err = ufs_tegra_enable_regulators(ufs_tegra);
-			if (err)
-				goto out_host_free;
-		}
 		err = ufs_tegra_init_ufs_clks(ufs_tegra);
 		if (err)
-			goto out_disable_regulators;
+			goto out_host_free;
 
 		err = ufs_tegra_enable_ufs_clks(ufs_tegra);
 		if (err)
-			goto out_disable_regulators;
+			goto out_host_free;
 
 		err = ufs_tegra_init_mphy_lane_clks(ufs_tegra);
 		if (err)
@@ -1282,9 +1185,6 @@ out_disable_mphylane_clks:
 		ufs_tegra_disable_mphylane_clks(ufs_tegra);
 out_disable_ufs_clks:
 	ufs_tegra_disable_ufs_clks(ufs_tegra);
-out_disable_regulators:
-	if (tegra_platform_is_silicon())
-		ufs_tegra_disable_regulators(ufs_tegra);
 out_host_free:
 	if (tegra_platform_is_silicon())
 		hba->priv = NULL;
