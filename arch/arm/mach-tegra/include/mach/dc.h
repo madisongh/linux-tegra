@@ -991,6 +991,7 @@ struct tegra_dc_win {
 
 #if defined(CONFIG_TEGRA_CSC_V2)
 	struct tegra_dc_csc_v2	csc;
+	bool force_user_csc;
 #else
 	struct tegra_dc_csc	csc;
 #endif
