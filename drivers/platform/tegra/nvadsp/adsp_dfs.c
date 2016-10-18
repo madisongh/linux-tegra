@@ -671,7 +671,7 @@ int adsp_dfs_core_init(struct platform_device *pdev)
 	policy = &dfs_policy;
 
 	if (IS_ENABLED(CONFIG_COMMON_CLK))
-		policy->adsp_clk = devm_clk_get(device, "adsp.ape");
+		policy->adsp_clk = devm_clk_get(device, "adsp");
 	else
 		policy->adsp_clk = clk_get_sys(NULL, policy->clk_name);
 	if (IS_ERR_OR_NULL(policy->adsp_clk)) {
