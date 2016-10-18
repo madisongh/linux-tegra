@@ -292,16 +292,21 @@ static inline void extract_appname(char *appname, const char *appfile)
 static nvadsp_app_handle_t app_load(const char *appfile,
 	struct adsp_shared_app *shared_app, bool dynamic)
 {
+	struct nvadsp_drv_data *drv_data;
 	struct device *dev = &priv.pdev->dev;
 	char appname[NVADSP_NAME_SZ] = { };
 	struct nvadsp_app_service *ser;
 
+	drv_data = platform_get_drvdata(priv.pdev);
 	extract_appname(appname, appfile);
 	mutex_lock(&priv.service_lock_list);
 	ser = get_loaded_service(appname);
 	if (!ser) {
-		dev_dbg(dev, "loading app %s %s\n", appfile, appname);
 
+		/* dynamic loading is disabled when running in secure mode */
+		if (drv_data->adsp_os_secload && dynamic)
+			goto err;
+		dev_dbg(dev, "loading app %s %s\n", appfile, appname);
 		ser = devm_kzalloc(dev, sizeof(*ser), GFP_KERNEL);
 		if (!ser)
 			goto err;
