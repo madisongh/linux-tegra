@@ -141,7 +141,7 @@
 #define ADMA_MAX_TRANSFER_SIZE					0x40000000
 #define ADMA_NAME_SIZE						16
 #define TRANSFER_ENABLE						1
-
+#define MAX_ADMAIF_WITH_DMA_FIFO_SIZE_3				2
 /*
  * If any burst is in flight and ADMA paused then this is the time to complete
  * on-flight burst and update ADMA status register.

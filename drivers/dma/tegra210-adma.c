@@ -908,10 +908,8 @@ static int get_transfer_param(struct tegra_adma_chan *tdc,
 		*ctrl |= tdc->dma_sconfig.slave_id <<
 				ADMA_CH_CTRL_TX_REQUEST_SELECT_SHIFT;
 
-		/* ADMAIF1-ADMAIF4 has default fifo size of 3, for rest
-		of ADMAIF's fifo size is 2. We need to match ADMA TX/RX fifo with
-		ADMAIF's fifo*/
-		if (tdc->dma_sconfig.slave_id > 4)
+		/* ADMA TX/RX fifo should match with ADMAIF's fifo*/
+		if (tdc->dma_sconfig.slave_id > MAX_ADMAIF_WITH_DMA_FIFO_SIZE_3)
 			*ahub_fifo_ctrl |= 2 <<
 					ADMA_CH_AHUB_FIFO_CTRL_TX_FIFO_SIZE_SHIFT;
 		else
@@ -930,10 +928,8 @@ static int get_transfer_param(struct tegra_adma_chan *tdc,
 		*ctrl |= tdc->dma_sconfig.slave_id  <<
 				ADMA_CH_CTRL_RX_REQUEST_SELECT_SHIFT;
 
-		/* ADMAIF1-ADMAIF4 has default fifo size of 3, for rest
-		of ADMAIF's fifo size is 2. We need to match ADMA TX/RX fifo with
-		ADMAIF's fifo*/
-		if (tdc->dma_sconfig.slave_id > 4)
+		/* ADMA TX/RX fifo should match with ADMAIF's fifo*/
+		if (tdc->dma_sconfig.slave_id > MAX_ADMAIF_WITH_DMA_FIFO_SIZE_3)
 			*ahub_fifo_ctrl |= 2 <<
 					ADMA_CH_AHUB_FIFO_CTRL_RX_FIFO_SIZE_SHIFT;
 		else
