@@ -907,8 +907,16 @@ static int get_transfer_param(struct tegra_adma_chan *tdc,
 		*ctrl &= ~ADMA_CH_CTRL_TX_REQUEST_SELECT_MASK;
 		*ctrl |= tdc->dma_sconfig.slave_id <<
 				ADMA_CH_CTRL_TX_REQUEST_SELECT_SHIFT;
-		*ahub_fifo_ctrl |= 3 <<
-				ADMA_CH_AHUB_FIFO_CTRL_TX_FIFO_SIZE_SHIFT;
+
+		/* ADMAIF1-ADMAIF4 has default fifo size of 3, for rest
+		of ADMAIF's fifo size is 2. We need to match ADMA TX/RX fifo with
+		ADMAIF's fifo*/
+		if (tdc->dma_sconfig.slave_id > 4)
+			*ahub_fifo_ctrl |= 2 <<
+					ADMA_CH_AHUB_FIFO_CTRL_TX_FIFO_SIZE_SHIFT;
+		else
+			*ahub_fifo_ctrl |= 3 <<
+					ADMA_CH_AHUB_FIFO_CTRL_TX_FIFO_SIZE_SHIFT;
 		return 0;
 	case DMA_DEV_TO_MEM:
 		*ahub_fifo_ctrl &= ~ADMA_CH_AHUB_FIFO_CTRL_RX_FIFO_SIZE_MASK;
@@ -921,8 +929,17 @@ static int get_transfer_param(struct tegra_adma_chan *tdc,
 		*ctrl &= ~ADMA_CH_CTRL_RX_REQUEST_SELECT_MASK;
 		*ctrl |= tdc->dma_sconfig.slave_id  <<
 				ADMA_CH_CTRL_RX_REQUEST_SELECT_SHIFT;
-		*ahub_fifo_ctrl |= 3 <<
-				ADMA_CH_AHUB_FIFO_CTRL_RX_FIFO_SIZE_SHIFT;
+
+		/* ADMAIF1-ADMAIF4 has default fifo size of 3, for rest
+		of ADMAIF's fifo size is 2. We need to match ADMA TX/RX fifo with
+		ADMAIF's fifo*/
+		if (tdc->dma_sconfig.slave_id > 4)
+			*ahub_fifo_ctrl |= 2 <<
+					ADMA_CH_AHUB_FIFO_CTRL_RX_FIFO_SIZE_SHIFT;
+		else
+			*ahub_fifo_ctrl |= 3 <<
+					ADMA_CH_AHUB_FIFO_CTRL_RX_FIFO_SIZE_SHIFT;
+
 		return 0;
 	default:
 		dev_err(tdc2dev(tdc), "Dma direction is not supported\n");
