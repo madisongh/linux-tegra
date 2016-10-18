@@ -172,6 +172,10 @@ static struct swgid_fixup tegra_swgid_fixup_t210[] = {
 	 TEGRA_SWGROUP_BIT(DC12), .linear_map = tegra_fb_linear_map, },
 	{ .name = "tegradc.1", .swgids = TEGRA_SWGROUP_BIT(DCB),
 				.linear_map = tegra_fb_linear_map, },
+	{ .name = "54200000.dc", .swgids = TEGRA_SWGROUP_BIT(DC) |
+	 TEGRA_SWGROUP_BIT(DC12), .linear_map = tegra_fb_linear_map, },
+	{ .name = "54240000.dc", .swgids = TEGRA_SWGROUP_BIT(DCB),
+				.linear_map = tegra_fb_linear_map, },
 	{ .name = "tegra-fuse",	.swgids = TEGRA_SWGROUP_BIT(PPCS) |
 					  TEGRA_SWGROUP_BIT(PPCS1) |
 	  TEGRA_SWGROUP_BIT(PPCS2), },
@@ -233,10 +237,11 @@ EXPORT_SYMBOL(tegra_smmu_fixup_swgids);
 
 static int __init tegra_smmu_init(void)
 {
+	tegra_fb_linear_set(NULL);
 	cma_carveout_linear_set();
 	return 0;
 }
-postcore_initcall(tegra_smmu_init);
+pure_initcall(tegra_smmu_init);
 
 struct iommu_linear_map_mapping {
 	const char * const name;
