@@ -197,10 +197,32 @@ static int tegra_usb_cd_update_charging_current(struct tegra_usb_cd *ucd)
 static enum tegra_usb_connect_type
 	tegra_usb_cd_detect_cable_and_set_current(struct tegra_usb_cd *ucd)
 {
+	int ret;
+
 	if (ucd->hw_ops == NULL)
 		return ucd->connect_type;
 
 	ucd->hw_ops->power_on(ucd);
+
+	if (ucd->hw_ops->apple_cd) {
+		ret = ucd->hw_ops->apple_cd(ucd);
+		switch(ret) {
+		case APPLE_500MA:
+			ucd->connect_type = CONNECT_TYPE_APPLE_500MA;
+			goto power_off;
+                        break;
+		case APPLE_1000MA:
+			ucd->connect_type = CONNECT_TYPE_APPLE_1000MA;
+			goto power_off;
+                        break;
+		case APPLE_2000MA:
+			ucd->connect_type = CONNECT_TYPE_APPLE_2000MA;
+			goto power_off;
+                        break;
+		default:
+			dev_dbg(ucd->dev, "Not an apple charger\n");
+		}
+	}
 
 	if (ucd->hw_ops->dcp_cd && ucd->hw_ops->dcp_cd(ucd)) {
 		if (ucd->hw_ops->cdp_cd && ucd->hw_ops->cdp_cd(ucd))
@@ -218,18 +240,10 @@ static enum tegra_usb_connect_type
 				ucd->connect_type = CONNECT_TYPE_DCP;
 		} else
 			ucd->connect_type = CONNECT_TYPE_DCP;
-	} else if (ucd->hw_ops->apple_500ma_cd
-			&& ucd->hw_ops->apple_500ma_cd(ucd))
-		ucd->connect_type = CONNECT_TYPE_APPLE_500MA;
-	else if (ucd->hw_ops->apple_1000ma_cd
-			&& ucd->hw_ops->apple_1000ma_cd(ucd))
-		ucd->connect_type = CONNECT_TYPE_APPLE_1000MA;
-	else if (ucd->hw_ops->apple_2000ma_cd
-		       && ucd->hw_ops->apple_2000ma_cd(ucd))
-		ucd->connect_type = CONNECT_TYPE_APPLE_2000MA;
-	else
+	} else
 		ucd->connect_type = CONNECT_TYPE_SDP;
 
+power_off:
 	ucd->hw_ops->power_off(ucd);
 
 	tegra_usb_cd_update_charging_extcon_state(ucd);

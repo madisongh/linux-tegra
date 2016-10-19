@@ -88,6 +88,7 @@ void tegra_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level);
 
 /* data contact detection */
 bool tegra_phy_xusb_utmi_pad_dcd(struct phy *phy);
+u32 tegra_phy_xusb_noncompliant_div_detect(struct phy *phy);
 
 bool tegra_phy_xusb_utmi_pad_primary_charger_detect(struct phy *phy);
 bool tegra_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy);

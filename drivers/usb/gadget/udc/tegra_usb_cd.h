@@ -43,9 +43,7 @@ struct tegra_usb_cd_ops {
 	bool    (*cdp_cd)(struct tegra_usb_cd *ucd);
 	bool    (*qc2_cd)(struct tegra_usb_cd *ucd);
 	bool    (*maxim14675_cd)(struct tegra_usb_cd *ucd);
-	bool    (*apple_500ma_cd)(struct tegra_usb_cd *ucd);
-	bool    (*apple_1000ma_cd)(struct tegra_usb_cd *ucd);
-	bool    (*apple_2000ma_cd)(struct tegra_usb_cd *ucd);
+	int     (*apple_cd)(struct tegra_usb_cd *ucd);
 	void	(*vbus_pad_protection)(struct tegra_usb_cd *ucd, bool enable);
 };
 
@@ -71,6 +69,12 @@ struct tegra_usb_cd_soc_data {
 struct vbus_lock {
 	struct wake_lock wakelock;
 	bool held;
+};
+
+enum tegra_usb_cd_apple_chargers {
+	APPLE_500MA,
+	APPLE_1000MA,
+	APPLE_2000MA,
 };
 
 #ifdef CONFIG_ARCH_TEGRA_18x_SOC
