@@ -976,17 +976,18 @@ static int tegra_sdhci_configure_regulators(struct sdhci_host *sdhci,
 
 	switch (option) {
 	case CONFIG_REG_GET:
-		tegra_host->vdd_io_reg = regulator_get(mmc_dev(sdhci->mmc),
-			"vddio_sdmmc");
-		if (IS_ERR_OR_NULL(tegra_host->vdd_io_reg)) {
-			dev_info(mmc_dev(sdhci->mmc), "%s regulator not found: %ld",
-				"vddio_sdmmc", PTR_ERR(tegra_host->vdd_io_reg));
+		tegra_host->vdd_io_reg = regulator_get_optional(
+			mmc_dev(sdhci->mmc), "vddio_sdmmc");
+		if (IS_ERR(tegra_host->vdd_io_reg)) {
+			dev_dbg(mmc_dev(sdhci->mmc),
+				"%s regulator not found: %ld", "vddio_sdmmc",
+				PTR_ERR(tegra_host->vdd_io_reg));
 			tegra_host->vdd_io_reg = NULL;
 		}
-		tegra_host->vdd_slot_reg = regulator_get(mmc_dev(sdhci->mmc),
-			"vdd_sd_slot");
-		if (IS_ERR_OR_NULL(tegra_host->vdd_slot_reg)) {
-			dev_info(mmc_dev(sdhci->mmc),
+		tegra_host->vdd_slot_reg = regulator_get_optional(
+			mmc_dev(sdhci->mmc), "vdd_sd_slot");
+		if (IS_ERR(tegra_host->vdd_slot_reg)) {
+			dev_dbg(mmc_dev(sdhci->mmc),
 				"%s regulator not found: %ld", "vdd_sd_slot",
 				PTR_ERR(tegra_host->vdd_slot_reg));
 			tegra_host->vdd_slot_reg = NULL;
