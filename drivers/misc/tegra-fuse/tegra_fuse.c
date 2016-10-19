@@ -50,15 +50,7 @@
 
 #include "fuse.h"
 
-#if defined(CONFIG_ARCH_TEGRA_11x_SOC)
-#include "tegra11x_fuse_offsets.h"
-#elif defined(CONFIG_ARCH_TEGRA_12x_SOC) || defined(CONFIG_ARCH_TEGRA_13x_SOC)
-#include "tegra12x_fuse_offsets.h"
-#elif defined(CONFIG_ARCH_TEGRA_18x_SOC)
 #include "drivers/misc/tegra-fuse/tegra18x_fuse_offsets.h"
-#elif defined(CONFIG_ARCH_TEGRA_21x_SOC)
-#include "tegra21x_fuse_offsets.h"
-#endif
 
 static DEVICE_ATTR(device_key, 0440, tegra_fuse_show, tegra_fuse_store);
 static DEVICE_ATTR(jtag_disable, 0440, tegra_fuse_show, tegra_fuse_store);
@@ -118,13 +110,9 @@ struct tegra_id {
 
 static struct tegra_id tegra_id;
 
-#ifndef CONFIG_ARCH_TEGRA_21x_SOC
 static unsigned int tegra_fuse_vp8_enable;
-#endif
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
 static int t18x_fuse_pgm_cycles;
 static struct device_node *tegra18x_fuse_base_init(void);
-#endif
 static int tegra_gpu_num_pixel_pipes;
 static int tegra_gpu_num_alus_per_pixel_pipe;
 
@@ -273,7 +261,6 @@ static struct param_info fuse_info_tbl[] = {
 		.data_offset = 13,
 		.sysfs_name = "pkc_disable",
 	},
-#ifndef CONFIG_ARCH_TEGRA_21x_SOC
 	[VP8_ENABLE] = {
 		.addr = &fuse_info.vp8_enable,
 		.sz = sizeof(fuse_info.vp8_enable),
@@ -283,7 +270,6 @@ static struct param_info fuse_info_tbl[] = {
 		.data_offset = 14,
 		.sysfs_name = "vp8_enable",
 	},
-#endif
 	[ODM_LOCK] = {
 		.addr = &fuse_info.odm_lock,
 		.sz = sizeof(fuse_info.odm_lock),
@@ -293,7 +279,6 @@ static struct param_info fuse_info_tbl[] = {
 		.data_offset = 15,
 		.sysfs_name = "odm_lock",
 	},
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
 	[BOOT_SEC_INFO] = {
 		.addr = &fuse_info.boot_sec_info,
 		.sz = sizeof(fuse_info.boot_sec_info),
@@ -303,7 +288,6 @@ static struct param_info fuse_info_tbl[] = {
 		.data_offset = 16,
 		.sysfs_name = "boot_sec_info",
 	},
-#endif
 #ifdef CONFIG_AID_FUSE
 	[AID] = {
 		.addr = &fuse_info.aid,
@@ -320,65 +304,12 @@ static struct param_info fuse_info_tbl[] = {
 	},
 };
 
-#ifndef CONFIG_ARCH_TEGRA_18x_SOC
-static u32 tegra_read_pmc_reg(int offset)
-{
-	return readl(IO_ADDRESS(TEGRA_PMC_BASE) + offset);
-}
-
-static u32 tegra_read_clk_ctrl_reg(int offset)
-{
-	return readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + offset);
-}
-#endif
-
-static u32 tegra_read_apb_misc_reg(int offset)
-{
-	return readl(IO_ADDRESS(TEGRA_APB_MISC_BASE) + offset);
-}
-
 u32 tegra_read_chipid(void)
 {
 	return readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE)
 			+ 0x804);
 }
 
-#ifndef CONFIG_ARCH_TEGRA_18x_SOC
-static inline u32 __tegra_fuse_readl(unsigned long offset)
-{
-	return readl(IO_ADDRESS(TEGRA_FUSE_BASE + offset));
-}
-
-static inline void __tegra_fuse_writel(u32 val,
-		unsigned long offset)
-{
-	writel(val, IO_ADDRESS(TEGRA_FUSE_BASE + offset));
-}
-
-int tegra_fuse_readl(unsigned long offset, u32 *val)
-{
-	if (fuse_base)
-		*val = readl(fuse_base + offset);
-	else
-		*val = __tegra_fuse_readl(offset);
-
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	fuse_update_overridden_reg_val(offset, val);
-#endif
-
-	return 0;
-}
-EXPORT_SYMBOL(tegra_fuse_readl);
-
-void tegra_fuse_writel(u32 val, unsigned long offset)
-{
-	if (fuse_base)
-		writel(val, fuse_base + offset);
-	else
-		__tegra_fuse_writel(val, offset);
-}
-EXPORT_SYMBOL(tegra_fuse_writel);
-#else
 int tegra_fuse_readl(unsigned long offset, u32 *val)
 {
 	if (!fuse_base)
@@ -406,7 +337,6 @@ void tegra_fuse_writel(u32 val, unsigned long offset)
 	}
 }
 EXPORT_SYMBOL(tegra_fuse_writel);
-#endif
 
 bool tegra_spare_fuse(int bit)
 {
@@ -476,28 +406,13 @@ module_param_cb(tegra_gpu_num_alus_per_pixel_pipe,
 
 int tegra_fuse_calib_gpcpll_get_adc(int *slope_uv, int *intercept_uv)
 {
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	u32 val;
-
-	tegra_fuse_readl(FUSE_RESERVED_CALIB, &val);
-	if (fuse_get_gpcpll_adc_rev(val)) {
-		*slope_uv = fuse_get_gpcpll_adc_slope_uv(val);
-		*intercept_uv = fuse_get_gpcpll_adc_intercept_uv(val);
-		return 0;
-	}
-#endif
 	return -EINVAL;
 }
 EXPORT_SYMBOL(tegra_fuse_calib_gpcpll_get_adc);
 
 bool tegra_fuse_can_use_na_gpcpll(void)
 {
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-	/* on T210 NA mode can be used if id >= 1 */
-	return tegra_gpu_speedo_id();
-#else
 	return false;
-#endif
 }
 EXPORT_SYMBOL(tegra_fuse_can_use_na_gpcpll);
 
@@ -665,25 +580,6 @@ void tegra_set_tegraid(u32 chipid, u32 major, u32 minor,
 	}
 }
 
-/* Overridable by implementation of future platforms */
-__weak void tegra_get_tegraid_from_hw(void)
-{
-	u32 cid;
-	u32 nlist;
-	char *priv = NULL;
-
-	cid = tegra_read_chipid();
-	nlist = tegra_read_apb_misc_reg(0x860);
-
-	tegra_set_tegraid(tegra_hidrev_get_chipid(cid),
-			tegra_hidrev_get_majorrev(cid),
-			tegra_hidrev_get_minorrev(cid),
-			tegra_hidrev_get_pre_si_plat(cid),
-			(nlist >> 0) & 0xffff,
-			(nlist >> 16) & 0xffff,
-			priv);
-}
-
 enum tegra_chipid tegra_get_chipid(void)
 {
 	if (tegra_id.chipid == TEGRA_CHIPID_UNKNOWN)
@@ -790,7 +686,6 @@ static struct kernel_param_ops tegra_revision_ops = {
 module_param_cb(tegra_chip_id, &tegra_chip_id_ops, &tegra_id.chipid, 0444);
 module_param_cb(tegra_chip_rev, &tegra_revision_ops, &tegra_id.revision, 0444);
 
-#ifndef CONFIG_ARCH_TEGRA_21x_SOC
 static unsigned int get_fuse_vp8_enable(char *val, struct kernel_param *kp)
 {
 	tegra_fuse_readl(FUSE_VP8_ENABLE_0, &tegra_fuse_vp8_enable);
@@ -801,7 +696,6 @@ static unsigned int get_fuse_vp8_enable(char *val, struct kernel_param *kp)
 module_param_call(tegra_fuse_vp8_enable, NULL, get_fuse_vp8_enable,
 		&tegra_fuse_vp8_enable, 0444);
 __MODULE_PARM_TYPE(tegra_fuse_vp8_enable, "uint");
-#endif
 
 static void wait_for_idle(void)
 {
@@ -1238,54 +1132,11 @@ static int fuse_set(struct device *dev,
 	return 0;
 }
 
-
-#ifndef CONFIG_ARCH_TEGRA_18x_SOC
-static int fuse_get_pgm_cycles(int index)
-{
-	int cycles;
-	int osc_khz;
-
-	switch (index) {
-	case 0:
-		osc_khz = 13000;
-		break;
-	case 4:
-		osc_khz = 19200;
-		break;
-	case 8:
-		osc_khz = 12000;
-		break;
-	case 12:
-		osc_khz = 26000;
-		break;
-	case 1:
-		osc_khz = 16800;
-		break;
-	case 5:
-		osc_khz = 38400;
-		break;
-	case 9:
-		osc_khz = 48000;
-		break;
-	default:
-		osc_khz = 0;
-		break;
-	}
-
-	cycles = DIV_ROUND_UP(osc_khz * PGM_TIME_US, 1000);
-
-	return cycles;
-}
-#endif
-
 static int tegra_fuse_program(struct device *dev,
 		struct fuse_data *pgm_data, u32 flags)
 {
 	u32 reg;
 	int i = 0;
-#ifndef CONFIG_ARCH_TEGRA_18x_SOC
-	int index;
-#endif
 	int ret;
 	int fuse_pgm_cycles;
 	unsigned long ulong_flags;
@@ -1325,22 +1176,7 @@ static int tegra_fuse_program(struct device *dev,
 		return -EPERM;
 	}
 
-#ifndef CONFIG_ARCH_TEGRA_18x_SOC
-	/* calculate the number of program cycles from the oscillator freq */
-	reg = tegra_read_pmc_reg(PMC_PLLP_OVERRIDE);
-	if (reg & PMC_OSC_OVERRIDE) {
-		index = (reg & PMC_OSC_FREQ_MASK) >> PMC_OSC_FREQ_SHIFT;
-	} else {
-		reg = tegra_read_clk_ctrl_reg(CAR_OSC_CTRL);
-		index = reg >> CAR_OSC_FREQ_SHIFT;
-	}
-
-	fuse_pgm_cycles = fuse_get_pgm_cycles(index);
-	dev_dbg(dev, "use %d programming cycles\n",
-			fuse_pgm_cycles);
-#else
 	fuse_pgm_cycles = t18x_fuse_pgm_cycles;
-#endif
 	if (fuse_pgm_cycles == 0)
 		return -EPERM;
 
@@ -1570,11 +1406,9 @@ static void tegra_set_sku_id(void)
 	u32 reg;
 
 	tegra_fuse_readl(FUSE_SKU_INFO, &reg);
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC) || defined(CONFIG_ARCH_TEGRA_18x_SOC)
 	if (reg & FUSE_SKU_MSB_MASK)
 		tegra_chip_sku_id = (reg >> FUSE_SKU_MSB_SHIFT);
 	else
-#endif
 		tegra_chip_sku_id = reg & 0xFF;
 
 }
@@ -1582,13 +1416,12 @@ static void tegra_set_sku_id(void)
 u32 tegra_get_fuse_opt_subrevision(void)
 {
 	u8 ret = 0;
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC) || defined(CONFIG_ARCH_TEGRA_18x_SOC)
 	u32 reg;
 
 	tegra_fuse_readl(FUSE_OPT_SUBREVISION, &reg);
 
 	ret = reg & FUSE_OPT_SUBREVISION_MASK;
-#endif
+
 	return ret;
 }
 EXPORT_SYMBOL(tegra_get_fuse_opt_subrevision);
@@ -1609,27 +1442,6 @@ u32 tegra_get_bct_strapping(void)
 	return tegra_chip_bct_strapping;
 }
 
-static struct tegra_fuse_chip_data tegra114_fuse_chip_data = {
-	.ext_regulator = true,
-	.power_down_mode = false,
-	.mirroring_support = false,
-	.is_redundant = true,
-};
-
-static struct tegra_fuse_chip_data tegra124_fuse_chip_data = {
-	.ext_regulator = true,
-	.power_down_mode = false,
-	.mirroring_support = false,
-	.is_redundant = true,
-};
-
-static struct tegra_fuse_chip_data tegra210_fuse_chip_data = {
-	.ext_regulator = false,
-	.power_down_mode = true,
-	.mirroring_support = false,
-	.is_redundant = true,
-};
-
 static struct tegra_fuse_chip_data tegra186_fuse_chip_data = {
 	.ext_regulator = false,
 	.power_down_mode = true,
@@ -1639,15 +1451,6 @@ static struct tegra_fuse_chip_data tegra186_fuse_chip_data = {
 
 static struct of_device_id tegra_fuse_of_match[] = {
 	{
-		.compatible = "nvidia,tegra114-efuse",
-		.data = &tegra114_fuse_chip_data,
-	}, {
-		.compatible = "nvidia,tegra124-efuse",
-		.data = &tegra124_fuse_chip_data,
-	}, {
-		.compatible = "nvidia,tegra210-efuse",
-		.data = &tegra210_fuse_chip_data,
-	}, {
 		.compatible = "nvidia,tegra186-efuse",
 		.data = &tegra186_fuse_chip_data,
 	},
@@ -1660,11 +1463,7 @@ static int tegra_fuse_probe(struct platform_device *pdev)
 	const struct of_device_id *match;
 	const struct tegra_fuse_chip_data *chip_data;
 	u32 reg;
-#ifndef CONFIG_ARCH_TEGRA_18x_SOC
-	struct resource *fuse_res;
-#else
 	struct clk *osc_clk;
-#endif
 
 	match = of_match_device(tegra_fuse_of_match, &pdev->dev);
 	if (!match) {
@@ -1690,16 +1489,6 @@ static int tegra_fuse_probe(struct platform_device *pdev)
 		return PTR_ERR(clk_fuse);
 	}
 
-#ifndef CONFIG_ARCH_TEGRA_18x_SOC
-	fuse_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!fuse_res) {
-		dev_err(&pdev->dev, "no mem resource\n");
-		return -EINVAL;
-	}
-	fuse_base = devm_ioremap_resource(&pdev->dev, fuse_res);
-	if (IS_ERR(fuse_base))
-		return PTR_ERR(fuse_base);
-#else
 	osc_clk = devm_clk_get(&pdev->dev, "clk_m");
 	if (IS_ERR(osc_clk)) {
 		dev_err(&pdev->dev, "failed to get clk_m");
@@ -1713,7 +1502,6 @@ static int tegra_fuse_probe(struct platform_device *pdev)
 	t18x_fuse_pgm_cycles = DIV_ROUND_UP(
 			clk_get_rate(osc_clk) * 12, 1000 * 1000);
 	t18x_fuse_pgm_cycles &= FUSETIME_PGM2_TWIDTH_PGM_MASK;
-#endif
 
 	mutex_init(&fuse_lock);
 	if (chip_data->power_down_mode) {
@@ -1813,7 +1601,6 @@ static void __exit tegra_fuse_exit(void)
 }
 module_exit(tegra_fuse_exit);
 
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
 static struct device_node *tegra18x_fuse_base_init(void)
 {
 	struct device_node *np;
@@ -1856,6 +1643,5 @@ static int tegra18x_fuse_init(void)
 	return 0;
 }
 subsys_initcall(tegra18x_fuse_init);
-#endif
 
 MODULE_DESCRIPTION("Fuse driver for tegra SOCs");
