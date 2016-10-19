@@ -897,7 +897,7 @@ int tegra_pinctrl_probe(struct platform_device *pdev,
 
 	pmx->prod_list = devm_tegra_prod_get(&pdev->dev);
 	if (IS_ERR(pmx->prod_list)) {
-		dev_info(&pdev->dev, "Prod-settngs not available\n");
+		dev_dbg(&pdev->dev, "Prod-settngs not available\n");
 		pmx->prod_list = NULL;
 	} else {
 		ret = tegra_prod_set_boot_init(pmx->regs, pmx->prod_list);
