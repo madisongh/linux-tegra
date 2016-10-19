@@ -976,6 +976,7 @@ static int __gpiod_request(struct gpio_desc *desc, const char *label)
 	struct gpio_chip	*chip = desc->chip;
 	int			status;
 	unsigned long		flags;
+	bool			hogged = false;
 
 	spin_lock_irqsave(&gpio_lock, flags);
 
@@ -987,11 +988,18 @@ static int __gpiod_request(struct gpio_desc *desc, const char *label)
 		desc_set_label(desc, label ? : "?");
 		status = 0;
 	} else {
-		status = -EBUSY;
-		goto done;
+		if (test_bit(FLAG_IS_HOGGED, &desc->flags)) {
+			hogged = true;
+			desc_set_label(desc, label ? : "?");
+			clear_bit(FLAG_IS_HOGGED, &desc->flags);
+			status = 0;
+		} else {
+			status = -EBUSY;
+			goto done;
+		}
 	}
 
-	if (chip->request) {
+	if (chip->request && !hogged) {
 		/* chip->request may sleep */
 		spin_unlock_irqrestore(&gpio_lock, flags);
 		status = chip->request(chip, gpio_chip_hwgpio(desc));
