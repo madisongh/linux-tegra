@@ -24,7 +24,11 @@ always		:= $(dtb-y)
 
 targets += dtbs
 
+DTC_FLAGS := -i $(tegra-dtstree)/soc/tegra/kernel-include
+DTC_FLAGS := -i $(tegra-dtstree)/soc/tegra/kernel-include/kernel-4.4
 DTC_FLAGS := -i $(tegra-dtstree)/platform/tegra/common/kernel-dts
+DTCCPP_FLAGS := -I$(tegra-dtstree)/soc/tegra/kernel-include
+DTCCPP_FLAGS := -I$(tegra-dtstree)/soc/tegra/kernel-include/kernel-4.4
 DTCCPP_FLAGS := -I$(tegra-dtstree)/platform/tegra/common/kernel-dts
 
 ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
@@ -36,9 +40,11 @@ endif
 
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
 DTC_FLAGS += -i $(srctree)/../t18x/include
+DTC_FLAGS += -i $(tegra-dtstree)/soc/t18x/kernel-include
 DTC_FLAGS += -i $(tegra-dtstree)/soc/t18x/kernel-dts
 DTC_FLAGS += -i $(tegra-dtstree)/platform/t18x/common/kernel-dts
 DTCCPP_FLAGS += -I$(srctree)/../t18x/include
+DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t18x/kernel-include
 DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t18x/kernel-dts
 DTCCPP_FLAGS += -I$(tegra-dtstree)/platform/t18x/common/kernel-dts
 endif
