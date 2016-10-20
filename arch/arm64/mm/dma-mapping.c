@@ -849,14 +849,16 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
 	return dev_addr;
 }
 
-dma_addr_t __iommu_linear_map(struct device *dev, phys_addr_t phys,
-			      size_t size, enum dma_data_direction dir,
-			      struct dma_attrs *attrs)
+
+static dma_addr_t __iommu_map_at(struct device *dev, dma_addr_t dma_addr,
+				 phys_addr_t phys, size_t size,
+				 enum dma_data_direction dir,
+				 struct dma_attrs *attrs)
 {
 	bool coherent = is_device_dma_coherent(dev);
 	int prot = dma_direction_to_prot(dir, coherent);
 
-	return iommu_dma_map_linear(dev, phys, size, prot);
+	return iommu_dma_map_at(dev, dma_addr, phys, size, prot);
 }
 
 
@@ -938,7 +940,7 @@ static struct dma_map_ops iommu_dma_ops = {
 	.dma_supported = iommu_dma_supported,
 	.mapping_error = iommu_dma_mapping_error,
 
-	.linear_map = __iommu_linear_map,
+	.map_at = __iommu_map_at,
 };
 
 /*
@@ -3138,14 +3140,15 @@ static dma_addr_t arm_iommu_map_page_at(struct device *dev, struct page *page,
 	return dma_addr + offset;
 }
 
-dma_addr_t arm_iommu_linear_map(struct device *dev, phys_addr_t phys,
-			      size_t size, enum dma_data_direction dir,
-			      struct dma_attrs *attrs)
+static dma_addr_t arm_iommu_map_at(struct device *dev, dma_addr_t dma_addr,
+				       phys_addr_t phys, size_t size,
+				       enum dma_data_direction dir,
+				       struct dma_attrs *attrs)
 {
 	dma_addr_t iova, ret;
 	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
 
-	iova = phys;
+	iova = dma_addr;
 	ret = __alloc_iova_at(mapping, &iova, size, attrs);
 
 	if (iova == -ENXIO) {
@@ -3156,11 +3159,11 @@ dma_addr_t arm_iommu_linear_map(struct device *dev, phys_addr_t phys,
 		 * desired phys memory. Map request should be carried out even
 		 * without successful IOVA allocation.
 		 */
-		iova = phys;
+		iova = dma_addr;
 	} else if (ret == DMA_ERROR_CODE) {
 		return ret;
-	} else if (iova != phys) {
-		__free_iova(mapping, iova, size, attrs);
+	} else if (iova != dma_addr) {
+		__free_iova(mapping, ret, size, attrs);
 		return DMA_ERROR_CODE;
 	}
 
@@ -3283,7 +3286,7 @@ struct dma_map_ops iommu_ops = {
 	.dma_supported	= arm_dma_supported,
 	.mapping_error	= arm_iommu_mapping_error,
 
-	.linear_map	= arm_iommu_linear_map,
+	.map_at		= arm_iommu_map_at,
 	.iova_alloc_at		= arm_iommu_iova_alloc_at,
 	.map_page_at		= arm_iommu_map_page_at,
 };
