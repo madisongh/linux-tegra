@@ -40,6 +40,11 @@
 #include <linux/clk/tegra.h>
 #include <linux/pinctrl/pinconf-tegra.h>
 
+/* This driver does not support meta stability for
+   t210 and t124 platform. Need some change to enable this
+   is not ready yet. */
+#define SPI_ENABLE_T124_T210_META_STABILITY 	0
+
 #define SPI_COMMAND1				0x000
 #define SPI_BIT_LENGTH(x)			(((x) & 0x1f) << 0)
 #define SPI_PACKED				(1 << 5)
@@ -989,9 +994,9 @@ static int tegra_spi_start_dma_based_transfer(
  */
 static int tegra_clk_pin_control(bool enable, struct tegra_spi_data *tspi)
 {
-	unsigned long val;
 	int ret = 0;
-
+#if SPI_ENABLE_T124_T210_META_STABILITY
+	unsigned long val;
 	if (tspi->clk_pin) {
 		if (tspi->clk_pin_state_enabled == enable)
 			return ret;
@@ -1011,6 +1016,7 @@ static int tegra_clk_pin_control(bool enable, struct tegra_spi_data *tspi)
 				"spi clk pin input state change err %d\n", ret);
 		}
 	}
+#endif
 	return ret;
 }
 
@@ -1970,7 +1976,9 @@ static int tegra_spi_probe(struct platform_device *pdev)
 	struct tegra_spi_data	*tspi;
 	struct resource		*r;
 	struct tegra_spi_platform_data *pdata = pdev->dev.platform_data;
+#if SPI_ENABLE_T124_T210_META_STABILITY
 	struct device_node *np;
+#endif
 	const struct of_device_id *match;
 	const struct tegra_spi_chip_data *chip_data = &tegra124_spi_chip_data;
 	int ret, spi_irq;
@@ -2039,6 +2047,7 @@ static int tegra_spi_probe(struct platform_device *pdev)
 	tspi->chip_data = chip_data;
 	tspi->clk_pin = (char *)pdata->clk_pin;
 	if (!tspi->chip_data->new_features) {
+#if SPI_ENABLE_T124_T210_META_STABILITY
 		if (tspi->clk_pin) {
 			tspi->clk_pin_state_enabled = true;
 			np = of_find_node_by_name(NULL, "pinmux");
@@ -2067,6 +2076,7 @@ static int tegra_spi_probe(struct platform_device *pdev)
 			     "Pin group name for clock line is not defined.\n");
 			goto exit_free_master;
 		}
+#endif
 	}
 
 	tspi->gpio_slave_ready = pdata->gpio_slave_ready;
