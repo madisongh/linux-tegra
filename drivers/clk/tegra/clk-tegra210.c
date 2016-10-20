@@ -2372,7 +2372,7 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_cap_vcore_emc] = { .dt_id = TEGRA210_CLK_CAP_VCORE_EMC, .present = true },
 	[tegra_clk_cap_throttle_emc] = { .dt_id = TEGRA210_CLK_CAP_THROTTLE_EMC, .present = true },
 	[tegra_clk_gr3d_emc] = { .dt_id = TEGRA210_CLK_GR3D_EMC, .present = true },
-	[tegra_clk_msenc_emc] = { .dt_id = TEGRA210_CLK_MSENC_EMC, .present = true },
+	[tegra_clk_nvenc_emc] = { .dt_id = TEGRA210_CLK_NVENC_EMC, .present = true },
 	[tegra_clk_nvjpg_emc] = { .dt_id = TEGRA210_CLK_NVJPG_EMC, .present = true },
 	[tegra_clk_nvdec_emc] = { .dt_id = TEGRA210_CLK_NVDEC_EMC, .present = true },
 	[tegra_clk_tsec_emc] = { .dt_id = TEGRA210_CLK_TSEC_EMC, .present = true },
@@ -2439,7 +2439,7 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_ispa_slcg_ovr] = { .dt_id = TEGRA210_CLK_ISPA_SLCG_OVR, .present = true },
 	[tegra_clk_ispb_slcg_ovr] = { .dt_id = TEGRA210_CLK_ISPB_SLCG_OVR, .present = true },
 	[tegra_clk_nvdec_slcg_ovr] = { .dt_id = TEGRA210_CLK_NVDEC_SLCG_OVR, .present = true },
-	[tegra_clk_msenc_slcg_ovr] = { .dt_id = TEGRA210_CLK_MSENC_SLCG_OVR, .present = true },
+	[tegra_clk_nvenc_slcg_ovr] = { .dt_id = TEGRA210_CLK_NVENC_SLCG_OVR, .present = true },
 	[tegra_clk_nvjpg_slcg_ovr] = { .dt_id = TEGRA210_CLK_NVJPG_SLCG_OVR, .present = true },
 	[tegra_clk_vic03_slcg_ovr] = { .dt_id = TEGRA210_CLK_VIC03_SLCG_OVR, .present = true },
 	[tegra_clk_xusb_dev_slcg_ovr] = { .dt_id = TEGRA210_CLK_XUSB_DEV_SLCG_OVR, .present = true },
@@ -2596,14 +2596,14 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "xusb_host", .dt_id = TEGRA210_CLK_XUSB_HOST, },
 	{ .con_id = "vic03_slcg_ovr", .dt_id = TEGRA210_CLK_VIC03_SLCG_OVR, },
 	{ .con_id = "vic03.cbus", .dt_id = TEGRA210_CLK_VIC03_CBUS, },
-	{ .con_id = "msenc.cbus", .dt_id = TEGRA210_CLK_MSENC_CBUS, },
+	{ .con_id = "nvenc.cbus", .dt_id = TEGRA210_CLK_NVENC_CBUS, },
 	{ .con_id = "disp1_slcg_ovr", .dt_id = TEGRA210_CLK_DISP1_SLCG_OVR },
 	{ .con_id = "disp2_slcg_ovr", .dt_id = TEGRA210_CLK_DISP2_SLCG_OVR },
 	{ .con_id = "vi_slcg_ovr", .dt_id = TEGRA210_CLK_VI_SLCG_OVR },
 	{ .con_id = "ispa_slcg_ovr", .dt_id = TEGRA210_CLK_ISPA_SLCG_OVR },
 	{ .con_id = "ispb_slcg_ovr", .dt_id = TEGRA210_CLK_ISPB_SLCG_OVR },
 	{ .con_id = "nvdec_slcg_ovr", .dt_id = TEGRA210_CLK_NVDEC_SLCG_OVR },
-	{ .con_id = "msenc_slcg_ovr", .dt_id = TEGRA210_CLK_MSENC_SLCG_OVR },
+	{ .con_id = "nvenc_slcg_ovr", .dt_id = TEGRA210_CLK_NVENC_SLCG_OVR },
 	{ .con_id = "nvjpg_slcg_ovr", .dt_id = TEGRA210_CLK_NVJPG_SLCG_OVR },
 	{ .con_id = "xusb_dev_slcg", .dt_id = TEGRA210_CLK_XUSB_DEV_SLCG_OVR },
 	{ .con_id = "xusb_host_slcg", .dt_id = TEGRA210_CLK_XUSB_HOST_SLCG_OVR },
@@ -3190,9 +3190,9 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 					0, "vic03");
 	clks[TEGRA210_CLK_VIC_FLOOR_CBUS] = clk;
 
-	clk = tegra_clk_register_shared("msenc.cbus", &cbus_parents[1], 1, 0, 0,
-					0, "msenc");
-	clks[TEGRA210_CLK_MSENC_CBUS] = clk;
+	clk = tegra_clk_register_shared("nvenc.cbus", &cbus_parents[1], 1, 0, 0,
+					0, "nvenc");
+	clks[TEGRA210_CLK_NVENC_CBUS] = clk;
 
 	clk = tegra_clk_register_shared("nvdec.cbus", &cbus_parents[1], 1, 0, 0,
 					0, "nvdec");
@@ -3852,9 +3852,9 @@ static void __init tegra210_ovr_clk_init(void __iomem *clk_base)
 			clk_base + LVL2_CLK_GATE_OVRE, 31, 0, NULL);
 	clks[TEGRA210_CLK_NVDEC_SLCG_OVR] = clk;
 
-	clk = clk_register_gate(NULL, "msenc_slcg_ovr", "msenc", 0,
+	clk = clk_register_gate(NULL, "nvenc_slcg_ovr", "nvenc", 0,
 			clk_base + LVL2_CLK_GATE_OVRE, 29, 0, NULL);
-	clks[TEGRA210_CLK_MSENC_SLCG_OVR] = clk;
+	clks[TEGRA210_CLK_NVENC_SLCG_OVR] = clk;
 
 	clk = clk_register_gate(NULL, "nvjpg_slcg_ovr", "nvjpg", 0,
 			clk_base + LVL2_CLK_GATE_OVRE, 9, 0, NULL);

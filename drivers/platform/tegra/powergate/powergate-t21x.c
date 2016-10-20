@@ -235,14 +235,14 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 	[TEGRA_POWERGATE_NVENC] = {
 		.name = "nvenc",
 		.clk_info = {
-			[0] = { .clk_name = "msenc.cbus", .clk_type = CLK_ONLY },
+			[0] = { .clk_name = "nvenc.cbus", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },
 			[1] = { .clk_name = "mc_cbpa" },
 			[2] = { .clk_name = "mc_ccpa" },
 			[3] = { .clk_name = "mc_cdpa" },
-			[4] = { .clk_name = "msenc_slcg_ovr" },
+			[4] = { .clk_name = "nvenc_slcg_ovr" },
 		},
 		.reset_id = { TEGRA210_CLK_NVENC },
 		.reset_id_num = 1,
