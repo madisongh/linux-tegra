@@ -1218,10 +1218,14 @@ static int __iommu_attach_group(struct iommu_domain *domain,
 	if (group->default_domain && group->domain != group->default_domain)
 		return -EBUSY;
 
+	/* This is necessary to perform early map_at requests during
+	 * SMMU driver init.
+	 */
+	group->domain = domain;
 	ret = __iommu_group_for_each_dev(group, domain,
 					 iommu_group_do_attach_device);
-	if (ret == 0)
-		group->domain = domain;
+	if (ret)
+		group->domain = NULL;
 
 	return ret;
 }
