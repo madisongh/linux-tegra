@@ -183,7 +183,6 @@ static inline int tegra_boorom_pmc_init(struct device *dev)
 #endif
 }
 
-extern void __iomem *tegra186_pmc_base;
 extern void tegra186_pmc_register_update(int offset,
 	unsigned long mask, unsigned long val);
 extern unsigned long tegra_pmc_register_get(u32 offset);
