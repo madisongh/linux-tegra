@@ -33,12 +33,6 @@ struct dma_map_ops {
 			       enum dma_data_direction dir,
 			       struct dma_attrs *attrs);
 
-	dma_addr_t (*map_page_at)(struct device *dev, struct page *page,
-				  dma_addr_t dma_handle,
-				  unsigned long offset, size_t size,
-				  enum dma_data_direction dir,
-				  struct dma_attrs *attrs);
-
 	dma_addr_t (*map_at)(struct device *dev, dma_addr_t dma_handle,
 			     phys_addr_t phys, size_t size,
 			     enum dma_data_direction dir,
@@ -76,8 +70,6 @@ struct dma_map_ops {
 #ifdef ARCH_HAS_DMA_GET_REQUIRED_MASK
 	u64 (*get_required_mask)(struct device *dev);
 #endif
-	dma_addr_t (*iova_alloc_at)(struct device *dev, dma_addr_t *dma_addr,
-				    size_t size, struct dma_attrs *attrs);
 	int is_phys;
 };
 

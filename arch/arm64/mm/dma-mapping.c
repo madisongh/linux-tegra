@@ -2359,14 +2359,6 @@ err_out:
 	return DMA_ERROR_CODE;
 }
 
-static dma_addr_t arm_iommu_iova_alloc_at(struct device *dev, dma_addr_t *iova,
-					  size_t size, struct dma_attrs *attrs)
-{
-	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-
-	return __alloc_iova_at(mapping, iova, size, attrs);
-}
-
 static inline void __free_iova(struct dma_iommu_mapping *mapping,
 			       dma_addr_t addr, size_t size,
 			       struct dma_attrs *attrs)
@@ -3291,8 +3283,6 @@ struct dma_map_ops iommu_ops = {
 	.mapping_error	= arm_iommu_mapping_error,
 
 	.map_at		= arm_iommu_map_at,
-	.iova_alloc_at		= arm_iommu_iova_alloc_at,
-	.map_page_at		= arm_iommu_map_page_at,
 };
 
 struct dma_map_ops iommu_coherent_ops = {
