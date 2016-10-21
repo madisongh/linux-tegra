@@ -399,7 +399,8 @@ static int nvhost_ioctl_channel_submit(struct nvhost_channel_userctx *ctx,
 	u32 *local_waitbases = NULL, *local_class_ids = NULL;
 	int err, i, hwctx_syncpt_idx = -1;
 
-	if (num_syncpt_incrs > host->info.nb_pts)
+	if ((num_syncpt_incrs < 1) || (num_syncpt_incrs >
+			host->info.nb_pts))
 		return -EINVAL;
 
 	if (num_cmdbufs < 0 || num_syncpt_incrs < 0)
