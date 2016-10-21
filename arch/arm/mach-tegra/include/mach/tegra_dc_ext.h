@@ -23,7 +23,6 @@
 
 struct tegra_dc_ext;
 
-#ifdef CONFIG_TEGRA_DC_EXTENSIONS
 int __init tegra_dc_ext_module_init(void);
 void __exit tegra_dc_ext_module_exit(void);
 
@@ -41,58 +40,5 @@ int tegra_dc_ext_process_vblank(int output, ktime_t timestamp);
 int tegra_dc_ext_process_bandwidth_renegotiate(int output,
 					struct tegra_dc_bw_data *bw);
 bool tegra_dc_ext_is_userspace_active(void);
-
-#else /* CONFIG_TEGRA_DC_EXTENSIONS */
-
-static inline
-int tegra_dc_ext_module_init(void)
-{
-	return 0;
-}
-static inline
-void tegra_dc_ext_module_exit(void)
-{
-}
-
-static inline
-struct tegra_dc_ext *tegra_dc_ext_register(struct platform_device *ndev,
-					   struct tegra_dc *dc)
-{
-	return NULL;
-}
-static inline
-void tegra_dc_ext_unregister(struct tegra_dc_ext *dc_ext)
-{
-}
-static inline
-void tegra_dc_ext_enable(struct tegra_dc_ext *dc_ext)
-{
-}
-static inline
-int tegra_dc_ext_disable(struct tegra_dc_ext *dc_ext)
-{
-	return 0;
-}
-static inline
-int tegra_dc_ext_restore(struct tegra_dc_ext *dc_ext)
-{
-	return 0;
-}
-static inline
-int tegra_dc_ext_process_hotplug(int output)
-{
-	return 0;
-}
-static inline
-int tegra_dc_ext_process_vblank(int output, ktime_t timestamp)
-{
-	return 0;
-}
-static inline
-bool tegra_dc_ext_is_userspace_active(void)
-{
-	return false;
-}
-#endif /* CONFIG_TEGRA_DC_EXTENSIONS */
 
 #endif /* __MACH_TEGRA_DC_EXT_H */
