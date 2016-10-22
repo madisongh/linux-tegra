@@ -395,8 +395,12 @@ static int tegra_usb_cd_probe(struct platform_device *pdev)
 
 	ucd->phy = devm_phy_get(&pdev->dev, "otg-phy");
 	if (IS_ERR(ucd->phy)) {
-		dev_err(&pdev->dev, "failed to get otg port phy %ld\n",
-			PTR_ERR(ucd->phy));
+		if (PTR_ERR(ucd->phy) != -EPROBE_DEFER) {
+			dev_err(&pdev->dev, "failed to get otg port phy %ld\n",
+				PTR_ERR(ucd->phy));
+		} else
+			dev_info(&pdev->dev, "otg phy is not available yet\n");
+
 		return PTR_ERR(ucd->phy);
 	}
 
