@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2011 Google, Inc.
  *
- * Copyright (c) 2012-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author:
  *	Jay Cheng <jacheng@nvidia.com>
@@ -90,6 +90,7 @@
 #define AHB_ARBITRATION_AHB_MEM_WRQUE_MST_ID	0xf8
 
 static DEFINE_SPINLOCK(ahb_lock);
+static void __iomem *ahb_gizmo_base;
 
 void ahb_gizmo_writel(unsigned long val, void __iomem *reg)
 {
@@ -114,12 +115,12 @@ void ahb_gizmo_writel(unsigned long val, void __iomem *reg)
 
 static inline unsigned long gizmo_readl(unsigned long offset)
 {
-	return readl(IO_TO_VIRT(TEGRA_AHB_GIZMO_BASE + offset));
+	return readl(ahb_gizmo_base + offset);
 }
 
 static inline void gizmo_writel(unsigned long value, unsigned long offset)
 {
-	writel(value, IO_TO_VIRT(TEGRA_AHB_GIZMO_BASE + offset));
+	writel(value, ahb_gizmo_base + offset);
 }
 
 #ifdef CONFIG_PM
@@ -195,16 +196,16 @@ static void tegra_ahbgizmo_resume(void)
 	gizmo_writel(ahb_gizmo[20], AHB_GIZMO_SDMMC2);
 	gizmo_writel(ahb_gizmo[21], AHB_GIZMO_SDMMC3);
 	ahb_gizmo_writel(ahb_gizmo[22],
-		IO_ADDRESS(TEGRA_AHB_GIZMO_BASE + AHB_MEM_PREFETCH_CFG_X));
+		ahb_gizmo_base + AHB_MEM_PREFETCH_CFG_X);
 	gizmo_writel(ahb_gizmo[23], AHB_ARBITRATION_XBAR_CTRL);
 	ahb_gizmo_writel(ahb_gizmo[24],
-		IO_ADDRESS(TEGRA_AHB_GIZMO_BASE + AHB_MEM_PREFETCH_CFG3));
+		ahb_gizmo_base + AHB_MEM_PREFETCH_CFG3);
 	ahb_gizmo_writel(ahb_gizmo[25],
-		IO_ADDRESS(TEGRA_AHB_GIZMO_BASE + AHB_MEM_PREFETCH_CFG4));
+		ahb_gizmo_base + AHB_MEM_PREFETCH_CFG4);
 	ahb_gizmo_writel(ahb_gizmo[26],
-		IO_ADDRESS(TEGRA_AHB_GIZMO_BASE + AHB_MEM_PREFETCH_CFG1));
+		ahb_gizmo_base + AHB_MEM_PREFETCH_CFG1);
 	ahb_gizmo_writel(ahb_gizmo[27],
-		IO_ADDRESS(TEGRA_AHB_GIZMO_BASE + AHB_MEM_PREFETCH_CFG2));
+		ahb_gizmo_base + AHB_MEM_PREFETCH_CFG2);
 	gizmo_writel(ahb_gizmo[28], AHB_ARBITRATION_AHB_MEM_WRQUE_MST_ID);
 #if !defined(CONFIG_ARCH_TEGRA_3x_SOC)
 	gizmo_writel(ahb_gizmo[29], AHB_MEM_PREFETCH_CFG5);
@@ -227,6 +228,7 @@ static struct syscore_ops tegra_ahbgizmo_syscore_ops = {
 
 static int __init tegra_init_ahb_gizmo(void)
 {
+	ahb_gizmo_base = ioremap(TEGRA_AHB_GIZMO_BASE, TEGRA_AHB_GIZMO_SIZE);
 	register_syscore_ops(&tegra_ahbgizmo_syscore_ops);
 
 	return 0;
