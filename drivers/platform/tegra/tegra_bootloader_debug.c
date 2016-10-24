@@ -211,12 +211,6 @@ out_err:
 	if (!IS_ERR_OR_NULL(bl_debug_node))
 		debugfs_remove_recursive(bl_debug_node);
 
-	if (ptr_bl_prof_start)
-		iounmap(ptr_bl_prof_start);
-
-	if (ptr_bl_debug_data_start)
-		iounmap(ptr_bl_debug_data_start);
-
 	return -ENODEV;
 }
 
