@@ -266,7 +266,6 @@ struct tegra_i2c_dev {
 	bool is_multimaster_mode;
 	bool is_periph_reset_done;
 	raw_spinlock_t xfer_lock;
-	struct i2c_bus_recovery_info bri;
 	int scl_gpio;
 	int sda_gpio;
 	struct i2c_algo_bit_data bit_data;
@@ -1108,12 +1107,6 @@ static int tegra_i2c_issue_bus_clear(struct tegra_i2c_dev *i2c_dev)
 
 		if (!(i2c_readl(i2c_dev, I2C_BUS_CLEAR_STATUS) & I2C_BC_STATUS))
 			dev_warn(i2c_dev->dev, "Un-recovered Arb lost\n");
-	} else {
-		ret = i2c_recover_bus(&i2c_dev->adapter);
-		if (ret) {
-			dev_warn(i2c_dev->dev, "Un-recovered Arb lost\n");
-			return ret;
-		}
 	}
 
 	return 0;
@@ -1925,10 +1918,6 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	i2c_dev->adapter.dev.parent = &pdev->dev;
 	i2c_dev->adapter.nr = pdev->id;
 	i2c_dev->adapter.dev.of_node = pdev->dev.of_node;
-	i2c_dev->bri.scl_gpio = i2c_dev->scl_gpio;
-	i2c_dev->bri.sda_gpio = i2c_dev->sda_gpio;
-	i2c_dev->bri.recover_bus = i2c_generic_gpio_recovery;
-	i2c_dev->adapter.bus_recovery_info = &i2c_dev->bri;
 
 	ret = i2c_add_numbered_adapter(&i2c_dev->adapter);
 	if (ret) {
