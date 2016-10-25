@@ -15,7 +15,8 @@ Required properties for Tegra186:
 
 Optional properties:
 --------------------
-No.
+- dcp-current-limit-ua : Charging current limit for DCP in uA
+- qc2-current-limit-ua : Charging current limit for QC2 in uA
 
 Example:
 --------
