@@ -260,6 +260,7 @@ struct device_node *__of_find_all_nodes(struct device_node *prev)
 	}
 	return np;
 }
+EXPORT_SYMBOL(__of_find_all_nodes);
 
 /**
  * of_find_all_nodes - Get next node in global list
