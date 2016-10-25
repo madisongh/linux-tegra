@@ -149,6 +149,10 @@ static inline long tegra_emc_round_rate_updown(unsigned long rate, bool up)
 {
        return 0;
 }
+static inline int tegra_dvfs_predict_mv_at_hz_cur_tfloor(struct clk *c, unsigned long rate)
+{
+	return 1000; /* mV */
+}
 
 #else
 
