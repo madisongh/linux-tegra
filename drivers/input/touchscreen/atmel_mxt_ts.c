@@ -353,6 +353,9 @@ struct mxt_data {
 
 	/* Indicates whether device is updating configuration */
 	bool updating_config;
+
+	/* Indicates whether device is initialized */
+	bool initialized;
 };
 
 static size_t mxt_obj_size(const struct mxt_object *obj)
@@ -2841,6 +2844,9 @@ static ssize_t mxt_config_crc_show(struct device *dev,
 {
 	struct mxt_data *data = dev_get_drvdata(dev);
 
+	if (!data->initialized)
+		return -EBUSY;
+
 	return scnprintf(buf, PAGE_SIZE, "%06x\n", data->config_crc);
 }
 
@@ -2849,6 +2855,10 @@ static ssize_t mxt_fw_version_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
 	struct mxt_data *data = dev_get_drvdata(dev);
+
+	if (!data->initialized)
+		return -EBUSY;
+
 	return scnprintf(buf, PAGE_SIZE, "%u.%u.%02X\n",
 			 data->info->version >> 4, data->info->version & 0xf,
 			 data->info->build);
@@ -2859,6 +2869,10 @@ static ssize_t mxt_hw_version_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
 	struct mxt_data *data = dev_get_drvdata(dev);
+
+	if (!data->initialized)
+		return -EBUSY;
+
 	return scnprintf(buf, PAGE_SIZE, "%u.%u\n",
 			data->info->family_id, data->info->variant_id);
 }
@@ -2890,6 +2904,9 @@ static ssize_t mxt_object_show(struct device *dev,
 	int i, j;
 	int error;
 	u8 *obuf;
+
+	if (!data->initialized)
+		return -EBUSY;
 
 	/* Pre-allocate buffer large enough to hold max sized object. */
 	obuf = kmalloc(256, GFP_KERNEL);
@@ -3082,6 +3099,9 @@ static ssize_t mxt_update_fw_store(struct device *dev,
 	struct mxt_data *data = dev_get_drvdata(dev);
 	int error;
 
+	if (!data->initialized)
+		return -EBUSY;
+
 	error = mxt_update_file_name(dev, &data->fw_name, buf, count);
 	if (error)
 		return error;
@@ -3116,6 +3136,9 @@ static ssize_t mxt_update_cfg_store(struct device *dev,
 	const struct mxt_platform_data *pdata = data->pdata;
 	const struct firmware *cfg;
 	int ret;
+
+	if (!data->initialized)
+		return -EBUSY;
 
 	ret = mxt_update_file_name(dev, &data->cfg_name, buf, count);
 	if (ret)
@@ -3166,6 +3189,9 @@ static ssize_t mxt_debug_enable_show(struct device *dev,
 	struct mxt_data *data = dev_get_drvdata(dev);
 	char c;
 
+	if (!data->initialized)
+		return -EBUSY;
+
 	c = data->debug_enabled ? '1' : '0';
 	return scnprintf(buf, PAGE_SIZE, "%c\n", c);
 }
@@ -3173,6 +3199,11 @@ static ssize_t mxt_debug_enable_show(struct device *dev,
 static ssize_t mxt_debug_notify_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
+	struct mxt_data *data = dev_get_drvdata(dev);
+
+	if (!data->initialized)
+		return -EBUSY;
+
 	return snprintf(buf, 3, "0\n");
 }
 
@@ -3182,6 +3213,9 @@ static ssize_t mxt_debug_v2_enable_store(struct device *dev,
 	struct mxt_data *data = dev_get_drvdata(dev);
 	u8 i;
 	ssize_t ret;
+
+	if (!data->initialized)
+		return -EBUSY;
 
 	if (kstrtou8(buf, 0, &i) == 0 && i < 2) {
 		if (i == 1)
@@ -3204,6 +3238,9 @@ static ssize_t mxt_debug_enable_store(struct device *dev,
 	struct mxt_data *data = dev_get_drvdata(dev);
 	u8 i;
 	ssize_t ret;
+
+	if (!data->initialized)
+		return -EBUSY;
 
 	if (kstrtou8(buf, 0, &i) == 0 && i < 2) {
 		data->debug_enabled = (i == 1);
@@ -3761,6 +3798,7 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		regulator_put(data->reg_vdd);
 		goto err_free_irq;
 	}
+	data->initialized = true;
 
 	return 0;
 
@@ -3776,6 +3814,7 @@ static int mxt_remove(struct i2c_client *client)
 {
 	struct mxt_data *data = i2c_get_clientdata(client);
 
+	data->initialized = false;
 	sysfs_remove_group(&client->dev.kobj, &mxt_fw_attr_group);
 	mxt_debug_msg_remove(data);
 	mxt_sysfs_remove(data);
