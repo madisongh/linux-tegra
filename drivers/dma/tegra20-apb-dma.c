@@ -1,7 +1,7 @@
 /*
  * DMA driver for Nvidia's Tegra20 APB DMA controller.
  *
- * Copyright (c) 2012-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1360,7 +1360,7 @@ static int tegra_dma_probe(struct platform_device *pdev)
 	if (IS_ERR(tdma->base_addr))
 		return PTR_ERR(tdma->base_addr);
 
-	tdma->dma_clk = devm_clk_get(&pdev->dev, NULL);
+	tdma->dma_clk = devm_clk_get(&pdev->dev, "dma");
 	if (IS_ERR(tdma->dma_clk)) {
 		dev_err(&pdev->dev, "Error: Missing controller clock\n");
 		return PTR_ERR(tdma->dma_clk);
