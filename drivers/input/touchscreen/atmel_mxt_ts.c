@@ -2150,8 +2150,8 @@ static int mxt_read_info_block(struct mxt_data *data)
 {
 	struct i2c_client *client = data->client;
 	int error;
-	size_t size;
-	void *id_buf, *buf;
+	size_t object_size, size;
+	void *id_buf = NULL, *object_buf = NULL, *buf = NULL;
 	uint8_t num_objects;
 	u32 calculated_crc;
 	u8 *crc_ptr;
@@ -2167,28 +2167,36 @@ static int mxt_read_info_block(struct mxt_data *data)
 		return -ENOMEM;
 
 	error = __mxt_read_reg(client, 0, size, id_buf);
-	if (error) {
-		kfree(id_buf);
-		return error;
+	if (error)
+		goto err_free_mem;
+
+	/* Read rest of info block */
+	num_objects = ((struct mxt_info *)id_buf)->object_num;
+	object_size = (num_objects * sizeof(struct mxt_object))
+		      + MXT_INFO_CHECKSUM_SIZE;
+	object_buf = kzalloc(object_size, GFP_KERNEL);
+	if (!object_buf) {
+		error = -ENOMEM;
+		goto err_free_mem;
 	}
 
-	/* Resize buffer to give space for rest of info block */
-	num_objects = ((struct mxt_info *)id_buf)->object_num;
-	size += (num_objects * sizeof(struct mxt_object))
-		+ MXT_INFO_CHECKSUM_SIZE;
+	error = mxt_read_blks(data, MXT_OBJECT_START, object_size, object_buf);
+	if (error)
+		goto err_free_mem;
 
+	/* Resize buffer to give space for rest of info block */
+	size += object_size;
 	buf = krealloc(id_buf, size, GFP_KERNEL);
 	if (!buf) {
 		error = -ENOMEM;
 		goto err_free_mem;
 	}
+	id_buf = NULL;
 
-	/* Read rest of info block */
-	error = mxt_read_blks(data, MXT_OBJECT_START,
-			      size - MXT_OBJECT_START,
-			      buf + MXT_OBJECT_START);
-	if (error)
-		goto err_free_mem;
+	/* Copy rest of info block into the buffer */
+	memcpy(buf + MXT_OBJECT_START, object_buf, object_size);
+	kfree(object_buf);
+	object_buf = NULL;
 
 	/* Extract & calculate checksum */
 	crc_ptr = buf + size - MXT_INFO_CHECKSUM_SIZE;
@@ -2231,6 +2239,8 @@ static int mxt_read_info_block(struct mxt_data *data)
 	return 0;
 
 err_free_mem:
+	kfree(id_buf);
+	kfree(object_buf);
 	kfree(buf);
 	return error;
 }
