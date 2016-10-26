@@ -1936,10 +1936,6 @@ static int tegra_soctherm_remove(struct platform_device *pdev)
 
 static int __maybe_unused soctherm_suspend(struct device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-
-	soctherm_clk_enable(pdev, false);
-
 	return 0;
 }
 
@@ -1949,13 +1945,6 @@ static int __maybe_unused soctherm_resume(struct device *dev)
 	struct tegra_soctherm *tegra = platform_get_drvdata(pdev);
 	struct tegra_soctherm_soc *soc = tegra->soc;
 	int err, i;
-
-	err = soctherm_clk_enable(pdev, true);
-	if (err) {
-		dev_err(&pdev->dev,
-			"Resume failed: enable clocks failed\n");
-		return err;
-	}
 
 	soctherm_init(pdev);
 
