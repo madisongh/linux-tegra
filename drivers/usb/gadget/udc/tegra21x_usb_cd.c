@@ -20,6 +20,15 @@
 #define	VOP_DIV2P0_DET	BIT(2)
 #define	VOP_DIV2P7_DET	BIT(3)
 
+#define VREG_CUR_LEVEL_0	500
+#define VREG_CUR_LEVEL_1	900
+#define VREG_CUR_LEVEL_2	1500
+#define VREG_CUR_LEVEL_3	2000
+
+#define IS_CUR_IN_RANGE(ma, low, high)	\
+	((ma >= VREG_CUR_LEVEL_##low) && (ma <= (VREG_CUR_LEVEL_##high - 1)))
+#define VREG_LVL(ma, level)	IS_CUR_IN_RANGE(ma, level, level + 1)
+
 static bool tegra21x_usb_dcp_charger_detect(struct tegra_usb_cd *ucd)
 {
 	bool status;
@@ -85,21 +94,22 @@ static int tegra21x_pad_power_off(struct tegra_usb_cd *ucd)
 static void tegra21x_usb_vbus_pad_protection(struct tegra_usb_cd *ucd,
 			bool enable)
 {
+	int current_limit;
+
+	current_limit = ucd->current_limit_ma;
+
 	if (!enable) {
 		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, -1);
 		return;
 	}
 
-	if (ucd->current_limit_ma >= 500 &&
-			ucd->current_limit_ma <= 899)
+	if (VREG_LVL(current_limit, 0))
 		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 0);
-	else if (ucd->current_limit_ma >= 900 &&
-			ucd->current_limit_ma <= 1499)
+	else if (VREG_LVL(current_limit, 1))
 		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 1);
-	else if (ucd->current_limit_ma >= 1500 &&
-			ucd->current_limit_ma <= 1999)
+	else if (VREG_LVL(current_limit, 2))
 		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 2);
-	else if (ucd->current_limit_ma >= 2000)
+	else if (current_limit >= VREG_CUR_LEVEL_3)
 		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 3);
 }
 
