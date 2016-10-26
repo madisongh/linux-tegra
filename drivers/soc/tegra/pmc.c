@@ -32,6 +32,7 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/irq.h>
+#include <linux/memblock.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_gpio.h>
@@ -515,6 +516,8 @@ static u32 io_dpd_reg, io_dpd2_reg;
 static struct tegra_pmc *pmc = &(struct tegra_pmc) {
 	.base = NULL,
 	.suspend_mode = TEGRA_SUSPEND_NONE,
+	.lp0_vec_phys = 0,
+	.lp0_vec_size = 0,
 };
 
 static u32 tegra_pmc_readl(unsigned long offset)
@@ -2719,6 +2722,9 @@ static int tegra_pmc_parse_dt(struct tegra_pmc *pmc, struct device_node *np)
 	pmc->cpu_pwr_good_en = of_property_read_bool(np,
 				"nvidia,cpu-pwr-good-en");
 
+	if (pmc->lp0_vec_size && pmc->lp0_vec_phys)
+		goto out;
+
 	values[0] = values[1] = 0;
 	if (of_property_read_u32_array(np, "nvidia,lp0-vec", values,
 				       ARRAY_SIZE(values)))
@@ -2728,6 +2734,7 @@ static int tegra_pmc_parse_dt(struct tegra_pmc *pmc, struct device_node *np)
 	pmc->lp0_vec_phys = values[0];
 	pmc->lp0_vec_size = values[1];
 
+out:
 	return 0;
 }
 
@@ -3207,6 +3214,28 @@ static struct platform_driver tegra_pmc_driver = {
 builtin_platform_driver(tegra_pmc_driver);
 
 /*
+ * Looking for lp0_vec=size@start.
+ */
+static int __init tegra_lp0_vec_arg(char *options)
+{
+
+	char *p = options;
+
+	pmc->lp0_vec_size = memparse(p, &p);
+
+	if (*p == '@')
+		pmc->lp0_vec_phys = memparse(p+1, NULL);
+
+	if (!pmc->lp0_vec_size || !pmc->lp0_vec_phys) {
+		pmc->lp0_vec_size = 0;
+		pmc->lp0_vec_phys = 0;
+	}
+
+	return 0;
+}
+early_param("lp0_vec", tegra_lp0_vec_arg);
+
+/*
  * Early initialization to allow access to registers in the very early boot
  * process.
  */
@@ -3284,6 +3313,13 @@ static int __init tegra_pmc_early_init(void)
 #ifdef CONFIG_PM_SLEEP
 	tegra_lp0_wakeup.of_node = np;
 	INIT_LIST_HEAD(&tegra_lp0_wakeup.wake_list);
+
+	if (pmc->lp0_vec_size &&
+	    (pmc->lp0_vec_phys < memblock_end_of_DRAM()))
+		if (memblock_reserve(pmc->lp0_vec_phys, pmc->lp0_vec_size))
+			pr_err("Failed to reserve lp0_vec %08llx@%08llx\n",
+			       (u64)pmc->lp0_vec_size,
+			       (u64)pmc->lp0_vec_phys);
 #endif
 
 	return 0;
