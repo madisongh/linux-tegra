@@ -1997,11 +1997,15 @@ void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode)
 static struct syscore_ops tegra_pmc_syscore_ops = {
 	.suspend = tegra_pmc_suspend,
 	.resume = tegra_pmc_resume,
+	.save = tegra_pmc_suspend,
+	.restore = tegra_pmc_resume,
 };
 
 static struct syscore_ops tegra_pmc_wake_syscore_ops = {
 	.suspend = tegra_pmc_wake_syscore_suspend,
 	.resume = tegra_pmc_wake_syscore_resume,
+	.save = tegra_pmc_wake_syscore_suspend,
+	.restore = tegra_pmc_wake_syscore_resume,
 };
 
 static void tegra_pmc_syscore_init(void)
