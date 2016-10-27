@@ -4293,13 +4293,14 @@ void tegra_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy)
 
 	/* power up necessary stuff */
 	tegra21x_usb2_trk_on(uphy);
-	tegra_phy_xusb_utmi_pad_power_on(phy);
 
-	reg = padctl_readl(uphy,
-		XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+	reg = padctl_readl(uphy, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+	reg &= ~USB2_OTG_PD;
+	padctl_writel(uphy, reg, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+
+	reg = padctl_readl(uphy, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
 	reg |= (USB2_OTG_PD2 | USB2_OTG_PD2_OVRD_EN);
-	padctl_writel(uphy, reg,
-		XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+	padctl_writel(uphy, reg, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
 
 	reg = padctl_readl(uphy,
 		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
@@ -4318,7 +4319,7 @@ void tegra_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy)
 	reg = padctl_readl(uphy,
 		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
 	reg &= ~(USBOP_RPD_OVRD_VAL | USBOP_RPU_OVRD_VAL |
-	USBON_RPD_OVRD_VAL | USBON_RPU_OVRD_VAL);
+		USBON_RPD_OVRD_VAL | USBON_RPU_OVRD_VAL);
 	padctl_writel(uphy, reg,
 		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
 
@@ -4326,7 +4327,7 @@ void tegra_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy)
 	reg = padctl_readl(uphy,
 		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
 	reg &= ~(OP_SRC_EN | ON_SINK_EN |
-	ON_SRC_EN | OP_SINK_EN);
+		ON_SRC_EN | OP_SINK_EN);
 	padctl_writel(uphy, reg,
 		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
 }
@@ -4344,9 +4345,12 @@ void tegra_phy_xusb_utmi_pad_charger_detect_off(struct phy *phy)
 	uphy = phy_get_drvdata(phy);
 	port = utmi_phy_to_port(phy);
 
-	reg = padctl_readl(uphy, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
-	reg &= ~USB2_OTG_PD2_OVRD_EN;
-	padctl_writel(uphy, reg, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+	reg = padctl_readl(uphy,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+	reg &= ~(USBOP_RPD_OVRD | USBOP_RPU_OVRD |
+		USBON_RPD_OVRD | USBON_RPU_OVRD);
+	padctl_writel(uphy, reg,
+		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
 
 	/* power down necessary stuff */
 	reg = padctl_readl(uphy,
@@ -4355,14 +4359,14 @@ void tegra_phy_xusb_utmi_pad_charger_detect_off(struct phy *phy)
 	padctl_writel(uphy, reg,
 		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
 
-	reg = padctl_readl(uphy,
-		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
-	reg &= ~(USBOP_RPD_OVRD | USBOP_RPU_OVRD |
-	USBON_RPD_OVRD | USBON_RPU_OVRD);
-	padctl_writel(uphy, reg,
-		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
+	reg = padctl_readl(uphy, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+	reg &= ~(USB2_OTG_PD2_OVRD_EN | USB2_OTG_PD2);
+	padctl_writel(uphy, reg, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
 
-	tegra_phy_xusb_utmi_pad_power_down(phy);
+	reg = padctl_readl(uphy, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+	reg |= USB2_OTG_PD;
+	padctl_writel(uphy, reg, XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+
 	tegra21x_usb2_trk_off(uphy);
 }
 EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_charger_detect_off);
