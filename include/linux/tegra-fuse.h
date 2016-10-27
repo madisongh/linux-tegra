@@ -80,4 +80,8 @@ int tegra_fuse_calib_base_get_ft(u32 *base_ft, s32 *shifted_ft);
 int tegra_fuse_calib_gpcpll_get_adc(int *slope_uv, int *intercept_uv);
 bool tegra_fuse_can_use_na_gpcpll(void);
 
+int tegra_fuse_control_read(unsigned long offset, u32 *value);
+void tegra_fuse_control_write(u32 value, unsigned long offset);
+void tegra_pmc_fuse_disable_mirroring(void);
+void tegra_pmc_fuse_enable_mirroring(void);
 #endif /* TEGRA_FUSE_H */

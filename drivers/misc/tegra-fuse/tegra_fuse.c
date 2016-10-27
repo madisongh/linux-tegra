@@ -108,6 +108,22 @@ int tegra_fuse_readl(unsigned long offset, u32 *val)
 }
 EXPORT_SYMBOL(tegra_fuse_readl);
 
+int tegra_fuse_control_read(unsigned long offset, u32 *value)
+{
+	if (!fuse_base)
+		tegra_fuse_base_init();
+
+	if (fuse_base)
+		*value = readl(fuse_base + offset);
+	else {
+		pr_err("%s: fuse_base not initialized\n", __func__);
+		WARN_ON(1);
+		return -EPROBE_DEFER;
+	}
+
+	return 0;
+}
+
 void tegra_fuse_writel(u32 val, unsigned long offset)
 {
 	if (fuse_base)
@@ -118,6 +134,16 @@ void tegra_fuse_writel(u32 val, unsigned long offset)
 	}
 }
 EXPORT_SYMBOL(tegra_fuse_writel);
+
+void tegra_fuse_control_write(u32 value, unsigned long offset)
+{
+	if (fuse_base)
+		writel(value, fuse_base + offset);
+	else {
+		pr_err("%s: fuse_base not initialized\n", __func__);
+		WARN_ON(1);
+	}
+}
 
 int tegra_gpu_register_sets(void)
 {
