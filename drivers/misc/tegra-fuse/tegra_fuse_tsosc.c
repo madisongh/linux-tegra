@@ -16,8 +16,6 @@
 
 #include <linux/tegra-fuse.h>
 
-#include "fuse.h"
-
 #define FUSE_FT_REV          0x128
 #define FUSE_CP_REV           0x190
 
