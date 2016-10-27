@@ -14,6 +14,7 @@ NVIDIA TEGRA186 DisplayPort
    touched by the DP driver itself.
  - nvidia,tx-pu-disable: Specifies whether TX_PU is disabled.
  - nvidia,lanes: Specifies the number of connected data lanes
+ - nvidia,enhanced-framing-disable: Force disable enhanced framing
 
  1.A) NVIDIA Display Default Output Settings
  This must be contained in dp-display parent node. This is default output settings.
