@@ -899,7 +899,7 @@ static inline void calibration_timer_update(struct tegra_cl_dvfs *cld)
 
 static void cl_dvfs_calibrate(struct tegra_cl_dvfs *cld)
 {
-	u32 val, data;
+	u32 val, data = 0;
 	ktime_t now;
 	unsigned long rate;
 	unsigned long step = RATE_STEP(cld);
@@ -2946,7 +2946,7 @@ DEFINE_SIMPLE_ATTRIBUTE(lock_fops, lock_get, lock_set, "%llu\n");
 
 static int monitor_get(void *data, u64 *val)
 {
-	u32 v, s;
+	u32 v = 0, s;
 	unsigned long flags;
 	struct clk *c = (struct clk *)data;
 	struct tegra_cl_dvfs *cld = ((struct clk *)data)->u.dfll.cl_dvfs;
