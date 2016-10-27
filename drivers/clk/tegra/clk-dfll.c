@@ -1,7 +1,7 @@
 /*
  * clk-dfll.c - Tegra DFLL clock source common code
  *
- * Copyright (C) 2012-2014 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2012-2016 NVIDIA Corporation. All rights reserved.
  *
  * Aleksandr Frid <afrid@nvidia.com>
  * Paul Walmsley <pwalmsley@nvidia.com>
@@ -676,7 +676,7 @@ static void dfll_init_out_if(struct tegra_dfll *td)
 	if (td->pmu_if == TEGRA_DFLL_PMU_PWM) {
 		int vinit = td->reg_init_uV;
 		int vstep = td->soc->alignment;
-		int vmin = regulator_list_voltage(td->vdd_reg, 0);
+		int vmin = regulator_list_voltage_unlocked(td->vdd_reg, 0);
 
 		td->lut_min = td->lut[0];
 		td->lut_max = td->lut[td->lut_size - 1];
@@ -1848,7 +1848,7 @@ void tegra_dfll_resume(struct platform_device *pdev)
 
 	reset_control_deassert(td->dvco_rst);
 
-	pm_runtime_get_sync(td->dev);
+	pm_runtime_get(td->dev);
 
 	/* Re-init DFLL */
 	dfll_init_out_if(td);
@@ -1856,7 +1856,7 @@ void tegra_dfll_resume(struct platform_device *pdev)
 	dfll_set_default_params(td);
 	dfll_set_open_loop_config(td);
 
-	pm_runtime_put_sync(td->dev);
+	pm_runtime_put(td->dev);
 
 	if (td->mode <= DFLL_DISABLED)
 		return;
