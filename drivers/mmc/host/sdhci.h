@@ -267,6 +267,7 @@
 #define   SDHCI_SPEC_300	2
 #define   SDHCI_SPEC_400	3
 #define   SDHCI_SPEC_410	4
+#define   SDHCI_SPEC_420	5
 
 /*
  * End of controller registers.
