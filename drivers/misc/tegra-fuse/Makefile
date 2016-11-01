@@ -12,4 +12,3 @@ subdir-ccflags-y       += -I$(srctree)
 
 obj-y	+= tegra_fuse.o
 obj-y	+= fuse-burn.o
-obj-y	+= tegra_fuse_tsosc.o
