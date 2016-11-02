@@ -61,6 +61,7 @@
 #define FUSE_SKU_MSB_SHIFT	8
 #define FUSE_OPT_SUBREVISION	0x248
 #define FUSE_OPT_SUBREVISION_MASK	0xF
+#define FUSE_BEGIN		0x100
 
 struct tegra_id {
 	enum tegra_chipid chipid;
@@ -97,7 +98,7 @@ int tegra_fuse_readl(unsigned long offset, u32 *val)
 		tegra_fuse_base_init();
 
 	if (fuse_base)
-		*val = readl(fuse_base + offset);
+		*val = readl(fuse_base + FUSE_BEGIN + offset);
 	else {
 		pr_err("%s: fuse_base not initialized\n", __func__);
 		WARN_ON(1);
@@ -127,7 +128,7 @@ int tegra_fuse_control_read(unsigned long offset, u32 *value)
 void tegra_fuse_writel(u32 val, unsigned long offset)
 {
 	if (fuse_base)
-		writel(val, fuse_base + offset);
+		writel(val, fuse_base + FUSE_BEGIN + offset);
 	else {
 		pr_err("%s: fuse_base not initialized\n", __func__);
 		WARN_ON(1);
