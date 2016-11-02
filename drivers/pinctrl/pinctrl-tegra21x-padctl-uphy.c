@@ -5069,6 +5069,67 @@ int tegra21x_phy_xusb_pretend_connected(struct phy *phy)
 }
 EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_pretend_connected);
 
+int tegra21x_phy_xusb_set_reverse_id(struct phy *phy)
+{
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_set_reverse_id);
+
+int tegra21x_phy_xusb_clear_reverse_id(struct phy *phy)
+{
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_clear_reverse_id);
+
+int tegra21x_phy_xusb_generate_srp(struct phy *phy)
+{
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_generate_srp);
+
+int tegra21x_phy_xusb_enable_srp_detect(struct phy *phy)
+{
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_enable_srp_detect);
+
+int tegra21x_phy_xusb_disable_srp_detect(struct phy *phy)
+{
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_disable_srp_detect);
+
+bool tegra21x_phy_xusb_srp_detected(struct phy *phy)
+{
+	return false;
+}
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_srp_detected);
+
+int tegra21x_phy_xusb_enable_otg_int(struct phy *phy)
+{
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_enable_otg_int);
+
+int tegra21x_phy_xusb_disable_otg_int(struct phy *phy)
+{
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_disable_otg_int);
+
+int tegra21x_phy_xusb_ack_otg_int(struct phy *phy)
+{
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_ack_otg_int);
+
+int tegra21x_phy_xusb_get_otg_vbus_id(struct phy *phy,
+				   struct tegra_xusb_otg_vbus_id *change)
+{
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_get_otg_vbus_id);
+
 MODULE_AUTHOR("BH Hsieh <bhsieh@nvidia.com>");
 MODULE_DESCRIPTION("Tegra 21x XUSB PADCTL and UPHY PLL/Lane driver");
 MODULE_LICENSE("GPL v2");

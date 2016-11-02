@@ -56,6 +56,35 @@ enum tegra_vbus_dir {
 	TEGRA_VBUS_SOURCE,
 	TEGRA_VBUS_SINK
 };
+
+/* RID status from IDDIG bits in XUSB_PADCTL_USB2_VBUS_ID_0 register */
+enum tegra_xusb_vbus_rid {
+	VBUS_ID_RID_GND,
+	VBUS_ID_RID_FLOAT,
+	VBUS_ID_RID_A,
+	VBUS_ID_RID_B,
+	VBUS_ID_RID_C,
+	VBUS_ID_RID_UNDEFINED
+};
+
+/* OTG status change details from XUSB_PADCTL_USB2_VBUS_ID_0 register */
+struct tegra_xusb_otg_vbus_id {
+	bool vbus_sess_vld_chg; /* bit 1 */
+	unsigned vbus_sess_vld:1; /* bit 0 */
+
+	bool vbus_vld_chg; /* bit 4 */
+	unsigned vbus_vld:1; /* bit 3 */
+
+	bool iddig_chg; /* bit 10 */
+	enum tegra_xusb_vbus_rid iddig; /* from bit [9:6] */
+
+	bool vbus_wakeup_chg; /* bit 23 */
+	unsigned vbus_wakeup:1; /* bit 22 */
+
+	unsigned vbus_override:1; /* bit 14 */
+	unsigned id_override:4; /* bit [21:18] */
+};
+
 struct phy;
 
 #ifdef CONFIG_PINCTRL_TEGRA21x_PADCTL_UPHY
@@ -98,6 +127,17 @@ int tegra21x_phy_xusb_pretend_connected(struct phy *phy);
  *       < 0: error
  */
 int tegra21x_phy_xusb_remote_wake_detected(struct phy *phy);
+int tegra21x_phy_xusb_set_reverse_id(struct phy *phy);
+int tegra21x_phy_xusb_clear_reverse_id(struct phy *phy);
+int tegra21x_phy_xusb_generate_srp(struct phy *phy);
+int tegra21x_phy_xusb_enable_srp_detect(struct phy *phy);
+int tegra21x_phy_xusb_disable_srp_detect(struct phy *phy);
+bool tegra21x_phy_xusb_srp_detected(struct phy *phy);
+int tegra21x_phy_xusb_enable_otg_int(struct phy *phy);
+int tegra21x_phy_xusb_disable_otg_int(struct phy *phy);
+int tegra21x_phy_xusb_ack_otg_int(struct phy *phy);
+int tegra21x_phy_xusb_get_otg_vbus_id(struct phy *phy,
+		struct tegra_xusb_otg_vbus_id *change);
 #else
 static inline int tegra21x_phy_xusb_set_vbus_override(struct phy *phy)
 {
@@ -241,6 +281,56 @@ static inline int tegra21x_phy_xusb_remote_wake_detected(struct phy *phy)
 {
 	return 0;
 }
+static inline int tegra21x_phy_xusb_set_reverse_id(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_clear_reverse_id(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_generate_srp(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_enable_srp_detect(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_disable_srp_detect(struct phy *phy)
+{
+	return 0;
+}
+
+static inline bool tegra21x_phy_xusb_srp_detected(struct phy *phy)
+{
+	return false;
+}
+
+static inline int tegra21x_phy_xusb_enable_otg_int(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_disable_otg_int(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_ack_otg_int(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_get_otg_vbus_id(struct phy *phy,
+		struct tegra_xusb_otg_vbus_id *change)
+{
+	return 0;
+}
 #endif
 
 #ifdef CONFIG_PINCTRL_TEGRA186_PADCTL
@@ -282,6 +372,17 @@ int tegra18x_phy_xusb_pretend_connected(struct phy *phy);
  *       < 0: error
  */
 int tegra18x_phy_xusb_remote_wake_detected(struct phy *phy);
+int tegra18x_phy_xusb_set_reverse_id(struct phy *phy);
+int tegra18x_phy_xusb_clear_reverse_id(struct phy *phy);
+int tegra18x_phy_xusb_generate_srp(struct phy *phy);
+int tegra18x_phy_xusb_enable_srp_detect(struct phy *phy);
+int tegra18x_phy_xusb_disable_srp_detect(struct phy *phy);
+bool tegra18x_phy_xusb_srp_detected(struct phy *phy);
+int tegra18x_phy_xusb_enable_otg_int(struct phy *phy);
+int tegra18x_phy_xusb_disable_otg_int(struct phy *phy);
+int tegra18x_phy_xusb_ack_otg_int(struct phy *phy);
+int tegra18x_phy_xusb_get_otg_vbus_id(struct phy *phy,
+		struct tegra_xusb_otg_vbus_id *change);
 #else
 static inline int tegra18x_phy_xusb_set_vbus_override(struct phy *phy)
 {
@@ -421,6 +522,57 @@ static inline int tegra18x_phy_xusb_pretend_connected(struct phy *phy)
  *       < 0: error
  */
 static inline int tegra18x_phy_xusb_remote_wake_detected(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_set_reverse_id(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_clear_reverse_id(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_generate_srp(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_enable_srp_detect(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_disable_srp_detect(struct phy *phy)
+{
+	return 0;
+}
+
+static inline bool tegra18x_phy_xusb_srp_detected(struct phy *phy)
+{
+	return false;
+}
+
+static inline int tegra18x_phy_xusb_enable_otg_int(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_disable_otg_int(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_ack_otg_int(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_get_otg_vbus_id(struct phy *phy,
+		struct tegra_xusb_otg_vbus_id *change)
 {
 	return 0;
 }
