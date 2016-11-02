@@ -2692,13 +2692,13 @@ static inline void tegra21x_utmi_phy_put_utmipll_iddq(
 
 	if (in_iddq) {
 		if (!tegra21x_utmi_phy_xusb_partitions_powergated()) {
-			dev_warn(uphy->dev,
+			dev_info(uphy->dev,
 			"trying to assert IDDQ while XUSB partitions are on\n");
 			return;
 		}
 
 		if (reg & UTMIPLL_LOCK) {
-			dev_warn(uphy->dev,
+			dev_info(uphy->dev,
 			"trying to assert IDDQ while UTMIPLL is locked\n");
 			return;
 		}
