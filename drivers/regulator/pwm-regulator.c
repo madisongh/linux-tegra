@@ -42,6 +42,9 @@ struct pwm_regulator_data {
 
 	/* Enable GPIO */
 	struct gpio_desc *enb_gpio;
+
+	/* Voltage ramp time */
+	u32 voltage_ramp_time;
 };
 
 struct pwm_voltages {
@@ -155,6 +158,8 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
 	int duty_cycle;
 	int ret;
 
+	dev_info(&rdev->dev, "%s() is called with %d:%d\n",
+				__func__, min_uV, max_uV);
 	duty_cycle = pwm_voltage_to_duty_cycle_percentage(rdev, min_uV);
 
 	ret = pwm_config(drvdata->pwm, (period / 100) * duty_cycle, period);
@@ -174,6 +179,14 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
 	usleep_range(ramp_delay, ramp_delay + 1000);
 
 	return 0;
+}
+
+static int pwm_regulator_set_voltage_time_sel(struct regulator_dev *rdev,
+				unsigned int old_uV, unsigned int new_uV)
+{
+	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+
+	return drvdata->voltage_ramp_time;
 }
 
 static struct regulator_ops pwm_regulator_voltage_table_ops = {
@@ -251,6 +264,11 @@ static int pwm_regulator_init_continuous(struct platform_device *pdev,
 {
 	memcpy(&drvdata->ops, &pwm_regulator_voltage_continuous_ops,
 	       sizeof(drvdata->ops));
+
+	if (!of_property_read_u32(pdev->dev.of_node, "voltage-time-sel",
+				&drvdata->voltage_ramp_time))
+		drvdata->ops.set_voltage_time_sel = pwm_regulator_set_voltage_time_sel;
+
 	drvdata->desc.ops = &drvdata->ops;
 	drvdata->desc.continuous_voltage_range = true;
 
@@ -326,6 +344,7 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	dev_info(&pdev->dev, "PWM regulator registration passed\n");
 	return 0;
 }
 
