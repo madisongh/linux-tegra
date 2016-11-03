@@ -57,12 +57,6 @@
 #define DPAUX1_NODE		"/host1x/dpaux1"
 #endif
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC) || defined(CONFIG_TEGRA_NVDISPLAY)
-#define HDMI_NODE		SOR1_NODE
-#else
-#define HDMI_NODE		"/host1x/hdmi"
-#endif
-
 #define DEFAULT_FPGA_FREQ_KHZ	160000
 
 #define TEGRA_DC_EXT_FLIP_MAX_WINDOW 6
@@ -73,8 +67,6 @@
 extern atomic_t sd_brightness;
 
 extern struct fb_videomode tegra_dc_vga_mode;
-
-extern char dc_or_node_names[][14];
 
 enum {
 	TEGRA_HPD_STATE_FORCE_DEASSERT = -1,
@@ -1118,6 +1110,7 @@ struct tegra_dc_platform_data {
 	int			default_clr_space;
 #endif
 	unsigned long		ctrl_num;
+	char dc_or_node_name[20];
 	unsigned long		win_mask;
 };
 
@@ -1236,26 +1229,22 @@ int tegra_dc_get_panel_sync_rate(void);
 int tegra_dc_get_head(const struct tegra_dc *dc);
 int tegra_dc_get_out(const struct tegra_dc *dc);
 
-#if defined(CONFIG_TEGRA_NVDISPLAY) || defined(CONFIG_ARCH_TEGRA_210_SOC)
 struct device_node *tegra_primary_panel_get_dt_node(
 				struct tegra_dc_platform_data *pdata);
 struct device_node *tegra_secondary_panel_get_dt_node(
 				struct tegra_dc_platform_data *pdata);
+#if defined(CONFIG_TEGRA_NVDISPLAY)
 struct device_node *tegra_tertiary_panel_get_dt_node(
 				struct tegra_dc_platform_data *pdata);
+
 #else
-static inline struct device_node *tegra_primary_panel_get_dt_node(
-				struct tegra_dc_platform_data *pdata)
-{ return NULL; }
-static inline struct device_node *tegra_secondary_panel_get_dt_node(
-				struct tegra_dc_platform_data *pdata)
-{ return NULL; }
 static inline struct device_node *tegra_tertiary_panel_get_dt_node(
 				struct tegra_dc_platform_data *pdata)
 {
-	return NULL;
+        return NULL;
 }
 #endif
+
 bool tegra_is_bl_display_initialized(int instance);
 
 static inline void find_dc_node(struct device_node **dc1_node,
