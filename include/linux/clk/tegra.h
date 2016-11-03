@@ -188,4 +188,6 @@ extern void tegra210_sata_pll_hw_sequence_start(void);
 extern void tegra210_csi_source_from_brick(void);
 extern void tegra210_csi_source_from_plld(void);
 
+int tegra_super_cdiv_use_therm_controls(bool);
+
 #endif /* __LINUX_CLK_TEGRA_H_ */
