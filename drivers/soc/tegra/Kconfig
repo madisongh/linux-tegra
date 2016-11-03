@@ -20,6 +20,18 @@ config TEGRA_CPU_EDP
 	  based on temperature and number of on-line CPUs to keep
 	  CPU rail current within power supply capabilities.
 
+config TEGRA_GPU_EDP
+	bool "GPU EDP management"
+	depends on THERMAL
+	select TEGRA_PROC_POWER_MODEL
+	default n
+	help
+	  Enforce electrical design limits on GPU power rail. GPU
+	  EDP prevents the GPU from drawing more current than its
+	  voltage regulator can supply. Limit maximum GPU frequency
+	  based on temperature to keep GPU rail current within power
+	  supply capabilities.
+
 config TEGRA_DVFS
 	bool
 	depends on ARCH_TEGRA

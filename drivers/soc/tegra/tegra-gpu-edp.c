@@ -1,6 +1,5 @@
 /*
- *
- * Copyright (c) 2011-2014, NVIDIA CORPORATION. All Rights Reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -20,21 +19,17 @@
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/module.h>
-#include <linux/uaccess.h>
 #include <linux/of.h>
 #include <linux/pm_qos.h>
 #include <linux/debugfs.h>
 #include <linux/tegra-fuse.h>
-#include <linux/tegra_ppm.h>
+#include <linux/thermal.h>
 
-#include <linux/platform/tegra/dvfs.h>
-#include <linux/platform/tegra/clock.h>
+#include <soc/tegra/tegra-dvfs.h>
+#include <soc/tegra/tegra-ppm.h>
 
 struct gpu_edp_platform_data {
-	const char *name;
-	char *cdev_name;
-	char *cap_clk_name;
-	char *clk_name;
+	char *name;
 	int freq_step;
 	int imax;
 };
@@ -58,6 +53,13 @@ struct gpu_edp {
 	struct edp_attrs *debugfs_attrs;
 
 };
+
+static int tegra_gpu_edp_predict_millivolts(void *p, unsigned long rate)
+{
+	struct clk *clk = (struct clk *)p;
+
+	return tegra_dvfs_predict_millivolts(clk, rate);
+}
 
 static void edp_update_cap(struct gpu_edp *ctx, int temperature,
 			  int imax, int pmax)
@@ -211,17 +213,6 @@ static int __init tegra_gpu_edp_parse_dt(struct platform_device *pdev,
 		 "missing required parameter: nvidia,edp_limit\n"))
 		return -ENODATA;
 
-	if (WARN(of_property_read_string(np, "nvidia,edp_cap_clk",
-					 (const char **)&pdata->cap_clk_name),
-		 "missing required parameter: nvidia,edp_cap_clk\n"))
-		return -ENODATA;
-
-	if (WARN(of_property_read_string(np, "nvidia,edp_clk",
-				      (const char **)&pdata->clk_name),
-		 "missing required parameter: nvidia,edp_clk\n"))
-		return -ENODATA;
-
-	pdata->cdev_name = "gpu_edp";
 	pdata->name = "gpu_edp";
 
 	return 0;
@@ -237,6 +228,7 @@ static int __init tegra_gpu_edp_probe(struct platform_device *pdev)
 	struct gpu_edp *ctx;
 	struct dentry *edp_dir = NULL;
 	int ret, ret_warn;
+	long maxf;
 
 	if (WARN(!pdev || !pdev->dev.of_node,
 		 "DT node required but absent\n"))
@@ -258,9 +250,19 @@ static int __init tegra_gpu_edp_probe(struct platform_device *pdev)
 		goto out;
 	}
 
-	gpu_clk = tegra_get_clock_by_name(pdata.clk_name);
-	fv = fv_relation_create(gpu_clk, pdata.freq_step, 150,
-				      tegra_dvfs_predict_mv_at_hz_max_tfloor);
+	gpu_clk = devm_clk_get(&pdev->dev, "gpu-edp");
+	if (IS_ERR(gpu_clk)) {
+		dev_err(&pdev->dev, "unable to find 'gpu-edp' clock\n");
+		ret = PTR_ERR(gpu_clk);
+		goto out;
+	}
+
+	maxf = clk_round_rate(gpu_clk, ULONG_MAX);
+	if (IS_ERR_VALUE(maxf))
+		return -ENODATA;
+
+	fv = fv_relation_create(gpu_clk, pdata.freq_step, 150, maxf, 0,
+				tegra_gpu_edp_predict_millivolts);
 	if (WARN(IS_ERR_OR_NULL(fv),
 		 "Failed GPU EDP mgmt init. freq/volt data unavailable\n")) {
 		ret = PTR_ERR(fv);
@@ -268,14 +270,18 @@ static int __init tegra_gpu_edp_probe(struct platform_device *pdev)
 		goto out;
 	}
 
-	iddq_ma = tegra_get_gpu_iddq_value();
-	pr_debug("%s: %s IDDQ value %d\n",
-		 __func__, pdata.name, iddq_ma);
+	iddq_ma = tegra_fuse_get_gpu_iddq();
+	if (iddq_ma < 0) {
+		dev_err(&pdev->dev, "unable to get GPU IDDQ: %d\n", iddq_ma);
+		ret = iddq_ma;
+		goto out;
+	}
 
-	ctx->cap_clk = tegra_get_clock_by_name(pdata.cap_clk_name);
-	if (!ctx->cap_clk)
-		pr_err("%s: cannot get clock:%s\n",
-		       __func__, pdata.cap_clk_name);
+	pr_debug("%s: %s IDDQ value %d\n", __func__, pdata.name, iddq_ma);
+
+	ctx->cap_clk = devm_clk_get(&pdev->dev, "gpu-edp-cap");
+	if (IS_ERR(ctx->cap_clk))
+		dev_err(&pdev->dev, "unable to find 'gpu-edp-cap' clock\n");
 
 	edp_dir = debugfs_create_dir("gpu_edp", NULL);
 
@@ -301,10 +307,9 @@ static int __init tegra_gpu_edp_probe(struct platform_device *pdev)
 			"pm_qos failure. max_gpu_power won't work\n");
 
 	ctx->cdev = thermal_of_cooling_device_register(
-		pdev->dev.of_node, pdata.cdev_name, ctx, &edp_cooling_ops);
+		pdev->dev.of_node, pdata.name, ctx, &edp_cooling_ops);
 	if (IS_ERR_OR_NULL(ctx->cdev)) {
-		pr_err("Failed to register '%s' cooling device\n",
-			pdata.cdev_name);
+		pr_err("Failed to register '%s' cooling device\n", pdata.name);
 		ctx->cdev = NULL;
 		ret = PTR_ERR(ctx->cdev);
 		goto out;

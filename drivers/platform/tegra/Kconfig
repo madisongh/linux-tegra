@@ -116,16 +116,6 @@ config TEGRA_SOCTHERM
         help
 	  Enables use of soctherm for thermal management.
 
-config TEGRA_GPU_EDP
-       bool "GPU EDP management"
-       depends on THERMAL
-       select TEGRA_PROC_POWER_MODEL
-       default n
-       help
-         Limit maximum GPU frequency based on temperature
-         to keep GPU rail current within power supply
-         capabilities.
-
 config TEGRA_CENTRAL_ACTMON
 	bool "Tegra Activity Monitor"
 	depends on ARCH_TEGRA_18x_SOC || ARCH_TEGRA_21x_SOC
