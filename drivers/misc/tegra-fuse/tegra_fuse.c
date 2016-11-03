@@ -56,11 +56,6 @@
 #define PRE_SI_DSIM_ASIM_LINSIM	6
 #define PRE_SI_VDK		8
 
-#define FUSE_SKU_INFO		0x110
-#define FUSE_SKU_MSB_MASK	0xFF00
-#define FUSE_SKU_MSB_SHIFT	8
-#define FUSE_OPT_SUBREVISION	0x248
-#define FUSE_OPT_SUBREVISION_MASK	0xF
 #define FUSE_BEGIN		0x100
 
 struct tegra_id {

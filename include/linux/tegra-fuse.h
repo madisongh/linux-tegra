@@ -16,16 +16,38 @@
  * GNU General Public License for more details.
  *
  */
+#ifndef __TEGRA_FUSE_H
+#define __TEGRA_FUSE_H
 
 #include <linux/tegra-soc.h>
 #include <linux/sysfs.h>
 #include <linux/platform_device.h>
 
-#ifndef __TEGRA_FUSE_H
-#define __TEGRA_FUSE_H
+#define FUSE_FUSEBYPASS_0		0x24
+#define FUSE_WRITE_ACCESS_SW_0		0x30
 
-#define FUSE_SKU_USB_CALIB_0	0x1f0
-#define FUSE_USB_CALIB_EXT_0	0x350
+#define FUSE_SKU_INFO			0x10
+#define FUSE_SKU_MSB_MASK		0xFF00
+#define FUSE_SKU_MSB_SHIFT		8
+
+#define FUSE_SKU_USB_CALIB_0		0xf0
+
+#define FUSE_OPT_SUBREVISION		0x148
+#define FUSE_OPT_SUBREVISION_MASK	0xF
+
+#define FUSE_OPT_PRIV_SEC_DIS_0		0x164
+#define FUSE_OPT_PRIV_SEC_EN_0		0x164
+#define FUSE_GCPLEX_CONFIG_FUSE_0	0x1c8
+
+#define FUSE_TSENSOR8_CALIB		0x180
+#define FUSE_SPARE_REALIGNMENT_REG_0	0x1fc
+
+#define FUSE_OPT_GPU_TPC0_DISABLE_0	0x20c
+#define FUSE_OPT_GPU_TPC1_DISABLE_0	0x23c
+
+#define FUSE_USB_CALIB_EXT_0		0x250
+
+#define FUSE_OPT_ECC_EN			0x258
 
 unsigned long long tegra_chip_uid(void);
 int tegra_fuse_readl(unsigned long offset, u32 *val);
