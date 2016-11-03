@@ -82,7 +82,7 @@ int tegra_cpu_speedo_value(void);
 int tegra_core_speedo_mv(void);
 int tegra_core_speedo_min_mv(void);
 int tegra_gpu_speedo_id(void);
-int tegra_get_cpu_iddq_value(void);
+int tegra_fuse_get_cpu_iddq(void);
 int tegra_get_chip_personality(void);
 
 #if defined(CONFIG_ARCH_TEGRA_21x_SOC)
@@ -91,8 +91,8 @@ int tegra_cpu_speedo_1_value(void);
 int tegra_soc_speedo_0_value(void);
 int tegra_soc_speedo_1_value(void);
 int tegra_soc_speedo_2_value(void);
-int tegra_get_soc_iddq_value(void);
-int tegra_get_gpu_iddq_value(void);
+int tegra_fuse_get_soc_iddq(void);
+int tegra_fuse_get_gpu_iddq(void);
 int tegra_gpu_speedo_value(void);
 #endif
 

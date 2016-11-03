@@ -90,9 +90,11 @@ struct tegra_sku_info {
 	int core_process_id;
 	int soc_speedo_id;
 	int soc_speedo_value;
+	int soc_iddq_value;
 	int gpu_speedo_id;
 	int gpu_process_id;
 	int gpu_speedo_value;
+	int gpu_iddq_value;
 	enum tegra_revision revision;
 };
 
