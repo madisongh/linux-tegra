@@ -69,6 +69,23 @@ enum tegra_bwmgr_request_type {
 	TEGRA_BWMGR_SET_EMC_REQ_COUNT /* Should always be last */
 };
 
+enum bwmgr_dram_types {
+	DRAM_TYPE_NONE,
+	DRAM_TYPE_LPDDR4_4CH_ECC,
+	DRAM_TYPE_LPDDR4_2CH_ECC,
+	DRAM_TYPE_LPDDR4_4CH,
+	DRAM_TYPE_LPDDR4_2CH,
+	DRAM_TYPE_LPDDR3_2CH,
+	DRAM_TYPE_DDR3_2CH
+};
+
+extern u8 bwmgr_dram_efficiency;
+extern u32 *bwmgr_dram_iso_eff_table;
+extern int bwmgr_iso_bw_percentage;
+extern enum bwmgr_dram_types bwmgr_dram_type;
+extern int emc_to_dram_freq_factor;
+void bwmgr_eff_init(void);
+
 struct tegra_bwmgr_client;
 
 #if defined(CONFIG_TEGRA_BWMGR)
