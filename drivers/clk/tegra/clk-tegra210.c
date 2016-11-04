@@ -2816,6 +2816,12 @@ static int tegra210_enable_pllu(void)
 		return -EINVAL;
 	}
 
+	/* clear IDDQ bit */
+	pllu.params = &pll_u_vco_params;
+	reg = readl_relaxed(clk_base + pllu.params->ext_misc_reg[0]);
+	reg &= ~BIT(pllu.params->iddq_bit_idx);
+	writel_relaxed(reg, clk_base + pllu.params->ext_misc_reg[0]);
+
 	reg = readl_relaxed(clk_base + PLLU_BASE);
 	reg &= ~GENMASK(20,0);
 	reg |= fentry->m;
@@ -2825,7 +2831,6 @@ static int tegra210_enable_pllu(void)
 	reg |= PLL_ENABLE;
 	writel(reg, clk_base + PLLU_BASE);
 
-	pllu.params = &pll_u_vco_params;
 	ret = tegra210_wait_for_mask(&pllu, PLLU_BASE, PLL_BASE_LOCK);
 
 	if (ret) {
