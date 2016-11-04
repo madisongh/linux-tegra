@@ -26,6 +26,8 @@
 #include <linux/workqueue.h>
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
+#include <linux/usb/of.h>
+#include <linux/usb/otg.h>
 #include <linux/kthread.h>
 #include <linux/circ_buf.h>
 #include <linux/extcon.h>
@@ -1512,17 +1514,20 @@ static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 		}
 	}
 
-	if (on) {
-		if (tegra->soc_config->set_id_override)
-			ret = tegra->soc_config->set_id_override(otg_phy);
-	} else {
-		if (tegra->soc_config->clear_id_override)
-			ret = tegra->soc_config->clear_id_override(otg_phy);
-	}
+	if (!XHCI_IS_T186(tegra)) {
+		if (on) {
+			if (tegra->soc_config->set_id_override)
+				ret = tegra->soc_config->
+					set_id_override(otg_phy);
+		} else {
+			if (tegra->soc_config->clear_id_override)
+				ret = tegra->soc_config->
+					clear_id_override(otg_phy);
+		}
 
-	if (ret) {
-		dev_dbg(tegra->dev, "%s ID override failed\n",
-			on ? "set" : "clear");
+		if (ret)
+			dev_dbg(tegra->dev, "%s ID override failed\n",
+				on ? "set" : "clear");
 	}
 
 	if (!tegra->otg_role_initialized) {
@@ -1733,6 +1738,31 @@ static void tegra_firmware_retry_work(struct work_struct *work)
 	}
 }
 
+static int tegra_xhci_otg_hcd_start(struct usb_hcd *hcd)
+{
+	struct tegra_xhci_hcd *tegra = hcd_to_tegra_xhci(hcd);
+
+	dev_dbg(tegra->dev, "OTG start(): %s\n", __func__);
+	tegra_xhci_set_host_mode(tegra, true);
+
+	return 0;
+}
+
+static int tegra_xhci_otg_hcd_stop(struct usb_hcd *hcd)
+{
+	struct tegra_xhci_hcd *tegra = hcd_to_tegra_xhci(hcd);
+
+	dev_dbg(tegra->dev, "OTG stop(): %s\n", __func__);
+	tegra_xhci_set_host_mode(tegra, false);
+
+	return 0;
+}
+
+struct otg_hcd_ops tegra_xhci_otg_hcd_ops = {
+	.start = tegra_xhci_otg_hcd_start,
+	.stop = tegra_xhci_otg_hcd_stop,
+};
+
 static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 {
 	struct tegra_xhci_hcd *tegra = context;
@@ -1802,6 +1832,10 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	device_init_wakeup(&tegra->hcd->self.root_hub->dev, true);
 	device_init_wakeup(&xhci->shared_hcd->self.root_hub->dev, true);
 
+	/* Set SS OTG port to the usb bus */
+	if (tegra->usb3_otg_port_base_1)
+		xhci->shared_hcd->self.otg_port = tegra->usb3_otg_port_base_1;
+
 	/* Enable firmware messages from controller. */
 	msg.cmd = MBOX_CMD_MSG_ENABLED;
 	msg.data = 0;
@@ -1813,7 +1847,23 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 
 	tegra->fw_loaded = true;
 
-	tegra_xhci_update_otg_role(tegra);
+	if (XHCI_IS_T186(tegra)) {
+		/* if there is any OTG port, register to otg core */
+		if (tegra->utmi_otg_port_base_1) {
+			tegra->hcd->otg_dev = of_usb_get_otg(dev->of_node);
+			ret = usb_otg_register_hcd(tegra->hcd,
+						   &tegra_xhci_otg_hcd_ops);
+			if (ret) {
+				dev_err(dev, "failed to register to OTG core: %d\n",
+					ret);
+				goto dealloc_usb3_hcd;
+			}
+
+			dev_dbg(dev, "registered to OTG core\n");
+		}
+	} else {
+		tegra_xhci_update_otg_role(tegra);
+	}
 
 	/* set pretend connected per HSIC PHY DTB */
 	for (i = 0; i < tegra->soc_config->num_phys[HSIC_PHY]; i++) {
@@ -1934,20 +1984,37 @@ static void tegra_xhci_debugfs_deinit(struct tegra_xhci_hcd *tegra)
 static irqreturn_t tegra_xhci_padctl_irq(int irq, void *dev_id)
 {
 	struct tegra_xhci_hcd *tegra = dev_id;
+	int i, j;
+	bool remote_wakeup = false;
+	bool oc = false;
 
 	if (XHCI_IS_T186(tegra)) {
-		unsigned i;
-		bool oc = false;
-
-		for (i = 0; i < tegra->soc_config->num_phys[UTMI_PHY]; i++) {
-			if (tegra->soc_config->overcurrent_detected &&
+		for (i = 0; i < MAX_PHY_TYPES; i++) {
+			for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
+				if (tegra->soc_config->remote_wake_detected &&
+				    tegra->soc_config->remote_wake_detected(
+						tegra->phys[i][j]) > 0) {
+					dev_dbg(tegra->dev,
+						"%s port %d remote wake detected\n",
+						tegra_phy_names[i], j);
+					remote_wakeup = true;
+				}
+				if (i == UTMI_PHY &&
+				tegra->soc_config->overcurrent_detected &&
 				tegra->soc_config->overcurrent_detected(
-						tegra->phys[UTMI_PHY][i]) > 0) {
-				dev_warn(tegra->dev,
-					"over-current detected on UTMI pad %u\n",
-					i);
-				oc = true;
+						tegra->phys[i][j]) > 0) {
+					dev_warn(tegra->dev,
+						 "port %d over-current detected\n",
+						 j);
+					oc = true;
+				}
 			}
+		}
+
+		if (!remote_wakeup && !oc) {
+			dev_dbg(tegra->dev,
+				"padctl interrupt isn't for XHCI\n");
+			return IRQ_NONE;
 		}
 
 		/* call padctl API to clear OC condition */
@@ -2148,7 +2215,7 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	}
 	ret = devm_request_threaded_irq(&pdev->dev, tegra->padctl_irq, NULL,
 				tegra_xhci_padctl_irq,
-				IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+				IRQF_ONESHOT | IRQF_TRIGGER_HIGH | IRQF_SHARED,
 				dev_name(&pdev->dev), tegra);
 	if (ret < 0)
 		goto put_hcd;
@@ -2321,6 +2388,7 @@ skip_clocks:
 	if (tegra->utmi_otg_port_base_1) {
 		dev_info(&pdev->dev, "UTMI port %d has OTG_CAP\n",
 			tegra->utmi_otg_port_base_1 - 1);
+		hcd->self.otg_port = tegra->utmi_otg_port_base_1;
 	} else
 		dev_info(&pdev->dev, "No UTMI port has OTG_CAP\n");
 
@@ -2354,18 +2422,6 @@ skip_clocks:
 
 	tegra_xhci_debugfs_init(tegra);
 
-	INIT_WORK(&tegra->id_extcon_work, tegra_xhci_id_extcon_work);
-	tegra->id_extcon = extcon_get_extcon_dev_by_cable(&pdev->dev, "id");
-	if (!IS_ERR(tegra->id_extcon)) {
-		tegra->id_extcon_nb.notifier_call = tegra_xhci_id_notifier;
-		extcon_register_notifier(tegra->id_extcon, EXTCON_USB_HOST,
-					 &tegra->id_extcon_nb);
-	} else if (PTR_ERR(tegra->id_extcon) == -EPROBE_DEFER) {
-		ret = -EPROBE_DEFER;
-		goto disable_phy;
-	} else
-		dev_info(&pdev->dev, "no USB ID extcon found\n");
-
 	INIT_DELAYED_WORK(&tegra->firmware_retry_work,
 					tegra_firmware_retry_work);
 
@@ -2375,21 +2431,30 @@ skip_clocks:
 				      tegra_xhci_probe_finish);
 	if (ret < 0) {
 		dev_warn(&pdev->dev, "can't request firmware(%d)\n", ret);
-		goto unregister_extcon;
+		goto disable_phy;
 	}
 
-	if (XHCI_IS_T186(tegra))
+	if (XHCI_IS_T186(tegra)) {
 		INIT_WORK(&tegra->oc_work, tegra_xhci_oc_work);
+	} else {
+		INIT_WORK(&tegra->id_extcon_work, tegra_xhci_id_extcon_work);
+		tegra->id_extcon = extcon_get_extcon_dev_by_cable(&pdev->dev,
+								  "id");
+		if (!IS_ERR(tegra->id_extcon)) {
+			tegra->id_extcon_nb.notifier_call =
+				tegra_xhci_id_notifier;
+			extcon_register_notifier(tegra->id_extcon,
+				EXTCON_USB_HOST, &tegra->id_extcon_nb);
+		} else if (PTR_ERR(tegra->id_extcon) == -EPROBE_DEFER) {
+			ret = -EPROBE_DEFER;
+			goto disable_phy;
+		} else
+			dev_info(&pdev->dev, "no USB ID extcon found\n");
+	}
 
 	device_init_wakeup(tegra->dev, true);
 	return 0;
 
-unregister_extcon:
-	cancel_work_sync(&tegra->id_extcon_work);
-	if (!IS_ERR(tegra->id_extcon)) {
-		extcon_unregister_notifier(tegra->id_extcon, EXTCON_USB_HOST,
-					   &tegra->id_extcon_nb);
-	}
 disable_phy:
 	tegra_xhci_debugfs_deinit(tegra);
 	tegra_xhci_phy_disable(tegra);
@@ -2423,8 +2488,16 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	struct usb_hcd *hcd = tegra->hcd;
 	struct xhci_hcd *xhci;
 
-	if (XHCI_IS_T186(tegra))
+	if (XHCI_IS_T186(tegra)) {
 		cancel_work_sync(&tegra->oc_work);
+		if (tegra->utmi_otg_port_base_1)
+			usb_otg_unregister_hcd(hcd);
+	} else {
+		cancel_work_sync(&tegra->id_extcon_work);
+		if (!IS_ERR(tegra->id_extcon))
+			extcon_unregister_notifier(tegra->id_extcon,
+					EXTCON_USB_HOST, &tegra->id_extcon_nb);
+	}
 
 	cancel_delayed_work_sync(&tegra->firmware_retry_work);
 	pm_runtime_get_sync(tegra->dev);
@@ -2439,12 +2512,6 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	} else if (hcd) {
 		/* Unbound after probe(), but before firmware loading. */
 		usb_put_hcd(hcd);
-	}
-
-	cancel_work_sync(&tegra->id_extcon_work);
-	if (!IS_ERR(tegra->id_extcon)) {
-		extcon_unregister_notifier(tegra->id_extcon, EXTCON_USB_HOST,
-					   &tegra->id_extcon_nb);
 	}
 
 	cancel_work_sync(&tegra->mbox_req_work);
@@ -2999,9 +3066,10 @@ static int tegra_xhci_suspend(struct device *dev)
 	if (!tegra->fw_loaded)
 		return 0;
 
-	flush_work(&tegra->id_extcon_work);
 	if (XHCI_IS_T186(tegra))
 		flush_work(&tegra->oc_work);
+	else
+		flush_work(&tegra->id_extcon_work);
 
 	mutex_lock(&tegra->lock);
 
@@ -3026,11 +3094,10 @@ static int tegra_xhci_suspend(struct device *dev)
 
 			/*
 			 * turn off VBUS for CDP enabled case.
-			 * skip vbus off for OTG port when it isn't host role
+			 * skip vbus off for OTG port
 			 */
-			if ((j != tegra->utmi_otg_port_base_1 - 1 ||
-					tegra->host_mode) &&
-					tegra->soc_config->utmi_vbus_power_off)
+			if ((j != tegra->utmi_otg_port_base_1 - 1) &&
+				tegra->soc_config->utmi_vbus_power_off)
 				tegra->soc_config->utmi_vbus_power_off(
 						tegra->phys[UTMI_PHY][j]);
 
@@ -3076,10 +3143,9 @@ static int tegra_xhci_resume_common(struct device *dev)
 				dev_dbg(dev, "%s: power on CDP phy %d failed\n",
 					__func__, j);
 
-			/* skip vbus on for OTG port when it isn't host role */
-			if ((j != tegra->utmi_otg_port_base_1 - 1 ||
-					tegra->host_mode) &&
-					tegra->soc_config->utmi_vbus_power_on)
+			/* skip vbus on for OTG port */
+			if ((j != tegra->utmi_otg_port_base_1 - 1) &&
+				tegra->soc_config->utmi_vbus_power_on)
 				tegra->soc_config->utmi_vbus_power_on(
 						tegra->phys[UTMI_PHY][j]);
 		}
@@ -3094,7 +3160,8 @@ static int tegra_xhci_resume_common(struct device *dev)
 	tegra->suspended = false;
 	mutex_unlock(&tegra->lock);
 
-	tegra_xhci_update_otg_role(tegra);
+	if (!XHCI_IS_T186(tegra))
+		tegra_xhci_update_otg_role(tegra);
 
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
