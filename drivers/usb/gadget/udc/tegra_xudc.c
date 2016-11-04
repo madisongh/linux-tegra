@@ -38,6 +38,9 @@
 #include <linux/tegra-powergate.h>
 #include <linux/tegra_pm_domains.h>
 #include <linux/usb/ch9.h>
+#include <linux/usb/of.h>
+#include <linux/usb/otg.h>
+#include <linux/usb/otg-fsm.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/tegra_usb_charger.h>
 #include <linux/workqueue.h>
@@ -574,6 +577,7 @@ struct tegra_xudc_soc_data {
 	int (*clear_vbus_override)(struct phy *utmi_phy);
 	void (*utmi_pad_power_on)(struct phy *utmi_phy);
 	void (*utmi_pad_power_off)(struct phy *utmi_phy);
+	bool (*has_otg_cap)(struct phy *utmi_phy);
 	bool pls_quirk;
 };
 
@@ -679,7 +683,8 @@ static void tegra_xudc_device_mode_on(struct tegra_xudc *xudc)
 	dev_info(xudc->dev, "device mode on\n");
 	if (xudc->soc->utmi_pad_power_on)
 		xudc->soc->utmi_pad_power_on(xudc->utmi_phy);
-	if (xudc->soc->set_vbus_override)
+	if ((!xudc->gadget.is_otg || !XUDC_IS_T186(xudc)) &&
+			xudc->soc->set_vbus_override)
 		xudc->soc->set_vbus_override(xudc->utmi_phy);
 
 	xudc->device_mode = true;
@@ -703,7 +708,9 @@ static void tegra_xudc_device_mode_off(struct tegra_xudc *xudc)
 	connected = !!(xudc_readl(xudc, PORTSC) & PORTSC_CCS);
 	reinit_completion(&xudc->disconnect_complete);
 
-	if (xudc->soc->clear_vbus_override)
+	/* clearing VBUS override will be handled in XOTG driver */
+	if ((xudc->suspended || !xudc->gadget.is_otg || !XUDC_IS_T186(xudc)) &&
+			xudc->soc->clear_vbus_override)
 		xudc->soc->clear_vbus_override(xudc->utmi_phy);
 	if (xudc->soc->utmi_pad_power_off)
 		xudc->soc->utmi_pad_power_off(xudc->utmi_phy);
@@ -1999,7 +2006,12 @@ static void tegra_xudc_set_sdp_dcp_charging_current_work(
 				  set_sdp_dcp_charging_current_work);
 
 	dev_dbg(xudc->dev, "%s\n", __func__);
-	tegra_ucd_set_sdp_cdp_current(xudc->ucd, xudc->current_ma);
+	/*
+	 * We actually are the VBUS supplier if we are a_peripheral,
+	 * so there is no point setting current here if we are A-device.
+	 */
+	if (!xudc->gadget.is_a_peripheral)
+		tegra_ucd_set_sdp_cdp_current(xudc->ucd, xudc->current_ma);
 }
 
 static int tegra_xudc_gadget_vbus_draw(struct usb_gadget *gadget, unsigned m_a)
@@ -2153,12 +2165,44 @@ static int tegra_xudc_ep0_set_feature(struct tegra_xudc *xudc,
 			xudc_writel(xudc, val, PORTPM);
 			break;
 		case USB_DEVICE_TEST_MODE:
-			if (xudc->gadget.speed != USB_SPEED_HIGH)
+			if (xudc->gadget.speed != USB_SPEED_FULL &&
+			    xudc->gadget.speed != USB_SPEED_HIGH)
 				return -EINVAL;
 			if (!set)
 				return -EINVAL;
 
 			xudc->test_mode_pattern = index >> 8;
+			switch (xudc->test_mode_pattern) {
+			case TEST_MODE_OTG_HNP_REQD:
+				dev_info(xudc->dev, "received otg_hnp_reqd\n");
+				xudc->gadget.host_request_flag = 1;
+				xudc->gadget.otg_hnp_reqd = 1;
+				break;
+			case TEST_MODE_OTG_SRP_REQD:
+				dev_info(xudc->dev, "received otg_srp_reqd\n");
+				xudc->gadget.otg_srp_reqd = 1;
+				break;
+			}
+			break;
+		case USB_DEVICE_B_HNP_ENABLE:
+			if (set) {
+				dev_info(xudc->dev, "received B_HNP_ENABLE\n");
+				xudc->gadget.b_hnp_enable = 1;
+				usb_otg_kick_fsm(xudc->dev);
+			} else {
+				/*
+				 * b_hnp_enable is only cleared on a bus reset
+				 * or at the end of a session. It can't be
+				 * cleared with a ClearFeature
+				 */
+				return -EINVAL;
+			}
+			break;
+		case USB_DEVICE_A_HNP_SUPPORT:
+			xudc->gadget.a_hnp_support = 1;
+			break;
+		case USB_DEVICE_A_ALT_HNP_SUPPORT:
+			xudc->gadget.a_alt_hnp_support = 1;
 			break;
 		default:
 			return -EINVAL;
@@ -2211,16 +2255,30 @@ static int tegra_xudc_ep0_get_status(struct tegra_xudc *xudc,
 	struct tegra_xudc_ep_context *ep_ctx;
 	u32 val, ep, index = le16_to_cpu(ctrl->wIndex);
 	u16 status = 0;
+	size_t len = sizeof(xudc->status_buf);
 
 	if (!(ctrl->bRequestType & USB_DIR_IN))
 		return -EINVAL;
 
 	if ((le16_to_cpu(ctrl->wValue) != 0) ||
-	    (le16_to_cpu(ctrl->wLength) != 2))
+	    (le16_to_cpu(ctrl->wLength) > 2))
 		return -EINVAL;
 
 	switch (ctrl->bRequestType & USB_RECIP_MASK) {
 	case USB_RECIP_DEVICE:
+		if (index == OTG_STS_SELECTOR) {
+			len = 1;
+			/*
+			 * set HOST_REQUEST_FLAG if user on peripheral side
+			 * requesting to become host
+			 */
+			if (xudc->gadget.host_request_flag) {
+				dev_info(xudc->dev, "set HOST_REQUEST_FLAG\n");
+				status = HOST_REQUEST_FLAG;
+			}
+		} else if (index)
+			return -EINVAL;
+
 		val = xudc_readl(xudc, PORTPM);
 
 		if (xudc->selfpowered)
@@ -2265,8 +2323,7 @@ static int tegra_xudc_ep0_get_status(struct tegra_xudc *xudc,
 	}
 
 	xudc->status_buf = cpu_to_le16(status);
-	return tegra_xudc_ep0_queue_data(xudc, &xudc->status_buf,
-					 sizeof(xudc->status_buf),
+	return tegra_xudc_ep0_queue_data(xudc, &xudc->status_buf, len,
 					 no_op_complete);
 }
 
@@ -2724,6 +2781,9 @@ static void tegra_xudc_port_connect(struct tegra_xudc *xudc)
 	val = xudc_readl(xudc, ST);
 	if (val & ST_RC)
 		xudc_writel(xudc, ST_RC, ST);
+
+	if (xudc->gadget.is_otg)
+		usb_otg_notify(xudc->dev, OTG_EVENT_PCD_PORT_CONNECT);
 }
 
 static void tegra_xudc_port_disconnect(struct tegra_xudc *xudc)
@@ -2739,6 +2799,9 @@ static void tegra_xudc_port_disconnect(struct tegra_xudc *xudc)
 	usb_gadget_set_state(&xudc->gadget, xudc->device_state);
 
 	complete(&xudc->disconnect_complete);
+
+	if (xudc->gadget.is_otg)
+		usb_otg_notify(xudc->dev, OTG_EVENT_PCD_PORT_DISCONNECT);
 }
 
 static void tegra_xudc_port_reset(struct tegra_xudc *xudc)
@@ -2763,6 +2826,9 @@ static void tegra_xudc_port_suspend(struct tegra_xudc *xudc)
 		xudc->driver->suspend(&xudc->gadget);
 		spin_lock(&xudc->lock);
 	}
+
+	if (xudc->gadget.is_otg)
+		usb_otg_notify(xudc->dev, OTG_EVENT_PCD_PORT_SUSPEND);
 }
 
 static void tegra_xudc_port_resume(struct tegra_xudc *xudc)
@@ -2774,6 +2840,9 @@ static void tegra_xudc_port_resume(struct tegra_xudc *xudc)
 		xudc->driver->resume(&xudc->gadget);
 		spin_lock(&xudc->lock);
 	}
+
+	if (xudc->gadget.is_otg)
+		usb_otg_notify(xudc->dev, OTG_EVENT_PCD_PORT_RESUME);
 }
 
 static inline void clear_port_change(struct tegra_xudc *xudc, u32 flag)
@@ -3289,6 +3358,11 @@ static void tegra_xudc_device_params_init(struct tegra_xudc *xudc)
 	val |= (0xf000 & CFG_DEV_SSPI_XFER_ACKTIMEOUT_MASK) <<
 		CFG_DEV_SSPI_XFER_ACKTIMEOUT_SHIFT;
 	xudc_writel(xudc, val, CFG_DEV_SSPI_XFER);
+
+	/* OTG related */
+	xudc->gadget.b_hnp_enable = 0;
+	xudc->gadget.a_hnp_support = 0;
+	xudc->gadget.a_alt_hnp_support = 0;
 }
 
 static int tegra_xudc_clk_enable(struct tegra_xudc *xudc)
@@ -3366,6 +3440,31 @@ static void tegra_xudc_non_std_charger_work(struct work_struct *work)
 	}
 }
 
+static int tegra_xudc_otg_gadget_start(struct usb_gadget *gadget)
+{
+	struct tegra_xudc *xudc = to_xudc(gadget);
+
+	dev_dbg(xudc->dev, "OTG start(): %s\n", __func__);
+	tegra_xudc_device_mode_on(xudc);
+
+	return 0;
+}
+
+static int tegra_xudc_otg_gadget_stop(struct usb_gadget *gadget)
+{
+	struct tegra_xudc *xudc = to_xudc(gadget);
+
+	dev_dbg(xudc->dev, "OTG stop(): %s\n", __func__);
+	tegra_xudc_device_mode_off(xudc);
+
+	return 0;
+}
+
+struct otg_gadget_ops tegra_xudc_otg_gadget_ops = {
+	.start = tegra_xudc_otg_gadget_start,
+	.stop = tegra_xudc_otg_gadget_stop,
+};
+
 static const char * const tegra210_xudc_supply_names[] = {
 	"hvdd_usb",
 	"avddio_usb",
@@ -3389,6 +3488,7 @@ static struct tegra_xudc_soc_data tegra210_xudc_soc_data = {
 	.clear_vbus_override = tegra21x_phy_xusb_clear_vbus_override,
 	.utmi_pad_power_on = tegra21x_phy_xusb_utmi_pad_power_on,
 	.utmi_pad_power_off = tegra21x_phy_xusb_utmi_pad_power_down,
+	.has_otg_cap = tegra21x_phy_xusb_has_otg_cap,
 	.pls_quirk = true,
 };
 
@@ -3404,6 +3504,7 @@ static struct tegra_xudc_soc_data tegra210b01_xudc_soc_data = {
 	.clear_vbus_override = tegra21x_phy_xusb_clear_vbus_override,
 	.utmi_pad_power_on = tegra21x_phy_xusb_utmi_pad_power_on,
 	.utmi_pad_power_off = tegra21x_phy_xusb_utmi_pad_power_down,
+	.has_otg_cap = tegra21x_phy_xusb_has_otg_cap,
 	.pls_quirk = false,
 };
 
@@ -3419,6 +3520,7 @@ static struct tegra_xudc_soc_data tegra186_xudc_soc_data = {
 	.clear_vbus_override = tegra18x_phy_xusb_clear_vbus_override,
 	.utmi_pad_power_on = tegra18x_phy_xusb_utmi_pad_power_on,
 	.utmi_pad_power_off = tegra18x_phy_xusb_utmi_pad_power_down,
+	.has_otg_cap = tegra18x_phy_xusb_has_otg_cap,
 	.pls_quirk = false,
 };
 
@@ -3591,14 +3693,6 @@ static int tegra_xudc_probe(struct platform_device *pdev)
 		goto disable_regulator;
 	}
 
-	xudc->data_role_extcon = extcon_get_extcon_dev_by_cable(&pdev->dev, "vbus");
-	if (IS_ERR(xudc->data_role_extcon)) {
-		err = PTR_ERR(xudc->data_role_extcon);
-		dev_err(xudc->dev, "extcon_get_extcon_dev_by_cable failed %d\n",
-				err);
-		goto disable_regulator;
-	}
-
 #if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
 	partition_id_xusba = tegra_pd_get_powergate_id(tegra_xusba_pd);
 #else
@@ -3683,16 +3777,44 @@ static int tegra_xudc_probe(struct platform_device *pdev)
 		}
 	}
 
+	/* for T186, register gadget to OTG core if the port is OTG port */
+	if (XUDC_IS_T186(xudc) && xudc->soc->has_otg_cap &&
+			xudc->soc->has_otg_cap(xudc->utmi_phy)) {
+		xudc->gadget.otg_dev = of_usb_get_otg(pdev->dev.of_node);
+		err = usb_otg_register_gadget(&xudc->gadget,
+				&tegra_xudc_otg_gadget_ops);
+		if (err) {
+			dev_err(&pdev->dev,
+				"failed to register to OTG core: %d\n", err);
+			goto del_gadget;
+		}
+
+		dev_dbg(&pdev->dev, "registered to OTG core\n");
+		xudc->gadget.is_otg = 1;
+	} else {
+		/* for T186 device-only port or for non-T186 */
+		xudc->data_role_extcon = extcon_get_extcon_dev_by_cable(
+				&pdev->dev, "vbus");
+		if (IS_ERR(xudc->data_role_extcon)) {
+			err = PTR_ERR(xudc->data_role_extcon);
+			dev_err(xudc->dev,
+				"extcon_get_extcon_dev_by_cable failed %d\n",
+				err);
+			goto del_gadget;
+		}
+
+		INIT_WORK(&xudc->data_role_work, tegra_xudc_data_role_work);
+		xudc->data_role_nb.notifier_call =
+				tegra_xudc_data_role_notifier;
+		extcon_register_notifier(xudc->data_role_extcon, EXTCON_USB,
+				&xudc->data_role_nb);
+
+		tegra_xudc_update_data_role(xudc);
+		xudc->gadget.is_otg = 0;
+	}
+
 	init_completion(&xudc->disconnect_complete);
-
-	INIT_WORK(&xudc->data_role_work, tegra_xudc_data_role_work);
-	xudc->data_role_nb.notifier_call = tegra_xudc_data_role_notifier;
-	extcon_register_notifier(xudc->data_role_extcon, EXTCON_USB,
-				 &xudc->data_role_nb);
-
 	INIT_DELAYED_WORK(&xudc->plc_reset_work, tegra_xudc_plc_reset_work);
-
-	tegra_xudc_update_data_role(xudc);
 
 	tegra_pd_add_device(&pdev->dev);
 	pm_runtime_set_active(&pdev->dev);
@@ -3700,6 +3822,8 @@ static int tegra_xudc_probe(struct platform_device *pdev)
 
 	return 0;
 
+del_gadget:
+	usb_del_gadget_udc(&xudc->gadget);
 free_eps:
 	tegra_xudc_free_eps(xudc);
 free_event_ring:
@@ -3732,9 +3856,14 @@ static int tegra_xudc_remove(struct platform_device *pdev)
 		tegra_usb_release_ucd(xudc->ucd);
 	}
 
-	extcon_unregister_notifier(xudc->data_role_extcon, EXTCON_USB,
-				   &xudc->data_role_nb);
-	cancel_work_sync(&xudc->data_role_work);
+	if (XUDC_IS_T186(xudc) && xudc->gadget.is_otg) {
+		usb_otg_unregister_gadget(&xudc->gadget);
+	} else {
+		extcon_unregister_notifier(xudc->data_role_extcon, EXTCON_USB,
+				&xudc->data_role_nb);
+		cancel_work_sync(&xudc->data_role_work);
+	}
+
 	usb_del_gadget_udc(&xudc->gadget);
 	tegra_xudc_free_eps(xudc);
 	tegra_xudc_free_event_ring(xudc);
@@ -3899,7 +4028,8 @@ static int tegra_xudc_suspend(struct device *dev)
 	xudc->suspended = true;
 	spin_unlock_irqrestore(&xudc->lock, flags);
 
-	flush_work(&xudc->data_role_work);
+	if (!XUDC_IS_T186(xudc) || !xudc->gadget.is_otg)
+		flush_work(&xudc->data_role_work);
 
 	/* Forcibly disconnect before powergating. */
 	tegra_xudc_device_mode_off(xudc);
@@ -3926,7 +4056,8 @@ static int tegra_xudc_resume(struct device *dev)
 	xudc->suspended = false;
 	spin_unlock_irqrestore(&xudc->lock, flags);
 
-	tegra_xudc_update_data_role(xudc);
+	if (!XUDC_IS_T186(xudc) || !xudc->gadget.is_otg)
+		tegra_xudc_update_data_role(xudc);
 
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
