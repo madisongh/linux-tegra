@@ -3829,7 +3829,6 @@ static void tegra210_clk_resume(void)
 	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_D]);
 
 	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_P]);
-	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_U]);
 
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_C_OUT1]);
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_M_OUT1]);
