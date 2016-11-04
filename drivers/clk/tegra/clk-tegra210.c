@@ -23,7 +23,6 @@
 #include <linux/delay.h>
 #include <linux/export.h>
 #include <linux/io.h>
-#include <linux/iopoll.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
@@ -2803,7 +2802,9 @@ EXPORT_SYMBOL_GPL(tegra210_put_utmipll_out_iddq);
 static int tegra210_enable_pllu(void)
 {
 	struct tegra_clk_pll_freq_table *fentry;
+	struct tegra_clk_pll pllu;
 	u32 reg;
+	int ret;
 
 	for (fentry = pll_u_freq_table; fentry->input_rate; fentry++) {
 		if (fentry->input_rate == pll_ref_freq)
@@ -2824,9 +2825,10 @@ static int tegra210_enable_pllu(void)
 	reg |= PLL_ENABLE;
 	writel(reg, clk_base + PLLU_BASE);
 
-	readl_relaxed_poll_timeout(clk_base + PLLU_BASE, reg,
-				   reg & PLL_BASE_LOCK, 2, 1000);
-	if (!(reg & PLL_BASE_LOCK)) {
+	pllu.params = &pll_u_vco_params;
+	ret = tegra210_wait_for_mask(&pllu, PLLU_BASE, PLL_BASE_LOCK);
+
+	if (ret) {
 		pr_err("Timed out waiting for PLL_U to lock\n");
 		return -ETIMEDOUT;
 	}
