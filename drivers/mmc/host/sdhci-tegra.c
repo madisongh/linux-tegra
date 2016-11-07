@@ -1297,7 +1297,6 @@ static void tegra_sdhci_post_voltage_switch(struct sdhci_host *sdhci,
 			tegra_sdhci_set_padctrl(sdhci, SDHOST_LOW_VOLT_MAX);
 		}
 	}
-	tegra_sdhci_do_calibration(sdhci, signal_voltage);
 	return;
 }
 
@@ -1514,6 +1513,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.is_tuning_done		= tegra_sdhci_is_tuning_done,
 	.pre_regulator_config	= tegra_sdhci_pre_regulator_config,
 	.enable_dma		= tegra_sdhci_enable_dma,
+	.do_calibration	= tegra_sdhci_do_calibration,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {

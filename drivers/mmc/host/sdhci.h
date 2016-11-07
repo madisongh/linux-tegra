@@ -603,6 +603,8 @@ struct sdhci_ops {
 	void	(*post_tuning)(struct sdhci_host *host);
 	bool	(*is_tuning_done)(struct sdhci_host *sdhci);
 	void	(*pre_regulator_config)(struct sdhci_host *sdhci, int vdd);
+	void	(*do_calibration)(struct sdhci_host *sdhci,
+			unsigned char signal_voltage);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

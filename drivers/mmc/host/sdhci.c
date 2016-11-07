@@ -1163,9 +1163,9 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 		period_time = ktime_to_ms(ktime_sub(cur_time,
 					host->timestamp));
 		if ((period_time >= SDHCI_PERIODIC_CALIB_TIMEOUT) &&
-			host->ops->switch_signal_voltage_exit)
-			host->ops->switch_signal_voltage_exit(host,
-					host->mmc->ios.signal_voltage, 0);
+			host->ops->do_calibration)
+			host->ops->do_calibration(host,
+					host->mmc->ios.signal_voltage);
 	}
 	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
 }
@@ -2075,6 +2075,8 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
 	if  (host->ops->switch_signal_voltage_exit)
 		host->ops->switch_signal_voltage_exit(host,
 			ios->signal_voltage, err ? 0 : 1);
+	if (host->ops->do_calibration)
+		host->ops->do_calibration(host, host->mmc->ios.signal_voltage);
 	sdhci_runtime_pm_put(host);
 	return err;
 }
@@ -3169,6 +3171,8 @@ int sdhci_runtime_resume_host(struct sdhci_host *host)
 	if (host->ops->switch_signal_voltage_exit)
 		host->ops->switch_signal_voltage_exit(host,
 			host->mmc->ios.signal_voltage, err ? 0 : 1);
+	if (host->ops->do_calibration)
+		host->ops->do_calibration(host, host->mmc->ios.signal_voltage);
 	sdhci_do_set_ios(host, &host->mmc->ios);
 
 	if ((host_flags & SDHCI_PV_ENABLED) &&
