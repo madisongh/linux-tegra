@@ -1414,7 +1414,7 @@ static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option)
 		tap_delay &= SDHCI_VNDR_CLK_CTRL_TAP_VALUE_MASK;
 		tegra_host->tuned_tap_delay = tap_delay;
 		tegra_host->tuning_status = TUNING_STATUS_DONE;
-		pr_err("%s tuning done saved tap delay=%d\n",
+		pr_info("%s tuning done saved tap delay=%d\n",
 			mmc_hostname(sdhci->mmc), tegra_host->tuned_tap_delay);
 		break;
 	case SET_DEFAULT_TAP:
