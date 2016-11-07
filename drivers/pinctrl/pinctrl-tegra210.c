@@ -1310,6 +1310,7 @@ static struct tegra_function tegra210_functions[] = {
 		.tri_reg = PINGROUP_REG(r),				\
 		.tri_bank = 1,						\
 		.tri_bit = 4,						\
+		.parked_bit = 5,					\
 		.einput_bit = 6,					\
 		.odrain_bit = 11,					\
 		.lock_bit = 7,						\
