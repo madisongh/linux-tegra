@@ -789,6 +789,7 @@ static int max77620_regulator_probe(struct platform_device *pdev)
 	for (id = 0; id < MAX77620_NUM_REGS; id++) {
 		struct regulator_dev *rdev;
 		struct regulator_desc *rdesc;
+		struct max77620_regulator_pdata *rpdata;
 
 		if ((max77620_chip->chip_id == MAX77620) &&
 		    (id == MAX77620_REGULATOR_ID_SD4))
@@ -796,6 +797,7 @@ static int max77620_regulator_probe(struct platform_device *pdev)
 
 		rdesc = &rinfo[id].desc;
 		pmic->rinfo[id] = &max77620_regs_info[id];
+		rpdata = &pmic->reg_pdata[id];
 		pmic->enable_power_mode[id] = MAX77620_POWER_MODE_NORMAL;
 
 		ret = max77620_read_slew_rate(pmic, id);
@@ -809,6 +811,13 @@ static int max77620_regulator_probe(struct platform_device *pdev)
 				rdesc->name, ret);
 			return ret;
 		}
+
+		/* there is no SW control for rails which are part of FPS
+		 * set always no contraint to true to avoid regulator
+		 * enable/disable notification
+		 */
+		if (rpdata->active_fps_src != MAX77620_FPS_SRC_NONE)
+			rdev->constraints->always_on = true;
 	}
 
 	return 0;
