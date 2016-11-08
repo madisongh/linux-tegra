@@ -1,7 +1,7 @@
 /*
  * GK20A Graphics
  *
- * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -138,8 +138,6 @@ struct gpu_ops {
 		void (*free_channel_ctx)(struct channel_gk20a *c);
 		int (*alloc_obj_ctx)(struct channel_gk20a  *c,
 				struct nvgpu_alloc_obj_ctx_args *args);
-		int (*free_obj_ctx)(struct channel_gk20a  *c,
-				struct nvgpu_free_obj_ctx_args *args);
 		int (*bind_ctxsw_zcull)(struct gk20a *g, struct gr_gk20a *gr,
 				struct channel_gk20a *c, u64 zcull_va,
 				u32 mode);

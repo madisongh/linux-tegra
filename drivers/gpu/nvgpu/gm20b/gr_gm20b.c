@@ -1,7 +1,7 @@
 /*
  * GM20B GPC MMU
  *
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1091,7 +1091,6 @@ void gm20b_init_gr(struct gpu_ops *gops)
 	gops->gr.get_gpc_tpc_mask = gr_gm20b_get_gpc_tpc_mask;
 	gops->gr.free_channel_ctx = gk20a_free_channel_ctx;
 	gops->gr.alloc_obj_ctx = gk20a_alloc_obj_ctx;
-	gops->gr.free_obj_ctx = gk20a_free_obj_ctx;
 	gops->gr.bind_ctxsw_zcull = gr_gk20a_bind_ctxsw_zcull;
 	gops->gr.get_zcull_info = gr_gk20a_get_zcull_info;
 	gops->gr.is_tpc_addr = gr_gm20b_is_tpc_addr;
