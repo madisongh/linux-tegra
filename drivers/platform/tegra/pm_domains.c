@@ -134,7 +134,7 @@ static int tegra_core_power_off(struct generic_pm_domain *genpd)
 
 #endif
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC) || defined(CONFIG_ARCH_TEGRA_18x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_APE)
 
 enum {
 	APE_CLK = 0,
@@ -331,7 +331,7 @@ static int __init tegra_init_mc_clk(struct generic_pm_domain *pd)
 	return 0;
 }
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC) || defined(CONFIG_ARCH_TEGRA_18x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_APE)
 static int __init tegra_init_ape(struct generic_pm_domain *pd)
 {
 	pd->power_off = tegra_ape_power_off;
