@@ -278,7 +278,7 @@ static void *late_alloc(unsigned long size)
 	return ptr;
 }
 
-static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+void __init create_mapping(phys_addr_t phys, unsigned long virt,
 				  phys_addr_t size, pgprot_t prot)
 {
 	if (virt < VMALLOC_START) {
@@ -296,52 +296,6 @@ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
 {
 	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot,
 				late_alloc);
-}
-
-/* To support old-style static device memory mapping. */
-static __init void iotable_init(struct map_desc *io_desc, int nr)
-{
-	struct map_desc *md;
-	struct vm_struct *vm;
-
-	vm = early_alloc(sizeof(*vm) * nr);
-
-	for (md = io_desc; nr; md++, nr--) {
-		create_mapping(PFN_PHYS(md->pfn),
-			       md->virtual, md->length, md->type);
-		vm->addr = (void *)(md->virtual & PAGE_MASK);
-		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
-		vm->phys_addr = __pfn_to_phys(md->pfn);
-		vm->flags = VM_IOREMAP;
-		vm->caller = iotable_init;
-		vm_area_add_early(vm++);
-	}
-}
-
-__init void iotable_init_va(struct map_desc *io_desc, int nr)
-{
-	struct map_desc *md;
-	struct vm_struct *vm;
-
-	vm = early_alloc(sizeof(*vm) * nr);
-
-	for (md = io_desc; nr; md++, nr--) {
-		vm->addr = (void *)(md->virtual & PAGE_MASK);
-		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
-		vm->phys_addr = __pfn_to_phys(md->pfn);
-		vm->flags = VM_IOREMAP;
-		vm->caller = iotable_init;
-		vm_area_add_early(vm++);
-	}
-}
-
-__init void iotable_init_mapping(struct map_desc *io_desc, int nr)
-{
-	struct map_desc *md;
-
-	for (md = io_desc; nr; md++, nr--)
-		create_mapping(PFN_PHYS(md->pfn),
-			       md->virtual, md->length, md->type);
 }
 
 static void create_mapping_late(phys_addr_t phys, unsigned long virt,

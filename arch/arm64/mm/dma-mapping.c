@@ -1426,34 +1426,25 @@ void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
 	dma_mmu_remap_num++;
 }
 
-__init void iotable_init_va(struct map_desc *io_desc, int nr);
-__init void iotable_init_mapping(struct map_desc *io_desc, int nr);
+void __init create_mapping(phys_addr_t phys, unsigned long virt,
+				  phys_addr_t size, pgprot_t prot);
 
 void __init dma_contiguous_remap(void)
 {
 	int i;
 	for (i = 0; i < dma_mmu_remap_num; i++) {
-		phys_addr_t start = dma_mmu_remap[i].base;
-		phys_addr_t end = start + dma_mmu_remap[i].size;
-		struct map_desc map;
+		phys_addr_t start;
+		phys_addr_t end;
 		unsigned long addr;
 
+		start = dma_mmu_remap[i].base & PMD_MASK;
+		end = (start + dma_mmu_remap[i].size + PMD_SIZE - 1) & PMD_MASK;
 		if (start >= end)
 			continue;
 
-		map.type = PAGE_KERNEL_EXEC;
-
-		for (addr = start; addr < end; addr += PAGE_SIZE) {
-			map.pfn = __phys_to_pfn(addr);
-			map.virtual = __phys_to_virt(addr);
-			map.length = PAGE_SIZE;
-			iotable_init_mapping(&map, 1);
-		}
-
-		map.pfn = __phys_to_pfn(start);
-		map.virtual = __phys_to_virt(start);
-		map.length = end - start;
-		iotable_init_va(&map, 1);
+		for (addr = start; addr < end; addr += PAGE_SIZE)
+			create_mapping(addr, __phys_to_virt(addr),
+				       PAGE_SIZE, PAGE_KERNEL_EXEC);
 	}
 }
 
