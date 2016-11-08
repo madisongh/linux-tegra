@@ -295,8 +295,10 @@ int tegra_smmu_of_parse_sids(struct device *dev)
 	for_each_child_of_node(domain_node, child) {
 		int ret;
 		phandle as;
-		u32 sid_list_len, sid;
+		u32 sid;
 		struct device_node *as_node;
+		struct property *property;
+		const __be32 *cur;
 
 		ret = of_property_read_u32(child, "address-space", &as);
 		if (ret) {
@@ -320,29 +322,13 @@ int tegra_smmu_of_parse_sids(struct device *dev)
 		}
 
 		/* Read the SIDs. */
-		ret = of_property_read_u32(child, "sid-list-len",
-					   &sid_list_len);
-		if (ret || sid_list_len > MAX_PHANDLE_ARGS) {
-			err = -EINVAL;
-			of_node_put(child);
-			dev_err(dev, "Failed to parse address-space prop!\n");
-			goto free_mem;
-		}
-
-		prop->nr_sids = sid_list_len;
-		for (i = 0; i < sid_list_len; i++) {
-			ret = of_property_read_u32_index(child, "sid-list",
-							 i, &sid);
-			if (ret) {
-				err = -EINVAL;
-				of_node_put(child);
-				dev_err(dev, "Failed to read sid-list prop!\n");
-				goto free_mem;
-			}
-
+		i = 0;
+		of_property_for_each_u32(child, "sid-list", property, cur, sid) {
 			sid_list[sid]++;
 			prop->sid_list[i] = sid;
+			i++;
 		}
+		prop->nr_sids = i;
 	}
 
 	for (i = 0; i < SMMU_MAX_SIDS; i++) {
