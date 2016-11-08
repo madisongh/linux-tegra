@@ -11,10 +11,6 @@ Required properties:
 Required properties for Tegra186:
 ---------------------------------
  - avdd-usb-supply: 3.3V supply to USB 2.0 pads.
- - dvdd-pex-supply: 1.0V supply to PEX USB 3.0 pads.
- - hvdd-pex-supply: 1.8V high-voltage supply to PEX USB 3.0 pads.
- - dvdd-pex-pll-supply: 1.0V supply to PEX USB 3.0 PLL.
- - hvdd-pex-pll-supply: 1.8V high-voltage supply to PEX PLL.
 
  - phys: Must contain an entry for each entry in phy-names.
    See ../phy/phy-bindings.txt for details.
@@ -41,10 +37,6 @@ Example:
 		phy-names = "usb2", "usb3";
 
 		avdd-usb-supply = <&spmic_sd3_3v3>;
-		dvdd-pex-supply = <&spmic_ldo7_1v0>;
-		hvdd-pex-supply =  <&vdd_1v8_sw>;
-		dvdd-pex-pll-supply = <&spmic_ldo7_1v0>;
-		hvdd-pex-pll-supply = <&vdd_1v8_sw>;
 
 		extcon-cables = <&vbus_id_extcon 0>;
 		extcon-cable-names = "vbus";

@@ -1,7 +1,7 @@
 /*
 * NVIDIA XUSB device mode controller
 *
-* Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
+* Copyright (c) 2013-2017, NVIDIA CORPORATION.  All rights reserved.
 * Copyright (c) 2015, Google Inc.
 *
 * This program is free software; you can redistribute it and/or modify it
@@ -3331,14 +3331,6 @@ static const char * const tegra210_xudc_supply_names[] = {
 static const char * const tegra186_xudc_supply_names[] = {
 	/* for USB2 pads */
 	"avdd-usb",
-
-	/* for PEX USB pads */
-	"dvdd-pex",
-	"hvdd-pex",
-
-	/* for PEX PLL */
-	"dvdd-pex-pll",
-	"hvdd-pex-pll",
 };
 
 static struct tegra_xudc_soc_data tegra210_xudc_soc_data = {
