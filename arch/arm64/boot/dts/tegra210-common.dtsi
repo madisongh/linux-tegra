@@ -23,6 +23,7 @@
 #include "tegra210-platforms/tegra210-prods.dtsi"
 #include "tegra210-platforms/tegra210-ers-touch-e1937-1000-a00.dtsi"
 #include "tegra210-platforms/tegra210-modem-common.dtsi"
+#include "tegra210-trusty.dtsi"
 
 / {
 	nvidia,dtbbuildtime = __DATE__, __TIME__;
