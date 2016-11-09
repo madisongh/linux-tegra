@@ -483,30 +483,9 @@ EXPORT_SYMBOL(unregister_serr_hook);
 asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 {
 	siginfo_t info;
-#ifdef CONFIG_SERROR_HANDLER
-	struct serr_hook *hook;
-	unsigned long flags;
-#endif
 	void __user *pc = (void __user *)instruction_pointer(regs);
 
 	console_verbose();
-
-#ifdef CONFIG_SERROR_HANDLER
-	raw_spin_lock_irqsave(&serr_lock, flags);
-	list_for_each_entry(hook, &serr_hook, node)
-		if (hook->fn(regs, reason, esr, hook->priv)) {
-			raw_spin_unlock_irqrestore(&serr_lock, flags);
-			return;
-		}
-#endif
-
-
-	pr_crit("CPU%d: Bad mode in %s handler detected, code 0x%08x\n",
-		smp_processor_id(), handler[reason], esr);
-
-#ifdef CONFIG_SERROR_HANDLER
-	raw_spin_unlock_irqrestore(&serr_lock, flags);
-#endif
 
 	pr_crit("Bad mode in %s handler detected, code 0x%08x -- %s\n",
 		handler[reason], esr, esr_get_class_string(esr));
@@ -521,7 +500,35 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 	info.si_addr  = pc;
 
 	arm64_notify_die("Oops - bad mode", regs, &info, 0);
+}
 
+asmlinkage void __exception handle_serr(unsigned long daif, unsigned long spsr,
+					 struct pt_regs *regs)
+{
+#ifdef CONFIG_SERROR_HANDLER
+	struct serr_hook *hook;
+	unsigned long flags;
+#endif
+	ulong mpidr;
+	ulong esr;
+	bool enter_bad_mode = false;
+
+	asm volatile("mrs %0, mpidr_el1" : "=r"(mpidr));
+	asm volatile ("mrs %0, esr_el1" : "=r"(esr));
+
+	pr_crit("CPU%d: SError detected, daif=%lx, "
+		"spsr=0x%lx, mpidr=%lx, esr=%lx\n",
+		smp_processor_id(), daif, spsr, mpidr, esr);
+
+#ifdef CONFIG_SERROR_HANDLER
+	raw_spin_lock_irqsave(&serr_lock, flags);
+	list_for_each_entry(hook, &serr_hook, node)
+		if (!hook->fn(regs, 3, spsr, hook->priv))
+			enter_bad_mode = true;
+	raw_spin_unlock_irqrestore(&serr_lock, flags);
+#endif
+	if (enter_bad_mode)
+		bad_mode(regs, 3, esr);
 }
 
 void __pte_error(const char *file, int line, unsigned long val)
