@@ -106,6 +106,11 @@
 #define NVQUIRK2_SET_PLL_CLK_PARENT		BIT(0)
 /* Tegra register write WAR - needs follow on register read */
 #define NVQUIRK2_TEGRA_WRITE_REG		BIT(1)
+/* Disable card clk before changing tap value and issue dat+cmd
+ * reset after sending each tuning command or after setting
+ * tap_delay for T210 platforms.
+*/
+#define NVQUIRK2_DISABLE_CARD_CLK  BIT(2)
 
 /* Common quirks for Tegra 12x and later versions of sdmmc controllers */
 #define TEGRA_SDHCI_QUIRKS (SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | \
@@ -429,6 +434,7 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	u16 clk;
 	u32 ctrl;
 	bool card_clk_enabled;
@@ -441,7 +447,8 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 	clk = sdhci_readw(sdhci, SDHCI_CLOCK_CONTROL);
 	card_clk_enabled = clk & SDHCI_CLOCK_CARD_EN;
 
-	if (card_clk_enabled) {
+	if ((soc_data->nvquirks2 & NVQUIRK2_DISABLE_CARD_CLK) &&
+		(card_clk_enabled)) {
 		clk &= ~SDHCI_CLOCK_CARD_EN;
 		sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
 	}
@@ -474,10 +481,10 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 	ctrl |= SDHCI_VNDR_TUN_CTRL0_TUN_HW_TAP;
 	sdhci_writel(sdhci, ctrl, SDHCI_VNDR_TUN_CTRL0_0);
 
-	udelay(1);
-	sdhci_reset(sdhci, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
-
-	if (card_clk_enabled) {
+	if ((soc_data->nvquirks2 & NVQUIRK2_DISABLE_CARD_CLK) &&
+		(card_clk_enabled)) {
+		udelay(1);
+		sdhci_reset(sdhci, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
 		clk |= SDHCI_CLOCK_CARD_EN;
 		sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
 	}
@@ -1615,6 +1622,7 @@ static const struct sdhci_pltfm_data sdhci_tegra210_pdata = {
 static const struct sdhci_tegra_soc_data soc_data_tegra210 = {
 	.pdata = &sdhci_tegra210_pdata,
 	.nvquirks2 = NVQUIRK2_TEGRA_WRITE_REG |
+		NVQUIRK2_DISABLE_CARD_CLK,
 		NVQUIRK2_SET_PLL_CLK_PARENT,
 };
 
