@@ -574,6 +574,7 @@ struct tegra_xudc_soc_data {
 	int (*clear_vbus_override)(struct phy *utmi_phy);
 	void (*utmi_pad_power_on)(struct phy *utmi_phy);
 	void (*utmi_pad_power_off)(struct phy *utmi_phy);
+	bool pls_quirk;
 };
 
 static bool u1_enable;
@@ -711,7 +712,7 @@ static void tegra_xudc_device_mode_off(struct tegra_xudc *xudc)
 		PORTSC_PLS_MASK;
 
 	/* Direct link to U0 if disconnected in RESUME or U2. */
-	if (XUDC_IS_T210(xudc) && xudc->gadget.speed == USB_SPEED_SUPER &&
+	if (xudc->soc->pls_quirk && xudc->gadget.speed == USB_SPEED_SUPER &&
 	    (pls == PORTSC_PLS_RESUME || pls == PORTSC_PLS_U2)) {
 		val = xudc_readl(xudc, PORTPM);
 		val |= PORTPM_FRWE;
@@ -3388,6 +3389,22 @@ static struct tegra_xudc_soc_data tegra210_xudc_soc_data = {
 	.clear_vbus_override = tegra21x_phy_xusb_clear_vbus_override,
 	.utmi_pad_power_on = tegra21x_phy_xusb_utmi_pad_power_on,
 	.utmi_pad_power_off = tegra21x_phy_xusb_utmi_pad_power_down,
+	.pls_quirk = true,
+};
+
+static struct tegra_xudc_soc_data tegra210b01_xudc_soc_data = {
+	.device_id = XUDC_DEVICE_ID_T210,
+	.supply_names = tegra210_xudc_supply_names,
+	.num_supplies = ARRAY_SIZE(tegra210_xudc_supply_names),
+	.u1_enable = false,
+	.u2_enable = true,
+	.lpm_enable = false,
+	.invalid_seq_num = true,
+	.set_vbus_override = tegra21x_phy_xusb_set_vbus_override,
+	.clear_vbus_override = tegra21x_phy_xusb_clear_vbus_override,
+	.utmi_pad_power_on = tegra21x_phy_xusb_utmi_pad_power_on,
+	.utmi_pad_power_off = tegra21x_phy_xusb_utmi_pad_power_down,
+	.pls_quirk = false,
 };
 
 static struct tegra_xudc_soc_data tegra186_xudc_soc_data = {
@@ -3402,6 +3419,7 @@ static struct tegra_xudc_soc_data tegra186_xudc_soc_data = {
 	.clear_vbus_override = tegra18x_phy_xusb_clear_vbus_override,
 	.utmi_pad_power_on = tegra18x_phy_xusb_utmi_pad_power_on,
 	.utmi_pad_power_off = tegra18x_phy_xusb_utmi_pad_power_down,
+	.pls_quirk = false,
 };
 
 static struct tegra_xudc_soc_data tegra194_xudc_soc_data = {
@@ -3417,12 +3435,17 @@ static struct tegra_xudc_soc_data tegra194_xudc_soc_data = {
 	.clear_vbus_override = tegra18x_phy_xusb_clear_vbus_override,
 	.utmi_pad_power_on = tegra18x_phy_xusb_utmi_pad_power_on,
 	.utmi_pad_power_off = tegra18x_phy_xusb_utmi_pad_power_down,
+	.pls_quirk = false,
 };
 
 static struct of_device_id tegra_xudc_of_match[] = {
 	{
 		.compatible = "nvidia,tegra210-xudc",
 		.data = &tegra210_xudc_soc_data
+	},
+	{
+		.compatible = "nvidia,tegra210b01-xudc",
+		.data = &tegra210b01_xudc_soc_data
 	},
 	{
 		.compatible = "nvidia,tegra186-xudc",
