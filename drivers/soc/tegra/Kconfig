@@ -7,6 +7,19 @@ config TEGRA_PROC_POWER_MODEL
 	  frequency, and number of cores. This driver is used by
 	  various other drivers including EDP.
 
+config TEGRA_CPU_EDP
+	bool "Enforce electrical design limits on CPU rail (CPU EDP)"
+	depends on ARCH_TEGRA
+	depends on CPU_FREQ && THERMAL
+	default n
+	select TEGRA_PROC_POWER_MODEL
+	help
+	  Enforce electrical design limits on CPU power rail. CPU
+	  EDP prevents the CPU from drawing more current than its
+	  voltage regulator can supply. Limit maximum CPU frequency
+	  based on temperature and number of on-line CPUs to keep
+	  CPU rail current within power supply capabilities.
+
 config TEGRA_DVFS
 	bool
 	depends on ARCH_TEGRA

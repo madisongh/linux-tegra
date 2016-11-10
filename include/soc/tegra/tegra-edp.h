@@ -49,8 +49,22 @@ struct tegra_sysedp_platform_data {
 };
 
 #ifdef CONFIG_TEGRA_CPU_EDP
+extern int tegra_cpu_edp_get_thermal_index(struct platform_device *pdev);
+extern int tegra_cpu_edp_count_therm_floors(struct platform_device *pdev);
+extern int tegra_cpu_edp_update_thermal_index(struct platform_device *pdev,
+					      unsigned long new_idx);
 extern bool tegra_cpu_edp_ready(void);
 #else
+static inline int
+tegra_cpu_edp_get_thermal_index(struct platform_device *pdev)
+{ return 0; }
+static inline int
+tegra_cpu_edp_count_therm_floors(struct platform_device *pdev)
+{ return 0; }
+static inline int
+tegra_cpu_edp_update_thermal_index(struct platform_device *pdev,
+				   unsigned long new_idx)
+{ return 0; }
 static inline bool tegra_cpu_edp_ready(void)
 { return false; }
 #endif

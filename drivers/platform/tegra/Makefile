@@ -49,8 +49,6 @@ ccflags-y += -I$(srctree)/arch/arm/mach-tegra
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC)        += tegra_throttle.o
 endif
 
-obj-$(CONFIG_TEGRA_EDP_LIMITS)          += cpu-edp.o # must precede cpu-tegra.o
-
 ifeq ($(CONFIG_CPU_FREQ),y)
 #obj-$(CONFIG_ARCH_TEGRA_21x_SOC)                  += cpu-tegra.o
 endif
