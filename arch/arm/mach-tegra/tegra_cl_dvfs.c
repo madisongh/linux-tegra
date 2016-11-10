@@ -150,6 +150,8 @@
 
 #define CL_DVFS_OUTPUT_LUT		0x200
 
+#define CL_DVFS_APERTURE		0x400
+
 #define CL_DVFS_CALIBR_TIME		40000
 #define CL_DVFS_OUTPUT_PENDING_TIMEOUT	1000
 #define CL_DVFS_OUTPUT_RAMP_DELAY	100
@@ -3241,6 +3243,9 @@ static ssize_t cl_register_write(struct file *file,
 	strim(buf);
 
 	if (sscanf(buf, "[0x%x] = 0x%x", &offs, &val) != 2)
+		return -1;
+
+	if (offs >= CL_DVFS_APERTURE)
 		return -1;
 
 	clk_enable(cld->soc_clk);
