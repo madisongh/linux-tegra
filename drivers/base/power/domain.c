@@ -983,9 +983,11 @@ static int pm_genpd_suspend_noirq(struct device *dev)
 
 	cancel_delayed_work_sync(&genpd->power_off_delayed_work);
 
-	ret = genpd_save_dev(genpd, dev);
-	if (ret)
-		return ret;
+	if (genpd->flags & GENPD_FLAG_PM_UPSTREAM) {
+		ret = genpd_save_dev(genpd, dev);
+		if (ret)
+			return ret;
+	}
 
 	ret = genpd_stop_dev(genpd, dev);
 	if (ret)
