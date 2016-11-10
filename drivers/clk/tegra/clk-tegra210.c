@@ -2851,6 +2851,7 @@ static int tegra210_init_pllu(void)
 			}
 		}
 		/* enable hw controlled mode */
+		reg = readl_relaxed(clk_base + PLLU_BASE);
 		reg &= ~PLLU_BASE_OVERRIDE;
 		writel(reg, clk_base + PLLU_BASE);
 
