@@ -2392,6 +2392,7 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_floor_emc] = { .dt_id = TEGRA210_CLK_FLOOR_EMC, .present = true },
 	[tegra_clk_override_emc] = { .dt_id = TEGRA210_CLK_OVERRIDE_EMC, .present = true },
 	[tegra_clk_edp_emc] = { .dt_id = TEGRA210_CLK_EDP_EMC, .present = true },
+	[tegra_clk_battery_emc] = { .dt_id = TEGRA210_CLK_BATTERY_EMC, .present = true },
 	[tegra_clk_vic_emc] = { .dt_id = TEGRA210_CLK_VIC_EMC, .present = true },
 	[tegra_clk_vic_shared_emc] = { .dt_id = TEGRA210_CLK_VIC_SHARED_EMC, .present = true },
 	[tegra_clk_ape_emc] = { .dt_id = TEGRA210_CLK_APE_EMC, .present = true },
