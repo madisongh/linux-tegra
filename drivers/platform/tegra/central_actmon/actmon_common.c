@@ -86,12 +86,22 @@ static void actmon_dev_disable(struct actmon_dev *dev)
 	if (dev->state == ACTMON_ON) {
 		dev->state = ACTMON_OFF;
 		disable_irq(actmon->virq);
+		/*
+		 * To avoid extra interrupt after disabling actmon
+		 * clear interrupt (set intr_status register)
+		 * disable global  int_en(GLB_INT_EN_0 register)
+		 * disable actmon (DEV_CTRL_ENB field)
+		 */
+		dev->ops.set_intr_st(0xffffffff, offs(dev->reg_offs));
+
+		if (actmon->ops.set_glb_intr)
+			actmon->ops.set_glb_intr(0x00, actmon->base);
+
 		val = actmon_dev_readl(offs(dev->reg_offs),
 			ACTMON_CMN_DEV_CTRL);
 		val &= ~ACTMON_CMN_DEV_CTRL_ENB;
 		actmon_dev_writel(offs(dev->reg_offs), ACTMON_CMN_DEV_CTRL,
 			val);
-		dev->ops.set_intr_st(0xffffffff, offs(dev->reg_offs));
 		actmon_wmb();
 	}
 	spin_unlock_irqrestore(&dev->lock, flags);
