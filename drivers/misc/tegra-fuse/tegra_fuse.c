@@ -65,7 +65,12 @@ struct tegra_id {
 	char *priv;
 };
 
-static void __iomem *fuse_base;
+struct tegra_fuse {
+	void __iomem *base;
+	struct clk *clk;
+};
+
+static struct tegra_fuse fuse = {0};
 static struct tegra_id tegra_id;
 static int tegra_gpu_num_pixel_pipes;
 static int tegra_gpu_num_alus_per_pixel_pipe;
@@ -84,62 +89,6 @@ static const char *tegra_platform_name[TEGRA_PLATFORM_MAX] = {
 	[TEGRA_PLATFORM_UNIT_FPGA] = "unit fpga",
 	[TEGRA_PLATFORM_VDK] = "vdk",
 };
-
-static struct device_node *tegra_fuse_base_init(void);
-
-int tegra_fuse_readl(unsigned long offset, u32 *val)
-{
-	if (!fuse_base)
-		tegra_fuse_base_init();
-
-	if (fuse_base)
-		*val = readl(fuse_base + FUSE_BEGIN + offset);
-	else {
-		pr_err("%s: fuse_base not initialized\n", __func__);
-		WARN_ON(1);
-		return -EPROBE_DEFER;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL(tegra_fuse_readl);
-
-int tegra_fuse_control_read(unsigned long offset, u32 *value)
-{
-	if (!fuse_base)
-		tegra_fuse_base_init();
-
-	if (fuse_base)
-		*value = readl(fuse_base + offset);
-	else {
-		pr_err("%s: fuse_base not initialized\n", __func__);
-		WARN_ON(1);
-		return -EPROBE_DEFER;
-	}
-
-	return 0;
-}
-
-void tegra_fuse_writel(u32 val, unsigned long offset)
-{
-	if (fuse_base)
-		writel(val, fuse_base + FUSE_BEGIN + offset);
-	else {
-		pr_err("%s: fuse_base not initialized\n", __func__);
-		WARN_ON(1);
-	}
-}
-EXPORT_SYMBOL(tegra_fuse_writel);
-
-void tegra_fuse_control_write(u32 value, unsigned long offset)
-{
-	if (fuse_base)
-		writel(value, fuse_base + offset);
-	else {
-		pr_err("%s: fuse_base not initialized\n", __func__);
-		WARN_ON(1);
-	}
-}
 
 int tegra_gpu_register_sets(void)
 {
@@ -529,47 +478,116 @@ static struct of_device_id tegra_fuse_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, tegra_fuse_of_match);
 
-static struct device_node *tegra_fuse_base_init(void)
+static void tegra_fuse_early_init(void)
 {
 	struct device_node *np;
 
 	np = of_find_matching_node(NULL, tegra_fuse_of_match);
-	if (!np)
-		goto err;
-
-	if (fuse_base)
-		return np;
-
-	fuse_base = of_iomap(np, 0);
-	if (!fuse_base) {
-		pr_warn("fuse DT node missing\n");
-		goto err;
+	if (!np) {
+		pr_err("fuse DT node missing\n");
+		return;
 	}
-	return np;
-err:
-	return NULL;
+
+	fuse.base = of_iomap(np, 0);
+	if (!fuse.base)
+		pr_warn("fuse DT node missing\n");
 }
 
-static int tegra_fuse_init(void)
+int tegra_fuse_readl(unsigned long offset, u32 *val)
 {
-	struct device_node *np;
-	struct clk *fuse_clk;
+	if (!fuse.base)
+		tegra_fuse_early_init();
 
-	np = tegra_fuse_base_init();
-	if (!np)
-		return -ENOENT;
-
-	fuse_clk = of_clk_get_by_name(np, "fuse");
-	if (IS_ERR(fuse_clk)) {
-		pr_err("%s(): fuse_clk get failed\n", __func__);
-		return PTR_ERR(fuse_clk);
+	if (fuse.base) {
+		*val = readl(fuse.base + FUSE_BEGIN + offset);
+	} else {
+		pr_err("fuse base not initialized\n");
+		WARN_ON(1);
+		return -ENODEV;
 	}
-	clk_prepare_enable(fuse_clk);
-
-	tegra_set_sku_id();
 
 	return 0;
 }
-subsys_initcall(tegra_fuse_init);
+EXPORT_SYMBOL(tegra_fuse_readl);
 
-MODULE_DESCRIPTION("Fuse driver for tegra SOCs");
+int tegra_fuse_control_read(unsigned long offset, u32 *value)
+{
+	if (!fuse.base)
+		tegra_fuse_early_init();
+
+	if (fuse.base) {
+		*value = readl(fuse.base + offset);
+	} else {
+		pr_err("fuse base not initialized\n");
+		WARN_ON(1);
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+void tegra_fuse_writel(u32 val, unsigned long offset)
+{
+	if (fuse.base) {
+		writel(val, fuse.base + FUSE_BEGIN + offset);
+	} else {
+		pr_err("fuse base not initialized\n");
+		WARN_ON(1);
+	}
+}
+EXPORT_SYMBOL(tegra_fuse_writel);
+
+void tegra_fuse_control_write(u32 value, unsigned long offset)
+{
+	if (fuse.base) {
+		writel(value, fuse.base + offset);
+	} else {
+		pr_err("fuse base not initialized\n");
+		WARN_ON(1);
+	}
+}
+
+static int tegra_fuse_probe(struct platform_device *pdev)
+{
+	struct resource *regs;
+	int err;
+
+	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	fuse.base = devm_ioremap_resource(&pdev->dev, regs);
+	if (IS_ERR(fuse.base))
+		return PTR_ERR(fuse.base);
+
+	fuse.clk = devm_clk_get(&pdev->dev, "fuse");
+	if (IS_ERR(fuse.clk)) {
+		pr_err("fuse clk get err:%ld\n", PTR_ERR(fuse.clk));
+		return PTR_ERR(fuse.clk);
+	}
+
+	/* Keeping fuse clock always ON for now*/
+	clk_prepare_enable(fuse.clk);
+
+	/* Read SKU register and set the sku id structure */
+	tegra_set_sku_id();
+
+	err = of_platform_default_populate(pdev->dev.of_node, NULL, &pdev->dev);
+	if (err < 0) {
+		dev_err(&pdev->dev, "child node not available\n");
+		return err;
+	}
+
+	return 0;
+}
+
+static struct platform_driver tegra_fuse_driver = {
+	.probe   = tegra_fuse_probe,
+	.driver  = {
+		.name  = "tegra-fuse",
+		.of_match_table = tegra_fuse_of_match,
+	},
+};
+
+static int __init tegra_fuse_init_driver(void)
+{
+	return platform_driver_register(&tegra_fuse_driver);
+}
+subsys_initcall(tegra_fuse_init_driver);
