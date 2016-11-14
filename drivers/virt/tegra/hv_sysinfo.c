@@ -16,7 +16,7 @@
 #include <linux/tegra-soc.h>
 #include <linux/io.h>
 #include "guest_sysinfo.h"
-#include "syscalls.h"
+#include <soc/tegra/virt/syscalls.h>
 
 static uint64_t sysinfo_ipa;
 static struct guest_sysinfo *sysinfo;

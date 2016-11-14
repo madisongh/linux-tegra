@@ -34,7 +34,7 @@
 #include <linux/atomic.h>
 
 #ifdef CONFIG_TEGRA_VIRTUALIZATION
-#include <../virt/tegra/syscalls.h>
+#include <soc/tegra/virt/syscalls.h>
 #include <linux/tegra-soc.h>
 #endif
 
