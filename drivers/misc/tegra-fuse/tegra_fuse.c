@@ -148,18 +148,6 @@ module_param_cb(tegra_gpu_num_alus_per_pixel_pipe,
 		&tegra_gpu_num_alus_per_pixel_pipe_ops,
 		&tegra_gpu_num_alus_per_pixel_pipe, 0444);
 
-int tegra_fuse_calib_gpcpll_get_adc(int *slope_uv, int *intercept_uv)
-{
-	return -EINVAL;
-}
-EXPORT_SYMBOL(tegra_fuse_calib_gpcpll_get_adc);
-
-bool tegra_fuse_can_use_na_gpcpll(void)
-{
-	return false;
-}
-EXPORT_SYMBOL(tegra_fuse_can_use_na_gpcpll);
-
 struct chip_revision {
 	enum tegra_chipid	chipid;
 	unsigned int		major;

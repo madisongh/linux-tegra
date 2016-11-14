@@ -99,8 +99,6 @@ int tegra_gpu_speedo_value(void);
 int tegra_fuse_get_tsensor_calib(int index, u32 *calib);
 int tegra_fuse_calib_base_get_cp(u32 *base_cp, s32 *shifted_cp);
 int tegra_fuse_calib_base_get_ft(u32 *base_ft, s32 *shifted_ft);
-int tegra_fuse_calib_gpcpll_get_adc(int *slope_uv, int *intercept_uv);
-bool tegra_fuse_can_use_na_gpcpll(void);
 
 int tegra_fuse_control_read(unsigned long offset, u32 *value);
 void tegra_fuse_control_write(u32 value, unsigned long offset);
