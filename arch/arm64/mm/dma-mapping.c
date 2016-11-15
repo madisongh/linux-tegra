@@ -1293,7 +1293,7 @@ static u64 get_coherent_dma_mask(struct device *dev)
 		 * must be able to be satisfied by a DMA allocation.
 		 */
 		if (mask == 0) {
-			dev_warn(dev, "coherent DMA mask is unset\n");
+			dev_dbg(dev, "coherent DMA mask is unset\n");
 			return 0;
 		}
 
