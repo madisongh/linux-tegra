@@ -573,12 +573,20 @@ static void tegra_adma_abort_all(struct tegra_adma_chan *tdc)
 /* Returns bytes transferred with period size granularity */
 static inline uint64_t tegra_adma_get_position(struct tegra_adma_chan *tdc)
 {
-	unsigned long cur_tc = 0;
-	uint64_t tx_done_max = (ADMA_CH_TRANSFER_DONE_COUNT_MASK >>
-		ADMA_CH_TRANSFER_DONE_COUNT_SHIFT) + 1;
-	uint64_t tx_done = channel_read(tdc, ADMA_CH_TRANSFER_STATUS) &
+	unsigned long tc_remain = 0, tc_transferred = 0;
+	uint64_t tx_done_max = ADMA_CH_TRANSFER_DONE_COUNT_MASK + 1;
+	uint64_t tx_done;
+
+	tx_done = channel_read(tdc, ADMA_CH_TRANSFER_STATUS) &
 		ADMA_CH_TRANSFER_DONE_COUNT_MASK;
-	tx_done = tx_done >> ADMA_CH_TRANSFER_DONE_COUNT_SHIFT;
+
+	/* read TC_STATUS register to get current transfer status. */
+	tc_remain = channel_read(tdc, ADMA_CH_TC_STATUS);
+
+	/* read TRANSFER_DONE_COUNT again in case TC_STATUS is just reset */
+	if (tc_remain == tdc->channel_reg.tc)
+		tx_done = channel_read(tdc, ADMA_CH_TRANSFER_STATUS) &
+			ADMA_CH_TRANSFER_DONE_COUNT_MASK;
 
 	/* Handle wrap around case */
 	if (tx_done < tdc->channel_reg.tx_done)
@@ -588,12 +596,10 @@ static inline uint64_t tegra_adma_get_position(struct tegra_adma_chan *tdc)
 		tdc->total_tx_done += (tx_done - tdc->channel_reg.tx_done);
 	tdc->channel_reg.tx_done = tx_done;
 
-	/* read TC_STATUS register to get current transfer status */
-	cur_tc = channel_read(tdc, ADMA_CH_TC_STATUS);
 	/* get transferred data count */
-	cur_tc = tdc->channel_reg.tc - cur_tc;
+	tc_transferred = tdc->channel_reg.tc - tc_remain;
 
-	return (tdc->total_tx_done * tdc->channel_reg.tc) + cur_tc;
+	return (tdc->total_tx_done * tdc->channel_reg.tc) + tc_transferred;
 }
 
 static bool handle_continuous_head_request(struct tegra_adma_chan *tdc,
