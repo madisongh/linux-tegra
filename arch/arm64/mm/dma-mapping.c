@@ -1443,13 +1443,6 @@ void __init dma_contiguous_remap(void)
 
 		map.type = PAGE_KERNEL_EXEC;
 
-		/*
-		 * Clear previous low-memory mapping
-		 */
-		for (addr = __phys_to_virt(start); addr < __phys_to_virt(end);
-		     addr += PMD_SIZE)
-			pmd_clear(pmd_off_k(addr));
-
 		for (addr = start; addr < end; addr += PAGE_SIZE) {
 			map.pfn = __phys_to_pfn(addr);
 			map.virtual = __phys_to_virt(addr);
