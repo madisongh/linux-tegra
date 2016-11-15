@@ -2484,11 +2484,6 @@ static int tegra21x_usb3_phy_init(struct phy *phy)
 	TRACE(uphy->dev, "phy init USB3 port %d uphy-lane-%u\n",
 		port, uphy_lane);
 
-	value = padctl_readl(uphy, XUSB_PADCTL_SS_PORT_MAP_0);
-	value &= ~SS_PORT_MAP(port, SS_PORT_MAP_PORT_DISABLED);
-	value |= SS_PORT_MAP(port, uphy->usb3_ports[port].usb2_map);
-	padctl_writel(uphy, value, XUSB_PADCTL_SS_PORT_MAP_0);
-
 	mutex_unlock(&uphy->lock);
 	return 0;
 }
@@ -2509,10 +2504,6 @@ static int tegra21x_usb3_phy_exit(struct phy *phy)
 	uphy_lane = uphy->usb3_ports[port].uphy_lane;
 	TRACE(dev, "phy exit USB3 port %d uphy-lane-%u\n",
 		port, uphy_lane);
-
-	value = padctl_readl(uphy, XUSB_PADCTL_SS_PORT_MAP_0);
-	value |= SS_PORT_MAP(port, SS_PORT_MAP_PORT_DISABLED);
-	padctl_writel(uphy, value, XUSB_PADCTL_SS_PORT_MAP_0);
 
 	mutex_unlock(&uphy->lock);
 	return 0;
@@ -2545,6 +2536,11 @@ static int tegra21x_usb3_phy_power_on(struct phy *phy)
 		dev_info(dev, "failed to apply prod for ss pad%d (%d)\n",
 			port, err);
 	}
+
+	reg = padctl_readl(uphy, XUSB_PADCTL_SS_PORT_MAP_0);
+	reg &= ~SS_PORT_MAP(port, SS_PORT_MAP_PORT_DISABLED);
+	reg |= SS_PORT_MAP(port, uphy->usb3_ports[port].usb2_map);
+	padctl_writel(uphy, reg, XUSB_PADCTL_SS_PORT_MAP_0);
 
 	/* No XUSB_PADCTL_SS_PORT_CAP on T210, use USB2_PORT_CAP */
 	reg = padctl_readl(uphy, XUSB_PADCTL_USB2_PORT_CAP_0);
@@ -2615,6 +2611,10 @@ static int tegra21x_usb3_phy_power_off(struct phy *phy)
 	reg = padctl_readl(uphy, XUSB_PADCTL_ELPG_PROGRAM_1);
 	reg |= SSPX_ELPG_VCORE_DOWN(port);
 	padctl_writel(uphy, reg, XUSB_PADCTL_ELPG_PROGRAM_1);
+
+	reg = padctl_readl(uphy, XUSB_PADCTL_SS_PORT_MAP_0);
+	reg |= SS_PORT_MAP(port, SS_PORT_MAP_PORT_DISABLED);
+	padctl_writel(uphy, reg, XUSB_PADCTL_SS_PORT_MAP_0);
 
 	mutex_unlock(&uphy->lock);
 	return 0;
