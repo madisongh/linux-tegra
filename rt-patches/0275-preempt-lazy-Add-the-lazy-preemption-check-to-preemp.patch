@@ -1,0 +1,81 @@
+From 1d97532ed0b16b982351557bbb5097885d11059d Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Wed, 20 Jan 2016 15:13:30 +0100
+Subject: [PATCH 275/351] preempt-lazy: Add the lazy-preemption check to
+ preempt_schedule()
+X-NVConfidentiality: public
+
+Probably in the rebase onto v4.1 this check got moved into less commonly used
+preempt_schedule_notrace(). This patch ensures that both functions use it.
+
+Reported-by: Mike Galbraith <umgwanakikbuti@gmail.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ kernel/sched/core.c | 36 ++++++++++++++++++++++++++++--------
+ 1 file changed, 28 insertions(+), 8 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 6bbe7ab5eca7..fb749eb3429d 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -3476,6 +3476,30 @@ static void __sched notrace preempt_schedule_common(void)
+ 	} while (need_resched());
+ }
+ 
++#ifdef CONFIG_PREEMPT_LAZY
++/*
++ * If TIF_NEED_RESCHED is then we allow to be scheduled away since this is
++ * set by a RT task. Oterwise we try to avoid beeing scheduled out as long as
++ * preempt_lazy_count counter >0.
++ */
++static int preemptible_lazy(void)
++{
++	if (test_thread_flag(TIF_NEED_RESCHED))
++		return 1;
++	if (current_thread_info()->preempt_lazy_count)
++		return 0;
++	return 1;
++}
++
++#else
++
++static int preemptible_lazy(void)
++{
++	return 1;
++}
++
++#endif
++
+ #ifdef CONFIG_PREEMPT
+ /*
+  * this is the entry point to schedule() from in-kernel preemption
+@@ -3490,6 +3514,8 @@ asmlinkage __visible void __sched notrace preempt_schedule(void)
+ 	 */
+ 	if (likely(!preemptible()))
+ 		return;
++	if (!preemptible_lazy())
++		return;
+ 
+ 	preempt_schedule_common();
+ }
+@@ -3516,15 +3542,9 @@ asmlinkage __visible void __sched notrace preempt_schedule_notrace(void)
+ 
+ 	if (likely(!preemptible()))
+ 		return;
+-
+-#ifdef CONFIG_PREEMPT_LAZY
+-	/*
+-	 * Check for lazy preemption
+-	 */
+-	if (current_thread_info()->preempt_lazy_count &&
+-	    !test_thread_flag(TIF_NEED_RESCHED))
++	if (!preemptible_lazy())
+ 		return;
+-#endif
++
+ 	do {
+ 		preempt_disable_notrace();
+ 		/*
+-- 
+2.10.1
+

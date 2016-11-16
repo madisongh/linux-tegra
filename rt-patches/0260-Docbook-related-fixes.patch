@@ -1,0 +1,50 @@
+From 00b4d1efd29ef50e392ea04f6fae4ea7bc02a811 Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Wed, 13 Jan 2016 17:49:11 +0100
+Subject: [PATCH 260/351] Docbook related fixes
+X-NVConfidentiality: public
+
+Reported-by: kernel test robot <ying.huang@linux.intel.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ include/linux/hrtimer.h   | 4 ++++
+ include/linux/interrupt.h | 1 +
+ 2 files changed, 5 insertions(+)
+
+diff --git a/include/linux/hrtimer.h b/include/linux/hrtimer.h
+index 6f78ca13ffdf..8fbcdfa5dc77 100644
+--- a/include/linux/hrtimer.h
++++ b/include/linux/hrtimer.h
+@@ -87,6 +87,9 @@ enum hrtimer_restart {
+  * @function:	timer expiry callback function
+  * @base:	pointer to the timer base (per cpu and per clock)
+  * @state:	state information (See bit values above)
++ * @cb_entry:	list entry to defer timers from hardirq context
++ * @irqsafe:	timer can run in hardirq context
++ * @praecox:	timer expiry time if expired at the time of programming
+  * @is_rel:	Set if the timer was armed relative
+  * @start_pid:  timer statistics field to store the pid of the task which
+  *		started the timer
+@@ -137,6 +140,7 @@ struct hrtimer_sleeper {
+  *			timer to a base on another cpu.
+  * @clockid:		clock id for per_cpu support
+  * @active:		red black tree root node for the active timers
++ * @expired:		list head for deferred timers.
+  * @get_time:		function to retrieve the current time of the clock
+  * @offset:		offset of this clock to the monotonic base
+  */
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index 47d38a0e4a81..79a9622b5a38 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -208,6 +208,7 @@ extern void resume_device_irqs(void);
+  * @irq:		Interrupt to which notification applies
+  * @kref:		Reference count, for internal use
+  * @work:		Work item, for internal use
++ * @list:		List item for deferred callbacks
+  * @notify:		Function to be called on change.  This will be
+  *			called in process context.
+  * @release:		Function to be called on release.  This will be
+-- 
+2.10.1
+

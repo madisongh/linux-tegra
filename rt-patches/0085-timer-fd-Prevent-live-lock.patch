@@ -1,0 +1,36 @@
+From 0298554bccf2716402bace2b1139bce5dd8c15cc Mon Sep 17 00:00:00 2001
+From: Thomas Gleixner <tglx@linutronix.de>
+Date: Wed, 25 Jan 2012 11:08:40 +0100
+Subject: [PATCH 085/351] timer-fd: Prevent live lock
+X-NVConfidentiality: public
+
+If hrtimer_try_to_cancel() requires a retry, then depending on the
+priority setting te retry loop might prevent timer callback completion
+on RT. Prevent that by waiting for completion on RT, no change for a
+non RT kernel.
+
+Reported-by: Sankara Muthukrishnan <sankara.m@gmail.com>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+---
+ fs/timerfd.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/fs/timerfd.c b/fs/timerfd.c
+index 053818dd6c18..c4bc14fe0085 100644
+--- a/fs/timerfd.c
++++ b/fs/timerfd.c
+@@ -450,7 +450,10 @@ static int do_timerfd_settime(int ufd, int flags,
+ 				break;
+ 		}
+ 		spin_unlock_irq(&ctx->wqh.lock);
+-		cpu_relax();
++		if (isalarm(ctx))
++			hrtimer_wait_for_timer(&ctx->t.alarm.timer);
++		else
++			hrtimer_wait_for_timer(&ctx->t.tmr);
+ 	}
+ 
+ 	/*
+-- 
+2.10.1
+

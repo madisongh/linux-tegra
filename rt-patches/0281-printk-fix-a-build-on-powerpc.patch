@@ -1,0 +1,156 @@
+From e6fd39d1e57e73332934e4de58bd59cac245c423 Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Thu, 4 Feb 2016 18:56:10 +0100
+Subject: [PATCH 281/351] printk: fix a build on powerpc
+X-NVConfidentiality: public
+
+As pwe kbuild test robot:
+arch/powerpc/kernel/built-in.o: In function `register_early_udbg_console':
+>> (.init.text+0x1266): undefined reference to `early_console'
+   arch/powerpc/kernel/built-in.o: In function `register_early_udbg_console':
+   (.init.text+0x126a): undefined reference to `early_console'
+   arch/powerpc/kernel/built-in.o: In function `register_early_udbg_console':
+   (.init.text+0x12d2): undefined reference to `early_console'
+
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ kernel/printk/printk.c | 115 +++++++++++++++++++++++++------------------------
+ 1 file changed, 59 insertions(+), 56 deletions(-)
+
+diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
+index 54e0422f4ee2..ecff6e3bcea9 100644
+--- a/kernel/printk/printk.c
++++ b/kernel/printk/printk.c
+@@ -245,6 +245,65 @@ struct printk_log {
+  */
+ static DEFINE_RAW_SPINLOCK(logbuf_lock);
+ 
++#ifdef CONFIG_EARLY_PRINTK
++struct console *early_console;
++
++static void early_vprintk(const char *fmt, va_list ap)
++{
++	if (early_console) {
++		char buf[512];
++		int n = vscnprintf(buf, sizeof(buf), fmt, ap);
++
++		early_console->write(early_console, buf, n);
++	}
++}
++
++asmlinkage void early_printk(const char *fmt, ...)
++{
++	va_list ap;
++
++	va_start(ap, fmt);
++	early_vprintk(fmt, ap);
++	va_end(ap);
++}
++
++/*
++ * This is independent of any log levels - a global
++ * kill switch that turns off all of printk.
++ *
++ * Used by the NMI watchdog if early-printk is enabled.
++ */
++static bool __read_mostly printk_killswitch;
++
++static int __init force_early_printk_setup(char *str)
++{
++	printk_killswitch = true;
++	return 0;
++}
++early_param("force_early_printk", force_early_printk_setup);
++
++void printk_kill(void)
++{
++	printk_killswitch = true;
++}
++
++#ifdef CONFIG_PRINTK
++static int forced_early_printk(const char *fmt, va_list ap)
++{
++	if (!printk_killswitch)
++		return 0;
++	early_vprintk(fmt, ap);
++	return 1;
++}
++#endif
++
++#else
++static inline int forced_early_printk(const char *fmt, va_list ap)
++{
++	return 0;
++}
++#endif
++
+ #ifdef CONFIG_PRINTK
+ DECLARE_WAIT_QUEUE_HEAD(log_wait);
+ /* the next printk record to read by syslog(READ) or /proc/kmsg */
+@@ -1696,62 +1755,6 @@ static size_t cont_print_text(char *text, size_t size)
+ 	return textlen;
+ }
+ 
+-#ifdef CONFIG_EARLY_PRINTK
+-struct console *early_console;
+-
+-static void early_vprintk(const char *fmt, va_list ap)
+-{
+-	if (early_console) {
+-		char buf[512];
+-		int n = vscnprintf(buf, sizeof(buf), fmt, ap);
+-
+-		early_console->write(early_console, buf, n);
+-	}
+-}
+-
+-asmlinkage void early_printk(const char *fmt, ...)
+-{
+-	va_list ap;
+-
+-	va_start(ap, fmt);
+-	early_vprintk(fmt, ap);
+-	va_end(ap);
+-}
+-
+-/*
+- * This is independent of any log levels - a global
+- * kill switch that turns off all of printk.
+- *
+- * Used by the NMI watchdog if early-printk is enabled.
+- */
+-static bool __read_mostly printk_killswitch;
+-
+-static int __init force_early_printk_setup(char *str)
+-{
+-	printk_killswitch = true;
+-	return 0;
+-}
+-early_param("force_early_printk", force_early_printk_setup);
+-
+-void printk_kill(void)
+-{
+-	printk_killswitch = true;
+-}
+-
+-static int forced_early_printk(const char *fmt, va_list ap)
+-{
+-	if (!printk_killswitch)
+-		return 0;
+-	early_vprintk(fmt, ap);
+-	return 1;
+-}
+-#else
+-static inline int forced_early_printk(const char *fmt, va_list ap)
+-{
+-	return 0;
+-}
+-#endif
+-
+ asmlinkage int vprintk_emit(int facility, int level,
+ 			    const char *dict, size_t dictlen,
+ 			    const char *fmt, va_list args)
+-- 
+2.10.1
+

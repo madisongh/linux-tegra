@@ -1,0 +1,91 @@
+From 05796fe323d7316d2615105455438e499a4ed052 Mon Sep 17 00:00:00 2001
+From: Grygorii Strashko <grygorii.strashko@ti.com>
+Date: Fri, 15 Jan 2016 16:20:47 +0200
+Subject: [PATCH 270/351] ARM: highmem: take into account FIX_KMAP_BEGIN in
+ switch_kmaps()
+X-NVConfidentiality: public
+
+Now the random crashes are observed on ARM TI am437x-idk-evm used with
+-RT Kernel v4.4-rt2 and with Highmem enabled.
+
+The reason of issue is that, newly introduced switch_kmaps() does not
+take into account FIX_KMAP_BEGIN, which was re-added by
+commit a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
+(K4.3) for ARM and since that the value of FIX_KMAP_BEGIN
+is not 0 any more.
+
+Hence update switch_kmaps() so it will take into FIX_KMAP_BEGIN while
+calculating fixmap idx. This patch also introduces fixmap_idx() to
+make code simpler and remove duplicated code.
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/mm/highmem.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index deabc36c936c..542692dbd40a 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -34,6 +34,11 @@ static inline pte_t get_fixmap_pte(unsigned long vaddr)
+ 	return *ptep;
+ }
+ 
++static unsigned int fixmap_idx(int type)
++{
++	return FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
++}
++
+ void *kmap(struct page *page)
+ {
+ 	might_sleep();
+@@ -80,7 +85,7 @@ void *kmap_atomic(struct page *page)
+ 
+ 	type = kmap_atomic_idx_push();
+ 
+-	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
++	idx = fixmap_idx(type);
+ 	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+ 	/*
+@@ -110,7 +115,7 @@ void __kunmap_atomic(void *kvaddr)
+ 
+ 	if (kvaddr >= (void *)FIXADDR_START) {
+ 		type = kmap_atomic_idx();
+-		idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
++		idx = fixmap_idx(type);
+ 
+ 		if (cache_is_vivt())
+ 			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
+@@ -146,7 +151,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
+ 		return page_address(page);
+ 
+ 	type = kmap_atomic_idx_push();
+-	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
++	idx = fixmap_idx(type);
+ 	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+ 	BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
+@@ -167,7 +172,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
+ 	 * Clear @prev's kmap_atomic mappings
+ 	 */
+ 	for (i = 0; i < prev_p->kmap_idx; i++) {
+-		int idx = i + KM_TYPE_NR * smp_processor_id();
++		int idx = fixmap_idx(i);
+ 
+ 		set_fixmap_pte(idx, __pte(0));
+ 	}
+@@ -175,7 +180,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
+ 	 * Restore @next_p's kmap_atomic mappings
+ 	 */
+ 	for (i = 0; i < next_p->kmap_idx; i++) {
+-		int idx = i + KM_TYPE_NR * smp_processor_id();
++		int idx = fixmap_idx(i);
+ 
+ 		if (!pte_none(next_p->kmap_pte[i]))
+ 			set_fixmap_pte(idx, next_p->kmap_pte[i]);
+-- 
+2.10.1
+

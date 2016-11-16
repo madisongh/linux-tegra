@@ -1,0 +1,30 @@
+From 7e3320521b1df017937786ab89569a4ab660a9de Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Fri, 15 Jan 2016 18:02:39 +0100
+Subject: [PATCH 265/351] kernel/time: fix wrong next wakeup computation in
+ get_next_timer_interrupt()
+X-NVConfidentiality: public
+
+resululted in about 25% softirq load on CPUs during idle.
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ kernel/time/timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/time/timer.c b/kernel/time/timer.c
+index a460cbb60055..fee8682c209e 100644
+--- a/kernel/time/timer.c
++++ b/kernel/time/timer.c
+@@ -1453,7 +1453,7 @@ u64 get_next_timer_interrupt(unsigned long basej, u64 basem)
+ 	 * the base lock to check when the next timer is pending and so
+ 	 * we assume the next jiffy.
+ 	 */
+-	return basej;
++	return basem + TICK_NSEC;
+ #endif
+ 	spin_lock(&base->lock);
+ 	if (base->active_timers) {
+-- 
+2.10.1
+

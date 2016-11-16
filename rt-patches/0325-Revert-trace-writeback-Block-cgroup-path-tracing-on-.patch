@@ -1,0 +1,31 @@
+From 49e085b752114227384f5e1e98ad94f37b9940aa Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Tue, 29 Mar 2016 16:28:15 +0200
+Subject: [PATCH 325/351] Revert "trace/writeback: Block cgroup path tracing on
+ RT"
+X-NVConfidentiality: public
+
+This reverts commit da53a0a5f0489708585493256ba1cd002292108d because we
+have a better replacement.
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ include/trace/events/writeback.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/trace/events/writeback.h b/include/trace/events/writeback.h
+index 253ef2833c46..fff846b512e6 100644
+--- a/include/trace/events/writeback.h
++++ b/include/trace/events/writeback.h
+@@ -132,7 +132,7 @@ DEFINE_EVENT(writeback_dirty_inode_template, writeback_dirty_inode,
+ );
+ 
+ #ifdef CREATE_TRACE_POINTS
+-#if defined(CONFIG_CGROUP_WRITEBACK) && !defined(CONFIG_PREEMPT_RT_FULL)
++#ifdef CONFIG_CGROUP_WRITEBACK
+ 
+ static inline size_t __trace_wb_cgroup_size(struct bdi_writeback *wb)
+ {
+-- 
+2.10.1
+

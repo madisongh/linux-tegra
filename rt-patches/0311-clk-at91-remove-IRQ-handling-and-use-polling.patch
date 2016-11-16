@@ -1,0 +1,1052 @@
+From a74a1f2fa4635518034dd7b5862b6ca18e99bf20 Mon Sep 17 00:00:00 2001
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Date: Wed, 16 Sep 2015 23:47:39 +0200
+Subject: [PATCH 311/351] clk: at91: remove IRQ handling and use polling
+X-NVConfidentiality: public
+
+The AT91 clock drivers make use of IRQs to avoid polling when waiting for
+some clocks to be enabled. Unfortunately, this leads to a crash when those
+IRQs are threaded (which happens when using preempt-rt) because they are
+registered before thread creation is possible.
+
+Use polling on those clocks instead to avoid the problem.
+
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/clk/at91/clk-main.c   | 138 +++++-----------------------------------
+ drivers/clk/at91/clk-master.c |  46 ++------------
+ drivers/clk/at91/clk-pll.c    |  47 ++------------
+ drivers/clk/at91/clk-system.c |  56 ++--------------
+ drivers/clk/at91/clk-utmi.c   |  49 ++------------
+ drivers/clk/at91/pmc.c        | 144 +-----------------------------------------
+ drivers/clk/at91/pmc.h        |   3 -
+ 7 files changed, 37 insertions(+), 446 deletions(-)
+
+diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
+index c1f119748bdc..4bfc94d6c26e 100644
+--- a/drivers/clk/at91/clk-main.c
++++ b/drivers/clk/at91/clk-main.c
+@@ -13,15 +13,8 @@
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/delay.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
+-#include <linux/io.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+-#include <linux/sched.h>
+-#include <linux/wait.h>
+ 
+ #include "pmc.h"
+ 
+@@ -37,8 +30,6 @@
+ struct clk_main_osc {
+ 	struct clk_hw hw;
+ 	struct regmap *regmap;
+-	unsigned int irq;
+-	wait_queue_head_t wait;
+ };
+ 
+ #define to_clk_main_osc(hw) container_of(hw, struct clk_main_osc, hw)
+@@ -46,8 +37,6 @@ struct clk_main_osc {
+ struct clk_main_rc_osc {
+ 	struct clk_hw hw;
+ 	struct regmap *regmap;
+-	unsigned int irq;
+-	wait_queue_head_t wait;
+ 	unsigned long frequency;
+ 	unsigned long accuracy;
+ };
+@@ -64,23 +53,11 @@ struct clk_rm9200_main {
+ struct clk_sam9x5_main {
+ 	struct clk_hw hw;
+ 	struct regmap *regmap;
+-	unsigned int irq;
+-	wait_queue_head_t wait;
+ 	u8 parent;
+ };
+ 
+ #define to_clk_sam9x5_main(hw) container_of(hw, struct clk_sam9x5_main, hw)
+ 
+-static irqreturn_t clk_main_osc_irq_handler(int irq, void *dev_id)
+-{
+-	struct clk_main_osc *osc = dev_id;
+-
+-	wake_up(&osc->wait);
+-	disable_irq_nosync(osc->irq);
+-
+-	return IRQ_HANDLED;
+-}
+-
+ static inline bool clk_main_osc_ready(struct regmap *regmap)
+ {
+ 	unsigned int status;
+@@ -107,11 +84,8 @@ static int clk_main_osc_prepare(struct clk_hw *hw)
+ 		regmap_write(regmap, AT91_CKGR_MOR, tmp);
+ 	}
+ 
+-	while (!clk_main_osc_ready(regmap)) {
+-		enable_irq(osc->irq);
+-		wait_event(osc->wait,
+-			   clk_main_osc_ready(regmap));
+-	}
++	while (!clk_main_osc_ready(regmap))
++		cpu_relax();
+ 
+ 	return 0;
+ }
+@@ -156,17 +130,15 @@ static const struct clk_ops main_osc_ops = {
+ 
+ static struct clk * __init
+ at91_clk_register_main_osc(struct regmap *regmap,
+-			   unsigned int irq,
+ 			   const char *name,
+ 			   const char *parent_name,
+ 			   bool bypass)
+ {
+-	int ret;
+ 	struct clk_main_osc *osc;
+ 	struct clk *clk = NULL;
+ 	struct clk_init_data init;
+ 
+-	if (!irq || !name || !parent_name)
++	if (!name || !parent_name)
+ 		return ERR_PTR(-EINVAL);
+ 
+ 	osc = kzalloc(sizeof(*osc), GFP_KERNEL);
+@@ -181,16 +153,6 @@ at91_clk_register_main_osc(struct regmap *regmap,
+ 
+ 	osc->hw.init = &init;
+ 	osc->regmap = regmap;
+-	osc->irq = irq;
+-
+-	init_waitqueue_head(&osc->wait);
+-	irq_set_status_flags(osc->irq, IRQ_NOAUTOEN);
+-	ret = request_irq(osc->irq, clk_main_osc_irq_handler,
+-			  IRQF_TRIGGER_HIGH, name, osc);
+-	if (ret) {
+-		kfree(osc);
+-		return ERR_PTR(ret);
+-	}
+ 
+ 	if (bypass)
+ 		regmap_update_bits(regmap,
+@@ -199,10 +161,8 @@ at91_clk_register_main_osc(struct regmap *regmap,
+ 				   AT91_PMC_OSCBYPASS | AT91_PMC_KEY);
+ 
+ 	clk = clk_register(NULL, &osc->hw);
+-	if (IS_ERR(clk)) {
+-		free_irq(irq, osc);
++	if (IS_ERR(clk))
+ 		kfree(osc);
+-	}
+ 
+ 	return clk;
+ }
+@@ -210,7 +170,6 @@ at91_clk_register_main_osc(struct regmap *regmap,
+ static void __init of_at91rm9200_clk_main_osc_setup(struct device_node *np)
+ {
+ 	struct clk *clk;
+-	unsigned int irq;
+ 	const char *name = np->name;
+ 	const char *parent_name;
+ 	struct regmap *regmap;
+@@ -224,11 +183,7 @@ static void __init of_at91rm9200_clk_main_osc_setup(struct device_node *np)
+ 	if (IS_ERR(regmap))
+ 		return;
+ 
+-	irq = irq_of_parse_and_map(np, 0);
+-	if (!irq)
+-		return;
+-
+-	clk = at91_clk_register_main_osc(regmap, irq, name, parent_name, bypass);
++	clk = at91_clk_register_main_osc(regmap, name, parent_name, bypass);
+ 	if (IS_ERR(clk))
+ 		return;
+ 
+@@ -237,16 +192,6 @@ static void __init of_at91rm9200_clk_main_osc_setup(struct device_node *np)
+ CLK_OF_DECLARE(at91rm9200_clk_main_osc, "atmel,at91rm9200-clk-main-osc",
+ 	       of_at91rm9200_clk_main_osc_setup);
+ 
+-static irqreturn_t clk_main_rc_osc_irq_handler(int irq, void *dev_id)
+-{
+-	struct clk_main_rc_osc *osc = dev_id;
+-
+-	wake_up(&osc->wait);
+-	disable_irq_nosync(osc->irq);
+-
+-	return IRQ_HANDLED;
+-}
+-
+ static bool clk_main_rc_osc_ready(struct regmap *regmap)
+ {
+ 	unsigned int status;
+@@ -269,11 +214,8 @@ static int clk_main_rc_osc_prepare(struct clk_hw *hw)
+ 				   MOR_KEY_MASK | AT91_PMC_MOSCRCEN,
+ 				   AT91_PMC_MOSCRCEN | AT91_PMC_KEY);
+ 
+-	while (!clk_main_rc_osc_ready(regmap)) {
+-		enable_irq(osc->irq);
+-		wait_event(osc->wait,
+-			   clk_main_rc_osc_ready(regmap));
+-	}
++	while (!clk_main_rc_osc_ready(regmap))
++		cpu_relax();
+ 
+ 	return 0;
+ }
+@@ -331,11 +273,9 @@ static const struct clk_ops main_rc_osc_ops = {
+ 
+ static struct clk * __init
+ at91_clk_register_main_rc_osc(struct regmap *regmap,
+-			      unsigned int irq,
+ 			      const char *name,
+ 			      u32 frequency, u32 accuracy)
+ {
+-	int ret;
+ 	struct clk_main_rc_osc *osc;
+ 	struct clk *clk = NULL;
+ 	struct clk_init_data init;
+@@ -355,22 +295,12 @@ at91_clk_register_main_rc_osc(struct regmap *regmap,
+ 
+ 	osc->hw.init = &init;
+ 	osc->regmap = regmap;
+-	osc->irq = irq;
+ 	osc->frequency = frequency;
+ 	osc->accuracy = accuracy;
+ 
+-	init_waitqueue_head(&osc->wait);
+-	irq_set_status_flags(osc->irq, IRQ_NOAUTOEN);
+-	ret = request_irq(osc->irq, clk_main_rc_osc_irq_handler,
+-			  IRQF_TRIGGER_HIGH, name, osc);
+-	if (ret)
+-		return ERR_PTR(ret);
+-
+ 	clk = clk_register(NULL, &osc->hw);
+-	if (IS_ERR(clk)) {
+-		free_irq(irq, osc);
++	if (IS_ERR(clk))
+ 		kfree(osc);
+-	}
+ 
+ 	return clk;
+ }
+@@ -378,7 +308,6 @@ at91_clk_register_main_rc_osc(struct regmap *regmap,
+ static void __init of_at91sam9x5_clk_main_rc_osc_setup(struct device_node *np)
+ {
+ 	struct clk *clk;
+-	unsigned int irq;
+ 	u32 frequency = 0;
+ 	u32 accuracy = 0;
+ 	const char *name = np->name;
+@@ -388,16 +317,11 @@ static void __init of_at91sam9x5_clk_main_rc_osc_setup(struct device_node *np)
+ 	of_property_read_u32(np, "clock-frequency", &frequency);
+ 	of_property_read_u32(np, "clock-accuracy", &accuracy);
+ 
+-	irq = irq_of_parse_and_map(np, 0);
+-	if (!irq)
+-		return;
+-
+ 	regmap = syscon_node_to_regmap(of_get_parent(np));
+ 	if (IS_ERR(regmap))
+ 		return;
+ 
+-	clk = at91_clk_register_main_rc_osc(regmap, irq, name, frequency,
+-					    accuracy);
++	clk = at91_clk_register_main_rc_osc(regmap, name, frequency, accuracy);
+ 	if (IS_ERR(clk))
+ 		return;
+ 
+@@ -529,16 +453,6 @@ static void __init of_at91rm9200_clk_main_setup(struct device_node *np)
+ CLK_OF_DECLARE(at91rm9200_clk_main, "atmel,at91rm9200-clk-main",
+ 	       of_at91rm9200_clk_main_setup);
+ 
+-static irqreturn_t clk_sam9x5_main_irq_handler(int irq, void *dev_id)
+-{
+-	struct clk_sam9x5_main *clkmain = dev_id;
+-
+-	wake_up(&clkmain->wait);
+-	disable_irq_nosync(clkmain->irq);
+-
+-	return IRQ_HANDLED;
+-}
+-
+ static inline bool clk_sam9x5_main_ready(struct regmap *regmap)
+ {
+ 	unsigned int status;
+@@ -553,11 +467,8 @@ static int clk_sam9x5_main_prepare(struct clk_hw *hw)
+ 	struct clk_sam9x5_main *clkmain = to_clk_sam9x5_main(hw);
+ 	struct regmap *regmap = clkmain->regmap;
+ 
+-	while (!clk_sam9x5_main_ready(regmap)) {
+-		enable_irq(clkmain->irq);
+-		wait_event(clkmain->wait,
+-			   clk_sam9x5_main_ready(regmap));
+-	}
++	while (!clk_sam9x5_main_ready(regmap))
++		cpu_relax();
+ 
+ 	return clk_main_probe_frequency(regmap);
+ }
+@@ -594,11 +505,8 @@ static int clk_sam9x5_main_set_parent(struct clk_hw *hw, u8 index)
+ 	else if (!index && (tmp & AT91_PMC_MOSCSEL))
+ 		regmap_write(regmap, AT91_CKGR_MOR, tmp & ~AT91_PMC_MOSCSEL);
+ 
+-	while (!clk_sam9x5_main_ready(regmap)) {
+-		enable_irq(clkmain->irq);
+-		wait_event(clkmain->wait,
+-			   clk_sam9x5_main_ready(regmap));
+-	}
++	while (!clk_sam9x5_main_ready(regmap))
++		cpu_relax();
+ 
+ 	return 0;
+ }
+@@ -623,12 +531,10 @@ static const struct clk_ops sam9x5_main_ops = {
+ 
+ static struct clk * __init
+ at91_clk_register_sam9x5_main(struct regmap *regmap,
+-			      unsigned int irq,
+ 			      const char *name,
+ 			      const char **parent_names,
+ 			      int num_parents)
+ {
+-	int ret;
+ 	struct clk_sam9x5_main *clkmain;
+ 	struct clk *clk = NULL;
+ 	struct clk_init_data init;
+@@ -652,21 +558,12 @@ at91_clk_register_sam9x5_main(struct regmap *regmap,
+ 
+ 	clkmain->hw.init = &init;
+ 	clkmain->regmap = regmap;
+-	clkmain->irq = irq;
+ 	regmap_read(clkmain->regmap, AT91_CKGR_MOR, &status);
+ 	clkmain->parent = status & AT91_PMC_MOSCEN ? 1 : 0;
+-	init_waitqueue_head(&clkmain->wait);
+-	irq_set_status_flags(clkmain->irq, IRQ_NOAUTOEN);
+-	ret = request_irq(clkmain->irq, clk_sam9x5_main_irq_handler,
+-			  IRQF_TRIGGER_HIGH, name, clkmain);
+-	if (ret)
+-		return ERR_PTR(ret);
+ 
+ 	clk = clk_register(NULL, &clkmain->hw);
+-	if (IS_ERR(clk)) {
+-		free_irq(clkmain->irq, clkmain);
++	if (IS_ERR(clk))
+ 		kfree(clkmain);
+-	}
+ 
+ 	return clk;
+ }
+@@ -676,7 +573,6 @@ static void __init of_at91sam9x5_clk_main_setup(struct device_node *np)
+ 	struct clk *clk;
+ 	const char *parent_names[2];
+ 	int num_parents;
+-	unsigned int irq;
+ 	const char *name = np->name;
+ 	struct regmap *regmap;
+ 
+@@ -691,11 +587,7 @@ static void __init of_at91sam9x5_clk_main_setup(struct device_node *np)
+ 
+ 	of_property_read_string(np, "clock-output-names", &name);
+ 
+-	irq = irq_of_parse_and_map(np, 0);
+-	if (!irq)
+-		return;
+-
+-	clk = at91_clk_register_sam9x5_main(regmap, irq, name, parent_names,
++	clk = at91_clk_register_sam9x5_main(regmap, name, parent_names,
+ 					    num_parents);
+ 	if (IS_ERR(clk))
+ 		return;
+diff --git a/drivers/clk/at91/clk-master.c b/drivers/clk/at91/clk-master.c
+index 8d94ddfc9c72..7d4a1864ea7c 100644
+--- a/drivers/clk/at91/clk-master.c
++++ b/drivers/clk/at91/clk-master.c
+@@ -12,13 +12,6 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
+-#include <linux/io.h>
+-#include <linux/wait.h>
+-#include <linux/sched.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ 
+@@ -47,22 +40,10 @@ struct clk_master_layout {
+ struct clk_master {
+ 	struct clk_hw hw;
+ 	struct regmap *regmap;
+-	unsigned int irq;
+-	wait_queue_head_t wait;
+ 	const struct clk_master_layout *layout;
+ 	const struct clk_master_characteristics *characteristics;
+ };
+ 
+-static irqreturn_t clk_master_irq_handler(int irq, void *dev_id)
+-{
+-	struct clk_master *master = (struct clk_master *)dev_id;
+-
+-	wake_up(&master->wait);
+-	disable_irq_nosync(master->irq);
+-
+-	return IRQ_HANDLED;
+-}
+-
+ static inline bool clk_master_ready(struct regmap *regmap)
+ {
+ 	unsigned int status;
+@@ -76,11 +57,8 @@ static int clk_master_prepare(struct clk_hw *hw)
+ {
+ 	struct clk_master *master = to_clk_master(hw);
+ 
+-	while (!clk_master_ready(master->regmap)) {
+-		enable_irq(master->irq);
+-		wait_event(master->wait,
+-			   clk_master_ready(master->regmap));
+-	}
++	while (!clk_master_ready(master->regmap))
++		cpu_relax();
+ 
+ 	return 0;
+ }
+@@ -143,13 +121,12 @@ static const struct clk_ops master_ops = {
+ };
+ 
+ static struct clk * __init
+-at91_clk_register_master(struct regmap *regmap, unsigned int irq,
++at91_clk_register_master(struct regmap *regmap,
+ 		const char *name, int num_parents,
+ 		const char **parent_names,
+ 		const struct clk_master_layout *layout,
+ 		const struct clk_master_characteristics *characteristics)
+ {
+-	int ret;
+ 	struct clk_master *master;
+ 	struct clk *clk = NULL;
+ 	struct clk_init_data init;
+@@ -171,19 +148,9 @@ at91_clk_register_master(struct regmap *regmap, unsigned int irq,
+ 	master->layout = layout;
+ 	master->characteristics = characteristics;
+ 	master->regmap = regmap;
+-	master->irq = irq;
+-	init_waitqueue_head(&master->wait);
+-	irq_set_status_flags(master->irq, IRQ_NOAUTOEN);
+-	ret = request_irq(master->irq, clk_master_irq_handler,
+-			  IRQF_TRIGGER_HIGH, "clk-master", master);
+-	if (ret) {
+-		kfree(master);
+-		return ERR_PTR(ret);
+-	}
+ 
+ 	clk = clk_register(NULL, &master->hw);
+ 	if (IS_ERR(clk)) {
+-		free_irq(master->irq, master);
+ 		kfree(master);
+ 	}
+ 
+@@ -233,7 +200,6 @@ of_at91_clk_master_setup(struct device_node *np,
+ {
+ 	struct clk *clk;
+ 	int num_parents;
+-	unsigned int irq;
+ 	const char *parent_names[MASTER_SOURCE_MAX];
+ 	const char *name = np->name;
+ 	struct clk_master_characteristics *characteristics;
+@@ -255,11 +221,7 @@ of_at91_clk_master_setup(struct device_node *np,
+ 	if (IS_ERR(regmap))
+ 		return;
+ 
+-	irq = irq_of_parse_and_map(np, 0);
+-	if (!irq)
+-		goto out_free_characteristics;
+-
+-	clk = at91_clk_register_master(regmap, irq, name, num_parents,
++	clk = at91_clk_register_master(regmap, name, num_parents,
+ 				       parent_names, layout,
+ 				       characteristics);
+ 	if (IS_ERR(clk))
+diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
+index 5f4c6ce628e0..fb2e0b56d4b7 100644
+--- a/drivers/clk/at91/clk-pll.c
++++ b/drivers/clk/at91/clk-pll.c
+@@ -12,14 +12,6 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
+-#include <linux/io.h>
+-#include <linux/kernel.h>
+-#include <linux/wait.h>
+-#include <linux/sched.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ 
+@@ -61,8 +53,6 @@ struct clk_pll_layout {
+ struct clk_pll {
+ 	struct clk_hw hw;
+ 	struct regmap *regmap;
+-	unsigned int irq;
+-	wait_queue_head_t wait;
+ 	u8 id;
+ 	u8 div;
+ 	u8 range;
+@@ -71,16 +61,6 @@ struct clk_pll {
+ 	const struct clk_pll_characteristics *characteristics;
+ };
+ 
+-static irqreturn_t clk_pll_irq_handler(int irq, void *dev_id)
+-{
+-	struct clk_pll *pll = (struct clk_pll *)dev_id;
+-
+-	wake_up(&pll->wait);
+-	disable_irq_nosync(pll->irq);
+-
+-	return IRQ_HANDLED;
+-}
+-
+ static inline bool clk_pll_ready(struct regmap *regmap, int id)
+ {
+ 	unsigned int status;
+@@ -127,11 +107,8 @@ static int clk_pll_prepare(struct clk_hw *hw)
+ 			(out << PLL_OUT_SHIFT) |
+ 			((pll->mul & layout->mul_mask) << layout->mul_shift));
+ 
+-	while (!clk_pll_ready(regmap, pll->id)) {
+-		enable_irq(pll->irq);
+-		wait_event(pll->wait,
+-			   clk_pll_ready(regmap, pll->id));
+-	}
++	while (!clk_pll_ready(regmap, pll->id))
++		cpu_relax();
+ 
+ 	return 0;
+ }
+@@ -320,7 +297,7 @@ static const struct clk_ops pll_ops = {
+ };
+ 
+ static struct clk * __init
+-at91_clk_register_pll(struct regmap *regmap, unsigned int irq, const char *name,
++at91_clk_register_pll(struct regmap *regmap, const char *name,
+ 		      const char *parent_name, u8 id,
+ 		      const struct clk_pll_layout *layout,
+ 		      const struct clk_pll_characteristics *characteristics)
+@@ -328,7 +305,6 @@ at91_clk_register_pll(struct regmap *regmap, unsigned int irq, const char *name,
+ 	struct clk_pll *pll;
+ 	struct clk *clk = NULL;
+ 	struct clk_init_data init;
+-	int ret;
+ 	int offset = PLL_REG(id);
+ 	unsigned int pllr;
+ 
+@@ -350,22 +326,12 @@ at91_clk_register_pll(struct regmap *regmap, unsigned int irq, const char *name,
+ 	pll->layout = layout;
+ 	pll->characteristics = characteristics;
+ 	pll->regmap = regmap;
+-	pll->irq = irq;
+ 	regmap_read(regmap, offset, &pllr);
+ 	pll->div = PLL_DIV(pllr);
+ 	pll->mul = PLL_MUL(pllr, layout);
+-	init_waitqueue_head(&pll->wait);
+-	irq_set_status_flags(pll->irq, IRQ_NOAUTOEN);
+-	ret = request_irq(pll->irq, clk_pll_irq_handler, IRQF_TRIGGER_HIGH,
+-			  id ? "clk-pllb" : "clk-plla", pll);
+-	if (ret) {
+-		kfree(pll);
+-		return ERR_PTR(ret);
+-	}
+ 
+ 	clk = clk_register(NULL, &pll->hw);
+ 	if (IS_ERR(clk)) {
+-		free_irq(pll->irq, pll);
+ 		kfree(pll);
+ 	}
+ 
+@@ -499,7 +465,6 @@ of_at91_clk_pll_setup(struct device_node *np,
+ 		      const struct clk_pll_layout *layout)
+ {
+ 	u32 id;
+-	unsigned int irq;
+ 	struct clk *clk;
+ 	struct regmap *regmap;
+ 	const char *parent_name;
+@@ -521,11 +486,7 @@ of_at91_clk_pll_setup(struct device_node *np,
+ 	if (!characteristics)
+ 		return;
+ 
+-	irq = irq_of_parse_and_map(np, 0);
+-	if (!irq)
+-		return;
+-
+-	clk = at91_clk_register_pll(regmap, irq, name, parent_name, id, layout,
++	clk = at91_clk_register_pll(regmap, name, parent_name, id, layout,
+ 				    characteristics);
+ 	if (IS_ERR(clk))
+ 		goto out_free_characteristics;
+diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
+index 0593adf1bf4b..8f35d8172909 100644
+--- a/drivers/clk/at91/clk-system.c
++++ b/drivers/clk/at91/clk-system.c
+@@ -12,13 +12,6 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/io.h>
+-#include <linux/irq.h>
+-#include <linux/of_irq.h>
+-#include <linux/interrupt.h>
+-#include <linux/wait.h>
+-#include <linux/sched.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ 
+@@ -32,8 +25,6 @@
+ struct clk_system {
+ 	struct clk_hw hw;
+ 	struct regmap *regmap;
+-	unsigned int irq;
+-	wait_queue_head_t wait;
+ 	u8 id;
+ };
+ 
+@@ -41,15 +32,6 @@ static inline int is_pck(int id)
+ {
+ 	return (id >= 8) && (id <= 15);
+ }
+-static irqreturn_t clk_system_irq_handler(int irq, void *dev_id)
+-{
+-	struct clk_system *sys = (struct clk_system *)dev_id;
+-
+-	wake_up(&sys->wait);
+-	disable_irq_nosync(sys->irq);
+-
+-	return IRQ_HANDLED;
+-}
+ 
+ static inline bool clk_system_ready(struct regmap *regmap, int id)
+ {
+@@ -69,15 +51,9 @@ static int clk_system_prepare(struct clk_hw *hw)
+ 	if (!is_pck(sys->id))
+ 		return 0;
+ 
+-	while (!clk_system_ready(sys->regmap, sys->id)) {
+-		if (sys->irq) {
+-			enable_irq(sys->irq);
+-			wait_event(sys->wait,
+-				   clk_system_ready(sys->regmap, sys->id));
+-		} else {
+-			cpu_relax();
+-		}
+-	}
++	while (!clk_system_ready(sys->regmap, sys->id))
++		cpu_relax();
++
+ 	return 0;
+ }
+ 
+@@ -114,12 +90,11 @@ static const struct clk_ops system_ops = {
+ 
+ static struct clk * __init
+ at91_clk_register_system(struct regmap *regmap, const char *name,
+-			 const char *parent_name, u8 id, int irq)
++			 const char *parent_name, u8 id)
+ {
+ 	struct clk_system *sys;
+ 	struct clk *clk = NULL;
+ 	struct clk_init_data init;
+-	int ret;
+ 
+ 	if (!parent_name || id > SYSTEM_MAX_ID)
+ 		return ERR_PTR(-EINVAL);
+@@ -137,24 +112,10 @@ at91_clk_register_system(struct regmap *regmap, const char *name,
+ 	sys->id = id;
+ 	sys->hw.init = &init;
+ 	sys->regmap = regmap;
+-	sys->irq = irq;
+-	if (irq) {
+-		init_waitqueue_head(&sys->wait);
+-		irq_set_status_flags(sys->irq, IRQ_NOAUTOEN);
+-		ret = request_irq(sys->irq, clk_system_irq_handler,
+-				IRQF_TRIGGER_HIGH, name, sys);
+-		if (ret) {
+-			kfree(sys);
+-			return ERR_PTR(ret);
+-		}
+-	}
+ 
+ 	clk = clk_register(NULL, &sys->hw);
+-	if (IS_ERR(clk)) {
+-		if (irq)
+-			free_irq(sys->irq, sys);
++	if (IS_ERR(clk))
+ 		kfree(sys);
+-	}
+ 
+ 	return clk;
+ }
+@@ -162,7 +123,6 @@ at91_clk_register_system(struct regmap *regmap, const char *name,
+ static void __init of_at91rm9200_clk_sys_setup(struct device_node *np)
+ {
+ 	int num;
+-	int irq = 0;
+ 	u32 id;
+ 	struct clk *clk;
+ 	const char *name;
+@@ -185,13 +145,9 @@ static void __init of_at91rm9200_clk_sys_setup(struct device_node *np)
+ 		if (of_property_read_string(np, "clock-output-names", &name))
+ 			name = sysclknp->name;
+ 
+-		if (is_pck(id))
+-			irq = irq_of_parse_and_map(sysclknp, 0);
+-
+ 		parent_name = of_clk_get_parent_name(sysclknp, 0);
+ 
+-		clk = at91_clk_register_system(regmap, name, parent_name, id,
+-					       irq);
++		clk = at91_clk_register_system(regmap, name, parent_name, id);
+ 		if (IS_ERR(clk))
+ 			continue;
+ 
+diff --git a/drivers/clk/at91/clk-utmi.c b/drivers/clk/at91/clk-utmi.c
+index 58a310e5768c..61fcf399e58c 100644
+--- a/drivers/clk/at91/clk-utmi.c
++++ b/drivers/clk/at91/clk-utmi.c
+@@ -11,14 +11,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
+-#include <linux/io.h>
+-#include <linux/sched.h>
+-#include <linux/wait.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ 
+@@ -29,22 +22,10 @@
+ struct clk_utmi {
+ 	struct clk_hw hw;
+ 	struct regmap *regmap;
+-	unsigned int irq;
+-	wait_queue_head_t wait;
+ };
+ 
+ #define to_clk_utmi(hw) container_of(hw, struct clk_utmi, hw)
+ 
+-static irqreturn_t clk_utmi_irq_handler(int irq, void *dev_id)
+-{
+-	struct clk_utmi *utmi = (struct clk_utmi *)dev_id;
+-
+-	wake_up(&utmi->wait);
+-	disable_irq_nosync(utmi->irq);
+-
+-	return IRQ_HANDLED;
+-}
+-
+ static inline bool clk_utmi_ready(struct regmap *regmap)
+ {
+ 	unsigned int status;
+@@ -62,11 +43,8 @@ static int clk_utmi_prepare(struct clk_hw *hw)
+ 
+ 	regmap_update_bits(utmi->regmap, AT91_CKGR_UCKR, uckr, uckr);
+ 
+-	while (!clk_utmi_ready(utmi->regmap)) {
+-		enable_irq(utmi->irq);
+-		wait_event(utmi->wait,
+-			   clk_utmi_ready(utmi->regmap));
+-	}
++	while (!clk_utmi_ready(utmi->regmap))
++		cpu_relax();
+ 
+ 	return 0;
+ }
+@@ -100,10 +78,9 @@ static const struct clk_ops utmi_ops = {
+ };
+ 
+ static struct clk * __init
+-at91_clk_register_utmi(struct regmap *regmap, unsigned int irq,
++at91_clk_register_utmi(struct regmap *regmap,
+ 		       const char *name, const char *parent_name)
+ {
+-	int ret;
+ 	struct clk_utmi *utmi;
+ 	struct clk *clk = NULL;
+ 	struct clk_init_data init;
+@@ -120,28 +97,16 @@ at91_clk_register_utmi(struct regmap *regmap, unsigned int irq,
+ 
+ 	utmi->hw.init = &init;
+ 	utmi->regmap = regmap;
+-	utmi->irq = irq;
+-	init_waitqueue_head(&utmi->wait);
+-	irq_set_status_flags(utmi->irq, IRQ_NOAUTOEN);
+-	ret = request_irq(utmi->irq, clk_utmi_irq_handler,
+-			  IRQF_TRIGGER_HIGH, "clk-utmi", utmi);
+-	if (ret) {
+-		kfree(utmi);
+-		return ERR_PTR(ret);
+-	}
+ 
+ 	clk = clk_register(NULL, &utmi->hw);
+-	if (IS_ERR(clk)) {
+-		free_irq(utmi->irq, utmi);
++	if (IS_ERR(clk))
+ 		kfree(utmi);
+-	}
+ 
+ 	return clk;
+ }
+ 
+ static void __init of_at91sam9x5_clk_utmi_setup(struct device_node *np)
+ {
+-	unsigned int irq;
+ 	struct clk *clk;
+ 	const char *parent_name;
+ 	const char *name = np->name;
+@@ -151,15 +116,11 @@ static void __init of_at91sam9x5_clk_utmi_setup(struct device_node *np)
+ 
+ 	of_property_read_string(np, "clock-output-names", &name);
+ 
+-	irq = irq_of_parse_and_map(np, 0);
+-	if (!irq)
+-		return;
+-
+ 	regmap = syscon_node_to_regmap(of_get_parent(np));
+ 	if (IS_ERR(regmap))
+ 		return;
+ 
+-	clk = at91_clk_register_utmi(regmap, irq, name, parent_name);
++	clk = at91_clk_register_utmi(regmap, name, parent_name);
+ 	if (IS_ERR(clk))
+ 		return;
+ 
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index 295b17b9c689..f17a2a1f1e85 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -13,12 +13,6 @@
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+-#include <linux/io.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/irqchip/chained_irq.h>
+-#include <linux/irqdomain.h>
+-#include <linux/of_irq.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ 
+@@ -67,118 +61,6 @@ int of_at91_get_clk_range(struct device_node *np, const char *propname,
+ }
+ EXPORT_SYMBOL_GPL(of_at91_get_clk_range);
+ 
+-static void pmc_irq_mask(struct irq_data *d)
+-{
+-	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
+-
+-	regmap_write(pmc->regmap, AT91_PMC_IDR, 1 << d->hwirq);
+-}
+-
+-static void pmc_irq_unmask(struct irq_data *d)
+-{
+-	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
+-
+-	regmap_write(pmc->regmap, AT91_PMC_IER, 1 << d->hwirq);
+-}
+-
+-static int pmc_irq_set_type(struct irq_data *d, unsigned type)
+-{
+-	if (type != IRQ_TYPE_LEVEL_HIGH) {
+-		pr_warn("PMC: type not supported (support only IRQ_TYPE_LEVEL_HIGH type)\n");
+-		return -EINVAL;
+-	}
+-
+-	return 0;
+-}
+-
+-static void pmc_irq_suspend(struct irq_data *d)
+-{
+-	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
+-
+-	regmap_read(pmc->regmap, AT91_PMC_IMR, &pmc->imr);
+-	regmap_write(pmc->regmap, AT91_PMC_IDR, pmc->imr);
+-}
+-
+-static void pmc_irq_resume(struct irq_data *d)
+-{
+-	struct at91_pmc *pmc = irq_data_get_irq_chip_data(d);
+-
+-	regmap_write(pmc->regmap, AT91_PMC_IER, pmc->imr);
+-}
+-
+-static struct irq_chip pmc_irq = {
+-	.name = "PMC",
+-	.irq_disable = pmc_irq_mask,
+-	.irq_mask = pmc_irq_mask,
+-	.irq_unmask = pmc_irq_unmask,
+-	.irq_set_type = pmc_irq_set_type,
+-	.irq_suspend = pmc_irq_suspend,
+-	.irq_resume = pmc_irq_resume,
+-};
+-
+-static struct lock_class_key pmc_lock_class;
+-
+-static int pmc_irq_map(struct irq_domain *h, unsigned int virq,
+-		       irq_hw_number_t hw)
+-{
+-	struct at91_pmc	*pmc = h->host_data;
+-
+-	irq_set_lockdep_class(virq, &pmc_lock_class);
+-
+-	irq_set_chip_and_handler(virq, &pmc_irq,
+-				 handle_level_irq);
+-	irq_set_chip_data(virq, pmc);
+-
+-	return 0;
+-}
+-
+-static int pmc_irq_domain_xlate(struct irq_domain *d,
+-				struct device_node *ctrlr,
+-				const u32 *intspec, unsigned int intsize,
+-				irq_hw_number_t *out_hwirq,
+-				unsigned int *out_type)
+-{
+-	struct at91_pmc *pmc = d->host_data;
+-	const struct at91_pmc_caps *caps = pmc->caps;
+-
+-	if (WARN_ON(intsize < 1))
+-		return -EINVAL;
+-
+-	*out_hwirq = intspec[0];
+-
+-	if (!(caps->available_irqs & (1 << *out_hwirq)))
+-		return -EINVAL;
+-
+-	*out_type = IRQ_TYPE_LEVEL_HIGH;
+-
+-	return 0;
+-}
+-
+-static const struct irq_domain_ops pmc_irq_ops = {
+-	.map	= pmc_irq_map,
+-	.xlate	= pmc_irq_domain_xlate,
+-};
+-
+-static irqreturn_t pmc_irq_handler(int irq, void *data)
+-{
+-	struct at91_pmc *pmc = (struct at91_pmc *)data;
+-	unsigned int tmpsr, imr;
+-	unsigned long sr;
+-	int n;
+-
+-	regmap_read(pmc->regmap, AT91_PMC_SR, &tmpsr);
+-	regmap_read(pmc->regmap, AT91_PMC_IMR, &imr);
+-
+-	sr = tmpsr & imr;
+-	if (!sr)
+-		return IRQ_NONE;
+-
+-	for_each_set_bit(n, &sr, BITS_PER_LONG)
+-		generic_handle_irq(irq_find_mapping(pmc->irqdomain, n));
+-
+-	return IRQ_HANDLED;
+-}
+-
+ static const struct at91_pmc_caps at91rm9200_caps = {
+ 	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_LOCKB |
+ 			  AT91_PMC_MCKRDY | AT91_PMC_PCK0RDY |
+@@ -230,12 +112,12 @@ static const struct at91_pmc_caps sama5d3_caps = {
+ 
+ static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
+ 					     struct regmap *regmap,
+-					     void __iomem *regbase, int virq,
++					     void __iomem *regbase,
+ 					     const struct at91_pmc_caps *caps)
+ {
+ 	struct at91_pmc *pmc;
+ 
+-	if (!regbase || !virq ||  !caps)
++	if (!regbase || !caps)
+ 		return NULL;
+ 
+ 	at91_pmc_base = regbase;
+@@ -245,26 +127,11 @@ static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
+ 		return NULL;
+ 
+ 	pmc->regmap = regmap;
+-	pmc->virq = virq;
+ 	pmc->caps = caps;
+ 
+-	pmc->irqdomain = irq_domain_add_linear(np, 32, &pmc_irq_ops, pmc);
+-	if (!pmc->irqdomain)
+-		goto out_free_pmc;
+-
+ 	regmap_write(pmc->regmap, AT91_PMC_IDR, 0xffffffff);
+-	if (request_irq(pmc->virq, pmc_irq_handler,
+-			IRQF_SHARED | IRQF_COND_SUSPEND, "pmc", pmc))
+-		goto out_remove_irqdomain;
+ 
+ 	return pmc;
+-
+-out_remove_irqdomain:
+-	irq_domain_remove(pmc->irqdomain);
+-out_free_pmc:
+-	kfree(pmc);
+-
+-	return NULL;
+ }
+ 
+ static void __init of_at91_pmc_setup(struct device_node *np,
+@@ -273,17 +140,12 @@ static void __init of_at91_pmc_setup(struct device_node *np,
+ 	struct at91_pmc *pmc;
+ 	void __iomem *regbase = of_iomap(np, 0);
+ 	struct regmap *regmap;
+-	int virq;
+ 
+ 	regmap = syscon_node_to_regmap(np);
+ 	if (IS_ERR(regmap))
+ 		panic("Could not retrieve syscon regmap");
+ 
+-	virq = irq_of_parse_and_map(np, 0);
+-	if (!virq)
+-		return;
+-
+-	pmc = at91_pmc_init(np, regmap, regbase, virq, caps);
++	pmc = at91_pmc_init(np, regmap, regbase, caps);
+ 	if (!pmc)
+ 		return;
+ }
+diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+index e160cb640e4a..b06a332b056a 100644
+--- a/drivers/clk/at91/pmc.h
++++ b/drivers/clk/at91/pmc.h
+@@ -32,10 +32,7 @@ struct at91_pmc_caps {
+ 
+ struct at91_pmc {
+ 	struct regmap *regmap;
+-	int virq;
+ 	const struct at91_pmc_caps *caps;
+-	struct irq_domain *irqdomain;
+-	u32 imr;
+ };
+ 
+ int of_at91_get_clk_range(struct device_node *np, const char *propname,
+-- 
+2.10.1
+

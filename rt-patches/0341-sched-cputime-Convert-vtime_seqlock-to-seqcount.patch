@@ -1,0 +1,219 @@
+From 63ce97931044295665f1e0638de68cd9dbe26cb6 Mon Sep 17 00:00:00 2001
+From: Frederic Weisbecker <fweisbec@gmail.com>
+Date: Thu, 19 Nov 2015 16:47:34 +0100
+Subject: [PATCH 341/351] sched/cputime: Convert vtime_seqlock to seqcount
+X-NVConfidentiality: public
+
+The cputime can only be updated by the current task itself, even in
+vtime case. So we can safely use seqcount instead of seqlock as there
+is no writer concurrency involved.
+
+[ bigeasy: safe since 6a61671bb2f3 ("cputime: Safely read cputime of
+full dynticks CPUs") ]
+
+Signed-off-by: Frederic Weisbecker <fweisbec@gmail.com>
+Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+Cc: Chris Metcalf <cmetcalf@ezchip.com>
+Cc: Christoph Lameter <cl@linux.com>
+Cc: Hiroshi Shimamoto <h-shimamoto@ct.jp.nec.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Luiz Capitulino <lcapitulino@redhat.com>
+Cc: Mike Galbraith <efault@gmx.de>
+Cc: Paul E . McKenney <paulmck@linux.vnet.ibm.com>
+Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Rik van Riel <riel@redhat.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Link: http://lkml.kernel.org/r/1447948054-28668-8-git-send-email-fweisbec@gmail.com
+Signed-off-by: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ include/linux/init_task.h |  2 +-
+ include/linux/sched.h     |  2 +-
+ kernel/fork.c             |  2 +-
+ kernel/sched/cputime.c    | 46 ++++++++++++++++++++++++----------------------
+ 4 files changed, 27 insertions(+), 25 deletions(-)
+
+diff --git a/include/linux/init_task.h b/include/linux/init_task.h
+index c52f61d08fbb..60fadde71a44 100644
+--- a/include/linux/init_task.h
++++ b/include/linux/init_task.h
+@@ -156,7 +156,7 @@ extern struct task_group root_task_group;
+ 
+ #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
+ # define INIT_VTIME(tsk)						\
+-	.vtime_seqlock = __SEQLOCK_UNLOCKED(tsk.vtime_seqlock),	\
++	.vtime_seqcount = SEQCNT_ZERO(tsk.vtime_seqcount),	\
+ 	.vtime_snap = 0,				\
+ 	.vtime_snap_whence = VTIME_SYS,
+ #else
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index bc11cd8bac72..8a303e439ce8 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1551,7 +1551,7 @@ struct task_struct {
+ 	cputime_t gtime;
+ 	struct prev_cputime prev_cputime;
+ #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
+-	seqlock_t vtime_seqlock;
++	seqcount_t vtime_seqcount;
+ 	unsigned long long vtime_snap;
+ 	enum {
+ 		/* Task is sleeping or running in a CPU with VTIME inactive */
+diff --git a/kernel/fork.c b/kernel/fork.c
+index c45c69bf4291..092c5ed02301 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -1380,7 +1380,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+ 	prev_cputime_init(&p->prev_cputime);
+ 
+ #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
+-	seqlock_init(&p->vtime_seqlock);
++	seqcount_init(&p->vtime_seqcount);
+ 	p->vtime_snap = 0;
+ 	p->vtime_snap_whence = VTIME_INACTIVE;
+ #endif
+diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
+index 0fb1ff7f8e6b..4611b1c1cb12 100644
+--- a/kernel/sched/cputime.c
++++ b/kernel/sched/cputime.c
+@@ -696,37 +696,37 @@ static void __vtime_account_system(struct task_struct *tsk)
+ 
+ void vtime_account_system(struct task_struct *tsk)
+ {
+-	write_seqlock(&tsk->vtime_seqlock);
++	write_seqcount_begin(&tsk->vtime_seqcount);
+ 	__vtime_account_system(tsk);
+-	write_sequnlock(&tsk->vtime_seqlock);
++	write_seqcount_end(&tsk->vtime_seqcount);
+ }
+ 
+ void vtime_gen_account_irq_exit(struct task_struct *tsk)
+ {
+-	write_seqlock(&tsk->vtime_seqlock);
++	write_seqcount_begin(&tsk->vtime_seqcount);
+ 	__vtime_account_system(tsk);
+ 	if (context_tracking_in_user())
+ 		tsk->vtime_snap_whence = VTIME_USER;
+-	write_sequnlock(&tsk->vtime_seqlock);
++	write_seqcount_end(&tsk->vtime_seqcount);
+ }
+ 
+ void vtime_account_user(struct task_struct *tsk)
+ {
+ 	cputime_t delta_cpu;
+ 
+-	write_seqlock(&tsk->vtime_seqlock);
++	write_seqcount_begin(&tsk->vtime_seqcount);
+ 	delta_cpu = get_vtime_delta(tsk);
+ 	tsk->vtime_snap_whence = VTIME_SYS;
+ 	account_user_time(tsk, delta_cpu, cputime_to_scaled(delta_cpu));
+-	write_sequnlock(&tsk->vtime_seqlock);
++	write_seqcount_end(&tsk->vtime_seqcount);
+ }
+ 
+ void vtime_user_enter(struct task_struct *tsk)
+ {
+-	write_seqlock(&tsk->vtime_seqlock);
++	write_seqcount_begin(&tsk->vtime_seqcount);
+ 	__vtime_account_system(tsk);
+ 	tsk->vtime_snap_whence = VTIME_USER;
+-	write_sequnlock(&tsk->vtime_seqlock);
++	write_seqcount_end(&tsk->vtime_seqcount);
+ }
+ 
+ void vtime_guest_enter(struct task_struct *tsk)
+@@ -738,19 +738,19 @@ void vtime_guest_enter(struct task_struct *tsk)
+ 	 * synchronization against the reader (task_gtime())
+ 	 * that can thus safely catch up with a tickless delta.
+ 	 */
+-	write_seqlock(&tsk->vtime_seqlock);
++	write_seqcount_begin(&tsk->vtime_seqcount);
+ 	__vtime_account_system(tsk);
+ 	current->flags |= PF_VCPU;
+-	write_sequnlock(&tsk->vtime_seqlock);
++	write_seqcount_end(&tsk->vtime_seqcount);
+ }
+ EXPORT_SYMBOL_GPL(vtime_guest_enter);
+ 
+ void vtime_guest_exit(struct task_struct *tsk)
+ {
+-	write_seqlock(&tsk->vtime_seqlock);
++	write_seqcount_begin(&tsk->vtime_seqcount);
+ 	__vtime_account_system(tsk);
+ 	current->flags &= ~PF_VCPU;
+-	write_sequnlock(&tsk->vtime_seqlock);
++	write_seqcount_end(&tsk->vtime_seqcount);
+ }
+ EXPORT_SYMBOL_GPL(vtime_guest_exit);
+ 
+@@ -763,24 +763,26 @@ void vtime_account_idle(struct task_struct *tsk)
+ 
+ void arch_vtime_task_switch(struct task_struct *prev)
+ {
+-	write_seqlock(&prev->vtime_seqlock);
++	write_seqcount_begin(&prev->vtime_seqcount);
+ 	prev->vtime_snap_whence = VTIME_INACTIVE;
+-	write_sequnlock(&prev->vtime_seqlock);
++	write_seqcount_end(&prev->vtime_seqcount);
+ 
+-	write_seqlock(&current->vtime_seqlock);
++	write_seqcount_begin(&current->vtime_seqcount);
+ 	current->vtime_snap_whence = VTIME_SYS;
+ 	current->vtime_snap = sched_clock_cpu(smp_processor_id());
+-	write_sequnlock(&current->vtime_seqlock);
++	write_seqcount_end(&current->vtime_seqcount);
+ }
+ 
+ void vtime_init_idle(struct task_struct *t, int cpu)
+ {
+ 	unsigned long flags;
+ 
+-	write_seqlock_irqsave(&t->vtime_seqlock, flags);
++	local_irq_save(flags);
++	write_seqcount_begin(&t->vtime_seqcount);
+ 	t->vtime_snap_whence = VTIME_SYS;
+ 	t->vtime_snap = sched_clock_cpu(cpu);
+-	write_sequnlock_irqrestore(&t->vtime_seqlock, flags);
++	write_seqcount_end(&t->vtime_seqcount);
++	local_irq_restore(flags);
+ }
+ 
+ cputime_t task_gtime(struct task_struct *t)
+@@ -792,13 +794,13 @@ cputime_t task_gtime(struct task_struct *t)
+ 		return t->gtime;
+ 
+ 	do {
+-		seq = read_seqbegin(&t->vtime_seqlock);
++		seq = read_seqcount_begin(&t->vtime_seqcount);
+ 
+ 		gtime = t->gtime;
+ 		if (t->flags & PF_VCPU)
+ 			gtime += vtime_delta(t);
+ 
+-	} while (read_seqretry(&t->vtime_seqlock, seq));
++	} while (read_seqcount_retry(&t->vtime_seqcount, seq));
+ 
+ 	return gtime;
+ }
+@@ -821,7 +823,7 @@ fetch_task_cputime(struct task_struct *t,
+ 		*udelta = 0;
+ 		*sdelta = 0;
+ 
+-		seq = read_seqbegin(&t->vtime_seqlock);
++		seq = read_seqcount_begin(&t->vtime_seqcount);
+ 
+ 		if (u_dst)
+ 			*u_dst = *u_src;
+@@ -845,7 +847,7 @@ fetch_task_cputime(struct task_struct *t,
+ 			if (t->vtime_snap_whence == VTIME_SYS)
+ 				*sdelta = delta;
+ 		}
+-	} while (read_seqretry(&t->vtime_seqlock, seq));
++	} while (read_seqcount_retry(&t->vtime_seqcount, seq));
+ }
+ 
+ 
+-- 
+2.10.1
+

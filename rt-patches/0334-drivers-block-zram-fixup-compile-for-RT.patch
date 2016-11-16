@@ -1,0 +1,27 @@
+From 5813ab506a0d7bff1e471fa8119eba48f189942d Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Fri, 8 Apr 2016 16:18:24 +0200
+Subject: [PATCH 334/351] drivers/block/zram: fixup compile for !RT
+X-NVConfidentiality: public
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/block/zram/zram_drv.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/block/zram/zram_drv.h b/drivers/block/zram/zram_drv.h
+index 1e4a3c685ec7..9e3e953d680e 100644
+--- a/drivers/block/zram/zram_drv.h
++++ b/drivers/block/zram/zram_drv.h
+@@ -134,7 +134,7 @@ static inline void zram_unlock_table(struct zram_table_entry *table)
+ 	bit_spin_unlock(ZRAM_ACCESS, &table->value);
+ }
+ 
+-static inline void zram_meta_init_locks(struct zram_meta *meta, u64 disksize) { }
++static inline void zram_meta_init_table_locks(struct zram_meta *meta, u64 disksize) { }
+ #else /* CONFIG_PREEMPT_RT_BASE */
+ static inline void zram_lock_table(struct zram_table_entry *table)
+ {
+-- 
+2.10.1
+

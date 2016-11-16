@@ -1,0 +1,259 @@
+From a5695a76a5803e92b4792f3976338fcdf7f61bfb Mon Sep 17 00:00:00 2001
+From: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
+Date: Mon, 14 Dec 2015 11:19:10 +0100
+Subject: [PATCH 336/351] panic, x86: Allow CPUs to save registers even if
+ looping in NMI context
+X-NVConfidentiality: public
+
+Currently, kdump_nmi_shootdown_cpus(), a subroutine of crash_kexec(),
+sends an NMI IPI to CPUs which haven't called panic() to stop them,
+save their register information and do some cleanups for crash dumping.
+However, if such a CPU is infinitely looping in NMI context, we fail to
+save its register information into the crash dump.
+
+For example, this can happen when unknown NMIs are broadcast to all
+CPUs as follows:
+
+  CPU 0                             CPU 1
+  ===========================       ==========================
+  receive an unknown NMI
+  unknown_nmi_error()
+    panic()                         receive an unknown NMI
+      spin_trylock(&panic_lock)     unknown_nmi_error()
+      crash_kexec()                   panic()
+                                        spin_trylock(&panic_lock)
+                                        panic_smp_self_stop()
+                                          infinite loop
+        kdump_nmi_shootdown_cpus()
+          issue NMI IPI -----------> blocked until IRET
+                                          infinite loop...
+
+Here, since CPU 1 is in NMI context, the second NMI from CPU 0 is
+blocked until CPU 1 executes IRET. However, CPU 1 never executes IRET,
+so the NMI is not handled and the callback function to save registers is
+never called.
+
+In practice, this can happen on some servers which broadcast NMIs to all
+CPUs when the NMI button is pushed.
+
+To save registers in this case, we need to:
+
+  a) Return from NMI handler instead of looping infinitely
+  or
+  b) Call the callback function directly from the infinite loop
+
+Inherently, a) is risky because NMI is also used to prevent corrupted
+data from being propagated to devices.  So, we chose b).
+
+This patch does the following:
+
+1. Move the infinite looping of CPUs which haven't called panic() in NMI
+   context (actually done by panic_smp_self_stop()) outside of panic() to
+   enable us to refer pt_regs. Please note that panic_smp_self_stop() is
+   still used for normal context.
+
+2. Call a callback of kdump_nmi_shootdown_cpus() directly to save
+   registers and do some cleanups after setting waiting_for_crash_ipi which
+   is used for counting down the number of CPUs which handled the callback
+
+Signed-off-by: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
+Acked-by: Michal Hocko <mhocko@suse.com>
+Cc: Aaron Tomlin <atomlin@redhat.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Andy Lutomirski <luto@kernel.org>
+Cc: Baoquan He <bhe@redhat.com>
+Cc: Chris Metcalf <cmetcalf@ezchip.com>
+Cc: Dave Young <dyoung@redhat.com>
+Cc: David Hildenbrand <dahi@linux.vnet.ibm.com>
+Cc: Don Zickus <dzickus@redhat.com>
+Cc: Eric Biederman <ebiederm@xmission.com>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: Gobinda Charan Maji <gobinda.cemk07@gmail.com>
+Cc: HATAYAMA Daisuke <d.hatayama@jp.fujitsu.com>
+Cc: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Javi Merino <javi.merino@arm.com>
+Cc: Jiang Liu <jiang.liu@linux.intel.com>
+Cc: Jonathan Corbet <corbet@lwn.net>
+Cc: kexec@lists.infradead.org
+Cc: linux-doc@vger.kernel.org
+Cc: lkml <linux-kernel@vger.kernel.org>
+Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+Cc: Michal Nazarewicz <mina86@mina86.com>
+Cc: Nicolas Iooss <nicolas.iooss_linux@m4x.org>
+Cc: Oleg Nesterov <oleg@redhat.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Prarit Bhargava <prarit@redhat.com>
+Cc: Rasmus Villemoes <linux@rasmusvillemoes.dk>
+Cc: Seth Jennings <sjenning@redhat.com>
+Cc: Stefan Lippers-Hollmann <s.l-h@gmx.de>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ulrich Obergfell <uobergfe@redhat.com>
+Cc: Vitaly Kuznetsov <vkuznets@redhat.com>
+Cc: Vivek Goyal <vgoyal@redhat.com>
+Cc: Yasuaki Ishimatsu <isimatu.yasuaki@jp.fujitsu.com>
+Link: http://lkml.kernel.org/r/20151210014628.25437.75256.stgit@softrs
+[ Cleanup comments, fixup formatting. ]
+Signed-off-by: Borislav Petkov <bp@suse.de>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/x86/kernel/nmi.c    |  6 +++---
+ arch/x86/kernel/reboot.c | 20 ++++++++++++++++++++
+ include/linux/kernel.h   | 16 ++++++++++++----
+ kernel/panic.c           |  9 +++++++++
+ kernel/watchdog.c        |  2 +-
+ 5 files changed, 45 insertions(+), 8 deletions(-)
+
+diff --git a/arch/x86/kernel/nmi.c b/arch/x86/kernel/nmi.c
+index fca87938d739..424aec4a4c71 100644
+--- a/arch/x86/kernel/nmi.c
++++ b/arch/x86/kernel/nmi.c
+@@ -231,7 +231,7 @@ pci_serr_error(unsigned char reason, struct pt_regs *regs)
+ #endif
+ 
+ 	if (panic_on_unrecovered_nmi)
+-		nmi_panic("NMI: Not continuing");
++		nmi_panic(regs, "NMI: Not continuing");
+ 
+ 	pr_emerg("Dazed and confused, but trying to continue\n");
+ 
+@@ -256,7 +256,7 @@ io_check_error(unsigned char reason, struct pt_regs *regs)
+ 	show_regs(regs);
+ 
+ 	if (panic_on_io_nmi) {
+-		nmi_panic("NMI IOCK error: Not continuing");
++		nmi_panic(regs, "NMI IOCK error: Not continuing");
+ 
+ 		/*
+ 		 * If we end up here, it means we have received an NMI while
+@@ -305,7 +305,7 @@ unknown_nmi_error(unsigned char reason, struct pt_regs *regs)
+ 
+ 	pr_emerg("Do you have a strange power saving mode enabled?\n");
+ 	if (unknown_nmi_panic || panic_on_unrecovered_nmi)
+-		nmi_panic("NMI: Not continuing");
++		nmi_panic(regs, "NMI: Not continuing");
+ 
+ 	pr_emerg("Dazed and confused, but trying to continue\n");
+ }
+diff --git a/arch/x86/kernel/reboot.c b/arch/x86/kernel/reboot.c
+index f660d63f40fe..8384207adde2 100644
+--- a/arch/x86/kernel/reboot.c
++++ b/arch/x86/kernel/reboot.c
+@@ -726,6 +726,7 @@ static int crashing_cpu;
+ static nmi_shootdown_cb shootdown_callback;
+ 
+ static atomic_t waiting_for_crash_ipi;
++static int crash_ipi_issued;
+ 
+ static int crash_nmi_callback(unsigned int val, struct pt_regs *regs)
+ {
+@@ -788,6 +789,9 @@ void nmi_shootdown_cpus(nmi_shootdown_cb callback)
+ 
+ 	smp_send_nmi_allbutself();
+ 
++	/* Kick CPUs looping in NMI context. */
++	WRITE_ONCE(crash_ipi_issued, 1);
++
+ 	msecs = 1000; /* Wait at most a second for the other cpus to stop */
+ 	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
+ 		mdelay(1);
+@@ -796,6 +800,22 @@ void nmi_shootdown_cpus(nmi_shootdown_cb callback)
+ 
+ 	/* Leave the nmi callback set */
+ }
++
++/* Override the weak function in kernel/panic.c */
++void nmi_panic_self_stop(struct pt_regs *regs)
++{
++	while (1) {
++		/*
++		 * Wait for the crash dumping IPI to be issued, and then
++		 * call its callback directly.
++		 */
++		if (READ_ONCE(crash_ipi_issued))
++			crash_nmi_callback(0, regs); /* Don't return */
++
++		cpu_relax();
++	}
++}
++
+ #else /* !CONFIG_SMP */
+ void nmi_shootdown_cpus(nmi_shootdown_cb callback)
+ {
+diff --git a/include/linux/kernel.h b/include/linux/kernel.h
+index a814bc014a2b..8a4a50381763 100644
+--- a/include/linux/kernel.h
++++ b/include/linux/kernel.h
+@@ -259,6 +259,7 @@ extern long (*panic_blink)(int state);
+ __printf(1, 2)
+ void panic(const char *fmt, ...)
+ 	__noreturn __cold;
++void nmi_panic_self_stop(struct pt_regs *);
+ extern void oops_enter(void);
+ extern void oops_exit(void);
+ void print_oops_end_marker(void);
+@@ -459,14 +460,21 @@ extern atomic_t panic_cpu;
+ 
+ /*
+  * A variant of panic() called from NMI context. We return if we've already
+- * panicked on this CPU.
++ * panicked on this CPU. If another CPU already panicked, loop in
++ * nmi_panic_self_stop() which can provide architecture dependent code such
++ * as saving register state for crash dump.
+  */
+-#define nmi_panic(fmt, ...)						\
++#define nmi_panic(regs, fmt, ...)					\
+ do {									\
+-	int cpu = raw_smp_processor_id();				\
++	int old_cpu, cpu;						\
+ 									\
+-	if (atomic_cmpxchg(&panic_cpu, PANIC_CPU_INVALID, cpu) != cpu)	\
++	cpu = raw_smp_processor_id();					\
++	old_cpu = atomic_cmpxchg(&panic_cpu, PANIC_CPU_INVALID, cpu);	\
++									\
++	if (old_cpu == PANIC_CPU_INVALID)				\
+ 		panic(fmt, ##__VA_ARGS__);				\
++	else if (old_cpu != cpu)					\
++		nmi_panic_self_stop(regs);				\
+ } while (0)
+ 
+ /*
+diff --git a/kernel/panic.c b/kernel/panic.c
+index 71498388d039..59379029d64e 100644
+--- a/kernel/panic.c
++++ b/kernel/panic.c
+@@ -64,6 +64,15 @@ void __weak panic_smp_self_stop(void)
+ 		cpu_relax();
+ }
+ 
++/*
++ * Stop ourselves in NMI context if another CPU has already panicked. Arch code
++ * may override this to prepare for crash dumping, e.g. save regs info.
++ */
++void __weak nmi_panic_self_stop(struct pt_regs *regs)
++{
++	panic_smp_self_stop();
++}
++
+ atomic_t panic_cpu = ATOMIC_INIT(PANIC_CPU_INVALID);
+ 
+ /**
+diff --git a/kernel/watchdog.c b/kernel/watchdog.c
+index 63073a177b14..8025fc36d8c1 100644
+--- a/kernel/watchdog.c
++++ b/kernel/watchdog.c
+@@ -436,7 +436,7 @@ static void watchdog_overflow_callback(struct perf_event *event,
+ 
+ 		raw_spin_unlock(&watchdog_output_lock);
+ 		if (hardlockup_panic)
+-			nmi_panic("Hard LOCKUP");
++			nmi_panic(regs, "Hard LOCKUP");
+ 
+ 		__this_cpu_write(hard_watchdog_warn, true);
+ 		return;
+-- 
+2.10.1
+

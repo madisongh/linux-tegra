@@ -1,0 +1,120 @@
+From 4cc2342e30d25ebd2c0e64bf398afef276ebf42e Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Thu, 11 Feb 2016 22:06:28 +0100
+Subject: [PATCH 307/351] kernel: sched: Fix preempt_disable_ip recodring for
+ preempt_disable()
+X-NVConfidentiality: public
+
+preempt_disable() invokes preempt_count_add() which saves the caller in
+current->preempt_disable_ip. It uses CALLER_ADDR1 which does not look for its
+caller but for the parent of the caller. Which means we get the correct caller
+for something like spin_lock() unless the architectures inlines those
+invocations. It is always wrong for preempt_disable() or local_bh_disable().
+
+This patch makes the function get_parent_ip() which tries CALLER_ADDR0,1,2 if
+the former is a locking function.  This seems to record the preempt_disable()
+caller properly for preempt_disable() itself as well as for get_cpu_var() or
+local_bh_disable().
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ include/linux/ftrace.h | 12 ++++++++++++
+ include/linux/sched.h  |  2 --
+ kernel/sched/core.c    | 14 ++------------
+ kernel/softirq.c       |  4 ++--
+ 4 files changed, 16 insertions(+), 16 deletions(-)
+
+diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+index 60048c50404e..f2cd67624f18 100644
+--- a/include/linux/ftrace.h
++++ b/include/linux/ftrace.h
+@@ -694,6 +694,18 @@ static inline void __ftrace_enabled_restore(int enabled)
+ #define CALLER_ADDR5 ((unsigned long)ftrace_return_address(5))
+ #define CALLER_ADDR6 ((unsigned long)ftrace_return_address(6))
+ 
++static inline unsigned long get_lock_parent_ip(void)
++{
++	unsigned long addr = CALLER_ADDR0;
++
++	if (!in_lock_functions(addr))
++		return addr;
++	addr = CALLER_ADDR1;
++	if (!in_lock_functions(addr))
++		return addr;
++	return CALLER_ADDR2;
++}
++
+ #ifdef CONFIG_IRQSOFF_TRACER
+   extern void time_hardirqs_on(unsigned long a0, unsigned long a1);
+   extern void time_hardirqs_off(unsigned long a0, unsigned long a1);
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index a6a87095ca40..79d8479039c5 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -183,8 +183,6 @@ extern void update_cpu_load_nohz(void);
+ static inline void update_cpu_load_nohz(void) { }
+ #endif
+ 
+-extern unsigned long get_parent_ip(unsigned long addr);
+-
+ extern void dump_cpu_task(int cpu);
+ 
+ struct seq_file;
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 6d852e7f16ff..c9560121e678 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -3050,16 +3050,6 @@ u64 scheduler_tick_max_deferment(void)
+ }
+ #endif
+ 
+-notrace unsigned long get_parent_ip(unsigned long addr)
+-{
+-	if (in_lock_functions(addr)) {
+-		addr = CALLER_ADDR2;
+-		if (in_lock_functions(addr))
+-			addr = CALLER_ADDR3;
+-	}
+-	return addr;
+-}
+-
+ #if defined(CONFIG_PREEMPT) && (defined(CONFIG_DEBUG_PREEMPT) || \
+ 				defined(CONFIG_PREEMPT_TRACER))
+ 
+@@ -3081,7 +3071,7 @@ void preempt_count_add(int val)
+ 				PREEMPT_MASK - 10);
+ #endif
+ 	if (preempt_count() == val) {
+-		unsigned long ip = get_parent_ip(CALLER_ADDR1);
++		unsigned long ip = get_lock_parent_ip();
+ #ifdef CONFIG_DEBUG_PREEMPT
+ 		current->preempt_disable_ip = ip;
+ #endif
+@@ -3108,7 +3098,7 @@ void preempt_count_sub(int val)
+ #endif
+ 
+ 	if (preempt_count() == val)
+-		trace_preempt_on(CALLER_ADDR0, get_parent_ip(CALLER_ADDR1));
++		trace_preempt_on(CALLER_ADDR0, get_lock_parent_ip());
+ 	__preempt_count_sub(val);
+ }
+ EXPORT_SYMBOL(preempt_count_sub);
+diff --git a/kernel/softirq.c b/kernel/softirq.c
+index 2ca63cc1469e..cb9c1d5dee10 100644
+--- a/kernel/softirq.c
++++ b/kernel/softirq.c
+@@ -287,9 +287,9 @@ void __local_bh_disable_ip(unsigned long ip, unsigned int cnt)
+ 
+ 	if (preempt_count() == cnt) {
+ #ifdef CONFIG_DEBUG_PREEMPT
+-		current->preempt_disable_ip = get_parent_ip(CALLER_ADDR1);
++		current->preempt_disable_ip = get_lock_parent_ip();
+ #endif
+-		trace_preempt_off(CALLER_ADDR0, get_parent_ip(CALLER_ADDR1));
++		trace_preempt_off(CALLER_ADDR0, get_lock_parent_ip());
+ 	}
+ }
+ EXPORT_SYMBOL(__local_bh_disable_ip);
+-- 
+2.10.1
+

@@ -1,0 +1,50 @@
+From 27f1c8967b525ce1cd2be930c53135d0134251bb Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Wed, 13 Jan 2016 17:47:11 +0100
+Subject: [PATCH 259/351] fix compile for CONFIG_MISSED_TIMER_OFFSETS_HIST
+X-NVConfidentiality: public
+
+Reported-by: kernel test robot <ying.huang@linux.intel.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ kernel/time/hrtimer.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/kernel/time/hrtimer.c b/kernel/time/hrtimer.c
+index 45c7322057d0..2cc3675e6864 100644
+--- a/kernel/time/hrtimer.c
++++ b/kernel/time/hrtimer.c
+@@ -1454,6 +1454,7 @@ static inline int hrtimer_rt_defer(struct hrtimer *timer) { return 0; }
+ 
+ #endif
+ 
++static enum hrtimer_restart hrtimer_wakeup(struct hrtimer *timer);
+ 
+ static void __hrtimer_run_queues(struct hrtimer_cpu_base *cpu_base, ktime_t now)
+ {
+@@ -1499,18 +1500,16 @@ static void __hrtimer_run_queues(struct hrtimer_cpu_base *cpu_base, ktime_t now)
+ 			if (basenow.tv64 < hrtimer_get_softexpires_tv64(timer))
+ 				break;
+ 
+-			 if (!hrtimer_rt_defer(timer))
+-				 __run_hrtimer(cpu_base, base, timer, &basenow);
+-			 else
+-				 raise = 1;
++			if (!hrtimer_rt_defer(timer))
++				__run_hrtimer(cpu_base, base, timer, &basenow);
++			else
++				raise = 1;
+ 		}
+ 	}
+ 	if (raise)
+ 		raise_softirq_irqoff(HRTIMER_SOFTIRQ);
+ }
+ 
+-static enum hrtimer_restart hrtimer_wakeup(struct hrtimer *timer);
+-
+ #ifdef CONFIG_HIGH_RES_TIMERS
+ 
+ /*
+-- 
+2.10.1
+

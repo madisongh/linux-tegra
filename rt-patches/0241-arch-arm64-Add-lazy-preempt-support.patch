@@ -1,0 +1,116 @@
+From f6859a34f28642d12c93c350784aad9f41b4653e Mon Sep 17 00:00:00 2001
+From: Anders Roxell <anders.roxell@linaro.org>
+Date: Thu, 14 May 2015 17:52:17 +0200
+Subject: [PATCH 241/351] arch/arm64: Add lazy preempt support
+X-NVConfidentiality: public
+
+arm64 is missing support for PREEMPT_RT. The main feature which is
+lacking is support for lazy preemption. The arch-specific entry code,
+thread information structure definitions, and associated data tables
+have to be extended to provide this support. Then the Kconfig file has
+to be extended to indicate the support is available, and also to
+indicate that support for full RT preemption is now available.
+
+Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+---
+ arch/arm64/Kconfig                   |  1 +
+ arch/arm64/include/asm/thread_info.h |  3 +++
+ arch/arm64/kernel/asm-offsets.c      |  1 +
+ arch/arm64/kernel/entry.S            | 13 ++++++++++---
+ 4 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 98f24c5a81ac..68fa987164d9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -78,6 +78,7 @@ config ARM64
+ 	select HAVE_PERF_REGS
+ 	select HAVE_PERF_USER_STACK_DUMP
+ 	select HAVE_RCU_TABLE_FREE
++	select HAVE_PREEMPT_LAZY
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select IOMMU_DMA if IOMMU_SUPPORT && !TEGRA_IOMMU_SMMU
+ 	select IRQ_DOMAIN
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index b38a8985a7b9..b1d2e3292dd0 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -49,6 +49,7 @@ struct thread_info {
+ 	mm_segment_t		addr_limit;	/* address limit */
+ 	struct task_struct	*task;		/* main task structure */
+ 	int			preempt_count;	/* 0 => preemptable, <0 => bug */
++	int			preempt_lazy_count; /* 0 => preemptable, <0 => bug */
+ 	int			cpu;		/* cpu */
+ };
+ 
+@@ -103,6 +104,7 @@ static inline struct thread_info *current_thread_info(void)
+ #define TIF_NEED_RESCHED	1
+ #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
+ #define TIF_FOREIGN_FPSTATE	3	/* CPU's FP state is not current's */
++#define TIF_NEED_RESCHED_LAZY	4
+ #define TIF_NOHZ		7
+ #define TIF_SYSCALL_TRACE	8
+ #define TIF_SYSCALL_AUDIT	9
+@@ -119,6 +121,7 @@ static inline struct thread_info *current_thread_info(void)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+ #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
+ #define _TIF_FOREIGN_FPSTATE	(1 << TIF_FOREIGN_FPSTATE)
++#define _TIF_NEED_RESCHED_LAZY	(1 << TIF_NEED_RESCHED_LAZY)
+ #define _TIF_NOHZ		(1 << TIF_NOHZ)
+ #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
+ #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 25de8b244961..c5038409e050 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -35,6 +35,7 @@ int main(void)
+   BLANK();
+   DEFINE(TI_FLAGS,		offsetof(struct thread_info, flags));
+   DEFINE(TI_PREEMPT,		offsetof(struct thread_info, preempt_count));
++  DEFINE(TI_PREEMPT_LAZY,	offsetof(struct thread_info, preempt_lazy_count));
+   DEFINE(TI_ADDR_LIMIT,		offsetof(struct thread_info, addr_limit));
+   DEFINE(TI_TASK,		offsetof(struct thread_info, task));
+   DEFINE(TI_CPU,		offsetof(struct thread_info, cpu));
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index e61b04273a9e..4764d7887e0b 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -364,11 +364,16 @@ el1_irq:
+ #ifdef CONFIG_PREEMPT
+ 	get_thread_info tsk
+ 	ldr	w24, [tsk, #TI_PREEMPT]		// get preempt count
+-	cbnz	w24, 1f				// preempt count != 0
++	cbnz	w24, 2f				// preempt count != 0
+ 	ldr	x0, [tsk, #TI_FLAGS]		// get flags
+-	tbz	x0, #TIF_NEED_RESCHED, 1f	// needs rescheduling?
+-	bl	el1_preempt
++	tbnz	x0, #TIF_NEED_RESCHED, 1f	// needs rescheduling?
++
++	ldr	w24, [tsk, #TI_PREEMPT_LAZY]	// get preempt lazy count
++	cbnz	w24, 2f				// preempt lazy count != 0
++	tbz	x0, #TIF_NEED_RESCHED_LAZY, 2f	// needs rescheduling?
+ 1:
++	bl	el1_preempt
++2:
+ #endif
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_on
+@@ -382,6 +387,7 @@ el1_preempt:
+ 1:	bl	preempt_schedule_irq		// irq en/disable is done inside
+ 	ldr	x0, [tsk, #TI_FLAGS]		// get new tasks TI_FLAGS
+ 	tbnz	x0, #TIF_NEED_RESCHED, 1b	// needs rescheduling?
++	tbnz	x0, #TIF_NEED_RESCHED_LAZY, 1b	// needs rescheduling?
+ 	ret	x24
+ #endif
+ 
+@@ -626,6 +632,7 @@ ret_fast_syscall_trace:
+  */
+ work_pending:
+ 	tbnz	x1, #TIF_NEED_RESCHED, work_resched
++	tbnz	x1, #TIF_NEED_RESCHED_LAZY, work_resched
+ 	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
+ 	ldr	x2, [sp, #S_PSTATE]
+ 	mov	x0, sp				// 'regs'
+-- 
+2.10.1
+

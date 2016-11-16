@@ -1,0 +1,1498 @@
+From 79b9b924860455351cf1c9de130c6295ac50688a Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Wed, 9 Mar 2016 11:24:03 +0100
+Subject: [PATCH 322/351] Add upstream swait
+X-NVConfidentiality: public
+
+This patch includes the chanages queued for upstream currently sitting in
+the TIP tree:
+ abedf8e2419f rcu: Use simple wait queues where possible in rcutree
+ 065bb78c5b09 rcu: Do not call rcu_nocb_gp_cleanup() while holding rnp->lock
+ 8577370fb0cb KVM: Use simple waitqueue for vcpu->wq
+ ef50c0463389 kbuild: Add option to turn incompatible pointer check into error
+ 13b35686e8b9 wait.[ch]: Introduce the simple waitqueue (swait) implementation
+
+plus -RT releated fixups like struct/function renaming and the
+completion fixup. The latter one required the addition of
+swake_up_all_locked().
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ Makefile                            |   3 +
+ arch/arm/kvm/arm.c                  |   6 +-
+ arch/arm/kvm/psci.c                 |   4 +-
+ arch/mips/kvm/mips.c                |   8 +-
+ arch/powerpc/include/asm/kvm_host.h |   4 +-
+ arch/powerpc/kvm/book3s_hv.c        |  22 ++--
+ arch/s390/include/asm/kvm_host.h    |   2 +-
+ arch/s390/kvm/interrupt.c           |   4 +-
+ arch/x86/kvm/lapic.c                |   6 +-
+ block/blk-core.c                    |   4 +-
+ block/blk-mq.c                      |   4 +-
+ drivers/usb/gadget/function/f_fs.c  |   2 +-
+ include/linux/blkdev.h              |   2 +-
+ include/linux/completion.h          |   8 +-
+ include/linux/kvm_host.h            |   5 +-
+ include/linux/swait.h               | 173 ++++++++++++++++++++++++++++++
+ include/linux/wait-simple.h         | 207 ------------------------------------
+ kernel/rcu/tree.c                   |  18 ++--
+ kernel/rcu/tree.h                   |  13 +--
+ kernel/rcu/tree_plugin.h            |  26 +++--
+ kernel/sched/Makefile               |   2 +-
+ kernel/sched/completion.c           |  10 +-
+ kernel/sched/swait.c                | 140 ++++++++++++++++++++++++
+ kernel/sched/wait-simple.c          | 115 --------------------
+ kernel/sched/work-simple.c          |   8 +-
+ virt/kvm/async_pf.c                 |   4 +-
+ virt/kvm/kvm_main.c                 |  17 ++-
+ 27 files changed, 412 insertions(+), 405 deletions(-)
+ create mode 100644 include/linux/swait.h
+ delete mode 100644 include/linux/wait-simple.h
+ create mode 100644 kernel/sched/swait.c
+ delete mode 100644 kernel/sched/wait-simple.c
+
+diff --git a/Makefile b/Makefile
+index d41f698d72e1..04ff84120592 100644
+--- a/Makefile
++++ b/Makefile
+@@ -782,6 +782,9 @@ KBUILD_CFLAGS   += $(call cc-option,-Werror=strict-prototypes)
+ # Prohibit date/time macros, which would make the build non-deterministic
+ KBUILD_CFLAGS   += $(call cc-option,-Werror=date-time)
+ 
++# enforce correct pointer usage
++KBUILD_CFLAGS   += $(call cc-option,-Werror=incompatible-pointer-types)
++
+ # use the deterministic mode of AR if available
+ KBUILD_ARFLAGS := $(call ar-option,D)
+ 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 2ce9cc2717ac..bb43bc396f06 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -498,16 +498,16 @@ static void kvm_arm_resume_guest(struct kvm *kvm)
+ 	struct kvm_vcpu *vcpu;
+ 
+ 	kvm_for_each_vcpu(i, vcpu, kvm) {
+-		struct swait_head *wq = kvm_arch_vcpu_wq(vcpu);
++		struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
+ 
+ 		vcpu->arch.pause = false;
+-		swait_wake_interruptible(wq);
++		swake_up(wq);
+ 	}
+ }
+ 
+ static void vcpu_sleep(struct kvm_vcpu *vcpu)
+ {
+-	 struct swait_head *wq = kvm_arch_vcpu_wq(vcpu);
++	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
+ 
+ 	swait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
+ 				       (!vcpu->arch.pause)));
+diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+index 08148c46c8d0..c2b131527a64 100644
+--- a/arch/arm/kvm/psci.c
++++ b/arch/arm/kvm/psci.c
+@@ -70,7 +70,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ {
+ 	struct kvm *kvm = source_vcpu->kvm;
+ 	struct kvm_vcpu *vcpu = NULL;
+-	struct swait_head *wq;
++	struct swait_queue_head *wq;
+ 	unsigned long cpu_id;
+ 	unsigned long context_id;
+ 	phys_addr_t target_pc;
+@@ -119,7 +119,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	smp_mb();		/* Make sure the above is visible */
+ 
+ 	wq = kvm_arch_vcpu_wq(vcpu);
+-	swait_wake_interruptible(wq);
++	swake_up(wq);
+ 
+ 	return PSCI_RET_SUCCESS;
+ }
+diff --git a/arch/mips/kvm/mips.c b/arch/mips/kvm/mips.c
+index 2683d04fdda5..8a113298b6cc 100644
+--- a/arch/mips/kvm/mips.c
++++ b/arch/mips/kvm/mips.c
+@@ -445,8 +445,8 @@ int kvm_vcpu_ioctl_interrupt(struct kvm_vcpu *vcpu,
+ 
+ 	dvcpu->arch.wait = 0;
+ 
+-	if (waitqueue_active(&dvcpu->wq))
+-		wake_up_interruptible(&dvcpu->wq);
++	if (swait_active(&dvcpu->wq))
++		swake_up(&dvcpu->wq);
+ 
+ 	return 0;
+ }
+@@ -1174,8 +1174,8 @@ static void kvm_mips_comparecount_func(unsigned long data)
+ 	kvm_mips_callbacks->queue_timer_int(vcpu);
+ 
+ 	vcpu->arch.wait = 0;
+-	if (waitqueue_active(&vcpu->wq))
+-		wake_up_interruptible(&vcpu->wq);
++	if (swait_active(&vcpu->wq))
++		swake_up(&vcpu->wq);
+ }
+ 
+ /* low level hrtimer wake routine */
+diff --git a/arch/powerpc/include/asm/kvm_host.h b/arch/powerpc/include/asm/kvm_host.h
+index b439518f0253..f8673ff84b31 100644
+--- a/arch/powerpc/include/asm/kvm_host.h
++++ b/arch/powerpc/include/asm/kvm_host.h
+@@ -286,7 +286,7 @@ struct kvmppc_vcore {
+ 	struct list_head runnable_threads;
+ 	struct list_head preempt_list;
+ 	spinlock_t lock;
+-	struct swait_head wq;
++	struct swait_queue_head wq;
+ 	spinlock_t stoltb_lock;	/* protects stolen_tb and preempt_tb */
+ 	u64 stolen_tb;
+ 	u64 preempt_tb;
+@@ -626,7 +626,7 @@ struct kvm_vcpu_arch {
+ 	u8 prodded;
+ 	u32 last_inst;
+ 
+-	struct swait_head *wqp;
++	struct swait_queue_head *wqp;
+ 	struct kvmppc_vcore *vcore;
+ 	int ret;
+ 	int trap;
+diff --git a/arch/powerpc/kvm/book3s_hv.c b/arch/powerpc/kvm/book3s_hv.c
+index 32be32b61d4c..df34a6432873 100644
+--- a/arch/powerpc/kvm/book3s_hv.c
++++ b/arch/powerpc/kvm/book3s_hv.c
+@@ -114,11 +114,11 @@ static bool kvmppc_ipi_thread(int cpu)
+ static void kvmppc_fast_vcpu_kick_hv(struct kvm_vcpu *vcpu)
+ {
+ 	int cpu;
+-	struct swait_head *wqp;
++	struct swait_queue_head *wqp;
+ 
+ 	wqp = kvm_arch_vcpu_wq(vcpu);
+-	if (swaitqueue_active(wqp)) {
+-		swait_wake_interruptible(wqp);
++	if (swait_active(wqp)) {
++		swake_up(wqp);
+ 		++vcpu->stat.halt_wakeup;
+ 	}
+ 
+@@ -707,8 +707,8 @@ int kvmppc_pseries_do_hcall(struct kvm_vcpu *vcpu)
+ 		tvcpu->arch.prodded = 1;
+ 		smp_mb();
+ 		if (vcpu->arch.ceded) {
+-			if (swaitqueue_active(&vcpu->wq)) {
+-				swait_wake_interruptible(&vcpu->wq);
++			if (swait_active(&vcpu->wq)) {
++				swake_up(&vcpu->wq);
+ 				vcpu->stat.halt_wakeup++;
+ 			}
+ 		}
+@@ -1447,7 +1447,7 @@ static struct kvmppc_vcore *kvmppc_vcore_create(struct kvm *kvm, int core)
+ 	INIT_LIST_HEAD(&vcore->runnable_threads);
+ 	spin_lock_init(&vcore->lock);
+ 	spin_lock_init(&vcore->stoltb_lock);
+-	init_swait_head(&vcore->wq);
++	init_swait_queue_head(&vcore->wq);
+ 	vcore->preempt_tb = TB_NIL;
+ 	vcore->lpcr = kvm->arch.lpcr;
+ 	vcore->first_vcpuid = core * threads_per_subcore;
+@@ -2519,9 +2519,9 @@ static void kvmppc_vcore_blocked(struct kvmppc_vcore *vc)
+ {
+ 	struct kvm_vcpu *vcpu;
+ 	int do_sleep = 1;
+-	DEFINE_SWAITER(wait);
++	DECLARE_SWAITQUEUE(wait);
+ 
+-	swait_prepare(&vc->wq, &wait, TASK_INTERRUPTIBLE);
++	prepare_to_swait(&vc->wq, &wait, TASK_INTERRUPTIBLE);
+ 
+ 	/*
+ 	 * Check one last time for pending exceptions and ceded state after
+@@ -2535,7 +2535,7 @@ static void kvmppc_vcore_blocked(struct kvmppc_vcore *vc)
+ 	}
+ 
+ 	if (!do_sleep) {
+-		swait_finish(&vc->wq, &wait);
++		finish_swait(&vc->wq, &wait);
+ 		return;
+ 	}
+ 
+@@ -2543,7 +2543,7 @@ static void kvmppc_vcore_blocked(struct kvmppc_vcore *vc)
+ 	trace_kvmppc_vcore_blocked(vc, 0);
+ 	spin_unlock(&vc->lock);
+ 	schedule();
+-	swait_finish(&vc->wq, &wait);
++	finish_swait(&vc->wq, &wait);
+ 	spin_lock(&vc->lock);
+ 	vc->vcore_state = VCORE_INACTIVE;
+ 	trace_kvmppc_vcore_blocked(vc, 1);
+@@ -2599,7 +2599,7 @@ static int kvmppc_run_vcpu(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
+ 			kvmppc_start_thread(vcpu, vc);
+ 			trace_kvm_guest_enter(vcpu);
+ 		} else if (vc->vcore_state == VCORE_SLEEPING) {
+-			swait_wake(&vc->wq);
++			swake_up(&vc->wq);
+ 		}
+ 
+ 	}
+diff --git a/arch/s390/include/asm/kvm_host.h b/arch/s390/include/asm/kvm_host.h
+index 2a84c76265ec..bbdc539fb3c6 100644
+--- a/arch/s390/include/asm/kvm_host.h
++++ b/arch/s390/include/asm/kvm_host.h
+@@ -427,7 +427,7 @@ struct kvm_s390_irq_payload {
+ struct kvm_s390_local_interrupt {
+ 	spinlock_t lock;
+ 	struct kvm_s390_float_interrupt *float_int;
+-	struct swait_head *wq;
++	struct swait_queue_head *wq;
+ 	atomic_t *cpuflags;
+ 	DECLARE_BITMAP(sigp_emerg_pending, KVM_MAX_VCPUS);
+ 	struct kvm_s390_irq_payload irq;
+diff --git a/arch/s390/kvm/interrupt.c b/arch/s390/kvm/interrupt.c
+index 8b4516b99bcd..cc862c486002 100644
+--- a/arch/s390/kvm/interrupt.c
++++ b/arch/s390/kvm/interrupt.c
+@@ -868,13 +868,13 @@ no_timer:
+ 
+ void kvm_s390_vcpu_wakeup(struct kvm_vcpu *vcpu)
+ {
+-	if (swaitqueue_active(&vcpu->wq)) {
++	if (swait_active(&vcpu->wq)) {
+ 		/*
+ 		 * The vcpu gave up the cpu voluntarily, mark it as a good
+ 		 * yield-candidate.
+ 		 */
+ 		vcpu->preempted = true;
+-		swait_wake_interruptible(&vcpu->wq);
++		swake_up(&vcpu->wq);
+ 		vcpu->stat.halt_wakeup++;
+ 	}
+ }
+diff --git a/arch/x86/kvm/lapic.c b/arch/x86/kvm/lapic.c
+index 906a1ecb7606..20d9e9fb3b74 100644
+--- a/arch/x86/kvm/lapic.c
++++ b/arch/x86/kvm/lapic.c
+@@ -1195,7 +1195,7 @@ static void apic_update_lvtt(struct kvm_lapic *apic)
+ static void apic_timer_expired(struct kvm_lapic *apic)
+ {
+ 	struct kvm_vcpu *vcpu = apic->vcpu;
+-	struct swait_head *q = &vcpu->wq;
++	struct swait_queue_head *q = &vcpu->wq;
+ 	struct kvm_timer *ktimer = &apic->lapic_timer;
+ 
+ 	if (atomic_read(&apic->lapic_timer.pending))
+@@ -1204,8 +1204,8 @@ static void apic_timer_expired(struct kvm_lapic *apic)
+ 	atomic_inc(&apic->lapic_timer.pending);
+ 	kvm_set_pending_timer(vcpu);
+ 
+-	if (swaitqueue_active(q))
+-		swait_wake_interruptible(q);
++	if (swait_active(q))
++		swake_up(q);
+ 
+ 	if (apic_lvtt_tscdeadline(apic))
+ 		ktimer->expired_tscdeadline = ktimer->tscdeadline;
+diff --git a/block/blk-core.c b/block/blk-core.c
+index 7cf98d55031a..8c6243597b48 100644
+--- a/block/blk-core.c
++++ b/block/blk-core.c
+@@ -680,7 +680,7 @@ static void blk_queue_usage_counter_release(struct percpu_ref *ref)
+ 	struct request_queue *q =
+ 		container_of(ref, struct request_queue, q_usage_counter);
+ 
+-	swait_wake_all(&q->mq_freeze_wq);
++	swake_up_all(&q->mq_freeze_wq);
+ }
+ 
+ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
+@@ -742,7 +742,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
+ 	q->bypass_depth = 1;
+ 	__set_bit(QUEUE_FLAG_BYPASS, &q->queue_flags);
+ 
+-	init_swait_head(&q->mq_freeze_wq);
++	init_swait_queue_head(&q->mq_freeze_wq);
+ 
+ 	/*
+ 	 * Init percpu_ref in atomic mode so that it's faster to shutdown.
+diff --git a/block/blk-mq.c b/block/blk-mq.c
+index 3c70813cb6b6..7cdf19e4aaea 100644
+--- a/block/blk-mq.c
++++ b/block/blk-mq.c
+@@ -130,7 +130,7 @@ void blk_mq_unfreeze_queue(struct request_queue *q)
+ 	WARN_ON_ONCE(freeze_depth < 0);
+ 	if (!freeze_depth) {
+ 		percpu_ref_reinit(&q->q_usage_counter);
+-		swait_wake_all(&q->mq_freeze_wq);
++		swake_up_all(&q->mq_freeze_wq);
+ 	}
+ }
+ EXPORT_SYMBOL_GPL(blk_mq_unfreeze_queue);
+@@ -149,7 +149,7 @@ void blk_mq_wake_waiters(struct request_queue *q)
+ 	 * dying, we need to ensure that processes currently waiting on
+ 	 * the queue are notified as well.
+ 	 */
+-	swait_wake_all(&q->mq_freeze_wq);
++	swake_up_all(&q->mq_freeze_wq);
+ }
+ 
+ bool blk_mq_can_queue(struct blk_mq_hw_ctx *hctx)
+diff --git a/drivers/usb/gadget/function/f_fs.c b/drivers/usb/gadget/function/f_fs.c
+index 6d3ba5c6518d..033ab2a86738 100644
+--- a/drivers/usb/gadget/function/f_fs.c
++++ b/drivers/usb/gadget/function/f_fs.c
+@@ -1405,7 +1405,7 @@ static void ffs_data_put(struct ffs_data *ffs)
+ 		pr_info("%s(): freeing\n", __func__);
+ 		ffs_data_clear(ffs);
+ 		BUG_ON(waitqueue_active(&ffs->ev.waitq) ||
+-		       swaitqueue_active(&ffs->ep0req_completion.wait));
++		       swait_active(&ffs->ep0req_completion.wait));
+ 		kfree(ffs->dev_name);
+ 		kfree(ffs);
+ 	}
+diff --git a/include/linux/blkdev.h b/include/linux/blkdev.h
+index e1dbf567d930..ba7ed493e8bc 100644
+--- a/include/linux/blkdev.h
++++ b/include/linux/blkdev.h
+@@ -456,7 +456,7 @@ struct request_queue {
+ 	struct throtl_data *td;
+ #endif
+ 	struct rcu_head		rcu_head;
+-	struct swait_head	mq_freeze_wq;
++	struct swait_queue_head	mq_freeze_wq;
+ 	struct percpu_ref	q_usage_counter;
+ 	struct list_head	all_q_node;
+ 
+diff --git a/include/linux/completion.h b/include/linux/completion.h
+index 3fe8d14c98c0..3bca1590e29f 100644
+--- a/include/linux/completion.h
++++ b/include/linux/completion.h
+@@ -7,7 +7,7 @@
+  * Atomic wait-for-completion handler data structures.
+  * See kernel/sched/completion.c for details.
+  */
+-#include <linux/wait-simple.h>
++#include <linux/swait.h>
+ 
+ /*
+  * struct completion - structure used to maintain state for a "completion"
+@@ -23,11 +23,11 @@
+  */
+ struct completion {
+ 	unsigned int done;
+-	struct swait_head wait;
++	struct swait_queue_head wait;
+ };
+ 
+ #define COMPLETION_INITIALIZER(work) \
+-	{ 0, SWAIT_HEAD_INITIALIZER((work).wait) }
++	{ 0, __SWAIT_QUEUE_HEAD_INITIALIZER((work).wait) }
+ 
+ #define COMPLETION_INITIALIZER_ONSTACK(work) \
+ 	({ init_completion(&work); work; })
+@@ -72,7 +72,7 @@ struct completion {
+ static inline void init_completion(struct completion *x)
+ {
+ 	x->done = 0;
+-	init_swait_head(&x->wait);
++	init_swait_queue_head(&x->wait);
+ }
+ 
+ /**
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index d856ccde77b4..c690acc6900e 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -25,6 +25,7 @@
+ #include <linux/irqflags.h>
+ #include <linux/context_tracking.h>
+ #include <linux/irqbypass.h>
++#include <linux/swait.h>
+ #include <asm/signal.h>
+ 
+ #include <linux/kvm.h>
+@@ -243,7 +244,7 @@ struct kvm_vcpu {
+ 	int fpu_active;
+ 	int guest_fpu_loaded, guest_xcr0_loaded;
+ 	unsigned char fpu_counter;
+-	struct swait_head wq;
++	struct swait_queue_head wq;
+ 	struct pid *pid;
+ 	int sigset_active;
+ 	sigset_t sigset;
+@@ -794,7 +795,7 @@ static inline bool kvm_arch_has_assigned_device(struct kvm *kvm)
+ }
+ #endif
+ 
+-static inline struct swait_head *kvm_arch_vcpu_wq(struct kvm_vcpu *vcpu)
++static inline struct swait_queue_head *kvm_arch_vcpu_wq(struct kvm_vcpu *vcpu)
+ {
+ #ifdef __KVM_HAVE_ARCH_WQP
+ 	return vcpu->arch.wqp;
+diff --git a/include/linux/swait.h b/include/linux/swait.h
+new file mode 100644
+index 000000000000..83f004a72320
+--- /dev/null
++++ b/include/linux/swait.h
+@@ -0,0 +1,173 @@
++#ifndef _LINUX_SWAIT_H
++#define _LINUX_SWAIT_H
++
++#include <linux/list.h>
++#include <linux/stddef.h>
++#include <linux/spinlock.h>
++#include <asm/current.h>
++
++/*
++ * Simple wait queues
++ *
++ * While these are very similar to the other/complex wait queues (wait.h) the
++ * most important difference is that the simple waitqueue allows for
++ * deterministic behaviour -- IOW it has strictly bounded IRQ and lock hold
++ * times.
++ *
++ * In order to make this so, we had to drop a fair number of features of the
++ * other waitqueue code; notably:
++ *
++ *  - mixing INTERRUPTIBLE and UNINTERRUPTIBLE sleeps on the same waitqueue;
++ *    all wakeups are TASK_NORMAL in order to avoid O(n) lookups for the right
++ *    sleeper state.
++ *
++ *  - the exclusive mode; because this requires preserving the list order
++ *    and this is hard.
++ *
++ *  - custom wake functions; because you cannot give any guarantees about
++ *    random code.
++ *
++ * As a side effect of this; the data structures are slimmer.
++ *
++ * One would recommend using this wait queue where possible.
++ */
++
++struct task_struct;
++
++struct swait_queue_head {
++	raw_spinlock_t		lock;
++	struct list_head	task_list;
++};
++
++struct swait_queue {
++	struct task_struct	*task;
++	struct list_head	task_list;
++};
++
++#define __SWAITQUEUE_INITIALIZER(name) {				\
++	.task		= current,					\
++	.task_list	= LIST_HEAD_INIT((name).task_list),		\
++}
++
++#define DECLARE_SWAITQUEUE(name)					\
++	struct swait_queue name = __SWAITQUEUE_INITIALIZER(name)
++
++#define __SWAIT_QUEUE_HEAD_INITIALIZER(name) {				\
++	.lock		= __RAW_SPIN_LOCK_UNLOCKED(name.lock),		\
++	.task_list	= LIST_HEAD_INIT((name).task_list),		\
++}
++
++#define DECLARE_SWAIT_QUEUE_HEAD(name)					\
++	struct swait_queue_head name = __SWAIT_QUEUE_HEAD_INITIALIZER(name)
++
++extern void __init_swait_queue_head(struct swait_queue_head *q, const char *name,
++				    struct lock_class_key *key);
++
++#define init_swait_queue_head(q)				\
++	do {							\
++		static struct lock_class_key __key;		\
++		__init_swait_queue_head((q), #q, &__key);	\
++	} while (0)
++
++#ifdef CONFIG_LOCKDEP
++# define __SWAIT_QUEUE_HEAD_INIT_ONSTACK(name)			\
++	({ init_swait_queue_head(&name); name; })
++# define DECLARE_SWAIT_QUEUE_HEAD_ONSTACK(name)			\
++	struct swait_queue_head name = __SWAIT_QUEUE_HEAD_INIT_ONSTACK(name)
++#else
++# define DECLARE_SWAIT_QUEUE_HEAD_ONSTACK(name)			\
++	DECLARE_SWAIT_QUEUE_HEAD(name)
++#endif
++
++static inline int swait_active(struct swait_queue_head *q)
++{
++	return !list_empty(&q->task_list);
++}
++
++extern void swake_up(struct swait_queue_head *q);
++extern void swake_up_all(struct swait_queue_head *q);
++extern void swake_up_locked(struct swait_queue_head *q);
++extern void swake_up_all_locked(struct swait_queue_head *q);
++
++extern void __prepare_to_swait(struct swait_queue_head *q, struct swait_queue *wait);
++extern void prepare_to_swait(struct swait_queue_head *q, struct swait_queue *wait, int state);
++extern long prepare_to_swait_event(struct swait_queue_head *q, struct swait_queue *wait, int state);
++
++extern void __finish_swait(struct swait_queue_head *q, struct swait_queue *wait);
++extern void finish_swait(struct swait_queue_head *q, struct swait_queue *wait);
++
++/* as per ___wait_event() but for swait, therefore "exclusive == 0" */
++#define ___swait_event(wq, condition, state, ret, cmd)			\
++({									\
++	struct swait_queue __wait;					\
++	long __ret = ret;						\
++									\
++	INIT_LIST_HEAD(&__wait.task_list);				\
++	for (;;) {							\
++		long __int = prepare_to_swait_event(&wq, &__wait, state);\
++									\
++		if (condition)						\
++			break;						\
++									\
++		if (___wait_is_interruptible(state) && __int) {		\
++			__ret = __int;					\
++			break;						\
++		}							\
++									\
++		cmd;							\
++	}								\
++	finish_swait(&wq, &__wait);					\
++	__ret;								\
++})
++
++#define __swait_event(wq, condition)					\
++	(void)___swait_event(wq, condition, TASK_UNINTERRUPTIBLE, 0,	\
++			    schedule())
++
++#define swait_event(wq, condition)					\
++do {									\
++	if (condition)							\
++		break;							\
++	__swait_event(wq, condition);					\
++} while (0)
++
++#define __swait_event_timeout(wq, condition, timeout)			\
++	___swait_event(wq, ___wait_cond_timeout(condition),		\
++		      TASK_UNINTERRUPTIBLE, timeout,			\
++		      __ret = schedule_timeout(__ret))
++
++#define swait_event_timeout(wq, condition, timeout)			\
++({									\
++	long __ret = timeout;						\
++	if (!___wait_cond_timeout(condition))				\
++		__ret = __swait_event_timeout(wq, condition, timeout);	\
++	__ret;								\
++})
++
++#define __swait_event_interruptible(wq, condition)			\
++	___swait_event(wq, condition, TASK_INTERRUPTIBLE, 0,		\
++		      schedule())
++
++#define swait_event_interruptible(wq, condition)			\
++({									\
++	int __ret = 0;							\
++	if (!(condition))						\
++		__ret = __swait_event_interruptible(wq, condition);	\
++	__ret;								\
++})
++
++#define __swait_event_interruptible_timeout(wq, condition, timeout)	\
++	___swait_event(wq, ___wait_cond_timeout(condition),		\
++		      TASK_INTERRUPTIBLE, timeout,			\
++		      __ret = schedule_timeout(__ret))
++
++#define swait_event_interruptible_timeout(wq, condition, timeout)	\
++({									\
++	long __ret = timeout;						\
++	if (!___wait_cond_timeout(condition))				\
++		__ret = __swait_event_interruptible_timeout(wq,		\
++						condition, timeout);	\
++	__ret;								\
++})
++
++#endif /* _LINUX_SWAIT_H */
+diff --git a/include/linux/wait-simple.h b/include/linux/wait-simple.h
+deleted file mode 100644
+index f86bca2c41d5..000000000000
+--- a/include/linux/wait-simple.h
++++ /dev/null
+@@ -1,207 +0,0 @@
+-#ifndef _LINUX_WAIT_SIMPLE_H
+-#define _LINUX_WAIT_SIMPLE_H
+-
+-#include <linux/spinlock.h>
+-#include <linux/list.h>
+-
+-#include <asm/current.h>
+-
+-struct swaiter {
+-	struct task_struct	*task;
+-	struct list_head	node;
+-};
+-
+-#define DEFINE_SWAITER(name)					\
+-	struct swaiter name = {					\
+-		.task	= current,				\
+-		.node	= LIST_HEAD_INIT((name).node),		\
+-	}
+-
+-struct swait_head {
+-	raw_spinlock_t		lock;
+-	struct list_head	list;
+-};
+-
+-#define SWAIT_HEAD_INITIALIZER(name) {				\
+-		.lock	= __RAW_SPIN_LOCK_UNLOCKED(name.lock),	\
+-		.list	= LIST_HEAD_INIT((name).list),		\
+-	}
+-
+-#define DEFINE_SWAIT_HEAD(name)					\
+-	struct swait_head name = SWAIT_HEAD_INITIALIZER(name)
+-
+-extern void __init_swait_head(struct swait_head *h, struct lock_class_key *key);
+-
+-#define init_swait_head(swh)					\
+-	do {							\
+-		static struct lock_class_key __key;		\
+-								\
+-		__init_swait_head((swh), &__key);		\
+-	} while (0)
+-
+-/*
+- * Waiter functions
+- */
+-extern void swait_prepare_locked(struct swait_head *head, struct swaiter *w);
+-extern void swait_prepare(struct swait_head *head, struct swaiter *w, int state);
+-extern void swait_finish_locked(struct swait_head *head, struct swaiter *w);
+-extern void swait_finish(struct swait_head *head, struct swaiter *w);
+-
+-/* Check whether a head has waiters enqueued */
+-static inline bool swaitqueue_active(struct swait_head *h)
+-{
+-	/* Make sure the condition is visible before checking list_empty() */
+-	smp_mb();
+-	return !list_empty(&h->list);
+-}
+-
+-/*
+- * Wakeup functions
+- */
+-extern unsigned int __swait_wake(struct swait_head *head, unsigned int state, unsigned int num);
+-extern unsigned int __swait_wake_locked(struct swait_head *head, unsigned int state, unsigned int num);
+-
+-#define swait_wake(head)			__swait_wake(head, TASK_NORMAL, 1)
+-#define swait_wake_interruptible(head)		__swait_wake(head, TASK_INTERRUPTIBLE, 1)
+-#define swait_wake_all(head)			__swait_wake(head, TASK_NORMAL, 0)
+-#define swait_wake_all_interruptible(head)	__swait_wake(head, TASK_INTERRUPTIBLE, 0)
+-
+-/*
+- * Event API
+- */
+-#define __swait_event(wq, condition)					\
+-do {									\
+-	DEFINE_SWAITER(__wait);						\
+-									\
+-	for (;;) {							\
+-		swait_prepare(&wq, &__wait, TASK_UNINTERRUPTIBLE);	\
+-		if (condition)						\
+-			break;						\
+-		schedule();						\
+-	}								\
+-	swait_finish(&wq, &__wait);					\
+-} while (0)
+-
+-/**
+- * swait_event - sleep until a condition gets true
+- * @wq: the waitqueue to wait on
+- * @condition: a C expression for the event to wait for
+- *
+- * The process is put to sleep (TASK_UNINTERRUPTIBLE) until the
+- * @condition evaluates to true. The @condition is checked each time
+- * the waitqueue @wq is woken up.
+- *
+- * wake_up() has to be called after changing any variable that could
+- * change the result of the wait condition.
+- */
+-#define swait_event(wq, condition)					\
+-do {									\
+-	if (condition)							\
+-		break;							\
+-	__swait_event(wq, condition);					\
+-} while (0)
+-
+-#define __swait_event_interruptible(wq, condition, ret)			\
+-do {									\
+-	DEFINE_SWAITER(__wait);						\
+-									\
+-	for (;;) {							\
+-		swait_prepare(&wq, &__wait, TASK_INTERRUPTIBLE);	\
+-		if (condition)						\
+-			break;						\
+-		if (signal_pending(current)) {				\
+-			ret = -ERESTARTSYS;				\
+-			break;						\
+-		}							\
+-		schedule();						\
+-	}								\
+-	swait_finish(&wq, &__wait);					\
+-} while (0)
+-
+-#define __swait_event_interruptible_timeout(wq, condition, ret)		\
+-do {									\
+-	DEFINE_SWAITER(__wait);						\
+-									\
+-	for (;;) {							\
+-		swait_prepare(&wq, &__wait, TASK_INTERRUPTIBLE);	\
+-		if (condition)						\
+-			break;						\
+-		if (signal_pending(current)) {				\
+-			ret = -ERESTARTSYS;				\
+-			break;						\
+-		}							\
+-		ret = schedule_timeout(ret);				\
+-		if (!ret)						\
+-			break;						\
+-	}								\
+-	swait_finish(&wq, &__wait);					\
+-} while (0)
+-
+-/**
+- * swait_event_interruptible - sleep until a condition gets true
+- * @wq: the waitqueue to wait on
+- * @condition: a C expression for the event to wait for
+- *
+- * The process is put to sleep (TASK_INTERRUPTIBLE) until the
+- * @condition evaluates to true. The @condition is checked each time
+- * the waitqueue @wq is woken up.
+- *
+- * wake_up() has to be called after changing any variable that could
+- * change the result of the wait condition.
+- */
+-#define swait_event_interruptible(wq, condition)			\
+-({									\
+-	int __ret = 0;							\
+-	if (!(condition))						\
+-		__swait_event_interruptible(wq, condition, __ret);	\
+-	__ret;								\
+-})
+-
+-#define swait_event_interruptible_timeout(wq, condition, timeout)	\
+-({									\
+-	int __ret = timeout;						\
+-	if (!(condition))						\
+-		__swait_event_interruptible_timeout(wq, condition, __ret);	\
+-	__ret;								\
+-})
+-
+-#define __swait_event_timeout(wq, condition, ret)			\
+-do {									\
+-	DEFINE_SWAITER(__wait);						\
+-									\
+-	for (;;) {							\
+-		swait_prepare(&wq, &__wait, TASK_UNINTERRUPTIBLE);	\
+-		if (condition)						\
+-			break;						\
+-		ret = schedule_timeout(ret);				\
+-		if (!ret)						\
+-			break;						\
+-	}								\
+-	swait_finish(&wq, &__wait);					\
+-} while (0)
+-
+-/**
+- * swait_event_timeout - sleep until a condition gets true or a timeout elapses
+- * @wq: the waitqueue to wait on
+- * @condition: a C expression for the event to wait for
+- * @timeout: timeout, in jiffies
+- *
+- * The process is put to sleep (TASK_UNINTERRUPTIBLE) until the
+- * @condition evaluates to true. The @condition is checked each time
+- * the waitqueue @wq is woken up.
+- *
+- * wake_up() has to be called after changing any variable that could
+- * change the result of the wait condition.
+- *
+- * The function returns 0 if the @timeout elapsed, and the remaining
+- * jiffies if the condition evaluated to true before the timeout elapsed.
+- */
+-#define swait_event_timeout(wq, condition, timeout)			\
+-({									\
+-	long __ret = timeout;						\
+-	if (!(condition))						\
+-		__swait_event_timeout(wq, condition, __ret);		\
+-	__ret;								\
+-})
+-
+-#endif
+diff --git a/kernel/rcu/tree.c b/kernel/rcu/tree.c
+index 64098d35de19..d862a203fce0 100644
+--- a/kernel/rcu/tree.c
++++ b/kernel/rcu/tree.c
+@@ -1621,7 +1621,6 @@ static int rcu_future_gp_cleanup(struct rcu_state *rsp, struct rcu_node *rnp)
+ 	int needmore;
+ 	struct rcu_data *rdp = this_cpu_ptr(rsp->rda);
+ 
+-	rcu_nocb_gp_cleanup(rsp, rnp);
+ 	rnp->need_future_gp[c & 0x1] = 0;
+ 	needmore = rnp->need_future_gp[(c + 1) & 0x1];
+ 	trace_rcu_future_gp(rnp, rdp, c,
+@@ -1642,7 +1641,7 @@ static void rcu_gp_kthread_wake(struct rcu_state *rsp)
+ 	    !READ_ONCE(rsp->gp_flags) ||
+ 	    !rsp->gp_kthread)
+ 		return;
+-	swait_wake(&rsp->gp_wq);
++	swake_up(&rsp->gp_wq);
+ }
+ 
+ /*
+@@ -2022,6 +2021,7 @@ static void rcu_gp_cleanup(struct rcu_state *rsp)
+ 	int nocb = 0;
+ 	struct rcu_data *rdp;
+ 	struct rcu_node *rnp = rcu_get_root(rsp);
++	struct swait_queue_head *sq;
+ 
+ 	WRITE_ONCE(rsp->gp_activity, jiffies);
+ 	raw_spin_lock_irq(&rnp->lock);
+@@ -2060,7 +2060,9 @@ static void rcu_gp_cleanup(struct rcu_state *rsp)
+ 			needgp = __note_gp_changes(rsp, rnp, rdp) || needgp;
+ 		/* smp_mb() provided by prior unlock-lock pair. */
+ 		nocb += rcu_future_gp_cleanup(rsp, rnp);
++		sq = rcu_nocb_gp_get(rnp);
+ 		raw_spin_unlock_irq(&rnp->lock);
++		rcu_nocb_gp_cleanup(sq);
+ 		cond_resched_rcu_qs();
+ 		WRITE_ONCE(rsp->gp_activity, jiffies);
+ 		rcu_gp_slow(rsp, gp_cleanup_delay);
+@@ -2261,7 +2263,7 @@ static void rcu_report_qs_rsp(struct rcu_state *rsp, unsigned long flags)
+ 	WARN_ON_ONCE(!rcu_gp_in_progress(rsp));
+ 	WRITE_ONCE(rsp->gp_flags, READ_ONCE(rsp->gp_flags) | RCU_GP_FLAG_FQS);
+ 	raw_spin_unlock_irqrestore(&rcu_get_root(rsp)->lock, flags);
+-	rcu_gp_kthread_wake(rsp);
++	swake_up(&rsp->gp_wq);  /* Memory barrier implied by swake_up() path. */
+ }
+ 
+ /*
+@@ -2922,7 +2924,7 @@ static void force_quiescent_state(struct rcu_state *rsp)
+ 	}
+ 	WRITE_ONCE(rsp->gp_flags, READ_ONCE(rsp->gp_flags) | RCU_GP_FLAG_FQS);
+ 	raw_spin_unlock_irqrestore(&rnp_old->lock, flags);
+-	rcu_gp_kthread_wake(rsp);
++	swake_up(&rsp->gp_wq); /* Memory barrier implied by swake_up() path. */
+ }
+ 
+ /*
+@@ -3645,7 +3647,7 @@ static void __rcu_report_exp_rnp(struct rcu_state *rsp, struct rcu_node *rnp,
+ 			raw_spin_unlock_irqrestore(&rnp->lock, flags);
+ 			if (wake) {
+ 				smp_mb(); /* EGP done before wake_up(). */
+-				swait_wake(&rsp->expedited_wq);
++				swake_up(&rsp->expedited_wq);
+ 			}
+ 			break;
+ 		}
+@@ -3902,7 +3904,7 @@ static void synchronize_sched_expedited_wait(struct rcu_state *rsp)
+ 	jiffies_start = jiffies;
+ 
+ 	for (;;) {
+-		ret = swait_event_interruptible_timeout(
++		ret = swait_event_timeout(
+ 				rsp->expedited_wq,
+ 				sync_rcu_preempt_exp_done(rnp_root),
+ 				jiffies_stall);
+@@ -4578,8 +4580,8 @@ static void __init rcu_init_one(struct rcu_state *rsp,
+ 		}
+ 	}
+ 
+-	init_swait_head(&rsp->gp_wq);
+-	init_swait_head(&rsp->expedited_wq);
++	init_swait_queue_head(&rsp->gp_wq);
++	init_swait_queue_head(&rsp->expedited_wq);
+ 	rnp = rsp->level[rcu_num_lvls - 1];
+ 	for_each_possible_cpu(i) {
+ 		while (i > rnp->grphi)
+diff --git a/kernel/rcu/tree.h b/kernel/rcu/tree.h
+index 2ba8f6c2e81e..c75834d8de24 100644
+--- a/kernel/rcu/tree.h
++++ b/kernel/rcu/tree.h
+@@ -27,8 +27,8 @@
+ #include <linux/threads.h>
+ #include <linux/cpumask.h>
+ #include <linux/seqlock.h>
++#include <linux/swait.h>
+ #include <linux/stop_machine.h>
+-#include <linux/wait-simple.h>
+ 
+ /*
+  * Define shape of hierarchy based on NR_CPUS, CONFIG_RCU_FANOUT, and
+@@ -242,7 +242,7 @@ struct rcu_node {
+ 				/* Refused to boost: not sure why, though. */
+ 				/*  This can happen due to race conditions. */
+ #ifdef CONFIG_RCU_NOCB_CPU
+-	struct swait_head nocb_gp_wq[2];
++	struct swait_queue_head nocb_gp_wq[2];
+ 				/* Place for rcu_nocb_kthread() to wait GP. */
+ #endif /* #ifdef CONFIG_RCU_NOCB_CPU */
+ 	int need_future_gp[2];
+@@ -394,7 +394,7 @@ struct rcu_data {
+ 	atomic_long_t nocb_q_count_lazy; /*  invocation (all stages). */
+ 	struct rcu_head *nocb_follower_head; /* CBs ready to invoke. */
+ 	struct rcu_head **nocb_follower_tail;
+-	struct swait_head nocb_wq;	/* For nocb kthreads to sleep on. */
++	struct swait_queue_head nocb_wq; /* For nocb kthreads to sleep on. */
+ 	struct task_struct *nocb_kthread;
+ 	int nocb_defer_wakeup;		/* Defer wakeup of nocb_kthread. */
+ 
+@@ -473,7 +473,7 @@ struct rcu_state {
+ 	unsigned long gpnum;			/* Current gp number. */
+ 	unsigned long completed;		/* # of last completed gp. */
+ 	struct task_struct *gp_kthread;		/* Task for grace periods. */
+-	struct swait_head gp_wq;		/* Where GP task waits. */
++	struct swait_queue_head gp_wq;		/* Where GP task waits. */
+ 	short gp_flags;				/* Commands for GP task. */
+ 	short gp_state;				/* GP kthread sleep state. */
+ 
+@@ -505,7 +505,7 @@ struct rcu_state {
+ 	atomic_long_t expedited_workdone3;	/* # done by others #3. */
+ 	atomic_long_t expedited_normal;		/* # fallbacks to normal. */
+ 	atomic_t expedited_need_qs;		/* # CPUs left to check in. */
+-	struct swait_head expedited_wq;		/* Wait for check-ins. */
++	struct swait_queue_head expedited_wq;	/* Wait for check-ins. */
+ 	int ncpus_snap;				/* # CPUs seen last time. */
+ 
+ 	unsigned long jiffies_force_qs;		/* Time at which to invoke */
+@@ -607,7 +607,8 @@ static void zero_cpu_stall_ticks(struct rcu_data *rdp);
+ static void increment_cpu_stall_ticks(void);
+ static bool rcu_nocb_cpu_needs_barrier(struct rcu_state *rsp, int cpu);
+ static void rcu_nocb_gp_set(struct rcu_node *rnp, int nrq);
+-static void rcu_nocb_gp_cleanup(struct rcu_state *rsp, struct rcu_node *rnp);
++static struct swait_queue_head *rcu_nocb_gp_get(struct rcu_node *rnp);
++static void rcu_nocb_gp_cleanup(struct swait_queue_head *sq);
+ static void rcu_init_one_nocb(struct rcu_node *rnp);
+ static bool __call_rcu_nocb(struct rcu_data *rdp, struct rcu_head *rhp,
+ 			    bool lazy, unsigned long flags);
+diff --git a/kernel/rcu/tree_plugin.h b/kernel/rcu/tree_plugin.h
+index 0d2f27f2f38d..8e119cf647ba 100644
+--- a/kernel/rcu/tree_plugin.h
++++ b/kernel/rcu/tree_plugin.h
+@@ -1717,9 +1717,9 @@ early_param("rcu_nocb_poll", parse_rcu_nocb_poll);
+  * Wake up any no-CBs CPUs' kthreads that were waiting on the just-ended
+  * grace period.
+  */
+-static void rcu_nocb_gp_cleanup(struct rcu_state *rsp, struct rcu_node *rnp)
++static void rcu_nocb_gp_cleanup(struct swait_queue_head *sq)
+ {
+-	swait_wake_all(&rnp->nocb_gp_wq[rnp->completed & 0x1]);
++	swake_up_all(sq);
+ }
+ 
+ /*
+@@ -1735,10 +1735,15 @@ static void rcu_nocb_gp_set(struct rcu_node *rnp, int nrq)
+ 	rnp->need_future_gp[(rnp->completed + 1) & 0x1] += nrq;
+ }
+ 
++static struct swait_queue_head *rcu_nocb_gp_get(struct rcu_node *rnp)
++{
++	return &rnp->nocb_gp_wq[rnp->completed & 0x1];
++}
++
+ static void rcu_init_one_nocb(struct rcu_node *rnp)
+ {
+-	init_swait_head(&rnp->nocb_gp_wq[0]);
+-	init_swait_head(&rnp->nocb_gp_wq[1]);
++	init_swait_queue_head(&rnp->nocb_gp_wq[0]);
++	init_swait_queue_head(&rnp->nocb_gp_wq[1]);
+ }
+ 
+ #ifndef CONFIG_RCU_NOCB_CPU_ALL
+@@ -1763,7 +1768,7 @@ static void wake_nocb_leader(struct rcu_data *rdp, bool force)
+ 	if (READ_ONCE(rdp_leader->nocb_leader_sleep) || force) {
+ 		/* Prior smp_mb__after_atomic() orders against prior enqueue. */
+ 		WRITE_ONCE(rdp_leader->nocb_leader_sleep, false);
+-		swait_wake(&rdp_leader->nocb_wq);
++		swake_up(&rdp_leader->nocb_wq);
+ 	}
+ }
+ 
+@@ -2079,7 +2084,7 @@ wait_again:
+ 			 * List was empty, wake up the follower.
+ 			 * Memory barriers supplied by atomic_long_add().
+ 			 */
+-			swait_wake(&rdp->nocb_wq);
++			swake_up(&rdp->nocb_wq);
+ 		}
+ 	}
+ 
+@@ -2259,7 +2264,7 @@ void __init rcu_init_nohz(void)
+ static void __init rcu_boot_init_nocb_percpu_data(struct rcu_data *rdp)
+ {
+ 	rdp->nocb_tail = &rdp->nocb_head;
+-	init_swait_head(&rdp->nocb_wq);
++	init_swait_queue_head(&rdp->nocb_wq);
+ 	rdp->nocb_follower_tail = &rdp->nocb_follower_head;
+ }
+ 
+@@ -2409,7 +2414,7 @@ static bool rcu_nocb_cpu_needs_barrier(struct rcu_state *rsp, int cpu)
+ 	return false;
+ }
+ 
+-static void rcu_nocb_gp_cleanup(struct rcu_state *rsp, struct rcu_node *rnp)
++static void rcu_nocb_gp_cleanup(struct swait_queue_head *sq)
+ {
+ }
+ 
+@@ -2417,6 +2422,11 @@ static void rcu_nocb_gp_set(struct rcu_node *rnp, int nrq)
+ {
+ }
+ 
++static struct swait_queue_head *rcu_nocb_gp_get(struct rcu_node *rnp)
++{
++	return NULL;
++}
++
+ static void rcu_init_one_nocb(struct rcu_node *rnp)
+ {
+ }
+diff --git a/kernel/sched/Makefile b/kernel/sched/Makefile
+index 6202e8dfb0ba..f093796c48f4 100644
+--- a/kernel/sched/Makefile
++++ b/kernel/sched/Makefile
+@@ -15,7 +15,7 @@ endif
+ 
+ obj-y += core.o loadavg.o clock.o cputime.o
+ obj-y += idle_task.o fair.o rt.o deadline.o stop_task.o
+-obj-y += wait.o wait-simple.o work-simple.o completion.o idle.o
++obj-y += wait.o swait.o work-simple.o completion.o idle.o
+ obj-$(CONFIG_SMP) += cpupri.o cpudeadline.o
+ obj-$(CONFIG_SCHED_AUTOGROUP) += auto_group.o
+ obj-$(CONFIG_SCHEDSTATS) += stats.o
+diff --git a/kernel/sched/completion.c b/kernel/sched/completion.c
+index 45ebcffd9feb..b62cf6400fe0 100644
+--- a/kernel/sched/completion.c
++++ b/kernel/sched/completion.c
+@@ -32,7 +32,7 @@ void complete(struct completion *x)
+ 
+ 	raw_spin_lock_irqsave(&x->wait.lock, flags);
+ 	x->done++;
+-	__swait_wake_locked(&x->wait, TASK_NORMAL, 1);
++	swake_up_locked(&x->wait);
+ 	raw_spin_unlock_irqrestore(&x->wait.lock, flags);
+ }
+ EXPORT_SYMBOL(complete);
+@@ -52,7 +52,7 @@ void complete_all(struct completion *x)
+ 
+ 	raw_spin_lock_irqsave(&x->wait.lock, flags);
+ 	x->done += UINT_MAX/2;
+-	__swait_wake_locked(&x->wait, TASK_NORMAL, 0);
++	swake_up_all_locked(&x->wait);
+ 	raw_spin_unlock_irqrestore(&x->wait.lock, flags);
+ }
+ EXPORT_SYMBOL(complete_all);
+@@ -62,9 +62,9 @@ do_wait_for_common(struct completion *x,
+ 		   long (*action)(long), long timeout, int state)
+ {
+ 	if (!x->done) {
+-		DEFINE_SWAITER(wait);
++		DECLARE_SWAITQUEUE(wait);
+ 
+-		swait_prepare_locked(&x->wait, &wait);
++		__prepare_to_swait(&x->wait, &wait);
+ 		do {
+ 			if (signal_pending_state(state, current)) {
+ 				timeout = -ERESTARTSYS;
+@@ -75,7 +75,7 @@ do_wait_for_common(struct completion *x,
+ 			timeout = action(timeout);
+ 			raw_spin_lock_irq(&x->wait.lock);
+ 		} while (!x->done && timeout);
+-		swait_finish_locked(&x->wait, &wait);
++		__finish_swait(&x->wait, &wait);
+ 		if (!x->done)
+ 			return timeout;
+ 	}
+diff --git a/kernel/sched/swait.c b/kernel/sched/swait.c
+new file mode 100644
+index 000000000000..8459561f0379
+--- /dev/null
++++ b/kernel/sched/swait.c
+@@ -0,0 +1,140 @@
++#include <linux/sched.h>
++#include <linux/swait.h>
++
++void __init_swait_queue_head(struct swait_queue_head *q, const char *name,
++			     struct lock_class_key *key)
++{
++	raw_spin_lock_init(&q->lock);
++	lockdep_set_class_and_name(&q->lock, key, name);
++	INIT_LIST_HEAD(&q->task_list);
++}
++EXPORT_SYMBOL(__init_swait_queue_head);
++
++/*
++ * The thing about the wake_up_state() return value; I think we can ignore it.
++ *
++ * If for some reason it would return 0, that means the previously waiting
++ * task is already running, so it will observe condition true (or has already).
++ */
++void swake_up_locked(struct swait_queue_head *q)
++{
++	struct swait_queue *curr;
++
++	if (list_empty(&q->task_list))
++		return;
++
++	curr = list_first_entry(&q->task_list, typeof(*curr), task_list);
++	wake_up_process(curr->task);
++	list_del_init(&curr->task_list);
++}
++EXPORT_SYMBOL(swake_up_locked);
++
++void swake_up_all_locked(struct swait_queue_head *q)
++{
++	struct swait_queue *curr;
++	int wakes = 0;
++
++	while (!list_empty(&q->task_list)) {
++
++		curr = list_first_entry(&q->task_list, typeof(*curr),
++					task_list);
++		wake_up_process(curr->task);
++		list_del_init(&curr->task_list);
++		wakes++;
++	}
++	WARN_ON(wakes > 2);
++}
++EXPORT_SYMBOL(swake_up_all_locked);
++
++void swake_up(struct swait_queue_head *q)
++{
++	unsigned long flags;
++
++	if (!swait_active(q))
++		return;
++
++	raw_spin_lock_irqsave(&q->lock, flags);
++	swake_up_locked(q);
++	raw_spin_unlock_irqrestore(&q->lock, flags);
++}
++EXPORT_SYMBOL(swake_up);
++
++/*
++ * Does not allow usage from IRQ disabled, since we must be able to
++ * release IRQs to guarantee bounded hold time.
++ */
++void swake_up_all(struct swait_queue_head *q)
++{
++	struct swait_queue *curr;
++	LIST_HEAD(tmp);
++
++	if (!swait_active(q))
++		return;
++
++	raw_spin_lock_irq(&q->lock);
++	list_splice_init(&q->task_list, &tmp);
++	while (!list_empty(&tmp)) {
++		curr = list_first_entry(&tmp, typeof(*curr), task_list);
++
++		wake_up_state(curr->task, TASK_NORMAL);
++		list_del_init(&curr->task_list);
++
++		if (list_empty(&tmp))
++			break;
++
++		raw_spin_unlock_irq(&q->lock);
++		raw_spin_lock_irq(&q->lock);
++	}
++	raw_spin_unlock_irq(&q->lock);
++}
++EXPORT_SYMBOL(swake_up_all);
++
++void __prepare_to_swait(struct swait_queue_head *q, struct swait_queue *wait)
++{
++	wait->task = current;
++	if (list_empty(&wait->task_list))
++		list_add(&wait->task_list, &q->task_list);
++}
++
++void prepare_to_swait(struct swait_queue_head *q, struct swait_queue *wait, int state)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&q->lock, flags);
++	__prepare_to_swait(q, wait);
++	set_current_state(state);
++	raw_spin_unlock_irqrestore(&q->lock, flags);
++}
++EXPORT_SYMBOL(prepare_to_swait);
++
++long prepare_to_swait_event(struct swait_queue_head *q, struct swait_queue *wait, int state)
++{
++	if (signal_pending_state(state, current))
++		return -ERESTARTSYS;
++
++	prepare_to_swait(q, wait, state);
++
++	return 0;
++}
++EXPORT_SYMBOL(prepare_to_swait_event);
++
++void __finish_swait(struct swait_queue_head *q, struct swait_queue *wait)
++{
++	__set_current_state(TASK_RUNNING);
++	if (!list_empty(&wait->task_list))
++		list_del_init(&wait->task_list);
++}
++
++void finish_swait(struct swait_queue_head *q, struct swait_queue *wait)
++{
++	unsigned long flags;
++
++	__set_current_state(TASK_RUNNING);
++
++	if (!list_empty_careful(&wait->task_list)) {
++		raw_spin_lock_irqsave(&q->lock, flags);
++		list_del_init(&wait->task_list);
++		raw_spin_unlock_irqrestore(&q->lock, flags);
++	}
++}
++EXPORT_SYMBOL(finish_swait);
+diff --git a/kernel/sched/wait-simple.c b/kernel/sched/wait-simple.c
+deleted file mode 100644
+index 7dfa86d1f654..000000000000
+--- a/kernel/sched/wait-simple.c
++++ /dev/null
+@@ -1,115 +0,0 @@
+-/*
+- * Simple waitqueues without fancy flags and callbacks
+- *
+- * (C) 2011 Thomas Gleixner <tglx@linutronix.de>
+- *
+- * Based on kernel/wait.c
+- *
+- * For licencing details see kernel-base/COPYING
+- */
+-#include <linux/init.h>
+-#include <linux/export.h>
+-#include <linux/sched.h>
+-#include <linux/wait-simple.h>
+-
+-/* Adds w to head->list. Must be called with head->lock locked. */
+-static inline void __swait_enqueue(struct swait_head *head, struct swaiter *w)
+-{
+-	list_add(&w->node, &head->list);
+-	/* We can't let the condition leak before the setting of head */
+-	smp_mb();
+-}
+-
+-/* Removes w from head->list. Must be called with head->lock locked. */
+-static inline void __swait_dequeue(struct swaiter *w)
+-{
+-	list_del_init(&w->node);
+-}
+-
+-void __init_swait_head(struct swait_head *head, struct lock_class_key *key)
+-{
+-	raw_spin_lock_init(&head->lock);
+-	lockdep_set_class(&head->lock, key);
+-	INIT_LIST_HEAD(&head->list);
+-}
+-EXPORT_SYMBOL(__init_swait_head);
+-
+-void swait_prepare_locked(struct swait_head *head, struct swaiter *w)
+-{
+-	w->task = current;
+-	if (list_empty(&w->node))
+-		__swait_enqueue(head, w);
+-}
+-
+-void swait_prepare(struct swait_head *head, struct swaiter *w, int state)
+-{
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&head->lock, flags);
+-	swait_prepare_locked(head, w);
+-	__set_current_state(state);
+-	raw_spin_unlock_irqrestore(&head->lock, flags);
+-}
+-EXPORT_SYMBOL(swait_prepare);
+-
+-void swait_finish_locked(struct swait_head *head, struct swaiter *w)
+-{
+-	__set_current_state(TASK_RUNNING);
+-	if (w->task)
+-		__swait_dequeue(w);
+-}
+-
+-void swait_finish(struct swait_head *head, struct swaiter *w)
+-{
+-	unsigned long flags;
+-
+-	__set_current_state(TASK_RUNNING);
+-	if (w->task) {
+-		raw_spin_lock_irqsave(&head->lock, flags);
+-		__swait_dequeue(w);
+-		raw_spin_unlock_irqrestore(&head->lock, flags);
+-	}
+-}
+-EXPORT_SYMBOL(swait_finish);
+-
+-unsigned int
+-__swait_wake_locked(struct swait_head *head, unsigned int state, unsigned int num)
+-{
+-	struct swaiter *curr, *next;
+-	int woken = 0;
+-
+-	list_for_each_entry_safe(curr, next, &head->list, node) {
+-		if (wake_up_state(curr->task, state)) {
+-			__swait_dequeue(curr);
+-			/*
+-			 * The waiting task can free the waiter as
+-			 * soon as curr->task = NULL is written,
+-			 * without taking any locks. A memory barrier
+-			 * is required here to prevent the following
+-			 * store to curr->task from getting ahead of
+-			 * the dequeue operation.
+-			 */
+-			smp_wmb();
+-			curr->task = NULL;
+-			if (++woken == num)
+-				break;
+-		}
+-	}
+-	return woken;
+-}
+-
+-unsigned int
+-__swait_wake(struct swait_head *head, unsigned int state, unsigned int num)
+-{
+-	unsigned long flags;
+-	int woken;
+-
+-	if (!swaitqueue_active(head))
+-		return 0;
+-
+-	raw_spin_lock_irqsave(&head->lock, flags);
+-	woken = __swait_wake_locked(head, state, num);
+-	raw_spin_unlock_irqrestore(&head->lock, flags);
+-	return woken;
+-}
+-EXPORT_SYMBOL(__swait_wake);
+diff --git a/kernel/sched/work-simple.c b/kernel/sched/work-simple.c
+index e57a0522573f..9ffe40543c81 100644
+--- a/kernel/sched/work-simple.c
++++ b/kernel/sched/work-simple.c
+@@ -5,7 +5,7 @@
+  * PREEMPT_RT_FULL safe. The callbacks are executed in kthread context.
+  */
+ 
+-#include <linux/wait-simple.h>
++#include <linux/swait.h>
+ #include <linux/work-simple.h>
+ #include <linux/kthread.h>
+ #include <linux/slab.h>
+@@ -19,7 +19,7 @@ static struct sworker *glob_worker;
+ 
+ struct sworker {
+ 	struct list_head events;
+-	struct swait_head wq;
++	struct swait_queue_head wq;
+ 
+ 	raw_spinlock_t lock;
+ 
+@@ -80,7 +80,7 @@ static struct sworker *swork_create(void)
+ 
+ 	INIT_LIST_HEAD(&worker->events);
+ 	raw_spin_lock_init(&worker->lock);
+-	init_swait_head(&worker->wq);
++	init_swait_queue_head(&worker->wq);
+ 
+ 	worker->task = kthread_run(swork_kthread, worker, "kswork");
+ 	if (IS_ERR(worker->task)) {
+@@ -117,7 +117,7 @@ bool swork_queue(struct swork_event *sev)
+ 	list_add_tail(&sev->item, &glob_worker->events);
+ 	raw_spin_unlock_irqrestore(&glob_worker->lock, flags);
+ 
+-	swait_wake(&glob_worker->wq);
++	swake_up(&glob_worker->wq);
+ 	return true;
+ }
+ EXPORT_SYMBOL_GPL(swork_queue);
+diff --git a/virt/kvm/async_pf.c b/virt/kvm/async_pf.c
+index 57d9436f7a9c..9378d0919ed8 100644
+--- a/virt/kvm/async_pf.c
++++ b/virt/kvm/async_pf.c
+@@ -98,8 +98,8 @@ static void async_pf_execute(struct work_struct *work)
+ 	 * This memory barrier pairs with prepare_to_wait's set_current_state()
+ 	 */
+ 	smp_mb();
+-	if (swaitqueue_active(&vcpu->wq))
+-		swait_wake_interruptible(&vcpu->wq);
++	if (swait_active(&vcpu->wq))
++		swake_up(&vcpu->wq);
+ 
+ 	mmput(mm);
+ 	kvm_put_kvm(vcpu->kvm);
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 0be613c3f144..9c75003e06a4 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -226,8 +226,7 @@ int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
+ 	vcpu->kvm = kvm;
+ 	vcpu->vcpu_id = id;
+ 	vcpu->pid = NULL;
+-	vcpu->halt_poll_ns = 0;
+-	init_swait_head(&vcpu->wq);
++	init_swait_queue_head(&vcpu->wq);
+ 	kvm_async_pf_vcpu_init(vcpu);
+ 
+ 	vcpu->pre_pcpu = -1;
+@@ -2003,7 +2002,7 @@ static int kvm_vcpu_check_block(struct kvm_vcpu *vcpu)
+ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
+ {
+ 	ktime_t start, cur;
+-	DEFINE_SWAITER(wait);
++	DECLARE_SWAITQUEUE(wait);
+ 	bool waited = false;
+ 	u64 block_ns;
+ 
+@@ -2028,7 +2027,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
+ 	kvm_arch_vcpu_blocking(vcpu);
+ 
+ 	for (;;) {
+-		swait_prepare(&vcpu->wq, &wait, TASK_INTERRUPTIBLE);
++		prepare_to_swait(&vcpu->wq, &wait, TASK_INTERRUPTIBLE);
+ 
+ 		if (kvm_vcpu_check_block(vcpu) < 0)
+ 			break;
+@@ -2037,7 +2036,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
+ 		schedule();
+ 	}
+ 
+-	swait_finish(&vcpu->wq, &wait);
++	finish_swait(&vcpu->wq, &wait);
+ 	cur = ktime_get();
+ 
+ 	kvm_arch_vcpu_unblocking(vcpu);
+@@ -2069,11 +2068,11 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
+ {
+ 	int me;
+ 	int cpu = vcpu->cpu;
+-	struct swait_head *wqp;
++	struct swait_queue_head *wqp;
+ 
+ 	wqp = kvm_arch_vcpu_wq(vcpu);
+-	if (swaitqueue_active(wqp)) {
+-		swait_wake_interruptible(wqp);
++	if (swait_active(wqp)) {
++		swake_up(wqp);
+ 		++vcpu->stat.halt_wakeup;
+ 	}
+ 
+@@ -2174,7 +2173,7 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me)
+ 				continue;
+ 			if (vcpu == me)
+ 				continue;
+-			if (swaitqueue_active(&vcpu->wq) && !kvm_arch_vcpu_runnable(vcpu))
++			if (swait_active(&vcpu->wq) && !kvm_arch_vcpu_runnable(vcpu))
+ 				continue;
+ 			if (!kvm_vcpu_eligible_for_directed_yield(vcpu))
+ 				continue;
+-- 
+2.10.1
+

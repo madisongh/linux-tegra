@@ -1,0 +1,42 @@
+From 18a6e6b6763455f6e0313a1eed6806eb5b5737ca Mon Sep 17 00:00:00 2001
+From: Mike Galbraith <umgwanakikbuti@gmail.com>
+Date: Sat, 27 Feb 2016 08:34:43 +0100
+Subject: [PATCH 299/351] locking/lglocks: Use preempt_enable/disable_nort() in
+ lg_double_[un]lock
+X-NVConfidentiality: public
+
+Let's not do that when snagging an rtmutex.
+
+Signed-off-by: Mike Galbraith <umgwanakilbuti@gmail.com>
+Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Cc: linux-rt-users <linux-rt-users@vger.kernel.org>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+---
+ kernel/locking/lglock.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/locking/lglock.c b/kernel/locking/lglock.c
+index 51bfe64e7d16..57e0ea72c28a 100644
+--- a/kernel/locking/lglock.c
++++ b/kernel/locking/lglock.c
+@@ -86,7 +86,7 @@ void lg_double_lock(struct lglock *lg, int cpu1, int cpu2)
+ 	if (cpu2 < cpu1)
+ 		swap(cpu1, cpu2);
+ 
+-	preempt_disable();
++	preempt_disable_nort();
+ 	lock_acquire_shared(&lg->lock_dep_map, 0, 0, NULL, _RET_IP_);
+ 	lg_do_lock(per_cpu_ptr(lg->lock, cpu1));
+ 	lg_do_lock(per_cpu_ptr(lg->lock, cpu2));
+@@ -97,7 +97,7 @@ void lg_double_unlock(struct lglock *lg, int cpu1, int cpu2)
+ 	lock_release(&lg->lock_dep_map, 1, _RET_IP_);
+ 	lg_do_unlock(per_cpu_ptr(lg->lock, cpu1));
+ 	lg_do_unlock(per_cpu_ptr(lg->lock, cpu2));
+-	preempt_enable();
++	preempt_enable_nort();
+ }
+ 
+ void lg_global_lock(struct lglock *lg)
+-- 
+2.10.1
+

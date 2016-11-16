@@ -1,0 +1,64 @@
+From 3a8fd6c4165931d34b3e587fedeb46b6566ff2ea Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Wed, 13 Jan 2016 17:56:45 +0100
+Subject: [PATCH 263/351] misc: hwlat_detector: replace "if (0 != var)" by "if
+ (var)"
+X-NVConfidentiality: public
+
+Suggested by Julia based on
+scripts/coccinelle/misc/compare_const_fl.cocci.
+
+Suggested-by: Julia Lawall <julia.lawall@lip6.fr>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/misc/hwlat_detector.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/misc/hwlat_detector.c b/drivers/misc/hwlat_detector.c
+index 2429c4331e68..52f5ad5fd9c0 100644
+--- a/drivers/misc/hwlat_detector.c
++++ b/drivers/misc/hwlat_detector.c
+@@ -616,7 +616,7 @@ static ssize_t  debug_enable_fwrite(struct file *filp,
+ 
+ 	buf[sizeof(buf)-1] = '\0';			/* just in case */
+ 	err = kstrtoul(buf, 10, &val);
+-	if (0 != err)
++	if (err)
+ 		return -EINVAL;
+ 
+ 	if (val) {
+@@ -921,7 +921,7 @@ static ssize_t  debug_width_fwrite(struct file *filp,
+ 
+ 	buf[U64STR_SIZE-1] = '\0';			/* just in case */
+ 	err = kstrtoull(buf, 10, &val);
+-	if (0 != err)
++	if (err)
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&data.lock);
+@@ -1005,7 +1005,7 @@ static ssize_t  debug_window_fwrite(struct file *filp,
+ 
+ 	buf[U64STR_SIZE-1] = '\0';			/* just in case */
+ 	err = kstrtoull(buf, 10, &val);
+-	if (0 != err)
++	if (err)
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&data.lock);
+@@ -1198,11 +1198,11 @@ static int detector_init(void)
+ 	pr_info(BANNER "version %s\n", VERSION);
+ 
+ 	ret = init_stats();
+-	if (0 != ret)
++	if (ret)
+ 		goto out;
+ 
+ 	ret = init_debugfs();
+-	if (0 != ret)
++	if (ret)
+ 		goto err_stats;
+ 
+ 	if (enabled)
+-- 
+2.10.1
+

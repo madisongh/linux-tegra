@@ -1,0 +1,51 @@
+From 25c9e0d3f7ee356f57153f9b7771ce7d63752004 Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Wed, 13 Jan 2016 17:44:47 +0100
+Subject: [PATCH 258/351] Revert "mm/rmap: retry lock check in anon_vma_free()"
+X-NVConfidentiality: public
+
+This is probably just a duct tape patch and root cause has been
+fixed in the meantime.
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ mm/rmap.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
+
+diff --git a/mm/rmap.c b/mm/rmap.c
+index 950d79743e8f..b577fbb98d4b 100644
+--- a/mm/rmap.c
++++ b/mm/rmap.c
+@@ -89,10 +89,8 @@ static inline struct anon_vma *anon_vma_alloc(void)
+ 	return anon_vma;
+ }
+ 
+-#include <linux/delay.h>
+-static void anon_vma_free(struct anon_vma *anon_vma)
++static inline void anon_vma_free(struct anon_vma *anon_vma)
+ {
+-	int cnt = 0;
+ 	VM_BUG_ON(atomic_read(&anon_vma->refcount));
+ 
+ 	/*
+@@ -113,17 +111,9 @@ static void anon_vma_free(struct anon_vma *anon_vma)
+ 	 * happen _before_ what follows.
+ 	 */
+ 	might_sleep();
+-retry:
+ 	if (rwsem_is_locked(&anon_vma->root->rwsem)) {
+ 		anon_vma_lock_write(anon_vma);
+ 		anon_vma_unlock_write(anon_vma);
+-
+-		if (rwsem_is_locked(&anon_vma->root->rwsem)) {
+-			cnt++;
+-			if (cnt > 3)
+-				msleep(1);
+-		}
+-		goto retry;
+ 	}
+ 
+ 	kmem_cache_free(anon_vma_cachep, anon_vma);
+-- 
+2.10.1
+

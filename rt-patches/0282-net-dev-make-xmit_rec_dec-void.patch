@@ -1,0 +1,27 @@
+From 5e807d5084af1931b681ad9470ef25f0d91ee518 Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Thu, 4 Feb 2016 18:59:19 +0100
+Subject: [PATCH 282/351] net: dev: make xmit_rec_dec() void
+X-NVConfidentiality: public
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ net/core/dev.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/net/core/dev.c b/net/core/dev.c
+index 88cc76252c50..ccfc25c7e8c1 100644
+--- a/net/core/dev.c
++++ b/net/core/dev.c
+@@ -2983,7 +2983,7 @@ static inline void xmit_rec_inc(void)
+ 	__this_cpu_inc(xmit_recursion);
+ }
+ 
+-static inline int xmit_rec_dec(void)
++static inline void xmit_rec_dec(void)
+ {
+ 	__this_cpu_dec(xmit_recursion);
+ }
+-- 
+2.10.1
+

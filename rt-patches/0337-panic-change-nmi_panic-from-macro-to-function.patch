@@ -1,0 +1,120 @@
+From 262ad979e2a79a8eaba07cb1696dbaa1c4de94b5 Mon Sep 17 00:00:00 2001
+From: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
+Date: Tue, 22 Mar 2016 14:27:17 -0700
+Subject: [PATCH 337/351] panic: change nmi_panic from macro to function
+X-NVConfidentiality: public
+
+Commit 1717f2096b54 ("panic, x86: Fix re-entrance problem due to panic
+on NMI") and commit 58c5661f2144 ("panic, x86: Allow CPUs to save
+registers even if looping in NMI context") introduced nmi_panic() which
+prevents concurrent/recursive execution of panic().  It also saves
+registers for the crash dump on x86.
+
+However, there are some cases where NMI handlers still use panic().
+This patch set partially replaces them with nmi_panic() in those cases.
+
+Even this patchset is applied, some NMI or similar handlers (e.g.  MCE
+handler) continue to use panic().  This is because I can't test them
+well and actual problems won't happen.  For example, the possibility
+that normal panic and panic on MCE happen simultaneously is very low.
+
+This patch (of 3):
+
+Convert nmi_panic() to a proper function and export it instead of
+exporting internal implementation details to modules, for obvious
+reasons.
+
+Signed-off-by: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
+Acked-by: Borislav Petkov <bp@suse.de>
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
+Cc: Michal Hocko <mhocko@suse.com>
+Cc: Rasmus Villemoes <linux@rasmusvillemoes.dk>
+Cc: Nicolas Iooss <nicolas.iooss_linux@m4x.org>
+Cc: Javi Merino <javi.merino@arm.com>
+Cc: Gobinda Charan Maji <gobinda.cemk07@gmail.com>
+Cc: "Steven Rostedt (Red Hat)" <rostedt@goodmis.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Vitaly Kuznetsov <vkuznets@redhat.com>
+Cc: HATAYAMA Daisuke <d.hatayama@jp.fujitsu.com>
+Cc: Tejun Heo <tj@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ include/linux/kernel.h | 21 +--------------------
+ kernel/panic.c         | 20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+), 20 deletions(-)
+
+diff --git a/include/linux/kernel.h b/include/linux/kernel.h
+index 8a4a50381763..a3ff969ec316 100644
+--- a/include/linux/kernel.h
++++ b/include/linux/kernel.h
+@@ -259,7 +259,7 @@ extern long (*panic_blink)(int state);
+ __printf(1, 2)
+ void panic(const char *fmt, ...)
+ 	__noreturn __cold;
+-void nmi_panic_self_stop(struct pt_regs *);
++void nmi_panic(struct pt_regs *regs, const char *msg);
+ extern void oops_enter(void);
+ extern void oops_exit(void);
+ void print_oops_end_marker(void);
+@@ -459,25 +459,6 @@ extern atomic_t panic_cpu;
+ #define PANIC_CPU_INVALID	-1
+ 
+ /*
+- * A variant of panic() called from NMI context. We return if we've already
+- * panicked on this CPU. If another CPU already panicked, loop in
+- * nmi_panic_self_stop() which can provide architecture dependent code such
+- * as saving register state for crash dump.
+- */
+-#define nmi_panic(regs, fmt, ...)					\
+-do {									\
+-	int old_cpu, cpu;						\
+-									\
+-	cpu = raw_smp_processor_id();					\
+-	old_cpu = atomic_cmpxchg(&panic_cpu, PANIC_CPU_INVALID, cpu);	\
+-									\
+-	if (old_cpu == PANIC_CPU_INVALID)				\
+-		panic(fmt, ##__VA_ARGS__);				\
+-	else if (old_cpu != cpu)					\
+-		nmi_panic_self_stop(regs);				\
+-} while (0)
+-
+-/*
+  * Only to be used by arch init code. If the user over-wrote the default
+  * CONFIG_PANIC_TIMEOUT, honor it.
+  */
+diff --git a/kernel/panic.c b/kernel/panic.c
+index 59379029d64e..4c62a4fe97aa 100644
+--- a/kernel/panic.c
++++ b/kernel/panic.c
+@@ -75,6 +75,26 @@ void __weak nmi_panic_self_stop(struct pt_regs *regs)
+ 
+ atomic_t panic_cpu = ATOMIC_INIT(PANIC_CPU_INVALID);
+ 
++/*
++ * A variant of panic() called from NMI context. We return if we've already
++ * panicked on this CPU. If another CPU already panicked, loop in
++ * nmi_panic_self_stop() which can provide architecture dependent code such
++ * as saving register state for crash dump.
++ */
++void nmi_panic(struct pt_regs *regs, const char *msg)
++{
++	int old_cpu, cpu;
++
++	cpu = raw_smp_processor_id();
++	old_cpu = atomic_cmpxchg(&panic_cpu, PANIC_CPU_INVALID, cpu);
++
++	if (old_cpu == PANIC_CPU_INVALID)
++		panic("%s", msg);
++	else if (old_cpu != cpu)
++		nmi_panic_self_stop(regs);
++}
++EXPORT_SYMBOL(nmi_panic);
++
+ /**
+  *	panic - halt the system
+  *	@fmt: The text string to print
+-- 
+2.10.1
+

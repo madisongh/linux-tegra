@@ -1,0 +1,53 @@
+From 23b7a0d4070966c6c52355f761aaf20f0926d8df Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Wed, 13 Jan 2016 17:41:53 +0100
+Subject: [PATCH 255/351] move update_migrate_disable() definition
+X-NVConfidentiality: public
+
+so it is not within CONFIG_SMP, fixes build on SMP=n
+
+Reported-by: kernel test robot <ying.huang@linux.intel.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ kernel/sched/core.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 57fb87e74771..0add633db364 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -1093,6 +1093,15 @@ void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
+ 		rq_clock_skip_update(rq, true);
+ }
+ 
++#if defined(CONFIG_PREEMPT_RT_FULL) && defined(CONFIG_SMP)
++#define MIGRATE_DISABLE_SET_AFFIN	(1<<30) /* Can't make a negative */
++#define migrate_disabled_updated(p)	((p)->migrate_disable & MIGRATE_DISABLE_SET_AFFIN)
++#define migrate_disable_count(p)	((p)->migrate_disable & ~MIGRATE_DISABLE_SET_AFFIN)
++#else
++static inline void update_migrate_disable(struct task_struct *p) { }
++#define migrate_disabled_updated(p)		0
++#endif
++
+ #ifdef CONFIG_SMP
+ /*
+  * This is how migration works:
+@@ -1210,15 +1219,6 @@ void set_cpus_allowed_common(struct task_struct *p, const struct cpumask *new_ma
+ 	p->nr_cpus_allowed = cpumask_weight(new_mask);
+ }
+ 
+-#if defined(CONFIG_PREEMPT_RT_FULL) && defined(CONFIG_SMP)
+-#define MIGRATE_DISABLE_SET_AFFIN	(1<<30) /* Can't make a negative */
+-#define migrate_disabled_updated(p)	((p)->migrate_disable & MIGRATE_DISABLE_SET_AFFIN)
+-#define migrate_disable_count(p)	((p)->migrate_disable & ~MIGRATE_DISABLE_SET_AFFIN)
+-#else
+-static inline void update_migrate_disable(struct task_struct *p) { }
+-#define migrate_disabled_updated(p)		0
+-#endif
+-
+ void do_set_cpus_allowed(struct task_struct *p, const struct cpumask *new_mask)
+ {
+ 	struct rq *rq = task_rq(p);
+-- 
+2.10.1
+

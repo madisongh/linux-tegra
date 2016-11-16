@@ -1,0 +1,37 @@
+From 7ed80b3c956f001533f3f0984bfaf78db71d5f88 Mon Sep 17 00:00:00 2001
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Date: Wed, 30 Sep 2015 02:01:20 +0200
+Subject: [PATCH 317/351] ARM: at91: remove useless includes and function
+ prototypes
+X-NVConfidentiality: public
+
+Remove leftover from the previous cleanup
+
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/mach-at91/generic.h | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index d224e195706a..28ca57a2060f 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -11,13 +11,6 @@
+ #ifndef _AT91_GENERIC_H
+ #define _AT91_GENERIC_H
+ 
+-#include <linux/of.h>
+-#include <linux/reboot.h>
+-
+- /* Map io */
+-extern void __init at91_map_io(void);
+-extern void __init at91_alt_map_io(void);
+-
+ #ifdef CONFIG_PM
+ extern void __init at91rm9200_pm_init(void);
+ extern void __init at91sam9260_pm_init(void);
+-- 
+2.10.1
+

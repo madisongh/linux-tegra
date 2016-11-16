@@ -1,0 +1,21 @@
+From 530bde7a6959c78c0957db478c714e694b5a6ced Mon Sep 17 00:00:00 2001
+From: "Steven Rostedt (Red Hat)" <rostedt@goodmis.org>
+Date: Thu, 14 Jul 2016 09:27:13 -0400
+Subject: [PATCH 351/351] Linux 4.4.17-rt25 REBASE
+X-NVConfidentiality: public
+
+---
+ localversion-rt | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 localversion-rt
+
+diff --git a/localversion-rt b/localversion-rt
+new file mode 100644
+index 000000000000..c5b71f9a229d
+--- /dev/null
++++ b/localversion-rt
+@@ -0,0 +1 @@
++-rt25
+-- 
+2.10.1
+

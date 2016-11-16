@@ -1,0 +1,31 @@
+From 042dccdec5c8e21b0d60baedd68fbbccfd5cf078 Mon Sep 17 00:00:00 2001
+From: Mike Galbraith <umgwanakikbuti@gmail.com>
+Date: Sat, 23 Jan 2016 08:11:53 +0100
+Subject: [PATCH 280/351] sched: fix ->nr_cpus_allowed = 1 transcription error
+ during migrate_disable() cleanup
+X-NVConfidentiality: public
+
+Setting p->nr_cpus_allowed accidentally wandered into migrate_disable()
+during the cleanup - kill it.
+
+Signed-off-by: Mike Galbraith <umgwanakikbuti@gmail.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ kernel/sched/core.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index fb749eb3429d..028aa36dafb6 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -3192,7 +3192,6 @@ void migrate_disable(void)
+ 	preempt_lazy_disable();
+ 	pin_current_cpu();
+ 	p->migrate_disable = 1;
+-	p->nr_cpus_allowed = 1;
+ 	preempt_enable();
+ }
+ EXPORT_SYMBOL(migrate_disable);
+-- 
+2.10.1
+

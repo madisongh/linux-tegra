@@ -1,0 +1,78 @@
+From 545cb61fe6f66b4756ce04b8dbeefb5e3802494a Mon Sep 17 00:00:00 2001
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Date: Wed, 27 Jan 2016 14:59:47 +0100
+Subject: [PATCH 312/351] clk: at91: pmc: merge at91_pmc_init in
+ atmel_pmc_probe
+X-NVConfidentiality: public
+
+at91_pmc_init() doesn't do much anymore, merge it in atmel_pmc_probe().
+
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/clk/at91/pmc.c | 34 +++++++++-------------------------
+ 1 file changed, 9 insertions(+), 25 deletions(-)
+
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index f17a2a1f1e85..01d049d4248a 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -110,30 +110,6 @@ static const struct at91_pmc_caps sama5d3_caps = {
+ 			  AT91_PMC_CFDEV,
+ };
+ 
+-static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
+-					     struct regmap *regmap,
+-					     void __iomem *regbase,
+-					     const struct at91_pmc_caps *caps)
+-{
+-	struct at91_pmc *pmc;
+-
+-	if (!regbase || !caps)
+-		return NULL;
+-
+-	at91_pmc_base = regbase;
+-
+-	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
+-	if (!pmc)
+-		return NULL;
+-
+-	pmc->regmap = regmap;
+-	pmc->caps = caps;
+-
+-	regmap_write(pmc->regmap, AT91_PMC_IDR, 0xffffffff);
+-
+-	return pmc;
+-}
+-
+ static void __init of_at91_pmc_setup(struct device_node *np,
+ 				     const struct at91_pmc_caps *caps)
+ {
+@@ -141,13 +117,21 @@ static void __init of_at91_pmc_setup(struct device_node *np,
+ 	void __iomem *regbase = of_iomap(np, 0);
+ 	struct regmap *regmap;
+ 
++	at91_pmc_base = regbase;
++
+ 	regmap = syscon_node_to_regmap(np);
+ 	if (IS_ERR(regmap))
+ 		panic("Could not retrieve syscon regmap");
+ 
+-	pmc = at91_pmc_init(np, regmap, regbase, caps);
++	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
+ 	if (!pmc)
+ 		return;
++
++	pmc->regmap = regmap;
++	pmc->caps = caps;
++
++	regmap_write(pmc->regmap, AT91_PMC_IDR, 0xffffffff);
++
+ }
+ 
+ static void __init of_at91rm9200_pmc_setup(struct device_node *np)
+-- 
+2.10.1
+

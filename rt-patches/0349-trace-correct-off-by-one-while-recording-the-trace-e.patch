@@ -1,0 +1,42 @@
+From 10f4c1d36b4893e9d7ae4a07a054f3fb824273af Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Wed, 25 May 2016 14:03:50 +0200
+Subject: [PATCH 349/351] trace: correct off by one while recording the
+ trace-event
+X-NVConfidentiality: public
+
+Trace events like raw_syscalls show always a preempt code of one. The
+reason is that on PREEMPT kernels rcu_read_lock_sched_notrace()
+increases the preemption counter and the function recording the counter
+is caller within the RCU section.
+
+Cc: stable-rt@vger.kernel.org
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+[ Changed this to upstream version. See commit e947841c0dce ]
+Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ kernel/trace/trace_events.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/kernel/trace/trace_events.c b/kernel/trace/trace_events.c
+index 4a48f97a2256..5bd79b347398 100644
+--- a/kernel/trace/trace_events.c
++++ b/kernel/trace/trace_events.c
+@@ -246,6 +246,14 @@ void *trace_event_buffer_reserve(struct trace_event_buffer *fbuffer,
+ 
+ 	local_save_flags(fbuffer->flags);
+ 	fbuffer->pc = preempt_count();
++	/*
++	 * If CONFIG_PREEMPT is enabled, then the tracepoint itself disables
++	 * preemption (adding one to the preempt_count). Since we are
++	 * interested in the preempt_count at the time the tracepoint was
++	 * hit, we need to subtract one to offset the increment.
++	 */
++	if (IS_ENABLED(CONFIG_PREEMPT))
++		fbuffer->pc--;
+ 	fbuffer->trace_file = trace_file;
+ 
+ 	fbuffer->event =
+-- 
+2.10.1
+

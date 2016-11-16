@@ -1,0 +1,33 @@
+From a255fdb9ace91813ae8f1bdadcb711b6251bfa83 Mon Sep 17 00:00:00 2001
+From: Anders Roxell <anders.roxell@linaro.org>
+Date: Fri, 15 Jan 2016 20:21:12 +0100
+Subject: [PATCH 272/351] drivers/cpuidle: coupled: fix warning
+ cpuidle_coupled_lock
+X-NVConfidentiality: public
+
+Used multi_v7_defconfig+PREEMPT_RT_FULL=y and this caused a compilation
+warning without this fix:
+../drivers/cpuidle/coupled.c:122:21: warning: 'cpuidle_coupled_lock'
+defined but not used [-Wunused-variable]
+
+Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/cpuidle/coupled.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
+index 344058f8501a..d5657d50ac40 100644
+--- a/drivers/cpuidle/coupled.c
++++ b/drivers/cpuidle/coupled.c
+@@ -119,7 +119,6 @@ struct cpuidle_coupled {
+ 
+ #define CPUIDLE_COUPLED_NOT_IDLE	(-1)
+ 
+-static DEFINE_MUTEX(cpuidle_coupled_lock);
+ static DEFINE_PER_CPU(struct call_single_data, cpuidle_coupled_poke_cb);
+ 
+ /*
+-- 
+2.10.1
+

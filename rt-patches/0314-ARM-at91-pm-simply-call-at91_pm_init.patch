@@ -1,0 +1,48 @@
+From 64efebbd9238bceae63a68c8e6bb3c19c214296e Mon Sep 17 00:00:00 2001
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Date: Wed, 30 Sep 2015 01:08:33 +0200
+Subject: [PATCH 314/351] ARM: at91: pm: simply call at91_pm_init
+X-NVConfidentiality: public
+
+at91_pm_init() doesn't return a value, as is the case for its callers,
+simply call it instead of returning its non-existent return value.
+
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/mach-at91/pm.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 23726fb31741..db32bf846cef 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -432,7 +432,7 @@ void __init at91sam9260_pm_init(void)
+ 	at91_dt_ramc();
+ 	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
+ 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
+-	return at91_pm_init();
++	at91_pm_init();
+ }
+ 
+ void __init at91sam9g45_pm_init(void)
+@@ -440,7 +440,7 @@ void __init at91sam9g45_pm_init(void)
+ 	at91_dt_ramc();
+ 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP;
+ 	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
+-	return at91_pm_init();
++	at91_pm_init();
+ }
+ 
+ void __init at91sam9x5_pm_init(void)
+@@ -448,5 +448,5 @@ void __init at91sam9x5_pm_init(void)
+ 	at91_dt_ramc();
+ 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
+ 	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
+-	return at91_pm_init();
++	at91_pm_init();
+ }
+-- 
+2.10.1
+

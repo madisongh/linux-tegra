@@ -1,0 +1,27 @@
+From 01d227d8a33aaf1fd71a7a0706a6edaead81d093 Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Tue, 8 Mar 2016 12:57:28 +0100
+Subject: [PATCH 308/351] trace: hist: make it compile again
+X-NVConfidentiality: public
+
+Fixes: a16cff01f63e ("trace: Use rcuidle version for preemptoff_hist trace point")
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ include/trace/events/hist.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/trace/events/hist.h b/include/trace/events/hist.h
+index 6122e4286177..f7710de1b1f3 100644
+--- a/include/trace/events/hist.h
++++ b/include/trace/events/hist.h
+@@ -9,6 +9,7 @@
+ 
+ #if !defined(CONFIG_PREEMPT_OFF_HIST) && !defined(CONFIG_INTERRUPT_OFF_HIST)
+ #define trace_preemptirqsoff_hist(a, b)
++#define trace_preemptirqsoff_hist_rcuidle(a, b)
+ #else
+ TRACE_EVENT(preemptirqsoff_hist,
+ 
+-- 
+2.10.1
+

@@ -1,0 +1,37 @@
+From 74f577560ab36861a1c55f11afbf47450a6b68f0 Mon Sep 17 00:00:00 2001
+From: Mike Galbraith <umgwanakikbuti@gmail.com>
+Date: Sun, 21 Feb 2016 16:11:30 +0100
+Subject: [PATCH 298/351] sched,rt: __always_inline preemptible_lazy()
+X-NVConfidentiality: public
+
+homer: # nm kernel/sched/core.o|grep preemptible_lazy
+00000000000000b5 t preemptible_lazy
+
+echo wakeup_rt > current_tracer ==> Welcome to infinity.
+
+Signed-off-by: Mike Galbraith <umgwanakikbuti@gmail.com>
+Acked-by: Hillf Danton <hillf.zj@alibaba-inc.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Cc: linux-rt-users <linux-rt-users@vger.kernel.org>
+Link: http://lkml.kernel.org/r/1456067490.3771.2.camel@gmail.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+---
+ kernel/sched/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index bcf3b79057c0..6d852e7f16ff 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -3481,7 +3481,7 @@ static void __sched notrace preempt_schedule_common(void)
+  * set by a RT task. Oterwise we try to avoid beeing scheduled out as long as
+  * preempt_lazy_count counter >0.
+  */
+-static int preemptible_lazy(void)
++static __always_inline int preemptible_lazy(void)
+ {
+ 	if (test_thread_flag(TIF_NEED_RESCHED))
+ 		return 1;
+-- 
+2.10.1
+

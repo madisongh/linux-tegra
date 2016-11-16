@@ -1,0 +1,34 @@
+From 1910ab6f04b9538d5e0f8740f242e2b295f66a18 Mon Sep 17 00:00:00 2001
+From: "bmouring@ni.com" <bmouring@ni.com>
+Date: Tue, 15 Dec 2015 17:07:30 -0600
+Subject: [PATCH 125/351] rtmutex: Use chainwalking control enum
+X-NVConfidentiality: public
+
+In 8930ed80 (rtmutex: Cleanup deadlock detector debug logic),
+chainwalking control enums were introduced to limit the deadlock
+detection logic. One of the calls to task_blocks_on_rt_mutex was
+missed when converting to use the enums.
+
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Brad Mouring <brad.mouring@ni.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ kernel/locking/rtmutex.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
+index f3e3e44bdf6c..8275f474d685 100644
+--- a/kernel/locking/rtmutex.c
++++ b/kernel/locking/rtmutex.c
+@@ -1020,7 +1020,7 @@ static void  noinline __sched rt_spin_lock_slowlock(struct rt_mutex *lock)
+ 	__set_current_state_no_track(TASK_UNINTERRUPTIBLE);
+ 	pi_unlock(&self->pi_lock);
+ 
+-	ret = task_blocks_on_rt_mutex(lock, &waiter, self, 0);
++	ret = task_blocks_on_rt_mutex(lock, &waiter, self, RT_MUTEX_MIN_CHAINWALK);
+ 	BUG_ON(ret);
+ 
+ 	for (;;) {
+-- 
+2.10.1
+

@@ -1,0 +1,33 @@
+From 1dbf97c585c1e4acb7edec074014f0cf106fd34b Mon Sep 17 00:00:00 2001
+From: Mike Galbraith <bitbucket@online.de>
+Date: Fri, 30 Aug 2013 07:57:25 +0200
+Subject: [PATCH 028/351] hwlat-detector: Don't ignore threshold module
+ parameter
+X-NVConfidentiality: public
+
+If the user specified a threshold at module load time, use it.
+
+
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
+Signed-off-by: Mike Galbraith <bitbucket@online.de>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/misc/hwlat_detector.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/misc/hwlat_detector.c b/drivers/misc/hwlat_detector.c
+index 6e88113bc098..2429c4331e68 100644
+--- a/drivers/misc/hwlat_detector.c
++++ b/drivers/misc/hwlat_detector.c
+@@ -414,7 +414,7 @@ static int init_stats(void)
+ 		goto out;
+ 
+ 	__reset_stats();
+-	data.threshold = DEFAULT_LAT_THRESHOLD;	    /* threshold us */
++	data.threshold = threshold ?: DEFAULT_LAT_THRESHOLD; /* threshold us */
+ 	data.sample_window = DEFAULT_SAMPLE_WINDOW; /* window us */
+ 	data.sample_width = DEFAULT_SAMPLE_WIDTH;   /* width us */
+ 
+-- 
+2.10.1
+

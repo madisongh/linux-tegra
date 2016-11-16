@@ -1,0 +1,46 @@
+From b7a5279b55b6321bf08e1c49338cd48879403c2e Mon Sep 17 00:00:00 2001
+From: Thomas Gleixner <tglx@linutronix.de>
+Date: Sun, 17 Jul 2011 19:35:29 +0200
+Subject: [PATCH 105/351] hotplug: Use migrate disable on unplug
+X-NVConfidentiality: public
+
+Migration needs to be disabled accross the unplug handling to make
+sure that the unplug thread is off the unplugged cpu.
+
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+---
+ kernel/cpu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/kernel/cpu.c b/kernel/cpu.c
+index 654f8db185c4..d4071577d491 100644
+--- a/kernel/cpu.c
++++ b/kernel/cpu.c
+@@ -457,14 +457,13 @@ static int _cpu_down(unsigned int cpu, int tasks_frozen)
+ 	cpumask_andnot(cpumask, cpu_online_mask, cpumask_of(cpu));
+ 	set_cpus_allowed_ptr(current, cpumask);
+ 	free_cpumask_var(cpumask);
+-	preempt_disable();
++	migrate_disable();
+ 	mycpu = smp_processor_id();
+ 	if (mycpu == cpu) {
+ 		printk(KERN_ERR "Yuck! Still on unplug CPU\n!");
+-		preempt_enable();
++		migrate_enable();
+ 		return -EBUSY;
+ 	}
+-	preempt_enable();
+ 
+ 	cpu_hotplug_begin();
+ 	err = cpu_unplug_begin(cpu);
+@@ -545,6 +544,7 @@ static int _cpu_down(unsigned int cpu, int tasks_frozen)
+ out_release:
+ 	cpu_unplug_done(cpu);
+ out_cancel:
++	migrate_enable();
+ 	cpu_hotplug_done();
+ 	trace_sched_cpu_hotplug(cpu, err, 0);
+ 	if (!err)
+-- 
+2.10.1
+
