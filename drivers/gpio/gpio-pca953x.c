@@ -110,7 +110,6 @@ struct pca953x_chip {
 	u8 irq_trig_raise[MAX_BANK];
 	u8 irq_trig_fall[MAX_BANK];
 #endif
-	struct regulator *vcc_reg;
 	struct i2c_client *client;
 	struct gpio_chip gpio_chip;
 	const char *const *names;
@@ -806,29 +805,6 @@ static int pca953x_probe(struct i2c_client *client,
 
 	chip->chip_type = PCA_CHIP_TYPE(chip->driver_data);
 
-	chip->vcc_reg = devm_regulator_get(&client->dev, "vcc");
-	if (PTR_ERR(chip->vcc_reg) == -ENODEV) {
-		dev_info(&client->dev,
-			"no regulator found for vcc, Assuming vcc is always powered");
-		chip->vcc_reg = NULL;
-	} else if (PTR_ERR(chip->vcc_reg) == -EPROBE_DEFER) {
-		ret = -EPROBE_DEFER;
-		goto err_exit;
-	} else if (IS_ERR(chip->vcc_reg)) {
-		ret = PTR_ERR(chip->vcc_reg);
-		dev_err(&client->dev,
-			"vcc regulator get failed, err %d\n", ret);
-		goto err_exit;
-	}
-
-	if (chip->vcc_reg) {
-		ret = regulator_enable(chip->vcc_reg);
-		if (ret < 0) {
-			dev_err(&client->dev, "failed to enable vcc\n");
-			return ret;
-		}
-	}
-
 	mutex_init(&chip->i2c_lock);
 
 	/* initialize cached registers from their original values.
@@ -863,6 +839,7 @@ static int pca953x_probe(struct i2c_client *client,
 
 err_exit:
 	regulator_disable(chip->regulator);
+	devm_kfree(&client->dev, chip);
 
 	return ret;
 }
@@ -880,9 +857,6 @@ static int pca953x_remove(struct i2c_client *client)
 			dev_err(&client->dev, "%s failed, %d\n",
 					"teardown", ret);
 	}
-
-	if (chip->vcc_reg)
-		regulator_disable(chip->vcc_reg);
 
 	regulator_disable(chip->regulator);
 
@@ -937,10 +911,6 @@ MODULE_DEVICE_TABLE(of, pca953x_dt_ids);
 #ifdef CONFIG_PM_SLEEP
 static int pca953x_suspend(struct device *dev)
 {
-	struct pca953x_chip *chip = i2c_get_clientdata(to_i2c_client(dev));
-
-	if (chip->vcc_reg)
-		regulator_disable(chip->vcc_reg);
 	return 0;
 }
 
@@ -951,14 +921,6 @@ static int pca953x_resume(struct device *dev)
 	int reg_count = NBANK(chip);
 	int i, reg_out, reg_dir;
 	int ret = 0;
-
-	if (chip->vcc_reg) {
-		ret = regulator_enable(chip->vcc_reg);
-		if (ret < 0) {
-			dev_err(&client->dev, "failed to enable vcc\n");
-			return ret;
-		}
-	}
 
 	switch (chip->chip_type) {
 	case PCA953X_TYPE:
