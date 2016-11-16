@@ -465,6 +465,10 @@ static int tegra_cpu_edp_probe(struct platform_device *pdev)
 
 	register_hotcpu_notifier(&tegra_cpu_edp_notifier_block);
 
+	mutex_lock(&ctx->edp_lock);
+	ctx->edp_cpumask = *cpu_online_mask;
+	mutex_unlock(&ctx->edp_lock);
+
 	platform_set_drvdata(pdev, ctx);
 
 	ctx->pdev = pdev;
