@@ -785,8 +785,10 @@ static int pca953x_probe(struct i2c_client *client,
 			chip->driver_data = (int)(uintptr_t)match->data;
 		} else {
 			acpi_id = acpi_match_device(pca953x_acpi_ids, &client->dev);
-			if (!acpi_id)
-				return -ENODEV;
+			if (!acpi_id) {
+				ret = -ENODEV;
+				goto err_exit;
+			}
 
 			chip->driver_data = acpi_id->driver_data;
 		}
@@ -927,7 +929,7 @@ static int pca953x_resume(struct device *dev)
 	int i, reg_out, reg_dir;
 	int ret = 0;
 
-	switch (chip->chip_type) {
+	switch (PCA_CHIP_TYPE(chip->driver_data)) {
 	case PCA953X_TYPE:
 		reg_out = PCA953X_OUTPUT;
 		reg_dir = PCA953X_DIRECTION;
