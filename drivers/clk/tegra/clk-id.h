@@ -458,6 +458,12 @@ enum clk_id {
 	tegra_clk_sata_slcg_ovr,
 	tegra_clk_sata_slcg_ovr_ipfs,
 	tegra_clk_sata_slcg_ovr_fpci,
+	tegra_clk_dmic1_sync_clk,
+	tegra_clk_dmic2_sync_clk,
+	tegra_clk_dmic3_sync_clk,
+	tegra_clk_dmic1_sync_clk_mux,
+	tegra_clk_dmic2_sync_clk_mux,
+	tegra_clk_dmic3_sync_clk_mux,
 	tegra_clk_max,
 };
 
