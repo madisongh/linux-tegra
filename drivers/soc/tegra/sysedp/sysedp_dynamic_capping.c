@@ -716,6 +716,12 @@ static int sysedp_dynamic_capping_probe(struct platform_device *pdev)
 	/* update battery power in time */
 	batmon_update_budget();
 
+	/*
+	 * Refresh sysedp dynamic capping configuration in
+	 * case any consumers have already been registered.
+	 */
+	_sysedp_refresh();
+
 	return 0;
 
 err:
