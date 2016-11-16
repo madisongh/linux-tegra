@@ -96,10 +96,9 @@ static void pr_caps(struct tegra_sysedp_devcap *old,
 	    (new->emcfreq == old->emcfreq))
 		return;
 
-	pr_debug("sysedp: gpupri %d, core %5u mW, cpu %5u mW, gpu %u %s, emc %u kHz\n",
+	pr_debug("sysedp: gpupri %d, core %5u mW, cpu %5u mW, gpu %u mW, emc %u kHz\n",
 		 gpu_busy, cur_corecap->power,
 		 new->cpu_power, new->gpu_cap,
-		 capping_data->gpu_cap_as_mw ? "mW" : "kHz",
 		 new->emcfreq);
 }
 
@@ -128,16 +127,14 @@ static void apply_caps(struct tegra_sysedp_devcap *devcap)
 		do_trace = true;
 	}
 
-	if ((new.gpu_cap != cur_caps.gpu_cap) &&
-	    (capping_data->gpu_cap_as_mw)) {
+	if (new.gpu_cap != cur_caps.gpu_cap) {
 		pm_qos_update_request(&gpupwr_qos, new.gpu_cap);
 		do_trace = true;
 	}
 
 	if (do_trace)
 		trace_sysedp_dynamic_capping(new.cpu_power, new.gpu_cap,
-					new.emcfreq, gpu_busy,
-					capping_data->gpu_cap_as_mw);
+					new.emcfreq, gpu_busy);
 	pr_caps(&cur_caps, &new);
 	cur_caps = new;
 }
@@ -148,16 +145,10 @@ static inline bool gpu_priority(void)
 	unsigned int bias;
 
 	/*
-	 * NOTE: the policy for selecting between the GPU priority
-	 * mode and the CPU priority mode depends on whether GPU
-	 * caps are expressed in mW or kHz. The policy is "smarter"
-	 * when capping is in terms of kHz. So, if GPU caps are
-	 * expressed in mW, it is highly preferred to use supplemental
-	 * GPU capping tables expressed in KHz, as well.
+	 * NOTE: It is highly preferred to use supplemental
+	 * GPU capping tables expressed in KHz.
 	 */
-	if (!capping_data->gpu_cap_as_mw)
-		bias = cur_corecap->cpupri.gpu_cap;
-	else if (capping_data->gpu_cap_as_mw && capping_data->gpu_supplement)
+	if (capping_data->gpu_supplement)
 		bias = cur_corecap->cpupri.gpu_supp_freq;
 	else
 		bias = 0;
@@ -371,20 +362,16 @@ static int corecaps_show(struct seq_file *file, void *data)
 	struct tegra_sysedp_corecap *p;
 	struct tegra_sysedp_devcap *c;
 	struct tegra_sysedp_devcap *g;
-	const char *gpu_label;
 
 	if (!capping_data || !capping_data->corecap)
 		return -ENODEV;
-
-	gpu_label = capping_data->gpu_cap_as_mw ?
-		    "GPU-mW" : "GPU-kHz";
 
 	p = capping_data->corecap;
 
 	seq_printf(file, "%s %s { %s %9s %9s } %s { %s %9s %9s } %7s\n",
 		   "E-state",
-		   "CPU-pri", "CPU-mW", gpu_label, "EMC-kHz",
-		   "GPU-pri", "CPU-mW", gpu_label, "EMC-kHz",
+		   "CPU-pri", "CPU-mW", "GPU-mW", "EMC-kHz",
+		   "GPU-pri", "CPU-mW", "GPU-mW", "EMC-kHz",
 		   "Pthrot");
 
 	for (i = 0; i < capping_data->corecap_size; i++, p++) {
@@ -424,8 +411,7 @@ static int status_show(struct seq_file *file, void *data)
 	seq_printf(file, "cpu balance : %u\n", cpu_power_balance);
 	seq_printf(file, "cpu power   : %u\n", get_devcap()->cpu_power +
 		   cpu_power_balance);
-	seq_printf(file, "gpu cap     : %u %s\n", cur_caps.gpu_cap,
-		   capping_data->gpu_cap_as_mw ? "mW" : "kHz");
+	seq_printf(file, "gpu cap     : %u mW\n", cur_caps.gpu_cap);
 	seq_printf(file, "emc cap     : %u kHz\n", cur_caps.emcfreq);
 	seq_printf(file, "cc method   : %u\n", cap_method);
 
@@ -634,8 +620,10 @@ static int of_sysedp_dynamic_capping_get_pdata(struct platform_device *pdev,
 		return -EINVAL;
 	}
 
-	obj_ptr->gpu_cap_as_mw =
-		!!of_find_property(np, "nvidia,gpu_cap_as_mw", NULL);
+	if (!of_property_read_bool(np, "nvidia,gpu_cap_as_mw")) {
+		dev_err(&pdev->dev, "GPU capping by frequency not supported\n");
+		return -EINVAL;
+	}
 
 	*pdata = obj_ptr;
 
@@ -677,9 +665,8 @@ static int sysedp_dynamic_capping_probe(struct platform_device *pdev)
 	pm_qos_add_request(&cpupwr_qos, PM_QOS_MAX_CPU_POWER,
 			   PM_QOS_CPU_POWER_MAX_DEFAULT_VALUE);
 
-	if (capping_data->gpu_cap_as_mw)
-		pm_qos_add_request(&gpupwr_qos, PM_QOS_MAX_GPU_POWER,
-				   PM_QOS_GPU_POWER_MAX_DEFAULT_VALUE);
+	pm_qos_add_request(&gpupwr_qos, PM_QOS_MAX_GPU_POWER,
+			   PM_QOS_GPU_POWER_MAX_DEFAULT_VALUE);
 
 	mutex_lock(&core_lock);
 	avail_power = capping_data->init_req_watts;

@@ -68,16 +68,15 @@ TRACE_EVENT(sysedp_set_avail_budget,
 TRACE_EVENT(sysedp_dynamic_capping,
 
 	TP_PROTO(unsigned int cpupwr, unsigned int gpu,
-		 unsigned int emc, bool favor_gpu, bool gpu_cap_as_mw),
+		 unsigned int emc, bool favor_gpu),
 
-	TP_ARGS(cpupwr, gpu, emc, favor_gpu, gpu_cap_as_mw),
+	TP_ARGS(cpupwr, gpu, emc, favor_gpu),
 
 	TP_STRUCT__entry(
 		__field(unsigned int, cpupwr)
 		__field(unsigned int, gpu)
 		__field(unsigned int, emc)
 		__field(bool, favor_gpu)
-		__field(bool, gpu_cap_as_mw)
 	),
 
 	TP_fast_assign(
@@ -85,12 +84,10 @@ TRACE_EVENT(sysedp_dynamic_capping,
 		__entry->gpu = gpu;
 		__entry->emc = emc;
 		__entry->favor_gpu = favor_gpu;
-		__entry->gpu_cap_as_mw = gpu_cap_as_mw;
 	),
 
-	TP_printk("CPU PWR %u, GPU %u %s, EMC %u, favor_gpu=%d",
+	TP_printk("CPU PWR %u, GPU %u mW, EMC %u, favor_gpu=%d",
 		__entry->cpupwr, __entry->gpu,
-		__entry->gpu_cap_as_mw ? "mW" : "kHz",
 		__entry->emc / 1000, __entry->favor_gpu)
 );
 
