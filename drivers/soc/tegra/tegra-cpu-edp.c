@@ -53,6 +53,7 @@ struct cpu_edp {
 	unsigned long freq_limit;
 	unsigned long sysedp_freq_limit;
 	unsigned long sysedp_cpupwr;
+	struct thermal_cooling_device *cdev;
 	struct thermal_zone_device *tz;
 	unsigned long edp_thermal_index;
 	struct mutex edp_lock;
@@ -75,9 +76,6 @@ static struct cpu_edp s_cpu = {
 static unsigned int tegra_get_sysedp_max_freq(struct cpu_edp *ctx,
 					      int online_cpus)
 {
-	if (WARN_ONCE(!ctx->edp_init_done, "Tegra PPM is not ready\n"))
-		return 0;
-
 	return tegra_ppm_get_maxf(ctx->ppm, ctx->sysedp_cpupwr,
 				  TEGRA_PPM_UNITS_MILLIWATTS,
 				  ctx->temperature, online_cpus);
@@ -85,9 +83,6 @@ static unsigned int tegra_get_sysedp_max_freq(struct cpu_edp *ctx,
 
 static unsigned int tegra_get_edp_max_freq(struct cpu_edp *ctx, int online_cpus)
 {
-	if (WARN_ONCE(!ctx->edp_init_done, "CPU-EDP is not ready\n"))
-		return 0;
-
 	return tegra_ppm_get_maxf(ctx->ppm, ctx->pdata.reg_edp,
 				  TEGRA_PPM_UNITS_MILLIAMPS,
 				  ctx->temperature, online_cpus);
@@ -125,18 +120,8 @@ static void tegra_edp_update_limit(struct device *dev)
  * for the cpu edp recation driver.
  */
 
-int tegra_cpu_edp_get_thermal_index(struct platform_device *pdev)
-{
-	struct cpu_edp *ctx = dev_get_drvdata(&pdev->dev);
-
-	if (!ctx)
-		return 0;
-	else
-		return ctx->edp_thermal_index;
-}
-EXPORT_SYMBOL(tegra_cpu_edp_get_thermal_index);
-
-int tegra_cpu_edp_count_therm_floors(struct platform_device *pdev)
+static int tegra_cpu_edp_get_max_state(struct thermal_cooling_device *cdev,
+				       unsigned long *max_state)
 {
 	/*
 	 * The thermal framework doesn't use this value to do anything,
@@ -147,21 +132,32 @@ int tegra_cpu_edp_count_therm_floors(struct platform_device *pdev)
 	 * So we set this max cooling state as a meaningless largish
 	 * number.
 	 */
-	return 1024;
-}
-EXPORT_SYMBOL(tegra_cpu_edp_count_therm_floors);
+	*max_state = 1024;
 
-int tegra_cpu_edp_update_thermal_index(struct platform_device *pdev,
-				       unsigned long new_idx)
+	return 0;
+}
+
+static int tegra_cpu_edp_get_cur_state(struct thermal_cooling_device *cdev,
+				       unsigned long *cur_state)
 {
-	struct cpu_edp *ctx = dev_get_drvdata(&pdev->dev);
+	struct cpu_edp *ctx = cdev->devdata;
+
+	*cur_state = ctx->edp_thermal_index;
+
+	return 0;
+}
+
+static int tegra_cpu_edp_set_cur_state(struct thermal_cooling_device *cdev,
+				       unsigned long cur_state)
+{
+	struct cpu_edp *ctx = cdev->devdata;
 
 	if (!cpufreq_get(0))
 		return 0;
 
 	mutex_lock(&ctx->edp_lock);
 
-	ctx->edp_thermal_index = new_idx;
+	ctx->edp_thermal_index = cur_state;
 
 	/*
 	 * Get temperature, convert from mC to C, and quantize to 4 degrees
@@ -170,7 +166,7 @@ int tegra_cpu_edp_update_thermal_index(struct platform_device *pdev,
 	ctx->temperature = (ctx->tz->temperature + 3999) / 4000 * 4;
 
 	ctx->edp_cpumask = *cpu_online_mask;
-	tegra_edp_update_limit(&pdev->dev);
+	tegra_edp_update_limit(&ctx->pdev->dev);
 
 	mutex_unlock(&ctx->edp_lock);
 
@@ -178,7 +174,12 @@ int tegra_cpu_edp_update_thermal_index(struct platform_device *pdev,
 
 	return 0;
 }
-EXPORT_SYMBOL(tegra_cpu_edp_update_thermal_index);
+
+static struct thermal_cooling_device_ops tegra_cpu_edp_cooling_ops = {
+	.get_max_state = tegra_cpu_edp_get_max_state,
+	.get_cur_state = tegra_cpu_edp_get_cur_state,
+	.set_cur_state = tegra_cpu_edp_set_cur_state,
+};
 
 bool tegra_cpu_edp_ready(void)
 {
@@ -205,11 +206,11 @@ static int tegra_edp_debugfs_init(struct cpu_edp *ctx, const char *name)
 		return -ENOMEM;
 
 	debugfs_create_u32("reg_edp_ma", S_IRUGO | S_IWUSR,
-			   edp_dir, &ctx->pdata.reg_edp);
+			   ctx->debugfs_dir, &ctx->pdata.reg_edp);
 	debugfs_create_u32("temperature", S_IRUGO,
-			   edp_dir, &ctx->temperature);
+			   ctx->debugfs_dir, &ctx->temperature);
 	debugfs_create_file("cpu_edp_limit", S_IRUGO,
-			    edp_dir, ctx, &cpu_edp_limit_fops);
+			    ctx->debugfs_dir, ctx, &cpu_edp_limit_fops);
 
 	return 0;
 }
@@ -451,11 +452,22 @@ static int tegra_cpu_edp_probe(struct platform_device *pdev)
 	}
 
 	ctx->ppm = tegra_ppm_create(name, fv, params,
-				    iddq_ma, edp_dir);
+				    iddq_ma, ctx->debugfs_dir);
 	if (IS_ERR_OR_NULL(ctx->ppm)) {
 		dev_err(&pdev->dev, "Create power model failed\n");
 		ret = PTR_ERR(ctx->ppm);
 		goto remove_debugfs;
+	}
+
+	platform_set_drvdata(pdev, ctx);
+	ctx->pdev = pdev;
+
+	ctx->cdev = thermal_of_cooling_device_register(pdev->dev.of_node, name,
+					ctx, &tegra_cpu_edp_cooling_ops);
+	if (IS_ERR_OR_NULL(ctx->cdev)) {
+		dev_err(&pdev->dev, "Failed to register cooling device\n");
+		ret = PTR_ERR(ctx->cdev);
+		goto destroy_ppm;
 	}
 
 	pm_qos_add_notifier(PM_QOS_MAX_CPU_POWER, &max_cpu_pwr_notifier_block);
@@ -469,13 +481,12 @@ static int tegra_cpu_edp_probe(struct platform_device *pdev)
 	ctx->edp_cpumask = *cpu_online_mask;
 	mutex_unlock(&ctx->edp_lock);
 
-	platform_set_drvdata(pdev, ctx);
-
-	ctx->pdev = pdev;
 	ctx->edp_init_done = true;
 
 	return 0;
 
+destroy_ppm:
+	tegra_ppm_destroy(ctx->ppm, NULL, NULL);
 remove_debugfs:
 	debugfs_remove_recursive(ctx->debugfs_dir);
 
