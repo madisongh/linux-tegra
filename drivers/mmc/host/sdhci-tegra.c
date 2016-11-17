@@ -1651,7 +1651,6 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 		return -EINVAL;
 
 	plat = devm_kzalloc(dev, sizeof(*plat), GFP_KERNEL);
-	of_property_read_u32(np, "max-clk-limit", &plat->max_clk_limit);
 	of_property_read_u32(np, "uhs-mask", &plat->uhs_mask);
 	of_property_read_u32(np, "dqs-trim-delay", &plat->dqs_trim_delay);
 	of_property_read_u32(np, "nvidia,ddr-tap-delay", &plat->ddr_tap_delay);
