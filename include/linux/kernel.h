@@ -468,6 +468,7 @@ extern bool early_boot_irqs_disabled;
 
 /* Values used for system_state */
 extern enum system_states {
+	SYSTEM_BOOTING_SINGLECORE,
 	SYSTEM_BOOTING,
 	SYSTEM_RUNNING,
 	SYSTEM_HALT,

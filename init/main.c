@@ -1000,6 +1000,9 @@ static noinline void __init kernel_init_freeable(void)
 	do_pre_smp_initcalls();
 	lockup_detector_init();
 
+	/* before this point, we were in SYSTEM_BOOTING_SINGLECORE */
+	system_state = SYSTEM_BOOTING;
+
 	smp_init();
 	sched_init_smp();
 
