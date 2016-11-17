@@ -12,8 +12,8 @@
 #include <linux/fb.h>
 #include <linux/mutex.h>
 #include <linux/notifier.h>
-#ifdef CONFIG_SYSEDP_FRAMEWORK
-#include <linux/sysedp.h>
+#ifdef CONFIG_TEGRA_SYS_EDP
+#include <soc/tegra/sysedp.h>
 #endif
 
 /* Notes on locking:
@@ -132,14 +132,14 @@ struct backlight_device {
 
 	int use_count;
 
-#ifdef CONFIG_SYSEDP_FRAMEWORK
+#ifdef CONFIG_TEGRA_SYS_EDP
 	struct sysedp_consumer *sysedpc;
 #endif
 };
 
-#ifdef CONFIG_SYSEDP_FRAMEWORK
+#ifdef CONFIG_TEGRA_SYS_EDP
 
-int backlight_update_status(struct backlight_device *bd);
+void backlight_update_status(struct backlight_device *bd);
 
 #else
 static inline int backlight_update_status(struct backlight_device *bd)

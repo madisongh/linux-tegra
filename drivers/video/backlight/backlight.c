@@ -22,8 +22,8 @@
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif
-#ifdef CONFIG_SYSEDP_FRAMEWORK
-#include <linux/sysedp.h>
+#ifdef CONFIG_TEGRA_SYS_EDP
+#include <soc/tegra/sysedp.h>
 #endif
 
 static struct list_head backlight_dev_list;
@@ -147,7 +147,7 @@ static inline void backlight_unregister_fb(struct backlight_device *bd)
 }
 #endif /* CONFIG_FB */
 
-#ifdef CONFIG_SYSEDP_FRAMEWORK
+#ifdef CONFIG_TEGRA_SYS_EDP
 extern atomic_t sd_brightness;
 
 /* Return value 0..11 : 0=zero brightness, 11=max brightness */
@@ -183,6 +183,7 @@ void backlight_update_status(struct backlight_device *bd)
 	}
 	mutex_unlock(&bd->update_lock);
 }
+EXPORT_SYMBOL(backlight_update_status);
 
 #endif
 
@@ -329,7 +330,7 @@ static int backlight_suspend(struct device *dev)
 		bd->props.state |= BL_CORE_SUSPENDED;
 		backlight_update_status(bd);
 	}
-#ifdef CONFIG_SYSEDP_FRAMEWORK
+#ifdef CONFIG_TEGRA_SYS_EDP
 	sysedp_set_state(bd->sysedpc, 0);
 #endif
 	mutex_unlock(&bd->ops_lock);
@@ -467,8 +468,8 @@ struct backlight_device *backlight_device_register(const char *name,
 	blocking_notifier_call_chain(&backlight_notifier,
 				     BACKLIGHT_REGISTERED, new_bd);
 
-#ifdef CONFIG_SYSEDP_FRAMEWORK
-	new_bd->sysedpc = sysedp_create_consumer(name, name);
+#ifdef CONFIG_TEGRA_SYS_EDP
+	new_bd->sysedpc = sysedp_create_consumer(parent->of_node, name);
 #endif
 	return new_bd;
 }
@@ -523,7 +524,7 @@ void backlight_device_unregister(struct backlight_device *bd)
 
 	backlight_unregister_fb(bd);
 
-#ifdef CONFIG_SYSEDP_FRAMEWORK
+#ifdef CONFIG_TEGRA_SYS_EDP
 	sysedp_free_consumer(bd->sysedpc);
 	bd->sysedpc = NULL;
 #endif
