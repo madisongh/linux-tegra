@@ -77,12 +77,8 @@ enum tegra_usb_cd_apple_chargers {
 	APPLE_2000MA,
 };
 
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
 int tegra18x_usb_cd_init_ops(struct tegra_usb_cd *ucd);
-#endif
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 int tegra21x_usb_cd_init_ops(struct tegra_usb_cd *ucd);
-#endif
 
 #endif /* __TEGRA_USB_CD_H */
