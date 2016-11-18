@@ -54,6 +54,7 @@
 #include <linux/reset.h>
 #include <linux/seq_file.h>
 #include <soc/tegra/pwm-tegra-dfll.h>
+#include <soc/tegra/tegra-dvfs.h>
 
 #include "clk-dfll.h"
 
@@ -1145,6 +1146,8 @@ static int dfll_register_clk(struct tegra_dfll *td)
 		dev_err(td->dev, "DFLL clock registration error\n");
 		return -EINVAL;
 	}
+
+	tegra_dvfs_set_dfll_range(td->dfll_clk, DFLL_RANGE_ALL_RATES);
 
 	ret = of_clk_add_provider(td->dev->of_node, of_clk_src_simple_get,
 				  td->dfll_clk);
