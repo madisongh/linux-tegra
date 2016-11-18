@@ -214,6 +214,14 @@ config USB_TEGRA_OTG
           Enable this driver on boards which use the internal VBUS and ID
           sensing of the Tegra USB PHY.
 
+config USB_TEGRA_XOTG
+	bool "Tegra XOTG Driver"
+	depends on USB && (ARCH_TEGRA || ARCH_TEGRA_18x_SOC)
+	help
+	  Enable this driver on boards with XUSB OTG port. This is the Nvidia
+	  XOTG driver which implements OTG spec. We will need this enabled for
+	  OTG port to work.
+
 config USB_ULPI
 	bool "Generic ULPI Transceiver Driver"
 	depends on ARM || ARM64
