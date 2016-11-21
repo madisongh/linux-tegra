@@ -61,7 +61,6 @@
 #define TEGRA_USB3_PHYS		(4)
 #define TEGRA_UTMI_PHYS		(4)
 #define TEGRA_HSIC_PHYS		(1)
-#define TEGRA_SNPS_PHYS		(1)
 #define T21x_UPHY_PLLS		(2)
 #define T21x_UPHY_LANES		(8)
 #define SATA_LANE_MASK		BIT(7)
@@ -73,7 +72,6 @@
 #define XUSB_PADCTL_USB2_PAD_MUX_0		(0x4)
 #define   USB2_OTG_PAD_PORTx(_port, _val)	(((_val) & 0x3)		\
 						<< ((_port) * 2))
-#define   USB2_OTG_PAD_PORTx_SNPS(_port)	USB2_OTG_PAD_PORTx(_port, 0)
 #define   USB2_OTG_PAD_PORTx_XUSB(_port)	USB2_OTG_PAD_PORTx(_port, 1)
 #define   USB2_HSIC_PAD_PORTx_XUSB(_port)	BIT((_port) + 14)
 #define   HSIC_PAD_TRK_XUSB			BIT(16)
@@ -263,12 +261,6 @@
 #define   RX_TERM_EN				BIT(21)
 #define   RX_TERM_OVRD				BIT(23)
 
-/* CAR registers */
-#define CLK_RST_CONTROLLER_UTMIPLL_HW_PWRDN_CFG0	(0x52c)
-#define   UTMIPLL_IDDQ_SWCTL			BIT(0)
-#define   UTMIPLL_IDDQ_OVERRIDE_VALUE		BIT(1)
-#define   UTMIPLL_LOCK				BIT(31)
-
 /* FUSE USB_CALIB registers */
 /* FUSE_USB_CALIB_0 */
 #define HS_CURR_LEVEL_PADX_SHIFT(x)		((x) ? (11 + (x - 1) * 6) : 0)
@@ -301,7 +293,6 @@ enum tegra21x_function {
 	TEGRA21x_FUNC_PCIE,
 	TEGRA21x_FUNC_USB3,
 	TEGRA21x_FUNC_SATA,
-	TEGRA21x_FUNC_SNPS,
 };
 
 struct tegra_padctl_uphy_function {
@@ -376,7 +367,6 @@ struct tegra_pcie_controller {
 
 struct tegra_xusb_utmi_port {
 	enum xusb_port_cap port_cap;
-	bool used_by_xusb;
 };
 
 struct tegra_xusb_hsic_port {
@@ -425,10 +415,8 @@ struct tegra_padctl_uphy {
 
 	struct clk *plle; /* plle in software control state */
 	struct clk *plle_pwrseq; /* plle in hardware power sequencer control */
-	struct clk *pllu; /* utmipll */
 	struct clk *usb2_trk_clk; /* utmi tracking circuit clock */
 	struct clk *hsic_trk_clk; /* hsic tracking circuit clock */
-	void __iomem *car_regs;
 
 	struct mutex lock;
 
@@ -444,7 +432,6 @@ struct tegra_padctl_uphy {
 	struct phy *hsic_phys[TEGRA_HSIC_PHYS];
 	struct phy *pcie_phys[TEGRA_PCIE_PHYS];
 	struct phy *sata_phys[TEGRA_SATA_PHYS];
-	struct phy *snps_phys[TEGRA_SNPS_PHYS];
 	struct tegra_xusb_hsic_port hsic_ports[TEGRA_HSIC_PHYS];
 	struct tegra_xusb_utmi_port utmi_ports[TEGRA_UTMI_PHYS];
 	int utmi_otg_port_base_1; /* one based utmi port number */
@@ -462,8 +449,8 @@ struct tegra_padctl_uphy {
 	struct mbox_chan *mbox_chan;
 
 	bool host_mode_phy_disabled; /* set true if mailbox is not available */
-	unsigned int utmi_enable; /* track if USB2 tracking circuits used
-				   * by XUSB and SNPS could be powered down
+	unsigned int utmi_enable; /* track if USB2 tracking circuits
+				   * could be powered down
 				   */
 	unsigned int hsic_enable; /* track if HSIC tracking circuits
 				   * could be powered down
@@ -524,37 +511,6 @@ static inline u32 padctl_readl(struct tegra_padctl_uphy *padctl,
 			       unsigned long offset)
 {
 	return readl(padctl->padctl_regs + offset);
-}
-#endif
-
-#ifdef VERBOSE_DEBUG
-#define car_writel(_padctl, _value, _offset)				\
-{									\
-	unsigned long v = _value, o = _offset;				\
-	pr_debug("%s car_writel %s(@0x%lx) with 0x%lx\n", __func__,	\
-		#_offset, o, v);					\
-	writel(v, _padctl->car_regs + o);				\
-}
-
-#define car_readl(_padctl, _offset)					\
-({									\
-	unsigned long v, o = _offset;					\
-	v = readl(_padctl->car_regs + o);				\
-	pr_debug("%s car_readl %s(@0x%lx) = 0x%lx\n", __func__,		\
-		#_offset, o, v);					\
-	v;								\
-})
-#else
-static inline void car_writel(struct tegra_padctl_uphy *padctl, u32 value,
-				 unsigned long offset)
-{
-	writel(value, padctl->car_regs + offset);
-}
-
-static inline u32 car_readl(struct tegra_padctl_uphy *padctl,
-			       unsigned long offset)
-{
-	return readl(padctl->car_regs + offset);
 }
 #endif
 
@@ -1468,16 +1424,9 @@ static int tegra21x_padctl_uphy_pinmux_set(struct pinctrl_dev *pinctrl,
 		int port = group - PIN_OTG_0;
 
 		value = padctl_readl(uphy, XUSB_PADCTL_USB2_PAD_MUX_0);
-		if (function == TEGRA21x_FUNC_SNPS) {
-			value |= USB2_OTG_PAD_PORTx_SNPS(port);
-			uphy->utmi_ports[port].used_by_xusb = false;
-			dev_info(uphy->dev, "UTMI-%d is used by SNPS\n", port);
-		} else {
-			value |= ((USB2_OTG_PAD_PORTx_XUSB(port)) |
-					USB2_BIAS_PAD_XUSB);
-			uphy->utmi_ports[port].used_by_xusb = true;
-			dev_info(uphy->dev, "UTMI-%d is used by XUSB\n", port);
-		}
+		value |= ((USB2_OTG_PAD_PORTx_XUSB(port)) |
+				USB2_BIAS_PAD_XUSB);
+		dev_info(uphy->dev, "UTMI-%d is used by XUSB\n", port);
 		padctl_writel(uphy, value, XUSB_PADCTL_USB2_PAD_MUX_0);
 	} else if (lane_is_hsic(group)) {
 		value = padctl_readl(uphy, XUSB_PADCTL_USB2_PAD_MUX_0);
@@ -1649,9 +1598,6 @@ static int tegra_padctl_uphy_pinconf_group_set(struct pinctrl_dev *pinctrl,
 				}
 			} else if (lane_is_otg(group)) {
 				int port = group - PIN_OTG_0;
-
-				if (!uphy->utmi_ports[port].used_by_xusb)
-					break;
 
 				uphy->utmi_ports[port].port_cap = value;
 				TRACE(dev, "UTMI port %d cap %lu\n",
@@ -2614,12 +2560,8 @@ static bool tegra21x_utmi_phy_xusb_partitions_powergated(void)
 static inline void tegra21x_utmi_phy_put_utmipll_iddq(
 				struct tegra_padctl_uphy *uphy, bool in_iddq)
 {
-	u32 reg;
-
 	TRACE(uphy->dev, "put UTMIPLL %s IDDQ\n",
 			in_iddq ? "in" : "out of");
-
-	reg = car_readl(uphy, CLK_RST_CONTROLLER_UTMIPLL_HW_PWRDN_CFG0);
 
 	if (in_iddq) {
 		if (!tegra21x_utmi_phy_xusb_partitions_powergated()) {
@@ -2628,44 +2570,14 @@ static inline void tegra21x_utmi_phy_put_utmipll_iddq(
 			return;
 		}
 
-		if (reg & UTMIPLL_LOCK) {
-			dev_info(uphy->dev,
-			"trying to assert IDDQ while UTMIPLL is locked\n");
-			return;
-		}
-
-		reg |= UTMIPLL_IDDQ_OVERRIDE_VALUE;
+		tegra210_put_utmipll_in_iddq();
 	} else
-		reg &= ~UTMIPLL_IDDQ_OVERRIDE_VALUE;
-
-	reg |= UTMIPLL_IDDQ_SWCTL;
-	car_writel(uphy, reg, CLK_RST_CONTROLLER_UTMIPLL_HW_PWRDN_CFG0);
+		tegra210_put_utmipll_out_iddq();
 }
 #define tegra21x_utmi_phy_put_utmipll_in_iddq(uphy)		\
 		tegra21x_utmi_phy_put_utmipll_iddq(uphy, true)
 #define tegra21x_utmi_phy_put_utmipll_out_iddq(uphy)		\
 		tegra21x_utmi_phy_put_utmipll_iddq(uphy, false)
-
-/* caller must hold uphy->lock */
-static inline void tegra21x_utmipll(struct tegra_padctl_uphy *uphy, bool enable)
-{
-	int err;
-
-	if (enable) {
-		tegra21x_utmi_phy_put_utmipll_out_iddq(uphy);
-		TRACE(uphy->dev, "enable UTMIPLL\n");
-		err = clk_prepare_enable(uphy->pllu);
-		if (err)
-			dev_err(uphy->dev,
-				"failed to enable UTMIPLL %d\n", err);
-	} else {
-		TRACE(uphy->dev, "disable UTMIPLL\n");
-		clk_disable_unprepare(uphy->pllu);
-		tegra21x_utmi_phy_put_utmipll_in_iddq(uphy);
-	}
-}
-#define tegra21x_utmipll_enable(uphy) tegra21x_utmipll(uphy, true)
-#define tegra21x_utmipll_disable(uphy) tegra21x_utmipll(uphy, false)
 
 /* caller must hold uphy->lock */
 static inline void tegra21x_usb2_trk(struct tegra_padctl_uphy *uphy, bool on)
@@ -2914,7 +2826,7 @@ static int tegra21x_utmi_phy_power_on(struct phy *phy)
 	}
 
 	uphy->utmipll_use_count++;
-	tegra21x_utmipll_enable(uphy);
+	tegra21x_utmi_phy_put_utmipll_out_iddq(uphy);
 	tegra21x_usb2_trk_on(uphy);
 
 out:
@@ -2938,7 +2850,7 @@ static int tegra21x_utmi_phy_power_off(struct phy *phy)
 	if (--uphy->utmi_enable == 0)
 		tegra21x_usb2_trk_off(uphy);
 	if (--uphy->utmipll_use_count == 0)
-		tegra21x_utmipll_disable(uphy);
+		tegra21x_utmi_phy_put_utmipll_in_iddq(uphy);
 
 	mutex_unlock(&uphy->lock);
 	return 0;
@@ -2968,73 +2880,6 @@ static inline bool is_utmi_phy(struct phy *phy)
 {
 	return phy->ops == &utmi_phy_ops;
 }
-
-static int tegra21x_snps_phy_init(struct phy *phy)
-{
-	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
-
-	TRACE(uphy->dev, "phy init SNPS\n");
-
-	return 0;
-}
-
-static int tegra21x_snps_phy_exit(struct phy *phy)
-{
-	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
-
-	TRACE(uphy->dev, "phy exit SNPS\n");
-
-	return 0;
-}
-
-static int tegra21x_snps_phy_power_on(struct phy *phy)
-{
-	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
-
-	mutex_lock(&uphy->lock);
-
-	TRACE(uphy->dev, "power on SNPS\n");
-
-	if (uphy->utmi_enable++ > 0) {
-		uphy->utmipll_use_count++;
-		goto out;
-	}
-
-	uphy->utmipll_use_count++;
-	tegra21x_utmipll_enable(uphy);
-	tegra21x_usb2_trk_on(uphy);
-
-out:
-	mutex_unlock(&uphy->lock);
-
-	return 0;
-}
-
-static int tegra21x_snps_phy_power_off(struct phy *phy)
-{
-	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
-
-	mutex_lock(&uphy->lock);
-
-	TRACE(uphy->dev, "power off SNPS\n");
-
-	if (--uphy->utmi_enable == 0)
-		tegra21x_usb2_trk_off(uphy);
-	if (--uphy->utmipll_use_count == 0)
-		tegra21x_utmipll_disable(uphy);
-
-	mutex_unlock(&uphy->lock);
-
-	return 0;
-}
-
-static const struct phy_ops snps_phy_ops = {
-	.init = tegra21x_snps_phy_init,
-	.exit = tegra21x_snps_phy_exit,
-	.power_on = tegra21x_snps_phy_power_on,
-	.power_off = tegra21x_snps_phy_power_off,
-	.owner = THIS_MODULE,
-};
 
 static int hsic_phy_to_port(struct phy *phy)
 {
@@ -3280,7 +3125,7 @@ static int tegra21x_hsic_phy_power_on(struct phy *phy)
 	}
 
 	uphy->utmipll_use_count++;
-	tegra21x_utmipll_enable(uphy);
+	tegra21x_utmi_phy_put_utmipll_out_iddq(uphy);
 	tegra21x_hsic_trk_on(uphy);
 
 out:
@@ -3315,7 +3160,7 @@ static int tegra21x_hsic_phy_power_off(struct phy *phy)
 	}
 
 	if (--uphy->utmipll_use_count == 0)
-		tegra21x_utmipll_disable(uphy);
+		tegra21x_utmi_phy_put_utmipll_in_iddq(uphy);
 
 out:
 	mutex_unlock(&uphy->lock);
@@ -3464,14 +3309,6 @@ static struct phy *tegra21x_padctl_uphy_xlate(struct device *dev,
 			phy = uphy->sata_phys[phy_index];
 			TRACE(dev, "returning sata_phys[%d]\n", phy_index);
 		}
-	} else if ((index >= TEGRA_PADCTL_UPHY_SNPS_BASE) &&
-		(index < TEGRA_PADCTL_UPHY_SNPS_BASE + 16)) {
-
-		phy_index = index - TEGRA_PADCTL_UPHY_SNPS_BASE;
-		if (phy_index < TEGRA_SNPS_PHYS) {
-			phy = uphy->snps_phys[phy_index];
-			TRACE(dev, "returning snps_phys[%d]\n", phy_index);
-		}
 	}
 
 	return (phy) ? phy : ERR_PTR(-EINVAL);
@@ -3529,10 +3366,6 @@ static const char * const tegra21x_sata_groups[] = {
 	"uphy-lane-7",
 };
 
-static const char * const tegra21x_snps_groups[] = {
-	"otg-0",
-};
-
 #define TEGRA21x_FUNCTION(_name)					\
 	{								\
 		.name = #_name,						\
@@ -3546,12 +3379,10 @@ static struct tegra_padctl_uphy_function tegra21x_functions[] = {
 	TEGRA21x_FUNCTION(pcie),
 	TEGRA21x_FUNCTION(usb3),
 	TEGRA21x_FUNCTION(sata),
-	TEGRA21x_FUNCTION(snps),
 };
 
 static const unsigned int tegra21x_otg_functions[] = {
 	TEGRA21x_FUNC_XUSB,
-	TEGRA21x_FUNC_SNPS,
 };
 
 static const unsigned int tegra21x_hsic_functions[] = {
@@ -3739,15 +3570,6 @@ static int tegra_xusb_setup_usb(struct tegra_padctl_uphy *uphy)
 		phy_set_drvdata(phy, uphy);
 	}
 
-	for (i = 0; i < TEGRA_SNPS_PHYS; i++) {
-		phy = devm_phy_create(uphy->dev, NULL, &snps_phy_ops);
-		if (IS_ERR(phy))
-			return PTR_ERR(phy);
-
-		uphy->snps_phys[i] = phy;
-		phy_set_drvdata(phy, uphy);
-	}
-
 	if (uphy->host_mode_phy_disabled)
 		goto skip_hsic; /* no mailbox support */
 
@@ -3904,13 +3726,6 @@ static int tegra21x_padctl_uphy_probe(struct platform_device *pdev)
 	dev_info(dev, "padctl mmio start %pa end %pa\n",
 		 &res->start, &res->end);
 
-	/* FIXME: should not access CAR registers here, use clk APIs instead */
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "car");
-	uphy->car_regs = devm_ioremap_resource(dev, res);
-	if (IS_ERR(uphy->car_regs))
-		return PTR_ERR(uphy->car_regs);
-	dev_info(dev, "car mmio start %pa end %pa\n", &res->start, &res->end);
-
 	/* XUSB_PADCTL_UPHY_PLL_P0_CTL_1_0 */
 	uphy->uphy_pll_regs[0]	= uphy->padctl_regs + 0x360;
 	/* XUSB_PADCTL_UPHY_MISC_PAD_P0_CTL_1_0 */
@@ -3964,12 +3779,6 @@ static int tegra21x_padctl_uphy_probe(struct platform_device *pdev)
 		dev_err(dev, "failed to get plle hw clock\n");
 		/* FIXME : cannot get pll_e_hw */
 		/* return PTR_ERR(uphy->plle_pwrseq);*/
-	}
-
-	uphy->pllu = devm_clk_get(dev, "pll_u");
-	if (IS_ERR(uphy->pllu)) {
-		dev_err(dev, "failed to get pllu clock\n");
-		return PTR_ERR(uphy->pllu);
 	}
 
 	uphy->usb2_trk_clk = devm_clk_get(dev, "usb2_trk");

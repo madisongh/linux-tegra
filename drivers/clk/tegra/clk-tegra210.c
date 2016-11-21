@@ -2760,6 +2760,32 @@ static void tegra210_utmi_param_configure(void)
 	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
 }
 
+void tegra210_put_utmipll_in_iddq(void)
+{
+	u32 reg;
+
+	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
+
+	if (reg & UTMIPLL_HW_PWRDN_CFG0_UTMIPLL_LOCK) {
+		pr_err("trying to assert IDDQ while UTMIPLL is locked\n");
+		return;
+	}
+
+	reg |= UTMIPLL_HW_PWRDN_CFG0_IDDQ_OVERRIDE;
+	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
+}
+EXPORT_SYMBOL_GPL(tegra210_put_utmipll_in_iddq);
+
+void tegra210_put_utmipll_out_iddq(void)
+{
+	u32 reg;
+
+	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
+	reg &= ~UTMIPLL_HW_PWRDN_CFG0_IDDQ_OVERRIDE;
+	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
+}
+EXPORT_SYMBOL_GPL(tegra210_put_utmipll_out_iddq);
+
 static int tegra210_enable_pllu(void)
 {
 	struct tegra_clk_pll_freq_table *fentry;
