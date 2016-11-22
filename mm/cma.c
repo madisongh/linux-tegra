@@ -1,6 +1,7 @@
 /*
  * Contiguous Memory Allocator
  *
+ * Copyright (c) 2016, NVIDIA Corporation.  All rights reserved.
  * Copyright (c) 2010-2011 by Samsung Electronics.
  * Copyright IBM Corporation, 2013
  * Copyright LG Electronics Inc., 2014
@@ -439,7 +440,8 @@ struct page *cma_alloc_at(struct cma *cma, size_t count,
 		bitmap_no = bitmap_find_next_zero_area_off(cma->bitmap,
 				bitmap_maxno, start, bitmap_count, mask,
 				offset);
-		if (bitmap_no >= bitmap_maxno || (start && start != bitmap_no)) {
+		if (bitmap_no >= bitmap_maxno ||
+			(start_pfn && start != bitmap_no)) {
 			mutex_unlock(&cma->lock);
 			break;
 		}
@@ -461,7 +463,7 @@ struct page *cma_alloc_at(struct cma *cma, size_t count,
 		}
 
 		cma_clear_bitmap(cma, pfn, count);
-		if (ret != -EBUSY || start)
+		if (ret != -EBUSY || start_pfn)
 			break;
 
 		pr_debug("%s(): memory range at %p is busy, retrying\n",
