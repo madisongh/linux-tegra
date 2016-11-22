@@ -2762,6 +2762,12 @@ static void tegra210_utmi_param_configure(void)
 
 	udelay(1);
 
+	reg = readl_relaxed(clk_base + XUSB_PLL_CFG0);
+	reg &= ~XUSB_PLL_CFG0_UTMIPLL_LOCK_DLY;
+	writel_relaxed(reg, clk_base + XUSB_PLL_CFG0);
+
+	udelay(1);
+
 	/* Enable HW control UTMIPLL */
 	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
 	reg |= UTMIPLL_HW_PWRDN_CFG0_SEQ_ENABLE;
@@ -2857,7 +2863,7 @@ static int tegra210_init_pllu(void)
 		writel_relaxed(reg, clk_base + PLLU_HW_PWRDN_CFG0);
 
 		reg = readl_relaxed(clk_base + XUSB_PLL_CFG0);
-		reg &= ~XUSB_PLL_CFG0_UTMIPLL_LOCK_DLY;
+		reg &= ~XUSB_PLL_CFG0_PLLU_LOCK_DLY_MASK;
 		writel_relaxed(reg, clk_base + XUSB_PLL_CFG0);
 		udelay(1);
 
