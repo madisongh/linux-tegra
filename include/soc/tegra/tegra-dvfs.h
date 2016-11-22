@@ -18,11 +18,13 @@
 #define _TEGRA_DVFS_H_
 
 #include <linux/platform_device.h>
+#include <soc/tegra/cvb.h>
 
 #define MAX_DVFS_FREQS		40
 #define DVFS_RAIL_STATS_TOP_BIN	100
 #define DVFS_RAIL_STATS_BIN	10000
 #define MAX_THERMAL_LIMITS	8
+#define MAX_THERMAL_RANGES	(MAX_THERMAL_LIMITS + 1)
 
 enum tegra_dvfs_core_thermal_type {
 	TEGRA_DVFS_CORE_THERMAL_FLOOR = 0,
@@ -68,11 +70,6 @@ struct rail_stats {
 	int bin_uv;
 };
 
-struct rail_alignment {
-	int offset_uv;
-	int step_uv;
-};
-
 struct dvfs_therm_limits {
 	u32 temperature;
 	u32 mv;
@@ -116,6 +113,8 @@ struct dvfs_rail {
 
 	bool is_ready;
 	bool in_band_pm;
+
+	struct thermal_cooling_device *vts_cdev;
 };
 
 enum dfll_range {
@@ -134,6 +133,7 @@ struct dvfs {
 	unsigned long freqs[MAX_DVFS_FREQS];
 	unsigned long *alt_freqs;
 	const int *millivolts;
+	const int *peak_millivolts;
 	const int *dfll_millivolts;
 	struct dvfs_rail *dvfs_rail;
 	bool auto_dvfs;
@@ -149,6 +149,55 @@ struct dvfs {
 	struct list_head node;
 	struct list_head reg_node;
 	bool use_alt_freqs;
+	bool therm_dvfs;
+
+	/* Maximum rate safe at minimum voltage across all thermal ranges */
+	unsigned long fmax_at_vmin_safe_t;
+};
+
+struct cvb_dvfs_table {
+	unsigned long freq;
+
+	/* Coeffs for voltage calculation, when dfll clock source is selected */
+	struct cvb_coefficients cvb_dfll_param;
+
+	/* Coeffs for voltage calculation, when pll clock source is selected */
+	struct cvb_coefficients cvb_pll_param;
+};
+
+struct cvb_dvfs {
+	int speedo_id;
+	int process_id;
+
+	/* tuning parameters for pll clock */
+	int pll_min_millivolts;
+
+	/* dvfs Max voltage */
+	int max_mv;
+
+	/* dvfs Max frequency */
+	unsigned long max_freq;
+	int freqs_mult;
+
+	/* scaling values for voltage calculation */
+	int speedo_scale;
+	int voltage_scale;
+	int thermal_scale;
+
+	struct cvb_dvfs_table cvb_vmin;
+
+	/* CVB table for various frequencies */
+	struct cvb_dvfs_table cvb_table[MAX_DVFS_FREQS];
+
+	/* Trips for minimal voltage settings per thermal ranges */
+	int vmin_trips_table[MAX_THERMAL_LIMITS];
+	int therm_floors_table[MAX_THERMAL_LIMITS];
+
+	/* Trips for thermal DVFS per thermal ranges */
+	int vts_trips_table[MAX_THERMAL_LIMITS];
+
+	/* Trips for clock source change per thermal ranges */
+	int clk_switch_trips[MAX_THERMAL_LIMITS];
 };
 
 static inline bool tegra_dvfs_rail_is_dfll_mode(struct dvfs_rail *rail)
@@ -208,6 +257,10 @@ int tegra_dvfs_rail_power_up(struct dvfs_rail *rail);
 unsigned long tegra_dvfs_round_rate(struct clk *c, unsigned long rate);
 int tegra_dvfs_add_alt_freqs(struct clk *c, struct dvfs *d);
 int tegra_dvfs_use_alt_freqs_on_clk(struct clk *c, bool use_alt_freq);
+int tegra_dvfs_predict_mv_at_hz_cur_tfloor(struct clk *c, unsigned long rate);
+int tegra_dvfs_init_thermal_dvfs_voltages(int *therm_voltages,
+	int *peak_voltages, int freqs_num, int ranges_num, struct dvfs *d);
+
 #else
 static inline int tegra_dvfs_dfll_mode_set(struct clk *c, unsigned long rate)
 { return -EINVAL; }
@@ -273,6 +326,12 @@ static inline int tegra_dvfs_add_alt_freqs(struct clk *c, struct dvfs *d)
 { return -EINVAL; }
 static inline int tegra_dvfs_use_alt_freqs_on_clk(struct clk *c,
 						  bool use_alt_freq)
+{ return -EINVAL; }
+static inline int tegra_dvfs_predict_mv_at_hz_cur_tfloor(struct clk *c,
+							  unsigned long rate)
+{ return -EINVAL; }
+static inline int tegra_dvfs_init_thermal_dvfs_voltages(int *therm_voltages,
+	int *peak_voltages, int freqs_num, int ranges_num, struct dvfs *d)
 { return -EINVAL; }
 #endif
 
