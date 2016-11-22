@@ -16,12 +16,11 @@
 #include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/pm_opp.h>
-
-#include "cvb.h"
+#include <soc/tegra/cvb.h>
 
 /* cvb_mv = ((c2 * speedo / s_scale + c1) * speedo / s_scale + c0) */
-static inline int get_cvb_voltage(int speedo, int s_scale,
-				  const struct cvb_coefficients *cvb)
+int tegra_get_cvb_voltage(int speedo, int s_scale,
+			  const struct cvb_coefficients *cvb)
 {
 	int mv;
 
@@ -31,8 +30,21 @@ static inline int get_cvb_voltage(int speedo, int s_scale,
 	return mv;
 }
 
-static int round_cvb_voltage(int mv, int v_scale,
-			     const struct rail_alignment *align)
+/* cvb_t_mv =
+   ((c3 * speedo / s_scale + c4 + c5 * T / t_scale) * T / t_scale) / v_scale */
+int tegra_get_cvb_t_voltage(int speedo, int s_scale, int t, int t_scale,
+			    struct cvb_coefficients *cvb)
+{
+	/* apply speedo & temperature scales: output mv = cvb_t_mv * v_scale */
+	int mv;
+	mv = DIV_ROUND_CLOSEST(cvb->c3 * speedo, s_scale) + cvb->c4 +
+		DIV_ROUND_CLOSEST(cvb->c5 * t, t_scale);
+	mv = DIV_ROUND_CLOSEST(mv * t, t_scale);
+	return mv;
+}
+
+int tegra_round_cvb_voltage(int mv, int v_scale,
+			    const struct rail_alignment *align)
 {
 	/* combined: apply voltage scale and round to cvb alignment step */
 	int uv;
@@ -49,7 +61,7 @@ enum {
 	UP
 };
 
-static int round_voltage(int mv, const struct rail_alignment *align, int up)
+int tegra_round_voltage(int mv, const struct rail_alignment *align, int up)
 {
 	if (align->step_uv) {
 		int uv;
@@ -70,17 +82,17 @@ static int build_opp_table(const struct cvb_table *d,
 	int i, ret, dfll_mv, min_mv, max_mv;
 	const struct cvb_table_freq_entry *table = NULL;
 
-	min_mv = round_voltage(d->min_millivolts, align, UP);
-	max_mv = round_voltage(d->max_millivolts, align, DOWN);
+	min_mv = tegra_round_voltage(d->min_millivolts, align, UP);
+	max_mv = tegra_round_voltage(d->max_millivolts, align, DOWN);
 
 	for (i = 0; i < MAX_DVFS_FREQS; i++) {
 		table = &d->cvb_table[i];
 		if (!table->freq || (table->freq > max_freq))
 			break;
 
-		dfll_mv = get_cvb_voltage(
+		dfll_mv = tegra_get_cvb_voltage(
 			speedo_value, d->speedo_scale, &table->coefficients);
-		dfll_mv = round_cvb_voltage(dfll_mv, d->voltage_scale, align);
+		dfll_mv = tegra_round_cvb_voltage(dfll_mv, d->voltage_scale, align);
 		dfll_mv = clamp(dfll_mv, min_mv, max_mv);
 
 		ret = dev_pm_opp_add(opp_dev, table->freq, dfll_mv * 1000);
