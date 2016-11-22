@@ -150,7 +150,7 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
 	u32 rem;
 	int ret;
 
-	dev_info(&rdev->dev, "%s() is called with %d:%d\n",
+	dev_dbg(&rdev->dev, "%s() is called with %d:%d\n",
 				__func__, min_uV, max_uV);
 
 	diff = rdev->constraints->max_uV - rdev->constraints->min_uV;
