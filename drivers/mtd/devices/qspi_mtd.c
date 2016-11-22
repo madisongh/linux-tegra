@@ -1205,12 +1205,12 @@ static int qspi_probe(struct spi_device *spi)
 		info->ss_endoffset = info->ss_soffset +
 					info->ss_size * info->n_subsectors;
 		if (info->ss_endoffset > flash->mtd.size) {
-			dev_err(&spi->dev, "%s SSErr %x %x %x %x\n", id->name,
+			dev_err(&spi->dev, "%s SSErr %x %x %x %llx\n", id->name,
 				info->n_subsectors, info->ss_soffset,
 					info->ss_size, flash->mtd.size);
 			return -EINVAL;
 		}
-		dev_info(&spi->dev, "%s SSG %x %x %x %x\n", id->name,
+		dev_info(&spi->dev, "%s SSG %x %x %x %llx\n", id->name,
 				info->n_subsectors, info->ss_soffset,
 					info->ss_size, flash->mtd.size);
 	}
