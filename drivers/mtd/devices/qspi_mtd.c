@@ -319,56 +319,6 @@ static int qspi_read_any_reg(struct qspi *flash,
 }
 
 /*
- * Enable/ Disable QPI Mode. Shall be called with
- * 1. flash->lock taken.
- * 2. WIP bit cleared
- */
-
-static int qspi_qpi_flag_set(struct qspi *flash, uint8_t is_set)
-{
-	uint8_t regval;
-	int status = PASS;
-
-	pr_debug("%s: %s %d\n", dev_name(&flash->spi->dev), __func__, is_set);
-
-	if (((flash->curr_cmd_mode == X4) && is_set) ||
-		((flash->curr_cmd_mode == X1) && !is_set)) {
-		return status;
-	}
-
-	status = qspi_read_any_reg(flash, RWAR_CR2V, &regval);
-	if (status) {
-		pr_err("error: %s CR2V read failed: bset: %d, Status: x%x\n",
-			__func__, is_set, status);
-		return status;
-	}
-	if (is_set)
-		regval |= 0x40;
-	else
-		regval &= ~0x40;
-	status = qspi_write_any_reg(flash, RWAR_CR2V, regval);
-	if (status) {
-		pr_err("error: %s CR2V write failed: bset: %d, Status: x%x\n",
-			__func__, is_set, status);
-		return status;
-	}
-
-	if (is_set)
-		flash->curr_cmd_mode = X4;
-	else
-		flash->curr_cmd_mode = X1;
-
-	status = wait_till_ready(flash, FALSE);
-	if (status) {
-		pr_err("error: %s: WIP failed: bset:%d, Status: x%x\n",
-			__func__, is_set, status);
-	}
-
-
-	return status;
-}
-
-/*
  * Enable/Disable QUAD flasg when QPI mode is disabled
  * Shall be called with...
  * 1. flash->lock taken.
@@ -376,10 +326,8 @@ static int qspi_qpi_flag_set(struct qspi *flash, uint8_t is_set)
  */
 static int qspi_quad_flag_set(struct qspi *flash, uint8_t is_set)
 {
-	uint8_t tx_buf[5], regval;
-	int status = PASS, err, tried = 0, comp = QUAD_ENABLE;
-	struct spi_transfer t[2];
-	struct spi_message m;
+	uint8_t regval;
+	int status = PASS;
 
 	pr_debug("%s: %s %d\n", dev_name(&flash->spi->dev), __func__, is_set);
 
