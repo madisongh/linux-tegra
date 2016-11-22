@@ -1068,9 +1068,17 @@ static void __pm_runtime_barrier(struct device *dev)
 		dev->power.request_pending = false;
 	}
 
-	if (dev->power.runtime_status == RPM_SUSPENDING
+	/* WAR: sometimes Kernel waits completion of runtime PM operations
+	 * indefinitely when restarting or shuting down.
+	 * It's a side effect by http://git-master/r/116092 which is for
+	 * freezing processes before restart or shutdown.
+	 * As a workaround to avoid this issue, added conditions to wait for
+	 * completion of runtime PM operations if system state is booting or
+	 * running. */
+	if ((system_state == SYSTEM_BOOTING || system_state == SYSTEM_RUNNING)
+	    && (dev->power.runtime_status == RPM_SUSPENDING
 	    || dev->power.runtime_status == RPM_RESUMING
-	    || dev->power.idle_notification) {
+	    || dev->power.idle_notification)) {
 		DEFINE_WAIT(wait);
 
 		/* Suspend, wake-up or idle notification in progress. */
