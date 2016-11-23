@@ -1989,8 +1989,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
 
 		if (!IS_ERR(mmc->supply.vqmmc)) {
-			ret = regulator_set_voltage(mmc->supply.vqmmc, 2700000,
-						    3600000);
+			ret = mmc_regulator_set_vqmmc(mmc, ios);
 			if (ret) {
 				pr_warn("%s: Switching to 3.3V signalling voltage failed\n",
 					mmc_hostname(mmc));
@@ -2011,8 +2010,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 		return -EAGAIN;
 	case MMC_SIGNAL_VOLTAGE_180:
 		if (!IS_ERR(mmc->supply.vqmmc)) {
-			ret = regulator_set_voltage(mmc->supply.vqmmc,
-					1700000, 1950000);
+			ret = mmc_regulator_set_vqmmc(mmc, ios);
 			if (ret) {
 				pr_warn("%s: Switching to 1.8V signalling voltage failed\n",
 					mmc_hostname(mmc));
@@ -2042,8 +2040,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 		return -EAGAIN;
 	case MMC_SIGNAL_VOLTAGE_120:
 		if (!IS_ERR(mmc->supply.vqmmc)) {
-			ret = regulator_set_voltage(mmc->supply.vqmmc, 1100000,
-						    1300000);
+			ret = mmc_regulator_set_vqmmc(mmc, ios);
 			if (ret) {
 				pr_warn("%s: Switching to 1.2V signalling voltage failed\n",
 					mmc_hostname(mmc));
