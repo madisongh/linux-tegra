@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -211,7 +211,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 #ifdef CONFIG_ARCH_TEGRA_HAS_SATA
 	[TEGRA_POWERGATE_SATA] = {
 		.name = "sata",
-		.disable_after_boot = true,
+		.disable_after_boot = false,
 		.clk_info = {
 			[0] = { .clk_name = "sata_oob", .clk_type = CLK_ONLY },
 			[1] = { .clk_name = "cml1", .clk_type = CLK_ONLY },
