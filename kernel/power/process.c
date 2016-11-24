@@ -25,7 +25,7 @@
  */
 unsigned int __read_mostly freeze_timeout_msecs = 20 * MSEC_PER_SEC;
 
-static int try_to_freeze_tasks(bool user_only, bool ignore_wakeup)
+static int try_to_freeze_tasks(bool user_only)
 {
 	struct task_struct *g, *p;
 	unsigned long end_time;
@@ -67,7 +67,7 @@ static int try_to_freeze_tasks(bool user_only, bool ignore_wakeup)
 		if (!todo || time_after(jiffies, end_time))
 			break;
 
-		if (!ignore_wakeup && pm_wakeup_pending()) {
+		if (pm_wakeup_pending()) {
 #ifdef CONFIG_PM_SLEEP
 			pm_get_active_wakeup_sources(suspend_abort,
 				MAX_SUSPEND_ABORT_LEN);
@@ -128,7 +128,7 @@ static int try_to_freeze_tasks(bool user_only, bool ignore_wakeup)
  *
  * On success, returns 0.  On failure, -errno and system is fully thawed.
  */
-static int __freeze_processes(bool ignore_wakeup)
+int freeze_processes(void)
 {
 	int error;
 
@@ -145,7 +145,7 @@ static int __freeze_processes(bool ignore_wakeup)
 	pm_wakeup_clear();
 	pr_info("Freezing user space processes ... ");
 	pm_freezing = true;
-	error = try_to_freeze_tasks(true, ignore_wakeup);
+	error = try_to_freeze_tasks(true);
 	if (!error) {
 		__usermodehelper_set_disable_depth(UMH_DISABLED);
 		pr_cont("done.");
@@ -166,16 +166,6 @@ static int __freeze_processes(bool ignore_wakeup)
 	return error;
 }
 
-int freeze_processes(void)
-{
-	return __freeze_processes(false);
-}
-
-int freeze_processes_ignore_wakeup(void)
-{
-	return __freeze_processes(true);
-}
-
 /**
  * freeze_kernel_threads - Make freezable kernel threads go to the refrigerator.
  *
@@ -191,7 +181,7 @@ int freeze_kernel_threads(void)
 	pr_info("Freezing remaining freezable tasks ... ");
 
 	pm_nosig_freezing = true;
-	error = try_to_freeze_tasks(false, false);
+	error = try_to_freeze_tasks(false);
 	if (!error)
 		pr_cont("done.");
 
