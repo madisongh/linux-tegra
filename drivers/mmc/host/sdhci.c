@@ -1451,6 +1451,15 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
 	}
 }
 
+static void sdhci_config_strobe(struct mmc_host *mmc, bool enable)
+{
+	struct sdhci_host *host;
+
+	host = mmc_priv(mmc);
+	if (host->ops->config_strobe)
+		host->ops->config_strobe(host, enable);
+}
+
 static void sdhci_post_init(struct mmc_host *mmc)
 {
 	struct sdhci_host *host;
@@ -2490,6 +2499,7 @@ static const struct mmc_host_ops sdhci_ops = {
 	.card_event			= sdhci_card_event,
 	.card_busy	= sdhci_card_busy,
 	.post_init	= sdhci_post_init,
+	.config_strobe	= sdhci_config_strobe,
 	.clear_cqe_intr	= sdhci_clear_cqe_interrupt,
 	.discard_cqe_task	= sdhci_cqe_task_discard_rq,
 	.enable_host_int	= sdhci_enable_host_interrupts,
