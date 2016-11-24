@@ -40,7 +40,7 @@
 #define DRIVER_NAME	"tegra-se-pka1"
 
 #define TEGRA_SE_MUTEX_WDT_UNITS	0x600000
-#define PKA1_TIMEOUT			2000	/*micro seconds*/
+#define PKA1_TIMEOUT			40000	/*micro seconds*/
 #define ECC_MAX_WORDS	20
 #define WORD_SIZE_BYTES	4
 
@@ -424,7 +424,9 @@ static void tegra_se_fill_pka1_opmem_addr(struct tegra_se_pka1_dev *se_dev,
 					 struct tegra_se_pka1_request *req)
 {
 	u32 i;
-	int len = req->size;
+	int len = 0;
+	int nwords = req->size / 4;
+	int nwords_521 = pka1_op_size[SE_PKA1_OP_MODE_ECC521] / 32;
 	u32 *MOD, *M, *R2, *EXP, *MSG;
 	u32 *A, *B, *PX, *PY, *K, *QX, *QY;
 
@@ -446,7 +448,7 @@ static void tegra_se_fill_pka1_opmem_addr(struct tegra_se_pka1_dev *se_dev,
 		EXP = req->exponent;
 		MSG = req->message;
 
-		for (i = 0; i < req->size / 4; i++) {
+		for (i = 0; i < nwords; i++) {
 			se_pka1_writel(se_dev, *EXP++, reg_bank_offset(
 				      TEGRA_SE_PKA1_RSA_EXP_BANK,
 				      TEGRA_SE_PKA1_RSA_EXP_ID,
@@ -468,24 +470,39 @@ static void tegra_se_fill_pka1_opmem_addr(struct tegra_se_pka1_dev *se_dev,
 		A = req->curve_param_a;
 
 		if (req->op_mode == SE_PKA1_OP_MODE_ECC521) {
-			for (i = 0; i < req->size / 4; i++)
+			for (i = 0; i < nwords; i++)
 				se_pka1_writel(se_dev, *MOD++,
+					      reg_bank_offset(
+						TEGRA_SE_PKA1_MOD_BANK,
+						TEGRA_SE_PKA1_MOD_ID,
+						req->op_mode) + (i * 4));
+
+			for (i = nwords; i < nwords_521; i++)
+				se_pka1_writel(se_dev, 0x0,
 					      reg_bank_offset(
 						TEGRA_SE_PKA1_MOD_BANK,
 						TEGRA_SE_PKA1_MOD_ID,
 						req->op_mode) + (i * 4));
 		}
 
-		for (i = 0; i < req->size / 4; i++)
+		for (i = 0; i < nwords; i++)
 			se_pka1_writel(se_dev, *A++, reg_bank_offset(
 					TEGRA_SE_PKA1_ECC_A_BANK,
 					TEGRA_SE_PKA1_ECC_A_ID,
 					req->op_mode) + (i * 4));
 
+		if (req->op_mode == SE_PKA1_OP_MODE_ECC521) {
+			for (i = nwords; i < nwords_521; i++)
+				se_pka1_writel(se_dev, 0x0, reg_bank_offset(
+						TEGRA_SE_PKA1_ECC_A_BANK,
+						TEGRA_SE_PKA1_ECC_A_ID,
+						req->op_mode) + (i * 4));
+		}
+
 		if (req->ecc_type != ECC_POINT_DOUBLE) {
 			PX = req->base_pt_x;
 			PY = req->base_pt_y;
-			for (i = 0; i < req->size / 4; i++) {
+			for (i = 0; i < nwords; i++) {
 				se_pka1_writel(se_dev, *PX++, reg_bank_offset(
 						TEGRA_SE_PKA1_ECC_XP_BANK,
 						TEGRA_SE_PKA1_ECC_XP_ID,
@@ -496,6 +513,20 @@ static void tegra_se_fill_pka1_opmem_addr(struct tegra_se_pka1_dev *se_dev,
 						TEGRA_SE_PKA1_ECC_YP_ID,
 						req->op_mode) + (i * 4));
 			}
+			if (req->op_mode == SE_PKA1_OP_MODE_ECC521) {
+				for (i = nwords; i < nwords_521; i++) {
+					se_pka1_writel(se_dev, 0x0,
+						       reg_bank_offset(
+						TEGRA_SE_PKA1_ECC_XP_BANK,
+						TEGRA_SE_PKA1_ECC_XP_ID,
+						req->op_mode) + (i * 4));
+					se_pka1_writel(se_dev, 0x0,
+						       reg_bank_offset(
+						TEGRA_SE_PKA1_ECC_YP_BANK,
+						TEGRA_SE_PKA1_ECC_YP_ID,
+						req->op_mode) + (i * 4));
+				}
+			}
 		}
 
 		if (req->ecc_type == ECC_POINT_VER ||
@@ -503,12 +534,22 @@ static void tegra_se_fill_pka1_opmem_addr(struct tegra_se_pka1_dev *se_dev,
 			/* For shamir trick, curve_param_b is parameter k
 			 * and k should be of size CTRL_BASE_RADIX
 			 */
-			if (req->ecc_type == ECC_SHAMIR_TRICK)
-				len = (num_words(req->op_mode)) * 4;
-
 			B = req->curve_param_b;
-			for (i = 0; i < len / 4; i++)
+			for (i = 0; i < nwords; i++)
 				se_pka1_writel(se_dev, *B++, reg_bank_offset(
+						TEGRA_SE_PKA1_ECC_B_BANK,
+						TEGRA_SE_PKA1_ECC_B_ID,
+						req->op_mode) + (i * 4));
+
+			if (req->ecc_type == ECC_SHAMIR_TRICK)
+				len = num_words(req->op_mode);
+
+			if (req->ecc_type == ECC_POINT_VER &&
+			    req->op_mode == SE_PKA1_OP_MODE_ECC521)
+				len = nwords_521;
+
+			for (i = nwords; i < len; i++)
+				se_pka1_writel(se_dev, 0x0, reg_bank_offset(
 						TEGRA_SE_PKA1_ECC_B_BANK,
 						TEGRA_SE_PKA1_ECC_B_ID,
 						req->op_mode) + (i * 4));
@@ -519,7 +560,7 @@ static void tegra_se_fill_pka1_opmem_addr(struct tegra_se_pka1_dev *se_dev,
 		    req->ecc_type == ECC_POINT_DOUBLE) {
 			QX = req->res_pt_x;
 			QY = req->res_pt_y;
-			for (i = 0; i < req->size / 4; i++) {
+			for (i = 0; i < nwords; i++) {
 				se_pka1_writel(se_dev, *QX++, reg_bank_offset(
 						TEGRA_SE_PKA1_ECC_XQ_BANK,
 						TEGRA_SE_PKA1_ECC_XQ_ID,
@@ -530,6 +571,21 @@ static void tegra_se_fill_pka1_opmem_addr(struct tegra_se_pka1_dev *se_dev,
 						TEGRA_SE_PKA1_ECC_YQ_ID,
 						req->op_mode) + (i * 4));
 			}
+			if (req->op_mode == SE_PKA1_OP_MODE_ECC521) {
+				for (i = nwords; i < nwords_521; i++) {
+					se_pka1_writel(se_dev, 0x0,
+						       reg_bank_offset(
+						TEGRA_SE_PKA1_ECC_XQ_BANK,
+						TEGRA_SE_PKA1_ECC_XQ_ID,
+						req->op_mode) + (i * 4));
+
+					se_pka1_writel(se_dev, 0x0,
+						       reg_bank_offset(
+						TEGRA_SE_PKA1_ECC_YQ_BANK,
+						TEGRA_SE_PKA1_ECC_YQ_ID,
+						req->op_mode) + (i * 4));
+				}
+			}
 		}
 
 		if (req->ecc_type == ECC_POINT_MUL ||
@@ -538,10 +594,15 @@ static void tegra_se_fill_pka1_opmem_addr(struct tegra_se_pka1_dev *se_dev,
 			 * and k for ECC_POINT_MUL and l for ECC_SHAMIR_TRICK
 			 * should be of size CTRL_BASE_RADIX
 			 */
-			len = (num_words(req->op_mode)) * 4;
 			K = req->key;
-			for (i = 0; i < len / 4; i++)
+			for (i = 0; i < nwords; i++)
 				se_pka1_writel(se_dev, *K++, reg_bank_offset(
+						TEGRA_SE_PKA1_ECC_K_BANK,
+						TEGRA_SE_PKA1_ECC_K_ID,
+						req->op_mode) + (i * 4));
+
+			for (i = nwords; i < num_words(req->op_mode); i++)
+				se_pka1_writel(se_dev, 0x0, reg_bank_offset(
 						TEGRA_SE_PKA1_ECC_K_BANK,
 						TEGRA_SE_PKA1_ECC_K_ID,
 						req->op_mode) + (i * 4));
@@ -607,7 +668,8 @@ static void tegra_se_program_pka1_regs(struct tegra_se_pka1_dev *se_dev,
 			       TEGRA_SE_PKA1_INT_ENABLE_OFFSET);
 		val =
 		TEGRA_SE_PKA1_CTRL_BASE_RADIX(pka1_ctrl_base(req->op_mode))
-			| TEGRA_SE_PKA1_CTRL_PARTIAL_RADIX(req->size / 4);
+			| TEGRA_SE_PKA1_CTRL_PARTIAL_RADIX(
+					pka1_op_size[req->op_mode] / 32);
 		val |= TEGRA_SE_PKA1_CTRL_GO(TEGRA_SE_PKA1_CTRL_GO_START);
 		se_pka1_writel(se_dev, val, TEGRA_SE_PKA1_CTRL_OFFSET);
 		break;
@@ -664,7 +726,7 @@ static void tegra_se_program_pka1_regs(struct tegra_se_pka1_dev *se_dev,
 			       TEGRA_SE_PKA1_CTRL_BASE_RADIX
 				(pka1_ctrl_base(req->op_mode)) |
 			       TEGRA_SE_PKA1_CTRL_PARTIAL_RADIX
-				(req->size / 4) |
+				(pka1_op_size[req->op_mode] / 32) |
 			       TEGRA_SE_PKA1_CTRL_GO
 				(TEGRA_SE_PKA1_CTRL_GO_START),
 			       TEGRA_SE_PKA1_CTRL_OFFSET);
