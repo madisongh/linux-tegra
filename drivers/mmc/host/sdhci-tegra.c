@@ -913,13 +913,15 @@ static void vendor_trim_clear_sel_vreg(struct sdhci_host *host, bool enable)
 	}
 }
 
-static void tegra_sdhci_en_strobe(struct sdhci_host *host)
+static void tegra_sdhci_config_strobe(struct sdhci_host *host, bool enable)
 {
 	u32 vndr_ctrl;
 
 	vndr_ctrl = sdhci_readl(host, SDHCI_VNDR_SYS_SW_CTRL);
-	vndr_ctrl |= (1 <<
-		SDHCI_VNDR_SYS_SW_CTRL_STROBE_SHIFT);
+	if (enable)
+		vndr_ctrl |= (1 << SDHCI_VNDR_SYS_SW_CTRL_STROBE_SHIFT);
+	else
+		vndr_ctrl &= ~(1 << SDHCI_VNDR_SYS_SW_CTRL_STROBE_SHIFT);
 	sdhci_writel(host, vndr_ctrl, SDHCI_VNDR_SYS_SW_CTRL);
 }
 
@@ -937,7 +939,7 @@ static void tegra_sdhci_post_init(struct sdhci_host *sdhci)
 	if ((sdhci->mmc->card->ext_csd.strobe_support) &&
 			(sdhci->mmc->caps2 & MMC_CAP2_EN_STROBE) &&
 			tegra_host->plat->en_strobe)
-		tegra_sdhci_en_strobe(sdhci);
+		tegra_sdhci_config_strobe(sdhci, true);
 
 	dll_cfg = sdhci_readl(sdhci, SDHCI_VNDR_DLLCAL_CFG);
 	dll_cfg |= SDHCI_VNDR_DLLCAL_CFG_EN_CALIBRATE;
@@ -1521,6 +1523,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.pre_regulator_config	= tegra_sdhci_pre_regulator_config,
 	.enable_dma		= tegra_sdhci_enable_dma,
 	.do_calibration	= tegra_sdhci_do_calibration,
+	.config_strobe	= tegra_sdhci_config_strobe,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
