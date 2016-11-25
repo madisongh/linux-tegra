@@ -421,6 +421,8 @@ static const char * const source_pll_states[] = {
 
 struct padctl_context {
 	u32 vbus_id;
+	u32 usb2_pad_mux;
+	u32 usb2_port_cap;
 };
 
 struct tegra_padctl_uphy {
@@ -3890,14 +3892,22 @@ static int tegra21x_uphy_pll_deinit(struct tegra_padctl_uphy *uphy)
 
 static void tegra21x_padctl_save(struct tegra_padctl_uphy *uphy)
 {
-	uphy->padctl_context.vbus_id = padctl_readl(uphy,
-						XUSB_PADCTL_USB2_VBUS_ID);
+	uphy->padctl_context.vbus_id =
+					padctl_readl(uphy, XUSB_PADCTL_USB2_VBUS_ID);
+	uphy->padctl_context.usb2_pad_mux =
+					padctl_readl(uphy, XUSB_PADCTL_USB2_PAD_MUX_0);
+	uphy->padctl_context.usb2_port_cap =
+					padctl_readl(uphy, XUSB_PADCTL_USB2_PORT_CAP_0);
 }
 
 static void tegra21x_padctl_restore(struct tegra_padctl_uphy *uphy)
 {
 	padctl_writel(uphy, uphy->padctl_context.vbus_id,
 						XUSB_PADCTL_USB2_VBUS_ID);
+	padctl_writel(uphy, uphy->padctl_context.usb2_pad_mux,
+						XUSB_PADCTL_USB2_PAD_MUX_0);
+	padctl_writel(uphy, uphy->padctl_context.usb2_port_cap,
+						XUSB_PADCTL_USB2_PORT_CAP_0);
 }
 
 static int tegra21x_padctl_uphy_suspend(struct device *dev)
