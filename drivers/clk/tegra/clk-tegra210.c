@@ -2900,6 +2900,9 @@ static u32 mux_vi_visensor_pd2vi_idx[] = {  [0] = 0, [1] = 1, [2] = 3 };
 static const char *mux_sor1[] = { "pll_p", "pll_d_out0", "pll_d2_out0", "clk_m" };
 static u32 mux_sor1_idx[] = { [0] = 0, [1] = 2, [2] = 5, [3] = 6 };
 
+static struct tegra_clk_periph tegra_sor0 =
+	TEGRA_CLK_PERIPH(14, 1, 0, 0, 0, 0, 0, 181, 0, NULL, NULL);
+
 static struct tegra_clk_periph tegra_sor1 =
 	TEGRA_CLK_PERIPH(14, 3, 0, 0, 0, 0, 0, 183, 0, NULL, &sor1_lock);
 
@@ -2924,9 +2927,9 @@ static __init void tegra210_periph_clk_init(void __iomem *clk_base,
 					      1, 17, 222);
 	clks[TEGRA210_CLK_SOR_SAFE] = clk;
 
-	clk = clk_register_mux(NULL, "sor0", mux_sorsafe_plldp,
-			       ARRAY_SIZE(mux_sorsafe_plldp), 0,
-			       clk_base + CLK_SOURCE_SOR0, 14, 1, 0, NULL);
+	clk = tegra_clk_register_periph_nodiv("sor0", mux_sorsafe_plldp,
+			       ARRAY_SIZE(mux_sorsafe_plldp), &tegra_sor0,
+			       clk_base, CLK_SOURCE_SOR0);
 
 	clks[TEGRA210_CLK_SOR0] = clk;
 
