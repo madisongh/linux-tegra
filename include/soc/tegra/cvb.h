@@ -85,6 +85,7 @@ struct thermal_table {
 	unsigned int thermal_cap_table_size;
 };
 
+#if defined(CONFIG_TEGRA_DVFS)
 const struct cvb_table *tegra_cvb_build_opp_table(
 		const struct cvb_table *cvb_tables,
 		size_t sz,
@@ -94,6 +95,20 @@ const struct cvb_table *tegra_cvb_build_opp_table(
 		int speedo_value,
 		unsigned long max_rate,
 		struct device *opp_dev);
+#else
+static inline const struct cvb_table *tegra_cvb_build_opp_table(
+		const struct cvb_table *cvb_tables,
+		size_t sz,
+		const struct rail_alignment *align,
+		int process_id,
+		int speedo_id,
+		int speedo_value,
+		unsigned long max_rate,
+		struct device *opp_dev)
+{
+	return ERR_PTR(-ENODEV);
+}
+#endif
 
 int tegra_get_cvb_voltage(int speedo, int s_scale,
 			  const struct cvb_coefficients *cvb);
