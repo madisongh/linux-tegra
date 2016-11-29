@@ -682,6 +682,10 @@ static void dfll_init_out_if(struct tegra_dfll *td)
 		td->lut_max = td->lut[td->lut_size - 1];
 		td->lut_safe = td->lut_min + 1;
 
+		/* clear DFLL_OUTPUT_CFG before setting new value */
+		dfll_writel(td, 0, DFLL_OUTPUT_CFG);
+		dfll_wmb(td);
+
 		val = dfll_readl(td, DFLL_OUTPUT_CFG);
 		val |= (td->lut_safe << DFLL_OUTPUT_CFG_SAFE_SHIFT) |
 		       (td->lut_max << DFLL_OUTPUT_CFG_MAX_SHIFT) |
