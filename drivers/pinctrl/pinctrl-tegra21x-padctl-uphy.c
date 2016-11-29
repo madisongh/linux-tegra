@@ -4600,17 +4600,6 @@ bool tegra_phy_xusb_utmi_pad_dcd(struct phy *phy)
 }
 EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_dcd);
 
-bool tegra_phy_get_lane_rdet(struct phy *phy, u8 lane_num)
-{
-	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
-	u32 data;
-
-	data = uphy_lane_readl(uphy, lane_num, UPHY_MISC_PAD_CTL_1);
-	data = data & AUX_TX_RDET_STATUS;
-	return !(!data);
-}
-EXPORT_SYMBOL_GPL(tegra_phy_get_lane_rdet);
-
 int tegra_phy_xusb_enable_sleepwalk(struct phy *phy,
 				    enum usb_device_speed speed)
 {

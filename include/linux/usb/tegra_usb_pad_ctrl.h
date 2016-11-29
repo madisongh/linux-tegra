@@ -655,9 +655,6 @@ int utmi_phy_pad_enable(struct tegra_prod *prod_list);
 #endif
 int usb3_phy_pad_enable(u32 lane_owner);
 int pcie_phy_pad_enable(bool enable, int lane_owner);
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-bool tegra_phy_get_lane_rdet(u8 lane_num);
-#endif
 
 int utmi_phy_iddq_override(bool set);
 void tegra_usb_pad_reg_update(u32 reg_offset, u32 mask, u32 val);
