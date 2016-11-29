@@ -27,6 +27,8 @@
 
 #include <linux/platform/tegra/cpu-tegra.h>
 
+#include <soc/tegra/tegra-dvfs.h>
+
 /* cpufreq transisition latency */
 #define TEGRA_CPUFREQ_TRANSITION_LATENCY (300 * 1000)
 #define IN_HZ(x) (x * 1000)
@@ -157,6 +159,8 @@ static int enable_cpu_clk(void)
 		clk_put(cpu_g);
 		return 0;
 	}
+
+	tegra_dvfs_set_dfll_range(cpu_g, DFLL_RANGE_ALL_RATES);
 
 set_rate_fail:
 	clk_put(cpu_g);

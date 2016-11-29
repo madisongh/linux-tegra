@@ -1147,8 +1147,6 @@ static int dfll_register_clk(struct tegra_dfll *td)
 		return -EINVAL;
 	}
 
-	tegra_dvfs_set_dfll_range(td->dfll_clk, DFLL_RANGE_ALL_RATES);
-
 	ret = of_clk_add_provider(td->dev->of_node, of_clk_src_simple_get,
 				  td->dfll_clk);
 	if (ret) {
