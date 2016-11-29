@@ -582,7 +582,7 @@ static int __init tegra_register_debugfs(void)
 		d = __clk_debugfs_add_file(clk, "clk_update_parent", 0200, clk,
 				   &parent_fops);
 		if (!d)
-			pr_err("debugfs clk_update_state failed %s\n", name);
+			pr_err("debugfs clk_update_parent failed %s\n", name);
 	}
 
 	return 0;
