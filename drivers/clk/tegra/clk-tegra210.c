@@ -2240,7 +2240,6 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_pll_c2] = { .dt_id = TEGRA210_CLK_PLL_C2, .present = true },
 	[tegra_clk_pll_c3] = { .dt_id = TEGRA210_CLK_PLL_C3, .present = true },
 	[tegra_clk_pll_m] = { .dt_id = TEGRA210_CLK_PLL_M, .present = true },
-	[tegra_clk_pll_m_out1] = { .dt_id = TEGRA210_CLK_PLL_M_OUT1, .present = true },
 	[tegra_clk_pll_p] = { .dt_id = TEGRA210_CLK_PLL_P, .present = true },
 	[tegra_clk_pll_p_out1] = { .dt_id = TEGRA210_CLK_PLL_P_OUT1, .present = true },
 	[tegra_clk_pll_p_out3] = { .dt_id = TEGRA210_CLK_PLL_P_OUT3, .present = true },
@@ -2486,7 +2485,6 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "pll_p_out3", .dt_id = TEGRA210_CLK_PLL_P_OUT3 },
 	{ .con_id = "pll_p_out4", .dt_id = TEGRA210_CLK_PLL_P_OUT4 },
 	{ .con_id = "pll_m", .dt_id = TEGRA210_CLK_PLL_M },
-	{ .con_id = "pll_m_out1", .dt_id = TEGRA210_CLK_PLL_M_OUT1 },
 	{ .con_id = "pll_x", .dt_id = TEGRA210_CLK_PLL_X },
 	{ .con_id = "pll_x_out0", .dt_id = TEGRA210_CLK_PLL_X_OUT0 },
 	{ .con_id = "pll_u", .dt_id = TEGRA210_CLK_PLL_U },
@@ -2996,9 +2994,6 @@ static void __init tegra210_pll_init(void __iomem *clk_base,
 	clk_register_clkdev(clk, "pll_mb", NULL);
 	clks[TEGRA210_CLK_PLL_MB] = clk;
 
-	clk_register_clkdev(clk, "pll_m_out1", NULL);
-	clks[TEGRA210_CLK_PLL_M_OUT1] = clk;
-
 	/* PLLM_UD */
 	clk = clk_register_fixed_factor(NULL, "pll_m_ud", "pll_m",
 					CLK_SET_RATE_PARENT, 1, 1);
@@ -3437,7 +3432,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
 static unsigned long pll_c_rate, pll_c2_rate, pll_c3_rate, pll_x_rate;
 static unsigned long pll_c4_rate, pll_d2_rate, pll_dp_rate;
 static unsigned long pll_re_vco_rate, pll_d_rate, pll_a_rate;
-static unsigned long pll_m_out1_rate, pll_c_out1_rate;
+static unsigned long pll_c_out1_rate;
 static unsigned long pll_a_out0_rate, pll_c4_out3_rate;
 static unsigned long pll_p_out_rate[5];
 static unsigned long pll_p_rate;
@@ -3556,7 +3551,6 @@ static int tegra210_clk_suspend(void)
 	pll_c3_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C3]);
 	pll_c_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C]);
 	pll_c_out1_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C_OUT1]);
-	pll_m_out1_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_M_OUT1]);
 	pll_x_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_X]);
 	pll_c4_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C4]);
 	pll_c4_out3_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C4_OUT3]);
