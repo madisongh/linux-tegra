@@ -2542,6 +2542,7 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "nvdec", .dt_id = TEGRA210_CLK_NVDEC },
 	{ .con_id = "vi", .dt_id = TEGRA210_CLK_VI },
 	{ .con_id = "isp", .dt_id = TEGRA210_CLK_ISP },
+	{ .con_id = "ispb", .dt_id = TEGRA210_CLK_ISPB },
 	{ .con_id = "ape", .dt_id = TEGRA210_CLK_APE },
 	{ .con_id = "host1x", .dt_id = TEGRA210_CLK_HOST1X },
 	{ .con_id = "tsec", .dt_id = TEGRA210_CLK_TSEC },
@@ -3424,6 +3425,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
 	{ TEGRA210_CLK_MC_CDPA, TEGRA210_CLK_CLK_MAX, 0, 1},
 	{ TEGRA210_CLK_SDMMC1, TEGRA210_CLK_PLL_P, 204000000, 0},
 	{ TEGRA210_CLK_SDMMC2, TEGRA210_CLK_PLL_P, 204000000, 0},
+	{ TEGRA210_CLK_PLL_C, TEGRA210_CLK_CLK_MAX, 800000000, 0},
 	/* This MUST be the last entry. */
 	{ TEGRA210_CLK_CLK_MAX, TEGRA210_CLK_CLK_MAX, 0, 0 },
 };
