@@ -3,7 +3,7 @@
  *
  * Tegra pulse-width-modulation controller driver
  *
- * Copyright (c) 2010-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010, NVIDIA Corporation.
  * Based on arch/arm/plat-mxc/pwm.c by Sascha Hauer <s.hauer@pengutronix.de>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -39,19 +39,20 @@
 #define PWM_SCALE_WIDTH	13
 #define PWM_SCALE_SHIFT	0
 
-struct tegra_pwm_chipdata {
-	int num_pwm;
+struct tegra_pwm_soc {
+	unsigned int num_channels;
 };
 
 struct tegra_pwm_chip {
-	struct pwm_chip		chip;
-	struct device		*dev;
+	struct pwm_chip chip;
+	struct device *dev;
 
-	struct clk		*clk;
-	struct reset_control	*rstc;
+	struct clk *clk;
+	struct reset_control*rst;
 
-	void __iomem		*mmio_base;
-	const struct tegra_pwm_chipdata	*chip_data;
+	void __iomem *regs;
+
+	const struct tegra_pwm_soc *soc;
 	bool			pretty_good_algo;
 	int			num_user;
 	struct pinctrl		*pinctrl;
@@ -66,13 +67,13 @@ static inline struct tegra_pwm_chip *to_tegra_pwm_chip(struct pwm_chip *chip)
 
 static inline u32 pwm_readl(struct tegra_pwm_chip *chip, unsigned int num)
 {
-	return readl(chip->mmio_base + (num << 4));
+	return readl(chip->regs + (num << 4));
 }
 
 static inline void pwm_writel(struct tegra_pwm_chip *chip, unsigned int num,
 			     unsigned long val)
 {
-	writel(val, chip->mmio_base + (num << 4));
+	writel(val, chip->regs + (num << 4));
 }
 
 static long tegra_get_optimal_rate(struct tegra_pwm_chip *pc,
@@ -184,6 +185,7 @@ timing_done:
 		val |= PWM_ENABLE;
 
 	pwm_writel(pc, pwm->hwpwm, val);
+
 	/*
 	 * If the PWM is not enabled, turn the clock off again to save power.
 	 */
@@ -232,56 +234,51 @@ static const struct pwm_ops tegra_pwm_ops = {
 static int tegra_pwm_probe(struct platform_device *pdev)
 {
 	struct tegra_pwm_chip *pwm;
-	const struct tegra_pwm_chipdata *cdata = NULL;
 	struct resource *r;
 	int ret;
-
-	cdata = of_device_get_match_data(&pdev->dev);
-	if (!cdata) {
-		dev_err(&pdev->dev, "Chip data not found\n");
-		return -ENODEV;
-	}
 
 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
 	if (!pwm)
 		return -ENOMEM;
 
+	pwm->soc = of_device_get_match_data(&pdev->dev);
 	pwm->dev = &pdev->dev;
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
-	if (IS_ERR(pwm->mmio_base))
-		return PTR_ERR(pwm->mmio_base);
+	pwm->regs = devm_ioremap_resource(&pdev->dev, r);
+	if (IS_ERR(pwm->regs))
+		return PTR_ERR(pwm->regs);
 
 	platform_set_drvdata(pdev, pwm);
 
-	pwm->clk = devm_clk_get(&pdev->dev, "pwm");
 	if (pdev->dev.of_node)
 		pwm->pretty_good_algo = of_property_read_bool(pdev->dev.of_node,
 						"pwm,use-pretty-good-alogorithm");
 
+	pwm->clk = devm_clk_get(&pdev->dev, "pwm");
 	if (IS_ERR(pwm->clk)) {
 		dev_err(&pdev->dev, "PWM clock get failed\n");
 		return PTR_ERR(pwm->clk);
 	}
 
-	pwm->rstc = devm_reset_control_get(&pdev->dev, "pwm");
-	if (IS_ERR(pwm->rstc)) {
-		ret = PTR_ERR(pwm->rstc);
+	pwm->rst = devm_reset_control_get(&pdev->dev, "pwm");
+	if (IS_ERR(pwm->rst)) {
+		ret = PTR_ERR(pwm->rst);
 		dev_err(&pdev->dev, "Reset control is not found: %d\n", ret);
 		return ret;
 	}
-	reset_control_reset(pwm->rstc);
 
-	pwm->chip_data = cdata;
+	reset_control_deassert(pwm->rst);
+
 	pwm->chip.dev = &pdev->dev;
 	pwm->chip.ops = &tegra_pwm_ops;
 	pwm->chip.base = -1;
-	pwm->chip.npwm = pwm->chip_data->num_pwm;
+	pwm->chip.npwm = pwm->soc->num_channels;
 
 	ret = pwmchip_add(&pwm->chip);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
+		reset_control_assert(pwm->rst);
 		return ret;
 	}
 
@@ -304,18 +301,24 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 			dev_info(&pdev->dev,
 				"Pinconfig found for suspend/resume\n");
 	}
+
 	return 0;
 }
 
 static int tegra_pwm_remove(struct platform_device *pdev)
 {
 	struct tegra_pwm_chip *pc = platform_get_drvdata(pdev);
-	int i;
+	unsigned int i;
+	int err;
 
 	if (WARN_ON(!pc))
 		return -ENODEV;
 
-	for (i = 0; i < pc->chip_data->num_pwm; i++) {
+	err = clk_prepare_enable(pc->clk);
+	if (err < 0)
+		return err;
+
+	for (i = 0; i < pc->chip.npwm; i++) {
 		struct pwm_device *pwm = &pc->chip.pwms[i];
 
 		if (!pwm_is_enabled(pwm))
@@ -327,15 +330,18 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 		clk_disable_unprepare(pc->clk);
 	}
 
+	reset_control_assert(pc->rst);
+	clk_disable_unprepare(pc->clk);
+
 	return pwmchip_remove(&pc->chip);
 }
 
-static const struct tegra_pwm_chipdata tegra20_pwm_cdata = {
-	.num_pwm = 4,
+static const struct tegra_pwm_soc tegra20_pwm_soc = {
+	.num_channels = 4,
 };
 
-static const struct tegra_pwm_chipdata tegra186_pwm_cdata = {
-	.num_pwm = 1,
+static const struct tegra_pwm_soc tegra186_pwm_soc = {
+	.num_channels = 1,
 };
 
 #ifdef CONFIG_PM_SLEEP
@@ -377,9 +383,9 @@ static const struct dev_pm_ops tegra_pwm_pm_ops = {
 };
 
 static const struct of_device_id tegra_pwm_of_match[] = {
-	{ .compatible = "nvidia,tegra20-pwm", .data = &tegra20_pwm_cdata },
-	{ .compatible = "nvidia,tegra30-pwm", .data = &tegra20_pwm_cdata },
-	{ .compatible = "nvidia,tegra186-pwm", .data = &tegra186_pwm_cdata, },
+	{ .compatible = "nvidia,tegra20-pwm", .data = &tegra20_pwm_soc },
+	{ .compatible = "nvidia,tegra30-pwm", .data = &tegra20_pwm_soc },
+	{ .compatible = "nvidia,tegra186-pwm", .data = &tegra186_pwm_soc },
 	{ }
 };
 
