@@ -200,7 +200,7 @@ static void __init init_cpu_capacity(void)
 		}
 
 		if (of_property_read_u32(cn, "cpu-ipc", &val)) {
-			pr_err("%s: Missing cpu-ipc property\n",
+			pr_info("%s: Missing cpu-ipc property\n",
 				cn->full_name);
 			continue;
 		}
