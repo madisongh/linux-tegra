@@ -587,21 +587,12 @@ static int max77620_pinctrl_probe(struct platform_device *pdev)
 		mpci->fps_config[i].suspend_power_down_slots = -1;
 	}
 
-	mpci->pctl = pinctrl_register(&max77620_pinctrl_desc,
-					&pdev->dev, mpci);
+	mpci->pctl = devm_pinctrl_register(&pdev->dev, &max77620_pinctrl_desc,
+				mpci);
 	if (IS_ERR(mpci->pctl)) {
 		dev_err(&pdev->dev, "Couldn't register pinctrl driver\n");
 		return PTR_ERR(mpci->pctl);
 	}
-
-	return 0;
-}
-
-static int max77620_pinctrl_remove(struct platform_device *pdev)
-{
-	struct max77620_pctrl_info *mpci = platform_get_drvdata(pdev);
-
-	pinctrl_unregister(mpci->pctl);
 
 	return 0;
 }
@@ -670,7 +661,6 @@ static struct platform_driver max77620_pinctrl_driver = {
 		.pm = &max77620_pinctrl_pm_ops,
 	},
 	.probe = max77620_pinctrl_probe,
-	.remove = max77620_pinctrl_remove,
 	.id_table = max77620_pinctrl_devtype,
 };
 
