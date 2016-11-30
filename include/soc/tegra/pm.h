@@ -21,8 +21,8 @@ enum tegra_suspend_mode {
 int tegra210_cpu_pm_enter(void *idle_idx);
 int tegra210_cpu_pm_exit(void *idle_idx);
 #else
-int tegra210_cpu_pm_enter(void *idle_idx) { return -1; }
-int tegra210_cpu_pm_exit(void *idle_idx) { return -1; }
+static inline int tegra210_cpu_pm_enter(void *idle_idx) { return -1; }
+static inline int tegra210_cpu_pm_exit(void *idle_idx) { return -1; }
 #endif
 
 #if defined(CONFIG_PM_SLEEP) && defined(CONFIG_ARM)
