@@ -2359,12 +2359,12 @@ static int bq2419x_resume(struct device *dev)
 		return IRQ_HANDLED;
 	}
 	if ((val & BQ2419x_VBUS_PG_STAT) == BQ2419x_PG_VBUS_USB) {
-		extcon_set_cable_state(&bq2419x->edev,
+		extcon_set_cable_state_(&bq2419x->edev,
 						bq2419x_extcon_cable[0], true);
 		if (!bq2419x->cable_connected)
 			dev_info(bq2419x->dev, "USB is connected\n");
 	} else if ((val & BQ2419x_VBUS_PG_STAT) == BQ2419x_VBUS_UNKNOWN) {
-		extcon_set_cable_state(&bq2419x->edev,
+		extcon_set_cable_state_(&bq2419x->edev,
 						bq2419x_extcon_cable[0], false);
 		if (bq2419x->cable_connected)
 			dev_info(bq2419x->dev, "USB is disconnected\n");
