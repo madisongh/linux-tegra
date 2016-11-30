@@ -1661,15 +1661,26 @@ static int atvr_raw_event(struct hid_device *hdev, struct hid_report *report,
 			report->id == SENSOR_REPORT_ID_SYN ||
 			report->id == SENSOR_REPORT_ID_COMBINED) &&
 			shdr_dev->snsr_fns && shdr_dev->snsr_fns->recv) {
-		shdr_dev->snsr_fns->recv(shdr_dev->st, data, size);
-		/* TODO: ret check */
-		if (report->id == SENSOR_REPORT_ID_COMBINED)
-			hid_report_raw_event(hdev, 0, data,
+		/* Handle button data first */
+		if (report->id == SENSOR_REPORT_ID_COMBINED) {
+			/*
+			 * hid_report_raw_event expects the input size to be
+			 * at least TS_HOSTCMD_REPORT_SIZE for button data.
+			 */
+			u8 button_data[TS_HOSTCMD_REPORT_SIZE] = { 0 };
+			/* Button data is only TS_BUTTON_REPORT_SIZE long */
+			memcpy(button_data, data, TS_BUTTON_REPORT_SIZE);
+			button_data[0] = JAR_BUTTON_REPORT_ID;
+			hid_report_raw_event(hdev, 0, button_data,
 					     TS_BUTTON_REPORT_SIZE, 0);
+		}
+		/* Handle Sensor data here */
+		shdr_dev->snsr_fns->recv(shdr_dev->st, data, size);
+		/* TODO : ret check */
+
 		/* we've handled the event */
 		return 1;
 	}
-	/* let the event through for regular input processing */
 	return 0;
 }
 
