@@ -33,6 +33,20 @@ struct max77620_therm_info {
 	int				irq_tjalarm2;
 };
 
+/**
+ * max77620_thermal_read_temp: Read PMIC die temperatue.
+ * @data:	Device specific data.
+ * temp:	Temperature in millidegrees Celsius
+ *
+ * The actual temperature of PMIC die is not available from PMIC.
+ * PMIC only tells the status if it has crossed or not the threshold level
+ * of 120degC or 140degC.
+ * If threshold has not been crossed then assume die temperature as 100degC
+ * else 120degC or 140deG based on the PMIC die temp threshold status.
+ *
+ * Return 0 on success otherwise error number to show reason of failure.
+ */
+
 static int max77620_thermal_read_temp(void *data, int *temp)
 {
 	struct max77620_therm_info *mtherm = data;
@@ -41,8 +55,8 @@ static int max77620_thermal_read_temp(void *data, int *temp)
 
 	ret = regmap_read(mtherm->rmap, MAX77620_REG_STATLBT, &val);
 	if (ret < 0) {
-		dev_err(mtherm->dev, "Failed to read STATLBT, %d\n", ret);
-		return -EINVAL;
+		dev_err(mtherm->dev, "Failed to read STATLBT: %d\n", ret);
+		return ret;
 	}
 
 	if (val & MAX77620_IRQ_TJALRM2_MASK)
@@ -51,6 +65,7 @@ static int max77620_thermal_read_temp(void *data, int *temp)
 		*temp = MAX77620_TJALARM1_TEMP;
 	else
 		*temp = MAX77620_NORMAL_OPERATING_TEMP;
+
 	return 0;
 }
 
@@ -77,7 +92,6 @@ static int max77620_thermal_probe(struct platform_device *pdev)
 	struct max77620_therm_info *mtherm;
 	int ret;
 
-
 	mtherm = devm_kzalloc(&pdev->dev, sizeof(*mtherm), GFP_KERNEL);
 	if (!mtherm)
 		return -ENOMEM;
@@ -88,6 +102,7 @@ static int max77620_thermal_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Alarm irq number not available\n");
 		return -EINVAL;
 	}
+
 	pdev->dev.of_node = pdev->dev.parent->of_node;
 
 	mtherm->dev = &pdev->dev;
@@ -101,7 +116,7 @@ static int max77620_thermal_probe(struct platform_device *pdev)
 				mtherm, &max77620_thermal_ops);
 	if (IS_ERR(mtherm->tz_device)) {
 		ret = PTR_ERR(mtherm->tz_device);
-		dev_err(&pdev->dev, "Failed to register thermal zone, %d\n",
+		dev_err(&pdev->dev, "Failed to register thermal zone: %d\n",
 			ret);
 		return ret;
 	}
@@ -111,7 +126,7 @@ static int max77620_thermal_probe(struct platform_device *pdev)
 					IRQF_ONESHOT | IRQF_SHARED,
 					dev_name(&pdev->dev), mtherm);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Failed to request irq1, %d\n", ret);
+		dev_err(&pdev->dev, "Failed to request irq1: %d\n", ret);
 		return ret;
 	}
 
@@ -120,7 +135,7 @@ static int max77620_thermal_probe(struct platform_device *pdev)
 					IRQF_ONESHOT | IRQF_SHARED,
 					dev_name(&pdev->dev), mtherm);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Failed to request irq2, %d\n", ret);
+		dev_err(&pdev->dev, "Failed to request irq2: %d\n", ret);
 		return ret;
 	}
 
