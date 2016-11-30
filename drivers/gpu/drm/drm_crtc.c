@@ -2956,8 +2956,8 @@ static struct drm_property_blob *drm_property_create_blob(struct drm_device *dev
 	struct drm_property_blob *blob;
 	int ret;
 
-	if (!length || !data)
-		return NULL;
+	if (!length || !data || length > ULONG_MAX - sizeof(struct drm_property_blob))
+		return ERR_PTR(-EINVAL);
 
 	blob = kzalloc(sizeof(struct drm_property_blob)+length, GFP_KERNEL);
 	if (!blob)
