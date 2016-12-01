@@ -1,7 +1,7 @@
 /*
  * mods_internal.h - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -458,6 +458,7 @@ int esc_mods_pci_unmap_resource(struct file *,
 				struct MODS_PCI_UNMAP_RESOURCE  *);
 #endif
 /* irq */
+int esc_mods_map_irq(struct file *pfile, struct MODS_DT_INFO *p);
 int esc_mods_register_irq(struct file *, struct MODS_REGISTER_IRQ *);
 int esc_mods_register_irq_2(struct file *,
 			    struct MODS_REGISTER_IRQ_2 *);

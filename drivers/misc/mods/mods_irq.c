@@ -1,7 +1,7 @@
 /*
  * mods_irq.c - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -23,6 +23,11 @@
 #include <linux/poll.h>
 #include <linux/interrupt.h>
 #include <linux/pci_regs.h>
+#include <linux/of.h>
+#include <linux/of_irq.h>
+#include <linux/io.h>
+#include <linux/platform_device.h>
+#include <linux/of_device.h>
 
 #define PCI_VENDOR_ID_NVIDIA 0x10de
 #define INDEX_IRQSTAT(irq)	(irq / BITS_NUM)
@@ -34,6 +39,9 @@
 #define IS_64BIT_ADDRESS(control)	(!!(control & PCI_MSI_FLAGS_64BIT))
 #define MSI_DATA_REG(base, is64bit) \
 	((is64bit == 1) ? base + PCI_MSI_DATA_64 : base + PCI_MSI_DATA_32)
+#define TOP_TKE_TKEIE_WDT_MASK(i)	(1 << (16 + 4 * (i)))
+#define TOP_TKE_TKEIE(i)		(0x100 + 4 * (i))
+
 
 struct nv_device {
 	char		  name[20];
@@ -853,7 +861,6 @@ static int mods_unregister_cpu_irq(struct file *pfile,
  * ESCAPE CALL FUNCTIONS *
  *************************/
 
-
 int esc_mods_register_irq_3(struct file *pfile,
 			    struct MODS_REGISTER_IRQ_3 *p)
 {
@@ -1271,4 +1278,52 @@ int esc_mods_irq_handled(struct file *pfile,
 	register_irq.type		= p->type;
 
 	return esc_mods_irq_handled_2(pfile, &register_irq);
+}
+
+int esc_mods_map_irq(struct file *pfile,
+					 struct MODS_DT_INFO *p)
+{
+	int ret;
+	/* the physical irq */
+	int hwirq;
+	/* irq parameters */
+	struct of_phandle_args oirq;
+	/* Search for the node by device tree name */
+	struct device_node *np = of_find_node_by_name(NULL, p->dt_name);
+
+	/* Can be multiple nodes that share the same dt name, */
+	/* make sure you get the correct node matched by the device's full */
+	/* name in device tree (i.e. watchdog@30c0000 as opposed */
+	/* to watchdog) */
+	while (of_node_cmp(np->full_name, p->full_name) != 0)
+		np = of_find_node_by_name(np, p->dt_name);
+
+	p->irq = irq_of_parse_and_map(np, p->index);
+	ret = of_irq_parse_one(np, p->index, &oirq);
+	if (ret) {
+		mods_error_printk("Could not parse IRQ\n");
+		return -EINVAL;
+	}
+
+	hwirq = oirq.args[1];
+	/* Get the platform device handle */
+	struct platform_device *pdev = of_find_device_by_node(np);
+
+	if (of_node_cmp(p->dt_name, "watchdog") == 0) {
+		/* Enable and unmask interrupt for watchdog */
+		struct resource *res_src = platform_get_resource(pdev,
+		IORESOURCE_MEM, 0);
+		struct resource *res_tke = platform_get_resource(pdev,
+		IORESOURCE_MEM, 2);
+		void __iomem *wdt_tke = devm_ioremap(&pdev->dev,
+		res_tke->start, resource_size(res_tke));
+		int wdt_index = ((res_src->start >> 16) & 0xF) - 0xc;
+
+		writel(TOP_TKE_TKEIE_WDT_MASK(wdt_index), wdt_tke +
+		TOP_TKE_TKEIE(hwirq));
+	}
+
+	/* enable the interrupt */
+	return 0;
+
 }
