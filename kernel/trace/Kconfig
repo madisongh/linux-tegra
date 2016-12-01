@@ -241,6 +241,17 @@ config FTRACE_SYSCALLS
 	help
 	  Basic tracer to catch the syscall entry and exit events.
 
+config FTRACE_PRINTK
+	bool "Trace based printk"
+	depends on TRACING
+	default y
+	help
+	  Enables ftrace based printk logging.  This is enabled by default
+	  when TRACING is enabled.  Disabling this would drop all printk
+	  messages destined for ftrace buffer.
+
+	  Say Y if unsure.
+
 config TRACER_SNAPSHOT
 	bool "Create a snapshot trace buffer"
 	select TRACER_MAX_TRACE

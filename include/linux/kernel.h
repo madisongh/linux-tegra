@@ -597,6 +597,7 @@ do {									\
  * let gcc optimize the rest.
  */
 
+#ifdef CONFIG_FTRACE_PRINTK
 #define trace_printk(fmt, ...)				\
 do {							\
 	char _______STR[] = __stringify((__VA_ARGS__));	\
@@ -663,9 +664,17 @@ int __trace_printk(unsigned long ip, const char *fmt, ...);
 })
 extern int __trace_bputs(unsigned long ip, const char *str);
 extern int __trace_puts(unsigned long ip, const char *str, int size);
+#else
+static inline __printf(1, 2)
+int trace_printk(const char *fmt, ...)
+{
+	return 0;
+}
+#endif /* CONFIG_FTRACE_PRINTK */
 
 extern void trace_dump_stack(int skip);
 
+#ifdef CONFIG_FTRACE_PRINTK
 /*
  * The double __builtin_constant_p is because gcc will give us an error
  * if we try to allocate the static variable to fmt if it is not a
@@ -688,6 +697,13 @@ __ftrace_vbprintk(unsigned long ip, const char *fmt, va_list ap);
 
 extern __printf(2, 0) int
 __ftrace_vprintk(unsigned long ip, const char *fmt, va_list ap);
+#else
+static inline int
+ftrace_vprintk(const char *fmt, va_list ap)
+{
+	return 0;
+}
+#endif /* CONFIG_FTRACE_PRINTK */
 
 extern void ftrace_dump(enum ftrace_dump_mode oops_dump_mode);
 #else
