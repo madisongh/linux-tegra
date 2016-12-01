@@ -1,7 +1,7 @@
 /*
  * mods_debugfs.c - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -34,6 +34,7 @@ static struct dentry *mods_debugfs_dir;
 #include <linux/platform/tegra/tegra_kfuse.h>
 #endif
 
+#include <video/tegra_dc_ext_kernel.h>
 #ifdef CONFIG_TEGRA_DC
 #include <../drivers/video/tegra/dc/dc_config.h>
 #include <../drivers/video/tegra/dc/dsi.h>

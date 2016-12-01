@@ -26,7 +26,7 @@
 #include <linux/nvhost.h>
 #include <linux/notifier.h>
 #include <linux/tegra-throughput.h>
-#include <mach/dc.h>
+#include <video/tegra_dc_ext_kernel.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/tegra_throughput.h>
