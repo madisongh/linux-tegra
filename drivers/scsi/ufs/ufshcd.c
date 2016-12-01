@@ -2385,10 +2385,16 @@ out:
 static int ufshcd_uic_hibern8_enter(struct ufs_hba *hba)
 {
 	struct uic_command uic_cmd = {0};
+	int ret;
 
 	uic_cmd.command = UIC_CMD_DME_HIBER_ENTER;
 
-	return ufshcd_uic_pwr_ctrl(hba, &uic_cmd);
+	ret = ufshcd_uic_pwr_ctrl(hba, &uic_cmd);
+
+	if (!ret) {
+		ufshcd_vops_hibern8_entry_notify(hba);
+	}
+	return ret;
 }
 
 static int ufshcd_uic_hibern8_exit(struct ufs_hba *hba)
