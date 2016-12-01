@@ -1,7 +1,7 @@
 /*
  * mods.h - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -504,6 +504,23 @@ struct MODS_SET_IRQ_MASK {
 					      which the mask will be applied */
 	__u8		    irq_type;	   /* irq type */
 	__u8		    mask_type;	   /* mask type */
+};
+
+#define MAX_DT_SIZE 64
+#define MAX_FULL_SIZE 128
+
+/*MODS_ESC_MAP_INTERRUPT*/
+struct MODS_DT_INFO {
+	/* OUT */
+	/* Logical irq number*/
+	__u32	irq;
+	/* IN */
+	/* DT name for looking up device tree node */
+	char	dt_name[MAX_DT_SIZE];
+	/* Full name of node as in device tree */
+	char	full_name[MAX_FULL_SIZE];
+	/* Irq index corresponding to physical irq */
+	__u32	index;
 };
 
 #define MODS_MASK_TYPE_IRQ_DISABLE      0
@@ -1074,4 +1091,7 @@ struct MODS_DMA_COPY_TO_USER {
 #define MODS_ESC_DMA_COPY_TO_USER			\
 		   _IOWR(MODS_IOC_MAGIC, 91,		\
 		   struct MODS_DMA_COPY_TO_USER)
+#define MODS_ESC_MAP_INTERRUPT			\
+		   _IOWR(MODS_IOC_MAGIC, 92,		\
+		   struct MODS_DT_INFO)
 #endif /* _MODS_H_  */
