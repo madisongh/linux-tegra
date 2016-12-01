@@ -60,6 +60,11 @@ struct cpu_dvfs {
 	int max_mv;
 	int min_mv;
 	struct cpu_pll_fv_table fv_table[MAX_DVFS_FREQS];
+
+	int pll_min_millivolts; /* when PLL source is selected */
+	int speedo_scale;
+	int voltage_scale;
+	struct cvb_table_freq_entry cvb_pll_table[MAX_DVFS_FREQS];
 };
 
 struct rail_stats {
