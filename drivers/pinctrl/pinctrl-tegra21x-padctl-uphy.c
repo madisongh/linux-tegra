@@ -3439,9 +3439,15 @@ static void tegra_xusb_phy_mbox_work(struct work_struct *work)
 			if (msg->cmd == MBOX_CMD_ENABLE_SS_LFPS_DETECTION)
 				tegra210_usb3_phy_set_lfps_detector(uphy, i,
 									true);
-			else
+			else {
 				tegra210_usb3_phy_set_lfps_detector(uphy, i,
 									false);
+				/*
+				 * Add this delay to increase stability of
+				 * directing U3.
+				 */
+				usleep_range(500, 1000);
+			}
 		}
 		break;
 	default:
