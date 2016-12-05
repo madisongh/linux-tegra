@@ -35,6 +35,7 @@ obj-$(CONFIG_CHARGER_BQ2419X)   += bq2419x-charger.o
 obj-$(CONFIG_BATTERY_BQ27441)	+= bq27441_battery.o
 obj-$(CONFIG_BATTERY_CHARGER_GAUGE_COMM) += battery-charger-gauge-comm.o
 obj-$(CONFIG_BATTERY_BQ27XXX)	+= bq27xxx_battery.o
+obj-$(CONFIG_BATTERY_GPIO)	+= gpio-battery.o
 obj-$(CONFIG_BATTERY_DA9030)	+= da9030_battery.o
 obj-$(CONFIG_BATTERY_DA9052)	+= da9052-battery.o
 obj-$(CONFIG_CHARGER_DA9150)	+= da9150-charger.o
