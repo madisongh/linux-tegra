@@ -38,7 +38,7 @@
 #include <asm/smp_plat.h>
 #include <asm/suspend.h>
 #include <asm/tlbflush.h>
-#include <mach/io_dpd.h>
+#include <linux/platform/tegra/io-dpd.h>
 
 #include "iomap.h"
 #include "pm.h"
