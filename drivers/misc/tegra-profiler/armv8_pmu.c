@@ -769,6 +769,9 @@ static int get_supported_events(int cpuid, int *events, int max_events)
 
 	struct quadd_pmu_ctx *local_pmu_ctx = &per_cpu(pmu_ctx, cpuid);
 
+	if (!local_pmu_ctx->current_map)
+		return 0;
+
 	max_events = min_t(int, QUADD_EVENT_TYPE_MAX, max_events);
 
 	for (i = 0; i < max_events; i++) {
@@ -777,6 +780,7 @@ static int get_supported_events(int cpuid, int *events, int max_events)
 		if (event != QUADD_ARMV8_UNSUPPORTED_EVENT)
 			events[nr_events++] = i;
 	}
+
 	return nr_events;
 }
 
@@ -802,7 +806,7 @@ static struct quadd_arch_info *get_arch(int cpuid)
 {
 	struct quadd_pmu_ctx *local_pmu_ctx = &per_cpu(pmu_ctx, cpuid);
 
-	return &local_pmu_ctx->arch;
+	return local_pmu_ctx->current_map ? &local_pmu_ctx->arch : NULL;
 }
 
 static struct quadd_event_source_interface pmu_armv8_int = {
@@ -825,17 +829,13 @@ static struct quadd_event_source_interface pmu_armv8_int = {
 
 static int quadd_armv8_pmu_init_for_cpu(int cpuid)
 {
-	u32 pmcr;
-	u32 idcode = 0;
-	int err = 0;
-	int idx;
+	int idx, err = 0;
+	u32 pmcr, ext_ver, idcode = 0;
+	u64 aa64_dfr;
+	u8 implementer;
 	struct cpuinfo_arm64 *local_cpu_data = &per_cpu(cpu_data, cpuid);
 	struct quadd_pmu_ctx *local_pmu_ctx = &per_cpu(pmu_ctx, cpuid);
 	u32 reg_midr = local_cpu_data->reg_midr;
-	u32 ext_ver;
-	u64 aa64_dfr;
-
-	char implementer = (reg_midr >> 24) & 0xFF;
 
 	strncpy(local_pmu_ctx->arch.name, "Unknown",
 			sizeof(local_pmu_ctx->arch.name));
@@ -843,6 +843,13 @@ static int quadd_armv8_pmu_init_for_cpu(int cpuid)
 	local_pmu_ctx->arch.type = QUADD_AA64_CPU_TYPE_UNKNOWN;
 	local_pmu_ctx->arch.ver = 0;
 	local_pmu_ctx->current_map = NULL;
+
+	INIT_LIST_HEAD(&local_pmu_ctx->used_events);
+
+	if (!reg_midr)
+		return 0;
+
+	implementer = (reg_midr >> 24) & 0xFF;
 
 	aa64_dfr = read_cpuid(ID_AA64DFR0_EL1);
 	aa64_dfr = (aa64_dfr >> 8) & 0x0f;
@@ -929,11 +936,10 @@ static int quadd_armv8_pmu_init_for_cpu(int cpuid)
 	}
 
 	local_pmu_ctx->arch.name[sizeof(local_pmu_ctx->arch.name) - 1] = '\0';
-	pr_info("arch: %s, type: %d, ver: %d\n",
-		local_pmu_ctx->arch.name, local_pmu_ctx->arch.type,
+	pr_info("[%d] arch: %s, type: %d, ver: %d\n",
+		cpuid, local_pmu_ctx->arch.name, local_pmu_ctx->arch.type,
 		local_pmu_ctx->arch.ver);
 
-	INIT_LIST_HEAD(&local_pmu_ctx->used_events);
 	return err;
 }
 
@@ -967,6 +973,7 @@ void quadd_armv8_pmu_deinit(void)
 	for_each_possible_cpu(cpu_id) {
 		struct quadd_pmu_ctx *local_pmu_ctx = &per_cpu(pmu_ctx, cpu_id);
 
-		free_events(&local_pmu_ctx->used_events);
+		if (local_pmu_ctx->current_map)
+			free_events(&local_pmu_ctx->used_events);
 	}
 }

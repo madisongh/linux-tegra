@@ -714,6 +714,9 @@ static int get_supported_events(int cpuid, int *events, int max_events)
 	int i, nr_events = 0;
 	struct quadd_pmu_ctx *local_pmu_ctx = this_cpu_ptr(&pmu_ctx);
 
+	if (!local_pmu_ctx->current_map)
+		return 0;
+
 	max_events = min_t(int, QUADD_EVENT_TYPE_MAX, max_events);
 
 	for (i = 0; i < max_events; i++) {
@@ -722,6 +725,7 @@ static int get_supported_events(int cpuid, int *events, int max_events)
 		if (event != QUADD_ARMV7_UNSUPPORTED_EVENT)
 			events[nr_events++] = i;
 	}
+
 	return nr_events;
 }
 
@@ -745,7 +749,7 @@ static struct quadd_arch_info *get_arch(int cpuid)
 {
 	struct quadd_pmu_ctx *local_pmu_ctx = this_cpu_ptr(&pmu_ctx);
 
-	return &local_pmu_ctx->arch;
+	return local_pmu_ctx->current_map ? &local_pmu_ctx->arch : NULL;
 }
 
 static struct quadd_event_source_interface pmu_armv7_int = {
@@ -766,22 +770,29 @@ static struct quadd_event_source_interface pmu_armv7_int = {
 	.get_arch		= get_arch,
 };
 
-static int quadd_armv7_pmu_init_for_cpu(int cpuid)
+static int quadd_armv7_pmu_init_for_cpu(int cpu)
 {
 	int err = 0;
 	unsigned long cpu_id, cpu_implementer, part_number;
 
-	struct cpuinfo_arm *local_cpu_data = &per_cpu(cpu_data, cpuid);
-	struct quadd_pmu_ctx *local_pmu_ctx = &per_cpu(pmu_ctx, cpuid);
-
-	cpu_id = local_cpu_data->cpuid;
-	cpu_implementer = cpu_id >> 24;
-	part_number = cpu_id & 0xFFF0;
+	struct cpuinfo_arm *local_cpu_data = &per_cpu(cpu_data, cpu);
+	struct quadd_pmu_ctx *local_pmu_ctx = &per_cpu(pmu_ctx, cpu);
 
 	local_pmu_ctx->arch.type = QUADD_ARM_CPU_TYPE_UNKNOWN;
 	local_pmu_ctx->arch.ver = 0;
+	local_pmu_ctx->current_map = NULL;
 	strncpy(local_pmu_ctx->arch.name, "Unknown",
 		sizeof(local_pmu_ctx->arch.name));
+
+	INIT_LIST_HEAD(&local_pmu_ctx->used_events);
+
+	cpu_id = local_cpu_data->cpu;
+
+	if (!cpu_id)
+		return 0;
+
+	cpu_implementer = cpu_id >> 24;
+	part_number = cpu_id & 0xFFF0;
 
 	if (cpu_implementer == ARM_CPU_IMP_ARM) {
 		switch (part_number) {
@@ -817,11 +828,9 @@ static int quadd_armv7_pmu_init_for_cpu(int cpuid)
 		err = 1;
 	}
 
-	INIT_LIST_HEAD(&local_pmu_ctx->used_events);
-
 	local_pmu_ctx->arch.name[sizeof(local_pmu_ctx->arch.name) - 1] = '\0';
-	pr_info("arch: %s, type: %d, ver: %d\n",
-		local_pmu_ctx->arch.name, local_pmu_ctx->arch.type,
+	pr_info("[%d] arch: %s, type: %d, ver: %d\n",
+		cpu, local_pmu_ctx->arch.name, local_pmu_ctx->arch.type,
 		local_pmu_ctx->arch.ver);
 
 	return err;
@@ -830,12 +839,10 @@ static int quadd_armv7_pmu_init_for_cpu(int cpuid)
 struct quadd_event_source_interface *quadd_armv7_pmu_init(void)
 {
 	struct quadd_event_source_interface *pmu = NULL;
-	int cpuid;
-	int err;
-	int initialized = 1;
+	int cpu, err, initialized = 1;
 
-	for_each_possible_cpu(cpuid) {
-		err = quadd_armv7_pmu_init_for_cpu(cpuid);
+	for_each_possible_cpu(cpu) {
+		err = quadd_armv7_pmu_init_for_cpu(cpu);
 		if (err) {
 			initialized = 0;
 			break;
@@ -852,11 +859,12 @@ struct quadd_event_source_interface *quadd_armv7_pmu_init(void)
 
 void quadd_armv7_pmu_deinit(void)
 {
-	int cpuid;
+	int cpu;
 
-	for_each_possible_cpu(cpuid) {
-		struct quadd_pmu_ctx *local_pmu_ctx = &per_cpu(pmu_ctx, cpuid);
+	for_each_possible_cpu(cpu) {
+		struct quadd_pmu_ctx *local_pmu_ctx = &per_cpu(pmu_ctx, cpu);
 
-		free_events(&local_pmu_ctx->used_events);
+		if (local_pmu_ctx->current_map)
+			free_events(&local_pmu_ctx->used_events);
 	}
 }
