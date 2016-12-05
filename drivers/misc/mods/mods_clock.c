@@ -21,7 +21,7 @@
 #include <linux/clk.h>
 #include <linux/platform/tegra/clock.h>
 #if defined(CONFIG_TEGRA_CLK_FRAMEWORK)
-	#include <mach/clk.h>
+	#include <linux/clk/tegra.h>
 #elif defined(CONFIG_COMMON_CLK) && defined(CONFIG_OF_RESOLVE) && \
 defined(CONFIG_OF_DYNAMIC)
 	#define MODS_COMMON_CLK 1
