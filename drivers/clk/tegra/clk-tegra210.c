@@ -3978,6 +3978,10 @@ static void __init tegra210_clock_init(struct device_node *np)
 	value &= ~BIT(25);
 	clk_writel(value, clk_base + PLLD_BASE);
 
+	value = clk_readl(clk_base + MISC_CLK_ENB);
+	value |= BIT(28);
+	clk_writel(value, clk_base + MISC_CLK_ENB);
+
 	tegra_clk_apply_init_table = tegra210_clock_apply_init_table;
 
 	tegra_super_clk_gen5_init(clk_base, pmc_base, tegra210_clks,
