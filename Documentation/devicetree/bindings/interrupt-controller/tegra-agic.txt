@@ -17,6 +17,9 @@ Required properties:
    does not provide per-cpu interface.
  - interrupts: The Agic is a secondary GIC, hence requires the
    interrupt number which is wired to the primary GIC.
+ - enable-agic-clks: enable AGIC clks from gic driver. This is only for
+   t210.
+
 
 Example:
 	tegra_agic: agic-controller {
@@ -26,7 +29,9 @@ Example:
 		no-gic-extension;
 		not-per-cpu;
 		reg = <0x0 0x702f9000 0x0 0x2000>,
-		      <0x0 0x702fa000 0x0 0x2000>;
+		      <0x0 0x702fa000 0x0 0x2000>,
+		      <0x0 0x60006000 0x0 0x1000>;
+		enable-agic-clks;
 		interrupts = <0 102 0xf04>;
 	};
 

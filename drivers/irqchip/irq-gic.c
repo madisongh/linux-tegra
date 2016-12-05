@@ -40,6 +40,7 @@
 #include <linux/interrupt.h>
 #include <linux/percpu.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/irqchip.h>
 #include <linux/irqchip/chained_irq.h>
 #include <linux/irqchip/arm-gic.h>
@@ -69,6 +70,56 @@ static void gic_check_cpu_features(void)
 }
 #else
 #define gic_check_cpu_features()	do { } while(0)
+#endif
+
+#ifdef CONFIG_TEGRA_APE_AGIC
+/* APE CLOCKS */
+#define CLK_SOURCE_APE			0x6c0
+#define CLK_OUT_ENB_Y_0			0x298
+#define CLK_OUT_ENB_V_0			0x360
+#define CLK_RST_DEV_Y_CLR_0		0x2ac
+
+#define	SELECT_CLK_M			(6 << 29)
+#define ENABLE_APE_CLK			(1 << 6)
+#define ENABLE_APB2APE_CLK		(1 << 11)
+#define RESET_APE				(1 << 6)
+
+static int enable_t210_agic_clks(struct device_node *node)
+{
+	void __iomem *clk_base;
+	u32 val;
+
+	clk_base = of_iomap(node, 2);
+	WARN(!clk_base, "unable to map agic clock registers\n");
+
+	/* Set CLK M as APE clk's soruce */
+	val = readl(clk_base + CLK_SOURCE_APE);
+	val |= SELECT_CLK_M;
+	writel(val, clk_base +  CLK_SOURCE_APE);
+	udelay(500);
+
+	/* APE clk enable */
+	val = readl(clk_base + CLK_OUT_ENB_Y_0);
+	val |= ENABLE_APE_CLK;
+	writel(val, clk_base + CLK_OUT_ENB_Y_0);
+	udelay(500);
+
+	/* apb2ape clk enable */
+	val = readl(clk_base + CLK_OUT_ENB_V_0);
+	val |= ENABLE_APB2APE_CLK;
+	writel(val, clk_base + CLK_OUT_ENB_V_0);
+	udelay(500);
+
+	/* ape reset clear */
+	val = readl(clk_base + CLK_RST_DEV_Y_CLR_0);
+	val |= RESET_APE;
+	writel(val, clk_base + CLK_RST_DEV_Y_CLR_0);
+	udelay(500);
+
+	pr_info("%s:%d ape clocked & reset cleared\n", __func__, __LINE__);
+
+	return 0;
+}
 #endif
 
 union gic_base {
@@ -1655,6 +1706,12 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 
 	cpu_base = of_iomap(node, 1);
 	WARN(!cpu_base, "unable to map gic cpu registers\n");
+
+#ifdef CONFIG_TEGRA_APE_AGIC
+	if ((of_property_read_bool(node, "enable-agic-clks")) &&
+	(!of_find_compatible_node(node, NULL, "nvidia,tegra210-agic")))
+		enable_t210_agic_clks(node);
+#endif
 
 	/*
 	 * Disable split EOI/Deactivate if either HYP is not available
