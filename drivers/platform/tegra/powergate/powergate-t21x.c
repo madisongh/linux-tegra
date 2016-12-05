@@ -833,6 +833,22 @@ static int tegra210_pg_nvdec_unpowergate(int id)
 	return 0;
 }
 
+static int tegra210_pg_sata_powergate(int id)
+{
+	tegra210_set_sata_pll_seq_sw(true);
+	tegra210_pg_powergate(TEGRA_POWERGATE_SATA);
+
+	return 0;
+}
+
+static int tegra210_pg_sata_unpowergate(int id)
+{
+	tegra210_pg_unpowergate(TEGRA_POWERGATE_SATA);
+	tegra210_set_sata_pll_seq_sw(false);
+
+	return 0;
+}
+
 static int tegra210_pg_powergate_partition(int id)
 {
 	int ret;
@@ -848,6 +864,9 @@ static int tegra210_pg_powergate_partition(int id)
 			break;
 		case TEGRA_POWERGATE_NVDEC:
 			ret = tegra210_pg_nvdec_powergate(id);
+			break;
+		case TEGRA_POWERGATE_SATA:
+			ret = tegra210_pg_sata_powergate(id);
 			break;
 		default:
 			ret = tegra210_pg_powergate(id);
@@ -871,6 +890,9 @@ static int tegra210_pg_unpowergate_partition(int id)
 			break;
 		case TEGRA_POWERGATE_NVDEC:
 			ret = tegra210_pg_nvdec_unpowergate(id);
+			break;
+		case TEGRA_POWERGATE_SATA:
+			ret = tegra210_pg_sata_unpowergate(id);
 			break;
 		default:
 			ret = tegra210_pg_unpowergate(id);
@@ -899,8 +921,12 @@ static int tegra210_pg_powergate_clk_off(int id)
 		goto exit_unlock;
 	}
 
+	if (id == TEGRA_POWERGATE_SATA)
+		tegra210_set_sata_pll_seq_sw(true);
+
 	ret = tegra1xx_powergate_partition_with_clk_off(id,
 			&tegra210_pg_partition_info[id]);
+
 exit_unlock:
 	mutex_unlock(&partition->pg_mutex);
 	trace_powergate(__func__, tegra210_pg_get_name(id), id, 0, ret);
@@ -923,6 +949,10 @@ static int tegra210_pg_unpowergate_clk_on(int id)
 
 	ret = tegra1xx_unpowergate_partition_with_clk_on(id,
 			&tegra210_pg_partition_info[id]);
+
+	if (id == TEGRA_POWERGATE_SATA)
+		tegra210_set_sata_pll_seq_sw(false);
+
 exit_unlock:
 	mutex_unlock(&partition->pg_mutex);
 	trace_powergate(__func__, tegra210_pg_get_name(id), id, 0, ret);
