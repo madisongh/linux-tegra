@@ -248,6 +248,9 @@
 #define CLK_M_DIVISOR_MASK 0x3
 #define BURST_POLICY_REG_SIZE 2
 
+#define CLK_RST_CONTROLLER_RST_DEV_Y_SET 0x2a8
+#define CLK_RST_CONTROLLER_RST_DEV_Y_CLR 0x2ac
+
 /*
  * SDM fractional divisor is 16-bit 2's complement signed number within
  * (-2^12 ... 2^12-1) range. Represented in PLL data structure as unsigned
@@ -3828,6 +3831,9 @@ static int tegra210_reset_assert(unsigned long id)
 {
 	if (id == TEGRA210_RST_DFLL_DVCO)
 		tegra210_clock_assert_dfll_dvco_reset();
+	else if (id == TEGRA210_RST_ADSP)
+		writel(GENMASK(26,21),
+			clk_base + CLK_RST_CONTROLLER_RST_DEV_Y_SET);
 	else
 		return -EINVAL;
 
@@ -3838,6 +3844,9 @@ static int tegra210_reset_deassert(unsigned long id)
 {
 	if (id == TEGRA210_RST_DFLL_DVCO)
 		tegra210_clock_deassert_dfll_dvco_reset();
+	else if (id == TEGRA210_RST_ADSP)
+		writel(GENMASK(26,21),
+			clk_base + CLK_RST_CONTROLLER_RST_DEV_Y_CLR);
 	else
 		return -EINVAL;
 
