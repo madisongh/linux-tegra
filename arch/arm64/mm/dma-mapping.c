@@ -1433,12 +1433,10 @@ void __init dma_contiguous_remap(void)
 {
 	int i;
 	for (i = 0; i < dma_mmu_remap_num; i++) {
-		phys_addr_t start;
-		phys_addr_t end;
 		unsigned long addr;
+		phys_addr_t start = dma_mmu_remap[i].base;
+		phys_addr_t end = start + dma_mmu_remap[i].size;
 
-		start = dma_mmu_remap[i].base & PMD_MASK;
-		end = (start + dma_mmu_remap[i].size + PMD_SIZE - 1) & PMD_MASK;
 		if (start >= end)
 			continue;
 
