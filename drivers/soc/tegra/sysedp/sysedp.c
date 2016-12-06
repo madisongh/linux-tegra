@@ -165,6 +165,8 @@ static struct sysedp_consumer_data *sysedp_find_consumer_data(
 		if (pdata->consumer_data[i].dn == dn)
 			return &pdata->consumer_data[i];
 
+	pr_err("%s: Failed to find consumer data for %s\n", __func__, dn->name);
+
 	return NULL;
 }
 
@@ -175,11 +177,8 @@ struct sysedp_consumer *sysedp_create_consumer(struct device_node *dn,
 	struct sysedp_consumer_data *match;
 
 	match = sysedp_find_consumer_data(dn);
-	if (!match) {
-		pr_info("%s: Unable to create %s, no consumer_data found\n",
-			__func__, consumername);
+	if (!match)
 		return NULL;
-	}
 
 	consumer = kzalloc(sizeof(*consumer), GFP_KERNEL);
 	if (!consumer)
@@ -190,6 +189,8 @@ struct sysedp_consumer *sysedp_create_consumer(struct device_node *dn,
 	consumer->num_states = match->num_states;
 
 	if (sysedp_register_consumer(consumer)) {
+		pr_err("%s: Failed to register consumer for %s\n", __func__,
+		       dn->name);
 		kfree(consumer);
 		return NULL;
 	}
@@ -270,7 +271,7 @@ static int of_sysedp_get_pdata(struct platform_device *pdev,
 	if (!np_consumers) {
 		obj_ptr->consumer_data_size = 0;
 		obj_ptr->consumer_data = NULL;
-		dev_err(&pdev->dev, "Missing consumers group\n");
+		dev_dbg(&pdev->dev, "Missing consumers group\n");
 		goto no_consumer;
 	}
 
