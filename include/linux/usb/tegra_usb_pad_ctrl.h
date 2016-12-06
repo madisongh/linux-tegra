@@ -15,7 +15,7 @@
 #ifndef _TEGRA_USB_PAD_CTRL_INTERFACE_H_
 #define _TEGRA_USB_PAD_CTRL_INTERFACE_H_
 
-#include <mach/xusb.h>
+#include <linux/usb/xusb.h>
 #include <linux/tegra_prod.h>
 
 #define UTMIPLL_HW_PWRDN_CFG0			0x52c

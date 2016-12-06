@@ -29,8 +29,8 @@
 #include <linux/clk/tegra.h>
 #include <linux/tegra-soc.h>
 #include <soc/tegra/fuse.h>
-#include <mach/tegra_usb_pmc.h>
-#include <mach/tegra_usb_pad_ctrl.h>
+#include <linux/usb/tegra_usb_pmc.h>
+#include <linux/usb/tegra_usb_pad_ctrl.h>
 #include <linux/tegra_prod.h>
 #include <dt-bindings/usb/tegra-usb.h>
 

@@ -44,7 +44,7 @@
 #include <linux/module.h>
 #include <linux/debugfs.h>
 
-#include <mach/tegra_usb_pad_ctrl.h>
+#include <linux/usb/tegra_usb_pad_ctrl.h>
 #include <soc/tegra/common.h>
 #include "../../../arch/arm/mach-tegra/iomap.h"
 #include "../../../arch/arm/mach-tegra/board.h"
