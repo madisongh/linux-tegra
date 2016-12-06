@@ -163,8 +163,7 @@ static int store_edp_max(void *data, u64 val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(edp_max_fops, show_edp_max, store_edp_max, "%llu\n");
 
-static int __init tegra_edp_debugfs_init(struct device *dev,
-					 struct gpu_edp *ctx)
+static int tegra_edp_debugfs_init(struct device *dev, struct gpu_edp *ctx)
 {
 	struct dentry *edp_dir;
 	struct edp_attrs *attr;
@@ -194,12 +193,12 @@ static int __init tegra_edp_debugfs_init(struct device *dev,
 	return 0;
 }
 #else
-static int __init tegra_edp_debugfs_init(void)
+static int tegra_edp_debugfs_init(void)
 { return 0; }
 #endif /* CONFIG_DEBUG_FS */
 
-static int __init tegra_gpu_edp_parse_dt(struct platform_device *pdev,
-					 struct gpu_edp_platform_data *pdata)
+static int tegra_gpu_edp_parse_dt(struct platform_device *pdev,
+				  struct gpu_edp_platform_data *pdata)
 {
 
 	struct device_node *np = pdev->dev.of_node;
@@ -219,7 +218,7 @@ static int __init tegra_gpu_edp_parse_dt(struct platform_device *pdev,
 	return 0;
 }
 
-static int __init tegra_gpu_edp_probe(struct platform_device *pdev)
+static int tegra_gpu_edp_probe(struct platform_device *pdev)
 {
 	struct clk *gpu_clk;
 	struct fv_relation *fv = NULL;
@@ -357,14 +356,10 @@ static struct platform_driver tegra_gpu_edp_driver = {
 		.owner = THIS_MODULE,
 		.of_match_table = tegra_gpu_edp_of_match,
 	},
+	.probe = tegra_gpu_edp_probe,
 };
 
-static int __init tegra_gpu_edp_driver_init(void)
-{
-	return platform_driver_probe(&tegra_gpu_edp_driver,
-				     tegra_gpu_edp_probe);
-}
-module_init(tegra_gpu_edp_driver_init);
+module_platform_driver(tegra_gpu_edp_driver);
 
 MODULE_AUTHOR("NVIDIA Corp.");
 MODULE_DESCRIPTION("Tegra GPU EDP management");
