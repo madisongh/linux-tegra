@@ -235,6 +235,15 @@ int nvmap_reserve_pages(struct nvmap_handle **handles, u32 *offsets, u32 *sizes,
 {
 	int i;
 
+	/* validates all page params first */
+	for (i = 0; i < nr; i++) {
+		u32 size = sizes[i] ? sizes[i] : handles[i]->size;
+		u32 offset = sizes[i] ? offsets[i] : 0;
+
+		if ((offset != 0) || (size != handles[i]->size))
+			return -EINVAL;
+	}
+
 	for (i = 0; i < nr; i++) {
 		u32 size = sizes[i] ? sizes[i] : handles[i]->size;
 		u32 offset = sizes[i] ? offsets[i] : 0;
