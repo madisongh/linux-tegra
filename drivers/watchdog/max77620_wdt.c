@@ -203,6 +203,7 @@ static int max77620_wdt_remove(struct platform_device *pdev)
 
 static struct platform_device_id max77620_wdt_devtype[] = {
 	{ .name = "max77620-watchdog", },
+	{ .name = "max20024-watchdog", },
 	{ },
 };
 
