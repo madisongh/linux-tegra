@@ -36,9 +36,7 @@
 #include <soc/tegra/xusb.h>
 
 #include <linux/platform/tegra/emc_bwmgr.h>
-#ifndef CONFIG_ARCH_TEGRA_21x_SOC
 #include <linux/platform/tegra/bwmgr_mc.h>
-#endif
 
 #include "xhci.h"
 
@@ -77,7 +75,6 @@
 #define XUSB_CFG_ARU_FW_SCRATCH			0x00000440
 #define XUSB_CFG_CSB_BASE_ADDR			0x800
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 /* IPFS registers */
 #define XUSB_HOST_MSI_BAR_SZ_0		0x0c0
 #define XUSB_HOST_MSI_AXI_BAR_ST_0		0x0c4
@@ -93,7 +90,6 @@
 #define XUSB_HOST_UFPCI_CONFIG_0		0x19c
 #define XUSB_HOST_CLKGATE_HYSTERESIS_0	0x1bc
 #define XUSB_HOST_MCCIF_FIFOCTRL_0		0x1dc
-#endif
 
 #define ARU_CONTEXT_HS_PLS_SUSPEND	3
 #define ARU_CONTEXT_HS_PLS_FS_MODE	6
@@ -195,6 +191,15 @@
 	USB_DEVICE(vid, pid), \
 	.driver_info = QUIRK_FOR_LS_DEVICE,
 
+/* Device ID */
+#define XHCI_DEVICE_ID_T210     0x0fad
+#define XHCI_DEVICE_ID_T186     0x10e2
+
+#define XHCI_IS_T210(t) (t->soc_config ? \
+	(t->soc_config->device_id == XHCI_DEVICE_ID_T210) : false)
+#define XHCI_IS_T186(t) (t->soc_config ? \
+	(t->soc_config->device_id == XHCI_DEVICE_ID_T186) : false)
+
 static const struct usb_device_id disable_usb_persist_quirk_list[] = {
 	/* Sandisk Extreme USB 3.0 pen drive, SuperSpeed */
 	{ USB_DEVICE_SS(0x0781, 0x5580) },
@@ -281,7 +286,6 @@ struct tegra_xhci_fw_cfgtbl {
 	u8 padding[137]; /* Padding to make 256-bytes cfgtbl */
 };
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 struct tegra_xhci_ipfs_context {
 	u32 msi_bar_sz;
 	u32 msi_axi_barst;
@@ -295,7 +299,6 @@ struct tegra_xhci_ipfs_context {
 	u32 clkgate_hysteresis;
 	u32 xusb_host_mccif_fifo_cntrl;
 };
-#endif
 
 struct tegra_xhci_fpci_context {
 	u32 hs_pls;
@@ -322,6 +325,7 @@ static const char * const tegra_phy_names[] = {
 };
 
 struct tegra_xhci_soc_config {
+	u16 device_id;
 	const char *firmware_file;
 	bool lpm_support;
 	unsigned int num_phys[MAX_PHY_TYPES];
@@ -378,7 +382,6 @@ struct tegra_xhci_hcd {
 	int num_supplies;
 	struct regulator_bulk_data *supplies;
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 	void __iomem *ipfs_base;
 	struct tegra_xhci_ipfs_context ipfs_ctx;
 	struct clk *host_clk;
@@ -390,7 +393,6 @@ struct tegra_xhci_hcd {
 	struct clk *pll_u_480m;
 	struct clk *clk_m;
 	struct clk *pll_e;
-#endif
 
 	int pgid_ss;
 	int pgid_host;
@@ -468,7 +470,6 @@ static inline void fpci_writel(struct tegra_xhci_hcd *tegra, u32 val, u32 addr)
 	writel(val, tegra->fpci_base + addr);
 }
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 static inline u32 ipfs_readl(struct tegra_xhci_hcd *tegra, u32 addr)
 {
 	u32 val = readl(tegra->ipfs_base + addr);
@@ -482,7 +483,6 @@ static inline void ipfs_writel(struct tegra_xhci_hcd *tegra, u32 val, u32 addr)
 	dev_dbg(tegra->dev, "%s addr 0x%x val 0x%x\n", __func__, addr, val);
 	writel(val, tegra->ipfs_base + addr);
 }
-#endif
 
 static u32 csb_readl(struct tegra_xhci_hcd *tegra, u32 addr)
 {
@@ -919,13 +919,13 @@ static void tegra_xhci_cfg(struct tegra_xhci_hcd *tegra)
 {
 	u32 reg;
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	reg = ipfs_readl(tegra, XUSB_HOST_CONFIGURATION_0);
-	reg |= IPFS_EN_FPCI;
-	ipfs_writel(tegra, reg, XUSB_HOST_CONFIGURATION_0);
+	if (XHCI_IS_T210(tegra)) {
+		reg = ipfs_readl(tegra, XUSB_HOST_CONFIGURATION_0);
+		reg |= IPFS_EN_FPCI;
+		ipfs_writel(tegra, reg, XUSB_HOST_CONFIGURATION_0);
 
-	udelay(10);
-#endif
+		udelay(10);
+	}
 
 	reg_dump(tegra->dev, tegra->fpci_base, XUSB_CFG_4);
 	/* Program Bar0 Space */
@@ -944,14 +944,14 @@ static void tegra_xhci_cfg(struct tegra_xhci_hcd *tegra)
 	fpci_writel(tegra, reg, XUSB_CFG_1);
 	reg_dump(tegra->dev, tegra->fpci_base, XUSB_CFG_1);
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	reg = ipfs_readl(tegra, XUSB_HOST_INTR_MASK_0);
-	reg |= IPFS_IP_INT_MASK;
-	ipfs_writel(tegra, reg, XUSB_HOST_INTR_MASK_0);
+	if (XHCI_IS_T210(tegra)) {
+		reg = ipfs_readl(tegra, XUSB_HOST_INTR_MASK_0);
+		reg |= IPFS_IP_INT_MASK;
+		ipfs_writel(tegra, reg, XUSB_HOST_INTR_MASK_0);
 
-	/* Set hysteresis */
-	ipfs_writel(tegra, 0x80, XUSB_HOST_CLKGATE_HYSTERESIS_0);
-#endif
+		/* Set hysteresis */
+		ipfs_writel(tegra, 0x80, XUSB_HOST_CLKGATE_HYSTERESIS_0);
+	}
 }
 
 static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
@@ -1245,16 +1245,16 @@ static void tegra_xhci_mbox_work(struct work_struct *work)
 		resp.cmd = MBOX_CMD_ACK;
 		break;
 	case MBOX_CMD_SET_BW:
-#ifndef CONFIG_ARCH_TEGRA_21x_SOC
-		/* fw sends bw request in MByte/sec, convert to HZ */
-		freq_khz = bwmgr_bw_to_freq(msg->data << 10);
-		ret = tegra_bwmgr_set_emc(tegra->bwmgr_handle,
-			freq_khz * 1000, TEGRA_BWMGR_SET_EMC_SHARED_BW);
-		if (ret)
-			dev_warn(tegra->dev,
-				"failed to set EMC khz=%lu errno=%d\n",
-				freq_khz, ret);
-#endif
+		if (!XHCI_IS_T210(tegra)) {
+			/* fw sends bw request in MByte/sec, convert to HZ */
+			freq_khz = bwmgr_bw_to_freq(msg->data << 10);
+			ret = tegra_bwmgr_set_emc(tegra->bwmgr_handle,
+				freq_khz * 1000, TEGRA_BWMGR_SET_EMC_SHARED_BW);
+			if (ret)
+				dev_warn(tegra->dev,
+					"failed to set EMC khz=%lu errno=%d\n",
+					freq_khz, ret);
+		}
 		resp.cmd = MBOX_CMD_COMPL;
 		break;
 	default:
@@ -1292,6 +1292,7 @@ static int tegra_xhci_setup(struct usb_hcd *hcd)
 }
 
 static const struct tegra_xhci_soc_config tegra186_soc_config = {
+	.device_id = XHCI_DEVICE_ID_T186,
 	.firmware_file = "tegra18x_xusb_firmware",
 	.lpm_support = true,
 
@@ -1310,6 +1311,7 @@ static const struct tegra_xhci_soc_config tegra186_soc_config = {
 MODULE_FIRMWARE("tegra18x_xusb_firmware");
 
 static const struct tegra_xhci_soc_config tegra210_soc_config = {
+	.device_id = XHCI_DEVICE_ID_T210,
 	.firmware_file = "tegra21x_xusb_firmware",
 	.lpm_support = true,
 
@@ -1686,48 +1688,48 @@ put_usb2_hcd:
 	release_firmware(fw);
 }
 
-static void fpga_hacks_init(struct platform_device *pdev)
+static void fpga_hacks_init(struct platform_device *pdev,
+				struct tegra_xhci_hcd *tegra)
 {
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
-	car_base = devm_ioremap_nocache(&pdev->dev, 0x05000000, 0x1000000);
-#endif
+	if (XHCI_IS_T186(tegra))
+		car_base = devm_ioremap_nocache(&pdev->dev,
+						0x05000000, 0x1000000);
 	if (!car_base)
 		dev_err(&pdev->dev, "failed to map CAR mmio\n");
 
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
-	padctl_base = devm_ioremap_nocache(&pdev->dev, 0x03520000, 0x2000);
-#endif
+	if (XHCI_IS_T186(tegra))
+		padctl_base = devm_ioremap_nocache(&pdev->dev,
+						0x03520000, 0x2000);
 	if (!padctl_base)
 		dev_err(&pdev->dev, "failed to map PADCTL mmio\n");
-
 }
 
 static
-void fpga_hacks_partition_reset(struct platform_device *pdev, bool on)
+void fpga_hacks_partition_reset(struct platform_device *pdev,
+				struct tegra_xhci_hcd *tegra, bool on)
 {
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
-	struct device *dev = &pdev->dev;
-	u32 val;
+	if (XHCI_IS_T186(tegra)) {
+		struct device *dev = &pdev->dev;
+		u32 val;
 
-	if (!car_base) {
-		dev_err(dev, "not able to access CAR mmio\n");
-		return;
+		if (!car_base) {
+			dev_err(dev, "not able to access CAR mmio\n");
+			return;
+		}
+
+		pr_debug("%s %sassert\n", __func__, on ? "" : "de");
+
+		reg_dump(dev, car_base, CLK_RST_CONTROLLER_RST_DEV_XUSB_0);
+		val = ioread32(car_base + CLK_RST_CONTROLLER_RST_DEV_XUSB_0);
+		if (on)
+			val |= (SWR_XUSB_HOST_RST | SWR_XUSB_DEV_RST |
+				SWR_XUSB_PADCTL_RST | SWR_XUSB_SS_RST);
+		else
+			val &= ~(SWR_XUSB_HOST_RST | SWR_XUSB_DEV_RST |
+				SWR_XUSB_PADCTL_RST | SWR_XUSB_SS_RST);
+		iowrite32(val, car_base + CLK_RST_CONTROLLER_RST_DEV_XUSB_0);
+		reg_dump(dev, car_base, CLK_RST_CONTROLLER_RST_DEV_XUSB_0);
 	}
-
-	pr_debug("%s %sassert\n", __func__, on ? "" : "de");
-
-	reg_dump(dev, car_base, CLK_RST_CONTROLLER_RST_DEV_XUSB_0);
-	val = ioread32(car_base + CLK_RST_CONTROLLER_RST_DEV_XUSB_0);
-	if (on)
-		val |= (SWR_XUSB_HOST_RST | SWR_XUSB_DEV_RST |
-			SWR_XUSB_PADCTL_RST | SWR_XUSB_SS_RST);
-	else
-		val &= ~(SWR_XUSB_HOST_RST | SWR_XUSB_DEV_RST |
-			SWR_XUSB_PADCTL_RST | SWR_XUSB_SS_RST);
-	iowrite32(val, car_base + CLK_RST_CONTROLLER_RST_DEV_XUSB_0);
-	reg_dump(dev, car_base, CLK_RST_CONTROLLER_RST_DEV_XUSB_0);
-
-#endif
 }
 
 static void tegra_xhci_debugfs_init(struct tegra_xhci_hcd *tegra)
@@ -1786,53 +1788,53 @@ static int tegra_xhci_clk_enable(struct tegra_xhci_hcd *tegra)
 {
 	int ret = 0;
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	/* enable clks */
-	ret = clk_prepare_enable(tegra->ss_clk);
-	if (ret < 0)
-		return ret;
-	ret = clk_prepare_enable(tegra->host_clk);
-	if (ret < 0)
-		goto disable_ss;
-	ret = clk_prepare_enable(tegra->pll_e);
-	if (ret < 0)
-		goto disable_host;
-	ret = clk_prepare_enable(tegra->falc_clk);
-	if (ret < 0)
-		goto disable_plle;
-	ret = clk_prepare_enable(tegra->fs_src_clk);
-	if (ret < 0)
-		goto disable_falc;
-	ret = clk_prepare_enable(tegra->hs_src_clk);
-	if (ret < 0)
-		goto disable_fs_src;
+	if (XHCI_IS_T210(tegra)) {
+		/* enable clks */
+		ret = clk_prepare_enable(tegra->ss_clk);
+		if (ret < 0)
+			return ret;
+		ret = clk_prepare_enable(tegra->host_clk);
+		if (ret < 0)
+			goto disable_ss;
+		ret = clk_prepare_enable(tegra->pll_e);
+		if (ret < 0)
+			goto disable_host;
+		ret = clk_prepare_enable(tegra->falc_clk);
+		if (ret < 0)
+			goto disable_plle;
+		ret = clk_prepare_enable(tegra->fs_src_clk);
+		if (ret < 0)
+			goto disable_falc;
+		ret = clk_prepare_enable(tegra->hs_src_clk);
+		if (ret < 0)
+			goto disable_fs_src;
 
-	return 0;
+		return 0;
 
 disable_fs_src:
-	clk_disable_unprepare(tegra->fs_src_clk);
+		clk_disable_unprepare(tegra->fs_src_clk);
 disable_falc:
-	clk_disable_unprepare(tegra->falc_clk);
+		clk_disable_unprepare(tegra->falc_clk);
 disable_plle:
-	clk_disable_unprepare(tegra->pll_e);
+		clk_disable_unprepare(tegra->pll_e);
 disable_host:
-	clk_disable_unprepare(tegra->host_clk);
+		clk_disable_unprepare(tegra->host_clk);
 disable_ss:
-	clk_disable_unprepare(tegra->ss_clk);
-#endif
+		clk_disable_unprepare(tegra->ss_clk);
+	}
 	return ret;
 }
 
 static void tegra_xhci_clk_disable(struct tegra_xhci_hcd *tegra)
 {
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	clk_disable_unprepare(tegra->hs_src_clk);
-	clk_disable_unprepare(tegra->fs_src_clk);
-	clk_disable_unprepare(tegra->falc_clk);
-	clk_disable_unprepare(tegra->pll_e);
-	clk_disable_unprepare(tegra->host_clk);
-	clk_disable_unprepare(tegra->ss_clk);
-#endif
+	if (XHCI_IS_T210(tegra)) {
+		clk_disable_unprepare(tegra->hs_src_clk);
+		clk_disable_unprepare(tegra->fs_src_clk);
+		clk_disable_unprepare(tegra->falc_clk);
+		clk_disable_unprepare(tegra->pll_e);
+		clk_disable_unprepare(tegra->host_clk);
+		clk_disable_unprepare(tegra->ss_clk);
+	}
 }
 
 static int tegra_xhci_probe(struct platform_device *pdev)
@@ -1937,21 +1939,21 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		goto put_hcd;
 	}
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-	if (!res) {
-		dev_err(&pdev->dev, "failed to get ipfs mmio resources\n");
-		ret = -ENXIO;
-		goto put_hcd;
+	if (XHCI_IS_T210(tegra)) {
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+		if (!res) {
+			dev_err(&pdev->dev,
+				"failed to get ipfs mmio resources\n");
+			ret = -ENXIO;
+			goto put_hcd;
+		}
+		tegra->ipfs_base = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(tegra->ipfs_base)) {
+			ret = PTR_ERR(tegra->ipfs_base);
+			dev_warn(&pdev->dev, "can't map ipfs mmio (%d)\n", ret);
+			goto put_hcd;
+		}
 	}
-	tegra->ipfs_base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(tegra->ipfs_base)) {
-		ret = PTR_ERR(tegra->ipfs_base);
-		dev_warn(&pdev->dev, "can't map ipfs mmio (%d)\n", ret);
-		goto put_hcd;
-	}
-#endif
-
 	tegra->irq = platform_get_irq(pdev, 0);
 	if (tegra->irq < 0) {
 		ret = tegra->irq;
@@ -1972,52 +1974,52 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto put_hcd;
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	/* get clks */
-	tegra->host_clk = devm_clk_get(&pdev->dev, "host");
-	if (IS_ERR(tegra->host_clk))
-		return PTR_ERR(tegra->host_clk);
+	if (XHCI_IS_T210(tegra)) {
+		/* get clks */
+		tegra->host_clk = devm_clk_get(&pdev->dev, "host");
+		if (IS_ERR(tegra->host_clk))
+			return PTR_ERR(tegra->host_clk);
 
-	tegra->falc_clk = devm_clk_get(&pdev->dev, "falcon_src");
-	if (IS_ERR(tegra->falc_clk))
-		return PTR_ERR(tegra->falc_clk);
+		tegra->falc_clk = devm_clk_get(&pdev->dev, "falcon_src");
+		if (IS_ERR(tegra->falc_clk))
+			return PTR_ERR(tegra->falc_clk);
 
-	tegra->ss_clk = devm_clk_get(&pdev->dev, "ss");
-	if (IS_ERR(tegra->ss_clk))
-		return PTR_ERR(tegra->ss_clk);
+		tegra->ss_clk = devm_clk_get(&pdev->dev, "ss");
+		if (IS_ERR(tegra->ss_clk))
+			return PTR_ERR(tegra->ss_clk);
 
-	tegra->ss_src_clk = devm_clk_get(&pdev->dev, "ss_src");
-	if (IS_ERR(tegra->ss_src_clk))
-		return PTR_ERR(tegra->ss_src_clk);
+		tegra->ss_src_clk = devm_clk_get(&pdev->dev, "ss_src");
+		if (IS_ERR(tegra->ss_src_clk))
+			return PTR_ERR(tegra->ss_src_clk);
 
-	tegra->hs_src_clk = devm_clk_get(&pdev->dev, "hs_src");
-	if (IS_ERR(tegra->hs_src_clk))
-		return PTR_ERR(tegra->hs_src_clk);
+		tegra->hs_src_clk = devm_clk_get(&pdev->dev, "hs_src");
+		if (IS_ERR(tegra->hs_src_clk))
+			return PTR_ERR(tegra->hs_src_clk);
 
-	tegra->fs_src_clk = devm_clk_get(&pdev->dev, "fs_src");
-	if (IS_ERR(tegra->fs_src_clk))
-		return PTR_ERR(tegra->fs_src_clk);
+		tegra->fs_src_clk = devm_clk_get(&pdev->dev, "fs_src");
+		if (IS_ERR(tegra->fs_src_clk))
+			return PTR_ERR(tegra->fs_src_clk);
 
-	tegra->pll_u_480m = devm_clk_get(&pdev->dev, "pll_u_480M");
-	if (IS_ERR(tegra->pll_u_480m))
-		return PTR_ERR(tegra->pll_u_480m);
+		tegra->pll_u_480m = devm_clk_get(&pdev->dev, "pll_u_480M");
+		if (IS_ERR(tegra->pll_u_480m))
+			return PTR_ERR(tegra->pll_u_480m);
 
-	tegra->clk_m = devm_clk_get(&pdev->dev, "clk_m");
-	if (IS_ERR(tegra->clk_m))
-		return PTR_ERR(tegra->clk_m);
+		tegra->clk_m = devm_clk_get(&pdev->dev, "clk_m");
+		if (IS_ERR(tegra->clk_m))
+			return PTR_ERR(tegra->clk_m);
 
-	tegra->pll_e = devm_clk_get(&pdev->dev, "pll_e");
-	if (IS_ERR(tegra->pll_e))
-		return PTR_ERR(tegra->pll_e);
-#endif
+		tegra->pll_e = devm_clk_get(&pdev->dev, "pll_e");
+		if (IS_ERR(tegra->pll_e))
+			return PTR_ERR(tegra->pll_e);
+	}
 
 	ret = tegra_xhci_clk_enable(tegra);
 	if (ret)
 		goto put_hcd;
 
 	if (tegra_platform_is_fpga()) {
-		fpga_hacks_init(pdev);
-		fpga_hacks_partition_reset(pdev, false);
+		fpga_hacks_init(pdev, tegra);
+		fpga_hacks_partition_reset(pdev, tegra, false);
 		goto skip_clocks;
 	}
 
@@ -2223,7 +2225,7 @@ disable_xhci_clk:
 put_hcd:
 	usb_put_hcd(hcd);
 	if (tegra_platform_is_fpga())
-		fpga_hacks_partition_reset(pdev, true);
+		fpga_hacks_partition_reset(pdev, tegra, true);
 
 	if (!IS_ERR_OR_NULL(tegra->bwmgr_handle))
 		tegra_bwmgr_unregister(tegra->bwmgr_handle);
@@ -2348,31 +2350,32 @@ static bool port_connected(struct tegra_xhci_hcd *tegra, unsigned int port)
 #if IS_ENABLED(CONFIG_PM_SLEEP) || IS_ENABLED(CONFIG_PM)
 static void tegra_xhci_save_context(struct tegra_xhci_hcd *tegra)
 {
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	/* Save IPFS registers */
-	tegra->ipfs_ctx.msi_bar_sz =
-			ipfs_readl(tegra, XUSB_HOST_MSI_BAR_SZ_0);
-	tegra->ipfs_ctx.msi_axi_barst =
-			ipfs_readl(tegra, XUSB_HOST_MSI_AXI_BAR_ST_0);
-	tegra->ipfs_ctx.msi_fpci_barst =
-			ipfs_readl(tegra, XUSB_HOST_MSI_FPCI_BAR_ST_0);
-	tegra->ipfs_ctx.msi_vec0 =
-			ipfs_readl(tegra, XUSB_HOST_MSI_VEC0_0);
-	tegra->ipfs_ctx.msi_en_vec0 =
-			ipfs_readl(tegra, XUSB_HOST_MSI_EN_VEC0_0);
-	tegra->ipfs_ctx.fpci_error_masks =
-			ipfs_readl(tegra, XUSB_HOST_FPCI_ERROR_MASKS_0);
-	tegra->ipfs_ctx.intr_mask =
-			ipfs_readl(tegra, XUSB_HOST_INTR_MASK_0);
-	tegra->ipfs_ctx.ipfs_intr_enable =
-			ipfs_readl(tegra, XUSB_HOST_IPFS_INTR_ENABLE_0);
-	tegra->ipfs_ctx.ufpci_config =
-			ipfs_readl(tegra, XUSB_HOST_UFPCI_CONFIG_0);
-	tegra->ipfs_ctx.clkgate_hysteresis =
-			ipfs_readl(tegra, XUSB_HOST_CLKGATE_HYSTERESIS_0);
-	tegra->ipfs_ctx.xusb_host_mccif_fifo_cntrl =
-			ipfs_readl(tegra, XUSB_HOST_MCCIF_FIFOCTRL_0);
-#endif
+	if (XHCI_IS_T210(tegra)) {
+		/* Save IPFS registers */
+		tegra->ipfs_ctx.msi_bar_sz =
+				ipfs_readl(tegra, XUSB_HOST_MSI_BAR_SZ_0);
+		tegra->ipfs_ctx.msi_axi_barst =
+				ipfs_readl(tegra, XUSB_HOST_MSI_AXI_BAR_ST_0);
+		tegra->ipfs_ctx.msi_fpci_barst =
+				ipfs_readl(tegra, XUSB_HOST_MSI_FPCI_BAR_ST_0);
+		tegra->ipfs_ctx.msi_vec0 =
+				ipfs_readl(tegra, XUSB_HOST_MSI_VEC0_0);
+		tegra->ipfs_ctx.msi_en_vec0 =
+				ipfs_readl(tegra, XUSB_HOST_MSI_EN_VEC0_0);
+		tegra->ipfs_ctx.fpci_error_masks =
+				ipfs_readl(tegra, XUSB_HOST_FPCI_ERROR_MASKS_0);
+		tegra->ipfs_ctx.intr_mask =
+				ipfs_readl(tegra, XUSB_HOST_INTR_MASK_0);
+		tegra->ipfs_ctx.ipfs_intr_enable =
+				ipfs_readl(tegra, XUSB_HOST_IPFS_INTR_ENABLE_0);
+		tegra->ipfs_ctx.ufpci_config =
+				ipfs_readl(tegra, XUSB_HOST_UFPCI_CONFIG_0);
+		tegra->ipfs_ctx.clkgate_hysteresis =
+				ipfs_readl(tegra,
+					XUSB_HOST_CLKGATE_HYSTERESIS_0);
+		tegra->ipfs_ctx.xusb_host_mccif_fifo_cntrl =
+				ipfs_readl(tegra, XUSB_HOST_MCCIF_FIFOCTRL_0);
+	}
 	/* Save FPCI registers */
 	tegra->fpci_ctx.hs_pls =
 		fpci_readl(tegra, XUSB_CFG_ARU_CONTEXT_HS_PLS);
@@ -2422,31 +2425,32 @@ static void tegra_xhci_restore_context(struct tegra_xhci_hcd *tegra)
 	fpci_writel(tegra, tegra->fpci_ctx.cfg_order, XUSB_CFG_AXI_CFG);
 	fpci_writel(tegra, tegra->fpci_ctx.cfg_fladj, XUSB_CFG_24);
 	fpci_writel(tegra, tegra->fpci_ctx.cfg_sid, XUSB_CFG_16);
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-	/* Restore IPFS registers */
-	ipfs_writel(tegra, tegra->ipfs_ctx.msi_bar_sz,
-			XUSB_HOST_MSI_BAR_SZ_0);
-	ipfs_writel(tegra, tegra->ipfs_ctx.msi_axi_barst,
-			XUSB_HOST_MSI_AXI_BAR_ST_0);
-	ipfs_writel(tegra, tegra->ipfs_ctx.msi_fpci_barst,
-			XUSB_HOST_MSI_FPCI_BAR_ST_0);
-	ipfs_writel(tegra, tegra->ipfs_ctx.msi_vec0,
-			XUSB_HOST_MSI_VEC0_0);
-	ipfs_writel(tegra, tegra->ipfs_ctx.msi_en_vec0,
-			XUSB_HOST_MSI_EN_VEC0_0);
-	ipfs_writel(tegra, tegra->ipfs_ctx.fpci_error_masks,
-			XUSB_HOST_FPCI_ERROR_MASKS_0);
-	ipfs_writel(tegra, tegra->ipfs_ctx.intr_mask,
-			XUSB_HOST_INTR_MASK_0);
-	ipfs_writel(tegra, tegra->ipfs_ctx.ipfs_intr_enable,
-			XUSB_HOST_IPFS_INTR_ENABLE_0);
-	ipfs_writel(tegra, tegra->ipfs_ctx.ufpci_config,
-			XUSB_HOST_UFPCI_CONFIG_0);
-	ipfs_writel(tegra, tegra->ipfs_ctx.clkgate_hysteresis,
-			XUSB_HOST_CLKGATE_HYSTERESIS_0);
-	ipfs_writel(tegra, tegra->ipfs_ctx.xusb_host_mccif_fifo_cntrl,
-			XUSB_HOST_MCCIF_FIFOCTRL_0);
-#endif
+
+	if (XHCI_IS_T210(tegra)) {
+		/* Restore IPFS registers */
+		ipfs_writel(tegra, tegra->ipfs_ctx.msi_bar_sz,
+				XUSB_HOST_MSI_BAR_SZ_0);
+		ipfs_writel(tegra, tegra->ipfs_ctx.msi_axi_barst,
+				XUSB_HOST_MSI_AXI_BAR_ST_0);
+		ipfs_writel(tegra, tegra->ipfs_ctx.msi_fpci_barst,
+				XUSB_HOST_MSI_FPCI_BAR_ST_0);
+		ipfs_writel(tegra, tegra->ipfs_ctx.msi_vec0,
+				XUSB_HOST_MSI_VEC0_0);
+		ipfs_writel(tegra, tegra->ipfs_ctx.msi_en_vec0,
+				XUSB_HOST_MSI_EN_VEC0_0);
+		ipfs_writel(tegra, tegra->ipfs_ctx.fpci_error_masks,
+				XUSB_HOST_FPCI_ERROR_MASKS_0);
+		ipfs_writel(tegra, tegra->ipfs_ctx.intr_mask,
+				XUSB_HOST_INTR_MASK_0);
+		ipfs_writel(tegra, tegra->ipfs_ctx.ipfs_intr_enable,
+				XUSB_HOST_IPFS_INTR_ENABLE_0);
+		ipfs_writel(tegra, tegra->ipfs_ctx.ufpci_config,
+				XUSB_HOST_UFPCI_CONFIG_0);
+		ipfs_writel(tegra, tegra->ipfs_ctx.clkgate_hysteresis,
+				XUSB_HOST_CLKGATE_HYSTERESIS_0);
+		ipfs_writel(tegra, tegra->ipfs_ctx.xusb_host_mccif_fifo_cntrl,
+				XUSB_HOST_MCCIF_FIFOCTRL_0);
+	}
 }
 
 static void tegra_xhci_program_utmi_power_lp0_exit(
@@ -2499,8 +2503,8 @@ static int tegra_xhci_wait_for_ports_enter_u3(struct tegra_xhci_hcd *tegra)
 			continue;
 
 		get_rootport_name(tegra, i, devname, sizeof(devname));
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-		if (DEV_SUPERSPEED(portsc)) {
+
+		if (XHCI_IS_T210(tegra) && DEV_SUPERSPEED(portsc)) {
 			unsigned long end = jiffies + msecs_to_jiffies(200);
 			while (time_before(jiffies, end)) {
 				if ((portsc & PORT_PLS_MASK) == XDEV_RESUME)
@@ -2518,7 +2522,7 @@ static int tegra_xhci_wait_for_ports_enter_u3(struct tegra_xhci_hcd *tegra)
 				}
 			}
 		}
-#endif
+
 		if (is_busy) {
 			dev_info(dev, "%s is not suspended: %08x\n", devname,
 				portsc);
@@ -2827,16 +2831,16 @@ static int tegra_xhci_suspend(struct device *dev)
 			if (ret)
 				dev_dbg(dev, "%s: power off CDP phy %d failed\n",
 					__func__, j);
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+
 			/*
 			 * turn off VBUS for CDP enabled case.
 			 * skip vbus off for OTG port when it isn't host role
 			 */
-			if (j != tegra->utmi_otg_port_base_1 - 1 ||
-					tegra->host_mode)
+			if (XHCI_IS_T186(tegra) &&
+					(j != tegra->utmi_otg_port_base_1 - 1 ||
+					tegra->host_mode))
 				tegra_phy_xusb_utmi_vbus_power_off(
 						tegra->phys[UTMI_PHY][j]);
-#endif
 
 		}
 	}
@@ -2879,13 +2883,13 @@ static int tegra_xhci_resume_common(struct device *dev)
 			if (ret)
 				dev_dbg(dev, "%s: power on CDP phy %d failed\n",
 					__func__, j);
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+
 			/* skip vbus on for OTG port when it isn't host role */
-			if (j != tegra->utmi_otg_port_base_1 - 1 ||
-					tegra->host_mode)
+			if (XHCI_IS_T186(tegra) &&
+					(j != tegra->utmi_otg_port_base_1 - 1 ||
+					tegra->host_mode))
 				tegra_phy_xusb_utmi_vbus_power_on(
 						tegra->phys[UTMI_PHY][j]);
-#endif
 		}
 	}
 
@@ -3182,14 +3186,13 @@ static int tegra_xhci_alloc_dev(struct usb_hcd *hcd, struct usb_device *udev)
 						__func__, i);
 				tegra->connected_utmi_ports[i] = 1;
 
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
 				/*
 				 * set pad protection circuit to >= 2A
 				 * CDP current range: 1.5A~5A see [BC1.2] p36
 				 */
-				tegra_phy_xusb_utmi_pad_set_protection_level(
+				if (XHCI_IS_T186(tegra))
+					tegra_phy_xusb_utmi_pad_set_protection_level(
 						tegra->phys[UTMI_PHY][i], 3);
-#endif
 			}
 		}
 	}
@@ -3218,11 +3221,10 @@ static void tegra_xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 				__func__, port);
 		tegra->connected_utmi_ports[port] = 0;
 
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-		/* disable pad protection circuit on this UTMI pad */
-		tegra_phy_xusb_utmi_pad_set_protection_level(
+		if (XHCI_IS_T186(tegra))
+			/* disable pad protection circuit on this UTMI pad */
+			tegra_phy_xusb_utmi_pad_set_protection_level(
 				tegra->phys[UTMI_PHY][port], -1);
-#endif
 	}
 }
 

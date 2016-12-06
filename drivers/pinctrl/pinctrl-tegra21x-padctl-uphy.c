@@ -3013,6 +3013,18 @@ static int tegra21x_utmi_phy_power_off(struct phy *phy)
 	return 0;
 }
 
+int tegra_phy_xusb_utmi_vbus_power_on(struct phy *phy)
+{
+	/* dummy function, needed for kernel unification */
+	return 0;
+}
+
+int tegra_phy_xusb_utmi_vbus_power_off(struct phy *phy)
+{
+	/* dummy function, needed for kernel unification */
+	return 0;
+}
+
 static const struct phy_ops utmi_phy_ops = {
 	.init = tegra21x_utmi_phy_init,
 	.exit = tegra21x_utmi_phy_exit,
