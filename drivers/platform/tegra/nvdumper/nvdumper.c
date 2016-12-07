@@ -25,10 +25,6 @@
 #include "nvdumper.h"
 #include "nvdumper-footprint.h"
 
-#ifdef CONFIG_TEGRA_USE_NCT
-#include "../../../arch/arm/mach-tegra/include/mach/nct.h"
-#endif
-
 unsigned long nvdumper_reserved;
 
 static void __init nvdumper_sysfs_init(void);
@@ -126,9 +122,6 @@ static int __init nvdumper_init(void)
 {
 	int ret;
 
-#ifdef CONFIG_TEGRA_USE_NCT
-	union nct_item_type *item;
-#endif
 	if (!nvdumper_reserved)
 		return -ENOTSUPP;
 	nvdumper_ptr = ioremap_nocache(nvdumper_reserved,
@@ -165,54 +158,15 @@ static int __init nvdumper_init(void)
 
 	nvdumper_sysfs_init();
 
-#ifdef CONFIG_TEGRA_USE_NCT
-	item = kzalloc(sizeof(*item), GFP_KERNEL);
-	if (!item) {
-		pr_err("failed to allocate memory\n");
-		goto err_out3;
-	}
-
-	ret = tegra_nct_read_item(NCT_ID_RAMDUMP, item);
-	if (ret < 0) {
-		pr_err("%s: NCT read failure\n", __func__);
-		kfree(item);
-		set_dirty_state(NVDUMPER_CLEAN);
-		goto err_out0;
-	}
-
-	pr_info("%s: RAMDUMP flag(%d) from NCT\n",
-			__func__, item->ramdump.flag);
-	if (item->ramdump.flag == 1)
-		set_dirty_state(NVDUMPER_DIRTY_DUMP);
-	else if (item->ramdump.flag == 2)
-		set_dirty_state(NVDUMPER_DIRTY);
-	else if (item->ramdump.flag == 3)
-		set_dirty_state(NVDUMPER_WDT_DUMP);
-	else
-		set_dirty_state(NVDUMPER_CLEAN);
-
-	kfree(item);
-
-	return 0;
-
-err_out3:
-
-#else
 	set_dirty_state(NVDUMPER_DIRTY);
 	return 0;
-#endif
 
 err_out2:
 	unregister_reboot_notifier(&nvdumper_reboot_notifier);
 err_out1:
 	iounmap(nvdumper_ptr);
 
-#ifdef CONFIG_TEGRA_USE_NCT /* avoid build error if NCT is not enabled*/
-err_out0:
-#endif
-
 	return ret;
-
 }
 
 static void __exit nvdumper_exit(void)
