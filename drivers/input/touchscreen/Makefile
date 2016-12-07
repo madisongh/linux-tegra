@@ -5,7 +5,7 @@
 # Each configuration option enables a list of files.
 
 GCOV_PROFILE := y
-
+KASAN_SANITIZE_lr388k7_ts.o := n
 ccflags-y += -Werror
 wm97xx-ts-y := wm97xx-core.o
 
