@@ -87,8 +87,6 @@ obj-y += bond_out.o
 
 obj-$(CONFIG_TEGRA_HMP_CLUSTER_CONTROL)      += cluster-control.o
 
-obj-$(CONFIG_TEGRA_USE_NCT)             += nct.o nct_sysfs.o
-
 endif
 
 obj-$(CONFIG_TEGRA_IVC)			+= tegra-ivc.o
