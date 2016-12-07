@@ -26,10 +26,6 @@
 
 int tegra12_emc_init(void);
 
-#ifdef CONFIG_TEGRA_USE_NCT
-extern int tegra12_nct_emc_table_init(struct tegra12_emc_pdata *nct_emc_pdata);
-#endif
-
 enum {
 	DRAM_DEV_SEL_ALL = 0,
 	DRAM_DEV_SEL_0	 = (2 << 30),
