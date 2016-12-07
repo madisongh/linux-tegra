@@ -907,7 +907,7 @@ int tegra_pinctrl_probe(struct platform_device *pdev,
 		}
 	}
 
-	pmx->pctl = pinctrl_register(&tegra_pinctrl_desc, &pdev->dev, pmx);
+	pmx->pctl = devm_pinctrl_register(&pdev->dev, &tegra_pinctrl_desc, pmx);
 	if (IS_ERR(pmx->pctl)) {
 		dev_err(&pdev->dev, "Couldn't register pinctrl driver\n");
 		return PTR_ERR(pmx->pctl);
@@ -923,16 +923,6 @@ int tegra_pinctrl_probe(struct platform_device *pdev,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(tegra_pinctrl_probe);
-
-int tegra_pinctrl_remove(struct platform_device *pdev)
-{
-	struct tegra_pmx *pmx = platform_get_drvdata(pdev);
-
-	pinctrl_unregister(pmx->pctl);
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(tegra_pinctrl_remove);
 
 int tegra_pinctrl_config_prod(struct device *dev, const char *prod_name)
 {
