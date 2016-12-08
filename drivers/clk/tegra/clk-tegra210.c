@@ -3633,7 +3633,7 @@ static u32 * __init tegra210_init_suspend_ctx(void)
 	int i, size = 0;
 
 	for (i = 0; i < ARRAY_SIZE(periph_srcs); i++)
-		size += periph_srcs[i].end - periph_srcs[i].start + 1;
+		size += periph_srcs[i].end - periph_srcs[i].start + 4;
 
 	periph_clk_src_ctx = kmalloc(size, GFP_KERNEL);
 
