@@ -36,7 +36,7 @@
 #include <asm/mmu.h>
 #endif
 
-#include <mach/gpufuse.h>
+#include <soc/tegra/gpufuse.h>
 
 /* Tegra macros defining HIDREV MINORREV */
 #define MINOR_QT                0

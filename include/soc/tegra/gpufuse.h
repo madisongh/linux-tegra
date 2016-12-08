@@ -1,6 +1,4 @@
 /*
- * arch/arm/mach-tegra/include/mach/gpufuse.h
- *
  * Copyright (C) 2010-2012 NVIDIA Corporation.
  *
  * This software is licensed under the terms of the GNU General Public
@@ -15,6 +13,10 @@
  */
 
 /* Number of register sets to handle in host context switching */
+
+#ifndef _SOC_TEGRA_GPUFUSE_H
+#define _SOC_TEGRA_GPUFUSE_H
+
 int tegra_gpu_register_sets(void);
 
 struct gpu_info {
@@ -24,3 +26,4 @@ struct gpu_info {
 
 void tegra_gpu_get_info(struct gpu_info *pInfo);
 
+#endif /* _SOC_TEGRA_GPUFUSE_H */
