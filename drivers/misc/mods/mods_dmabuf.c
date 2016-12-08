@@ -25,7 +25,7 @@
 #include <linux/dma-buf.h>
 #include <linux/platform_device.h>
 
-#include <mach/tegra_smmu.h>
+#include <linux/tegra_smmu.h>
 
 #include "mods_internal.h"
 
