@@ -1381,13 +1381,6 @@ static int tegra_adma_probe(struct platform_device *pdev)
 			return PTR_ERR(tdma->dma_clk);
 		}
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-		tdma->ape_clk = clk_get_sys(NULL, "adma.ape");
-		if (IS_ERR(tdma->ape_clk)) {
-			dev_err(&pdev->dev, "Error: Missing APE clock\n");
-			return PTR_ERR(tdma->ape_clk);
-		}
-#else
 		tdma->ape_clk = devm_clk_get(&pdev->dev, "adma.ape");
 		if (IS_ERR(tdma->ape_clk)) {
 			dev_err(&pdev->dev, "Error: Missing APE clock\n");
@@ -1399,7 +1392,6 @@ static int tegra_adma_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "Error: Missing APB2APE clock\n");
 			return PTR_ERR(tdma->apb2ape_clk);
 		}
-#endif
 	}
 
 	spin_lock_init(&tdma->global_lock);
@@ -1593,9 +1585,7 @@ static int tegra_adma_runtime_suspend(struct device *dev)
 	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
 		clk_disable_unprepare(tdma->dma_clk);
 		clk_disable_unprepare(tdma->ape_clk);
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
 		clk_disable_unprepare(tdma->apb2ape_clk);
-#endif
 	}
 
 	return 0;
@@ -1614,13 +1604,13 @@ static int tegra_adma_runtime_resume(struct device *dev)
 			dev_err(dev, "clk_enable failed: %d\n", ret);
 			return ret;
 		}
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
+
 		ret = clk_prepare_enable(tdma->apb2ape_clk);
 		if (ret < 0) {
 			dev_err(dev, "clk_enable failed: %d\n", ret);
 			return ret;
 		}
-#endif
+
 		ret = clk_prepare_enable(tdma->dma_clk);
 		if (ret < 0) {
 			dev_err(dev, "clk_enable failed: %d\n", ret);
