@@ -441,6 +441,10 @@ struct tegra_xhci_hcd {
 
 	u8 *connected_utmi_ports; /* keep track of connected UTMI ports */
 	bool cdp_enabled;
+
+	struct mutex mbox_lock_ack;
+	u32 fw_ack; /* storing the mbox cmd_type from FW */
+	wait_queue_head_t fw_ack_wq; /* sleep support for FW to SW mbox ack */
 };
 
 static struct hc_driver __read_mostly tegra_xhci_hc_driver;
@@ -1257,6 +1261,22 @@ static void tegra_xhci_mbox_work(struct work_struct *work)
 		}
 		resp.cmd = MBOX_CMD_COMPL;
 		break;
+	case MBOX_CMD_ACK:
+	case MBOX_CMD_NAK:
+		if (XHCI_IS_T210(tegra)) {
+			if (msg->cmd == MBOX_CMD_ACK)
+				dev_dbg(tegra->dev,
+					"%s firmware responds ACK\n",
+					__func__);
+			else
+				dev_warn(tegra->dev,
+					"%s firmware responds NAK\n",
+					__func__);
+			/* inform processes that needs FW ACK */
+			tegra->fw_ack = msg->cmd;
+			wake_up_interruptible(&tegra->fw_ack_wq);
+		}
+		break;
 	default:
 		break;
 	}
@@ -1339,6 +1359,63 @@ static const struct of_device_id tegra_xhci_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, tegra_xhci_of_match);
 
+/*
+ * ack_fw_message_send_sync - send FW message and block until receiving FW ACK
+ *      This function will block until FW ack is received.
+ * @return      0 if FW returns MBOX_CMD_ACK (success)
+ *              -EINVAL if FW returns MBOX_CMD_NAK (failure)
+ *              -EPIPE if FW returns a mbox type other than ACK or NACK
+ *              -ETIMEOUT if either sending or waiting for FW ack times out
+ *              -ERESTARTSYS if the wait has been interrupted by a signal
+ */
+static int ack_fw_message_send_sync(struct tegra_xhci_hcd *tegra,
+				enum tegra_xusb_mbox_cmd type, u32 data)
+{
+	int ret = 0;
+	struct tegra_xusb_mbox_msg msg;
+
+	if (!XHCI_IS_T210(tegra))
+		return ret;
+
+	mutex_lock(&tegra->mbox_lock_ack);
+	tegra->fw_ack = 0;
+
+	/* send mbox message */
+	msg.cmd = type;
+	msg.data = data;
+	ret = mbox_send_message(tegra->mbox_chan, &msg);
+	if (ret)
+		goto out;
+
+	/* wait for FW ACK with 20ms timeout */
+	ret = wait_event_interruptible_timeout(tegra->fw_ack_wq,
+			tegra->fw_ack, msecs_to_jiffies(20));
+	if (ret == 0) {
+		dev_warn(tegra->dev, "%s: timeout waiting for FW msg\n",
+				__func__);
+		ret = -ETIMEDOUT;
+		goto out;
+	} else if (ret == -ERESTARTSYS) {
+		dev_warn(tegra->dev, "%s: interrupted when waiting\n",
+				__func__);
+		goto out;
+	}
+
+	/* we have got FW ACK here, check what FW returns */
+	dev_dbg(tegra->dev, "%s: FW ack type:%u\n",
+			__func__, tegra->fw_ack);
+	if (tegra->fw_ack == MBOX_CMD_ACK)
+		ret = 0;
+	else if (tegra->fw_ack == MBOX_CMD_NAK)
+		ret = -EINVAL;
+	else
+		ret = -EPIPE; /* violation in mailbox protocol */
+
+out:
+	mutex_unlock(&tegra->mbox_lock_ack);
+	return ret;
+}
+
 static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 {
 	struct xhci_hcd *xhci;
@@ -1413,6 +1490,25 @@ role_update:
 	if (on) {
 		/* switch to host mode */
 		if (tegra->usb3_otg_port_base_1) {
+			if (XHCI_IS_T210(tegra)) {
+				/* set PP=0 */
+				xhci_hub_control(xhci->shared_hcd, GetPortStatus
+					, 0, tegra->usb3_otg_port_base_1
+					, (char *) &status, sizeof(status));
+				if (status & USB_SS_PORT_STAT_POWER) {
+					xhci_hub_control(xhci->shared_hcd,
+						ClearPortFeature,
+						USB_PORT_FEAT_POWER,
+						tegra->usb3_otg_port_base_1,
+						NULL, 0);
+				}
+
+				/* reset OTG port SSPI */
+				ack_fw_message_send_sync(tegra,
+						MBOX_CMD_RESET_SSPI,
+						tegra->usb3_otg_port_base_1);
+			}
+
 			xhci_hub_control(xhci->shared_hcd, SetPortFeature,
 				USB_PORT_FEAT_POWER, tegra->usb3_otg_port_base_1
 				, NULL, 0);
@@ -2063,6 +2159,10 @@ skip_clocks:
 				"can't get mailbox channel (%d)\n", ret);
 		goto disable_regulator;
 	}
+
+	/* FW mailbox ACK wait queue initialization */
+	mutex_init(&tegra->mbox_lock_ack);
+	init_waitqueue_head(&tegra->fw_ack_wq);
 
 	for (i = 0; i < ARRAY_SIZE(tegra->phys); i++) {
 		tegra->phys[i] = devm_kcalloc(&pdev->dev,
