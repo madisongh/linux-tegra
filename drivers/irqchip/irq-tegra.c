@@ -516,7 +516,7 @@ static int __init tegra_ictlr_init(struct device_node *node,
 		node->full_name, num_ictlrs * 32, parent->full_name);
 
 	for (i = 0; i < ARRAY_SIZE(doorbells); i++)
-		doorbells[idx].hwirq = -1;
+		doorbells[i].hwirq = -1;
 
 	for (idx = 0; idx < ARRAY_SIZE(doorbells); idx++) {
 		int irq;
