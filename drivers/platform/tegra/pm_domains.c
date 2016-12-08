@@ -160,11 +160,7 @@ static bool tegra_ape_pd_initialized;
 /* APE wakelock is needed to preserve AGIC state */
 static struct wake_lock tegra_ape_wakelock;
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-#define APE_CLK_GET(name) clk_get_sys(NULL, name)
-#else
 #define APE_CLK_GET(name) of_clk_get_by_name(ape_pd->gpd.of_node, name)
-#endif /* CONFIG_ARCH_TEGRA_21x_SOC */
 
 static int tegra_ape_pd_enable_clks(struct tegra_pm_domain *ape_pd)
 {
