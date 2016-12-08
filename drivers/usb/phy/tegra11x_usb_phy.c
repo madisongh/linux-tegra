@@ -35,7 +35,6 @@
 #include <dt-bindings/usb/tegra-usb.h>
 
 #include "tegra_usb_phy.h"
-#include "../../../arch/arm/mach-tegra/gpio-names.h"
 
 /* HACK! This needs to come from DT */
 #include "../../../arch/arm/mach-tegra/iomap.h"
