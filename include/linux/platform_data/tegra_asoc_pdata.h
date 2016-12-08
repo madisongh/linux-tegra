@@ -1,6 +1,4 @@
 /*
- * arch/arm/mach-tegra/include/mach/tegra_asoc_pdata.h
- *
  * Copyright (c) 2012-2013, NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
