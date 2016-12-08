@@ -80,7 +80,6 @@ obj-$(CONFIG_COMMON_CLK) += common_clock.o
 
 
 obj-$(CONFIG_TEGRA_KFUSE) += tegra_kfuse.o
-obj-y += apbio.o
 
 obj-$(CONFIG_TEGRA_MC_DOMAINS) += pm_domains.o
 obj-y += bond_out.o
