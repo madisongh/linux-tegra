@@ -2537,7 +2537,7 @@ static void clk_pll_iddq_disable(struct clk_hw *hw)
 		spin_unlock_irqrestore(pll->lock, flags);
 }
 
-#ifdef CONFIG_PM_SLEEP
+#if defined(CONFIG_PM_SLEEP) && defined(CONFIG_ARCH_TEGRA_210_SOC)
 void tegra_clk_pll_resume(struct clk *c, unsigned long rate)
 {
 	struct clk *parent = clk_get_parent(c);
