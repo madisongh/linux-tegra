@@ -26,6 +26,7 @@
 #include <linux/pm_qos.h>
 
 #include <linux/platform/tegra/cpu-tegra.h>
+#include <linux/platform/tegra/cpu_emc.h>
 
 #include <soc/tegra/tegra-dvfs.h>
 
@@ -96,7 +97,7 @@ static void pm_qos_register_notifier(void)
 		&tfreq_priv->max_freq_notifier);
 }
 
-static struct device_node *of_get_scaling_node(const char *name)
+struct device_node *of_get_scaling_node(const char *name)
 {
 	struct device *dev = &tfreq_priv->pdev->dev;
 	struct device_node *scaling_np = NULL;
@@ -176,11 +177,11 @@ dfll_fail:
 
 static int cpufreq_table_make_from_dt(void)
 {
-	struct device_node *np = NULL;
 	struct tegra_cpufreq_table_data *tftbl = &tfreq_priv->tfrqtbl;
 	struct device *dev = &tfreq_priv->pdev->dev;
 	struct cpufreq_frequency_table *ftbl;
 	const char *propname = "freq-table";
+	struct device_node *np = NULL;
 	u32 *freqs = NULL;
 	int i, freqs_num;
 	int ret = 0;
@@ -286,18 +287,19 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int index)
 
 	cpufreq_freq_transition_begin(policy, &freqs);
 
-	if (freqs.old != tgt_freq)
+	if (freqs.old != tgt_freq) {
 		for_each_cpu(cpu, policy->cpus) {
 			update_cpu_freq(tgt_freq, cpu);
 			tfreq_priv->cpu_freq[cpu] = tgt_freq;
 		}
-
+		set_cpu_to_emc_freq(tgt_freq);
+	}
 	policy->cur = tgt_freq;
 
 	cpufreq_freq_transition_end(policy, &freqs, ret);
 out:
-	dev_dbg(dev, "cpu: %d, oldfreq(kHz): %d, req freq(kHz): %d final freq(kHz): %d tgt_index %u\n",
-		policy->cpu, freqs.old, tgt_freq, policy->cur, index);
+	dev_dbg(dev, "cpu: %d, oldfreq(kHz): %u, req freq(kHz): %u final freq(kHz):%u\n",
+				policy->cpu, freqs.old, tgt_freq, policy->cur);
 	return ret;
 }
 
@@ -324,6 +326,8 @@ static int percpu_cpufreq_init(struct cpufreq_policy *policy)
 
 	freq = get_cpu_freq(policy->cpu); /* boot freq */
 
+	set_cpu_to_emc_freq(freq);
+
 	cpufreq_table_validate_and_show(policy, ftbl);
 
 	/* clip boot frequency to table entry */
@@ -349,6 +353,7 @@ static int percpu_cpufreq_init(struct cpufreq_policy *policy)
 static int percpu_cpufreq_exit(struct cpufreq_policy *policy)
 {
 	cpufreq_frequency_table_cpuinfo(policy, tfreq_priv->tfrqtbl.freq_table);
+
 	return 0;
 }
 
@@ -373,6 +378,7 @@ static int tegra_cpufreq_probe(struct platform_device *pdev)
 	tfreq_priv = devm_kzalloc(dev, sizeof(*tfreq_priv), GFP_KERNEL);
 	if (!tfreq_priv)
 		return -ENOMEM;
+
 	platform_set_drvdata(pdev, tfreq_priv);
 	tfreq_priv->pdev = pdev;
 	ret = cpufreq_table_make_from_dt();
@@ -380,6 +386,10 @@ static int tegra_cpufreq_probe(struct platform_device *pdev)
 		goto err_out;
 
 	ret = enable_cpu_clk();
+	if (ret)
+		goto err_out;
+
+	ret = enable_cpu_emc_clk();
 	if (ret)
 		goto err_out;
 
@@ -399,6 +409,7 @@ static int tegra_cpufreq_remove(struct platform_device *pdev)
 {
 	struct tegra_cpufreq_priv *priv = platform_get_drvdata(pdev);
 
+	disable_cpu_emc_clk();
 	platform_device_unregister(priv->pdev);
 	return 0;
 }

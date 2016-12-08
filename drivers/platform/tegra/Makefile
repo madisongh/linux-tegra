@@ -45,7 +45,7 @@ obj-$(CONFIG_ARCH_TEGRA_21x_SOC)        += tegra_throttle.o
 endif
 
 ifeq ($(CONFIG_CPU_FREQ),y)
-#obj-$(CONFIG_ARCH_TEGRA_21x_SOC)                  += cpu-tegra.o
+obj-$(CONFIG_ARM_TEGRA210_CPUFREQ)                  += cpu_emc.o
 endif
 
 obj-$(CONFIG_TEGRA_CLUSTER_CONTROL) += sysfs-cluster.o
