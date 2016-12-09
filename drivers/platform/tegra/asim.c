@@ -22,8 +22,6 @@
 #include <linux/of_device.h>
 #include <linux/module.h>
 
-#include <mach/irqs.h>
-
 #include "iomap.h"
 
 #define DEFAULT_ASIM_FAKE_RPC_BASE	0x538f0000

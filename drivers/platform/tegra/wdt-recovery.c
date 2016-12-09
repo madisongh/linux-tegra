@@ -29,8 +29,6 @@
 
 #include <asm/mach/time.h>
 
-#include <mach/irqs.h>
-
 #include "iomap.h"
 
 static int wdt_heartbeat = 30;

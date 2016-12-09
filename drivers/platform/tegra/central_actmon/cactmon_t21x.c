@@ -24,7 +24,6 @@
 #include <linux/uaccess.h>
 #include <linux/module.h>
 #include <linux/delay.h>
-#include <mach/irqs.h>
 #include <linux/platform/tegra/cpu-tegra.h>
 #include <linux/platform/tegra/clock.h>
 #include <linux/tegra_pm_domains.h>
