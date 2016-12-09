@@ -2492,6 +2492,7 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_dmic1_sync_clk_mux] = { .dt_id = TEGRA210_CLK_DMIC1_SYNC_CLK_MUX, .present = true },
 	[tegra_clk_dmic2_sync_clk_mux] = { .dt_id = TEGRA210_CLK_DMIC2_SYNC_CLK_MUX, .present = true },
 	[tegra_clk_dmic3_sync_clk_mux] = { .dt_id = TEGRA210_CLK_DMIC3_SYNC_CLK_MUX, .present = true },
+	[tegra_clk_la] = { .dt_id = TEGRA210_CLK_LA, .present = true },
 };
 
 static struct tegra_devclk devclks[] __initdata = {
@@ -2664,6 +2665,7 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "pll_p_out5", .dt_id = TEGRA210_CLK_PLL_P_OUT5 },
 	{ .con_id = "aclk_slcg_ovr", .dt_id = TEGRA210_CLK_ACLK_SLCG_OVR },
 	{ .con_id = "aclk", .dt_id = TEGRA210_CLK_ACLK },
+	{ .con_id = "la", .dt_id = TEGRA210_CLK_LA },
 };
 
 static struct tegra_audio_clk_info tegra210_audio_plls[] = {
