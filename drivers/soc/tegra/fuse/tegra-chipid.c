@@ -139,3 +139,4 @@ enum tegra_chipid tegra_get_chipid(void)
 
 	return tegra_id.chipid;
 }
+EXPORT_SYMBOL(tegra_get_chipid);
