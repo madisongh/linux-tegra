@@ -47,7 +47,6 @@
 #include <linux/usb/tegra_usb_pad_ctrl.h>
 #include <soc/tegra/common.h>
 #include "../../../arch/arm/mach-tegra/iomap.h"
-#include "../../../arch/arm/mach-tegra/board.h"
 
 #define INT_USB		20
 

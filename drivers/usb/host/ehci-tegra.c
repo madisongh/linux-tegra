@@ -46,7 +46,6 @@
 
 /* HACK! This needs to come from DT */
 #include "../../../arch/arm/mach-tegra/iomap.h"
-#include "../../../arch/arm/mach-tegra/board.h"
 
 #if 0
 #define EHCI_DBG(stuff...)	pr_info("ehci-tegra: " stuff)
