@@ -3939,6 +3939,11 @@ static void __init tegra210_ovr_clk_init(void __iomem *clk_base)
 	clk = clk_register_gate(NULL, "sata_slcg_ovr_fpci", "sata", 0,
 			clk_base + LVL2_CLK_GATE_OVRC, 19, 0, NULL);
 	clks[TEGRA210_CLK_SATA_SLCG_OVR_FPCI] = clk;
+
+	clk = clk_register_gate(NULL, "aclk_slcg_ovr", "ape", 0,
+			clk_base + LVL2_CLK_GATE_OVRE, 11, 0, NULL);
+	clks[TEGRA210_CLK_ACLK_SLCG_OVR] = clk;
+
 }
 
 /**
