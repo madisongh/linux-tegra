@@ -54,7 +54,7 @@ int tegra_fuse_readl(unsigned long offset, u32 *val);
 
 #if defined(CONFIG_TEGRA_FUSE)
 bool tegra_spare_fuse(int bit);
-u32 tegra_get_chip_id(void);
+u8 tegra_get_chip_id(void);
 int tegra_get_sku_override(void);
 u32 tegra_get_sku_id(void);
 #endif

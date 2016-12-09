@@ -448,7 +448,7 @@ u32 tegra_get_sku_id(void)
 	return tegra_chip_sku_id;
 }
 
-u32 tegra_get_chip_id(void)
+u8 tegra_get_chip_id(void)
 {
 	return tegra_chip_id;
 }
