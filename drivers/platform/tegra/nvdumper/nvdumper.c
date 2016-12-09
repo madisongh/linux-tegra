@@ -21,7 +21,6 @@
 #include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
-#include "../../../arch/arm/mach-tegra/board.h"
 #include "nvdumper.h"
 #include "nvdumper-footprint.h"
 
