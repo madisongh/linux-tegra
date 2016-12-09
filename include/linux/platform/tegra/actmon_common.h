@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2016-2017, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -155,6 +155,8 @@ struct actmon_drv_data {
 	unsigned long freq;
 	struct reset_control *actmon_rst;
 	struct actmon_dev devices[MAX_DEVICES];
+	int (*actmon_dev_platform_init)(struct actmon_dev *adev,
+		struct platform_device *pdev);
 	int (*clock_init)(struct platform_device *pdev);
 	int (*clock_deinit)(struct platform_device *pdev);
 	int (*reset_init)(struct platform_device *pdev);
@@ -184,7 +186,7 @@ static inline void actmon_dev_writel(void __iomem *base, u32
 {
 	__raw_writel(val, base + offset);
 }
-int __init actmon_platform_register(struct platform_device *pdev);
-int actmon_dev_platform_register(struct actmon_dev *adev,
-		struct platform_device *pdev);
+
+int tegra_actmon_register(struct actmon_drv_data *actmon);
+int tegra_actmon_remove(struct platform_device *pdev);
 #endif /* ACTMON_COMMON_H */
