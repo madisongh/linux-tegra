@@ -535,6 +535,7 @@ struct tegra_xudc {
 	struct work_struct set_sdp_dcp_charging_current_work;
 	struct delayed_work non_std_charger_work;
 	u32 current_ma;
+	bool selfpowered;
 };
 
 #define XUDC_TRB_MAX_BUFFER_SIZE 65536
@@ -1988,6 +1989,16 @@ static int tegra_xudc_gadget_vbus_draw(struct usb_gadget *gadget, unsigned m_a)
 	return 0;
 }
 
+static int tegra_xudc_set_selfpowered(struct usb_gadget *gadget, int is_on)
+{
+	struct tegra_xudc *xudc = to_xudc(gadget);
+
+	dev_dbg(xudc->dev, "%s: %d\n", __func__, is_on);
+	xudc->selfpowered = !!is_on;
+
+	return 0;
+}
+
 static struct usb_gadget_ops tegra_xudc_gadget_ops = {
 	.get_frame = tegra_xudc_gadget_get_frame,
 	.wakeup = tegra_xudc_gadget_wakeup,
@@ -1995,6 +2006,7 @@ static struct usb_gadget_ops tegra_xudc_gadget_ops = {
 	.udc_start = tegra_xudc_gadget_start,
 	.udc_stop = tegra_xudc_gadget_stop,
 	.vbus_draw = tegra_xudc_gadget_vbus_draw,
+	.set_selfpowered = tegra_xudc_set_selfpowered,
 };
 
 static void no_op_complete(struct usb_ep *ep, struct usb_request *req)
@@ -2183,6 +2195,9 @@ static int tegra_xudc_ep0_get_status(struct tegra_xudc *xudc,
 	switch (ctrl->bRequestType & USB_RECIP_MASK) {
 	case USB_RECIP_DEVICE:
 		val = xudc_readl(xudc, PORTPM);
+
+		if (xudc->selfpowered)
+			status |= BIT(USB_DEVICE_SELF_POWERED);
 
 		if ((xudc->gadget.speed < USB_SPEED_SUPER) &&
 		    (val & PORTPM_RWE))
