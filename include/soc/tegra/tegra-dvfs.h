@@ -109,10 +109,10 @@ struct dvfs_rail {
 	struct rail_alignment alignment;
 	struct rail_stats stats;
 
-	const struct dvfs_therm_limits *therm_floors;
+	struct dvfs_therm_limits *therm_floors;
 	int therm_floors_size;
 	int therm_floor_idx;
-	const struct dvfs_therm_limits *therm_caps;
+	struct dvfs_therm_limits *therm_caps;
 	int therm_caps_size;
 	int therm_cap_idx;
 
@@ -120,6 +120,16 @@ struct dvfs_rail {
 	bool in_band_pm;
 
 	struct thermal_cooling_device *vts_cdev;
+	struct device_node *vts_of_node;
+	int vts_trips_table[MAX_THERMAL_LIMITS];
+	int vts_number_of_trips;
+	unsigned long therm_scale_idx;
+	int therm_floors_table[MAX_THERMAL_LIMITS];
+
+	struct thermal_cooling_device *vmax_cdev;
+	struct device_node *vmax_of_node;
+	int *vmax_trips;
+	int vmax_trips_num;
 };
 
 enum dfll_range {
@@ -155,6 +165,8 @@ struct dvfs {
 	struct list_head reg_node;
 	bool use_alt_freqs;
 	bool therm_dvfs;
+	bool na_dvfs;
+	bool na_therm_update;
 
 	/* Maximum rate safe at minimum voltage across all thermal ranges */
 	unsigned long fmax_at_vmin_safe_t;
@@ -193,16 +205,6 @@ struct cvb_dvfs {
 
 	/* CVB table for various frequencies */
 	struct cvb_dvfs_table cvb_table[MAX_DVFS_FREQS];
-
-	/* Trips for minimal voltage settings per thermal ranges */
-	int vmin_trips_table[MAX_THERMAL_LIMITS];
-	int therm_floors_table[MAX_THERMAL_LIMITS];
-
-	/* Trips for thermal DVFS per thermal ranges */
-	int vts_trips_table[MAX_THERMAL_LIMITS];
-
-	/* Trips for clock source change per thermal ranges */
-	int clk_switch_trips[MAX_THERMAL_LIMITS];
 };
 
 static inline bool tegra_dvfs_rail_is_dfll_mode(struct dvfs_rail *rail)
@@ -265,7 +267,7 @@ int tegra_dvfs_use_alt_freqs_on_clk(struct clk *c, bool use_alt_freq);
 int tegra_dvfs_predict_mv_at_hz_cur_tfloor(struct clk *c, unsigned long rate);
 int tegra_dvfs_init_thermal_dvfs_voltages(int *therm_voltages,
 	int *peak_voltages, int freqs_num, int ranges_num, struct dvfs *d);
-
+long tegra_dvfs_predict_hz_at_mv_max_tfloor(struct clk *c, int mv);
 #else
 static inline int tegra_dvfs_dfll_mode_set(struct clk *c, unsigned long rate)
 { return -EINVAL; }
@@ -337,6 +339,9 @@ static inline int tegra_dvfs_predict_mv_at_hz_cur_tfloor(struct clk *c,
 { return -EINVAL; }
 static inline int tegra_dvfs_init_thermal_dvfs_voltages(int *therm_voltages,
 	int *peak_voltages, int freqs_num, int ranges_num, struct dvfs *d)
+{ return -EINVAL; }
+static inline long tegra_dvfs_predict_hz_at_mv_max_tfloor(struct clk *c,
+							  int mv)
 { return -EINVAL; }
 #endif
 
