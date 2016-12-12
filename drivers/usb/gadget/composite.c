@@ -746,6 +746,12 @@ static int set_config(struct usb_composite_dev *cdev,
 	power = c->MaxPower ? c->MaxPower : CONFIG_USB_GADGET_VBUS_DRAW;
 	if (gadget->speed <= USB_SPEED_HIGH && power > USB_HS_VBUS_MAX_DRAW)
 		power = USB_HS_VBUS_MAX_DRAW;
+
+	/* set as self-powered if peripheral draws less than 100 mA */
+	if (power <= USB_SELF_POWER_VBUS_MAX_DRAW)
+		usb_gadget_set_selfpowered(gadget);
+	else
+		usb_gadget_clear_selfpowered(gadget);
 done:
 	usb_gadget_vbus_draw(gadget, power);
 	if (result >= 0 && cdev->delayed_status)
