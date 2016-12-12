@@ -1782,10 +1782,6 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	if (!core)
 		return 0;
 
-	/* bail early if nothing to do */
-	if (rate == clk_core_get_rate_nolock(core))
-		return 0;
-
 	if ((core->flags & CLK_SET_RATE_GATE) && core->prepare_count)
 		return -EBUSY;
 
@@ -1834,16 +1830,21 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
  */
 int clk_set_rate(struct clk *clk, unsigned long rate)
 {
-	int ret;
+	int ret = 0;
 
 	if (!clk)
-		return 0;
+		return ret;
 
 	/* prevent racing with updates to the clock topology */
 	clk_prepare_lock();
 
+	/* bail early if nothing to do */
+	if (rate == clk_core_get_rate_nolock(clk->core))
+		goto out;
+
 	ret = clk_core_set_rate_nolock(clk->core, rate);
 
+out:
 	clk_prepare_unlock();
 
 	return ret;
@@ -1917,6 +1918,32 @@ int clk_set_max_rate(struct clk *clk, unsigned long rate)
 	return clk_set_rate_range(clk, clk->min_rate, rate);
 }
 EXPORT_SYMBOL_GPL(clk_set_max_rate);
+
+/**
+ * clk_set_rate_nocache - set a clock rate regardless of the cached rate
+ *
+ * @clk: clock source
+ * @rate: desired maximum clock rate in Hz, inclusive
+ *
+ * Returns success (0) or negative errno.
+ */
+int clk_set_rate_nocache(struct clk *clk, unsigned long rate)
+{
+	int ret;
+
+	if (!clk)
+		return 0;
+
+        /* prevent racing with updates to the clock topology */
+	clk_prepare_lock();
+
+	ret = clk_core_set_rate_nolock(clk->core, rate);
+
+	clk_prepare_unlock();
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(clk_set_rate_nocache);
 
 /**
  * clk_get_parent - return the parent of a clk
