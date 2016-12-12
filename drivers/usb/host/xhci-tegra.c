@@ -3292,7 +3292,8 @@ static int tegra_xhci_alloc_dev(struct usb_hcd *hcd, struct usb_device *udev)
 				 */
 				if (XHCI_IS_T186(tegra))
 					tegra_phy_xusb_utmi_pad_set_protection_level(
-						tegra->phys[UTMI_PHY][i], 3);
+						tegra->phys[UTMI_PHY][i], 3,
+						TEGRA_VBUS_SOURCE);
 			}
 		}
 	}
@@ -3324,7 +3325,8 @@ static void tegra_xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 		if (XHCI_IS_T186(tegra))
 			/* disable pad protection circuit on this UTMI pad */
 			tegra_phy_xusb_utmi_pad_set_protection_level(
-				tegra->phys[UTMI_PHY][port], -1);
+				tegra->phys[UTMI_PHY][port], -1,
+				TEGRA_VBUS_DEFAULT);
 	}
 }
 
