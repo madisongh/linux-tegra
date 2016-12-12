@@ -346,16 +346,16 @@ static inline long tegra_dvfs_predict_hz_at_mv_max_tfloor(struct clk *c,
 #endif
 
 #ifdef CONFIG_TEGRA_124_DVFS
-int tegra124_init_dvfs(void);
+int tegra124_init_dvfs(struct device_node *node);
 #else
-static inline int tegra124_init_dvfs(void)
+static inline int tegra124_init_dvfs(struct device_node *node)
 { return -EINVAL; }
 #endif
 
 #ifdef CONFIG_TEGRA_210_DVFS
-int tegra210_init_dvfs(void);
+int tegra210_init_dvfs(struct device_node *node);
 #else
-static inline int tegra210_init_dvfs(void)
+static inline int tegra210_init_dvfs(struct device_node *node)
 { return -EINVAL; }
 #endif
 
