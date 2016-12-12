@@ -24,7 +24,7 @@
 #include <dt-bindings/memory/tegra-swgroup.h>
 
 #include "../../../arch/arm/mach-tegra/iomap.h"
-#include "../../../arch/arm/mach-tegra/board.h"
+#include <soc/tegra/memory-carveout.h>
 #include <linux/platform/tegra/common.h>
 
 /* FIXME: Use DT reserved-memory node */
