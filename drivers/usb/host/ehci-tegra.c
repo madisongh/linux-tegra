@@ -2,7 +2,7 @@
  * EHCI-compliant USB host controller driver for NVIDIA Tegra SoCs
  *
  * Copyright (c) 2010 Google, Inc.
- * Copyright (c) 2009-2016 NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -540,10 +540,6 @@ static struct tegra_usb_platform_data *tegra_ehci_dt_parse_pdata(
 	bool is_intf_utmi, is_intf_hsic;
 	int err;
 	u32 instance;
-#if defined(CONFIG_ARCH_TEGRA_13x_SOC)
-	int modem_id = tegra_get_modem_id();
-	int usb_port_owner_info = tegra_get_usb_port_owner_info();
-#endif
 
 	if (!np)
 		return NULL;
@@ -574,27 +570,12 @@ static struct tegra_usb_platform_data *tegra_ehci_dt_parse_pdata(
 	BUG_ON(is_intf_hsic && is_intf_utmi);
 
 	instance = of_alias_get_id(pdev->dev.of_node, "ehci");
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 	if (instance == 1) {
 		pdata->phy_intf = TEGRA_USB_PHY_INTF_HSIC;
 		pdata->u_data.host.skip_resume =
 			of_property_read_bool(np, "nvidia,skip_resume");
 	}
-#elif defined(CONFIG_ARCH_TEGRA_13x_SOC)
-	if (instance == 1 && modem_id) {
-		if (!(usb_port_owner_info & HSIC1_PORT_OWNER_XUSB)) {
-			pdata->phy_intf = TEGRA_USB_PHY_INTF_HSIC;
-		} else
-			return NULL;
-	} else if (is_intf_utmi) {
-		if (!(usb_port_owner_info &
-			(UTMI1_PORT_OWNER_XUSB ||
-			UTMI2_PORT_OWNER_XUSB)))
-			pdata->phy_intf = TEGRA_USB_PHY_INTF_UTMI;
-		else
-			return NULL;
-	}
-#endif
+
 	pdata->op_mode = TEGRA_USB_OPMODE_HOST;
 
 	pdata->u_data.host.hot_plug =
