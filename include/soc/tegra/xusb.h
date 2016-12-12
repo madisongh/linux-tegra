@@ -83,8 +83,20 @@ void tegra_phy_xusb_utmi_pad_charger_detect_off(struct phy *phy);
 void tegra_phy_xusb_utmi_pad_enable_detect_filters(struct phy *phy);
 void tegra_phy_xusb_utmi_pad_disable_detect_filters(struct phy *phy);
 
+/*
+ * Tegra OTG port VBUS direction:
+ * default (based on port capability) or
+ * as source or sink
+ */
+enum tegra_vbus_dir {
+	TEGRA_VBUS_DEFAULT,
+	TEGRA_VBUS_SOURCE,
+	TEGRA_VBUS_SINK
+};
+
 /* level < 0: disable protection */
-void tegra_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level);
+void tegra_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level,
+						  enum tegra_vbus_dir dir);
 
 /* data contact detection */
 bool tegra_phy_xusb_utmi_pad_dcd(struct phy *phy);

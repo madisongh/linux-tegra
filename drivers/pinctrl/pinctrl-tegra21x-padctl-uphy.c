@@ -4255,8 +4255,9 @@ bool tegra_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy)
 }
 EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_secondary_charger_detect);
 
-
-void tegra_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level)
+/* ignoring dir since T210 doesn't support VREG_DIR bits */
+void tegra_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level,
+						  enum tegra_vbus_dir dir)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
