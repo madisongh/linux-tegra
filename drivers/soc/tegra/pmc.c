@@ -117,6 +117,8 @@
 #define GPU_RG_CNTRL			0x2d4
 
 #define PMC_FUSE_CTRL                   0x450
+#define PMC_FUSE_CTRL_ENABLE_REDIRECTION	(1 << 0)
+#define PMC_FUSE_CTRL_DISABLE_REDIRECTION	(1 << 1)
 #define PMC_FUSE_CTRL_PS18_LATCH_SET    (1 << 8)
 #define PMC_FUSE_CTRL_PS18_LATCH_CLEAR  (1 << 9)
 
@@ -1330,6 +1332,28 @@ void tegra_pmc_fuse_control_ps18_latch_clear(void)
 	mdelay(1);
 }
 EXPORT_SYMBOL(tegra_pmc_fuse_control_ps18_latch_clear);
+
+void tegra_pmc_fuse_disable_mirroring(void)
+{
+	u32 val;
+
+	val = tegra_pmc_readl(PMC_FUSE_CTRL);
+	if (val & PMC_FUSE_CTRL_ENABLE_REDIRECTION)
+		tegra_pmc_writel(PMC_FUSE_CTRL_DISABLE_REDIRECTION,
+				PMC_FUSE_CTRL);
+}
+EXPORT_SYMBOL(tegra_pmc_fuse_disable_mirroring);
+
+void tegra_pmc_fuse_enable_mirroring(void)
+{
+	u32 val;
+
+	val = tegra_pmc_readl(PMC_FUSE_CTRL);
+	if (!(val & PMC_FUSE_CTRL_ENABLE_REDIRECTION))
+		tegra_pmc_writel(PMC_FUSE_CTRL_ENABLE_REDIRECTION,
+				PMC_FUSE_CTRL);
+}
+EXPORT_SYMBOL(tegra_pmc_fuse_enable_mirroring);
 
 #ifdef CONFIG_PM_SLEEP
 enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void)
