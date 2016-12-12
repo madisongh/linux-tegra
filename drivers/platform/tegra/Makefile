@@ -51,6 +51,8 @@ endif
 obj-$(CONFIG_TEGRA_CLUSTER_CONTROL) += sysfs-cluster.o
 obj-$(CONFIG_TEGRA_HMP_CLUSTER_CONTROL) += sysfs-cluster.o
 
+obj-$(CONFIG_PSTORE_RAM) += tegra_ramoops.o
+
 obj-y += io.o
 ifneq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
 obj-y += ahb.o
