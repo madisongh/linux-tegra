@@ -656,7 +656,6 @@ static int utmi_phy_open(struct tegra_usb_phy *phy)
 
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, phy->inst);
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 	if (phy->pdev->dev.of_node) {
 		phy->prod_list = devm_tegra_prod_get(&phy->pdev->dev);
 		if (IS_ERR_OR_NULL(phy->prod_list)) {
@@ -666,7 +665,6 @@ static int utmi_phy_open(struct tegra_usb_phy *phy)
 			phy->prod_list = NULL;
 		}
 	}
-#endif
 
 	pmc_init(phy);
 
@@ -869,11 +867,7 @@ static int utmi_phy_power_off(struct tegra_usb_phy *phy)
 		if (phy->pdata->port_otg) {
 			bool id_present = false;
 			val = readl(base + USB_PHY_VBUS_WAKEUP_ID);
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 			id_present = (val & USB_ID_SW_VALUE) ? false : true;
-#else
-			id_present = (val & USB_ID_STATUS) ? false : true;
-#endif
 			if (id_present &&
 				phy->pdata->u_data.host.remote_wakeup_supported)
 				pmc->pmc_ops->setup_pmc_wake_detect(pmc);
@@ -966,9 +960,6 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
-#ifdef CONFIG_ARCH_TEGRA_11x_SOC
-	void __iomem *padctl_base = IO_ADDRESS(TEGRA_XUSB_PADCTL_BASE);
-#endif
 	struct tegra_utmi_config *config = &phy->pdata->u_cfg.utmi;
 	struct tegra_usb_pmc_data *pmc = &pmc_data[phy->inst];
 
@@ -996,9 +987,6 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 
 	val = readl(base + UTMIP_HSRX_CFG0);
 	val &= ~(UTMIP_IDLE_WAIT(~0) | UTMIP_ELASTIC_LIMIT(~0));
-#ifndef CONFIG_ARCH_TEGRA_21x_SOC
-	val &= ~UTMIP_PCOUNT_UPDN_DIV(~0);
-#endif
 	val |= UTMIP_IDLE_WAIT(config->idle_wait_delay);
 	val |= UTMIP_ELASTIC_LIMIT(config->elastic_limit);
 	writel(val, base + UTMIP_HSRX_CFG0);
@@ -1060,7 +1048,6 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	val |= UTMIP_XCVR_TERM_RANGE_ADJ(config->term_range_adj);
 	writel(val, base + UTMIP_XCVR_CFG1);
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 	val = readl(base + UTMIP_BIAS_CFG0);
 	val &= ~UTMIP_HSSQUELCH_LEVEL(~0);
 	val |= UTMIP_HSSQUELCH_LEVEL(2);
@@ -1076,7 +1063,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	else
 		val |= UTMIP_XCVR_VREG_FIX18; /* source cur */
 	writel(val, base + UTMIP_XCVR_CFG2);
-#endif
+
 	if (tegra_platform_is_silicon()) {
 		val = readl(base + UTMIP_BIAS_CFG1);
 		val &= ~UTMIP_BIAS_PDTRK_COUNT(~0);
@@ -1086,12 +1073,8 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 
 	val = readl(base + UTMIP_SPARE_CFG0);
 	val &= ~FUSE_SETUP_SEL;
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 	val &= ~FUSE_SQUELCH_SEL;
 	val &= ~FUSE_ATERM_SEL;
-#else
-	val |= FUSE_ATERM_SEL;
-#endif
 	writel(val, base + UTMIP_SPARE_CFG0);
 
 	val = readl(base + USB_SUSP_CTRL);
@@ -1181,19 +1164,6 @@ safe_settings:
 
 	phy->phy_clk_on = true;
 	phy->hw_accessible = true;
-
-#ifdef CONFIG_ARCH_TEGRA_11x_SOC
-	val = readl(padctl_base + PADCTL_SNPS_OC_MAP);
-	val |= CONTROLLER_OC(phy->inst, 0x4);
-	writel(val, padctl_base + PADCTL_SNPS_OC_MAP);
-
-	val = readl(padctl_base + PADCTL_OC_DET);
-	if (phy->inst == 0)
-		val |= ENABLE0_OC_MAP(config->vbus_oc_map);
-	if (phy->inst == 2)
-		val |= ENABLE1_OC_MAP(config->vbus_oc_map);
-	writel(val, padctl_base + PADCTL_OC_DET);
-#endif
 
 	PHY_DBG("%s(%d) End inst:[%d]\n", __func__, __LINE__, phy->inst);
 	return 0;
@@ -2288,9 +2258,6 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
-#ifdef CONFIG_ARCH_TEGRA_11x_SOC
-	void __iomem *padctl_base = IO_ADDRESS(TEGRA_XUSB_PADCTL_BASE);
-#endif
 
 	DBG("%s(%d) inst:[%d]\n", __func__, __LINE__, phy->inst);
 
@@ -2299,12 +2266,6 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 					__func__, __LINE__, phy->inst);
 		return 0;
 	}
-
-#ifdef CONFIG_ARCH_TEGRA_11x_SOC
-	val = readl(padctl_base + PADCTL_SNPS_OC_MAP);
-	val |= CONTROLLER_OC(phy->inst, 0x7);
-	writel(val, padctl_base + PADCTL_SNPS_OC_MAP);
-#endif
 
 	val = readl(base + UHSIC_PADS_CFG1);
 	val &= ~(UHSIC_PD_BG | UHSIC_PD_RX |
@@ -2332,10 +2293,8 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 
 	val = readl(base + UHSIC_HSRX_CFG1);
 	val |= UHSIC_HS_SYNC_START_DLY(HSIC_SYNC_START_DELAY);
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 	val &= ~HSIC_RX_STROBE_DELAY_TRIMMER_MASK;
 	val |= UHSIC_RX_STROBE_DLY_TRIMMER(HSIC_RX_STROBE_DELAY_TRIMMER);
-#endif
 	writel(val, base + UHSIC_HSRX_CFG1);
 
 	/* WAR HSIC TX */
@@ -2416,13 +2375,7 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 	/* Clear RTUNEP, SLEWP & SLEWN bit fields */
 	val &= ~(UHSIC_TX_RTUNEP | UHSIC_TX_SLEWP | UHSIC_TX_SLEWN);
 	/* set Rtune impedance to 50 ohm */
-#if defined(CONFIG_ARCH_TEGRA_13x_SOC) || defined(CONFIG_ARCH_TEGRA_21x_SOC)
 	val |= UHSIC_TX_RTUNE_P(0x8);
-#elif defined(CONFIG_ARCH_TEGRA_12x_SOC)
-	val |= UHSIC_TX_RTUNE_P(0xA);
-#else
-	val |= UHSIC_TX_RTUNE_P(0xC);
-#endif
 	writel(val, base + UHSIC_PADS_CFG0);
 
 	if (usb_phy_reg_status_wait(base + USB_SUSP_CTRL,

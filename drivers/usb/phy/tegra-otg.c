@@ -3,7 +3,7 @@
  *
  * OTG transceiver driver for Tegra UTMI phy
  *
- * Copyright (C) 2010-2015 NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2016, NVIDIA CORPORATION. All rights reserved.
  * Copyright (C) 2010 Google, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -941,8 +941,6 @@ static struct tegra_usb_otg_data *tegra_otg_dt_parse_pdata(
 	if (!np)
 		return NULL;
 
-#if (defined(CONFIG_ARCH_TEGRA_21x_SOC) || defined(CONFIG_ARCH_TEGRA_12x_SOC))\
-	&& !defined(CONFIG_ARCH_TEGRA_13x_SOC)
 	/* get EHCI device/pdata handle */
 	if (!tegra->ehci_node) {
 		tegra->ehci_node = of_parse_phandle(np, "nvidia,hc-device", 0);
@@ -951,7 +949,7 @@ static struct tegra_usb_otg_data *tegra_otg_dt_parse_pdata(
 			return NULL;
 		}
 	}
-#endif
+
 	pdata = devm_kzalloc(&pdev->dev, sizeof(struct tegra_usb_otg_data),
 			GFP_KERNEL);
 	if (!pdata) {
