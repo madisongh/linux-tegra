@@ -698,21 +698,18 @@ int __init tegra_powergate_init(void)
 	tegra_pmc = ioremap(TEGRA_PMC_BASE, 4096);
 	tegra_mc = ioremap(TEGRA_MC_BASE, 4096);
 	switch (tegra_get_chip_id()) {
-		case TEGRA210:
-			pg_ops = tegra210_powergate_init_chip_support();
-			break;
+	case TEGRA210:
+		pg_ops = tegra210_powergate_init_chip_support();
+		break;
 
-		default:
-/*
- * TODO: Add correct chipid and remove this later
- */
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
-			pg_ops = tegra186_powergate_init_chip_support();
-#else
-			pg_ops = NULL;
-			pr_info("%s: Unknown Tegra variant. Disabling powergate\n", __func__);
-#endif
-			break;
+	case TEGRA186:
+		pg_ops = tegra186_powergate_init_chip_support();
+		break;
+
+	default:
+		pg_ops = NULL;
+		pr_info("%s: Unknown Tegra variant. Disabling powergate\n", __func__);
+		break;
 	}
 
 	tegra_powergate_init_refcount();
