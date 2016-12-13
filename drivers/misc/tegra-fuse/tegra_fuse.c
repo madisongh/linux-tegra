@@ -75,7 +75,6 @@ static struct tegra_id tegra_id;
 static int tegra_gpu_num_pixel_pipes;
 static int tegra_gpu_num_alus_per_pixel_pipe;
 static u32 tegra_chip_sku_id;
-static u32 tegra_chip_id;
 static u32 tegra_chip_bct_strapping;
 enum tegra_revision tegra_revision;
 static enum tegra_platform tegra_platform;
@@ -450,7 +449,7 @@ u32 tegra_get_sku_id(void)
 
 u8 tegra_get_chip_id(void)
 {
-	return tegra_chip_id;
+	return (u8)tegra_get_chipid();
 }
 EXPORT_SYMBOL(tegra_get_chip_id);
 
