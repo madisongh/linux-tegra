@@ -3229,7 +3229,7 @@ static void __init tegra210_pll_init(void __iomem *clk_base,
 	clks[TEGRA210_CLK_PLL_P_UD] = clk;
 }
 
-static const char *cbus_parents[] = { "c2bus", "c3bus" };
+static const char *cbus_parents[] = { "c2bus", "c3bus", "isp.cbus", "vi.cbus", "cbus" };
 static const char *abus_parents[] = { "abus" };
 
 static __init void tegra210_shared_clk_init(char *sclk_high_clk)
@@ -3331,6 +3331,35 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 
 	clks[TEGRA210_CLK_APB_SCLK] = clk;
 	sbus_cbus->u.system.apb_bus = __clk_get_hw(clk);
+
+	clk = tegra_clk_register_cbus("cbus", "pll_c", 0, "pll_p", 0,
+					1000000000);
+	clk_register_clkdev(clk, "cbus", NULL);
+	clks[TEGRA210_CLK_CBUS] = clk;
+
+	clk = tegra_clk_register_shared_connect("vi.cbus", &cbus_parents[4],
+						1, 0, 0, 0, "vi");
+	clks[TEGRA210_CLK_VI_CBUS] = clk;
+
+	clk = tegra_clk_register_shared_connect("isp.cbus", &cbus_parents[4],
+						1, 0, 0, 0, "isp");
+	clks[TEGRA210_CLK_ISP_CBUS] = clk;
+
+	clk = tegra_clk_register_shared("ispa.isp.cbus", &cbus_parents[2], 1, 0, 0,
+					0, "ispa");
+	clks[TEGRA210_CLK_ISPA_ISP_CBUS] = clk;
+
+	clk = tegra_clk_register_shared("ispb.isp.cbus", &cbus_parents[2], 1, 0, 0,
+					0, "ispb");
+	clks[TEGRA210_CLK_ISPB_ISP_CBUS] = clk;
+
+	clk = tegra_clk_register_shared("vi_v4l2.cbus", &cbus_parents[3], 1, 0, 0,
+					0, "vi");
+	clks[TEGRA210_CLK_VI_V4L2_CBUS] = clk;
+
+	clk = tegra_clk_register_shared("vi_bypass.cbus", &cbus_parents[3], 1, 0, 0,
+					0, "vi");
+	clks[TEGRA210_CLK_VI_BYPASS_CBUS] = clk;
 
 	tegra_shared_clk_init(tegra210_clks);
 }

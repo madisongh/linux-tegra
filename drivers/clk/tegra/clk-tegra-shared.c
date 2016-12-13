@@ -154,6 +154,8 @@ static struct tegra_shared_clk shared_clks[] = {
 	SHARED_CLK("vcm.ahb.sclk", "ahb.sclk", 0, 0, 0, NULL, tegra_clk_vcm_ahb_sclk),
 	SHARED_CLK("vcm.apb.sclk", "apb.sclk", 0, 0, 0, NULL, tegra_clk_vcm_apb_sclk),
 	SHARED_CLK("sdmmc4.sclk", "ahb.sclk", 0, 0, 0, NULL, tegra_clk_sdmmc4_ahb_sclk),
+	SHARED_CLK("cap.vcore.cbus", "cbus", SHARED_CEILING, 0, 0, NULL, tegra_clk_cap_vcore_cbus),
+	SHARED_CLK("override.cbus", "cbus", SHARED_OVERRIDE, 0, 0, NULL, tegra_clk_override_cbus),
 };
 
 void __init tegra_shared_clk_init(struct tegra_clk *tegra_clks)
