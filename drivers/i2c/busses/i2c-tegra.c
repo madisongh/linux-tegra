@@ -1160,20 +1160,19 @@ static void tegra_i2c_config_fifo_trig(struct tegra_i2c_dev *i2c_dev,
 		int len)
 {
 	u32 val;
-	u8 maxburst = 0;
+	u8 maxburst;
 	struct dma_slave_config dma_sconfig;
 
-	val = i2c_readl(i2c_dev, I2C_FIFO_CONTROL);
 	if (len & 0xF) {
-		val |= I2C_FIFO_CONTROL_TX_TRIG_1
+		val = I2C_FIFO_CONTROL_TX_TRIG_1
 			| I2C_FIFO_CONTROL_RX_TRIG_1;
 		maxburst = 1;
 	} else if (((len) >> 4) & 0x1) {
-		val |= I2C_FIFO_CONTROL_TX_TRIG_4
+		val = I2C_FIFO_CONTROL_TX_TRIG_4
 			| I2C_FIFO_CONTROL_RX_TRIG_4;
 		maxburst = 4;
 	} else {
-		val |= I2C_FIFO_CONTROL_TX_TRIG_8
+		val = I2C_FIFO_CONTROL_TX_TRIG_8
 			| I2C_FIFO_CONTROL_RX_TRIG_8;
 		maxburst = 8;
 	}
