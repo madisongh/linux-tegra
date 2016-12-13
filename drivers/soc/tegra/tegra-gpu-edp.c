@@ -251,7 +251,12 @@ static int __init tegra_gpu_edp_probe(struct platform_device *pdev)
 		goto free_params;
 	}
 
-	gpu_clk = devm_clk_get(&pdev->dev, "gpu-edp");
+	/*
+	 * FIXME: Ideally we should look up the clock via device-tree,
+	 * but currently this clock is only register as a devclk and so
+	 * using device-tree is not possible.
+	 */
+	gpu_clk = clk_get_sys("gpcclk", "gpcclk");
 	if (IS_ERR(gpu_clk)) {
 		dev_err(&pdev->dev, "unable to find 'gpu-edp' clock\n");
 		ret = PTR_ERR(gpu_clk);
