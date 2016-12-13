@@ -2494,6 +2494,7 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_dmic3_sync_clk_mux] = { .dt_id = TEGRA210_CLK_DMIC3_SYNC_CLK_MUX, .present = true },
 	[tegra_clk_la] = { .dt_id = TEGRA210_CLK_LA, .present = true },
 	[tegra_clk_se_8] = { .dt_id = TEGRA210_CLK_SE, .present = true },
+	[tegra_clk_ispa] = { .dt_id = TEGRA210_CLK_ISPA, .present = true },
 };
 
 static struct tegra_devclk devclks[] __initdata = {
@@ -3927,7 +3928,7 @@ static void __init tegra210_ovr_clk_init(void __iomem *clk_base)
 			clk_base + LVL2_CLK_GATE_OVRA, 15, 0, NULL);
 	clks[TEGRA210_CLK_VI_SLCG_OVR] = clk;
 
-	clk = clk_register_gate(NULL, "ispa_slcg_ovr", "isp", 0,
+	clk = clk_register_gate(NULL, "ispa_slcg_ovr", "ispa", 0,
 			clk_base + LVL2_CLK_GATE_OVRE, 3, 0, NULL);
 	clks[TEGRA210_CLK_ISPA_SLCG_OVR] = clk;
 
