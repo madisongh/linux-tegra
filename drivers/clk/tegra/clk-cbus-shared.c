@@ -340,6 +340,20 @@ static int _simple_shared_update(struct tegra_clk_cbus_shared *bus)
 	return err;
 }
 
+static int _connect_shared_update(struct tegra_clk_cbus_shared *bus)
+{
+	unsigned long rate;
+	int err;
+
+	rate = _clk_shared_bus_update(bus, NULL, NULL, NULL);
+
+	bus->u.shared_bus_user.rate = rate;
+
+	err = clk_set_rate(bus->hw.clk, rate);
+
+	return err;
+}
+
 static bool shared_clk_set_rate;
 
 static int clk_shared_bus_update(struct clk *bus)
@@ -946,22 +960,21 @@ struct clk *tegra_clk_register_cbus(const char *name,
 	return c;
 }
 
-struct clk *tegra_clk_register_shared(const char *name,
+static struct tegra_clk_cbus_shared *tegra_clk_init_shared(const char *name,
 		const char **parent, u8 num_parents, unsigned long flags,
 		unsigned long usages, enum shared_bus_users_mode mode,
 		const char *client)
 {
 	struct tegra_clk_cbus_shared *shared;
-	struct clk_init_data init;
 	struct tegra_clk_cbus_shared *parent_cbus;
-	struct clk *client_clk, *parent_clk, *c;
+	struct clk *client_clk, *parent_clk;
 
 	if (num_parents > 2)
 		return ERR_PTR(-EINVAL);
 
 	parent_clk = __clk_lookup(parent[0]);
 	if (IS_ERR(parent_clk))
-		return parent_clk;
+		return ERR_PTR(PTR_ERR(parent_clk));
 
 	parent_cbus = to_clk_cbus_shared(__clk_get_hw(parent_clk));
 
@@ -973,7 +986,7 @@ struct clk *tegra_clk_register_shared(const char *name,
 		client_clk = __clk_lookup(client);
 		if (IS_ERR(client_clk)) {
 			kfree(shared);
-			return client_clk;
+			return ERR_PTR(PTR_ERR(client_clk));
 		}
 		shared->u.shared_bus_user.client = client_clk;
 		shared->magic = TEGRA_CLK_SHARED_MAGIC;
@@ -993,7 +1006,7 @@ struct clk *tegra_clk_register_shared(const char *name,
 
 		if (IS_ERR(c)) {
 			kfree(shared);
-			return c;
+			return ERR_PTR(PTR_ERR(c));
 		}
 
 		shared->u.shared_bus_user.inputs[0] = parent_clk;
@@ -1005,6 +1018,23 @@ struct clk *tegra_clk_register_shared(const char *name,
 
 	list_add_tail(&shared->u.shared_bus_user.node,
 			&parent_cbus->shared_bus_list);
+
+	return shared;
+}
+
+struct clk *tegra_clk_register_shared(const char *name,
+		const char **parent, u8 num_parents, unsigned long flags,
+		unsigned long usages, enum shared_bus_users_mode mode,
+		const char *client)
+{
+	struct tegra_clk_cbus_shared *shared;
+	struct clk_init_data init;
+	struct clk *c;
+
+	shared = tegra_clk_init_shared(name, parent, num_parents, flags,
+				       usages, mode, client);
+	if (IS_ERR(shared))
+		return ERR_PTR(PTR_ERR(shared));
 
 	flags |= CLK_GET_RATE_NOCACHE;
 
@@ -1024,6 +1054,40 @@ struct clk *tegra_clk_register_shared(const char *name,
 	return c;
 }
 
+struct clk *tegra_clk_register_shared_connect(const char *name,
+		const char **parent, u8 num_parents, unsigned long flags,
+		unsigned long usages, enum shared_bus_users_mode mode,
+		const char *client)
+{
+	struct tegra_clk_cbus_shared *shared;
+	struct clk_init_data init;
+	struct clk *c;
+
+	shared = tegra_clk_init_shared(name, parent, num_parents, flags,
+				       usages, mode, client);
+	if (IS_ERR(shared))
+		return ERR_PTR(PTR_ERR(shared));
+
+	INIT_LIST_HEAD(&shared->shared_bus_list);
+	flags |= CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE;
+
+	init.name = name;
+	init.ops = &tegra_clk_shared_master_ops;
+	init.flags = flags;
+	init.parent_names = parent;
+	init.num_parents = 1;
+
+	shared->bus_update = _connect_shared_update;
+
+	/* Data in .init is copied by clk_register(), so stack variable OK */
+	shared->hw.init = &init;
+
+	c = clk_register(NULL, &shared->hw);
+	if (!c)
+		kfree(shared);
+
+	return c;
+}
 /*
  * Not all shared clocks have a cbus clock as parent. The parent clock however
  * provides the head of the shared clock list. This clock provides a placeholder

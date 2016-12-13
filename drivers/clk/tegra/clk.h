@@ -905,6 +905,10 @@ void tegra_shared_clk_init(struct tegra_clk *tegra_clks);
 struct clk *tegra_clk_register_cascade_master(const char *name,
 		const char *parent, const char *topclkname,
 		unsigned long flags);
+struct clk *tegra_clk_register_shared_connect(const char *name,
+		const char **parent, u8 num_parents, unsigned long flags,
+		unsigned long usages, enum shared_bus_users_mode mode,
+		const char *client);
 
 struct tegra_clk_skipper {
 	struct clk_hw hw;
