@@ -3,7 +3,7 @@
  *
  * Memory manager for Tegra GPU
  *
- * Copyright (c) 2009-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -196,6 +196,9 @@ void *__nvmap_kmap(struct nvmap_handle *h, unsigned int pagenum)
 	if (!h)
 		return NULL;
 
+	if (!h->alloc)
+		goto out;
+
 	if (pagenum >= h->size >> PAGE_SHIFT)
 		goto out;
 	prot = nvmap_pgprot(h, PG_PROT_KERNEL);
@@ -222,7 +225,7 @@ void __nvmap_kunmap(struct nvmap_handle *h, unsigned int pagenum,
 	phys_addr_t paddr;
 	struct vm_struct *area = NULL;
 
-	if (!h ||
+	if (!h || !h->alloc ||
 	    WARN_ON(!virt_addr_valid(h)) ||
 	    WARN_ON(!addr))
 		return;
@@ -266,7 +269,7 @@ void *__nvmap_mmap(struct nvmap_handle *h)
 		return NULL;
 
 	if (!h->alloc)
-		return NULL;
+		goto put_handle;
 
 	prot = nvmap_pgprot(h, PG_PROT_KERNEL);
 
@@ -276,7 +279,7 @@ void *__nvmap_mmap(struct nvmap_handle *h)
 			pages = nvmap_pages(h->pgalloc.pages,
 					    h->size >> PAGE_SHIFT);
 			if (!pages)
-				return NULL;
+				goto put_handle;
 			vaddr = vm_map_ram(pages,
 				h->size >> PAGE_SHIFT, -1, prot);
 			nvmap_altfree(pages,
@@ -296,10 +299,8 @@ void *__nvmap_mmap(struct nvmap_handle *h)
 	adj_size = PAGE_ALIGN(adj_size);
 
 	v = alloc_vm_area(adj_size, 0);
-	if (!v) {
-		nvmap_handle_put(h);
-		return NULL;
-	}
+	if (!v)
+		goto put_handle;
 
 	p = v->addr + (h->carveout->base & ~PAGE_MASK);
 	ioremap_page_range((ulong)v->addr, (ulong)v->addr + adj_size,
@@ -309,11 +310,14 @@ void *__nvmap_mmap(struct nvmap_handle *h)
 	 * the handle will not be freed while the kernel mapping exists.
 	 * nvmap_handle_put will be called by unmapping this address */
 	return p;
+put_handle:
+	nvmap_handle_put(h);
+	return NULL;
 }
 
 void __nvmap_munmap(struct nvmap_handle *h, void *addr)
 {
-	if (!h ||
+	if (!h || !h->alloc ||
 	    WARN_ON(!virt_addr_valid(h)) ||
 	    WARN_ON(!addr))
 		return;
@@ -447,6 +451,11 @@ struct sg_table *__nvmap_sg_table(struct nvmap_client *client,
 	if (!h)
 		return ERR_PTR(-EINVAL);
 
+	if (!h->alloc) {
+		err = -EINVAL;
+		goto put_handle;
+	}
+
 	npages = PAGE_ALIGN(h->size) >> PAGE_SHIFT;
 	sgt = kzalloc(sizeof(*sgt), GFP_KERNEL);
 	if (!sgt) {
@@ -476,6 +485,7 @@ struct sg_table *__nvmap_sg_table(struct nvmap_client *client,
 
 err:
 	kfree(sgt);
+put_handle:
 	nvmap_handle_put(h);
 	return ERR_PTR(err);
 }
