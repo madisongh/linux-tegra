@@ -257,8 +257,7 @@ static int tegra_gpu_edp_probe(struct platform_device *pdev)
 	 */
 	gpu_clk = clk_get_sys("gpcclk", "gpcclk");
 	if (IS_ERR(gpu_clk)) {
-		dev_err(&pdev->dev, "unable to find 'gpu-edp' clock\n");
-		ret = PTR_ERR(gpu_clk);
+		ret = -EPROBE_DEFER;
 		goto free_params;
 	}
 
