@@ -413,10 +413,10 @@ static int tegra_set_baudrate(struct tegra_uart_port *tup, unsigned int baud)
 
 	if (tup->cdata->support_clk_src_div) {
 		rate = baud * 16;
+		tup->required_rate = rate;
 		if (tup->n_adjustable_baud_rates)
 			rate = tegra_get_tolerance_rate(tup, baud, rate);
 
-		tup->required_rate = rate;
 		ret = clk_set_rate(tup->uart_clk, rate);
 		if (ret < 0) {
 			dev_err(tup->uport.dev,
