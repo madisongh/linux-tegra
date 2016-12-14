@@ -164,9 +164,9 @@ static int store_edp_max(void *data, u64 val)
 DEFINE_SIMPLE_ATTRIBUTE(edp_max_fops, show_edp_max, store_edp_max, "%llu\n");
 
 static int __init tegra_edp_debugfs_init(struct device *dev,
-					 struct gpu_edp *ctx,
-					 struct dentry *edp_dir)
+					 struct gpu_edp *ctx)
 {
+	struct dentry *edp_dir;
 	struct edp_attrs *attr;
 	struct edp_attrs attrs[] = {
 		{ ctx, &ctx->imax, "imax" },
@@ -174,8 +174,9 @@ static int __init tegra_edp_debugfs_init(struct device *dev,
 		{ NULL}
 	};
 
-	if (!edp_dir)
-		return -ENOSYS;
+	edp_dir = debugfs_create_dir("gpu_edp", NULL);
+	if (IS_ERR_OR_NULL(edp_dir))
+		return -ENOMEM;
 
 	ctx->debugfs_attrs = devm_kzalloc(dev, sizeof(attrs), GFP_KERNEL);
 	if (!ctx->debugfs_attrs)
@@ -226,71 +227,73 @@ static int __init tegra_gpu_edp_probe(struct platform_device *pdev)
 	unsigned iddq_ma;
 	struct gpu_edp_platform_data pdata;
 	struct gpu_edp *ctx;
-	struct dentry *edp_dir = NULL;
-	int ret, ret_warn;
+	int ret;
 	long maxf;
 
-	if (WARN(!pdev || !pdev->dev.of_node,
-		 "DT node required but absent\n"))
+	if (WARN(!pdev || !pdev->dev.of_node, "DT node missing!\n"))
 		return -EINVAL;
 
 	ret = tegra_gpu_edp_parse_dt(pdev, &pdata);
-	if (WARN(ret, "GPU EDP management initialization failed\n"))
+	if (ret) {
+		dev_err(&pdev->dev, "failed to parse device-tree\n");
 		return ret;
+	}
 
 	params = of_read_tegra_ppm_params(pdev->dev.of_node);
-	if (WARN(IS_ERR_OR_NULL(params),
-		 "GPU EDP management initialization failed\n"))
+	if (IS_ERR_OR_NULL(params)) {
+		dev_err(&pdev->dev, "failed to initialise PPM params\n");
 		return PTR_ERR(params);
+	}
 
 	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
-	if (WARN(!ctx,
-		 "Failed GPU EDP mgmt init. Allocation failure\n")) {
+	if (!ctx) {
 		ret = -ENOMEM;
-		goto out;
+		goto free_params;
 	}
 
 	gpu_clk = devm_clk_get(&pdev->dev, "gpu-edp");
 	if (IS_ERR(gpu_clk)) {
 		dev_err(&pdev->dev, "unable to find 'gpu-edp' clock\n");
 		ret = PTR_ERR(gpu_clk);
-		goto out;
+		goto free_params;
 	}
 
 	maxf = clk_round_rate(gpu_clk, ULONG_MAX);
-	if (IS_ERR_VALUE(maxf))
-		return -ENODATA;
+	if (IS_ERR_VALUE(maxf)) {
+		dev_err(&pdev->dev, "unable to get max GPU freq\n");
+		ret = maxf;
+		goto free_params;
+	}
 
 	fv = fv_relation_create(gpu_clk, pdata.freq_step, 150, maxf, 0,
 				tegra_gpu_edp_predict_millivolts);
-	if (WARN(IS_ERR_OR_NULL(fv),
-		 "Failed GPU EDP mgmt init. freq/volt data unavailable\n")) {
+	if (IS_ERR_OR_NULL(fv)) {
+		dev_err(&pdev->dev, "failed to create freq/volt table\n");
 		ret = PTR_ERR(fv);
-		fv = NULL;
-		goto out;
+		goto free_params;
 	}
 
 	iddq_ma = tegra_fuse_get_gpu_iddq();
 	if (iddq_ma < 0) {
 		dev_err(&pdev->dev, "unable to get GPU IDDQ: %d\n", iddq_ma);
 		ret = iddq_ma;
-		goto out;
+		goto destroy_fv;
 	}
 
-	pr_debug("%s: %s IDDQ value %d\n", __func__, pdata.name, iddq_ma);
+	dev_dbg(&pdev->dev, "%s IDDQ value %d\n", pdata.name, iddq_ma);
 
 	ctx->cap_clk = devm_clk_get(&pdev->dev, "gpu-edp-cap");
-	if (IS_ERR(ctx->cap_clk))
+	if (IS_ERR(ctx->cap_clk)) {
 		dev_err(&pdev->dev, "unable to find 'gpu-edp-cap' clock\n");
-
-	edp_dir = debugfs_create_dir("gpu_edp", NULL);
+		ret = PTR_ERR(ctx->cap_clk);
+		goto destroy_fv;
+	}
 
 	ctx->ppm = tegra_ppm_create(pdata.name, fv, params, iddq_ma, NULL);
-	if (WARN(IS_ERR_OR_NULL(ctx->ppm),
-		 "Failed GPU EDP mgmt init. Couldn't create power model\n")) {
+	if (IS_ERR_OR_NULL(ctx->ppm)) {
+		dev_err(&pdev->dev, "failed to create power model\n");
 		ret = PTR_ERR(ctx->ppm);
-		ctx->ppm = NULL;
-		goto out;
+		goto destroy_fv;
 	}
 
 	ctx->temperature_now = -273; /* HACK */
@@ -300,36 +303,40 @@ static int __init tegra_gpu_edp_probe(struct platform_device *pdev)
 	mutex_init(&ctx->edp_lock);
 
 	s_gpu = ctx;
-	ret_warn = pm_qos_add_notifier(PM_QOS_MAX_GPU_POWER,
-					 &max_gpu_pwr_notifier);
-	if (ret_warn)
-		dev_err(&pdev->dev,
-			"pm_qos failure. max_gpu_power won't work\n");
-
-	ctx->cdev = thermal_of_cooling_device_register(
-		pdev->dev.of_node, pdata.name, ctx, &edp_cooling_ops);
-	if (IS_ERR_OR_NULL(ctx->cdev)) {
-		pr_err("Failed to register '%s' cooling device\n", pdata.name);
-		ctx->cdev = NULL;
-		ret = PTR_ERR(ctx->cdev);
-		goto out;
-	}
-
-	ret_warn = tegra_edp_debugfs_init(&pdev->dev, ctx, edp_dir);
-	if (ret_warn)
-		dev_err(&pdev->dev,
-			"failed to init debugfs interface\n");
-
-out:
+	ret = pm_qos_add_notifier(PM_QOS_MAX_GPU_POWER, &max_gpu_pwr_notifier);
 	if (ret) {
-		if (ctx) {
-			thermal_cooling_device_unregister(ctx->cdev);
-			tegra_ppm_destroy(ctx->ppm, NULL, NULL);
-		}
-		debugfs_remove_recursive(edp_dir);
-		fv_relation_destroy(fv);
-		kfree(params);
+		dev_err(&pdev->dev, "failed to add PM QOS notifier\n");
+		goto destroy_ppm;
 	}
+
+	ctx->cdev = thermal_of_cooling_device_register(pdev->dev.of_node,
+						       pdata.name, ctx,
+						       &edp_cooling_ops);
+	if (IS_ERR_OR_NULL(ctx->cdev)) {
+		dev_err(&pdev->dev, "failed to register cooling device\n");
+		ret = PTR_ERR(ctx->cdev);
+		goto remove_pm_qos;
+	}
+
+	ret = tegra_edp_debugfs_init(&pdev->dev, ctx);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to initialise debugfs\n");
+		goto remove_cdev;
+	}
+
+	return 0;
+
+remove_cdev:
+	thermal_cooling_device_unregister(ctx->cdev);
+remove_pm_qos:
+	pm_qos_remove_notifier(PM_QOS_MAX_GPU_POWER, &max_gpu_pwr_notifier);
+destroy_ppm:
+	tegra_ppm_destroy(ctx->ppm, NULL, NULL);
+destroy_fv:
+	fv_relation_destroy(fv);
+free_params:
+	kfree(params);
+
 	return ret;
 }
 
