@@ -526,13 +526,13 @@ static int camera_new_device(struct camera_info *cam, unsigned long arg)
 			next_dev->client->addr == dev_info.addr) {
 			dev_dbg(cam_desc.dev,
 				"%s: device already exists.\n", __func__);
-			camera_remove_device(new_dev, false);
 			if (atomic_xchg(&next_dev->in_use, 1)) {
 				dev_err(cam_desc.dev, "%s device %s BUSY\n",
 					__func__, next_dev->name);
 				err = -EBUSY;
 				goto new_device_err;
-			}
+			} else
+				camera_remove_device(new_dev, false);
 			new_dev = next_dev;
 			goto new_device_done;
 		}
