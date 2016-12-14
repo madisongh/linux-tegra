@@ -37,7 +37,6 @@
 #include <soc/tegra/tegra-ppm.h>
 
 struct cpu_edp_platform_data {
-	char *clk_name;
 	int n_caps;
 	int freq_step;
 	int reg_edp;
@@ -433,7 +432,12 @@ static int tegra_cpu_edp_probe(struct platform_device *pdev)
 
 	mutex_init(&ctx->edp_lock);
 
-	cpu_clk = clk_get_sys(NULL, "cclk_g");
+	cpu_clk = devm_clk_get(&pdev->dev, "cpu-edp");
+	if (IS_ERR(cpu_clk)) {
+		dev_err(&pdev->dev, "Failed to get 'cpu-edp' clock\n");
+		return PTR_ERR(cpu_clk);
+	}
+
 	fv = fv_relation_create(cpu_clk, ctx->pdata.freq_step, 220,
 				tegra_edp_get_max_cpu_freq(), 0,
 				tegra_cpu_edp_predict_millivolts);
