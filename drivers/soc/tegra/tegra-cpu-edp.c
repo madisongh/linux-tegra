@@ -46,6 +46,8 @@ struct cpu_edp {
 	struct platform_device *pdev;
 	struct cpu_edp_platform_data pdata;
 	struct tegra_ppm *ppm;
+	struct tegra_ppm_params *params;
+	struct fv_relation *fv;
 	struct dentry *debugfs_dir;
 	int temperature;
 	struct cpumask edp_cpumask;
@@ -406,9 +408,7 @@ tegra_cpu_edp_predict_millivolts(void *p, unsigned long rate)
 static int tegra_cpu_edp_probe(struct platform_device *pdev)
 {
 	struct cpu_edp *ctx = &s_cpu;
-	struct tegra_ppm_params *params;
 	struct clk *cpu_clk;
-	struct fv_relation *fv;
 	char *name = "cpu_edp";
 	unsigned iddq_ma;
 	int ret;
@@ -418,16 +418,16 @@ static int tegra_cpu_edp_probe(struct platform_device *pdev)
 		return -EPROBE_DEFER;
 	}
 
-	params = of_read_tegra_ppm_params(pdev->dev.of_node);
-	if (IS_ERR_OR_NULL(params)) {
+	ctx->params = of_read_tegra_ppm_params(pdev->dev.of_node);
+	if (IS_ERR_OR_NULL(ctx->params)) {
 		dev_err(&pdev->dev, "Parse ppm parameters failed\n");
-		return PTR_ERR(params);
+		return PTR_ERR(ctx->params);
 	}
 
 	ret = tegra_cpu_edp_parse_dt(pdev, ctx);
 	if (ret) {
 		dev_err(&pdev->dev, "Parse CPU EDP parameters failed\n");
-		return ret;
+		goto free_params;
 	}
 
 	mutex_init(&ctx->edp_lock);
@@ -435,15 +435,17 @@ static int tegra_cpu_edp_probe(struct platform_device *pdev)
 	cpu_clk = devm_clk_get(&pdev->dev, "cpu-edp");
 	if (IS_ERR(cpu_clk)) {
 		dev_err(&pdev->dev, "Failed to get 'cpu-edp' clock\n");
-		return PTR_ERR(cpu_clk);
+		ret = PTR_ERR(cpu_clk);
+		goto free_params;
 	}
 
-	fv = fv_relation_create(cpu_clk, ctx->pdata.freq_step, 220,
-				tegra_edp_get_max_cpu_freq(), 0,
-				tegra_cpu_edp_predict_millivolts);
-	if (IS_ERR_OR_NULL(fv)) {
+	ctx->fv = fv_relation_create(cpu_clk, ctx->pdata.freq_step, 220,
+				     tegra_edp_get_max_cpu_freq(), 0,
+				     tegra_cpu_edp_predict_millivolts);
+	if (IS_ERR_OR_NULL(ctx->fv)) {
 		dev_err(&pdev->dev, "Initialize freq/volt data failed\n");
-		return PTR_ERR(fv);
+		ret = PTR_ERR(ctx->fv);
+		goto free_params;
 	}
 
 	iddq_ma = tegra_sku_info.cpu_iddq_value;
@@ -452,10 +454,10 @@ static int tegra_cpu_edp_probe(struct platform_device *pdev)
 	ret = tegra_edp_debugfs_init(ctx, name);
 	if (ret) {
 		dev_err(&pdev->dev, "Creating debugfs entries failed\n");
-		return ret;
+		goto destroy_fv;
 	}
 
-	ctx->ppm = tegra_ppm_create(name, fv, params,
+	ctx->ppm = tegra_ppm_create(name, ctx->fv, ctx->params,
 				    iddq_ma, ctx->debugfs_dir);
 	if (IS_ERR_OR_NULL(ctx->ppm)) {
 		dev_err(&pdev->dev, "Create power model failed\n");
@@ -474,12 +476,25 @@ static int tegra_cpu_edp_probe(struct platform_device *pdev)
 		goto destroy_ppm;
 	}
 
-	pm_qos_add_notifier(PM_QOS_MAX_CPU_POWER, &max_cpu_pwr_notifier_block);
+	ret = pm_qos_add_notifier(PM_QOS_MAX_CPU_POWER,
+				  &max_cpu_pwr_notifier_block);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to add PM QOS notifier\n");
+		goto remove_cdev;
+	}
 
-	cpufreq_register_notifier(&edp_cpufreq_notifier_block,
-				  CPUFREQ_POLICY_NOTIFIER);
+	ret = cpufreq_register_notifier(&edp_cpufreq_notifier_block,
+					CPUFREQ_POLICY_NOTIFIER);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to add CPUFREQ notifier\n");
+		goto remove_pm_qos;
+	}
 
-	register_hotcpu_notifier(&tegra_cpu_edp_notifier_block);
+	ret = register_hotcpu_notifier(&tegra_cpu_edp_notifier_block);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to add hot-CPU notifier\n");
+		goto remove_cpufreq;
+	}
 
 	mutex_lock(&ctx->edp_lock);
 	ctx->edp_cpumask = *cpu_online_mask;
@@ -489,10 +504,22 @@ static int tegra_cpu_edp_probe(struct platform_device *pdev)
 
 	return 0;
 
+remove_cpufreq:
+	cpufreq_unregister_notifier(&edp_cpufreq_notifier_block,
+				    CPUFREQ_POLICY_NOTIFIER);
+remove_pm_qos:
+	pm_qos_remove_notifier(PM_QOS_MAX_CPU_POWER,
+			       &max_cpu_pwr_notifier_block);
+remove_cdev:
+	thermal_cooling_device_unregister(ctx->cdev);
 destroy_ppm:
 	tegra_ppm_destroy(ctx->ppm, NULL, NULL);
 remove_debugfs:
 	debugfs_remove_recursive(ctx->debugfs_dir);
+destroy_fv:
+	fv_relation_destroy(ctx->fv);
+free_params:
+	kfree(ctx->params);
 
 	return ret;
 }
@@ -505,9 +532,12 @@ static int tegra_cpu_edp_remove(struct platform_device *pdev)
 	cpufreq_unregister_notifier(&edp_cpufreq_notifier_block,
 				    CPUFREQ_POLICY_NOTIFIER);
 	pm_qos_remove_notifier(PM_QOS_MAX_CPU_POWER,
-				&max_cpu_pwr_notifier_block);
+			       &max_cpu_pwr_notifier_block);
+	thermal_cooling_device_unregister(ctx->cdev);
 	tegra_ppm_destroy(ctx->ppm, NULL, NULL);
 	debugfs_remove_recursive(ctx->debugfs_dir);
+	fv_relation_destroy(ctx->fv);
+	kfree(ctx->params);
 
 	return 0;
 }
