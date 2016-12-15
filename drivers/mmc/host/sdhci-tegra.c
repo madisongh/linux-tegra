@@ -1625,7 +1625,7 @@ static const struct sdhci_pltfm_data sdhci_tegra210_pdata = {
 static const struct sdhci_tegra_soc_data soc_data_tegra210 = {
 	.pdata = &sdhci_tegra210_pdata,
 	.nvquirks2 = NVQUIRK2_TEGRA_WRITE_REG |
-		NVQUIRK2_DISABLE_CARD_CLK,
+		NVQUIRK2_DISABLE_CARD_CLK |
 		NVQUIRK2_SET_PLL_CLK_PARENT,
 };
 
