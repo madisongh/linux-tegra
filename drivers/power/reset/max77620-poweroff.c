@@ -371,6 +371,8 @@ static struct platform_device_id max77620_poweroff_devtype[] = {
 	{
 		.name = "max20024-power",
 	},
+	{
+	}
 };
 
 static struct platform_driver max77620_poweroff_driver = {
