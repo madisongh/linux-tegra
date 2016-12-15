@@ -480,7 +480,7 @@ static int init_cpu_edp_limits_calculated(void)
 					else if (tegra_cpu_speedo_id() == 8)
 						limit = 1887000;
 					/* CD575M UCM1 default */
-					else if (tegra_cpu_speedo_id() == -1)
+					else if (tegra_cpu_speedo_id() == 5)
 						limit = 1887000;
 			} else
 				limit = cpu_edp_calculate_maxf(params,
