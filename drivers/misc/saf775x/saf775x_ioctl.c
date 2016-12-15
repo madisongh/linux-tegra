@@ -148,12 +148,17 @@ static int saf775x_hwdep_ioctl(struct file *file,
 		if (arg && copy_from_user(&saf775x, _saf775x, sizeof(saf775x)))
 			return -EFAULT;
 
+		if (saf775x.val_len <= 0) {
+			dev_err(dev, "Failed to wrong length value");
+			return -EFAULT;
+		}
+
 		buf = devm_kzalloc(dev,
 			sizeof(*buf) * saf775x.val_len, GFP_KERNEL);
 
 		if (!buf) {
-				dev_err(dev, "Failed to allocate memory for codec read buffer");
-				return -ENOMEM;
+			dev_err(dev, "Failed to allocate memory for codec read buffer");
+			return -ENOMEM;
 		}
 		if (copy_from_user(buf, _saf775x->val,
 				sizeof(*buf) * saf775x.val_len)) {
