@@ -1275,6 +1275,7 @@ static struct platform_device_id tegra_adma_devtype[] = {
 	{
 		.name = "tegra210-adma",
 		.driver_data = (unsigned long)&tegra210_adma_chip_data,
+	}, {
 	},
 };
 
