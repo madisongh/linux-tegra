@@ -734,17 +734,17 @@ static int tmpm32xi2c_parse_dt(struct tmpm32xi2c_chip *chip)
 {
 	struct i2c_client *client = chip->client;
 	struct device_node *np = client->dev.of_node;
+	u32 val = 0;
 	int ret;
 
 	if (!np)
 		return -ENOENT;
 
+	chip->irq_flags = IRQF_TRIGGER_LOW;
 	ret = of_property_read_u32(client->dev.of_node, "tmpm32xi2c,irq_flags",
-					(unsigned int *)&chip->irq_flags);
-	if (ret) {
-		dev_warn(&client->dev, "Using default irq_flags");
-		chip->irq_flags = IRQF_TRIGGER_LOW;
-	}
+				   &val);
+	if (!ret)
+		chip->irq_flags = val;
 
 	return 0;
 }
