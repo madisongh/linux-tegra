@@ -95,14 +95,24 @@ static void cbus_restore(struct clk_hw *hw)
 {
 	struct tegra_clk_cbus_shared *user;
 	struct tegra_clk_cbus_shared *cbus = to_clk_cbus_shared(hw);
+	struct clk *parent;
+	unsigned long parent_rate;
+
+	parent = clk_get_parent(hw->clk);
+	parent_rate = clk_get_rate(parent);
 
 	list_for_each_entry(user, &cbus->shared_bus_list,
 				 u.shared_bus_user.node) {
 		struct clk *client = user->u.shared_bus_user.client;
 
 		if (client) {
+			int div;
+			long new_rate;
+
 			cbus_switch_one(client, clk_get_parent(hw->clk));
-			clk_set_rate(client, user->u.shared_bus_user.rate);
+			div = parent_rate / user->u.shared_bus_user.rate;
+			new_rate = (parent_rate + div - 1) / div;
+			clk_set_rate(client, new_rate);
 		}
 	}
 }
