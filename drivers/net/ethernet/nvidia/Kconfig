@@ -25,10 +25,4 @@ config FORCEDETH
 	  To compile this driver as a module, choose M here. The module
 	  will be called forcedeth.
 
-if ARCH_TEGRA_18x_SOC
-trysource "../t18x/drivers/net/ethernet/nvidia/eqos/Kconfig"
-trysource "../t18x/drivers/net/ethernet/nvidia/eqos/Kconfig.t18x"
-trysource "drivers/net/ethernet/nvidia/eqos/Kconfig.t18x"
-endif # ARCH_TEGRA_18x_SOC
-
 endif # NET_VENDOR_NVIDIA
