@@ -97,18 +97,10 @@ static int clk_periph_enable(struct clk_hw *hw)
 	return 0;
 }
 
-static void clk_periph_disable(struct clk_hw *hw)
+static void _periph_disable_locked(struct tegra_clk_periph_gate *gate)
 {
-	struct tegra_clk_periph_gate *gate = to_clk_periph_gate(hw);
-	unsigned long flags = 0;
-
-	spin_lock_irqsave(&periph_ref_lock, flags);
-
-	gate->enable_refcnt[gate->clk_num]--;
-	if (gate->enable_refcnt[gate->clk_num] > 0) {
-		spin_unlock_irqrestore(&periph_ref_lock, flags);
+	if (gate->enable_refcnt[gate->clk_num] > 0)
 		return;
-	}
 
 	/*
 	 * If peripheral is in the APB bus then read the APB bus to
@@ -119,6 +111,30 @@ static void clk_periph_disable(struct clk_hw *hw)
 		tegra_read_chipid();
 
 	write_enb_clr(periph_clk_to_bit(gate), gate);
+}
+
+static void clk_periph_disable_unused(struct clk_hw *hw)
+{
+	struct tegra_clk_periph_gate *gate = to_clk_periph_gate(hw);
+	unsigned long flags = 0;
+
+	spin_lock_irqsave(&periph_ref_lock, flags);
+
+	_periph_disable_locked(gate);
+
+	spin_unlock_irqrestore(&periph_ref_lock, flags);
+}
+
+static void clk_periph_disable(struct clk_hw *hw)
+{
+	struct tegra_clk_periph_gate *gate = to_clk_periph_gate(hw);
+	unsigned long flags = 0;
+
+	spin_lock_irqsave(&periph_ref_lock, flags);
+
+	gate->enable_refcnt[gate->clk_num]--;
+
+	_periph_disable_locked(gate);
 
 	spin_unlock_irqrestore(&periph_ref_lock, flags);
 }
@@ -155,6 +171,7 @@ const struct clk_ops tegra_clk_periph_gate_ops = {
 	.is_prepared = clk_periph_is_prepared,
 	.enable = clk_periph_enable,
 	.disable = clk_periph_disable,
+	.disable = clk_periph_disable_unused,
 	.prepare = clk_periph_prepare,
 	.unprepare = clk_periph_unprepare,
 };
