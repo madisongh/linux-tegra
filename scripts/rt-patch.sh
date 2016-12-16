@@ -11,6 +11,8 @@ apply_rt_patches()
 		# set flag in case of failure and continue
 		patch -s -d .. -p1 < $p || any_failure=1
 	done
+	./config --file ../arch/arm64/configs/tegra_t186ref_gnu_linux_defconfig --enable PREEMPT_RT_FULL  --disable CPU_IDLE_TEGRA18X  --disable CPU_FREQ_GOV_INTERACTIVE || any_failure=1
+
 }
 
 revert_rt_patches()
@@ -20,6 +22,8 @@ revert_rt_patches()
 		# set flag in case of failure and continue
 		patch -s -R -d .. -p1 < $p || any_failure=1
 	done
+	#  CPU_FREQ_GOV_INTERACTIVE need to keep disable for Automotive
+	./config --file ../arch/arm64/configs/tegra_t186ref_gnu_linux_defconfig --disable PREEMPT_RT_FULL  --enable CPU_IDLE_TEGRA18X  --disable CPU_FREQ_GOV_INTERACTIVE || any_failure=1
 }
 
 usage()
