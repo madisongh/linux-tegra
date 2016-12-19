@@ -462,7 +462,7 @@ static int oz_net_notifier(struct notifier_block *nb, unsigned long event,
 		oz_trace_msg(M, "%s: event %s\n", __func__,
 			(event == NETDEV_UNREGISTER) ?
 			"NETDEV_UNREGISTER" : "NETDEV_DOWN");
-		pr_info("%s: event %s\n", __func__,
+		pr_debug("%s: event %s\n", __func__,
 			(event == NETDEV_UNREGISTER) ?
 			"NETDEV_UNREGISTER" : "NETDEV_DOWN");
 		oz_binding_remove(dev->name);
@@ -805,7 +805,7 @@ void oz_binding_remove(const char *net_dev)
 	int found = 0;
 
 	oz_trace_msg(M, "Removing binding: '%s'\n", net_dev);
-	pr_info("%s: Remove binding: '%s'\n", __func__, net_dev);
+	pr_debug("%s: Remove binding: '%s'\n", __func__, net_dev);
 	spin_lock_bh(&g_binding_lock);
 	list_for_each_entry_safe(binding, tmp, &g_binding, link) {
 		if (compare_binding_name(binding->name, net_dev)) {
