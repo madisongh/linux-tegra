@@ -39,6 +39,7 @@
 #include <linux/spinlock.h>
 #include <linux/tegra-soc.h>
 #include <linux/platform/tegra/io-dpd.h>
+#include <linux/power/reset/system-pmic.h>
 
 #include <soc/tegra/common.h>
 #include <soc/tegra/fuse.h>
@@ -265,6 +266,24 @@
 #define   UHSIC_STROBE_RPD_C			BIT(16)
 #define   UHSIC_STROBE_RPD_D			BIT(24)
 
+/* Bootrom comand register */
+
+#define PMC_REG_8bit_MASK			0xFF
+#define PMC_REG_16bit_MASK			0xFFFF
+#define PMC_BR_COMMAND_I2C_ADD_MASK		0x7F
+#define PMC_BR_COMMAND_WR_COMMANDS_MASK		0x3F
+#define PMC_BR_COMMAND_WR_COMMANDS_SHIFT	8
+#define PMC_BR_COMMAND_OPERAND_SHIFT		15
+#define PMC_BR_COMMAND_CSUM_MASK		0xFF
+#define PMC_BR_COMMAND_CSUM_SHIFT		16
+#define PMC_BR_COMMAND_PMUX_MASK		0x7
+#define PMC_BR_COMMAND_PMUX_SHIFT		24
+#define PMC_BR_COMMAND_CTRL_ID_MASK		0x7
+#define PMC_BR_COMMAND_CTRL_ID_SHIFT		27
+#define PMC_BR_COMMAND_CTRL_TYPE_SHIFT		30
+#define PMC_BR_COMMAND_RST_EN_SHIFT		31
+
+
 /* io dpd off request code */
 #define IO_DPD_CODE_OFF		1
 
@@ -278,16 +297,36 @@ static struct io_dpd_reg_info t3_io_dpd_req_regs[] = {
 	{0x1c0, 30},
 };
 
+/* Bootrom commands structures */
+struct tegra_bootrom_block {
+	const char *name;
+	int address;
+	bool reg_8bits;
+	bool data_8bits;
+	bool i2c_controller;
+	int controller_id;
+	bool enable_reset;
+	int ncommands;
+	u32 *commands;
+};
+
+struct tegra_bootrom_commands {
+	u32 command_retry_count;
+	u32 delay_between_commands;
+	u32 wait_before_bus_clear;
+	struct tegra_bootrom_block *blocks;
+	int nblocks;
+};
+
 static DEFINE_SPINLOCK(tegra_io_dpd_lock);
 static DEFINE_SPINLOCK(tegra_pmc_access_lock);
+
+static struct tegra_bootrom_commands *br_rst_commands;
+static struct tegra_bootrom_commands *br_off_commands;
 
 #ifdef CONFIG_PADCTRL_TEGRA210_PMC
 extern int tegra210_pmc_padctrl_init(struct device *dev,
 				     struct device_node *np);
-#endif
-
-#ifdef CONFIG_TEGRA210_BOOTROM_PMC
-extern int tegra210_boorom_pmc_init(struct device *dev);
 #endif
 
 struct tegra_pmc_soc {
@@ -299,6 +338,7 @@ struct tegra_pmc_soc {
 	bool has_tsense_reset;
 	bool has_gpu_clamps;
 	bool has_ps18;
+	bool has_bootrom_command;
 };
 
 /**
@@ -1411,6 +1451,268 @@ void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode)
 }
 #endif
 
+/* PMC Bootrom commands */
+static int tegra_pmc_parse_bootrom_cmd(struct device *dev,
+				       struct device_node *np,
+				       struct tegra_bootrom_commands **br_cmds)
+{
+	struct device_node *child;
+	struct tegra_bootrom_commands *bcommands;
+	int *command_ptr;
+	struct tegra_bootrom_block *block;
+	int nblocks;
+	u32 reg, data, pval;
+	u32 *wr_commands;
+	int count, nblock, ncommands, i, reg_shift;
+	int ret;
+	int sz_bcommand, sz_blocks;
+
+	nblocks = of_get_available_child_count(np);
+	if (!nblocks) {
+		dev_info(dev, "PMC: No Bootrom Command\n");
+		return -ENOENT;
+	}
+
+	count = 0;
+	for_each_available_child_of_node(np, child) {
+		ret = of_property_count_u32_elems(child,
+						  "nvidia,write-commands");
+		if (ret < 0) {
+			dev_err(dev, "PMC: Node %s does not have write-commnds\n",
+				child->full_name);
+			return -EINVAL;
+		}
+		count += ret / 2;
+	}
+
+	sz_bcommand = (sizeof(*bcommands) + 0x3) & ~0x3;
+	sz_blocks = (sizeof(*block) + 0x3) & ~0x3;
+	bcommands = devm_kzalloc(dev,  sz_bcommand + nblocks * sz_blocks +
+				 count * sizeof(u32), GFP_KERNEL);
+	if (!bcommands)
+		return -ENOMEM;
+
+	bcommands->nblocks = nblocks;
+	bcommands->blocks = (void *)bcommands + sz_bcommand;
+	command_ptr = (void *)bcommands->blocks + nblocks * sz_blocks;
+
+	of_property_read_u32(np, "nvidia,command-retries-count",
+			     &bcommands->command_retry_count);
+	of_property_read_u32(np, "nvidia,delay-between-commands-us",
+			     &bcommands->delay_between_commands);
+	of_property_read_u32(np, "nvidia,wait-before-start-bus-clear-us",
+			     &bcommands->wait_before_bus_clear);
+
+	nblock = 0;
+	for_each_available_child_of_node(np, child) {
+		block = &bcommands->blocks[nblock];
+		ret = of_property_read_u32(child, "reg", &pval);
+		if (ret) {
+			dev_err(dev, "PMC: Reg property missing on block %s\n",
+				child->name);
+			return ret;
+		}
+		block->address = pval;
+		of_property_read_string(child, "nvidia,command-names",
+					&block->name);
+		block->reg_8bits = !of_property_read_bool(child,
+					"nvidia,enable-16bit-register");
+		block->data_8bits = !of_property_read_bool(child,
+					"nvidia,enable-16bit-data");
+		block->i2c_controller = of_property_read_bool(child,
+					"nvidia,controller-type-i2c");
+		block->enable_reset = of_property_read_bool(child,
+					"nvidia,enable-controller-reset");
+		count = of_property_count_u32_elems(child,
+						    "nvidia,write-commands");
+		ncommands = count / 2;
+
+		block->commands = command_ptr;
+		command_ptr += ncommands;
+		wr_commands = block->commands;
+		reg_shift = (block->data_8bits) ? 8 : 16;
+		for (i = 0; i < ncommands; ++i) {
+			of_property_read_u32_index(child,
+						   "nvidia,write-commands",
+						   i * 2, &reg);
+			of_property_read_u32_index(child,
+						   "nvidia,write-commands",
+						   i * 2 + 1, &data);
+
+			wr_commands[i] = (data << reg_shift) | reg;
+		}
+		block->ncommands = ncommands;
+		nblock++;
+	}
+	*br_cmds = bcommands;
+
+	return 0;
+}
+
+static int tegra_pmc_read_bootrom_cmd(struct device *dev,
+		      struct tegra_bootrom_commands **br_rst_cmds,
+		      struct tegra_bootrom_commands **br_off_cmds)
+{
+	struct device_node *np = dev->of_node;
+	struct device_node *br_np, *rst_np, *off_np;
+	int ret;
+
+	*br_rst_cmds = NULL;
+	*br_off_cmds = NULL;
+
+	br_np = of_find_node_by_name(np, "bootrom-commands");
+	if (!br_np) {
+		dev_info(dev, "PMC: Bootrom commmands not found\n");
+		return -ENOENT;
+	}
+
+	rst_np = of_find_node_by_name(br_np, "reset-commands");
+	if (!rst_np) {
+		dev_info(dev, "PMC: bootrom-commands used for reset\n");
+		rst_np = br_np;
+	}
+
+	ret = tegra_pmc_parse_bootrom_cmd(dev, rst_np, br_rst_cmds);
+	if (ret < 0)
+		return ret;
+
+	if (rst_np == br_np)
+		return 0;
+
+	off_np = of_find_node_by_name(br_np, "power-off-commands");
+	if (!off_np)
+		return 0;
+	ret = tegra_pmc_parse_bootrom_cmd(dev, off_np, br_off_cmds);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+static int tegra_pmc_configure_bootrom_scratch(struct device *dev,
+		struct tegra_bootrom_commands *br_commands)
+{
+	struct tegra_bootrom_block *block;
+	int i, j, k;
+	u32 cmd;
+	int reg_offset = 1;
+	u32 reg_data_mask;
+	int cmd_pw;
+	u32 block_add, block_val, csum;
+
+	for (i = 0; i < br_commands->nblocks; ++i) {
+		block = &br_commands->blocks[i];
+
+		cmd = block->address & PMC_BR_COMMAND_I2C_ADD_MASK;
+		cmd |= block->ncommands << PMC_BR_COMMAND_WR_COMMANDS_SHIFT;
+		if (!block->reg_8bits || !block->data_8bits)
+			cmd |= BIT(PMC_BR_COMMAND_OPERAND_SHIFT);
+
+		if (block->enable_reset)
+			cmd |= BIT(PMC_BR_COMMAND_RST_EN_SHIFT);
+
+		cmd |= (block->controller_id & PMC_BR_COMMAND_CTRL_ID_MASK) <<
+					PMC_BR_COMMAND_CTRL_ID_SHIFT;
+
+		/* Checksum will be added after parsing from reg/data */
+		tegra_pmc_write_bootrom_command(reg_offset * 4, cmd);
+		block_add = reg_offset * 4;
+		block_val = cmd;
+		reg_offset++;
+
+		cmd_pw = (block->reg_8bits && block->data_8bits) ? 2 : 1;
+		reg_data_mask = (cmd_pw == 1) ? 0xFFFF : 0xFFFFFFFFUL;
+		csum = 0;
+
+		for (j = 0; j < block->ncommands; j++) {
+			cmd = block->commands[j] & reg_data_mask;
+			if (cmd_pw == 2) {
+				j++;
+				if (j == block->ncommands)
+					goto reg_update;
+				cmd |= (block->commands[j] & reg_data_mask) <<
+					16;
+			}
+reg_update:
+			tegra_pmc_write_bootrom_command(reg_offset * 4, cmd);
+			for (k = 0; k < 4; ++k)
+				csum += (cmd >> (k * 8)) & 0xFF;
+			reg_offset++;
+		}
+		for (k = 0; k < 4; ++k)
+			csum += (block_val >> (k * 8)) & 0xFF;
+		csum = 0x100 - csum;
+		block_val = (block_val & 0xFF00FFFF) | ((csum & 0xFF) << 16);
+		tegra_pmc_write_bootrom_command(block_add, block_val);
+	}
+
+	cmd = br_commands->command_retry_count & 0x7;
+	cmd |= (br_commands->delay_between_commands & 0x1F) << 3;
+	cmd |= (br_commands->nblocks & 0x7) << 8;
+	cmd |= (br_commands->wait_before_bus_clear & 0x1F) << 11;
+	tegra_pmc_write_bootrom_command(0, cmd);
+
+	return 0;
+}
+
+static int tegra_pmc_init_bootrom_power_off_cmd(struct device *dev)
+{
+	int ret;
+
+	if (!br_off_commands) {
+		dev_info(dev, "PMC: Power Off Command not available\n");
+		return 0;
+	}
+
+	ret = tegra_pmc_configure_bootrom_scratch(NULL, br_off_commands);
+	if (ret < 0) {
+		dev_err(dev, "PMC: Failed to configure power-off command: %d\n",
+			ret);
+		return ret;
+	}
+
+	dev_info(dev, "PMC: Successfully configure power-off commands\n");
+
+	return 0;
+}
+
+static void tegra_pmc_soc_power_off(void)
+{
+	tegra_pmc_init_bootrom_power_off_cmd(pmc->dev);
+	tegra_pmc_reset_system();
+}
+
+static int tegra_pmc_init_boorom_cmds(struct device *dev)
+{
+	int ret;
+
+	ret = tegra_pmc_read_bootrom_cmd(dev, &br_rst_commands,
+					 &br_off_commands);
+	if (ret < 0) {
+		if (ret == -ENOENT)
+			ret = 0;
+		else
+			dev_info(dev,
+				 "PMC: Failed to read bootrom cmd: %d\n", ret);
+
+		return ret;
+	}
+
+	if (br_off_commands)
+		soc_specific_power_off = tegra_pmc_soc_power_off;
+
+	ret = tegra_pmc_configure_bootrom_scratch(dev, br_rst_commands);
+	if (ret < 0) {
+		dev_info(dev, "PMC: Failed to write bootrom scratch register: %d\n",
+			 ret);
+		return ret;
+	}
+
+	dev_info(dev, "PMC: Successfully configure bootrom reset commands\n");
+
+	return 0;
+}
+
 static int tegra_pmc_parse_dt(struct tegra_pmc *pmc, struct device_node *np)
 {
 	u32 value, values[2];
@@ -1632,15 +1934,11 @@ static int tegra_pmc_probe(struct platform_device *pdev)
 	/* Register as pad controller */
 	err = tegra210_pmc_padctrl_init(&pdev->dev, pdev->dev.of_node);
 	if (err)
-		pr_err("ERROR: Pad control driver init failed: %d\n",
-			err);
+		pr_err("ERROR: Pad control driver init failed: %d\n", err);
 #endif
 
-#ifdef CONFIG_TEGRA210_BOOTROM_PMC
-	err = tegra210_boorom_pmc_init(&pdev->dev);
-	if (err < 0)
-		pr_err("ERROR: Bootrom PMC config failed: %d\n", err);
-#endif
+	if (pmc->soc->has_bootrom_command)
+		tegra_pmc_init_boorom_cmds(&pdev->dev);
 
 	/* handle PMC reboot reason with PSCI */
 	if (arm_pm_restart)
@@ -1685,6 +1983,7 @@ static const struct tegra_pmc_soc tegra20_pmc_soc = {
 	.cpu_powergates = NULL,
 	.has_tsense_reset = false,
 	.has_gpu_clamps = false,
+	.has_bootrom_command = false,
 };
 
 static const char * const tegra30_powergates[] = {
@@ -1718,6 +2017,7 @@ static const struct tegra_pmc_soc tegra30_pmc_soc = {
 	.cpu_powergates = tegra30_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = false,
+	.has_bootrom_command = false,
 };
 
 static const char * const tegra114_powergates[] = {
@@ -1755,6 +2055,7 @@ static const struct tegra_pmc_soc tegra114_pmc_soc = {
 	.cpu_powergates = tegra114_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = false,
+	.has_bootrom_command = false,
 };
 
 static const char * const tegra124_powergates[] = {
@@ -1798,6 +2099,7 @@ static const struct tegra_pmc_soc tegra124_pmc_soc = {
 	.cpu_powergates = tegra124_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = true,
+	.has_bootrom_command = false,
 };
 
 static const char * const tegra210_powergates[] = {
@@ -1846,6 +2148,7 @@ static const struct tegra_pmc_soc tegra210_pmc_soc = {
 	.has_tsense_reset = true,
 	.has_gpu_clamps = true,
 	.has_ps18 = true,
+	.has_bootrom_command = true,
 };
 
 static const struct of_device_id tegra_pmc_match[] = {
