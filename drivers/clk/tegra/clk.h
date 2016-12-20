@@ -956,4 +956,13 @@ void tegra_clk_osc_resume(void __iomem *clk_base);
 int div71_get(unsigned long rate, unsigned parent_rate, u8 width,
 	      u8 frac_width, u8 flags);
 
+struct tegra_pto_table {
+	int clk_id;
+	int divider;
+	u32 pto_id;
+	u32 presel_value;
+	u32 presel_reg;
+	u32 presel_mask;
+};
+void tegra_register_ptos(struct tegra_pto_table *ptodefs, int num_pto_defs);
 #endif /* TEGRA_CLK_H */
