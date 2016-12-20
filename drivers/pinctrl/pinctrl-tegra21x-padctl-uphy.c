@@ -264,12 +264,6 @@
 #define   RX_TERM_OVRD				BIT(23)
 
 /* CAR registers */
-#define CLK_RST_CONTROLLER_XUSBIO_SATA_PLL_CFG0(_pll)	(_pll ? 0x490 : 0x51c)
-#define   SATA_SEQ_IN_SWCTL			BIT(4)
-#define   SATA_SEQ_RESET_INPUT_VALUE		BIT(5)
-#define   SATA_SEQ_LANE_PD_INPUT_VALUE		BIT(6)
-#define   SATA_SEQ_PADPLL_PD_INPUT_VALUE	BIT(7)
-
 #define CLK_RST_CONTROLLER_UTMIPLL_HW_PWRDN_CFG0	(0x52c)
 #define   UTMIPLL_IDDQ_SWCTL			BIT(0)
 #define   UTMIPLL_IDDQ_OVERRIDE_VALUE		BIT(1)
@@ -2106,40 +2100,6 @@ static inline void tegra21x_sata_phy_idle_detector(
 #define tegra21x_sata_phy_idle_detector_disable(uphy)		\
 		tegra21x_sata_phy_idle_detector(uphy, false)
 
-/* caller must hold uphy->lock */
-static inline void tegra21x_sata_phy_force_seq(struct tegra_padctl_uphy *uphy,
-						int pll, bool force_off)
-{
-	unsigned int uphy_lane;
-	u32 reg;
-
-	TRACE(uphy->dev, "%s SATA power sequencer\n",
-			force_off ? "force off" : "force on");
-
-	for_each_set_bit(uphy_lane, &uphy->sata_lanes, T21x_UPHY_LANES) {
-		reg = car_readl(uphy,
-				CLK_RST_CONTROLLER_XUSBIO_SATA_PLL_CFG0(pll));
-
-		if (force_off)
-			reg |= (SATA_SEQ_IN_SWCTL |
-				SATA_SEQ_RESET_INPUT_VALUE |
-				SATA_SEQ_LANE_PD_INPUT_VALUE |
-				SATA_SEQ_PADPLL_PD_INPUT_VALUE);
-		else
-			reg &= ~(SATA_SEQ_IN_SWCTL |
-				SATA_SEQ_RESET_INPUT_VALUE |
-				SATA_SEQ_LANE_PD_INPUT_VALUE |
-				SATA_SEQ_PADPLL_PD_INPUT_VALUE);
-
-		car_writel(uphy, reg,
-				CLK_RST_CONTROLLER_XUSBIO_SATA_PLL_CFG0(pll));
-	}
-}
-#define tegra21x_sata_phy_force_seq_off(uphy, pll)		\
-		tegra21x_sata_phy_force_seq(uphy, pll, true)
-#define tegra21x_sata_phy_force_seq_on(uphy, pll)		\
-		tegra21x_sata_phy_force_seq(uphy, pll, false)
-
 static int tegra21x_sata_uphy_pll_init(struct tegra_padctl_uphy *uphy)
 {
 	unsigned int uphy_lane;
@@ -2169,7 +2129,7 @@ static int tegra21x_sata_uphy_pll_init(struct tegra_padctl_uphy *uphy)
 		goto assert_pll1_reset;
 
 	tegra21x_sata_phy_idle_detector_disable(uphy);
-	tegra21x_sata_phy_force_seq_off(uphy, 1);
+	tegra210_set_sata_pll_seq_sw(true);
 
 	mutex_unlock(&uphy->lock);
 
@@ -2242,7 +2202,7 @@ static int tegra21x_sata_phy_power_on(struct phy *phy)
 	TRACE(dev, "power on SATA uphy-lanes 0x%lx\n", uphy->sata_lanes);
 
 	uphy_lanes_clamp_disable(uphy, uphy->sata_lanes);
-	tegra21x_sata_phy_force_seq_on(uphy, 1);
+	tegra210_set_sata_pll_seq_sw(false);
 	tegra21x_sata_phy_idle_detector_enable(uphy);
 
 	mutex_unlock(&uphy->lock);
@@ -2260,7 +2220,7 @@ static int tegra21x_sata_phy_power_off(struct phy *phy)
 	TRACE(dev, "power off SATA uphy-lanes 0x%lx\n", uphy->sata_lanes);
 
 	tegra21x_sata_phy_idle_detector_disable(uphy);
-	tegra21x_sata_phy_force_seq_off(uphy, 1);
+	tegra210_set_sata_pll_seq_sw(true);
 	uphy_lanes_clamp_enable(uphy, uphy->sata_lanes);
 
 	mutex_unlock(&uphy->lock);
