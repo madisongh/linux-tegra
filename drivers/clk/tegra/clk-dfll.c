@@ -362,6 +362,7 @@ struct tegra_dfll {
 
 	/* i2c_lut array entries are regulator framework selectors */
 	unsigned			lut[MAX_DFLL_VOLTAGES];
+	unsigned			lut_uv[MAX_DFLL_VOLTAGES];
 	int				lut_size;
 	u8				lut_min, lut_max, lut_safe;
 
@@ -722,8 +723,7 @@ static void set_dvco_rate_min(struct tegra_dfll *td)
 	unsigned long rate, prev_rate;
 	int min_uv, uv;
 
-	min_uv = regulator_list_voltage(td->vdd_reg,
-			td->lut[td->thermal_floor_output]);
+	min_uv = td->lut_uv[td->thermal_floor_output];
 
 	td->dvco_rate_min = td->out_rate_min;
 
@@ -1068,8 +1068,7 @@ static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
 	rcu_read_unlock();
 
 	for (i = 0; i < td->lut_size; i++) {
-		if ((regulator_list_voltage(td->vdd_reg, td->lut[i]) /
-					td->soc->alignment) == align_volt)
+		if ((td->lut_uv[i] / td->soc->alignment) == align_volt)
 			return i;
 	}
 
@@ -1091,8 +1090,7 @@ static u8 find_mv_out_cap(struct tegra_dfll *td, int mv)
 	u8 i;
 
 	for (i = 0; i < td->lut_size; i++) {
-		if (regulator_list_voltage(td->vdd_reg, td->lut[i]) >=
-				mv * 1000)
+		if (td->lut_uv[i] >= mv * 1000)
 			return i;
 	}
 
@@ -1114,8 +1112,7 @@ static u8 find_mv_out_floor(struct tegra_dfll *td, int mv)
 	u8 i;
 
 	for (i = 0; i < td->lut_size; i++) {
-		if (regulator_list_voltage(td->vdd_reg, td->lut[i]) >
-				mv * 1000) {
+		if (td->lut_uv[i] > mv * 1000) {
 			if (!i)
 				/* minimum possible output */
 				return 0;
@@ -2190,6 +2187,11 @@ static int dfll_build_lut(struct tegra_dfll *td)
 	} else {
 		ret = 0;
 		td->dvco_rate_min = td->out_rate_min;
+
+		for (j = 0; j < td->lut_size; j++)
+			td->lut_uv[j] =
+				regulator_list_voltage_unlocked(td->vdd_reg,
+				td->lut[j]);
 	}
 
 out:
