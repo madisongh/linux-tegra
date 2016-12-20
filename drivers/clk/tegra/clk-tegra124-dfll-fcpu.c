@@ -593,6 +593,8 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 	soc->tune0_low = cvb->cpu_dfll_data.tune0_low;
 	soc->tune0_high = cvb->cpu_dfll_data.tune0_high;
 	soc->tune1 = cvb->cpu_dfll_data.tune1;
+	soc->tune_high_min_millivolts =
+		cvb->cpu_dfll_data.tune_high_min_millivolts;
 
 	return tegra_dfll_register(pdev, soc);
 }
