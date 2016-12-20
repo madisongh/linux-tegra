@@ -2361,15 +2361,15 @@ void tegra_dfll_suspend(struct platform_device *pdev)
 	if (td->mode <= DFLL_DISABLED)
 		return;
 
-//	td->thermal_cap_index =
-//		tegra_dfll_count_thermal_states(td, TEGRA_DFLL_THERMAL_CAP);
-//	td->thermal_floor_index = 0;
-//	set_dvco_rate_min(td);
+	td->thermal_cap_index =
+		tegra_dfll_count_thermal_states(td, TEGRA_DFLL_THERMAL_CAP);
+	td->thermal_floor_index = 0;
+	set_dvco_rate_min(td);
 
 	td->resume_mode = td->mode;
 	switch (td->mode) {
 	case DFLL_CLOSED_LOOP:
-	//	dfll_set_close_loop_config(td, &td->last_req);
+		dfll_set_close_loop_config(td, &td->last_req);
 		dfll_set_frequency_request(td, &td->last_req);
 
 		dfll_unlock(td);
@@ -2397,7 +2397,7 @@ void tegra_dfll_resume(struct platform_device *pdev)
 
 	/* Re-init DFLL */
 	dfll_init_out_if(td);
-	//dfll_init_tuning_thresholds(td);
+	dfll_init_tuning_thresholds(td);
 	dfll_set_default_params(td);
 	dfll_set_open_loop_config(td);
 
