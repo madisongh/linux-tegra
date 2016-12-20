@@ -31,7 +31,6 @@ obj-$(CONFIG_ARCH_TEGRA_21x_SOC)         += tegra_ptm_t210.o
 endif
 
 obj-y += nvdumper/
-obj-$(CONFIG_TEGRA_PMC) += pmc.o
 ifeq ($(CONFIG_PM),y)
 obj-$(CONFIG_ARCH_TEGRA_21x_SOC)	+= tegra21-pmc-iopower.o
 endif
