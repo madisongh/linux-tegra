@@ -16,6 +16,7 @@
 
 #include <linux/slab.h>
 #include <linux/io.h>
+#include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/clk-provider.h>
@@ -458,6 +459,29 @@ static unsigned long clk_shared_recalc_rate(struct clk_hw *hw,
 	return shared->u.shared_bus_user.rate;
 }
 
+static int shared_read_op(void *data, u64 *state)
+{
+	*state = *((u32 *)data);
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(shared_flags_ops, shared_read_op, NULL, "%08llx\n");
+
+static int clk_shared_debug(struct clk_hw *hw, struct dentry *dir)
+{
+	struct dentry *d;
+	struct tegra_clk_cbus_shared *shared = to_clk_cbus_shared(hw);
+
+	d = debugfs_create_file("shared_bus_flags", S_IRUGO, dir,
+				&shared->flags, &shared_flags_ops);
+
+	if (!d)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int clk_cascade_master_set_rate(struct clk_hw *hw, unsigned long rate,
 					unsigned long parent_rate)
 {
@@ -817,6 +841,7 @@ static const struct clk_ops tegra_clk_cbus_ops = {
 	.recalc_rate = clk_cbus_recalc_rate,
 	.round_rate = clk_cbus_round_rate,
 	.set_rate = clk_cbus_set_rate,
+	.debug_init = clk_shared_debug,
 };
 
 static const struct clk_ops tegra_clk_shared_ops = {
