@@ -31,9 +31,6 @@ obj-$(CONFIG_ARCH_TEGRA_21x_SOC)         += tegra_ptm_t210.o
 endif
 
 obj-y += nvdumper/
-ifeq ($(CONFIG_PM),y)
-obj-$(CONFIG_ARCH_TEGRA_21x_SOC)	+= tegra21-pmc-iopower.o
-endif
 obj-$(CONFIG_PM) += pm.o
 
 obj-$(CONFIG_TEGRA_MC_DOMAINS) += pm_domains.o
