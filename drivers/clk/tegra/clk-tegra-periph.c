@@ -872,6 +872,7 @@ static struct tegra_periph_init_data gate_clks[] = {
 	GATE("mc_cbpa", "mc", 168, 0, tegra_clk_mc_cbpa, 0),
 	GATE("mc_ccpa", "mc", 201, 0, tegra_clk_mc_ccpa, 0),
 	GATE("mc_cdpa", "mc", 200, 0, tegra_clk_mc_cdpa, 0),
+	GATE("cec", "pclk", 136, 0, tegra_clk_cec, 0),
 };
 
 static struct tegra_periph_init_data div_clks[] = {
