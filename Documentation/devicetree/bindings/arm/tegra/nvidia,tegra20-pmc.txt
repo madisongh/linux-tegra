@@ -2,7 +2,15 @@ NVIDIA Tegra Power Management Controller (PMC)
 
 The PMC block interacts with an external Power Management Unit. The PMC
 mostly controls the entry and exit of the system from different sleep
-modes. It provides power-gating controllers for SoC and CPU power-islands.
+modes. It provides following functionalies/configurations:
+- Power-gating controllers for SoC and CPU power-islands.
+- Low power modes of I/O pads.
+- IO pad voltage configurations based on IO rail voltage.
+    For NVIDIA SoCs, starting with Tegra124 and beyond, IO pads support
+    multi-level voltages and can operate at a nominal IO voltage of
+    either 1.8V or 3.3V. NVIDIA Tegra210 and beyond needs to configure
+    its IO pad voltage based on IO rail voltage by SW explicitly. Tegra124
+    has HW detection mechanism for IO rail voltage.
 
 Required properties:
 - name : Should be pmc
@@ -50,6 +58,7 @@ Required properties when nvidia,suspend-mode=<0>:
   or resume from deep sleep mode. When the system is resumed from the deep
   sleep mode, the warm boot code will restore some PLLs, clocks and then
   bring up CPU0 for resuming the system.
+
 
 Hardware-triggered thermal reset:
 On Tegra30, Tegra114 and Tegra124, if the 'i2c-thermtrip' subnode exists,
@@ -113,3 +122,97 @@ pmc@7000f400 {
 	};
 	...
 };
+
+== I/O pad Low power and voltage configuration node ==
+  NVIDIA Tegra124 supports the HW based IO rail voltage detection and when it
+  detect any change in IO voltage, it configures the PMC IO pad for desired
+  voltage. Hence, it is not required to provide any information from Device
+  Tree for the IO pad configurations.
+
+  NVIDIA Tegra210 and beyond does not have HW based IO rail detection and
+  hence SW need to explicitly configure PMC IO pad voltage based on IO rail
+  voltage.
+
+  The DT bindings for configuring the low power state and voltage configuration
+  of IO pads follow the same design as pinctrl DT bindings. Please refer
+    <../../pinctrl/pinctrl-bindings.txt> for details of the common pinctrl
+  bindings used by client devices, including the meaning of the phrase
+  "pin configuration node".
+
+  The DT property of the IO pads must be under the node of Tegra PMC node.
+
+  Tegra's IO pads configuration nodes act as a container for an arbitrary
+  number of subnodes. Each of these subnodes represents some desired
+  configuration for an IO pads, or a list of IO pads. This configuration
+  can include the low power enable/disable control.
+
+  The name of each subnode is not important; all subnodes should be enumerated
+  and processed purely based on their content. Each subnode only affects those
+  parameters that are explicitly listed. Unspecified is represented as an absent
+  property,
+
+  The IO pad voltage configuration are required if:
+  - there is IO rail power supply connected to IO pad and default
+    configuration of IO pads voltage is not matching with the IO rail i.e.
+    bootloader has not done the required initialization for IO pad voltage.
+  - dynamic switching of IO rail voltage is required like SD3.0 and hence
+  configuration in IO pads voltage.
+
+Required subnode-properties:
+==========================
+  - pins : An array of strings. Each string contains the name of an IO pads. Valid
+         values for these names are listed below.
+
+Optional subnode-properties:
+==========================
+  Following properties are supported from generic pin configuration explained
+  in <../../pinctrl/pinctrl-bindings.txt>.
+  - low-power-enable:  enable low power mode.
+  - low-power-disable: disable low power mode.
+  - nvidia,power-source-voltage: Integer, tells the power source voltage levels.
+	There is two possible values for this property defines in the
+	<include/dt-binding/pinctrl/pinctrl-tegra-io-pad.h>
+		TEGRA_IO_PAD_VOLTAGE_1800000UV for 1.8V
+		TEGRA_IO_PAD_VOLTAGE_3300000UV for 3.3V
+	This property is supported for Tegra210 and beyond. Also some IO pads
+	support the multi-voltage level in their pins.
+
+Valid values for pin for Tegra124 are:
+        audio, bb, cam, comp, csia, csib, csie, dsi, dsib, dsic, dsid, hdmi,
+        hsic, hv, lvds, mipi-bias, nand, pex-bias, pex-clk1, pex-clk2,
+        pex-ctrl, sdmmc1, sdmmc3, sdmmc4, sys-ddc, uart, usb0, usb1, usb2,
+        usb-bias
+
+Valid values for pin for Tegra210 are:
+        audio, audio-hv, cam, csia, csib, csic, csid, csie, csif,
+        dbg, debug-nonao, dmic, dp, dsi, dsib, dsic, dsid, emmc, emmc2,
+        gpio, hdmi, hsic, lvds, mipi-bias, pex-bias, pex-clk1, pex-clk2,
+        pex-ctrl, sdmmc1, sdmmc3, spi, spi-hv, uart, usb-bias, usb0,
+        usb1, usb2, usb3.
+
+The IO pads which support multi-level voltage for Tegra210 are:
+	audio, audio-hv, cam, dbg, dmic, gpio, pex-ctrl, sdmmc1,
+	sdmmc3, spi, spi-hv, uart.
+
+Example:
+        pmc@7000e400 {
+                pinctrl-names = "default";
+                pinctrl-0 = <&io_pad_default>;
+                io_pad_default: common {
+                        audio-hv {
+                                pins = "audio-hv";
+                                low-power-disable;
+				nvidia,power-source-voltage = <TEGRA_IO_PAD_VOLTAGE_3300000UV>;
+                        };
+
+                        gpio {
+                                pins = "gpio";
+                                low-power-disable;
+                        };
+
+                        audio {
+                                pins = "audio";
+                                low-power-enable;
+                        };
+                };
+        };
