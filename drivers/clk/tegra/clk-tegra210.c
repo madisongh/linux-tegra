@@ -2753,6 +2753,7 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "xusb_dev_src", .dt_id = TEGRA210_CLK_XUSB_FS_SRC },
 	{ .con_id = "gpu_gate", .dt_id = TEGRA210_CLK_GPU },
 	{ .con_id = "gpu_ref", .dt_id = TEGRA210_CLK_PLL_G_REF },
+	{ .con_id = "gbus", .dt_id = TEGRA210_CLK_GBUS },
 	{ .con_id = "pll_p_out5", .dt_id = TEGRA210_CLK_PLL_P_OUT5 },
 	{ .con_id = "aclk_slcg_ovr", .dt_id = TEGRA210_CLK_ACLK_SLCG_OVR },
 	{ .con_id = "aclk", .dt_id = TEGRA210_CLK_ACLK },
