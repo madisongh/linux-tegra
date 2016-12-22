@@ -862,7 +862,7 @@ static int uphy_pll_calibration(struct tegra_padctl_uphy *uphy, int pll)
 	}
 	if (!(value & CAL_DONE)) {
 		dev_err(dev, "start PLL%d calibration timeout\n", pll);
-		return -ETIMEDOUT;
+		return -EPROBE_DEFER;
 	}
 
 	/* stop PLL calibration */
@@ -878,7 +878,7 @@ static int uphy_pll_calibration(struct tegra_padctl_uphy *uphy, int pll)
 	}
 	if (value & CAL_DONE) {
 		dev_err(dev, "stop PLL%d calibration timeout\n", pll);
-		return -ETIMEDOUT;
+		return -EPROBE_DEFER;
 	}
 
 	return 0;
@@ -967,13 +967,13 @@ static int uphy_pll_init_full(struct tegra_padctl_uphy *uphy, int pll,
 	reg = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_1);
 	if (!(reg & LOCKDET_STATUS)) {
 		dev_err(dev, "enable PLL%d timeout\n", pll);
-		return -ETIMEDOUT;
+		return -EPROBE_DEFER;
 	}
 
 	if (uphy->uphy_pll_state[pll] == UPHY_PLL_POWER_DOWN) {
 		rc = uphy_pll_resistor_calibration(uphy, pll);
 		if (rc)
-			return rc;
+			return -EPROBE_DEFER;
 	}
 
 	uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_UP_FULL;
