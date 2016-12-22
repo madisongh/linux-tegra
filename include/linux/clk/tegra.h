@@ -182,9 +182,18 @@ extern void tegra210_set_sata_pll_seq_sw(bool state);
 extern void tegra210_put_utmipll_in_iddq(void);
 extern void tegra210_put_utmipll_out_iddq(void);
 
-
+#ifdef CONFIG_ARCH_TEGRA_210_SOC
 extern void tegra210_csi_source_from_brick(void);
 extern void tegra210_csi_source_from_plld(void);
+#else
+static inline void tegra210_csi_source_from_brick(void)
+{
+}
+
+static inline void tegra210_csi_source_from_plld(void)
+{
+}
+#endif
 
 int tegra_super_cdiv_use_therm_controls(bool);
 
