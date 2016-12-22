@@ -1885,6 +1885,26 @@ int tegra_dfll_count_thermal_states(struct tegra_dfll *td,
 EXPORT_SYMBOL(tegra_dfll_count_thermal_states);
 
 /**
+ * tegra_dfll_get_thermal_floor_mv - return millivolts of thermal floor
+ */
+u32 tegra_dfll_get_thermal_floor_mv(void)
+{
+	return tegra_dfll_dev->lut_uv[tegra_dfll_dev->thermal_floor_output]
+	       / 1000;
+}
+EXPORT_SYMBOL(tegra_dfll_get_thermal_floor_mv);
+
+/**
+ * tegra_dfll_get_thermal_index - return millivolts of thermal cap
+ */
+u32 tegra_dfll_get_thermal_cap_mv(void)
+{
+	return tegra_dfll_dev->lut_uv[tegra_dfll_dev->thermal_cap_output]
+	       / 1000;
+}
+EXPORT_SYMBOL(tegra_dfll_get_thermal_cap_mv);
+
+/**
  * tegra_dfll_get_by_phandle - get DFLL device from a phandle
  * @np: device node
  * @prop: property name
