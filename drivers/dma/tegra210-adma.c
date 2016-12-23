@@ -1520,12 +1520,7 @@ err_pm_disable:
 	if (!pm_runtime_status_suspended(&pdev->dev))
 		tegra_adma_runtime_suspend(&pdev->dev);
 	tegra_pd_remove_device(&pdev->dev);
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-	clk_put(tdma->ape_clk);
-#else
-	devm_clk_put(&pdev->dev, tdma->ape_clk);
-	devm_clk_put(&pdev->dev, tdma->apb2ape_clk);
-#endif
+
 	return ret;
 }
 
@@ -1542,12 +1537,6 @@ static int tegra_adma_remove(struct platform_device *pdev)
 		tasklet_kill(&tdc->tasklet);
 	}
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-	clk_put(tdma->ape_clk);
-#else
-	devm_clk_put(&pdev->dev, tdma->ape_clk);
-	devm_clk_put(&pdev->dev, tdma->apb2ape_clk);
-#endif
 	pm_runtime_disable(&pdev->dev);
 	if (!pm_runtime_status_suspended(&pdev->dev))
 		tegra_adma_runtime_suspend(&pdev->dev);
