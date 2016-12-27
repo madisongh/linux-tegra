@@ -102,11 +102,16 @@ union app_complete_status_message {
 
 
 /*ADSP message pool structure */
+#define ADSP_MAX_MSGQ_SIZE		4096
+#define ADSP_MAX_MSGQ_WSIZE		(ADSP_MAX_MSGQ_SIZE / sizeof(int32_t))
+#define ADSP_MSGQ_MAX_QUEUE_WSIZE	\
+	(ADSP_MAX_MSGQ_WSIZE - (int32_t)MSGQ_HEADER_WSIZE)
+
 union app_loader_msgq {
 	msgq_t msgq;
 	struct {
 		int32_t header[MSGQ_HEADER_WSIZE];
-		int32_t queue[MSGQ_MAX_QUEUE_WSIZE];
+		int32_t queue[ADSP_MSGQ_MAX_QUEUE_WSIZE];
 	};
 };
 
