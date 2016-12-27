@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2016, NVIDIA CORPORATION. All rights reserved.
  *
  * Description:
  * High-speed USB device controller driver.
@@ -1609,14 +1609,12 @@ static int tegra_detect_cable_type(struct tegra_udc *udc)
 		} else
 			tegra_udc_set_charger_type(udc, CONNECT_TYPE_DCP);
 	}
-#if !defined(CONFIG_ARCH_TEGRA_11x_SOC) && !defined(CONFIG_ARCH_TEGRA_14x_SOC)
 	else if (tegra_usb_phy_apple_500ma_charger_detected(udc->phy))
 		tegra_udc_set_charger_type(udc, CONNECT_TYPE_APPLE_500MA);
 	else if (tegra_usb_phy_apple_1000ma_charger_detected(udc->phy))
 		tegra_udc_set_charger_type(udc, CONNECT_TYPE_APPLE_1000MA);
 	else if (tegra_usb_phy_apple_2000ma_charger_detected(udc->phy))
 		tegra_udc_set_charger_type(udc, CONNECT_TYPE_APPLE_2000MA);
-#endif
 	else if (tegra_usb_phy_nv_charger_detected(udc->phy))
 		tegra_udc_set_charger_type(udc, CONNECT_TYPE_NV_CHARGER);
 	else
