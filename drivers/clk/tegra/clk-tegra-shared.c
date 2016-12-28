@@ -123,7 +123,7 @@ static struct tegra_shared_clk shared_clks[] = {
 	SHARED_CLK("vic.shared_emc", "emc_master", SHARED_BW, 0, 0, NULL, tegra_clk_vic_shared_emc),
 	SHARED_CLK("ape.emc", "emc_master", 0, 0, 0, NULL, tegra_clk_ape_emc),
 	SHARED_CLK("pcie.emc", "emc_master", 0, 0, 0, NULL, tegra_clk_pcie_emc),
-	SHARED_CLK("gm20b.gbus", "gbus", SHARED_CEILING, 0, 0, NULL, tegra_clk_gm20b_gbus),
+	SHARED_CLK("gm20b.gbus", "gbus", 0, 0, 0, NULL, tegra_clk_gm20b_gbus),
 	SHARED_CLK("cap.gbus", "gbus", SHARED_CEILING, 0, 0, NULL, tegra_clk_cap_gbus),
 	SHARED_CLK("edp.gbus", "gbus", SHARED_CEILING, 0, 0, NULL, tegra_clk_edp_gbus),
 	SHARED_CLK("cap.vgpu.gbus", "gbus", SHARED_CEILING, 0, 0, NULL, tegra_clk_cap_vgpu_gbus),
