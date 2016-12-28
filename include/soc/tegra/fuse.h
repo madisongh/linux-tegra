@@ -56,5 +56,6 @@ static inline u32 tegra_get_sku_id(void)
 #endif
 
 #endif /* __ASSEMBLY__ */
+u32 tegra_fuse_get_subrevision(void);
 
 #endif /* __SOC_TEGRA_FUSE_H__ */
