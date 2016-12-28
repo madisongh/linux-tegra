@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
  * Copyright (C) 2011-2012 Linaro Ltd <mturquette@linaro.org>
+ * Copyright (c) 2016 NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/clkdev.h>
+#include <linux/fs.h>
 #include "clk.h"
 
 static DEFINE_SPINLOCK(enable_lock);
