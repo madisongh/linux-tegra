@@ -1988,6 +1988,7 @@ void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode)
 #define tegra_pmc_resume		NULL
 #define tegra_pmc_wake_syscore_suspend	NULL
 #define tegra_pmc_wake_syscore_resume	NULL
+static inline void set_core_power_timers(void) { }
 #endif
 
 static struct syscore_ops tegra_pmc_syscore_ops = {
