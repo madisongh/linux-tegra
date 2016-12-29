@@ -4,8 +4,8 @@ GCOV_PROFILE := y
 #
 # Makefile for the video capture/playback device drivers.
 #
-obj-y	+= camera/
-obj-y	+= vi/
+obj-$(CONFIG_VIDEO_CAMERA)	+= camera/
+obj-$(CONFIG_VIDEO_TEGRA_VI)	+= vi/
 obj-$(CONFIG_VIDEO_ISC)		+= auto/
 obj-$(CONFIG_VIDEO_CAMERA)	+= regmap_util.o
 obj-$(CONFIG_VIDEO_TEGRA_VI_TPG) += tpg/
