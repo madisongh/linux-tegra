@@ -1107,7 +1107,7 @@ static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
 	rcu_read_unlock();
 
 	for (i = 0; i < td->lut_size; i++) {
-		if ((td->lut_uv[i] / td->soc->alignment) == align_volt)
+		if ((td->lut_uv[i] / td->soc->alignment) >= align_volt)
 			return i;
 	}
 
