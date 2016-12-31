@@ -78,6 +78,7 @@ obj-$(CONFIG_EQOS_APE_HWDEP)    += eqos_ape/
 obj-$(CONFIG_TEGRA_PROFILER)	+= tegra-profiler/
 obj-$(CONFIG_TEGRA_CPC)		+= tegra_cpc.o
 obj-$(CONFIG_NVS)		+= nvs/
+obj-$(CONFIG_BM92TXX)		+= bm92txx.o
 
 GCOV_PROFILE_cpuload.o := y
 obj-y				+= inter-tegra/
