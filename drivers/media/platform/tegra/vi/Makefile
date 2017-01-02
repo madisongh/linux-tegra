@@ -17,10 +17,3 @@ endif
 
 nvhost-vi-objs += vi.o
 obj-$(CONFIG_VIDEO_TEGRA_VI) += nvhost-vi.o
-
-ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
-obj-$(CONFIG_VIDEO_TEGRA_VI) += \
-       $(call tegra-path,t18x,drivers/video/tegra/host/vi/vi_notify.o) \
-       $(call tegra-path,t18x,drivers/video/tegra/host/vi/host_vi_notify.o) \
-       $(call tegra-path,t18x,drivers/video/tegra/host/vi/vi4.o)
-endif
