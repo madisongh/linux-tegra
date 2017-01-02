@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2010 Google, Inc.
  *
- * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -1924,7 +1924,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 			signal_voltage = MMC_SIGNAL_VOLTAGE_180;
 		rc = tegra_sdhci_signal_voltage_switch(host, signal_voltage);
 		if (rc) {
-			dev_err(&pdev->dev,
+			dev_dbg(&pdev->dev,
 				" voltage switch failed in probe, err: %d\n"
 				, rc);
 		} else {
@@ -1932,7 +1932,7 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 				rc = tegra_sdhci_configure_regulators(host,
 					CONFIG_REG_EN, 0, 0);
 			if (rc)
-				dev_err(&pdev->dev,
+				dev_dbg(&pdev->dev,
 					" voltage enable failed in probe, err: %d\n"
 					, rc);
 			tegra_sdhci_post_voltage_switch(host, signal_voltage,
