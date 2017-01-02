@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 Google, Inc.
- * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -30,6 +30,7 @@
 #include <linux/tegra-fuse.h>
 #include <linux/platform/tegra/common.h>
 #include <linux/of_address.h>
+#include <soc/tegra/fuse.h>
 
 #include <asm/fixmap.h>
 #ifdef CONFIG_ARM64
@@ -70,6 +71,7 @@ struct tegra_fuse {
 	struct clk *clk;
 };
 
+static u32 prod_mode;
 static struct tegra_fuse fuse = {0};
 static struct tegra_id tegra_id;
 static int tegra_gpu_num_pixel_pipes;
@@ -146,6 +148,21 @@ module_param_cb(tegra_gpu_num_pixel_pipes, &tegra_gpu_num_pixel_pipes_ops,
 module_param_cb(tegra_gpu_num_alus_per_pixel_pipe,
 		&tegra_gpu_num_alus_per_pixel_pipe_ops,
 		&tegra_gpu_num_alus_per_pixel_pipe, 0444);
+
+static int get_prod_mode(char *val, const struct kernel_param *kp)
+{
+	u32 reg = 0;
+
+	tegra_fuse_readl(TEGRA_FUSE_PRODUCTION_MODE, &reg);
+	prod_mode = reg;
+	return param_get_uint(val, kp);
+}
+
+static struct kernel_param_ops tegra_prod_mode_ops = {
+	.get = get_prod_mode,
+};
+
+module_param_cb(tegra_prod_mode, &tegra_prod_mode_ops, &prod_mode, 0444);
 
 struct chip_revision {
 	enum tegra_chipid	chipid;
