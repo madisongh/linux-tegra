@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 Google, Inc.
- * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -110,6 +110,10 @@ extern const struct tegra_fuse_soc tegra124_fuse_soc;
 
 #ifdef CONFIG_ARCH_TEGRA_210_SOC
 extern const struct tegra_fuse_soc tegra210_fuse_soc;
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+extern const struct tegra_fuse_soc tegra186_fuse_soc;
 #endif
 
 #endif
