@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -54,6 +54,9 @@ static const struct apbmisc_data *apbmisc_data;
 
 u32 tegra_read_chipid(void)
 {
+	if (!apbmisc_base)
+		tegra_init_apbmisc();
+
 	if (!apbmisc_base) {
 		WARN(1, "Tegra Chip ID not yet available\n");
 		return 0;
@@ -64,6 +67,9 @@ u32 tegra_read_chipid(void)
 
 u8 tegra_get_chip_id(void)
 {
+	if (!apbmisc_base)
+		tegra_init_apbmisc();
+
 	if (!apbmisc_base) {
 		WARN(1, "Tegra Chip ID not yet available\n");
 		return 0;
@@ -74,6 +80,9 @@ u8 tegra_get_chip_id(void)
 
 u32 tegra_read_emu_revid(void)
 {
+	if (!apbmisc_base)
+		tegra_init_apbmisc();
+
 	if (!apbmisc_base) {
 		WARN(1, "Tegra Chip ID not yet available\n");
 		return 0;
@@ -201,7 +210,7 @@ exit:
 	tegra_sku_info.sku_id = tegra_fuse_read_early(FUSE_SKU_INFO);
 }
 
-void __init tegra_init_apbmisc(void)
+void tegra_init_apbmisc(void)
 {
 	struct resource apbmisc, straps;
 	struct device_node *np;
