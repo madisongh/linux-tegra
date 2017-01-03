@@ -721,7 +721,6 @@ endif
 
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
 KBUILD_CFLAGS += -I$(srctree)/../t18x/include
-KBUILD_CFLAGS += -I$(srctree)/../nvhost-t18x/include
 endif
 KBUILD_CFLAGS += -I$(srctree)/../nvhost/include
 KBUILD_CFLAGS += -I$(srctree)/../display/include
