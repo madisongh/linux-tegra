@@ -21,7 +21,7 @@
 #include <linux/platform_device.h>
 #include <linux/tegra-soc.h>
 #include <linux/reset.h>
-#include <linux/tegra-pmc.h>
+#include <soc/tegra/pmc.h>
 
 #include <linux/of.h>
 #include <linux/of_device.h>
