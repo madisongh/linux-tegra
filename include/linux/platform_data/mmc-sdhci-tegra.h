@@ -62,6 +62,7 @@ struct tegra_sdhci_platform_data {
 	int cd_gpio;
 	bool cd_wakeup_capable;
 	bool en_periodic_calib;
+	bool rate_change_needs_clk;
 };
 
 #endif

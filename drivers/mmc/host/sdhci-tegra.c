@@ -176,9 +176,10 @@ struct sdhci_tegra {
 	const struct sdhci_tegra_soc_data *soc_data;
 	const struct tegra_sdhci_platform_data *plat;
 	struct tegra_bwmgr_client *emc_clk;
-	bool	clk_enabled;
+	bool clk_enabled;
+	bool rate_change_needs_clk;
 	/* ensure atomic set clock calls */
-	struct mutex	set_clock_mutex;
+	struct mutex set_clock_mutex;
 	/* max clk supported by the platform */
 	unsigned int max_clk_limit;
 	/* max ddr clk supported by the platform */
@@ -743,6 +744,8 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	pr_debug("%s %s %u enabled=%u\n", __func__,
 		mmc_hostname(sdhci->mmc), clock, tegra_host->clk_enabled);
 	if (clock) {
+		if (!plat->rate_change_needs_clk)
+			tegra_sdhci_set_clk_rate(sdhci, clock);
 		if (!tegra_host->clk_enabled) {
 			ret = clk_prepare_enable(pltfm_host->clk);
 			if (ret) {
@@ -766,7 +769,8 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 					ret);
 			}
 		}
-		tegra_sdhci_set_clk_rate(sdhci, clock);
+		if (plat->rate_change_needs_clk)
+			tegra_sdhci_set_clk_rate(sdhci, clock);
 		if (plat->en_periodic_calib &&
 			sdhci->is_calibration_done) {
 			cur_time = ktime_get();
@@ -1698,6 +1702,8 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	plat->cd_wakeup_capable = of_property_read_bool(np, "nvidia,cd-wakeup-capable");
 	plat->en_periodic_calib = of_property_read_bool(np,
 			"nvidia,en-periodic-calib");
+	plat->rate_change_needs_clk = of_property_read_bool(np,
+		"nvidia,rate-change-needs-clock-enabled");
 
 	tegra_host->plat = plat;
 	return mmc_of_parse(host->mmc);
