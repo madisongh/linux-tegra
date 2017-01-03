@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 2002 ARM Limited, All Rights Reserved.
  *
- *  Copyright (C) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (C) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -75,9 +75,9 @@ static void gic_check_cpu_features(void)
 #ifdef CONFIG_TEGRA_APE_AGIC
 /* APE CLOCKS */
 #define CLK_SOURCE_APE			0x6c0
-#define CLK_OUT_ENB_Y_0			0x298
-#define CLK_OUT_ENB_V_0			0x360
-#define CLK_RST_DEV_Y_CLR_0		0x2ac
+#define CLK_OUT_ENB_SET_Y		0x29c
+#define CLK_OUT_ENB_SET_V		0x440
+#define CLK_RST_DEV_Y_CLR		0x2ac
 
 #define	SELECT_CLK_M			(6 << 29)
 #define ENABLE_APE_CLK			(1 << 6)
@@ -94,27 +94,14 @@ static int enable_t210_agic_clks(struct device_node *node)
 
 	/* Set CLK M as APE clk's soruce */
 	val = readl(clk_base + CLK_SOURCE_APE);
+	val &= ~GENMASK(31, 29);
 	val |= SELECT_CLK_M;
 	writel(val, clk_base +  CLK_SOURCE_APE);
-	udelay(500);
 
-	/* APE clk enable */
-	val = readl(clk_base + CLK_OUT_ENB_Y_0);
-	val |= ENABLE_APE_CLK;
-	writel(val, clk_base + CLK_OUT_ENB_Y_0);
-	udelay(500);
-
-	/* apb2ape clk enable */
-	val = readl(clk_base + CLK_OUT_ENB_V_0);
-	val |= ENABLE_APB2APE_CLK;
-	writel(val, clk_base + CLK_OUT_ENB_V_0);
-	udelay(500);
-
-	/* ape reset clear */
-	val = readl(clk_base + CLK_RST_DEV_Y_CLR_0);
-	val |= RESET_APE;
-	writel(val, clk_base + CLK_RST_DEV_Y_CLR_0);
-	udelay(500);
+	writel(ENABLE_APE_CLK, clk_base + CLK_OUT_ENB_SET_Y);
+	writel(ENABLE_APB2APE_CLK, clk_base + CLK_OUT_ENB_SET_V);
+	udelay(2);
+	writel(RESET_APE, clk_base + CLK_RST_DEV_Y_CLR);
 
 	pr_info("%s:%d ape clocked & reset cleared\n", __func__, __LINE__);
 
