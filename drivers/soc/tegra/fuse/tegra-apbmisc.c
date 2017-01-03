@@ -127,7 +127,7 @@ static const struct apbmisc_data tegra186_apbmisc_data = {
 	.emu_revid_offset = TEGRA_MISCREG_EMU_REVID
 };
 
-static const struct of_device_id apbmisc_match[] __initconst = {
+static const struct of_device_id apbmisc_match[] = {
 	{
 		.compatible = "nvidia,tegra20-apbmisc",
 		.data = &tegra20_apbmisc_data,
