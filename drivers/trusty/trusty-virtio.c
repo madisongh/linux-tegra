@@ -1,4 +1,20 @@
 /*
+ * Copyright (c) 2017, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
  * Trusty Virtio driver
  *
  * Copyright (C) 2015 Google, Inc.
@@ -32,7 +48,7 @@
 
 #include <linux/atomic.h>
 
-#include "syscalls.h"
+#include <soc/tegra/virt/syscalls.h>
 
 #include "trusty-virtio-work.h"
 
@@ -247,7 +263,7 @@ static u64 trusty_virtio_get_features(struct virtio_device *vdev)
 static int trusty_virtio_finalize_features(struct virtio_device *vdev)
 {
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
-	
+
 	/* Make sure we don't have any features > 32 bits! */
 	BUG_ON((u32)vdev->features != vdev->features);
 
