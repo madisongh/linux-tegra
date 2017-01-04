@@ -42,12 +42,6 @@
 
 #define FUSE_HAS_REVISION_INFO	BIT(0)
 
-#if defined(CONFIG_ARCH_TEGRA_3x_SOC) || \
-    defined(CONFIG_ARCH_TEGRA_114_SOC) || \
-    defined(CONFIG_ARCH_TEGRA_124_SOC) || \
-    defined(CONFIG_ARCH_TEGRA_132_SOC) || \
-	defined(CONFIG_ARCH_TEGRA_210_SOC) || \
-	defined(CONFIG_ARCH_TEGRA_18x_SOC)
 static u32 tegra30_fuse_read_early(struct tegra_fuse *fuse, unsigned int offset)
 {
 	return readl_relaxed(fuse->base + FUSE_BEGIN + offset);
@@ -160,9 +154,7 @@ static void __init tegra30_fuse_init(struct tegra_fuse *fuse)
 	fuse->soc->speedo_init(&tegra_sku_info);
 	tegra30_fuse_add_randomness();
 }
-#endif
 
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
 static const struct tegra_fuse_info tegra30_fuse_info = {
 	.read = tegra30_fuse_read,
 	.size = 0x2a4,
@@ -174,9 +166,7 @@ const struct tegra_fuse_soc tegra30_fuse_soc = {
 	.speedo_init = tegra30_init_speedo_data,
 	.info = &tegra30_fuse_info,
 };
-#endif
 
-#ifdef CONFIG_ARCH_TEGRA_114_SOC
 static const struct tegra_fuse_info tegra114_fuse_info = {
 	.read = tegra30_fuse_read,
 	.size = 0x2a0,
@@ -188,9 +178,7 @@ const struct tegra_fuse_soc tegra114_fuse_soc = {
 	.speedo_init = tegra114_init_speedo_data,
 	.info = &tegra114_fuse_info,
 };
-#endif
 
-#if defined(CONFIG_ARCH_TEGRA_124_SOC) || defined(CONFIG_ARCH_TEGRA_132_SOC)
 static const struct tegra_fuse_info tegra124_fuse_info = {
 	.read = tegra30_fuse_read,
 	.size = 0x300,
@@ -202,9 +190,7 @@ const struct tegra_fuse_soc tegra124_fuse_soc = {
 	.speedo_init = tegra124_init_speedo_data,
 	.info = &tegra124_fuse_info,
 };
-#endif
 
-#if defined(CONFIG_ARCH_TEGRA_210_SOC)
 static const struct tegra_fuse_info tegra210_fuse_info = {
 	.read = tegra30_fuse_read,
 	.write = tegra30_fuse_write,
@@ -217,9 +203,7 @@ const struct tegra_fuse_soc tegra210_fuse_soc = {
 	.speedo_init = tegra210_init_speedo_data,
 	.info = &tegra210_fuse_info,
 };
-#endif
 
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
 static void __init tegra186_fuse_init(struct tegra_fuse *fuse)
 {
 	fuse->read_early = tegra30_fuse_read_early;
@@ -242,4 +226,3 @@ const struct tegra_fuse_soc tegra186_fuse_soc = {
 	.init = tegra186_fuse_init,
 	.info = &tegra186_fuse_info,
 };
-#endif
