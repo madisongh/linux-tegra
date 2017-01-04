@@ -106,6 +106,5 @@ obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
 obj-$(CONFIG_TEGRA_FIRMWARES_CLASS)	+= firmwares.o
 obj-$(CONFIG_TEGRA_FIRMWARES_INVENTORY)	+= firmwares-all.o
 
-obj-$(CONFIG_ARCH_TEGRA_18x_SOC)	+= tegra_chipid.o
 obj-$(CONFIG_TEGRA_HSP)			+= tegra-hsp.o
 obj-$(CONFIG_TEGRA_HSP)			+= tegra186-hsp.o

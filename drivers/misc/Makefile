@@ -57,7 +57,6 @@ obj-$(CONFIG_ECHO)		+= echo/
 obj-$(CONFIG_VEXPRESS_SYSCFG)	+= vexpress-syscfg.o
 obj-$(CONFIG_CXL_BASE)		+= cxl/
 obj-$(CONFIG_UID_CPUTIME) += uid_cputime.o
-obj-$(CONFIG_TEGRA_FUSE)    += tegra-fuse/
 obj-$(CONFIG_TEGRA_CRYPTO_DEV)  += tegra-cryptodev.o
 obj-$(CONFIG_BLUEDROID_PM)      += bluedroid_pm.o
 obj-$(CONFIG_GPS_HWGEOFENCING)  += gps_wake.o
