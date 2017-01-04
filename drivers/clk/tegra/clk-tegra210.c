@@ -3407,8 +3407,9 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 					0, "nvdec");
 	clks[TEGRA210_CLK_NVDEC_CBUS] = clk;
 
-	clk = tegra_clk_register_cbus("abus", "pll_a1", 0, "pll_p", 38400000,
-				      1000000000);
+	clk = tegra_clk_register_cbus("abus", "pll_a1",
+				      TEGRA_SHARED_BUS_RETENTION, "pll_p",
+				      38400000, 1000000000);
 	clks[TEGRA210_CLK_ABUS] = clk;
 
 	clk = tegra_clk_register_shared("adsp.cpu.abus", &abus_parents[0] , 1,
@@ -3435,8 +3436,9 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 						12750000, 1600000000);
 	clks[TEGRA210_CLK_EMC_MASTER] = clk;
 
-	clk = tegra_clk_register_gbus("gbus", "gpcclk", 0,
-					12000000, 1300000000);
+	clk = tegra_clk_register_gbus("gbus", "gpcclk",
+				      TEGRA_SHARED_BUS_RETENTION,
+				      12000000, 1300000000);
 	clks[TEGRA210_CLK_GBUS] = clk;
 
 	clk = tegra_clk_register_shared_master("host1x_master", "host1x", 0,
@@ -3447,7 +3449,8 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 						12000000, 408000000);
 	clks[TEGRA210_CLK_MSELECT_MASTER] = clk;
 
-	clk = tegra_clk_register_shared_master("ape_master", "ape", 0,
+	clk = tegra_clk_register_shared_master("ape_master", "ape",
+						TEGRA_SHARED_BUS_RETENTION,
 						12000000, 408000000);
 	clks[TEGRA210_CLK_APE_MASTER] = clk;
 
