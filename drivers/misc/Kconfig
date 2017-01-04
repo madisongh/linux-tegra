@@ -656,4 +656,5 @@ source "drivers/misc/tegra-cec/Kconfig"
 source "drivers/misc/nvs-dfsh/Kconfig"
 source "drivers/misc/tegra-profiler/Kconfig"
 source "drivers/misc/inter-tegra/Kconfig"
+source "drivers/misc/nvs/Kconfig"
 endmenu

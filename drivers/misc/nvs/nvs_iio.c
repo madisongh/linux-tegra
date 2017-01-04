@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
+/* Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -1382,7 +1382,7 @@ static int nvs_write_raw(struct iio_dev *indio_dev,
 			if (st->fn_dev->offset) {
 				ret = st->fn_dev->offset(st->client,
 							 st->cfg->snsr_id,
-							 -1 , val);
+							 -1, val);
 				if (ret > 0) {
 					st->cfg->offset.ival = val;
 					st->cfg->offset.fval = val2;
