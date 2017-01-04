@@ -1188,14 +1188,13 @@ struct clk *tegra_clk_register_cbus(const char *name,
 	cbus->min_rate = min_rate;
 	cbus->max_rate = max_rate;
 	cbus->bus_update = _simple_shared_update;
+	cbus->flags = flags;
 
 	INIT_LIST_HEAD(&cbus->shared_bus_list);
 
-	flags |= CLK_GET_RATE_NOCACHE;
-
 	init.name = name;
 	init.ops = &tegra_clk_cbus_ops;
-	init.flags = flags;
+	init.flags = CLK_GET_RATE_NOCACHE;
 	init.parent_names = &parent;
 	init.num_parents = 1;
 
@@ -1289,11 +1288,9 @@ struct clk *tegra_clk_register_shared(const char *name,
 	if (IS_ERR(shared))
 		return ERR_PTR(PTR_ERR(shared));
 
-	flags |= CLK_GET_RATE_NOCACHE | CLK_SET_RATE_NOCACHE;
-
 	init.name = name;
 	init.ops = &tegra_clk_shared_ops;
-	init.flags = flags;
+	init.flags = CLK_GET_RATE_NOCACHE | CLK_SET_RATE_NOCACHE;
 	init.parent_names = parent;
 	init.num_parents = 1;
 
@@ -1322,12 +1319,11 @@ struct clk *tegra_clk_register_shared_connect(const char *name,
 		return ERR_PTR(PTR_ERR(shared));
 
 	INIT_LIST_HEAD(&shared->shared_bus_list);
-	flags |= CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE |
-		CLK_SET_RATE_NOCACHE;
 
 	init.name = name;
 	init.ops = &tegra_clk_shared_connect_master_ops;
-	init.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE;
+	init.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE
+			| CLK_SET_RATE_NOCACHE;
 	init.parent_names = parent;
 	init.num_parents = 1;
 
@@ -1404,17 +1400,16 @@ struct clk *tegra_clk_register_shared_master(const char *name,
 
 	INIT_LIST_HEAD(&master->shared_bus_list);
 
-	flags |= CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE;
-
 	init.name = name;
 	init.ops = &tegra_clk_shared_master_ops;
-	init.flags = flags;
+	init.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE;
 	init.parent_names = &parent;
 	init.num_parents = 1;
 
 	master->min_rate = min_rate;
 	master->max_rate = max_rate;
 	master->bus_update = _simple_shared_update;
+	master->flags = flags;
 
 	/* Data in .init is copied by clk_register(), so stack variable OK */
 	master->hw.init = &init;
@@ -1460,11 +1455,10 @@ struct clk *tegra_clk_register_cascade_master(const char *name,
 	list_add_tail(&cascade_master->u.shared_bus_user.node,
 			&parent_cbus->shared_bus_list);
 
-	flags |= CLK_GET_RATE_NOCACHE | CLK_SET_RATE_NOCACHE;
-
 	init.name = name;
 	init.ops = &tegra_clk_cascade_master_ops;
-	init.flags = flags;
+	init.flags = CLK_GET_RATE_NOCACHE | CLK_SET_RATE_NOCACHE;
+ 
 	init.parent_names = &parent;
 	init.num_parents = 1;
 
@@ -1475,6 +1469,7 @@ struct clk *tegra_clk_register_cascade_master(const char *name,
 	cascade_master->max_rate = parent_cbus->max_rate;
 	if (sbusclkname)
 		cascade_master->max_rate /= 2;
+	cascade_master->flags = flags;
 
 	/* Data in .init is copied by clk_register(), so stack variable OK */
 	cascade_master->hw.init = &init;
