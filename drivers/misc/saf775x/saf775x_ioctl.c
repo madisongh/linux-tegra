@@ -1,7 +1,7 @@
 /*
  * saf775x_ioctl.c -- SAF775X Soc Audio driver IO control
  *
- * Copyright (c) 2014-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include "saf775x_ioctl.h"
+#include "compat_saf775x_ioctl.h"
 
 static struct saf775x_ioctl_ops saf775x_ops;
 static struct saf775x_device_interfaces saf775x_devifs;
@@ -130,7 +131,6 @@ static int saf775x_hwdep_ioctl(struct file *file,
 	case SAF775X_CONTROL_SET_MIXER:
 		if (arg && copy_from_user(&param, _param, sizeof(param)))
 			return -EFAULT;
-
 		ret = saf775x_ops.codec_set_ctrl(codec_priv, param.name,
 				param.reg, param.val,
 				param.num_reg);
@@ -262,6 +262,9 @@ static const struct file_operations saf775x_ioctl_fops = {
 	.open = saf775x_ioctl_open,
 	.release = saf775x_ioctl_release,
 	.unlocked_ioctl = saf775x_hwdep_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = compat_saf775x_hwdep_ioctl,
+#endif
 #if defined(CONFIG_SPI_MASTER)
 	.write = saf775x_hwdep_write,
 	.read = saf775x_hwdep_read,

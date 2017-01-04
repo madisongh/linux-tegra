@@ -10,7 +10,7 @@
 # FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
 # more details.
 #
-# Copyright (c) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2015-2017, NVIDIA CORPORATION.  All rights reserved.
 #
 
 obj-$(CONFIG_SAF775x_HWDEP) := saf775x-hwdep.o
@@ -18,6 +18,9 @@ obj-$(CONFIG_SAF775x_HWDEP) := saf775x-hwdep.o
 saf775x-hwdep-objs := \
 	saf775x_stub.o \
 	saf775x_ioctl.o
+ifdef CONFIG_COMPAT
+	saf775x-hwdep-objs += compat_saf775x_ioctl.o
+endif
 
 obj-$(CONFIG_SAF36XX_HWDEP) += saf36xx-hwdep.o
 
