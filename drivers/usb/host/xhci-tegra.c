@@ -1,7 +1,7 @@
 /*
  * NVIDIA Tegra xHCI host controller driver for T186/future chips
  *
- * Copyright (C) 2015-2016, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2015-2017, NVIDIA Corporation.  All rights reserved.
  * Copyright (C) 2014 Google, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -1249,16 +1249,14 @@ static void tegra_xhci_mbox_work(struct work_struct *work)
 		resp.cmd = MBOX_CMD_ACK;
 		break;
 	case MBOX_CMD_SET_BW:
-		if (!XHCI_IS_T210(tegra)) {
-			/* fw sends bw request in MByte/sec, convert to HZ */
-			freq_khz = bwmgr_bw_to_freq(msg->data << 10);
-			ret = tegra_bwmgr_set_emc(tegra->bwmgr_handle,
-				freq_khz * 1000, TEGRA_BWMGR_SET_EMC_SHARED_BW);
-			if (ret)
-				dev_warn(tegra->dev,
-					"failed to set EMC khz=%lu errno=%d\n",
-					freq_khz, ret);
-		}
+		/* fw sends bw request in MByte/sec, convert to HZ */
+		freq_khz = bwmgr_bw_to_freq(msg->data << 10);
+		ret = tegra_bwmgr_set_emc(tegra->bwmgr_handle,
+			freq_khz * 1000, TEGRA_BWMGR_SET_EMC_SHARED_BW);
+		if (ret)
+			dev_warn(tegra->dev,
+				"failed to set EMC khz=%lu errno=%d\n",
+				freq_khz, ret);
 		resp.cmd = MBOX_CMD_COMPL;
 		break;
 	case MBOX_CMD_ACK:
