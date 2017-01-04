@@ -2,7 +2,7 @@
  * Copyright (C) 2009 Palm, Inc.
  * Author: Yvonne Yip <y@palm.com>
  *
- * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -63,6 +63,8 @@ struct tegra_sdhci_platform_data {
 	bool cd_wakeup_capable;
 	bool en_periodic_calib;
 	bool rate_change_needs_clk;
+	bool disable_clk_gate;
+	bool disable_runtime_pm;
 };
 
 #endif

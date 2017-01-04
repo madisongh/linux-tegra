@@ -1381,13 +1381,19 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 
 static int tegra_sdhci_runtime_suspend(struct sdhci_host *sdhci)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+
 	/* disable clock */
-	tegra_sdhci_set_clock(sdhci, 0);
+	if (!tegra_host->plat->disable_clk_gate)
+		tegra_sdhci_set_clock(sdhci, 0);
 	return 0;
 }
 
 static int tegra_sdhci_runtime_resume(struct sdhci_host *sdhci)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	unsigned int clk;
 
 	/* enable clock */
@@ -1398,7 +1404,8 @@ static int tegra_sdhci_runtime_resume(struct sdhci_host *sdhci)
 	else
 		clk = SDMMC_TEGRA_FALLBACK_CLK_HZ;
 
-	tegra_sdhci_set_clock(sdhci, clk);
+	if (!tegra_host->plat->disable_clk_gate)
+		tegra_sdhci_set_clock(sdhci, clk);
 
 	return 0;
 }
@@ -1664,7 +1671,14 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	of_property_read_u32(np, "nvidia,ddr-trim-delay", &plat->ddr_trim_delay);
 	plat->pwrdet_support = of_property_read_bool(np, "pwrdet-support");
 	plat->cd_gpio = of_get_named_gpio(np, "cd-gpios", 0);
+
 	plat->disable_rtpm = of_property_read_bool(np, "nvidia,disable-rtpm");
+	if (plat->disable_rtpm)
+		plat->disable_clk_gate = true;
+	else
+		plat->disable_clk_gate = of_property_read_bool(np,
+			"disable-dynamic-clock-gating");
+
 	plat->instance = of_alias_get_id(np, "sdhci");
 	of_property_read_u32(np, "tap-delay", &plat->tap_delay);
 	of_property_read_u32(np, "trim-delay", &plat->trim_delay);
