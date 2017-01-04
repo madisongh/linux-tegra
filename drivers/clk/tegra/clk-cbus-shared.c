@@ -337,12 +337,6 @@ static unsigned long _clk_shared_bus_update(struct tegra_clk_cbus_shared *cbus,
 				slow = c;
 		}
 	}
-	/*
-	 * Keep the bus rate as its default rate when there is no SHARED_FLOOR
-	 * users enabled so we won't underrun the bus.
-	 */
-	if (!top_rate)
-		rate = clk_get_rate(cbus->hw.clk);
 
 	if (!strcmp(__clk_get_name(cbus->hw.clk), "emc_master")) {
 		unsigned long iso_bw_min = 0;
