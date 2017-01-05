@@ -45,6 +45,7 @@
 #include <linux/err.h>
 #include <linux/i2c.h>
 #include <linux/io.h>
+#include <linux/iopoll.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -1580,6 +1581,43 @@ static void dfll_unregister_clk(struct tegra_dfll *td)
 	td->dfll_clk = NULL;
 }
 
+static int dfll_wait_monitor_data(struct tegra_dfll *td, u32 *reg)
+{
+	int sample_period;
+
+	sample_period = DIV_ROUND_UP(1000000, td->sample_rate);
+
+	return readl_relaxed_poll_timeout(td->base + DFLL_MONITOR_DATA, *reg,
+					  *reg & DFLL_MONITOR_DATA_NEW_MASK, 1,
+					  sample_period * 2);
+}
+
+/*
+ * Reading monitor data concurrently with the update may render intermediate
+ * (neither "old" nor "new") values. Synchronization with the "rising edge"
+ * of DATA_NEW makes it very unlikely, but still possible. Use simple filter:
+ * compare 2 consecutive readings for data consistency within 2 LSb range.
+ * Return error otherwise. On the platform that does not allow to use DATA_NEW
+ * at all check for consistency of consecutive reads is the only protection.
+ */
+static int dfll_get_monitor_data(struct tegra_dfll *td, u32 *reg)
+{
+	u32 val;
+
+	dfll_wait_monitor_data(td, reg);
+	*reg &= DFLL_MONITOR_DATA_VAL_MASK;
+
+	val = dfll_readl(td, DFLL_MONITOR_DATA) & DFLL_MONITOR_DATA_VAL_MASK;
+	if (abs(*reg - val) <= 2)
+		return 0;
+
+	*reg = dfll_readl(td, DFLL_MONITOR_DATA) & DFLL_MONITOR_DATA_VAL_MASK;
+	if (abs(*reg - val) <= 2)
+		return 0;
+
+	return -EINVAL;
+}
+
 /*
  * Debugfs interface
  */
@@ -1624,13 +1662,17 @@ static u64 dfll_read_monitor_rate(struct tegra_dfll *td)
 	if (!dfll_is_running(td))
 		return 0;
 
-	v = dfll_readl(td, DFLL_MONITOR_DATA);
-	v = (v & DFLL_MONITOR_DATA_VAL_MASK) >> DFLL_MONITOR_DATA_VAL_SHIFT;
+	mutex_lock(&td->lock);
+
+	dfll_set_monitor_mode(td, DFLL_FREQ);
+	dfll_get_monitor_data(td, &v);
 	pre_scaler_rate = dfll_calc_monitored_rate(v, td->ref_rate);
 
 	s = dfll_readl(td, DFLL_FREQ_REQ);
 	s = (s & DFLL_FREQ_REQ_SCALE_MASK) >> DFLL_FREQ_REQ_SCALE_SHIFT;
 	post_scaler_rate = dfll_scale_dvco_rate(s, pre_scaler_rate);
+
+	mutex_unlock(&td->lock);
 
 	return post_scaler_rate;
 }
