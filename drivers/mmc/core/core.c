@@ -5,7 +5,7 @@
  *  SD support Copyright (C) 2004 Ian Molton, All Rights Reserved.
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
  *  MMCv4 support Copyright (C) 2006 Philip Langdale, All Rights Reserved.
- *  Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1613,7 +1613,7 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
 			if (!result)
 				mmc->regulator_enabled = true;
 		}
-	} else if (mmc->regulator_enabled) {
+	} else if (mmc->regulator_enabled && regulator_is_enabled(supply)) {
 		result = regulator_disable(supply);
 		if (result == 0)
 			mmc->regulator_enabled = false;

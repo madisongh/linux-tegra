@@ -45,6 +45,10 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/pinctrl/pinconf-tegra.h>
 
+#include <linux/uaccess.h>
+#include <linux/debugfs.h>
+#include <linux/fs.h>
+
 #include "sdhci-pltfm.h"
 
 #define SDHCI_RTPM_MSEC_TMOUT 10
@@ -403,10 +407,9 @@ static void sdhci_tegra_card_event(struct sdhci_host *sdhci)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
-	int present = sdhci->mmc->rem_card_present;
 	int err;
 
-	if (!present) {
+	if (sdhci->mmc->rem_card_present) {
 		/* turn off voltage rregulators */
 		err = tegra_sdhci_configure_regulators(sdhci,
 				CONFIG_REG_DIS, 0, 0);
@@ -1383,6 +1386,7 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
 	struct platform_device *pdev = to_platform_device(mmc_dev(sdhci->mmc));
 	int ret = 0;
 	int signal_voltage = MMC_SIGNAL_VOLTAGE_330;
@@ -1397,7 +1401,13 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 				tegra_host->cd_irq, ret);
 	}
 
-	sdhci->mmc->rem_card_present = (mmc_gpio_get_cd(sdhci->mmc) == 0);
+	if (!plat->cd_cap_invert)
+		sdhci->mmc->rem_card_present =
+			(mmc_gpio_get_cd(sdhci->mmc) == 0);
+	else
+		sdhci->mmc->rem_card_present =
+			mmc_gpio_get_cd(sdhci->mmc);
+
 
 	/* Setting the min identification clock of freq 400KHz */
 	tegra_sdhci_set_clock(sdhci, 400000);
@@ -1460,6 +1470,153 @@ static void tegra_sdhci_post_resume(struct sdhci_host *sdhci)
 		(sdhci->mmc->ios.timing == MMC_TIMING_MMC_HS400));
 	if (dll_calib_req)
 		tegra_sdhci_post_init(sdhci);
+}
+
+/*
+ * Simulate the card remove and insert
+ * set req to true to insert the card
+ * set req to false to remove the card
+ */
+static int sdhci_tegra_carddetect(struct sdhci_host *sdhost, bool req)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhost);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	bool card_present = false;
+	int err = 0;
+
+	if (!(sdhost->mmc->caps & MMC_CAP_NONREMOVABLE))
+		if (sdhost->mmc->rem_card_present)
+			card_present = true;
+
+	/* Check if card is inserted physically before performing */
+	if ((mmc_gpio_get_cd(sdhost->mmc) == 0)) {
+		err = -ENXIO;
+		dev_err(mmc_dev(sdhost->mmc),
+				"Card not inserted in slot\n");
+		goto err_config;
+	}
+
+	/* Ignore the request if card already in requested state*/
+	if (card_present == req) {
+		dev_info(mmc_dev(sdhost->mmc),
+				"Card already in requested state\n");
+		goto err_config;
+	} else
+		card_present = req;
+
+	if (card_present) {
+		/* Virtual card insertion */
+		sdhost->mmc->rem_card_present = true;
+		sdhost->mmc->rescan_disable = 0;
+
+	/* If vqmmc regulator and no 1.8V signalling, then there's no UHS */
+		if (!IS_ERR(sdhost->mmc->supply.vqmmc)) {
+			err = regulator_enable(sdhost->mmc->supply.vqmmc);
+			if (err) {
+				pr_warn("%s: Failed to enable vqmmc regulator: %d\n",
+					mmc_hostname(sdhost->mmc), err);
+				sdhost->mmc->supply.vqmmc = ERR_PTR(-EINVAL);
+			}
+		}
+	/* If vmmc regulator and no 1.8V signalling, then there's no UHS */
+		if (!IS_ERR(sdhost->mmc->supply.vmmc)) {
+			err = regulator_enable(sdhost->mmc->supply.vmmc);
+			if (err) {
+				pr_warn("%s: Failed to enable vmmc regulator: %d\n",
+					mmc_hostname(sdhost->mmc), err);
+				sdhost->mmc->supply.vmmc = ERR_PTR(-EINVAL);
+			}
+		}
+	} else {
+		/* Virtual card removal */
+		sdhost->mmc->rem_card_present = false;
+		sdhost->mmc->rescan_disable = 0;
+		if (tegra_host->is_rail_enabled) {
+			if (!IS_ERR(sdhost->mmc->supply.vqmmc))
+				regulator_disable(sdhost->mmc->supply.vqmmc);
+			if (!IS_ERR(sdhost->mmc->supply.vmmc))
+				regulator_disable(sdhost->mmc->supply.vmmc);
+			tegra_host->is_rail_enabled = false;
+		}
+	}
+	sdhost->mmc->trigger_card_event = true;
+	mmc_detect_change(sdhost->mmc, msecs_to_jiffies(200));
+
+err_config:
+	return err;
+};
+
+static int get_card_insert(void *data, u64 *val)
+{
+	struct sdhci_host *sdhost = data;
+
+	*val = sdhost->mmc->rem_card_present;
+
+	return 0;
+}
+
+static int set_card_insert(void *data, u64 val)
+{
+	struct sdhci_host *sdhost = data;
+	int err = 0;
+
+	if (val > 1) {
+		err = -EINVAL;
+		dev_err(mmc_dev(sdhost->mmc),
+			"Usage error. Use 0 to remove, 1 to insert %d\n", err);
+		goto err_detect;
+	}
+
+	if (sdhost->mmc->caps & MMC_CAP_NONREMOVABLE) {
+		err = -EINVAL;
+		dev_err(mmc_dev(sdhost->mmc),
+		    "usage error, Supports only SDCARD hosts only %d\n", err);
+		goto err_detect;
+	}
+
+	err = sdhci_tegra_carddetect(sdhost, val);
+err_detect:
+	return err;
+}
+
+
+DEFINE_SIMPLE_ATTRIBUTE(sdhci_tegra_card_insert_fops, get_card_insert,
+	set_card_insert, "%llu\n");
+
+static void sdhci_tegra_misc_debugfs(struct sdhci_host *host)
+{
+	struct dentry *root = host->debugfs_root;
+	unsigned saved_line;
+
+/*backup original host timing capabilities as debugfs may override it later*/
+	host->caps_timing_orig = host->mmc->caps &
+				(MMC_CAP_SD_HIGHSPEED | MMC_CAP_UHS_DDR50
+				| MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25
+				| MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_SDR104);
+
+	if (!root) {
+		root = debugfs_create_dir(dev_name(mmc_dev(host->mmc)), NULL);
+		if (IS_ERR_OR_NULL(root)) {
+			saved_line = __LINE__;
+			goto err_root;
+		}
+		host->debugfs_root = root;
+	}
+
+	if (!debugfs_create_file("card_insert", S_IRUSR | S_IWUSR, root, host,
+			&sdhci_tegra_card_insert_fops)) {
+		saved_line = __LINE__;
+		goto err_node;
+	}
+
+	return;
+
+err_node:
+	debugfs_remove_recursive(root);
+	host->debugfs_root = NULL;
+err_root:
+	pr_err("%s %s: Failed to initialize debugfs functionality at line=%d\n"
+		, __func__,	mmc_hostname(host->mmc), saved_line);
 }
 
 static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option)
@@ -1860,6 +2017,7 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	plat->pwrdet_support = of_property_read_bool(np, "pwrdet-support");
 	plat->update_pinctrl_settings = of_property_read_bool(np,
 		"nvidia,update-pinctrl-settings");
+	plat->cd_cap_invert = of_property_read_bool(np, "cd-inverted");
 
 	tegra_host->plat = plat;
 	return mmc_of_parse(host->mmc);
@@ -1953,7 +2111,12 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		}
 	}
 
-	host->mmc->rem_card_present = (mmc_gpio_get_cd(host->mmc) == 0);
+	if (!plat->cd_cap_invert)
+		host->mmc->rem_card_present =
+			(mmc_gpio_get_cd(host->mmc) == 0);
+	else
+		host->mmc->rem_card_present =
+			mmc_gpio_get_cd(host->mmc);
 
 	/*
 	 * If there is no card detect gpio, assume that the
@@ -2122,6 +2285,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 	if (rc)
 		goto err_add_host;
+
+	sdhci_tegra_misc_debugfs(host);
 
 	return 0;
 

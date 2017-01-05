@@ -2,7 +2,7 @@
  *  linux/drivers/mmc/host/sdhci.c - Secure Digital Host Controller Interface driver
  *
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
- *  Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1838,7 +1838,7 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 static int sdhci_do_get_cd(struct sdhci_host *host)
 {
-	int gpio_cd = mmc_gpio_get_cd(host->mmc);
+	int gpio_cd = host->mmc->rem_card_present;
 
 	if (host->flags & SDHCI_DEVICE_DEAD)
 		return 0;
@@ -2553,8 +2553,7 @@ static void sdhci_tasklet_finish(unsigned long param)
 
 		/* Spec says we should do both at the same time, but Ricoh
 		   controllers do not like that. */
-		sdhci_do_reset(host, SDHCI_RESET_DATA);
-		sdhci_do_reset(host, SDHCI_RESET_CMD);
+		sdhci_do_reset(host, SDHCI_RESET_DATA | SDHCI_RESET_CMD);
 	}
 
 	host->mrq = NULL;

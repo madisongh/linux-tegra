@@ -4,7 +4,7 @@
  * Header file for Host Controller registers and I/O accessors.
  *
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
- *  Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -522,6 +522,7 @@ struct sdhci_host {
 
 	u32 caps;		/* Alternative CAPABILITY_0 */
 	u32 caps1;		/* Alternative CAPABILITY_1 */
+	u32 caps_timing_orig;    /* Save the original host timing caps */
 
 	unsigned int            ocr_avail_sdio;	/* OCR bit masks */
 	unsigned int            ocr_avail_sd;
@@ -540,6 +541,10 @@ struct sdhci_host {
 
 	unsigned int		tuning_count;	/* Timer count for re-tuning */
 	unsigned int		tuning_mode;	/* Re-tuning mode supported by host */
+#ifdef CONFIG_DEBUG_FS
+	struct dentry           *debugfs_root;
+#endif
+
 #define SDHCI_TUNING_MODE_1	0
 	struct cmdq_host	*cq_host;
 	bool			need_vmmc_ocr_bypass;
