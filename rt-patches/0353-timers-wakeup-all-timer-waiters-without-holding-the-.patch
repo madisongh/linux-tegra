@@ -1,0 +1,34 @@
+From 80fd3c5f1be689ce192d73393650c373a09dc99d Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Wed, 13 Jul 2016 17:13:23 +0200
+Subject: [PATCH 353/365] timers: wakeup all timer waiters without holding the
+ base lock
+
+There should be no need to hold the base lock during the wakeup. There
+should be no boosting involved, the wakeup list has its own lock so it
+should be safe to do this without the lock.
+
+Cc: stable-rt@vger.kernel.org
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ kernel/time/timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/time/timer.c b/kernel/time/timer.c
+index d521214..603699f 100644
+--- a/kernel/time/timer.c
++++ b/kernel/time/timer.c
+@@ -1313,8 +1313,8 @@ static inline void __run_timers(struct tvec_base *base)
+ 			}
+ 		}
+ 	}
+-	wakeup_timer_waiters(base);
+ 	spin_unlock_irq(&base->lock);
++	wakeup_timer_waiters(base);
+ }
+ 
+ #ifdef CONFIG_NO_HZ_COMMON
+-- 
+2.7.4
+

@@ -1,0 +1,46 @@
+From 62f4fd1439a0d77bc2a3398f4fc21300658a6709 Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Thu, 15 Sep 2016 18:25:47 +0200
+Subject: [PATCH 360/365] fs/dcache: incremental fixup of the retry routine
+
+It has been pointed out by tglx that on UP the non-RT task could spin
+its entire time slice because the lock owner is preempted. This won't
+happen on !RT. So we back to "chill" if we can't cond_resched() did not
+work.
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ fs/dcache.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/fs/dcache.c b/fs/dcache.c
+index e8d9522..3f1876a 100644
+--- a/fs/dcache.c
++++ b/fs/dcache.c
+@@ -40,8 +40,6 @@
+ #include <linux/ratelimit.h>
+ #include <linux/list_lru.h>
+ #include <linux/kasan.h>
+-#include <linux/sched/rt.h>
+-#include <linux/sched/deadline.h>
+ 
+ #include "internal.h"
+ #include "mount.h"
+@@ -795,10 +793,11 @@ kill_it:
+ 		if (parent == dentry) {
+ 			/* the task with the highest priority won't schedule */
+ 			r = cond_resched();
+-			if (!r && (rt_task(current) || dl_task(current)))
++			if (!r)
+ 				cpu_chill();
+-		} else
++		} else {
+ 			dentry = parent;
++		}
+ 		goto repeat;
+ 	}
+ }
+-- 
+2.7.4
+

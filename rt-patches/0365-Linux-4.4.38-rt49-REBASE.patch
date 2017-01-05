@@ -1,0 +1,20 @@
+From fa2fe8a0e53349062e53dcccc764711293faa61b Mon Sep 17 00:00:00 2001
+From: "Steven Rostedt (Red Hat)" <rostedt@goodmis.org>
+Date: Thu, 27 Oct 2016 17:37:28 -0400
+Subject: [PATCH 365/365] Linux 4.4.38-rt49 REBASE
+
+---
+ localversion-rt | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 localversion-rt
+
+diff --git a/localversion-rt b/localversion-rt
+new file mode 100644
+index 0000000..4b7dca6
+--- /dev/null
++++ b/localversion-rt
+@@ -0,0 +1 @@
++-rt49
+-- 
+2.7.4
+

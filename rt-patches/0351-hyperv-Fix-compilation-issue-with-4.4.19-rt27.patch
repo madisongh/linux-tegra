@@ -1,0 +1,42 @@
+From 898d30debf347d6582d4ed273868f3888236dc96 Mon Sep 17 00:00:00 2001
+From: Juerg Haefliger <juerg.haefliger@hpe.com>
+Date: Thu, 1 Sep 2016 10:57:14 +0200
+Subject: [PATCH 351/365] hyperv: Fix compilation issue with 4.4.19-rt27
+
+Fix a compilation issue introduced by upstream commit
+4b44f2d18a330565227a7348844493c59366171e
+
+The upstream commit exports the symbol add_interrupt_randomness()
+which is now being used in the Hyper-V driver. The RT patch adds another
+argument to that function so its usage in the Hyper-V driver needs to
+be fixed.
+
+This patch should be merged with:
+patches/0216-random-Make-it-work-on-rt.patch
+commit 20985550b01a21ba00a587d17d7c26da61e01acc random: Make it work on rt
+
+Link: http://lkml.kernel.org/r/20160901085714.14815-1-juerg.haefliger@hpe.com
+
+Signed-off-by: Juerg Haefliger <juerg.haefliger@hpe.com>
+Reviewed-by: T Makphaibulchoke <tmac@hpe.com>
+Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ drivers/hv/vmbus_drv.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/hv/vmbus_drv.c b/drivers/hv/vmbus_drv.c
+index 509ed97..b2498b2 100644
+--- a/drivers/hv/vmbus_drv.c
++++ b/drivers/hv/vmbus_drv.c
+@@ -820,7 +820,7 @@ static void vmbus_isr(void)
+ 			tasklet_schedule(&msg_dpc);
+ 	}
+ 
+-	add_interrupt_randomness(HYPERVISOR_CALLBACK_VECTOR, 0);
++	add_interrupt_randomness(HYPERVISOR_CALLBACK_VECTOR, 0, 0);
+ }
+ 
+ 
+-- 
+2.7.4
+

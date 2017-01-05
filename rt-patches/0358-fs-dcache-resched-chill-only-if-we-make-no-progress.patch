@@ -1,0 +1,79 @@
+From da2d3c1ba11e29d177bf9f627f8621ebad42397c Mon Sep 17 00:00:00 2001
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Thu, 8 Sep 2016 18:33:52 +0200
+Subject: [PATCH 358/365] fs/dcache: resched/chill only if we make no progress
+
+Upstream commit 47be61845c77 ("fs/dcache.c: avoid soft-lockup in
+dput()") changed the condition _when_ cpu_relax() / cond_resched() was
+invoked. This change was adapted in -RT into mostly the same thing
+except that if cond_resched() did nothing we had to do cpu_chill() to
+force the task off CPU for a tiny little bit in case the task had RT
+priority and did not want to leave the CPU.
+This change resulted in a performance regression (in my testcase the
+build time on /dev/shm increased from 19min to 24min). The reason is
+that with this change cpu_chill() was invoked even dput() made progress
+(dentry_kill() returned a different dentry) instead only if we were
+trying this operation on the same dentry over and over again.
+
+This patch brings back to the old behavior back to cond_resched() &
+chill if we make no progress. A little improvement is to invoke
+cpu_chill() only if we are a RT task (and avoid the sleep otherwise).
+Otherwise the scheduler should remove us from the CPU if we make no
+progress.
+
+Cc: stable-rt@vger.kernel.org
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ fs/dcache.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/fs/dcache.c b/fs/dcache.c
+index 2ee5a8e6..e8d9522 100644
+--- a/fs/dcache.c
++++ b/fs/dcache.c
+@@ -40,6 +40,8 @@
+ #include <linux/ratelimit.h>
+ #include <linux/list_lru.h>
+ #include <linux/kasan.h>
++#include <linux/sched/rt.h>
++#include <linux/sched/deadline.h>
+ 
+ #include "internal.h"
+ #include "mount.h"
+@@ -748,6 +750,8 @@ static inline bool fast_dput(struct dentry *dentry)
+  */
+ void dput(struct dentry *dentry)
+ {
++	struct dentry *parent;
++
+ 	if (unlikely(!dentry))
+ 		return;
+ 
+@@ -784,14 +788,17 @@ repeat:
+ 	return;
+ 
+ kill_it:
+-	dentry = dentry_kill(dentry);
+-	if (dentry) {
++	parent = dentry_kill(dentry);
++	if (parent) {
+ 		int r;
+ 
+-		/* the task with the highest priority won't schedule */
+-		r = cond_resched();
+-		if (!r)
+-			cpu_chill();
++		if (parent == dentry) {
++			/* the task with the highest priority won't schedule */
++			r = cond_resched();
++			if (!r && (rt_task(current) || dl_task(current)))
++				cpu_chill();
++		} else
++			dentry = parent;
+ 		goto repeat;
+ 	}
+ }
+-- 
+2.7.4
+
