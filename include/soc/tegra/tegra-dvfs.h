@@ -270,7 +270,7 @@ int tegra_dvfs_init_thermal_dvfs_voltages(int *therm_voltages,
 long tegra_dvfs_predict_hz_at_mv_max_tfloor(struct clk *c, int mv);
 int tegra_dvfs_predict_mv_at_hz_max_tfloor(struct clk *c, unsigned long rate);
 unsigned long tegra_dvfs_get_fmax_at_vmin_safe_t(struct clk *c);
-
+bool tegra_dvfs_is_rail_ready(struct dvfs_rail *rail);
 #else
 static inline int tegra_dvfs_dfll_mode_set(struct clk *c, unsigned long rate)
 { return -EINVAL; }
@@ -352,6 +352,8 @@ static inline int tegra_dvfs_predict_mv_at_hz_max_tfloor(struct clk *c,
 static inline unsigned long tegra_dvfs_get_fmax_at_vmin_safe_t(struct clk *c)
 { return 0; }
 
+static inline bool tegra_dvfs_is_rail_ready(struct dvfs_rail *rail)
+{ return false; }
 #endif
 
 #ifdef CONFIG_TEGRA_124_DVFS
