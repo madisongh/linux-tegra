@@ -47,6 +47,7 @@
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/pm_opp.h>
 #include <linux/pm_runtime.h>
@@ -378,6 +379,9 @@ struct tegra_dfll {
 	unsigned int			thermal_floor_index;
 	unsigned int			thermal_cap_output;
 	unsigned int			thermal_cap_index;
+
+	/* mutex protecting register accesses */
+	struct mutex			lock;
 };
 
 enum dfll_monitor_mode {
@@ -1295,8 +1299,10 @@ static int dfll_request_rate(struct tegra_dfll *td, unsigned long rate)
 	td->last_req = req;
 
 	if (td->mode == DFLL_CLOSED_LOOP) {
+		mutex_lock(&td->lock);
 		dfll_set_close_loop_config(td, &td->last_req);
 		dfll_set_frequency_request(td, &td->last_req);
+		mutex_unlock(&td->lock);
 	}
 
 	return 0;
@@ -1321,7 +1327,10 @@ static int dfll_disable(struct tegra_dfll *td)
 		return -EINVAL;
 	}
 
+	mutex_lock(&td->lock);
 	dfll_set_mode(td, DFLL_DISABLED);
+	mutex_unlock(&td->lock);
+
 	pm_runtime_put_sync(td->dev);
 
 	return 0;
@@ -1343,7 +1352,10 @@ static int dfll_enable(struct tegra_dfll *td)
 	}
 
 	pm_runtime_get_sync(td->dev);
+
+	mutex_lock(&td->lock);
 	dfll_set_mode(td, DFLL_OPEN_LOOP);
+	mutex_unlock(&td->lock);
 
 	return 0;
 }
@@ -1376,10 +1388,13 @@ static int dfll_lock(struct tegra_dfll *td)
 		else
 			dfll_i2c_set_output_enabled(td, true);
 
+		mutex_lock(&td->lock);
 		dfll_set_mode(td, DFLL_CLOSED_LOOP);
 		dfll_set_close_loop_config(td, req);
 		dfll_set_frequency_request(td, req);
 		dfll_set_force_output_enabled(td, false);
+		mutex_unlock(&td->lock);
+
 		return 0;
 
 	default:
@@ -1402,8 +1417,10 @@ static int dfll_unlock(struct tegra_dfll *td)
 
 	switch (td->mode) {
 	case DFLL_CLOSED_LOOP:
+		mutex_lock(&td->lock);
 		dfll_set_open_loop_config(td);
 		dfll_set_mode(td, DFLL_OPEN_LOOP);
+		mutex_unlock(&td->lock);
 
 		if (td->pmu_if == TEGRA_DFLL_PMU_PWM)
 			tegra_dfll_pwm_output_disable();
@@ -1685,6 +1702,8 @@ static int attr_registers_show(struct seq_file *s, void *data)
 	u32 val, offs;
 	struct tegra_dfll *td = s->private;
 
+	mutex_lock(&td->lock);
+
 	seq_puts(s, "CONTROL REGISTERS:\n");
 	for (offs = 0; offs <= DFLL_MONITOR_DATA; offs += 4) {
 		if (td->pmu_if == TEGRA_DFLL_PMU_I2C &&
@@ -1723,6 +1742,8 @@ static int attr_registers_show(struct seq_file *s, void *data)
 			seq_printf(s, "[0x%02x] = 0x%08x\n", offs,
 				   __raw_readl(td->lut_base + offs));
 	}
+
+	mutex_unlock(&td->lock);
 
 	return 0;
 }
@@ -1813,8 +1834,10 @@ int tegra_dfll_update_thermal_index(struct tegra_dfll *td,
 		set_dvco_rate_min(td);
 
 		if (td->mode == DFLL_CLOSED_LOOP) {
+			mutex_lock(&td->lock);
 			dfll_set_close_loop_config(td, &td->last_req);
 			dfll_set_frequency_request(td, &td->last_req);
+			mutex_unlock(&td->lock);
 		}
 	} else if (type == TEGRA_DFLL_THERMAL_CAP &&
 		   td->soc->thermal_cap_table) {
@@ -1826,8 +1849,10 @@ int tegra_dfll_update_thermal_index(struct tegra_dfll *td,
 		td->thermal_cap_index = new_index;
 
 		if (td->mode == DFLL_CLOSED_LOOP) {
+			mutex_lock(&td->lock);
 			dfll_set_close_loop_config(td, &td->last_req);
 			dfll_set_frequency_request(td, &td->last_req);
+			mutex_unlock(&td->lock);
 		}
 	}
 
@@ -2615,6 +2640,8 @@ int tegra_dfll_register(struct platform_device *pdev,
 	ret = dfll_init(td);
 	if (ret)
 		return ret;
+
+	mutex_init(&td->lock);
 
 	ret = dfll_register_clk(td);
 	if (ret) {
