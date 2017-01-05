@@ -2,7 +2,7 @@
  * tegra_asoc_utils_alt.c - MCLK and DAP Utility driver
  *
  * Author: Stephen Warren <swarren@nvidia.com>
- * Copyright (c) 2010-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2010-2017 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -142,12 +142,13 @@ int tegra_alt_asoc_utils_set_rate(struct tegra_asoc_audio_clock_info *data,
 	case 22050:
 	case 44100:
 	case 88200:
+	case 176400:
 		if (data->soc == TEGRA_ASOC_UTILS_SOC_TEGRA20)
 			new_baseclock = 56448000;
 		else if (data->soc == TEGRA_ASOC_UTILS_SOC_TEGRA30)
 			new_baseclock = 564480000;
 		else
-			new_baseclock = 282240000;
+			new_baseclock = 338688000;
 		break;
 	case 8000:
 	case 16000:
