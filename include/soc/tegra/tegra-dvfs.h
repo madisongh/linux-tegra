@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2014-2017, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -268,6 +268,7 @@ int tegra_dvfs_predict_mv_at_hz_cur_tfloor(struct clk *c, unsigned long rate);
 int tegra_dvfs_init_thermal_dvfs_voltages(int *therm_voltages,
 	int *peak_voltages, int freqs_num, int ranges_num, struct dvfs *d);
 long tegra_dvfs_predict_hz_at_mv_max_tfloor(struct clk *c, int mv);
+int tegra_dvfs_predict_mv_at_hz_max_tfloor(struct clk *c, unsigned long rate);
 unsigned long tegra_dvfs_get_fmax_at_vmin_safe_t(struct clk *c);
 
 #else
@@ -344,6 +345,9 @@ static inline int tegra_dvfs_init_thermal_dvfs_voltages(int *therm_voltages,
 { return -EINVAL; }
 static inline long tegra_dvfs_predict_hz_at_mv_max_tfloor(struct clk *c,
 							  int mv)
+{ return -EINVAL; }
+static inline int tegra_dvfs_predict_mv_at_hz_max_tfloor(struct clk *c,
+							 unsigned long rate)
 { return -EINVAL; }
 static inline unsigned long tegra_dvfs_get_fmax_at_vmin_safe_t(struct clk *c)
 { return 0; }
