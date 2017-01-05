@@ -180,6 +180,7 @@
 #define DFLL_INTR_MIN_MASK		0x1
 #define DFLL_INTR_MAX_MASK		0x2
 
+#define DFLL_CC4_HVC			0x74
 /*
  * Integrated I2C controller registers - relative to td->i2c_controller_base
  */
@@ -1816,6 +1817,14 @@ static int attr_registers_show(struct seq_file *s, void *data)
 			val = dfll_readl(td, offs);
 		seq_printf(s, "[0x%02x] = 0x%08x\n", offs, val);
 	}
+
+	seq_puts(s, "\nOVERRIDE REGISTERS:\n");
+	offs = DFLL_CC4_HVC;
+	if (td->pmu_if == TEGRA_DFLL_PMU_I2C)
+		val = dfll_i2c_readl(td, offs);
+	else
+		val = dfll_readl(td, offs);
+	seq_printf(s, "[0x%02x] = 0x%08x\n", offs, val);
 
 	if (td->pmu_if == TEGRA_DFLL_PMU_I2C) {
 		seq_puts(s, "\nINTEGRATED I2C CONTROLLER REGISTERS:\n");
