@@ -1682,20 +1682,22 @@ static void tegra_of_device_add_pmc_wake(struct device *dev)
 		while (!of_parse_phandle_with_args(dev->of_node,
 						   "nvidia,pmc-wakeup",
 						   "#nvidia,wake-cells",
-						   i++, &ph_args))
+						   i++, &ph_args)) {
 			tegra_pmc_add_wakeup_event(&ph_args, dev, dev->of_node);
+			of_node_put(ph_args.np);
+		}
 	} else {
 		for_each_child_of_node(dev->of_node, np) {
 			i = 0;
 			while (!of_parse_phandle_with_args(np,
 							   "nvidia,pmc-wakeup",
 							   "#nvidia,wake-cells",
-							   i++, &ph_args))
+							   i++, &ph_args)) {
 				tegra_pmc_add_wakeup_event(&ph_args, dev, np);
+				of_node_put(ph_args.np);
+			}
 		}
 	}
-
-	of_node_put(ph_args.np);
 }
 
 static int tegra_pmc_wake_notifier_call(struct notifier_block *nb,
