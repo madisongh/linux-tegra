@@ -1739,6 +1739,50 @@ static int attr_dvco_rate_min_get(void *data, u64 *val)
 DEFINE_SIMPLE_ATTRIBUTE(dvco_rate_min_fops, attr_dvco_rate_min_get,
 		NULL, "%llu\n");
 
+static int attr_vmin_get(void *data, u64 *val)
+{
+	struct tegra_dfll *td = data;
+
+	*val = td->lut_uv[td->lut_min] / 1000;
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(attr_vmin_fops, attr_vmin_get, NULL, "%llu\n");
+
+static int attr_vmax_get(void *data, u64 *val)
+{
+	struct tegra_dfll *td = data;
+
+	*val = td->lut_uv[td->lut_max] / 1000;
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(attr_vmax_fops, attr_vmax_get, NULL, "%llu\n");
+
+static int attr_output_get(void *data, u64 *val)
+{
+	struct tegra_dfll *td = data;
+	u32 reg;
+
+	mutex_lock(&td->lock);
+
+	reg = dfll_readl(td, DFLL_OUTPUT_FORCE);
+	if (reg & DFLL_OUTPUT_FORCE_ENABLE) {
+		*val = td->lut_uv[reg & DFLL_OUTPUT_FORCE_VALUE_MASK] / 1000;
+		return 0;
+	}
+
+	dfll_set_monitor_mode(td, DFLL_OUTPUT_VALUE);
+	dfll_get_monitor_data(td, &reg);
+
+	*val = td->lut_uv[reg] / 1000;
+
+	mutex_unlock(&td->lock);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(attr_output_fops, attr_output_get, NULL, "%llu\n");
+
 static int attr_registers_show(struct seq_file *s, void *data)
 {
 	u32 val, offs;
@@ -1833,6 +1877,18 @@ static int dfll_debug_init(struct tegra_dfll *td)
 
 	if (!debugfs_create_file("registers", S_IRUGO,
 				 td->debugfs_dir, td, &attr_registers_fops))
+		goto err_out;
+
+	if (!debugfs_create_file("vmin_mv", S_IRUGO,
+				 td->debugfs_dir, td, &attr_vmin_fops))
+		goto err_out;
+
+	if (!debugfs_create_file("vmax_mv", S_IRUGO,
+				 td->debugfs_dir, td, &attr_vmax_fops))
+		goto err_out;
+
+	if (!debugfs_create_file("output_mv", S_IRUGO,
+				 td->debugfs_dir, td, &attr_output_fops))
 		goto err_out;
 
 	return 0;
