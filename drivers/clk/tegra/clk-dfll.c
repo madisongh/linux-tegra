@@ -1,7 +1,7 @@
 /*
  * clk-dfll.c - Tegra DFLL clock source common code
  *
- * Copyright (C) 2012-2016 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2012-2017 NVIDIA Corporation. All rights reserved.
  *
  * Aleksandr Frid <afrid@nvidia.com>
  * Paul Walmsley <pwalmsley@nvidia.com>
@@ -2083,6 +2083,24 @@ error:
 	return td;
 }
 EXPORT_SYMBOL(tegra_dfll_get_by_phandle);
+
+/**
+ * tegra_dfll_get_min_millivolts - return DFLL min millivolts
+ */
+u32 tegra_dfll_get_min_millivolts(void)
+{
+	return tegra_dfll_dev->soc->min_millivolts;
+}
+EXPORT_SYMBOL(tegra_dfll_get_min_millivolts);
+
+/**
+ * tegra_dfll_get_thermal_floor - return millivolts for thermal floor
+ */
+u32 tegra_dfll_get_thermal_floor(int index)
+{
+	return tegra_dfll_dev->soc->thermal_floor_table[index].millivolts;
+}
+EXPORT_SYMBOL(tegra_dfll_get_thermal_floor);
 
 /*
  * DFLL initialization
