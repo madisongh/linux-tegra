@@ -3,7 +3,7 @@
  *
  * adsp dynamic frequency scaling
  *
- * Copyright (C) 2014-2016, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2017, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -86,6 +86,7 @@ struct adsp_dfs_policy {
 	unsigned long cpu_max;    /* ADSP max freq(KHz). Remain unchanged */
 
 	struct clk *adsp_clk;
+	struct clk *aclk_clk;
 	struct notifier_block rate_change_nb;
 	struct nvadsp_mbox mbox;
 
@@ -123,6 +124,66 @@ static bool is_os_running(struct device *dev)
 	}
 	return true;
 }
+
+static int adsp_clk_get(struct adsp_dfs_policy *policy)
+{
+	struct device_node *node = device->of_node;
+	int ret = 0;
+
+	if (IS_ENABLED(CONFIG_COMMON_CLK))
+		policy->adsp_clk = devm_clk_get(device, "adsp");
+	else
+		policy->adsp_clk = clk_get_sys(NULL, policy->clk_name);
+
+	if (IS_ERR_OR_NULL(policy->adsp_clk)) {
+		dev_err(device, "unable to find adsp clock\n");
+		ret = PTR_ERR(policy->adsp_clk);
+	}
+
+	if (!of_device_is_compatible(node, "nvidia,tegra210-adsp")) {
+		policy->aclk_clk = devm_clk_get(device, "aclk");
+
+		if (IS_ERR_OR_NULL(policy->aclk_clk)) {
+			dev_err(device, "unable to find aclk clock\n");
+			ret = PTR_ERR(policy->aclk_clk);
+		}
+	}
+
+	return ret;
+}
+
+static void adsp_clk_put(struct adsp_dfs_policy *policy)
+{
+	if (policy->adsp_clk) {
+		if (IS_ENABLED(CONFIG_COMMON_CLK))
+			devm_clk_put(device, policy->adsp_clk);
+		else
+			clk_put(policy->adsp_clk);
+	}
+
+	if (policy->aclk_clk)
+		devm_clk_put(device, policy->aclk_clk);
+}
+
+static int adsp_clk_set_rate(struct adsp_dfs_policy *policy,
+			     unsigned long freq_hz)
+{
+	struct device_node *node = device->of_node;
+	int ret;
+
+	if (of_device_is_compatible(node, "nvidia,tegra210-adsp"))
+		ret = clk_set_rate(policy->adsp_clk, freq_hz);
+	else
+		ret = clk_set_rate(policy->aclk_clk, freq_hz);
+
+	return ret;
+}
+
+static unsigned long adsp_clk_get_rate(struct adsp_dfs_policy *policy)
+{
+	return clk_get_rate(policy->adsp_clk);
+}
+
 /* Expects and returns freq in Hz as table is formmed in terms of Hz */
 static unsigned long adsp_get_target_freq(unsigned long tfreq, int *index)
 {
@@ -227,7 +288,7 @@ static unsigned long update_freq(unsigned long tfreq)
 		return 0;
 	}
 
-	ret = clk_set_rate(policy->adsp_clk, tfreq);
+	ret = adsp_clk_set_rate(policy, tfreq);
 	if (ret) {
 		dev_err(device, "failed to set adsp freq:%d\n", ret);
 		policy->update_freq_flag = false;
@@ -290,7 +351,7 @@ static unsigned long update_freq(unsigned long tfreq)
 
 err_out:
 	if (!policy->update_freq_flag) {
-		ret = clk_set_rate(policy->adsp_clk, old_freq * 1000);
+		ret = adsp_clk_set_rate(policy, old_freq * 1000);
 		if (ret) {
 			dev_err(device, "failed to resume adsp freq:%lu\n", old_freq);
 			policy->update_freq_flag = false;
@@ -690,15 +751,9 @@ int adsp_dfs_core_init(struct platform_device *pdev)
 	device = &pdev->dev;
 	policy = &dfs_policy;
 
-	if (IS_ENABLED(CONFIG_COMMON_CLK))
-		policy->adsp_clk = devm_clk_get(device, "adsp");
-	else
-		policy->adsp_clk = clk_get_sys(NULL, policy->clk_name);
-	if (IS_ERR_OR_NULL(policy->adsp_clk)) {
-		dev_err(&pdev->dev, "unable to find adsp clock\n");
-		ret = PTR_ERR(policy->adsp_clk);
+	ret = adsp_clk_get(policy);
+	if (ret)
 		goto end;
-	}
 
 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
 		drv->bwmgr = tegra_bwmgr_register(TEGRA_BWMGR_CLIENT_APE_ADSP);
@@ -727,7 +782,7 @@ int adsp_dfs_core_init(struct platform_device *pdev)
 
 	policy->min = policy->cpu_min = adsp_cpu_freq_table[0] / 1000;
 
-	policy->cur = clk_get_rate(policy->adsp_clk) / 1000;
+	policy->cur = adsp_clk_get_rate(policy) / 1000;
 
 	efreq = adsp_to_emc_freq(policy->cur);
 
@@ -786,12 +841,8 @@ int adsp_dfs_core_init(struct platform_device *pdev)
 	dev_dbg(&pdev->dev, "adsp dfs initialized ....\n");
 	return ret;
 end:
-	if (policy->adsp_clk) {
-		if (IS_ENABLED(CONFIG_COMMON_CLK))
-			devm_clk_put(&pdev->dev, policy->adsp_clk);
-		else
-			clk_put(policy->adsp_clk);
-	}
+
+	adsp_clk_put(policy);
 
 	if (IS_ENABLED(CONFIG_COMMON_CLK) && drv->bwmgr) {
 		tegra_bwmgr_set_emc(drv->bwmgr, 0,
@@ -823,13 +874,7 @@ int adsp_dfs_core_exit(struct platform_device *pdev)
 	tegra_unregister_clk_rate_notifier(clk_get_parent(policy->adsp_clk),
 					   &policy->rate_change_nb);
 #endif
-
-	if (policy->adsp_clk) {
-		if (IS_ENABLED(CONFIG_COMMON_CLK))
-			devm_clk_put(&pdev->dev, policy->adsp_clk);
-		else
-			clk_put(policy->adsp_clk);
-	}
+	adsp_clk_put(policy);
 
 	if (IS_ENABLED(CONFIG_COMMON_CLK) && drv->bwmgr) {
 		tegra_bwmgr_set_emc(drv->bwmgr, 0,

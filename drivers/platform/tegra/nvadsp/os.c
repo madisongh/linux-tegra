@@ -5,7 +5,7 @@
  * Copyright (C) 2011 Texas Instruments, Inc.
  * Copyright (C) 2011 Google, Inc.
  *
- * Copyright (C) 2014-2016 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2017, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -804,7 +804,7 @@ static int nvadsp_set_ape_freq(struct nvadsp_drv_data *drv_data)
 	return ret;
 }
 
-static int set_adsp_clks_and_timer_prescalar(struct nvadsp_drv_data *drv_data)
+static int nvadsp_t210_set_clks_and_prescalar(struct nvadsp_drv_data *drv_data)
 {
 	struct nvadsp_shared_mem *shared_mem = drv_data->shared_adsp_os_data;
 	struct nvadsp_os_args *os_args = &shared_mem->os_args;
@@ -859,7 +859,7 @@ end:
 	return ret;
 }
 
-static int set_adsp_clks(struct nvadsp_drv_data *drv_data)
+static int nvadsp_set_adsp_clks(struct nvadsp_drv_data *drv_data)
 {
 	struct nvadsp_shared_mem *shared_mem = drv_data->shared_adsp_os_data;
 	struct nvadsp_os_args *os_args = &shared_mem->os_args;
@@ -870,13 +870,16 @@ static int set_adsp_clks(struct nvadsp_drv_data *drv_data)
 	int ret = 0;
 
 	adsp_freq = drv_data->adsp_freq_hz; /* in Hz*/
-	max_adsp_freq = clk_round_rate(drv_data->adsp_clk, ULONG_MAX);
+
+	/* round rate shall be used with adsp parent clk i.e. aclk */
+	max_adsp_freq = clk_round_rate(drv_data->aclk_clk, ULONG_MAX);
 
 	/* Set max adsp boot freq */
 	if (!adsp_freq)
 		adsp_freq = max_adsp_freq;
 
-	ret = clk_set_rate(drv_data->adsp_clk, adsp_freq);
+	/* set rate shall be used with adsp parent clk i.e. aclk */
+	ret = clk_set_rate(drv_data->aclk_clk, adsp_freq);
 	if (ret) {
 		dev_err(dev, "setting adsp_freq:%luHz failed.\n", adsp_freq);
 		dev_err(dev, "max_adsp_freq:%luHz\n", max_adsp_freq);
@@ -967,7 +970,7 @@ static int nvadsp_set_boot_freqs(struct nvadsp_drv_data *drv_data)
 
 	if (of_device_is_compatible(node, "nvidia,tegra210-adsp")) {
 		if (drv_data->adsp_cpu_clk) {
-			ret = set_adsp_clks_and_timer_prescalar(drv_data);
+			ret = nvadsp_t210_set_clks_and_prescalar(drv_data);
 			if (ret)
 				goto end;
 		} else {
@@ -976,7 +979,7 @@ static int nvadsp_set_boot_freqs(struct nvadsp_drv_data *drv_data)
 		}
 	} else {
 		if (drv_data->adsp_clk) {
-			ret = set_adsp_clks(drv_data);
+			ret = nvadsp_set_adsp_clks(drv_data);
 			if (ret)
 				goto end;
 		} else {

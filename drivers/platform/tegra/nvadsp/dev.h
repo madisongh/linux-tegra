@@ -3,7 +3,7 @@
  *
  * A header file for Host driver for ADSP and APE
  *
- * Copyright (C) 2014-2016, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2017, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -100,6 +100,7 @@ struct nvadsp_drv_data {
 	struct clk *ape_clk;
 	struct clk *apb2ape_clk;
 	struct clk *adsp_clk;
+	struct clk *aclk_clk;
 	struct clk *adsp_cpu_clk;
 	struct clk *adsp_neon_clk;
 	struct clk *ape_emc_clk;
