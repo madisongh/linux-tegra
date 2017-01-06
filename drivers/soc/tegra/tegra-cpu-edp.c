@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016, NVIDIA CORPORATION. All Rights Reserved.
+ * Copyright (c) 2014-2017, NVIDIA CORPORATION. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -402,7 +402,7 @@ tegra_cpu_edp_predict_millivolts(void *p, unsigned long rate)
 {
 	struct clk *clk = (struct clk *)p;
 
-	return tegra_dvfs_predict_millivolts(clk, rate);
+	return tegra_dvfs_predict_mv_at_hz_max_tfloor(clk, rate);
 }
 
 static int tegra_cpu_edp_probe(struct platform_device *pdev)
