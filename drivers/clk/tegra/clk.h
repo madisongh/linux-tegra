@@ -895,6 +895,9 @@ struct clk *tegra_clk_register_cbus(const char *name,
 		const char *parent, unsigned long flags,
 		const char *backup, unsigned long min_rate,
 		unsigned long max_rate);
+struct clk *tegra_clk_register_gbus(const char *name,
+		const char *parent, unsigned long flags,
+		unsigned long min_rate, unsigned long max_rate);
 struct clk *tegra_clk_register_shared_master(const char *name,
 		const char *parent, unsigned long flags,
 		unsigned long min_rate, unsigned long max_rate);

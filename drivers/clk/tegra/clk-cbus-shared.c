@@ -533,6 +533,16 @@ static int clk_shared_debug(struct clk_hw *hw, struct dentry *dir)
 	return 0;
 }
 
+static int clk_gbus_prepare(struct clk_hw *hw)
+{
+	return tegra_dvfs_set_rate(hw->clk, clk_get_rate(hw->clk));
+}
+
+static void clk_gbus_unprepare(struct clk_hw *hw)
+{
+	tegra_dvfs_set_rate(hw->clk, 0);
+}
+
 static unsigned long clk_cascade_master_recalc_rate(struct clk_hw *hw,
 						    unsigned long parent_rate)
 {
@@ -911,6 +921,11 @@ static const struct clk_ops tegra_clk_shared_ops = {
 	.recalc_rate = clk_shared_recalc_rate,
 };
 
+static const struct clk_ops tegra_clk_gbus_ops = {
+	.prepare = clk_gbus_prepare,
+	.unprepare = clk_gbus_unprepare,
+};
+
 static const struct clk_ops tegra_clk_shared_master_ops;
 
 static const struct clk_ops tegra_clk_cascade_master_ops = {
@@ -1194,6 +1209,43 @@ struct clk *tegra_clk_register_shared_connect(const char *name,
 	register_bus_clk_notifier(c);
 	return c;
 }
+
+struct clk *tegra_clk_register_gbus(const char *name,
+		const char *parent, unsigned long flags,
+		unsigned long min_rate, unsigned long max_rate)
+{
+	struct tegra_clk_cbus_shared *master;
+	struct clk_init_data init;
+	struct clk *c;
+
+	master = kzalloc(sizeof(*master), GFP_KERNEL);
+	if (!master)
+		return ERR_PTR(-ENOMEM);
+
+	INIT_LIST_HEAD(&master->shared_bus_list);
+
+	flags |= CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE;
+
+	init.name = name;
+	init.ops = &tegra_clk_gbus_ops;
+	init.flags = flags;
+	init.parent_names = &parent;
+	init.num_parents = 1;
+
+	master->min_rate = min_rate;
+	master->max_rate = max_rate;
+	master->bus_update = _simple_shared_update;
+
+	/* Data in .init is copied by clk_register(), so stack variable OK */
+	master->hw.init = &init;
+
+	c = clk_register(NULL, &master->hw);
+	if (!c)
+		kfree(master);
+
+	return c;
+}
+
 /*
  * Not all shared clocks have a cbus clock as parent. The parent clock however
  * provides the head of the shared clock list. This clock provides a placeholder
