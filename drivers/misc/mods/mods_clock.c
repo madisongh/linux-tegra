@@ -1,7 +1,7 @@
 /*
  * mods_clock.c - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -27,7 +27,6 @@ defined(CONFIG_OF_DYNAMIC)
 	#define MODS_COMMON_CLK 1
 #endif
 #if defined(MODS_COMMON_CLK)
-	#include "mods_clock.h"
 	#include <linux/clk-provider.h>
 	#include <linux/of_device.h>
 	#include <linux/of.h>
@@ -47,306 +46,59 @@ struct clock_entry {
 };
 
 #if defined(MODS_COMMON_CLK)
-static struct property clock_names_prop = {
-	.name = "clock-names",
-};
-
-static struct property clocks_prop = {
-	.name = "clocks",
-};
-
-static struct property reset_names_prop = {
-	.name = "reset-names",
-};
-
-static struct property resets_prop = {
-	.name = "resets",
-};
-
-static struct of_device_id tegra_car_of_match[] = {
-	{ .compatible = "nvidia,tegra124-car", },
-	{ .compatible = "nvidia,tegra210-car", },
-	{ .compatible = "nvidia,tegra18x-car", },
-	{},
-};
-
-static struct device_node *find_node(const char *compatible)
+static struct device_node *find_clocks_node(const char *name)
 {
-	struct device_node *np = NULL;
-	struct of_device_id matches = {};
+	const char *node_name = "mods-simple-bus";
+	struct device_node *pp = NULL, *np = NULL;
 
-	strncpy(matches.compatible, compatible,
-			sizeof(matches.compatible));
+	pp = of_find_node_by_name(NULL, node_name);
 
-	np = of_find_matching_node(NULL, &matches);
+	if (!pp) {
+		mods_error_printk("'mods-simple-bus' node not found in device tree\n");
+		return pp;
+	}
 
+	np = of_get_child_by_name(pp, name);
 	return np;
 }
-
-static void mods_update_node_properties(struct device_node *np,
-		struct device_node *dup)
-{
-	struct property *prop;
-	struct device_node *child;
-
-	for_each_property_of_node(np, prop)
-		of_add_property(dup, prop);
-
-	for_each_child_of_node(np, child)
-		child->parent = dup;
-}
-
-static void mods_attach_node_and_children(struct device_node *np)
-{
-	struct device_node *next, *dup, *child;
-
-	dup = of_find_node_by_path(np->full_name);
-	if (dup) {
-		mods_debug_printk(DEBUG_CLOCK, "Duplicate 'mods' node found in "
-				  "the device tree!!\n");
-		mods_update_node_properties(np, dup);
-		return;
-	}
-
-	child = np->child;
-	np->child = NULL;
-	np->sibling = NULL;
-	of_attach_node(np);
-	while (child) {
-		next = child->sibling;
-		mods_attach_node_and_children(child);
-		child = next;
-	}
-}
-
-static void mods_detach_node_and_children(struct device_node *np)
-{
-	while (np->child)
-		mods_detach_node_and_children(np->child);
-	of_detach_node(np);
-}
-
-/**
- * mods_attach_node_data - Reads, copies data from mods dtb node compiled
- * in the kernel image and attaches it to live dtb tree.
- * */
-static void mods_attach_node_data(void)
-{
-	void *modsnode_data;
-	struct device_node *modsnode_data_np, *np;
-	int rc;
-	/*
-	 *  __dtb_mods_begin[] and __dtb_mods_end[] are magically
-	 * created by cmd_dt_S_dtb in kernel/scripts/Makefile.lib
-	 * */
-	extern uint8_t __dtb_mods_begin[];
-	extern uint8_t __dtb_mods_end[];
-	const int size = __dtb_mods_end - __dtb_mods_begin;
-
-	if (!size) {
-		mods_error_printk("mods.dtb is not compiled in kernel image; "
-				  "Can't create 'mods' node in device tree; "
-				  "and can't init clocks\n");
-		return;
-	}
-
-	modsnode_data = kmemdup(__dtb_mods_begin, size, GFP_KERNEL);
-	if (!modsnode_data) {
-		mods_error_printk("Failed to alloate memory for 'mods' node; "
-				  "Can't init clocks\n");
-		return;
-	}
-
-	/* unflatten the modsnode_data blob into device node structure */
-	of_fdt_unflatten_tree(modsnode_data, &modsnode_data_np);
-	if (!modsnode_data_np) {
-		mods_error_printk("'mods' node can't be interpretted as a "
-				  "device_node. Can't init clocks\n");
-		return;
-	}
-
-	of_node_set_flag(modsnode_data_np, OF_DETACHED);
-	rc = of_resolve_phandles(modsnode_data_np);
-	if (rc) {
-		mods_error_printk("Failed to resolve phandles (rc=%i); "
-				  "Can't init clocks\n", rc);
-		return;
-	}
-
-	/* attach the "modsnode" node to live tree */
-	np = modsnode_data_np->child;
-	while (np) {
-		struct device_node *next = np->sibling;
-
-		np->parent = of_root;
-		mods_attach_node_and_children(np);
-		np = next;
-	}
-}
-
-/* detach the mods node from the live dtb tree
- * when mods driver shuts down
- * */
-static void mods_remove_node_data(void)
-{
-	struct property *prop;
-	struct device_node *mods_np = find_node("nvidia,tegra-mods");
-
-	for_each_property_of_node(mods_np, prop)
-		of_remove_property(mods_np, prop);
-
-	mods_detach_node_and_children(mods_np);
-}
-#endif  /* CONFIG_COMMON_CLOCK */
+#endif
 
 void mods_init_clock_api(void)
 {
 #if defined(MODS_COMMON_CLK)
+	const char *okay_value = "okay";
 	struct device_node *mods_np = 0;
-	struct device_node *car_np = 0;
-	void *clk_names = 0;
-	void *clk_tuples = 0;
-	int index, size, pos, num_clocks = 0;
-#endif
+	struct property *pp = 0;
+	int size_value = 0;
 
-#if defined(CONFIG_RESET_CONTROLLER)
-	void *rst_names;
-	void *rst_tuples;
-	u32 num_resets = 0;
+	mods_np = find_clocks_node("mods-clocks");
+	if (!mods_np) {
+		mods_error_printk("'mods-clocks' node not found in device tree\n");
+		goto err;
+	}
+
+	pp = of_find_property(mods_np, "status", NULL);
+	if (IS_ERR(pp)) {
+		mods_error_printk("'status' prop not found in 'mods-clocks' node.");
+		goto err;
+	}
+
+	/* if status is 'okay', then skip updating property */
+	if (of_device_is_available(mods_np))
+		goto err;
+
+	size_value = strlen(okay_value) + 1;
+	pp->value = kmalloc(size_value, GFP_KERNEL);
+	strncpy(pp->value, okay_value, size_value);
+	pp->length = size_value;
+
+err:
+	of_node_put(mods_np);
 #endif
 
 	spin_lock_init(&mods_clock_lock);
 	INIT_LIST_HEAD(&mods_clock_handles);
 	last_handle = 0;
-
-#if defined(MODS_COMMON_CLK)
-	/* add mods node to kernel's live device tree*/
-	mods_attach_node_data();
-
-	mods_np = find_node("nvidia,tegra-mods");
-	if (!mods_np || !of_device_is_available(mods_np)) {
-		mods_error_printk("'mods' node not found in the device tree. "
-				  "Can't init clocks\n");
-		goto err;
-	}
-
-	car_np = of_find_matching_node(NULL, tegra_car_of_match);
-	if (!car_np || !of_device_is_available(car_np)) {
-		mods_error_printk("'tegra_car' node not found in device tree. "
-				  "Can't init clocks\n");
-		goto err;
-	}
-
-	num_clocks = sizeof(clock_list)/sizeof(clock_list[0]);
-	/* update tegra_car phandle values in all clocks */
-	for (index = 0; index < num_clocks; ++index) {
-		clock_list[index].phandle = cpu_to_be32(car_np->phandle);
-		clock_list[index].clk_uid = cpu_to_be32(clock_list[index].clk_uid);
-		clock_list[index].rst_uid = cpu_to_be32(clock_list[index].rst_uid);
-	}
-
-	size = num_clocks * 2 * sizeof(u32);
-	clk_tuples = kmalloc(size, GFP_ATOMIC);
-	if (IS_ERR(clk_tuples))
-		mods_error_printk("Not enough memory. Can't init clocks\n");
-	memset(clk_tuples, 0, size);
-	for (index = 0, pos = 0; index < num_clocks; ++index) {
-		memmove(clk_tuples + pos, &clock_list[index].phandle,
-			sizeof(u32));
-		pos += sizeof(u32);
-		memmove(clk_tuples + pos, &clock_list[index].clk_uid,
-			sizeof(u32));
-		pos += sizeof(u32);
-	}
-
-	clocks_prop.value = clk_tuples;
-	clocks_prop.length = size;
-	if (of_add_property(mods_np, &clocks_prop) < 0) {
-		mods_error_printk("Couldn't add 'clocks' prop to 'mods' node "
-				  "in device tree. Can't init clocks\n");
-		goto err;
-	}
-
-	for (index = 0, size = 0; index < num_clocks; ++index)
-		size += strlen(clock_list[index].name) + 1;
-
-	clk_names = kmalloc(size, GFP_ATOMIC);
-	if (IS_ERR(clk_names))
-		mods_error_printk("Not enough memory. Can't init clocks\n");
-	memset(clk_names, '\0', size);
-	for (index = 0, pos = 0; index < num_clocks; ++index) {
-		memmove(clk_names + pos, clock_list[index].name,
-			strlen(clock_list[index].name) + 1);
-		pos += strlen(clock_list[index].name) + 1;
-	}
-
-	clock_names_prop.value = clk_names;
-	clock_names_prop.length = size;
-	if (of_add_property(mods_np, &clock_names_prop) < 0) {
-		mods_error_printk("Could'nt add 'clock-names' prop to 'mods' "
-				  "node. Can't init clocks\n");
-		goto err;
-	}
-
-#if defined(CONFIG_RESET_CONTROLLER)
-	for (index = 0; index < num_clocks; ++index)
-		if (clock_list[index].rst_uid != -1)
-			++num_resets;
-
-	size = num_resets * 2 * sizeof(u32);
-	rst_tuples = kmalloc(size, GFP_ATOMIC);
-	if (IS_ERR(rst_tuples))
-		mods_error_printk("Not enough memory. Can't init reset devs\n");
-	memset(rst_tuples, 0, size);
-	for (index = 0, pos = 0; index < num_clocks; ++index) {
-		if (clock_list[index].rst_uid != -1) {
-			memmove(rst_tuples + pos, &clock_list[index].phandle,
-				sizeof(u32));
-			pos += sizeof(u32);
-			memmove(rst_tuples + pos, &clock_list[index].rst_uid,
-				sizeof(u32));
-			pos += sizeof(u32);
-		}
-	}
-
-	resets_prop.value = rst_tuples;
-	resets_prop.length = size;
-	if (of_add_property(mods_np, &resets_prop) < 0) {
-		mods_error_printk("Couldn't add 'resets' prop to 'mods' node "
-				  "in device tree. Can't init clocks\n");
-		goto err;
-	}
-
-	for (index = 0, size = 0; index < num_clocks; ++index)
-		if (clock_list[index].rst_uid != -1)
-			size += strlen(clock_list[index].name) + 1;
-
-	rst_names = kmalloc(size, GFP_ATOMIC);
-	if (IS_ERR(rst_names))
-		mods_error_printk("Not enough memory. Can't init reset devs\n");
-	memset(rst_names, '\0', size);
-	for (index = 0, pos = 0; index < num_clocks; ++index) {
-		if (clock_list[index].rst_uid != -1) {
-			memmove(rst_names + pos, clock_list[index].name,
-				strlen(clock_list[index].name) + 1);
-			pos += strlen(clock_list[index].name) + 1;
-		}
-	}
-
-	reset_names_prop.value = rst_names;
-	reset_names_prop.length = size;
-	if (of_add_property(mods_np, &reset_names_prop) < 0) {
-		mods_error_printk("Could'nt add 'reset-names' prop to 'mods' "
-				  "node. Can't init clocks\n");
-		goto err;
-	}
-#endif
-
-err:
-	of_node_put(mods_np);
-	of_node_put(car_np);
-	return;
-#endif /* CONFIG_COMMON_CLOCK */
 }
 
 void mods_shutdown_clock_api(void)
@@ -363,10 +115,6 @@ void mods_shutdown_clock_api(void)
 		list_del(iter);
 		kfree(entry);
 	}
-
-#if defined(MODS_COMMON_CLK)
-	mods_remove_node_data();
-#endif /* CONFIG_COMMON_CLOCK */
 
 	spin_unlock(&mods_clock_lock);
 }
@@ -450,18 +198,17 @@ int esc_mods_get_clock_handle(struct file *pfile,
 #elif defined(MODS_COMMON_CLK)
 	struct device_node *mods_np = 0;
 	struct property *pp = 0;
-	u32 index, size = 0;
 
 	LOG_ENT();
 
-	mods_np = find_node("nvidia,tegra-mods");
+	mods_np = find_clocks_node("mods-clocks");
 	if (!mods_np || !of_device_is_available(mods_np)) {
-		mods_error_printk("'mods' node not found in device tree\n");
+		mods_error_printk("'mods-clocks' node not found in device tree\n");
 		goto err;
 	}
 	pp = of_find_property(mods_np, "clock-names", NULL);
 	if (IS_ERR(pp)) {
-		mods_error_printk("'clock-names' prop not found in 'mods' node."
+		mods_error_printk("'clock-names' prop not found in 'mods-clocks' node."
 				  " Can't get clock handle for %s\n",
 				  p->controller_name);
 		goto err;
@@ -473,10 +220,6 @@ int esc_mods_get_clock_handle(struct file *pfile,
 		mods_error_printk("clk (%s) not found\n", p->controller_name);
 	else {
 		p->clock_handle = mods_get_clock_handle(pclk);
-		size = sizeof(clock_list)/sizeof(clock_list[0]);
-		for (index = 0; index < size; ++index)
-			if (!strcmp(clock_list[index].name, p->controller_name))
-				clock_list[index].mhandle = p->clock_handle;
 		ret = OK;
 	}
 err:
@@ -780,49 +523,35 @@ int esc_mods_clock_reset_assert(struct file *pfile,
 		struct reset_control *prst = 0;
 		struct device_node *mods_np = 0;
 		struct property *pp = 0;
-		u32 index, size = 0;
 
-		mods_np = find_node("nvidia,tegra-mods");
+		mods_np = find_clocks_node("mods-clocks");
 		if (!mods_np || !of_device_is_available(mods_np)) {
-			mods_error_printk("'mods' node not found in DTB\n");
+			mods_error_printk("'mods-clocks' node not found in DTB\n");
 			goto err;
 		}
 		pp = of_find_property(mods_np, "reset-names", NULL);
 		if (IS_ERR(pp)) {
-			mods_error_printk("'reset-names' prop not found in 'mods' node."
+			mods_error_printk("'reset-names' prop not found in 'mods-clocks' node."
 					  " Can't get handle for reset dev %s\n",
 					  __clk_get_name(pclk));
 			goto err;
 		}
 
-		size = sizeof(clock_list)/sizeof(clock_list[0]);
-		for (index = 0; index < size; ++index)
-			if (clock_list[index].mhandle == p->clock_handle)
-				break;
-		if (index == size) {
-			clk_name = __clk_get_name(pclk);
-			for (index = 0; index < size; ++index) {
-				if (!strcmp(clock_list[index].name, clk_name)) {
-					clock_list[index].mhandle =
-						p->clock_handle;
-					break;
-				}
-			}
-		}
+		clk_name = __clk_get_name(pclk);
 
-		prst = of_reset_control_get(mods_np, clock_list[index].name);
+		prst = of_reset_control_get(mods_np, clk_name);
 		if (IS_ERR(prst)) {
 			mods_error_printk("reset device %s not found. Failed "
-					  "to reset\n", clock_list[index].name);
+					  "to reset\n", clk_name);
 			goto err;
 		}
 		ret = reset_control_assert(prst);
 		if (ret) {
 			mods_error_printk("failed to assert reset on '%s'\n",
-					  clock_list[index].name);
+					  clk_name);
 		} else {
 			mods_debug_printk(DEBUG_CLOCK, "asserted reset on '%s'",
-					  clock_list[index].name);
+					  clk_name);
 		}
 
 err:
@@ -857,49 +586,35 @@ int esc_mods_clock_reset_deassert(struct file *pfile,
 		struct reset_control *prst = 0;
 		struct device_node *mods_np = 0;
 		struct property *pp = 0;
-		u32 index, size = 0;
 
-		mods_np = find_node("nvidia,tegra-mods");
+		mods_np = find_clocks_node("mods-clocks");
 		if (!mods_np || !of_device_is_available(mods_np)) {
-			mods_error_printk("'mods' node not found in DTB\n");
+			mods_error_printk("'mods-clocks' node not found in DTB\n");
 			goto err;
 		}
 		pp = of_find_property(mods_np, "reset-names", NULL);
 		if (IS_ERR(pp)) {
-			mods_error_printk("'reset-names' prop not found in 'mods' node."
+			mods_error_printk("'reset-names' prop not found in 'mods-clocks' node."
 					  " Can't get handle for reset dev %s\n",
 					  __clk_get_name(pclk));
 			goto err;
 		}
 
-		size = sizeof(clock_list)/sizeof(clock_list[0]);
-		for (index = 0; index < size; ++index)
-			if (clock_list[index].mhandle == p->clock_handle)
-				break;
-		if (index == size) {
-			clk_name = __clk_get_name(pclk);
-			for (index = 0; index < size; ++index) {
-				if (!strcmp(clock_list[index].name, clk_name)) {
-					clock_list[index].mhandle =
-						p->clock_handle;
-					break;
-				}
-			}
-		}
+		clk_name = __clk_get_name(pclk);
 
-		prst = of_reset_control_get(mods_np, clock_list[index].name);
+		prst = of_reset_control_get(mods_np, clk_name);
 		if (IS_ERR(prst)) {
 			mods_error_printk("reset device %s not found. Failed "
-					  "to reset\n", clock_list[index].name);
+					  "to reset\n", clk_name);
 			goto err;
 		}
 		ret = reset_control_deassert(prst);
 		if (ret) {
 			mods_error_printk("failed to assert reset on '%s'\n",
-					  clock_list[index].name);
+					  clk_name);
 		} else {
 			mods_debug_printk(DEBUG_CLOCK, "deasserted reset on '%s'",
-					  clock_list[index].name);
+					  clk_name);
 		}
 
 err:
