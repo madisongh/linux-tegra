@@ -1,7 +1,7 @@
 /*
  * mods_debugfs.c - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -295,7 +295,7 @@ static int mods_dc_border_get(void *data, u64 *val)
 	if (!dc->enabled)
 		*val = 0ULL;
 	else
-		*val = (u64)tegra_dc_readl(dc, blender_reg);
+		*val = (u64)tegra_dc_readl_exported(dc, blender_reg);
 	return 0;
 }
 static int mods_dc_border_set(void *data, u64 val)
@@ -310,8 +310,8 @@ static int mods_dc_border_set(void *data, u64 val)
 		return 0;
 	mutex_lock(&dc->lock);
 	tegra_dc_get(dc);
-	tegra_dc_writel(dc, val, blender_reg);
-	tegra_dc_writel(dc, GENERAL_ACT_REQ, DC_CMD_STATE_CONTROL);
+	tegra_dc_writel_exported(dc, val, blender_reg);
+	tegra_dc_writel_exported(dc, GENERAL_ACT_REQ, DC_CMD_STATE_CONTROL);
 	tegra_dc_put(dc);
 	mutex_unlock(&dc->lock);
 	return 0;
@@ -325,7 +325,7 @@ static int mods_sd_brightness_get(void *data, u64 *val)
 	if (!dc->enabled)
 		*val = 0ULL;
 	else {
-		*val = (u64)tegra_dc_readl(dc, DC_DISP_SD_BL_CONTROL);
+		*val = (u64)tegra_dc_readl_exported(dc, DC_DISP_SD_BL_CONTROL);
 		*val = SD_BLC_BRIGHTNESS(*val);
 	}
 	return 0;
@@ -339,7 +339,7 @@ static int mods_sd_pixel_count_get(void *data, u64 *val)
 	if (!dc->enabled)
 		*val = 0ULL;
 	else
-		*val = (u64)tegra_dc_readl(dc, DC_DISP_SD_PIXEL_COUNT);
+		*val = (u64)tegra_dc_readl_exported(dc, DC_DISP_SD_PIXEL_COUNT);
 	return 0;
 }
 DEFINE_SIMPLE_ATTRIBUTE(mods_sd_pixel_count_fops, mods_sd_pixel_count_get,
@@ -353,7 +353,7 @@ static int mods_sd_hw_k_rgb_show(struct seq_file *s, void *unused)
 	if (!dc->enabled)
 		val = 0U;
 	else
-		val = tegra_dc_readl(dc, DC_DISP_SD_HW_K_VALUES);
+		val = tegra_dc_readl_exported(dc, DC_DISP_SD_HW_K_VALUES);
 
 	seq_printf(s, "%u %u %u\n", SD_HW_K_R(val), SD_HW_K_G(val),
 		SD_HW_K_B(val));
@@ -383,7 +383,8 @@ static int mods_sd_histogram_show(struct seq_file *s, void *unused)
 		if (!dc->enabled)
 			val = 0U;
 		else
-			val = tegra_dc_readl(dc, DC_DISP_SD_HISTOGRAM(i));
+			val = tegra_dc_readl_exported(dc,
+				DC_DISP_SD_HISTOGRAM(i));
 		seq_printf(s, "%u %u %u %u\n",
 			SD_HISTOGRAM_BIN_0(val),
 			SD_HISTOGRAM_BIN_1(val),
@@ -446,7 +447,7 @@ static int mods_dc_oc_show(struct seq_file *s, void *unused)
 	if (!dc->enabled)
 		val = 0U;
 	else
-		val = tegra_dc_readl(dc, DC_DISP_CSC2_CONTROL);
+		val = tegra_dc_readl_exported(dc, DC_DISP_CSC2_CONTROL);
 #else
 	val = 0U;
 #endif
@@ -508,8 +509,9 @@ static ssize_t mods_dc_oc_write(struct file *file, const char __user *user_buf,
 
 		mutex_lock(&dc->lock);
 		tegra_dc_get(dc);
-		tegra_dc_writel(dc, val, DC_DISP_CSC2_CONTROL);
-		tegra_dc_writel(dc, GENERAL_ACT_REQ, DC_CMD_STATE_CONTROL);
+		tegra_dc_writel_exported(dc, val, DC_DISP_CSC2_CONTROL);
+		tegra_dc_writel_exported(dc, GENERAL_ACT_REQ,
+				DC_CMD_STATE_CONTROL);
 		tegra_dc_put(dc);
 		mutex_unlock(&dc->lock);
 	}
@@ -548,7 +550,7 @@ static int mods_dc_crc_latched_show(struct seq_file *s, void *unused)
 #ifdef CONFIG_TEGRA_DC_INTERLACE
 	{
 		u32 val;
-		val = tegra_dc_readl(dc, DC_DISP_INTERLACE_CONTROL);
+		val = tegra_dc_readl_exported(dc, DC_DISP_INTERLACE_CONTROL);
 		if (val & INTERLACE_MODE_ENABLE)
 			field = (val & INTERLACE_STATUS_FIELD_2) ? 1 : 0;
 	}

@@ -1,7 +1,7 @@
 /*
  * mods_tegradc.c - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2014-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2014-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -259,10 +259,10 @@ int esc_mods_tegra_dc_setup_sd(struct file *fp,
 #endif
 #if defined(CONFIG_ARCH_TEGRA_12x_SOC)
 	tegra_dc_io_start(dc);
-	val = tegra_dc_readl(dc, DC_DISP_SD_CONTROL);
+	val = tegra_dc_readl_exported(dc, DC_DISP_SD_CONTROL);
 	val &= ~SD_KINIT_BIAS(0);
 	val &= ~SD_CORRECTION_MODE_MAN;
-	tegra_dc_writel(dc, val | SD_KINIT_BIAS(args->k_init_bias),
+	tegra_dc_writel_exported(dc, val | SD_KINIT_BIAS(args->k_init_bias),
 		DC_DISP_SD_CONTROL);
 	tegra_dc_io_end(dc);
 #endif
@@ -270,7 +270,8 @@ int esc_mods_tegra_dc_setup_sd(struct file *fp,
 	if (dc->enabled) {
 		mutex_lock(&dc->lock);
 		tegra_dc_get(dc);
-		tegra_dc_writel(dc, GENERAL_ACT_REQ, DC_CMD_STATE_CONTROL);
+		tegra_dc_writel_exported(dc, GENERAL_ACT_REQ,
+				DC_CMD_STATE_CONTROL);
 		tegra_dc_put(dc);
 		mutex_unlock(&dc->lock);
 	}
