@@ -70,12 +70,16 @@ X:	arch/arm64/mach-tegra/
 X:	arch/arm64/include/asm/mach/
 X:	arch/arm64/configs/
 
+ANDROID
+M:	Sachin Nikam <snikam@nvidia.com>
+F:	drivers/android/
+
 AUDIO
 M:	Niranjan Wartikar <nwartikar@nvidia.com>
+M:	Sharad Gupta <sharadg@nvidia.com>
 L:	sw-mobile-audio-arch@exchange.nvidia.com
 S:	Supported
-F:	sound/soc/tegra/*
-F:	sound/soc/tegra-alt/*
+F:	sound/
 
 AUDIO_AUTO
 M:	Nitin Pai <npai@nvidia.com>
@@ -103,6 +107,7 @@ F:	drivers/pci/host/pci-tegra.c
 F:	drivers/base/regmap/regmap-mmio.c
 F:	drivers/i2c/*
 F:	drivers/i2c/busses/*
+F:	drivers/misc/inter-tegra/inter_tegra_spi.c
 F:	drivers/mfd/aat2870-core.c
 F:	drivers/mfd/max77663-core.c
 F:	drivers/mfd/max8831.c
@@ -121,14 +126,20 @@ F:	drivers/video/backlight/pwm_bl.c
 F:	drivers/video/backlight/tegra_pwm_bl.c
 
 CAMERA
-M:	Nicholas Haemel <nhaemel@nvidia.com>
 M:	Jihoon Bang <jbang@nvidia.com>
+M:	Nicholas Haemel <nhaemel@nvidia.com>
 M:	Shantanu Nath <snath@nvidia.com>
 L:	sw-mobile-camera@exchange.nvidia.com
 S:	Supported
+F:	drivers/media/i2c/*
 F:	drivers/media/platform/soc_camera/tegra_camera/*
 F:	drivers/media/platform/tegra/*
 F:	drivers/media/platform/tegra/cam_dev/*
+F:	drivers/media/platform/tegra/camera/
+F:	drivers/media/platform/tegra/vi/*
+F:	drivers/media/platform/tegra/vivid/*
+F:	drivers/media/usb/uvc/*
+F:	drivers/media/v4l2-core/*
 F:	drivers/video/tegra/camera/*
 F:	drivers/platform/tegra/csi.c
 
@@ -137,10 +148,14 @@ M:	Krishna Thota <kthota@nvidia.com>
 L:      sw-mobile-comms-hdc@exchange.nvidia.com
 S:	Supported
 F:	drivers/misc/tegra-baseband/*
+F:	drivers/net/
+F:	include/linux/netdevice.h
+F:	include/net/*
+F:	net/
 
 CPU
-M:	Bo Yan <byan@nvidia.com>
 M:	Alexander Van Brunt <avanbrunt@nvidia.com>
+M:	Bo Yan <byan@nvidia.com>
 L:	sw-mobile-cpu@exchange.nvidia.com
 S:	Supported
 F:	arch/arm64/mach-tegra/denver-hardwood.c
@@ -158,24 +173,26 @@ F:	drivers/clocksource/tegra-tsc-timers.c
 F:	drivers/clocksource/tegra-wakeup-nvtimers.c
 F:	drivers/clocksource/tegra210-timer.c
 F:	drivers/cpuidle/denver-cpuidle.c
-F:	drivers/irqchip/irq-tegra.c
+F:	drivers/hwtracing/*
+F:	drivers/irqchip/*
 F:	drivers/media/platform/tegra/nvavp/*
 F:	drivers/media/platform/tegra/nvavp-virt/*
+F:	drivers/perf/arm_pmu.c
 F:	drivers/platform/tegra/asim.c
 F:	drivers/platform/tegra/board-common.c
 F:	drivers/platform/tegra/bond_out.c
 F:	drivers/platform/tegra/flowctrl.c
 F:	drivers/platform/tegra/mselect.c
 F:	drivers/misc/tegra_timerinfo.c
-F:	drivers/platform/tegra/tegra_fiq_debugger.c
-F:	drivers/platform/tegra/tegra_ptm*.c
-F:	drivers/platform/tegra/denver_mca.c
-F:	drivers/platform/tegra/tegra_serr.c
+F:	drivers/platform/tegra/*
+F:	drivers/staging/android/fiq_debugger/*
+F:	include/asm-generic/*
 
 DISPLAY
 M:	Mitch Luban <mluban@nvidia.com>
 M:	Venu Byravarasu <vbyravarasu@nvidia.com>
 M:	Jon Mayo <jmayo@nvidia.com>
+M:	Ujwal Patel <ujwalp@nvidia.com>
 L:	tegra-display-core@exchange.nvidia.com
 S:	Supported
 F:	arch/arm/mach-tegra/panel-*.c
@@ -197,9 +214,10 @@ L:	sw-mobile-platform@exchange.nvidia.com
 S:	Supported
 F:	arch/arm/boot/dts/
 F:	arch/arm64/boot/dts/
+F:	drivers/of/
 
 HDCP
-M:	Vincent Chen <vinchen@nvidia.com>
+M:	Vincent Chen <zochen@nvidia.com>
 M:	Sharath Sarangpur <ssarangpur@nvidia.com>
 L:	sw-mobile-security@exchange.nvidia.com
 S:	Supported
@@ -231,6 +249,22 @@ F:	drivers/platform/tegra/tegra-ivc.c
 F:	drivers/virt/tegra/ivc-cdev.c
 F:	drivers/virt/tegra/ivcbench_cli.c
 
+KERNEL-CORE
+M:	Bharat Nihalani <bnihalani@nvidia.com>
+M:	Yu-Huan Hsu <YHsu@nvidia.com>
+F:	drivers/base/core.c
+F:	drivers/base/devres.c
+F:	drivers/base/firmware_class.c
+F:	drivers/base/regmap/regcache.c
+F:	include/linux/blk-cgroup.h
+F:	include/linux/fixp-arith.h
+F:	include/linux/genhd.h
+F:	include/linux/log2.h
+F:	include/trace/*
+F:	ipc/*
+F:	kernel/
+F:	lib/
+
 MEMORY
 M:	Krishna Reddy <vdumpa@nvidia.com>
 M:	Sri Krishna Chowdary <schowdary@nvidia.com>
@@ -239,12 +273,15 @@ S:	Supported
 F:	arch/arm/mach-tegra/board-*-memory.c
 F:	arch/arm/mm/*
 F:	arch/arm64/mm/*
+F:	drivers/base/cacheinfo.c
 F:	drivers/base/dma-coherent.c
 F:	drivers/base/dma-contiguous.c
+F:	drivers/dma/*
 F:	drivers/of/of_reserved_mem.c
 F:	drivers/gpu/ion/*
 F:	drivers/dma-buf/*
 F:	drivers/iommu/*
+F:	drivers/md/*
 F:	drivers/memory/*
 F:	drivers/platform/tegra/iommu.c
 F:	drivers/platform/tegra/mc/*
@@ -252,6 +289,8 @@ F:	drivers/staging/android/ion/*
 F:	drivers/staging/android/ion/tegra/*
 F:	drivers/video/tegra/nvmap/*
 F:	drivers/platform/tegra/iommu.c
+F:	include/linux/mm.h
+F:	include/linux/vmstat.h
 F:	mm/*
 
 NVDUMPER
@@ -259,6 +298,11 @@ M:	Mark Peters <mpeters@nvidia.com>
 M:	Yifei Wan <ywan@nvidia.com>
 S:	Supported
 F:	drivers/platform/tegra/nvdumper/*
+
+PCI
+M:	Vidya Sagar <vidyas@nvidia.com>
+F:	drivers/nvme/host/pci.c
+F:	drivers/pci/pci.c
 
 PLATFORM
 M:	Mallikarjun Kasoju <mkasoju@nvidia.com>
@@ -270,15 +314,15 @@ F:	arch/arm/mach-tegra/baseband-xmm-power.c
 F:	arch/arm/mach-tegra/board-common.c
 F:	arch/arm/mach-tegra/board-info.c
 F:	arch/arm/mach-tegra/kfuse.c
+F:	drivers/base/platform.c
 F:	drivers/misc/tegra-fuse/tegra_fuse.c
-F:	drivers/gpio/gpio-palmas.c
-F:	drivers/gpio/gpio-tegra.c
+F:	drivers/gpio/*
 F:	drivers/hwmon/*
 F:	drivers/leds/leds-max8831.c
 F:	drivers/misc/bcm4329_rfkill.c
 F:	drivers/misc/max1749.c
 F:	drivers/misc/nct1008.c
-F:	drivers/pinctrl/pinctrl-*.c
+F:	drivers/pinctrl/*
 F:	drivers/platform/tegra/kfuse.c
 F:	drivers/usb/serial/baseband_usb_chr.c
 
@@ -293,9 +337,11 @@ F:	drivers/regulator/
 F:	drivers/extcon/
 
 POWER: CLOCKS AND VOLTAGE
-M:	Matthew Longnecker <mlongnecker@nvidia.com>
 M:	Aleksandr Frid <afrid@nvidia.com>
+M:	Matthew Longnecker <mlongnecker@nvidia.com>
 L:	sw-mobile-clocks@exchange.nvidia.com
+F:	drivers/base/power/*
+F:	drivers/clk/*
 F:	drivers/clk/tegra/*
 F:	drivers/platform/tegra/*actmon*
 F:	drivers/platform/tegra/*clock*
@@ -330,12 +376,15 @@ F:	drivers/platform/tegra/*throttle.c
 F:	drivers/thermal/
 
 POWER: EDP AND FRIENDS
+M:	Jonathan Hunter <jonathanh@nvidia.com>
 M:	Matthew Longnecker <mlongnecker@nvidia.com>
 L:	mobile-sys-edp@exchange.nvidia.com
 S:	Supported
 F:	drivers/edp/
 F:	drivers/misc/tegra_ppm.c
 F:	drivers/platform/tegra/*edp.c
+F:	drivers/soc/tegra/sysedp/
+F:	drivers/soc/tegra/*edp*
 F:	include/linux/tegra_ppm.h
 
 POWER: GATING AND STATES
@@ -368,24 +417,27 @@ F:	kernel/sysctl.c
 F:	kernel/time/tick-sched.c
 
 SECURE OS
-M:	Vincent Chen <vinchen@nvidia.com>
+M:	Vincent Chen <zochen@nvidia.com>
 L:	TMK@exchange.nvidia.com
 S:	Supported
 F:	security/tlk_driver/
 
 SECURITY
-M:	Vincent Chen <vinchen@nvidia.com>
+M:	Vincent Chen <zochen@nvidia.com>
 L:	sw-mobile-security@exchange.nvidia.com
 S:	Supported
+F:	crypto/*
 F:	drivers/crypto/*
 F:	drivers/misc/tegra-cryptodev.c
+F:	include/crypto/*
+F:	security/
 
 SENSORS AND INPUT
 M:	Robert Collins <rcollins@nvidia.com>
 L:	sw-mobile-sensors@exchange.nvidia.com
 S:	Supported
-F:	arch/arm/mach-tegra/board-*-sensors.c
-F:	arch/arm/mach-tegra/board-touch-*.c
+F:	drivers/hid/*
+F:	drivers/iio/common/nvs/*
 F:	drivers/iio/imu/*
 F:	drivers/iio/light/*
 F:	drivers/iio/magnetometer/*
@@ -393,16 +445,29 @@ F:	drivers/iio/pressure/*
 F:	drivers/input/misc/compass/*
 F:	drivers/input/misc/mpu/*
 F:	drivers/input/misc/pressure/*
+F:	drivers/input/*
+F:	drivers/input/misc/*
+F:	drivers/misc/nvs/*
+F:	drivers/misc/nvs-dfsh/*
 F:	drivers/staging/iio/*
 
 STORAGE
 M:	Venu Byravarasu <vbyravarasu@nvidia.com>
+M:	Pavan Kunapuli <pkunapuli@nvidia.com>
 M:	Sumeet Gupta <sumeetg@nvidia.com>
 L:	sw-mobile-system@exchange.nvidia.com
 S:	Supported
 F:	arch/arm/mach-tegra/board-*-sdhci.c
+F:	block/*
+F:	drivers/ata/*
+F:	drivers/mmc/card/*
 F:	drivers/mmc/host/*
 F:	drivers/mtd/*
+F:	drivers/nvme/host/scsi.c
+F:	drivers/scsi/*
+F:	drivers/target/*
+F:	include/linux/fs.h
+F:	fs/
 
 SYSTEM
 M:	Laxman Dewangan <ldewangan@nvidia.com>
@@ -437,10 +502,16 @@ L:	usb3-sweng@exchange.nvidia.com
 S:	Supported
 F:	drivers/mailbox/tegra-xusb-mailbox.c
 F:	drivers/misc/tegra-baseband/tegra_usb_modem_power.c
+F:	drivers/usb/gadget/function/*
+F:	drivers/usb/serial/*
 F:	drivers/usb/gadget/tegra_udc.c
 F:	drivers/usb/gadget/udc/tegra_xudc.c
 F:	drivers/usb/host/ehci-tegra.c
 F:	drivers/usb/host/xhci-tegra*
 F:	drivers/usb/phy/tegra*otg.c
 F:	drivers/usb/phy/tegra*usb_phy.c
+
+VIRTIO
+M:	Vladislav Buzov <vbuzov@nvidia.com>
+F:	drivers/virtio/*
 
