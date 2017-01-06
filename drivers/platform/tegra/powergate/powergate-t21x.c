@@ -174,8 +174,8 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 	[TEGRA_POWERGATE_VE] = {
 		.name = "ve",
 		.clk_info = {
-			[0] = { .clk_name = "ispa.isp.cbus", .clk_type = CLK_ONLY },
-			[1] = { .clk_name = "vi_v4l2.cbus", .clk_type = CLK_ONLY },
+			[0] = { .clk_name = "ispa", .clk_type = CLK_ONLY },
+			[1] = { .clk_name = "vi", .clk_type = CLK_ONLY },
 			[2] = { .clk_name = "csi", .clk_type = CLK_ONLY },
 			[3] = { .clk_name = "vii2c", .clk_type = CLK_ONLY },
 			[4] = { .clk_name = "cilab", .clk_type = CLK_ONLY },
@@ -449,7 +449,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 	[TEGRA_POWERGATE_VE2] = {
 		.name = "ve2",
 		.clk_info = {
-			[0] = { .clk_name = "ispb.isp.cbus", .clk_type = CLK_ONLY },
+			[0] = { .clk_name = "ispb", .clk_type = CLK_ONLY },
 		},
 		.slcg_info = {
 			[0] = { .clk_name = "mc_capa" },

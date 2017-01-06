@@ -2682,9 +2682,9 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "aclk", .dt_id = TEGRA210_CLK_ACLK },
 	{ .con_id = "la", .dt_id = TEGRA210_CLK_LA },
 	{ .con_id = "se", .dt_id = TEGRA210_CLK_SE },
-	{ .con_id = "vi_v4l2.cbus", .dt_id = TEGRA210_CLK_VI_V4L2_CBUS },
-	{ .con_id = "ispa.isp.cbus", .dt_id = TEGRA210_CLK_ISPA_ISP_CBUS },
-	{ .con_id = "ispb.isp.cbus", .dt_id = TEGRA210_CLK_ISPB_ISP_CBUS },
+	{ .con_id = "vi_v4l2", .dt_id = TEGRA210_CLK_VI_V4L2_CBUS },
+	{ .con_id = "ispa", .dt_id = TEGRA210_CLK_ISPA_ISP_CBUS },
+	{ .con_id = "ispb", .dt_id = TEGRA210_CLK_ISPB_ISP_CBUS },
 };
 
 static struct tegra_audio_clk_info tegra210_audio_plls[] = {
@@ -3387,7 +3387,7 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 	sbus_cbus->u.system.apb_bus = __clk_get_hw(clk);
 
 	clk = tegra_clk_register_cbus("cbus", "pll_c", 0, "pll_p", 0,
-					1000000000);
+					307200000);
 	clk_register_clkdev(clk, "cbus", NULL);
 	clks[TEGRA210_CLK_CBUS] = clk;
 
@@ -3574,7 +3574,6 @@ static struct tegra_clk_init_table init_table[] __initdata = {
 	{ TEGRA210_CLK_MC_CDPA, TEGRA210_CLK_CLK_MAX, 0, 1},
 	{ TEGRA210_CLK_SDMMC1, TEGRA210_CLK_PLL_P, 204000000, 0},
 	{ TEGRA210_CLK_SDMMC2, TEGRA210_CLK_PLL_P, 204000000, 0},
-	{ TEGRA210_CLK_PLL_C, TEGRA210_CLK_CLK_MAX, 800000000, 0},
 	/* This MUST be the last entry. */
 	{ TEGRA210_CLK_CLK_MAX, TEGRA210_CLK_CLK_MAX, 0, 0 },
 };
