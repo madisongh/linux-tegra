@@ -982,6 +982,31 @@ void tegra_pmc_reset_system(void)
 }
 EXPORT_SYMBOL(tegra_pmc_reset_system);
 
+int tegra_pmc_clear_reboot_reason(u32 reason)
+{
+	u32 val;
+
+	val = readl_relaxed(pmc->reboot_base +
+			    pmc->soc->rmap[TEGRA_PMC_SCRATCH0]);
+	val &= ~reason;
+	writel_relaxed(val, pmc->reboot_base +
+		       pmc->soc->rmap[TEGRA_PMC_SCRATCH0]);
+	return 0;
+}
+EXPORT_SYMBOL(tegra_pmc_clear_reboot_reason);
+
+int tegra_pmc_set_reboot_reason(u32 reason)
+{
+	u32 val;
+
+	val = readl_relaxed(pmc->reboot_base +
+			    pmc->soc->rmap[TEGRA_PMC_SCRATCH0]);
+	val |= reason;
+	writel_relaxed(val, pmc->reboot_base +
+		       pmc->soc->rmap[TEGRA_PMC_SCRATCH0]);
+	return 0;
+}
+EXPORT_SYMBOL(tegra_pmc_set_reboot_reason);
 
 /* UFS power gate control */
 void tegra_pmc_ufs_pwrcntrl_update(unsigned long mask, unsigned long val)
@@ -3625,6 +3650,7 @@ static const unsigned long tegra186_register_map[TEGRA_PMC_MAX_REG] = {
 	[TEGRA_PMC_IO_DPD_STATUS]		= 0x78,
 	[TEGRA_PMC_IO_DPD2_REQ]			= 0x7C,
 	[TEGRA_PMC_IO_DPD2_STATUS]		= 0x80,
+	[TEGRA_PMC_SCRATCH0]			= 0x2000,
 };
 
 static const struct tegra_pmc_soc tegra186_pmc_soc = {
