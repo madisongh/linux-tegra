@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -155,12 +155,14 @@ static int enable_cpu_clk(void)
 	old_parent = clk_get_parent(cpu_g);
 
 	ret = clk_set_parent(cpu_g, tfreq_priv->cpu_clk);
-	if (!ret) {
-		clk_put(cpu_g);
-		return 0;
-	}
+	if (ret)
+		goto set_rate_fail;
 
 	tegra_dvfs_set_dfll_range(cpu_g, DFLL_RANGE_ALL_RATES);
+
+	clk_put(cpu_g);
+
+	return 0;
 
 set_rate_fail:
 	clk_put(cpu_g);
