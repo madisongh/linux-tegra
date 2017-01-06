@@ -257,7 +257,7 @@ static struct adsp_dfs_policy dfs_policy =  {
 /*
  * update_freq - update adsp freq and ask adsp to change timer as
  * change in adsp freq.
- * tfreq - target frequency in KHz
+ * freq_khz - target frequency in KHz
  * return - final freq got set.
  *		- 0, incase of error.
  *
@@ -265,37 +265,38 @@ static struct adsp_dfs_policy dfs_policy =  {
  * change notifier, when freq is changed in hw
  *
  */
-static unsigned long update_freq(unsigned long tfreq)
+static unsigned long update_freq(unsigned long freq_khz)
 {
 	u32 efreq;
 	int index;
 	int ret;
-	unsigned long old_freq;
+	unsigned long tfreq_hz, old_freq_khz;
 	enum adsp_dfs_reply reply;
 	struct nvadsp_mbox *mbx = &policy->mbox;
 	struct nvadsp_drv_data *drv = dev_get_drvdata(device);
 
-	tfreq = adsp_get_target_freq(tfreq * 1000, &index);
-	if (!tfreq) {
+	tfreq_hz = adsp_get_target_freq(freq_khz * 1000, &index);
+	if (!tfreq_hz) {
 		dev_info(device, "unable get the target freq\n");
 		return 0;
 	}
 
-	old_freq = policy->cur;
+	old_freq_khz = policy->cur;
 
-	if ((tfreq / 1000) == old_freq) {
+	if ((tfreq_hz / 1000) == old_freq_khz) {
 		dev_dbg(device, "old and new target_freq is same\n");
 		return 0;
 	}
 
-	ret = adsp_clk_set_rate(policy, tfreq);
+	ret = adsp_clk_set_rate(policy, tfreq_hz);
 	if (ret) {
-		dev_err(device, "failed to set adsp freq:%d\n", ret);
+		dev_err(device, "failed to set adsp freq:%luhz err:%d\n",
+			tfreq_hz, ret);
 		policy->update_freq_flag = false;
 		return 0;
 	}
 
-	efreq = adsp_to_emc_freq(tfreq / 1000);
+	efreq = adsp_to_emc_freq(tfreq_hz / 1000);
 
 	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
 		tegra_bwmgr_set_emc(drv->bwmgr, efreq * 1000,
@@ -309,7 +310,7 @@ static unsigned long update_freq(unsigned long tfreq)
 		}
 	}
 
-	dev_dbg(device, "sending change in freq:%lu\n", tfreq);
+	dev_dbg(device, "sending change in freq(hz):%lu\n", tfreq_hz);
 	/*
 	 * Ask adsp to do action upon change in freq. ADSP and Host need to
 	 * maintain the same freq table.
@@ -346,18 +347,21 @@ static unsigned long update_freq(unsigned long tfreq)
 		dev_err(device, "Error: adsp freq change status\n");
 	}
 
-	dev_dbg(device, "%s:status received from adsp: %s, tfreq:%lu\n", __func__,
-		(policy->update_freq_flag == true ? "ACK" : "NACK"), tfreq);
+	dev_dbg(device, "%s:status received from adsp: %s, tfreq(hz):%lu\n",
+		__func__,
+		policy->update_freq_flag == true ? "ACK" : "NACK",
+		tfreq_hz);
 
 err_out:
 	if (!policy->update_freq_flag) {
-		ret = adsp_clk_set_rate(policy, old_freq * 1000);
+		ret = adsp_clk_set_rate(policy, old_freq_khz * 1000);
 		if (ret) {
-			dev_err(device, "failed to resume adsp freq:%lu\n", old_freq);
+			dev_err(device, "failed to resume adsp freq(khz):%lu\n",
+				old_freq_khz);
 			policy->update_freq_flag = false;
 		}
 
-		efreq = adsp_to_emc_freq(old_freq / 1000);
+		efreq = adsp_to_emc_freq(old_freq_khz);
 		if (IS_ENABLED(CONFIG_COMMON_CLK)) {
 			tegra_bwmgr_set_emc(drv->bwmgr, efreq * 1000,
 					    TEGRA_BWMGR_SET_EMC_FLOOR);
@@ -370,9 +374,9 @@ err_out:
 			}
 		}
 
-		tfreq = old_freq;
+		tfreq_hz = old_freq_khz * 1000;
 	}
-	return tfreq / 1000;
+	return tfreq_hz / 1000;
 }
 
 /* Set adsp dfs policy min freq(Khz) */
@@ -673,16 +677,18 @@ exit_out:
  *
  * @params:
  * freq: adsp freq in KHz
- * return - final freq got set.
- *		- 0, incase of error.
+ * return - final freq set
+ *	  - 0 incase of error
  *
  */
-unsigned long adsp_override_freq(unsigned long freq)
+unsigned long adsp_override_freq(unsigned long req_freq_khz)
 {
+	unsigned long ret_freq = 0, freq;
 	int index;
-	unsigned long ret_freq = 0;
 
 	mutex_lock(&policy_mutex);
+
+	freq = req_freq_khz;
 
 	if (freq < policy->min)
 		freq = policy->min;
@@ -691,7 +697,9 @@ unsigned long adsp_override_freq(unsigned long freq)
 
 	freq = adsp_get_target_freq(freq * 1000, &index);
 	if (!freq) {
-		dev_warn(device, "unable get the target freq\n");
+		dev_warn(device,
+			 "req freq:%lukhz. unable get the target freq.\n",
+			 req_freq_khz);
 		goto exit_out;
 	}
 	freq = freq / 1000; /* In KHz */
@@ -707,7 +715,9 @@ unsigned long adsp_override_freq(unsigned long freq)
 		policy->cur = ret_freq;
 
 	if (ret_freq != freq) {
-		dev_warn(device, "freq override to %lu rejected\n", freq);
+		dev_warn(device,
+			 "req freq:%lukhz. freq override to %lukhz rejected.\n",
+			 req_freq_khz, freq);
 		policy->ovr_freq = 0;
 		goto exit_out;
 	}
