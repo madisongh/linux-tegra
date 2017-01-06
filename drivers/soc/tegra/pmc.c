@@ -467,6 +467,15 @@ struct tegra_pmc_soc {
 	bool has_gpu_clamps;
 	bool has_ps18;
 	bool has_bootrom_command;
+	bool has_pclk_clock;
+	bool has_interrupt_polarity_support;
+	bool has_reboot_base_address;
+	bool show_reset_status;
+	bool skip_lp0_vector_setup;
+	bool skip_legacy_pmc_init;
+	bool skip_power_gate_debug_fs_init;
+	bool skip_restart_register;
+	bool skip_arm_pm_restart;
 };
 
 struct tegra_io_pad_regulator {
@@ -478,6 +487,7 @@ struct tegra_io_pad_regulator {
 /**
  * struct tegra_pmc - NVIDIA Tegra PMC
  * @base: pointer to I/O remapped register region
+ * @reboot_base: pointer to I/O remapped register region for reboot address
  * @clk: pointer to pclk clock
  * @rate: currently configured rate of pclk
  * @suspend_mode: lowest suspend mode available
@@ -499,6 +509,7 @@ struct tegra_io_pad_regulator {
 struct tegra_pmc {
 	struct device *dev;
 	void __iomem *base;
+	void __iomem *reboot_base;
 	struct clk *clk;
 
 	const struct tegra_pmc_soc *soc;
@@ -888,6 +899,9 @@ static const struct file_operations powergate_fops = {
 static int tegra_powergate_debugfs_init(void)
 {
 	struct dentry *d;
+
+	if (pmc->soc->skip_power_gate_debug_fs_init)
+		return 0;
 
 	d = debugfs_create_file("powergate", S_IRUGO, NULL, NULL,
 				&powergate_fops);
@@ -2498,6 +2512,9 @@ static const struct pinconf_ops tegra_pmc_io_pads_pinconf_ops = {
 
 static int tegra_pmc_io_pads_pinctrl_init(struct tegra_pmc *pmc)
 {
+	if (!pmc->soc->num_descs)
+		return 0;
+
 	pmc->pinctrl_desc.name = "pinctr-pmc-io-pads";
 	pmc->pinctrl_desc.pctlops = &tegra_pmc_io_pads_pinctrl_ops;
 	pmc->pinctrl_desc.confops = &tegra_pmc_io_pads_pinconf_ops;
@@ -2704,6 +2721,9 @@ static void tegra_pmc_init(struct tegra_pmc *pmc)
 {
 	u32 value;
 
+	if (pmc->soc->skip_legacy_pmc_init)
+		return;
+
 	/* Always enable CPU power request */
 	value = tegra_pmc_readl(TEGRA_PMC_CNTRL);
 	value |= PMC_CNTRL_CPU_PWRREQ_OE;
@@ -2828,11 +2848,25 @@ static int tegra_pmc_probe(struct platform_device *pdev)
 
 	iounmap(base);
 
-	pmc->clk = devm_clk_get(&pdev->dev, "pclk");
-	if (IS_ERR(pmc->clk)) {
-		err = PTR_ERR(pmc->clk);
-		dev_err(&pdev->dev, "failed to get pclk: %d\n", err);
-		return err;
+	if (pmc->soc->has_reboot_base_address) {
+		base =  pmc->reboot_base;
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+		pmc->reboot_base = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(pmc->reboot_base))
+			return PTR_ERR(pmc->reboot_base);
+
+		iounmap(base);
+	} else {
+		pmc->reboot_base = pmc->base;
+	}
+
+	if (pmc->soc->has_pclk_clock) {
+		pmc->clk = devm_clk_get(&pdev->dev, "pclk");
+		if (IS_ERR(pmc->clk)) {
+			err = PTR_ERR(pmc->clk);
+			dev_err(&pdev->dev, "failed to get pclk: %d\n", err);
+			return err;
+		}
 	}
 
 	pmc->dev = &pdev->dev;
@@ -2847,11 +2881,13 @@ static int tegra_pmc_probe(struct platform_device *pdev)
 			return err;
 	}
 
-	err = register_restart_handler(&tegra_pmc_restart_handler);
-	if (err) {
-		dev_err(&pdev->dev, "unable to register restart handler, %d\n",
-			err);
-		return err;
+	if (!pmc->soc->skip_restart_register) {
+		err = register_restart_handler(&tegra_pmc_restart_handler);
+		if (err) {
+			dev_err(&pdev->dev, "unable to register restart handler, %d\n",
+				err);
+			return err;
+		}
 	}
 
 	err = tegra_pmc_io_pads_pinctrl_init(pmc);
@@ -2867,7 +2903,7 @@ static int tegra_pmc_probe(struct platform_device *pdev)
 		tegra_pmc_init_boorom_cmds(&pdev->dev);
 
 	/* handle PMC reboot reason with PSCI */
-	if (arm_pm_restart)
+	if (!pmc->soc->skip_arm_pm_restart && arm_pm_restart)
 		psci_handle_reboot_cmd = tegra_pmc_program_reboot_reason;
 
 	return 0;
@@ -3219,6 +3255,15 @@ static const struct tegra_pmc_soc tegra210_pmc_soc = {
 	.has_gpu_clamps = true,
 	.has_ps18 = true,
 	.has_bootrom_command = true,
+	.has_pclk_clock = true,
+	.has_interrupt_polarity_support = true,
+	.show_reset_status = false,
+	.has_reboot_base_address = false,
+	.skip_lp0_vector_setup = false,
+	.skip_legacy_pmc_init = false,
+	.skip_power_gate_debug_fs_init = false,
+	.skip_restart_register = false,
+	.skip_arm_pm_restart = false,
 	.num_io_pads = ARRAY_SIZE(tegra210_io_pads),
 	.io_pads = tegra210_io_pads,
 	.num_descs = ARRAY_SIZE(tegra210_io_pads_pinctrl_desc),
@@ -3226,7 +3271,26 @@ static const struct tegra_pmc_soc tegra210_pmc_soc = {
 	.rmap = tegra210_register_map,
 };
 
+/* Tegra 186 register map */
+static const unsigned long tegra186_register_map[TEGRA_PMC_MAX_REG] = {
+};
+
+static const struct tegra_pmc_soc tegra186_pmc_soc = {
+	.has_tsense_reset = false,
+	.has_pclk_clock = false,
+	.has_interrupt_polarity_support = false,
+	.show_reset_status = true,
+	.has_reboot_base_address = true,
+	.skip_lp0_vector_setup = true,
+	.skip_legacy_pmc_init = true,
+	.skip_power_gate_debug_fs_init = true,
+	.skip_restart_register = true,
+	.skip_arm_pm_restart = true,
+	.rmap = tegra186_register_map,
+};
+
 static const struct of_device_id tegra_pmc_match[] = {
+	{ .compatible = "nvidia,tegra186-pmc", .data = &tegra186_pmc_soc },
 	{ .compatible = "nvidia,tegra210-pmc", .data = &tegra210_pmc_soc },
 	{ .compatible = "nvidia,tegra132-pmc", .data = &tegra124_pmc_soc },
 	{ .compatible = "nvidia,tegra124-pmc", .data = &tegra124_pmc_soc },
@@ -3331,24 +3395,38 @@ static int __init tegra_pmc_early_init(void)
 		return -ENXIO;
 	}
 
+	if (pmc->soc && pmc->soc->has_reboot_base_address) {
+		pmc->reboot_base = of_iomap(np, 1);
+		if (!pmc->reboot_base) {
+			pr_err("Failed to map reboot PMC registers\n");
+			return -ENXIO;
+		}
+	} else {
+		pmc->reboot_base = pmc->base;
+	}
+
 	mutex_init(&pmc->powergates_lock);
 
 	/*
 	 * Invert the interrupt polarity if a PMC device tree node exists and
 	 * contains the nvidia,invert-interrupt property.
 	 */
-	invert = of_property_read_bool(np, "nvidia,invert-interrupt");
+	if (pmc->soc && pmc->soc->has_interrupt_polarity_support) {
+		invert = of_property_read_bool(np, "nvidia,invert-interrupt");
+		value = tegra_pmc_readl(TEGRA_PMC_CNTRL);
 
-	value = tegra_pmc_readl(TEGRA_PMC_CNTRL);
+		if (invert)
+			value |= PMC_CNTRL_INTR_POLARITY;
+		else
+			value &= ~PMC_CNTRL_INTR_POLARITY;
 
-	if (invert)
-		value |= PMC_CNTRL_INTR_POLARITY;
-	else
-		value &= ~PMC_CNTRL_INTR_POLARITY;
-
-	tegra_pmc_writel(value, TEGRA_PMC_CNTRL);
+		tegra_pmc_writel(value, TEGRA_PMC_CNTRL);
+	}
 
 #ifdef CONFIG_PM_SLEEP
+	if (pmc->soc && pmc->soc->skip_lp0_vector_setup)
+		goto skip_lp0_setup;
+
 	tegra_lp0_wakeup.of_node = np;
 	INIT_LIST_HEAD(&tegra_lp0_wakeup.wake_list);
 
@@ -3358,6 +3436,7 @@ static int __init tegra_pmc_early_init(void)
 			pr_err("Failed to reserve lp0_vec %08llx@%08llx\n",
 			       (u64)pmc->lp0_vec_size,
 			       (u64)pmc->lp0_vec_phys);
+skip_lp0_setup:
 #endif
 
 	return 0;
