@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2017 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -2611,6 +2611,7 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "dmic3", .dt_id = TEGRA210_CLK_DMIC3 },
 	{ .con_id = "hda", .dt_id = TEGRA210_CLK_HDA },
 	{ .con_id = "hda2codec_2x", .dt_id = TEGRA210_CLK_HDA2CODEC_2X },
+	{ .con_id = "hda2hdmi", .dt_id = TEGRA210_CLK_HDA2HDMI },
 	{ .con_id = "sdmmc1", .dt_id = TEGRA210_CLK_SDMMC1 },
 	{ .con_id = "sdmmc2", .dt_id = TEGRA210_CLK_SDMMC2 },
 	{ .con_id = "sdmmc3", .dt_id = TEGRA210_CLK_SDMMC3 },
