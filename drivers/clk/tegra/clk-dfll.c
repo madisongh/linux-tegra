@@ -1872,7 +1872,7 @@ static int dfll_debug_init(struct tegra_dfll *td)
 				 td->debugfs_dir, td, &enable_fops))
 		goto err_out;
 
-	if (!debugfs_create_file("lock", S_IRUGO,
+	if (!debugfs_create_file("lock", S_IRUGO | S_IWUSR,
 				 td->debugfs_dir, td, &lock_fops))
 		goto err_out;
 
