@@ -6,7 +6,7 @@
  * Author:
  *	Erik Gilling <konkers@google.com>
  *
- * Copyright (c) 2010-2016, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2017, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -1354,8 +1354,9 @@ struct nvdisp_isoclient_bw_info {
 	tegra_isomgr_handle		isomgr_handle;
 	struct tegra_bwmgr_client	*bwmgr_handle;
 
-	struct nvdisp_bandwidth_config	*max_config;
+	struct nvdisp_bandwidth_config	max_config;
 	struct nvdisp_bandwidth_config	cur_config;
+	struct nvdisp_bandwidth_config	usr_config;
 
 	u32				available_bw;		/* KB/s */
 	u32				reserved_bw;		/* KB/s */
