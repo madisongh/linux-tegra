@@ -702,8 +702,10 @@ static int watchdog_release(struct inode *inode, struct file *file)
 	mutex_lock(&wd_data->lock);
 
 	wdd = wd_data->wdd;
-	if (!wdd)
-		goto done;
+	if (!wdd) {
+		mutex_unlock(&wd_data->lock);
+		return 0;
+	}
 
 	/*
 	 * We only stop the watchdog if we received the magic character
@@ -728,7 +730,6 @@ static int watchdog_release(struct inode *inode, struct file *file)
 	/* make sure that /dev/watchdog can be re-opened */
 	clear_bit(_WDOG_DEV_OPEN, &wd_data->status);
 
-done:
 	mutex_unlock(&wd_data->lock);
 	/*
 	 * Allow the owner module to be unloaded again unless the watchdog
