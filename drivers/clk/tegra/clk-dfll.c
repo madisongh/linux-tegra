@@ -960,7 +960,7 @@ static u32 dfll_set_force_output_value(struct tegra_dfll *td, u8 out_val)
 {
 	u32 val = dfll_readl(td, DFLL_OUTPUT_FORCE);
 
-	val |= (val & DFLL_OUTPUT_FORCE_ENABLE) | (out_val & OUT_MASK);
+	val = (val & DFLL_OUTPUT_FORCE_ENABLE) | (out_val & OUT_MASK);
 	dfll_writel(td, val, DFLL_OUTPUT_FORCE);
 	dfll_wmb(td);
 
@@ -1770,7 +1770,7 @@ static int attr_output_get(void *data, u64 *val)
 	reg = dfll_readl(td, DFLL_OUTPUT_FORCE);
 	if (reg & DFLL_OUTPUT_FORCE_ENABLE) {
 		*val = td->lut_uv[reg & DFLL_OUTPUT_FORCE_VALUE_MASK] / 1000;
-		return 0;
+		goto out;
 	}
 
 	dfll_set_monitor_mode(td, DFLL_OUTPUT_VALUE);
@@ -1778,11 +1778,48 @@ static int attr_output_get(void *data, u64 *val)
 
 	*val = td->lut_uv[reg] / 1000;
 
+out:
 	mutex_unlock(&td->lock);
 
 	return 0;
 }
 DEFINE_SIMPLE_ATTRIBUTE(attr_output_fops, attr_output_get, NULL, "%llu\n");
+
+static int attr_fout_mv_get(void *data, u64 *val)
+{
+	struct tegra_dfll *td = data;
+	u32 reg;
+
+	reg = dfll_readl(td, DFLL_OUTPUT_FORCE);
+	*val = td->lut_uv[reg & DFLL_OUTPUT_FORCE_VALUE_MASK] / 1000;
+
+	return 0;
+}
+
+static int attr_fout_mv_set(void *data, u64 val)
+{
+	struct tegra_dfll *td = data;
+
+	mutex_lock(&td->lock);
+
+	if (val) {
+		u8 out_value;
+
+		out_value = find_mv_out_cap(td, val);
+		if (td->pmu_if == TEGRA_DFLL_PMU_I2C)
+			out_value = td->lut[out_value];
+		dfll_set_force_output_value(td, out_value);
+		dfll_set_force_output_enabled(td, true);
+	} else {
+		dfll_set_force_output_enabled(td, false);
+	}
+
+	mutex_unlock(&td->lock);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(attr_fout_mv_fops, attr_fout_mv_get, attr_fout_mv_set,
+			"%llu\n");
 
 static int attr_registers_show(struct seq_file *s, void *data)
 {
@@ -1898,6 +1935,10 @@ static int dfll_debug_init(struct tegra_dfll *td)
 
 	if (!debugfs_create_file("output_mv", S_IRUGO,
 				 td->debugfs_dir, td, &attr_output_fops))
+		goto err_out;
+
+	if (!debugfs_create_file("force_out_mv", S_IRUGO | S_IWUSR,
+				 td->debugfs_dir, td, &attr_fout_mv_fops))
 		goto err_out;
 
 	debugfs_create_symlink("monitor", td->debugfs_dir, "rate");
