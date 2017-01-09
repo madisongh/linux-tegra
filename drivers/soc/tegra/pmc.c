@@ -2,7 +2,7 @@
  * drivers/soc/tegra/pmc.c
  *
  * Copyright (c) 2010 Google, Inc
- * Copyright (c) 2012-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@google.com>
@@ -950,6 +950,7 @@ int tegra_io_rail_power_on(int id)
 		return tegra_pmc_io_pad_low_power_disable("hdmi");
 	default:
 		return -EINVAL;
+	}
 }
 EXPORT_SYMBOL(tegra_pmc_io_pad_low_power_disable);
 
@@ -962,6 +963,7 @@ int tegra_io_rail_power_off(int id)
 		return tegra_pmc_io_pad_low_power_enable("hdmi");
 	default:
 		return -EINVAL;
+	}
 }
 EXPORT_SYMBOL(tegra_io_rail_power_off);
 #endif /* CONFIG_TEGRA_POWERGATE */
