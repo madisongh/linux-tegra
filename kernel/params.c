@@ -402,6 +402,7 @@ int param_set_invbool(const char *val, const struct kernel_param *kp)
 	bool boolval;
 	struct kernel_param dummy;
 
+	memset(&dummy, 0, sizeof(struct kernel_param));
 	dummy.arg = &boolval;
 	ret = param_set_bool(val, &dummy);
 	if (ret == 0)
@@ -459,6 +460,7 @@ static int param_array(struct module *mod,
 	struct kernel_param kp;
 	char save;
 
+	memset(&kp, 0, sizeof(struct kernel_param));
 	/* Get the name right for errors. */
 	kp.name = name;
 	kp.arg = elem;
