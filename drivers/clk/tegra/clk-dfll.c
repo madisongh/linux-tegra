@@ -1900,6 +1900,9 @@ static int dfll_debug_init(struct tegra_dfll *td)
 				 td->debugfs_dir, td, &attr_output_fops))
 		goto err_out;
 
+	debugfs_create_symlink("monitor", td->debugfs_dir, "rate");
+	debugfs_create_symlink("dvco_rate", td->debugfs_dir, "dvco_rate_min");
+
 	return 0;
 
 err_out:
