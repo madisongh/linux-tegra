@@ -1362,15 +1362,7 @@ static int dfll_enable(struct tegra_dfll *td)
 	return 0;
 }
 
-/**
- * tegra_dfll_lock - switch from open-loop to closed-loop mode
- * @td: DFLL instance
- *
- * Switch from OPEN_LOOP state to CLOSED_LOOP state. Returns 0 upon success,
- * -EINVAL if the DFLL's target rate hasn't been set yet, or -EPERM if the
- * DFLL is not currently in open-loop mode.
- */
-static int dfll_lock(struct tegra_dfll *td)
+static int _dfll_lock(struct tegra_dfll *td)
 {
 	struct dfll_rate_req *req = &td->last_req;
 
@@ -1390,12 +1382,10 @@ static int dfll_lock(struct tegra_dfll *td)
 		else
 			dfll_i2c_set_output_enabled(td, true);
 
-		mutex_lock(&td->lock);
 		dfll_set_mode(td, DFLL_CLOSED_LOOP);
 		dfll_set_close_loop_config(td, req);
 		dfll_set_frequency_request(td, req);
 		dfll_set_force_output_enabled(td, false);
-		mutex_unlock(&td->lock);
 
 		return 0;
 
@@ -1408,21 +1398,32 @@ static int dfll_lock(struct tegra_dfll *td)
 }
 
 /**
- * tegra_dfll_unlock - switch from closed-loop to open-loop mode
+ * tegra_dfll_lock - switch from open-loop to closed-loop mode
  * @td: DFLL instance
  *
- * Switch from CLOSED_LOOP state to OPEN_LOOP state. Returns 0 upon success,
- * or -EPERM if the DFLL is not currently in open-loop mode.
+ * Switch from OPEN_LOOP state to CLOSED_LOOP state. Returns 0 upon success,
+ * -EINVAL if the DFLL's target rate hasn't been set yet, or -EPERM if the
+ * DFLL is not currently in open-loop mode.
  */
-static int dfll_unlock(struct tegra_dfll *td)
+static int dfll_lock(struct tegra_dfll *td)
 {
+	int ret;
 
+	mutex_lock(&td->lock);
+
+	ret = _dfll_lock(td);
+
+	mutex_unlock(&td->lock);
+
+	return ret;
+}
+
+static int _dfll_unlock(struct tegra_dfll *td)
+{
 	switch (td->mode) {
 	case DFLL_CLOSED_LOOP:
-		mutex_lock(&td->lock);
 		dfll_set_open_loop_config(td);
 		dfll_set_mode(td, DFLL_OPEN_LOOP);
-		mutex_unlock(&td->lock);
 
 		if (td->pmu_if == TEGRA_DFLL_PMU_PWM)
 			tegra_dfll_pwm_output_disable();
@@ -1440,6 +1441,26 @@ static int dfll_unlock(struct tegra_dfll *td)
 			__func__, mode_name[td->mode]);
 		return -EPERM;
 	}
+}
+
+/**
+ * tegra_dfll_unlock - switch from closed-loop to open-loop mode
+ * @td: DFLL instance
+ *
+ * Switch from CLOSED_LOOP state to OPEN_LOOP state. Returns 0 upon success,
+ * or -EPERM if the DFLL is not currently in open-loop mode.
+ */
+static int dfll_unlock(struct tegra_dfll *td)
+{
+	int ret;
+
+	mutex_lock(&td->lock);
+
+	ret = _dfll_unlock(td);
+
+	mutex_unlock(&td->lock);
+
+	return ret;
 }
 
 /*
@@ -2650,7 +2671,7 @@ void tegra_dfll_suspend(struct platform_device *pdev)
 		dfll_set_close_loop_config(td, &td->last_req);
 		dfll_set_frequency_request(td, &td->last_req);
 
-		dfll_unlock(td);
+		_dfll_unlock(td);
 		break;
 	default:
 		break;
@@ -2691,7 +2712,7 @@ void tegra_dfll_resume(struct platform_device *pdev)
 		dfll_i2c_set_output_enabled(td, false);
 		break;
 	case DFLL_CLOSED_LOOP:
-		dfll_lock(td);
+		_dfll_lock(td);
 		break;
 	default:
 		break;
