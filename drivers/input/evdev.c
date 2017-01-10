@@ -1216,12 +1216,12 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
 		if (input_ff_effect_from_user(p, size, &effect))
 			return -EFAULT;
 
+		if (effect.id >= dev->ff->max_effects)
+			return -EINVAL;
+
 		error = input_ff_upload(dev, &effect, file);
 		if (error)
 			return error;
-
-		if (effect.id >= dev->ff->max_effects)
-			return -EINVAL;
 
 		if (put_user(effect.id, &(((struct ff_effect __user *)p)->id)))
 			return -EFAULT;
