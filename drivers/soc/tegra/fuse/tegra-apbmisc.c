@@ -157,7 +157,7 @@ static struct chip_revision tegra_chip_revisions[] = {
 
 void tegra_init_revision(void)
 {
-	u32 id, chipid, major, minor, subrev;
+	u32 id, chipid, major, minor, subrev, reg;
 	enum tegra_revision revision = TEGRA_REVISION_UNKNOWN;
 	char sub_type = 0;
 	int i;
@@ -166,6 +166,7 @@ void tegra_init_revision(void)
 	chipid = tegra_hidrev_get_chipid(id);
 	major = tegra_hidrev_get_majorrev(id);
 	minor = tegra_hidrev_get_minorrev(id);
+	pr_info("tegra-id: chipid=%x.\n", id);
 
 	/* For pre-silicon the major is 0, for silicon it is >= 1 */
 	if (major == 0) {
@@ -194,6 +195,7 @@ void tegra_init_revision(void)
 		sub_type = 'r';
 		break;
 	}
+	pr_info("tegra-id: opt_subrevision=%x.\n", subrev);
 
 	for (i = 0; i < ARRAY_SIZE(tegra_chip_revisions); i++) {
 		if ((chipid != tegra_chip_revisions[i].chipid) ||
