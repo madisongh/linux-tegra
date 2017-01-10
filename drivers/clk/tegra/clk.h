@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -832,6 +832,7 @@ enum shared_bus_users_mode {
 
 #define TEGRA_SHARED_BUS_RATE_LIMIT	BIT(0)
 #define TEGRA_SHARED_BUS_RETENTION	BIT(1)
+#define TEGRA_SHARED_BUS_RACE_TO_SLEEP	BIT(2)
 
 struct clk_div_sel {
 	struct clk_hw *src;

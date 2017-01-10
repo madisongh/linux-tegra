@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -107,12 +107,21 @@ static void cbus_restore(struct clk_hw *hw)
 		struct clk *client = user->u.shared_bus_user.client;
 
 		if (client) {
-			int div;
-			long new_rate;
+			unsigned long new_rate = user->u.shared_bus_user.rate;
 
 			cbus_switch_one(client, clk_get_parent(hw->clk));
-			div = parent_rate / user->u.shared_bus_user.rate;
-			new_rate = (parent_rate + div - 1) / div;
+
+			if ((user->flags & TEGRA_SHARED_BUS_RACE_TO_SLEEP) ||
+			    (new_rate > parent_rate)) {
+				clk_set_rate(client, parent_rate);
+				continue;
+			}
+
+			if (new_rate) {
+				int div = parent_rate / new_rate;
+
+				new_rate = (parent_rate + div - 1) / div;
+			}
 			clk_set_rate(client, new_rate);
 		}
 	}
