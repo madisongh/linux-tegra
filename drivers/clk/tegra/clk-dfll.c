@@ -1713,7 +1713,7 @@ static u64 dfll_read_monitor_rate(struct tegra_dfll *td)
 	return post_scaler_rate;
 }
 
-static int attr_enable_get(void *data, u64 *val)
+static int enable_get(void *data, u64 *val)
 {
 	struct tegra_dfll *td = data;
 
@@ -1721,16 +1721,15 @@ static int attr_enable_get(void *data, u64 *val)
 
 	return 0;
 }
-static int attr_enable_set(void *data, u64 val)
+static int enable_set(void *data, u64 val)
 {
 	struct tegra_dfll *td = data;
 
 	return val ? dfll_enable(td) : dfll_disable(td);
 }
-DEFINE_SIMPLE_ATTRIBUTE(enable_fops, attr_enable_get, attr_enable_set,
-			"%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(enable_fops, enable_get, enable_set, "%llu\n");
 
-static int attr_lock_get(void *data, u64 *val)
+static int lock_get(void *data, u64 *val)
 {
 	struct tegra_dfll *td = data;
 
@@ -1738,16 +1737,15 @@ static int attr_lock_get(void *data, u64 *val)
 
 	return 0;
 }
-static int attr_lock_set(void *data, u64 val)
+static int lock_set(void *data, u64 val)
 {
 	struct tegra_dfll *td = data;
 
 	return val ? dfll_lock(td) :  dfll_unlock(td);
 }
-DEFINE_SIMPLE_ATTRIBUTE(lock_fops, attr_lock_get, attr_lock_set,
-			"%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(lock_fops, lock_get, lock_set, "%llu\n");
 
-static int attr_rate_get(void *data, u64 *val)
+static int rate_get(void *data, u64 *val)
 {
 	struct tegra_dfll *td = data;
 
@@ -1756,15 +1754,15 @@ static int attr_rate_get(void *data, u64 *val)
 	return 0;
 }
 
-static int attr_rate_set(void *data, u64 val)
+static int rate_set(void *data, u64 val)
 {
 	struct tegra_dfll *td = data;
 
 	return dfll_request_rate(td, val);
 }
-DEFINE_SIMPLE_ATTRIBUTE(rate_fops, attr_rate_get, attr_rate_set, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(rate_fops, rate_get, rate_set, "%llu\n");
 
-static int attr_dvco_rate_min_get(void *data, u64 *val)
+static int dvco_rate_min_get(void *data, u64 *val)
 {
 	struct tegra_dfll *td = data;
 
@@ -1772,10 +1770,9 @@ static int attr_dvco_rate_min_get(void *data, u64 *val)
 
 	return 0;
 }
-DEFINE_SIMPLE_ATTRIBUTE(dvco_rate_min_fops, attr_dvco_rate_min_get,
-		NULL, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(dvco_rate_min_fops, dvco_rate_min_get, NULL, "%llu\n");
 
-static int attr_vmin_get(void *data, u64 *val)
+static int vmin_get(void *data, u64 *val)
 {
 	struct tegra_dfll *td = data;
 
@@ -1783,9 +1780,9 @@ static int attr_vmin_get(void *data, u64 *val)
 
 	return 0;
 }
-DEFINE_SIMPLE_ATTRIBUTE(attr_vmin_fops, attr_vmin_get, NULL, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(vmin_fops, vmin_get, NULL, "%llu\n");
 
-static int attr_vmax_get(void *data, u64 *val)
+static int vmax_get(void *data, u64 *val)
 {
 	struct tegra_dfll *td = data;
 
@@ -1793,9 +1790,9 @@ static int attr_vmax_get(void *data, u64 *val)
 
 	return 0;
 }
-DEFINE_SIMPLE_ATTRIBUTE(attr_vmax_fops, attr_vmax_get, NULL, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(vmax_fops, vmax_get, NULL, "%llu\n");
 
-static int attr_output_get(void *data, u64 *val)
+static int output_get(void *data, u64 *val)
 {
 	struct tegra_dfll *td = data;
 	u32 reg;
@@ -1818,9 +1815,9 @@ out:
 
 	return 0;
 }
-DEFINE_SIMPLE_ATTRIBUTE(attr_output_fops, attr_output_get, NULL, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(output_fops, output_get, NULL, "%llu\n");
 
-static int attr_fout_mv_get(void *data, u64 *val)
+static int fout_mv_get(void *data, u64 *val)
 {
 	struct tegra_dfll *td = data;
 	u32 reg;
@@ -1831,7 +1828,7 @@ static int attr_fout_mv_get(void *data, u64 *val)
 	return 0;
 }
 
-static int attr_fout_mv_set(void *data, u64 val)
+static int fout_mv_set(void *data, u64 val)
 {
 	struct tegra_dfll *td = data;
 
@@ -1853,10 +1850,9 @@ static int attr_fout_mv_set(void *data, u64 val)
 
 	return 0;
 }
-DEFINE_SIMPLE_ATTRIBUTE(attr_fout_mv_fops, attr_fout_mv_get, attr_fout_mv_set,
-			"%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(fout_mv_fops, fout_mv_get, fout_mv_set, "%llu\n");
 
-static int attr_registers_show(struct seq_file *s, void *data)
+static int registers_show(struct seq_file *s, void *data)
 {
 	u32 val, offs;
 	struct tegra_dfll *td = s->private;
@@ -1915,21 +1911,37 @@ static int attr_registers_show(struct seq_file *s, void *data)
 	return 0;
 }
 
-static int attr_registers_open(struct inode *inode, struct file *file)
+static int registers_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, attr_registers_show, inode->i_private);
+	return single_open(file, registers_show, inode->i_private);
 }
 
-static const struct file_operations attr_registers_fops = {
-	.open		= attr_registers_open,
+static const struct file_operations registers_fops = {
+	.open		= registers_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
+static struct {
+	char				*name;
+	umode_t				mode;
+	const struct file_operations	*fops;
+} dfll_debugfs_nodes[] = {
+	{ "enable", S_IRUGO | S_IWUSR, &enable_fops },
+	{ "lock", S_IRUGO | S_IWUSR, &lock_fops },
+	{ "force_out_mv", S_IRUGO | S_IWUSR, &fout_mv_fops },
+	{ "rate", S_IRUGO, &rate_fops },
+	{ "dvco_rate_min", S_IRUGO, &dvco_rate_min_fops },
+	{ "registers", S_IRUGO, &registers_fops },
+	{ "vmin_mv", S_IRUGO, &vmin_fops },
+	{ "vmax_mv", S_IRUGO, &vmax_fops },
+	{ "output_mv", S_IRUGO, &output_fops },
+};
+
 static int dfll_debug_init(struct tegra_dfll *td)
 {
-	int ret;
+	int i;
 
 	if (!td || (td->mode == DFLL_UNINITIALIZED))
 		return 0;
@@ -1938,43 +1950,13 @@ static int dfll_debug_init(struct tegra_dfll *td)
 	if (!td->debugfs_dir)
 		return -ENOMEM;
 
-	ret = -ENOMEM;
-
-	if (!debugfs_create_file("enable", S_IRUGO | S_IWUSR,
-				 td->debugfs_dir, td, &enable_fops))
-		goto err_out;
-
-	if (!debugfs_create_file("lock", S_IRUGO | S_IWUSR,
-				 td->debugfs_dir, td, &lock_fops))
-		goto err_out;
-
-	if (!debugfs_create_file("rate", S_IRUGO,
-				 td->debugfs_dir, td, &rate_fops))
-		goto err_out;
-
-	if (!debugfs_create_file("dvco_rate_min", S_IRUGO,
-				 td->debugfs_dir, td, &dvco_rate_min_fops))
-		goto err_out;
-
-	if (!debugfs_create_file("registers", S_IRUGO,
-				 td->debugfs_dir, td, &attr_registers_fops))
-		goto err_out;
-
-	if (!debugfs_create_file("vmin_mv", S_IRUGO,
-				 td->debugfs_dir, td, &attr_vmin_fops))
-		goto err_out;
-
-	if (!debugfs_create_file("vmax_mv", S_IRUGO,
-				 td->debugfs_dir, td, &attr_vmax_fops))
-		goto err_out;
-
-	if (!debugfs_create_file("output_mv", S_IRUGO,
-				 td->debugfs_dir, td, &attr_output_fops))
-		goto err_out;
-
-	if (!debugfs_create_file("force_out_mv", S_IRUGO | S_IWUSR,
-				 td->debugfs_dir, td, &attr_fout_mv_fops))
-		goto err_out;
+	for (i = 0; i < ARRAY_SIZE(dfll_debugfs_nodes); i++) {
+		if (!debugfs_create_file(dfll_debugfs_nodes[i].name,
+					 dfll_debugfs_nodes[i].mode,
+					 td->debugfs_dir, td,
+					 dfll_debugfs_nodes[i].fops))
+			goto err_out;
+	}
 
 	debugfs_create_symlink("monitor", td->debugfs_dir, "rate");
 	debugfs_create_symlink("dvco_rate", td->debugfs_dir, "dvco_rate_min");
@@ -1983,7 +1965,7 @@ static int dfll_debug_init(struct tegra_dfll *td)
 
 err_out:
 	debugfs_remove_recursive(td->debugfs_dir);
-	return ret;
+	return -ENOMEM;
 }
 
 #endif /* CONFIG_DEBUG_FS */
