@@ -115,8 +115,10 @@ static int get_prod_mode(char *val, const struct kernel_param *kp)
 {
 	u32 reg = 0;
 
-	tegra_fuse_readl(TEGRA_FUSE_PRODUCTION_MODE, &reg);
-	prod_mode = reg;
+	if (tegra_get_platform() == TEGRA_PLATFORM_SILICON) {
+		tegra_fuse_readl(TEGRA_FUSE_PRODUCTION_MODE, &reg);
+		prod_mode = reg;
+	}
 	return param_get_uint(val, kp);
 }
 
