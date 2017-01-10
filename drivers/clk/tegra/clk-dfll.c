@@ -56,6 +56,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/reset.h>
 #include <linux/seq_file.h>
+#include <linux/uaccess.h>
 #include <soc/tegra/cvb.h>
 #include <soc/tegra/pwm-tegra-dfll.h>
 #include <soc/tegra/tegra-dfll.h>
@@ -1971,6 +1972,40 @@ static int registers_show(struct seq_file *s, void *data)
 	return 0;
 }
 
+static ssize_t register_write(struct file *file,
+	const char __user *userbuf, size_t count, loff_t *ppos)
+{
+	char buf[80];
+	u32 offs;
+	u32 val;
+	struct tegra_dfll *td = file->f_path.dentry->d_inode->i_private;
+
+	if (sizeof(buf) <= count)
+		return -EINVAL;
+
+	if (copy_from_user(buf, userbuf, count))
+		return -EFAULT;
+
+	/* terminate buffer and trim - white spaces may be appended
+	 *  at the end when invoked from shell command line */
+	buf[count] = '\0';
+	strim(buf);
+
+	if (sscanf(buf, "[0x%x] = 0x%x", &offs, &val) != 2)
+		return -EINVAL;
+
+	if (offs >= 0x400)
+		return -EINVAL;
+
+	clk_enable(td->soc_clk);
+	mutex_lock(&td->lock);
+	dfll_writel(td, val, offs & (~0x3));
+	mutex_unlock(&td->lock);
+	clk_disable(td->soc_clk);
+
+	return count;
+}
+
 static int registers_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, registers_show, inode->i_private);
@@ -1979,6 +2014,7 @@ static int registers_open(struct inode *inode, struct file *file)
 static const struct file_operations registers_fops = {
 	.open		= registers_open,
 	.read		= seq_read,
+	.write		= register_write,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
