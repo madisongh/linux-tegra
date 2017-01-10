@@ -106,7 +106,7 @@
 #define DFLL_FREQ_REQ_SCALE_MAX		256
 #define DFLL_FREQ_REQ_FREQ_VALID	(0x1 << 7)
 #define DFLL_FREQ_REQ_MULT_SHIFT	0
-#define DFLL_FREQ_REG_MULT_MASK		(0x7f << DFLL_FREQ_REQ_MULT_SHIFT)
+#define DFLL_FREQ_REQ_MULT_MASK		(0x7f << DFLL_FREQ_REQ_MULT_SHIFT)
 #define FREQ_MAX			127
 
 /* DFLL_DROOP_CTRL: droop prevention control */
@@ -367,6 +367,7 @@ struct tegra_dfll {
 	unsigned			lut_uv[MAX_DFLL_VOLTAGES];
 	int				lut_size;
 	u8				lut_min, lut_max, lut_safe;
+	u8				lut_force_min;
 
 	/* tuning parameters */
 	u8				tune_high_out_start;
@@ -384,6 +385,9 @@ struct tegra_dfll {
 
 	/* mutex protecting register accesses */
 	struct mutex			lock;
+
+	/* PMIC undershoot */
+	int				pmu_undershoot_gb;
 };
 
 enum dfll_monitor_mode {
@@ -481,6 +485,31 @@ static int is_output_i2c_req_pending(struct tegra_dfll *td)
 		return 1;
 
 	return 0;
+}
+
+static u8 dfll_get_output_min(struct tegra_dfll *td)
+{
+	u32 tune_min;
+
+	tune_min = td->tune_range == DFLL_TUNE_LOW ?
+			0 : td->tune_high_out_min;
+	return max(tune_min, td->thermal_floor_output);
+}
+
+static void set_force_out_min(struct tegra_dfll *td)
+{
+	u8 lut_force_min;
+	int force_mv_min = td->pmu_undershoot_gb;
+
+	if (!force_mv_min)
+		return;
+
+	lut_force_min = dfll_get_output_min(td);
+	force_mv_min += td->lut_uv[lut_force_min];
+	lut_force_min = find_mv_out_cap(td, force_mv_min);
+	if (lut_force_min == td->lut_safe)
+		lut_force_min++;
+	td->lut_force_min = lut_force_min;
 }
 
 /**
@@ -608,15 +637,6 @@ static void dfll_tune_high(struct tegra_dfll *td)
 		td->soc->set_clock_trimmers_high();
 }
 
-static u8 dfll_get_output_min(struct tegra_dfll *td)
-{
-	u32 tune_min;
-
-	tune_min = td->tune_range == DFLL_TUNE_LOW ?
-			0 : td->tune_high_out_min;
-	return max(tune_min, td->thermal_floor_output);
-}
-
 /**
  * dfll_set_close_loop_config - prepare to switch to closed-loop mode
  * @pdev: DFLL instance
@@ -631,13 +651,14 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 			  struct dfll_rate_req *req)
 {
 	bool sample_tune_out_last = false;
-	u32 out_min, out_max;
+	u8 out_min, out_max;
 
 	switch (td->tune_range) {
 	case DFLL_TUNE_LOW:
 		if (req->lut_index > td->tune_high_out_start) {
 			td->tune_range = DFLL_TUNE_WAIT_DFLL;
 			mod_timer(&td->tune_timer, jiffies + td->tune_delay);
+			set_force_out_min(td);
 		}
 		sample_tune_out_last = true;
 		break;
@@ -647,6 +668,7 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 	case DFLL_TUNE_WAIT_PMIC:
 		if (req->lut_index <= td->tune_high_out_start)
 			dfll_tune_low(td);
+		set_force_out_min(td);
 		break;
 	default:
 		BUG();
@@ -658,6 +680,7 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 		out_max = td->thermal_cap_output;
 	else
 		out_max = out_min + DFLL_CAP_GUARD_BAND_STEPS;
+	out_max = max(out_max, td->lut_force_min);
 
 	if ((td->lut_min != out_min) || (td->lut_max != out_max)) {
 		dfll_set_output_limits(td, out_min, out_max);
@@ -1057,6 +1080,7 @@ static void dfll_init_out_if(struct tegra_dfll *td)
 	}
 
 	set_dvco_rate_min(td);
+	set_force_out_min(td);
 
 	td->lut_min = td->thermal_floor_output;
 	td->lut_max = td->thermal_cap_output;
@@ -1262,19 +1286,30 @@ static int dfll_calculate_rate_request(struct tegra_dfll *td,
 static void dfll_set_frequency_request(struct tegra_dfll *td,
 				       struct dfll_rate_req *req)
 {
-	u32 val = 0;
+	u32 val;
 	int force_val;
 	int coef = 128; /* FIXME: td->cg_scale? */;
 
 	if (td->pmu_if == TEGRA_DFLL_PMU_PWM)
 		force_val = td->lut[req->lut_index] - td->lut[td->lut_safe];
-	else
+	else if (td->lut_force_min > req->lut_index) {
+		int f;
+
+		/* respect force output floor when new rate is lower */
+		val = dfll_readl(td, DFLL_FREQ_REQ);
+		f = val & DFLL_FREQ_REQ_MULT_MASK;
+		if (!(val & DFLL_FREQ_REQ_FREQ_VALID)
+			|| (f > req->mult_bits))
+			force_val = td->lut_force_min - td->lut_safe;
+		else
+			force_val = req->lut_index - td->lut_safe;
+	} else
 		force_val = req->lut_index - td->lut_safe;
 
 	force_val = force_val * coef / td->cg;
 	force_val = clamp(force_val, FORCE_MIN, FORCE_MAX);
 
-	val |= req->mult_bits << DFLL_FREQ_REQ_MULT_SHIFT;
+	val = req->mult_bits << DFLL_FREQ_REQ_MULT_SHIFT;
 	val |= req->scale_bits << DFLL_FREQ_REQ_SCALE_SHIFT;
 	val |= ((u32)force_val << DFLL_FREQ_REQ_FORCE_SHIFT) &
 		DFLL_FREQ_REQ_FORCE_MASK;
@@ -1852,6 +1887,31 @@ static int fout_mv_set(void *data, u64 val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(fout_mv_fops, fout_mv_get, fout_mv_set, "%llu\n");
 
+static int undershoot_get(void *data, u64 *val)
+{
+	struct tegra_dfll *td = data;
+
+	*val = td->pmu_undershoot_gb;
+
+	return 0;
+}
+
+static int undershoot_set(void *data, u64 val)
+{
+	struct tegra_dfll *td = data;
+
+	mutex_lock(&td->lock);
+
+	td->pmu_undershoot_gb = val;
+	set_force_out_min(td);
+
+	mutex_unlock(&td->lock);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(undershoot_fops, undershoot_get, undershoot_set,
+			"%llu\n");
+
 static int registers_show(struct seq_file *s, void *data)
 {
 	u32 val, offs;
@@ -1931,6 +1991,7 @@ static struct {
 	{ "enable", S_IRUGO | S_IWUSR, &enable_fops },
 	{ "lock", S_IRUGO | S_IWUSR, &lock_fops },
 	{ "force_out_mv", S_IRUGO | S_IWUSR, &fout_mv_fops },
+	{ "pmu_undershoot_gb", S_IRUGO | S_IWUSR, &undershoot_fops },
 	{ "rate", S_IRUGO, &rate_fops },
 	{ "dvco_rate_min", S_IRUGO, &dvco_rate_min_fops },
 	{ "registers", S_IRUGO, &registers_fops },
@@ -2000,6 +2061,7 @@ int tegra_dfll_update_thermal_index(struct tegra_dfll *td,
 		td->thermal_floor_index = new_index;
 
 		set_dvco_rate_min(td);
+		set_force_out_min(td);
 
 		if (td->mode == DFLL_CLOSED_LOOP) {
 			mutex_lock(&td->lock);
@@ -2535,6 +2597,8 @@ static int dfll_fetch_i2c_params(struct tegra_dfll *td)
 	if (!read_dt_param(td, "nvidia,i2c-fs-rate", &td->i2c_fs_rate))
 		return -EINVAL;
 
+	read_dt_param(td, "nvidia,pmic-undershoot-gb", &td->pmu_undershoot_gb);
+
 	regmap = regulator_get_regmap(td->vdd_reg);
 	i2c_dev = regmap_get_device(regmap);
 	i2c_client = to_i2c_client(i2c_dev);
@@ -2660,6 +2724,7 @@ void tegra_dfll_suspend(struct platform_device *pdev)
 		tegra_dfll_count_thermal_states(td, TEGRA_DFLL_THERMAL_CAP);
 	td->thermal_floor_index = 0;
 	set_dvco_rate_min(td);
+	set_force_out_min(td);
 
 	td->resume_mode = td->mode;
 	switch (td->mode) {
