@@ -514,9 +514,24 @@ void tegra210_plle_hw_sequence_start(void)
 }
 EXPORT_SYMBOL_GPL(tegra210_plle_hw_sequence_start);
 
+bool tegra210_xusb_pll_hw_sequence_is_enabled(void)
+{
+	u32 val;
+
+	val = readl_relaxed(clk_base + XUSBIO_PLL_CFG0);
+	if (val & XUSBIO_PLL_CFG0_SEQ_ENABLE)
+		return true;
+
+	return false;
+}
+EXPORT_SYMBOL_GPL(tegra210_xusb_pll_hw_sequence_is_enabled);
+
 void tegra210_xusb_pll_hw_control_enable(void)
 {
 	u32 val;
+
+	if (tegra210_xusb_pll_hw_sequence_is_enabled())
+		return;
 
 	val = readl_relaxed(clk_base + XUSBIO_PLL_CFG0);
 	val &= ~(XUSBIO_PLL_CFG0_CLK_ENABLE_SWCTL |
@@ -531,15 +546,33 @@ void tegra210_xusb_pll_hw_sequence_start(void)
 {
 	u32 val;
 
+	if (tegra210_xusb_pll_hw_sequence_is_enabled())
+		return;
+
 	val = readl_relaxed(clk_base + XUSBIO_PLL_CFG0);
 	val |= XUSBIO_PLL_CFG0_SEQ_ENABLE;
 	writel_relaxed(val, clk_base + XUSBIO_PLL_CFG0);
 }
 EXPORT_SYMBOL_GPL(tegra210_xusb_pll_hw_sequence_start);
 
+bool tegra210_sata_pll_hw_sequence_is_enabled(void)
+{
+	u32 val;
+
+	val = readl_relaxed(clk_base + SATA_PLL_CFG0);
+	if (val & SATA_PLL_CFG0_SEQ_ENABLE)
+		return true;
+
+	return false;
+}
+EXPORT_SYMBOL_GPL(tegra210_sata_pll_hw_sequence_is_enabled);
+
 void tegra210_sata_pll_hw_control_enable(void)
 {
 	u32 val;
+
+	if (tegra210_sata_pll_hw_sequence_is_enabled())
+		return;
 
 	val = readl_relaxed(clk_base + SATA_PLL_CFG0);
 	val &= ~SATA_PLL_CFG0_PADPLL_RESET_SWCTL;
@@ -552,6 +585,9 @@ EXPORT_SYMBOL_GPL(tegra210_sata_pll_hw_control_enable);
 void tegra210_sata_pll_hw_sequence_start(void)
 {
 	u32 val;
+
+	if (tegra210_sata_pll_hw_sequence_is_enabled())
+		return;
 
 	val = readl_relaxed(clk_base + SATA_PLL_CFG0);
 	val |= SATA_PLL_CFG0_SEQ_ENABLE;

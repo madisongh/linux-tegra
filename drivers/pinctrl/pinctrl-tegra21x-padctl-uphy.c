@@ -375,15 +375,13 @@ struct tegra_xusb_hsic_port {
 
 enum uphy_pll_state {
 	UPHY_PLL_POWER_DOWN = 0,
-	UPHY_PLL_POWER_UP_PARTIAL,
-	UPHY_PLL_POWER_UP_FULL,
+	UPHY_PLL_POWER_UP_SW_CTL,
 	UPHY_PLL_POWER_UP_HW_SEQ,
 };
 
 static const char * const uphy_pll_states[] = {
 	"UPHY_PLL_POWER_DOWN",
-	"UPHY_PLL_POWER_UP_PARTIAL",
-	"UPHY_PLL_POWER_UP_FULL",
+	"UPHY_PLL_POWER_UP_SW_CTL",
 	"UPHY_PLL_POWER_UP_HW_SEQ"
 };
 
@@ -811,6 +809,8 @@ static int uphy_pll_hw_sequencer_enable(struct tegra_padctl_uphy *uphy, int pll,
 		tegra210_xusb_pll_hw_sequence_start();
 
 	uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_UP_HW_SEQ;
+	TRACE(dev, "done enable PLL%d in HW by function %d\n",
+				pll, func);
 
 	/* enable PLLE Power sequencer */
 	if ((uphy->uphy_pll_state[0] == UPHY_PLL_POWER_UP_HW_SEQ) &&
@@ -829,6 +829,18 @@ static int uphy_pll_power_down(struct tegra_padctl_uphy *uphy, int pll
 {
 	struct device *dev = uphy->dev;
 	u32 value;
+
+	if ((pll == 0 && tegra210_xusb_pll_hw_sequence_is_enabled()) ||
+		(pll == 1 && tegra210_sata_pll_hw_sequence_is_enabled())) {
+		TRACE(dev, "PLL%d is in HW, skip powering down\n", pll);
+		uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_DOWN;
+		return 0;
+	}
+
+	if (uphy->uphy_pll_state[pll] == UPHY_PLL_POWER_DOWN) {
+		TRACE(dev, "PLL%d was already powered down", pll);
+		return 0;
+	}
 
 	value = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_1);
 	value &= ~PLL_ENABLE;
@@ -853,6 +865,7 @@ static int uphy_pll_power_down(struct tegra_padctl_uphy *uphy, int pll
 	value |= PLL_IDDQ;
 	uphy_pll_writel(uphy, pll, value, UPHY_PLL_CTL_1);
 	uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_DOWN;
+	TRACE(dev, "done powering down PLL%d\n", pll);
 
 	return 0;
 }
@@ -919,11 +932,19 @@ static int uphy_pll_init_full(struct tegra_padctl_uphy *uphy, int pll,
 		return -EINVAL;
 	}
 
+	if ((pll == 0 && tegra210_xusb_pll_hw_sequence_is_enabled()) ||
+		(pll == 1 && tegra210_sata_pll_hw_sequence_is_enabled()))
+		uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_UP_HW_SEQ;
+
 	TRACE(dev, "PLL%d state %s\n", pll,
 			uphy_pll_states[uphy->uphy_pll_state[pll]]);
 
-	if (uphy->uphy_pll_state[pll] >= UPHY_PLL_POWER_UP_FULL)
+	if (uphy->uphy_pll_state[pll] >= PLL_POWER_UP_SW_CTL) {
+		TRACE(dev,
+		"PLL%d was already enabled in SW/HW, current function is %d",
+		pll, func);
 		return 0; /* already done */
+	}
 
 	TRACE(dev, "PLL%d full init by function %d\n", pll, func);
 
@@ -993,7 +1014,8 @@ static int uphy_pll_init_full(struct tegra_padctl_uphy *uphy, int pll,
 			return -EPROBE_DEFER;
 	}
 
-	uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_UP_FULL;
+	uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_UP_SW_CTL;
+	TRACE(dev, "done enable PLL%d in SW by function %d\n", pll, func);
 
 	return uphy_pll_hw_sequencer_enable(uphy, pll, func);
 }
@@ -3858,17 +3880,11 @@ static int tegra21x_padctl_uphy_probe(struct platform_device *pdev)
 		goto assert_padctl_rst;
 	}
 
-	err = tegra21x_uphy_pll_init(uphy);
-	if (err) {
-		dev_err(dev, "failed to initialize UPHY PLLs %d\n", err);
-		goto unregister;
-	}
-
 	for (i = 0; i < TEGRA_PCIE_PHYS; i++) {
 		phy = devm_phy_create(dev, NULL, &pcie_phy_ops);
 		if (IS_ERR(phy)) {
 			err = PTR_ERR(phy);
-			goto uphy_pll_deinit;
+			goto unregister;
 		}
 		uphy->pcie_phys[i] = phy;
 		phy_set_drvdata(phy, uphy);
@@ -3878,7 +3894,7 @@ static int tegra21x_padctl_uphy_probe(struct platform_device *pdev)
 		phy = devm_phy_create(dev, NULL, &sata_phy_ops);
 		if (IS_ERR(phy)) {
 			err = PTR_ERR(phy);
-			goto uphy_pll_deinit;
+			goto unregister;
 		}
 		uphy->sata_phys[0] = phy;
 		phy_set_drvdata(phy, uphy);
@@ -3895,7 +3911,7 @@ static int tegra21x_padctl_uphy_probe(struct platform_device *pdev)
 		err = PTR_ERR(uphy->mbox_chan);
 		if (err == -EPROBE_DEFER) {
 			dev_info(&pdev->dev, "mailbox is not ready yet\n");
-			goto uphy_pll_deinit;
+			goto unregister;
 		} else {
 			dev_warn(&pdev->dev,
 				 "failed to get mailbox, USB Host PHY support disabled\n");
@@ -3930,16 +3946,22 @@ static int tegra21x_padctl_uphy_probe(struct platform_device *pdev)
 	uphy->sata_bypass_fuse =
 		of_property_read_bool(np, "nvidia,sata-use-prods");
 
+	err = tegra21x_uphy_pll_init(uphy);
+	if (err) {
+		dev_err(dev, "failed to initialize UPHY PLLs %d\n", err);
+		goto remove_sysfs;
+	}
+
 	dev_info(&pdev->dev, "Done tegra21x_padctl_uphy_probe\n");
 	return 0;
 
+remove_sysfs:
+	sysfs_remove_group(&pdev->dev.kobj, &padctl_uphy_attr_group);
 free_mailbox:
 	if (!IS_ERR(uphy->mbox_chan)) {
 		cancel_work_sync(&uphy->mbox_req_work);
 		mbox_free_channel(uphy->mbox_chan);
 	}
-uphy_pll_deinit:
-	tegra21x_uphy_pll_deinit(uphy);
 unregister:
 	pinctrl_unregister(uphy->pinctrl);
 assert_padctl_rst:
