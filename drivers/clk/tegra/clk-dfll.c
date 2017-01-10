@@ -608,30 +608,13 @@ static void dfll_tune_high(struct tegra_dfll *td)
 		td->soc->set_clock_trimmers_high();
 }
 
-/**
- * dfll_set_open_loop_config - prepare to switch to open-loop mode
- * @td: DFLL instance
- *
- * Prepare to switch the DFLL to open-loop mode. This switches the
- * DFLL to the low-voltage tuning range, ensures that I2C output
- * forcing is disabled, and disables the output clock rate scaler.
- * The DFLL's low-voltage tuning range parameters must be
- * characterized to keep the downstream device stable at any DVCO
- * input voltage. No return value.
- */
-static void dfll_set_open_loop_config(struct tegra_dfll *td)
+static u8 dfll_get_output_min(struct tegra_dfll *td)
 {
-	u32 val;
+	u32 tune_min;
 
-	/* always tune low (safe) in open loop */
-	if (td->tune_range != DFLL_TUNE_LOW)
-		dfll_tune_low(td);
-
-	val = dfll_readl(td, DFLL_FREQ_REQ);
-	val |= DFLL_FREQ_REQ_SCALE_MASK;
-	val &= ~DFLL_FREQ_REQ_FORCE_ENABLE;
-	dfll_writel(td, val, DFLL_FREQ_REQ);
-	dfll_wmb(td);
+	tune_min = td->tune_range == DFLL_TUNE_LOW ?
+			0 : td->tune_high_out_min;
+	return max(tune_min, td->thermal_floor_output);
 }
 
 /**
@@ -648,7 +631,7 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 			  struct dfll_rate_req *req)
 {
 	bool sample_tune_out_last = false;
-	u32 tune_min, out_min, out_max;
+	u32 out_min, out_max;
 
 	switch (td->tune_range) {
 	case DFLL_TUNE_LOW:
@@ -669,9 +652,7 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 		BUG();
 	}
 
-	tune_min = td->tune_range == DFLL_TUNE_LOW ?
-			0 : td->tune_high_out_min;
-	out_min = max(tune_min, td->thermal_floor_output);
+	out_min = dfll_get_output_min(td);
 
 	if (td->thermal_cap_output > out_min + DFLL_CAP_GUARD_BAND_STEPS)
 		out_max = td->thermal_cap_output;
@@ -682,6 +663,39 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 		dfll_set_output_limits(td, out_min, out_max);
 		dfll_load_i2c_lut(td);
 	}
+}
+
+/**
+ * dfll_set_open_loop_config - prepare to switch to open-loop mode
+ * @td: DFLL instance
+ *
+ * Prepare to switch the DFLL to open-loop mode. This switches the
+ * DFLL to the low-voltage tuning range, ensures that I2C output
+ * forcing is disabled, and disables the output clock rate scaler.
+ * The DFLL's low-voltage tuning range parameters must be
+ * characterized to keep the downstream device stable at any DVCO
+ * input voltage. No return value.
+ */
+static void dfll_set_open_loop_config(struct tegra_dfll *td)
+{
+	u32 val;
+	u32 out_min, out_max;
+
+	out_min = td->lut_min;
+	out_max = td->lut_max;
+	/* always tune low (safe) in open loop */
+	if (td->tune_range != DFLL_TUNE_LOW) {
+		dfll_tune_low(td);
+		out_min = dfll_get_output_min(td);
+	}
+
+	dfll_set_output_limits(td, out_min, out_max);
+
+	val = dfll_readl(td, DFLL_FREQ_REQ);
+	val |= DFLL_FREQ_REQ_SCALE_MASK;
+	val &= ~DFLL_FREQ_REQ_FORCE_ENABLE;
+	dfll_writel(td, val, DFLL_FREQ_REQ);
+	dfll_wmb(td);
 }
 
 /**
