@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -414,7 +414,6 @@ struct tegra_padctl_uphy {
 	struct reset_control *padctl_rst;
 
 	struct clk *plle; /* plle in software control state */
-	struct clk *plle_pwrseq; /* plle in hardware power sequencer control */
 	struct clk *usb2_trk_clk; /* utmi tracking circuit clock */
 	struct clk *hsic_trk_clk; /* hsic tracking circuit clock */
 
@@ -670,9 +669,14 @@ static int uphy_pll_source_clk_enable(struct tegra_padctl_uphy *uphy)
 	if (rc)
 		return rc;
 
+	if (tegra210_plle_hw_sequence_is_enabled()) {
+		TRACE(dev,
+		"PLLE HW was already enabled before UPHY PLL init!\n");
+		uphy->plle_state = PLL_POWER_UP_HW_SEQ;
+	}
+
 	/* power up PLLE if it has not been enabled */
 	if (uphy->plle_state == PLL_POWER_DOWN) {
-		TRACE(dev, "enable PLLE\n");
 		rc = clk_prepare_enable(uphy->plle);
 		if (rc) {
 			dev_err(dev, "failed to enable PLLE clock %d\n",
@@ -680,6 +684,7 @@ static int uphy_pll_source_clk_enable(struct tegra_padctl_uphy *uphy)
 			return rc;
 		}
 		uphy->plle_state = PLL_POWER_UP_SW_CTL;
+		TRACE(dev, "done enable PLLE in SW\n");
 	}
 
 	return 0;
@@ -696,11 +701,17 @@ static int uphy_pll_source_clk_disable(struct tegra_padctl_uphy *uphy, int pll,
 	if (rc)
 		return rc;
 
-	/* both UPHY PLLs are powered down, power down PLLE */
-	if (uphy->plle_state == PLL_POWER_UP_SW_CTL) {
-		TRACE(dev, "disable PLLE\n");
+	/* Both UPHY PLLs are powered down, power down PLLE.
+	 * Note that clk_disable_unprepare(PLLE) is still
+	 * invoked even PLLE is in HW in order to sync
+	 * enable_cnt/prepare_cnt of PLLE.
+	 * clk_plle_tegra210_disable doesn't really disable
+	 * PLLE if it's in HW.
+	 */
+	if (uphy->plle_state >= PLL_POWER_UP_SW_CTL) {
 		clk_disable_unprepare(uphy->plle);
 		uphy->plle_state = PLL_POWER_DOWN;
+		TRACE(dev, "done disable PLLE\n");
 	}
 
 	return rc;
@@ -801,7 +812,13 @@ static int uphy_pll_hw_sequencer_enable(struct tegra_padctl_uphy *uphy, int pll,
 
 	uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_UP_HW_SEQ;
 
-	/* FIXME: enable PLLE Power sequencer */
+	/* enable PLLE Power sequencer */
+	if ((uphy->uphy_pll_state[0] == UPHY_PLL_POWER_UP_HW_SEQ) &&
+		(uphy->uphy_pll_state[1] == UPHY_PLL_POWER_UP_HW_SEQ)) {
+		tegra210_plle_hw_sequence_start();
+		uphy->plle_state = PLL_POWER_UP_HW_SEQ;
+		TRACE(dev, "done enable PLLE in HW");
+	}
 
 	return 0;
 }
@@ -992,6 +1009,8 @@ static int uphy_pll_init(struct tegra_padctl_uphy *uphy,
 	TRACE(dev, "PLL init by function %d\n", func);
 
 	rc = uphy_pll_source_clk_enable(uphy);
+	if (rc)
+		return rc;
 
 	switch (func) {
 	case TEGRA21x_FUNC_PCIE:
@@ -1056,10 +1075,14 @@ int uphy_pll_deinit(struct tegra_padctl_uphy *uphy,
 			rc = uphy_pll_power_down(uphy, i, func);
 			if (rc)
 				return rc;
-			rc = uphy_pll_source_clk_disable(uphy, i, func);
-			if (rc)
-				return rc;
 		}
+	}
+
+	if ((uphy->uphy_pll_state[0] == UPHY_PLL_POWER_DOWN) &&
+		(uphy->uphy_pll_state[1] == UPHY_PLL_POWER_DOWN)) {
+		rc = uphy_pll_source_clk_disable(uphy, i, func);
+		if (rc)
+			return rc;
 	}
 
 	return 0;
@@ -3781,13 +3804,6 @@ static int tegra21x_padctl_uphy_probe(struct platform_device *pdev)
 	if (IS_ERR(uphy->plle)) {
 		dev_err(dev, "failed to get plle clock\n");
 		return PTR_ERR(uphy->plle);
-	}
-
-	uphy->plle_pwrseq = clk_get_sys(NULL, "pll_e_hw");
-	if (IS_ERR(uphy->plle_pwrseq)) {
-		dev_err(dev, "failed to get plle hw clock\n");
-		/* FIXME : cannot get pll_e_hw */
-		/* return PTR_ERR(uphy->plle_pwrseq);*/
 	}
 
 	uphy->usb2_trk_clk = devm_clk_get(dev, "usb2_trk");

@@ -392,7 +392,6 @@ struct tegra_xhci_hcd {
 	struct clk *fs_src_clk;
 	struct clk *pll_u_480m;
 	struct clk *clk_m;
-	struct clk *pll_e;
 
 	int pgid_ss;
 	int pgid_host;
@@ -1922,12 +1921,9 @@ static int tegra_xhci_clk_enable(struct tegra_xhci_hcd *tegra)
 		ret = clk_prepare_enable(tegra->host_clk);
 		if (ret < 0)
 			goto disable_ss;
-		ret = clk_prepare_enable(tegra->pll_e);
-		if (ret < 0)
-			goto disable_host;
 		ret = clk_prepare_enable(tegra->falc_clk);
 		if (ret < 0)
-			goto disable_plle;
+			goto disable_host;
 		ret = clk_prepare_enable(tegra->fs_src_clk);
 		if (ret < 0)
 			goto disable_falc;
@@ -1941,8 +1937,6 @@ disable_fs_src:
 		clk_disable_unprepare(tegra->fs_src_clk);
 disable_falc:
 		clk_disable_unprepare(tegra->falc_clk);
-disable_plle:
-		clk_disable_unprepare(tegra->pll_e);
 disable_host:
 		clk_disable_unprepare(tegra->host_clk);
 disable_ss:
@@ -1957,7 +1951,6 @@ static void tegra_xhci_clk_disable(struct tegra_xhci_hcd *tegra)
 		clk_disable_unprepare(tegra->hs_src_clk);
 		clk_disable_unprepare(tegra->fs_src_clk);
 		clk_disable_unprepare(tegra->falc_clk);
-		clk_disable_unprepare(tegra->pll_e);
 		clk_disable_unprepare(tegra->host_clk);
 		clk_disable_unprepare(tegra->ss_clk);
 	}
@@ -2133,10 +2126,6 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 		tegra->clk_m = devm_clk_get(&pdev->dev, "clk_m");
 		if (IS_ERR(tegra->clk_m))
 			return PTR_ERR(tegra->clk_m);
-
-		tegra->pll_e = devm_clk_get(&pdev->dev, "pll_e");
-		if (IS_ERR(tegra->pll_e))
-			return PTR_ERR(tegra->pll_e);
 	}
 
 	ret = tegra_xhci_clk_enable(tegra);
