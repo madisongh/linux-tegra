@@ -2502,6 +2502,7 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_iqc2] = { .dt_id = TEGRA210_CLK_IQC2, .present = true },
 	[tegra_clk_pll_a_out_adsp] = { .dt_id = TEGRA210_CLK_PLL_A_OUT_ADSP, .present = true },
 	[tegra_clk_pll_a_out0_out_adsp] = { .dt_id = TEGRA210_CLK_PLL_A_OUT0_OUT_ADSP, .present = true },
+	[tegra_clk_vic_floor_cbus] = { .dt_id = TEGRA210_CLK_VIC_FLOOR_CBUS, .present = true },
 };
 
 static struct tegra_devclk devclks[] __initdata = {
@@ -3319,10 +3320,6 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 	clk = tegra_clk_register_shared("tsecb.cbus", &cbus_parents[0], 1, 0, 0,
 					0, "tsecb");
 	clks[TEGRA210_CLK_TSECB_CBUS] = clk;
-
-	clk = tegra_clk_register_shared("vic.floor.cbus", &cbus_parents[0], 1, 0, 0,
-					0, "vic03");
-	clks[TEGRA210_CLK_VIC_FLOOR_CBUS] = clk;
 
 	clk = tegra_clk_register_shared("nvenc.cbus", &cbus_parents[1], 1, 0, 0,
 					0, "nvenc");
