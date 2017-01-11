@@ -975,7 +975,7 @@ int tegra_io_rail_power_on(int id)
 		return -EINVAL;
 	}
 }
-EXPORT_SYMBOL(tegra_pmc_io_pad_low_power_disable);
+EXPORT_SYMBOL(tegra_io_rail_power_on);
 
 int tegra_io_rail_power_off(int id)
 {
