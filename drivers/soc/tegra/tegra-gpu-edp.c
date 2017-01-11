@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, NVIDIA CORPORATION. All Rights Reserved.
+ * Copyright (c) 2011-2017, NVIDIA CORPORATION. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -255,16 +255,16 @@ static int tegra_gpu_edp_probe(struct platform_device *pdev)
 	 * but currently this clock is only register as a devclk and so
 	 * using device-tree is not possible.
 	 */
-	gpu_clk = clk_get_sys("gpcclk", "gpcclk");
+	gpu_clk = clk_get_sys("gbus", "gbus");
 	if (IS_ERR(gpu_clk)) {
 		ret = -EPROBE_DEFER;
 		goto free_params;
 	}
 
 	maxf = clk_round_rate(gpu_clk, ULONG_MAX);
-	if (IS_ERR_VALUE(maxf)) {
+	if (maxf <= 0) {
 		dev_err(&pdev->dev, "unable to get max GPU freq\n");
-		ret = maxf;
+		ret = -EPROBE_DEFER;
 		goto free_params;
 	}
 
