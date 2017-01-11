@@ -28,6 +28,7 @@ extern phys_addr_t tegra_fb_size;
 extern phys_addr_t tegra_fb2_start;
 extern phys_addr_t tegra_fb2_size;
 
+#ifdef CONFIG_ARCH_TEGRA
 bool soc_is_tegra(void);
 int tegra_get_usb_port_owner_info(void);
 void tegra_get_display_board_info(struct board_info *bi);
@@ -36,6 +37,12 @@ void __tegra_move_framebuffer(struct platform_device *pdev,
 				phys_addr_t to, phys_addr_t from, size_t size);
 void __tegra_clear_framebuffer(struct platform_device *pdev,
 				unsigned long to, unsigned long size);
+#else
+static inline bool soc_is_tegra(void)
+{
+	return 0;
+}
+#endif
 
 
 #endif /* __SOC_TEGRA_COMMON_H__ */
