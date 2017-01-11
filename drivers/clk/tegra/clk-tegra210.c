@@ -2958,7 +2958,7 @@ static const char *mux_sor1[] = { "pll_p", "pll_d_out0", "pll_d2_out0", "clk_m" 
 static u32 mux_sor1_idx[] = { [0] = 0, [1] = 2, [2] = 5, [3] = 6 };
 
 static struct tegra_clk_periph tegra_sor0 =
-	TEGRA_CLK_PERIPH(14, 1, 0, 0, 0, 0, 0, 181, 0, NULL, NULL);
+	TEGRA_CLK_PERIPH(14, 1, 0, 0, 0, 0, 0, 182, 0, NULL, NULL);
 
 static struct tegra_clk_periph tegra_sor1 =
 	TEGRA_CLK_PERIPH(14, 3, 0, 0, 0, 0, 0, 183, 0, NULL, &sor1_lock);
