@@ -167,9 +167,8 @@ void tegra_pmc_iopower_enable(int reg, u32 bit_mask);
 void tegra_pmc_iopower_disable(int reg, u32 bit_mask);
 int tegra_pmc_iopower_get_status(int reg, u32 bit_mask);
 
+#if defined(CONFIG_ARCH_OR_PLATFORM_TEGRA) && !defined(CONFIG_TEGRA186_PMC)
 void tegra_pmc_io_dpd_clear(void);
-
-#if defined(CONFIG_ARCH_TEGRA)
 int tegra_pmc_io_pad_low_power_enable(const char *pad_name);
 int tegra_pmc_io_pad_low_power_disable(const char *pad_name);
 int tegra_io_rail_power_on(int id);
@@ -177,6 +176,10 @@ int tegra_io_rail_power_off(int id);
 int tegra_pmc_io_pad_set_voltage(const char *pad_name, unsigned int pad_uv);
 int tegra_pmc_io_pad_get_voltage(const char *pad_name);
 #else
+static inline void tegra_pmc_io_dpd_clear(void)
+{
+}
+
 static inline int tegra_pmc_io_pad_low_power_enable(const char *pad_name)
 {
 	return 0;
