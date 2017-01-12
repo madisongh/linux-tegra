@@ -48,7 +48,6 @@
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/pm_opp.h>
 #include <linux/pm_runtime.h>
@@ -56,6 +55,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/reset.h>
 #include <linux/seq_file.h>
+#include <linux/spinlock.h>
 #include <linux/uaccess.h>
 #include <soc/tegra/cvb.h>
 #include <soc/tegra/pwm-tegra-dfll.h>
@@ -384,8 +384,8 @@ struct tegra_dfll {
 	unsigned int			thermal_cap_output;
 	unsigned int			thermal_cap_index;
 
-	/* mutex protecting register accesses */
-	struct mutex			lock;
+	/* spinlock protecting register accesses */
+	spinlock_t			lock;
 
 	/* PMIC undershoot */
 	int				pmu_undershoot_gb;
@@ -1351,10 +1351,8 @@ static int dfll_request_rate(struct tegra_dfll *td, unsigned long rate)
 	td->last_req = req;
 
 	if (td->mode == DFLL_CLOSED_LOOP) {
-		mutex_lock(&td->lock);
 		dfll_set_close_loop_config(td, &td->last_req);
 		dfll_set_frequency_request(td, &td->last_req);
-		mutex_unlock(&td->lock);
 	}
 
 	return 0;
@@ -1373,15 +1371,17 @@ static int dfll_request_rate(struct tegra_dfll *td, unsigned long rate)
  */
 static int dfll_disable(struct tegra_dfll *td)
 {
+	unsigned long flags;
+
 	if (td->mode != DFLL_OPEN_LOOP) {
 		dev_err(td->dev, "cannot disable DFLL in %s mode\n",
 			mode_name[td->mode]);
 		return -EINVAL;
 	}
 
-	mutex_lock(&td->lock);
+	spin_lock_irqsave(&td->lock, flags);
 	dfll_set_mode(td, DFLL_DISABLED);
-	mutex_unlock(&td->lock);
+	spin_unlock_irqrestore(&td->lock, flags);
 
 	pm_runtime_put_sync(td->dev);
 
@@ -1397,6 +1397,8 @@ static int dfll_disable(struct tegra_dfll *td)
  */
 static int dfll_enable(struct tegra_dfll *td)
 {
+	unsigned long flags;
+
 	if (td->mode != DFLL_DISABLED) {
 		dev_err(td->dev, "cannot enable DFLL in %s mode\n",
 			mode_name[td->mode]);
@@ -1405,9 +1407,9 @@ static int dfll_enable(struct tegra_dfll *td)
 
 	pm_runtime_get_sync(td->dev);
 
-	mutex_lock(&td->lock);
+	spin_lock_irqsave(&td->lock, flags);
 	dfll_set_mode(td, DFLL_OPEN_LOOP);
-	mutex_unlock(&td->lock);
+	spin_unlock_irqrestore(&td->lock, flags);
 
 	return 0;
 }
@@ -1457,13 +1459,14 @@ static int _dfll_lock(struct tegra_dfll *td)
  */
 static int dfll_lock(struct tegra_dfll *td)
 {
+	unsigned long flags;
 	int ret;
 
-	mutex_lock(&td->lock);
+	spin_lock_irqsave(&td->lock, flags);
 
 	ret = _dfll_lock(td);
 
-	mutex_unlock(&td->lock);
+	spin_unlock_irqrestore(&td->lock, flags);
 
 	return ret;
 }
@@ -1502,13 +1505,14 @@ static int _dfll_unlock(struct tegra_dfll *td)
  */
 static int dfll_unlock(struct tegra_dfll *td)
 {
+	unsigned long flags;
 	int ret;
 
-	mutex_lock(&td->lock);
+	spin_lock_irqsave(&td->lock, flags);
 
 	ret = _dfll_unlock(td);
 
-	mutex_unlock(&td->lock);
+	spin_unlock_irqrestore(&td->lock, flags);
 
 	return ret;
 }
@@ -1588,8 +1592,16 @@ static int dfll_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 			     unsigned long parent_rate)
 {
 	struct tegra_dfll *td = clk_hw_to_dfll(hw);
+	int err;
+	unsigned long flags;
 
-	return dfll_request_rate(td, rate);
+	spin_lock_irqsave(&td->lock, flags);
+
+	err = dfll_request_rate(td, rate);
+
+	spin_unlock_irqrestore(&td->lock, flags);
+
+	return err;
 }
 
 static const struct clk_ops dfll_clk_ops = {
@@ -1710,6 +1722,7 @@ int tegra_dfll_update_thermal_index(struct tegra_dfll *td,
 			unsigned long new_index)
 {
 	int mv;
+	unsigned long flags;
 
 	if (type == TEGRA_DFLL_THERMAL_FLOOR && td->soc->thermal_floor_table) {
 		if (new_index >= td->soc->thermal_floor_table_size)
@@ -1723,10 +1736,10 @@ int tegra_dfll_update_thermal_index(struct tegra_dfll *td,
 		set_force_out_min(td);
 
 		if (td->mode == DFLL_CLOSED_LOOP) {
-			mutex_lock(&td->lock);
+			spin_lock_irqsave(&td->lock, flags);
 			dfll_set_close_loop_config(td, &td->last_req);
 			dfll_set_frequency_request(td, &td->last_req);
-			mutex_unlock(&td->lock);
+			spin_unlock_irqrestore(&td->lock, flags);
 		}
 	} else if (type == TEGRA_DFLL_THERMAL_CAP &&
 		   td->soc->thermal_cap_table) {
@@ -1738,10 +1751,10 @@ int tegra_dfll_update_thermal_index(struct tegra_dfll *td,
 		td->thermal_cap_index = new_index;
 
 		if (td->mode == DFLL_CLOSED_LOOP) {
-			mutex_lock(&td->lock);
+			spin_lock_irqsave(&td->lock, flags);
 			dfll_set_close_loop_config(td, &td->last_req);
 			dfll_set_frequency_request(td, &td->last_req);
-			mutex_unlock(&td->lock);
+			spin_unlock_irqrestore(&td->lock, flags);
 		}
 	}
 
@@ -2493,11 +2506,12 @@ static u64 dfll_read_monitor_rate(struct tegra_dfll *td)
 {
 	u32 v, s;
 	u64 pre_scaler_rate, post_scaler_rate;
+	unsigned long flags;
 
 	if (!dfll_is_running(td))
 		return 0;
 
-	mutex_lock(&td->lock);
+	spin_lock_irqsave(&td->lock, flags);
 
 	dfll_set_monitor_mode(td, DFLL_FREQ);
 	dfll_get_monitor_data(td, &v);
@@ -2507,7 +2521,7 @@ static u64 dfll_read_monitor_rate(struct tegra_dfll *td)
 	s = (s & DFLL_FREQ_REQ_SCALE_MASK) >> DFLL_FREQ_REQ_SCALE_SHIFT;
 	post_scaler_rate = dfll_scale_dvco_rate(s, pre_scaler_rate);
 
-	mutex_unlock(&td->lock);
+	spin_unlock_irqrestore(&td->lock, flags);
 
 	return post_scaler_rate;
 }
@@ -2556,8 +2570,16 @@ static int rate_get(void *data, u64 *val)
 static int rate_set(void *data, u64 val)
 {
 	struct tegra_dfll *td = data;
+	int err;
+	unsigned long flags;
 
-	return dfll_request_rate(td, val);
+	spin_lock_irqsave(&td->lock, flags);
+
+	err = dfll_request_rate(td, val);
+
+	spin_unlock_irqrestore(&td->lock, flags);
+
+	return err;
 }
 DEFINE_SIMPLE_ATTRIBUTE(rate_fops, rate_get, rate_set, "%llu\n");
 
@@ -2595,8 +2617,9 @@ static int output_get(void *data, u64 *val)
 {
 	struct tegra_dfll *td = data;
 	u32 reg;
+	unsigned long flags;
 
-	mutex_lock(&td->lock);
+	spin_lock_irqsave(&td->lock, flags);
 
 	reg = dfll_readl(td, DFLL_OUTPUT_FORCE);
 	if (reg & DFLL_OUTPUT_FORCE_ENABLE) {
@@ -2610,7 +2633,7 @@ static int output_get(void *data, u64 *val)
 	*val = td->lut_uv[reg] / 1000;
 
 out:
-	mutex_unlock(&td->lock);
+	spin_unlock_irqrestore(&td->lock, flags);
 
 	return 0;
 }
@@ -2630,8 +2653,9 @@ static int fout_mv_get(void *data, u64 *val)
 static int fout_mv_set(void *data, u64 val)
 {
 	struct tegra_dfll *td = data;
+	unsigned long flags;
 
-	mutex_lock(&td->lock);
+	spin_lock_irqsave(&td->lock, flags);
 
 	if (val) {
 		u8 out_value;
@@ -2645,7 +2669,7 @@ static int fout_mv_set(void *data, u64 val)
 		dfll_set_force_output_enabled(td, false);
 	}
 
-	mutex_unlock(&td->lock);
+	spin_unlock_irqrestore(&td->lock, flags);
 
 	return 0;
 }
@@ -2663,13 +2687,14 @@ static int undershoot_get(void *data, u64 *val)
 static int undershoot_set(void *data, u64 val)
 {
 	struct tegra_dfll *td = data;
+	unsigned long flags;
 
-	mutex_lock(&td->lock);
+	spin_lock_irqsave(&td->lock, flags);
 
 	td->pmu_undershoot_gb = val;
 	set_force_out_min(td);
 
-	mutex_unlock(&td->lock);
+	spin_unlock_irqrestore(&td->lock, flags);
 
 	return 0;
 }
@@ -2687,13 +2712,14 @@ static int tune_high_mv_get(void *data, u64 *val)
 static int tune_high_mv_set(void *data, u64 val)
 {
 	struct tegra_dfll *td = data;
+	unsigned long flags;
 
-	mutex_lock(&td->lock);
+	spin_lock_irqsave(&td->lock, flags);
 	td->soc->tune_high_min_millivolts = val;
 	dfll_init_tuning_thresholds(td);
 	if (td->mode == DFLL_CLOSED_LOOP)
 		dfll_set_frequency_request(td, &td->last_req);
-	mutex_unlock(&td->lock);
+	spin_unlock_irqrestore(&td->lock, flags);
 
 	return clk_set_rate_nocache(td->dfll_clk, clk_get_rate(td->dfll_clk));
 }
@@ -2704,8 +2730,9 @@ static int registers_show(struct seq_file *s, void *data)
 {
 	u32 val, offs;
 	struct tegra_dfll *td = s->private;
+	unsigned long flags;
 
-	mutex_lock(&td->lock);
+	spin_lock_irqsave(&td->lock, flags);
 
 	seq_puts(s, "CONTROL REGISTERS:\n");
 	for (offs = 0; offs <= DFLL_MONITOR_DATA; offs += 4) {
@@ -2754,7 +2781,7 @@ static int registers_show(struct seq_file *s, void *data)
 				   __raw_readl(td->lut_base + offs));
 	}
 
-	mutex_unlock(&td->lock);
+	spin_unlock_irqrestore(&td->lock, flags);
 
 	return 0;
 }
@@ -2765,6 +2792,7 @@ static ssize_t register_write(struct file *file,
 	char buf[80];
 	u32 offs;
 	u32 val;
+	unsigned long flags;
 	struct tegra_dfll *td = file->f_path.dentry->d_inode->i_private;
 
 	if (sizeof(buf) <= count)
@@ -2785,9 +2813,9 @@ static ssize_t register_write(struct file *file,
 		return -EINVAL;
 
 	clk_enable(td->soc_clk);
-	mutex_lock(&td->lock);
+	spin_lock_irqsave(&td->lock, flags);
 	dfll_writel(td, val, offs & (~0x3));
-	mutex_unlock(&td->lock);
+	spin_unlock_irqrestore(&td->lock, flags);
 	clk_disable(td->soc_clk);
 
 	return count;
@@ -2965,7 +2993,7 @@ int tegra_dfll_register(struct platform_device *pdev,
 	if (ret)
 		return ret;
 
-	mutex_init(&td->lock);
+	spin_lock_init(&td->lock);
 
 	ret = dfll_register_clk(td);
 	if (ret) {
