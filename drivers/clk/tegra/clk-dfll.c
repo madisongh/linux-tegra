@@ -37,6 +37,7 @@
  *
  */
 
+#include <dt-bindings/thermal/tegra210-dfll-trips.h>
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/debugfs.h>
@@ -3186,6 +3187,65 @@ static const struct file_operations registers_fops = {
 	.release	= single_release,
 };
 
+static int profiles_show(struct seq_file *s, void *data)
+{
+	struct thermal_tv tv;
+	int i, size;
+	unsigned long r;
+	struct tegra_dfll *td = s->private;
+	u8 v;
+
+	size = td->soc->thermal_cap_table_size;
+	seq_printf(s, "THERM CAPS:%s\n", size ? "" : " NONE");
+	for (i = 0; i < size; i++) {
+		tv = td->soc->thermal_cap_table[i];
+		if (tv.temp == TEGRA210_DFLL_THERMAL_CAP_NOCAP / 1000)
+			continue;
+		seq_printf(s, "%3dC.. %5dmV\n", tv.temp, tv.millivolts);
+	}
+
+	if (td->tune_high_target_rate_min == ULONG_MAX) {
+		seq_puts(s, "TUNE HIGH: NONE\n");
+	} else {
+		seq_puts(s, "TUNE HIGH:\n");
+		seq_printf(s, "min    %5dmV%9lukHz\n",
+			   td->lut_uv[td->tune_high_out_min],
+			   td->tune_high_dvco_rate_min / 1000);
+		seq_printf(s, "%-14s%9lukHz\n", "rate threshold",
+			   td->tune_high_target_rate_min / 1000);
+	}
+
+	size = td->soc->thermal_floor_table_size;
+	seq_printf(s, "THERM FLOORS:%s\n", size ? "" : " NONE");
+	for (i = 0; i < size; i++) {
+		tv = td->soc->thermal_floor_table[i];
+		r = td->dvco_rate_floors[i];
+		v = find_mv_out_cap(td, tv.millivolts);
+		seq_printf(s, " ..%3dC%5dmV%9lukHz%s\n",
+			   tv.temp, tv.millivolts,
+			   (r ? : get_dvco_rate_below(td, v)) / 1000,
+			   r ? " (calibrated)"  : "");
+	}
+	r = td->dvco_rate_floors[i];
+	seq_printf(s, "  vmin:%5dmV%9lukHz%s\n", td->lut_uv[0] / 1000,
+		   (r ? : td->out_rate_min) / 1000,
+		   r ? " (calibrated)"  : "");
+
+	return 0;
+}
+
+static int profiles_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, profiles_show, inode->i_private);
+}
+
+static const struct file_operations profiles_fops = {
+	.open		= profiles_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
 static struct {
 	char				*name;
 	umode_t				mode;
@@ -3203,6 +3263,7 @@ static struct {
 	{ "vmin_mv", S_IRUGO, &vmin_fops },
 	{ "vmax_mv", S_IRUGO, &vmax_fops },
 	{ "output_mv", S_IRUGO, &output_fops },
+	{ "profiles", S_IRUGO, &profiles_fops },
 };
 
 static int dfll_debug_init(struct tegra_dfll *td)
