@@ -3224,6 +3224,10 @@ static int dfll_debug_init(struct tegra_dfll *td)
 			goto err_out;
 	}
 
+	if (!debugfs_create_x32("flags", S_IRUGO, td->debugfs_dir,
+				&td->cfg_flags))
+		goto err_out;
+
 	debugfs_create_symlink("monitor", td->debugfs_dir, "rate");
 	debugfs_create_symlink("dvco_rate", td->debugfs_dir, "dvco_rate_min");
 
