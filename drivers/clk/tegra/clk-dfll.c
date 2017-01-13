@@ -1089,7 +1089,7 @@ static void dfll_init_out_if(struct tegra_dfll *td)
 
 	if (td->pmu_if == TEGRA_DFLL_PMU_PWM) {
 		int vinit = td->reg_init_uV;
-		int vstep = td->soc->alignment;
+		int vstep = td->soc->alignment.step_uv;
 		int vmin = regulator_list_voltage_unlocked(td->vdd_reg, 0);
 
 		/* clear DFLL_OUTPUT_CFG before setting new value */
@@ -1159,12 +1159,12 @@ static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
 		rcu_read_unlock();
 		return PTR_ERR(opp);
 	}
-	align_volt = dev_pm_opp_get_voltage(opp) / td->soc->alignment;
+	align_volt = dev_pm_opp_get_voltage(opp) / td->soc->alignment.step_uv;
 
 	rcu_read_unlock();
 
 	for (i = 0; i < td->lut_size; i++) {
-		if ((td->lut_uv[i] / td->soc->alignment) >= align_volt)
+		if ((td->lut_uv[i] / td->soc->alignment.step_uv) >= align_volt)
 			return i;
 	}
 
@@ -2261,6 +2261,15 @@ u32 tegra_dfll_get_thermal_floor(int index)
 }
 EXPORT_SYMBOL(tegra_dfll_get_thermal_floor);
 
+/**
+ * tegra_dfll_get_alignment - return DFLL alignment
+ */
+struct rail_alignment *tegra_dfll_get_alignment(void)
+{
+	return &tegra_dfll_dev->soc->alignment;
+}
+EXPORT_SYMBOL(tegra_dfll_get_alignment);
+
 /*
  * DFLL initialization
  */
@@ -2445,12 +2454,12 @@ static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
 {
 	int i, n_voltages, reg_volt, align_volt;
 
-	align_volt = uV / td->soc->alignment;
+	align_volt = uV / td->soc->alignment.step_uv;
 	n_voltages = regulator_count_voltages(td->vdd_reg);
 
 	for (i = 0; i < n_voltages; i++) {
 		reg_volt = regulator_list_voltage_unlocked(td->vdd_reg, i) /
-					td->soc->alignment;
+					td->soc->alignment.step_uv;
 
 		if (reg_volt < 0)
 			break;
@@ -2471,12 +2480,12 @@ static int find_vdd_map_entry_min(struct tegra_dfll *td, int uV)
 {
 	int i, n_voltages, reg_volt, align_volt;
 
-	align_volt = uV / td->soc->alignment;
+	align_volt = uV / td->soc->alignment.step_uv;
 	n_voltages = regulator_count_voltages(td->vdd_reg);
 
 	for (i = 0; i < n_voltages; i++) {
 		reg_volt = regulator_list_voltage_unlocked(td->vdd_reg, i) /
-					td->soc->alignment;
+					td->soc->alignment.step_uv;
 
 		if (reg_volt < 0)
 			break;
@@ -2531,7 +2540,7 @@ static int dfll_build_lut(struct tegra_dfll *td)
 	}
 
 	v_min_align = DIV_ROUND_UP(td->soc->min_millivolts * 1000,
-			td->soc->alignment) * td->soc->alignment;
+		td->soc->alignment.step_uv) * td->soc->alignment.step_uv;
 
 	if (lut < 0)
 		goto out;

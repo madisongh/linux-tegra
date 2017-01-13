@@ -1,6 +1,6 @@
 /*
  * clk-dfll.h - prototypes and macros for the Tegra DFLL clocksource driver
- * Copyright (C) 2013 NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2013-2017 NVIDIA Corporation.  All rights reserved.
  *
  * Aleksandr Frid <afrid@nvidia.com>
  * Paul Walmsley <pwalmsley@nvidia.com>
@@ -21,6 +21,7 @@
 #include <linux/platform_device.h>
 #include <linux/reset.h>
 #include <linux/types.h>
+#include <soc/tegra/cvb.h>
 
 struct thermal_tv;
 
@@ -42,8 +43,8 @@ struct thermal_tv;
  */
 struct tegra_dfll_soc_data {
 	struct device *dev;
+	struct rail_alignment alignment;
 	unsigned int min_millivolts;
-	unsigned int alignment;
 	u32 tune0_low;
 	u32 tune0_high;
 	u32 tune1;

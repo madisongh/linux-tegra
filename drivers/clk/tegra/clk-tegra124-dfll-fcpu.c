@@ -1,7 +1,7 @@
 /*
  * Tegra124 DFLL FCPU clock source driver
  *
- * Copyright (C) 2012-2014 NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2012-2017 NVIDIA Corporation.  All rights reserved.
  *
  * Aleksandr Frid <afrid@nvidia.com>
  * Paul Walmsley <pwalmsley@nvidia.com>
@@ -619,7 +619,8 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 	}
 
 	soc->min_millivolts = cvb->min_millivolts;
-	soc->alignment = align.step_uv;
+	soc->alignment.step_uv = align.step_uv;
+	soc->alignment.offset_uv = align.offset_uv;
 	soc->tune0_low = cvb->cpu_dfll_data.tune0_low;
 	soc->tune0_high = cvb->cpu_dfll_data.tune0_high;
 	soc->tune1 = cvb->cpu_dfll_data.tune1;
