@@ -14,7 +14,7 @@
 #include <linux/padctrl/padctrl.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <dt-bindings/padctrl/tegra210-pads.h>
+#include <dt-bindings/soc/tegra-io-pads.h>
 
 #include <soc/tegra/pmc.h>
 
