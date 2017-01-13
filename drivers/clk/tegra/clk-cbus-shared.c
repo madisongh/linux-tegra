@@ -1034,6 +1034,7 @@ static struct tegra_clk_cbus_shared *tegra_clk_init_shared(const char *name,
 		}
 		shared->u.shared_bus_user.client = client_clk;
 		shared->magic = TEGRA_CLK_SHARED_MAGIC;
+		flags |= TEGRA_SHARED_BUS_RACE_TO_SLEEP;
 	}
 
 	shared->u.shared_bus_user.mode = mode;
