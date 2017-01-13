@@ -51,7 +51,6 @@ config CORESIGHT_SINK_ETBV10
 
 config CORESIGHT_SOURCE_ETM3X
 	bool "CoreSight Embedded Trace Macrocell 3.x driver"
-	depends on !ARM64
 	select CORESIGHT_LINKS_AND_SINKS
 	help
 	  This driver provides support for processor ETM3.x and PTM1.x modules,

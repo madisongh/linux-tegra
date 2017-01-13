@@ -45,29 +45,14 @@ static struct etm_drvdata *etmdrvdata[NR_CPUS];
 static inline void etm_writel(struct etm_drvdata *drvdata,
 			      u32 val, u32 off)
 {
-	if (drvdata->use_cp14) {
-		if (etm_writel_cp14(off, val)) {
-			dev_err(drvdata->dev,
-				"invalid CP14 access to ETM reg: %#x", off);
-		}
-	} else {
-		writel_relaxed(val, drvdata->base + off);
-	}
+	writel_relaxed(val, drvdata->base + off);
 }
 
 static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
 {
 	u32 val;
 
-	if (drvdata->use_cp14) {
-		if (etm_readl_cp14(off, &val)) {
-			dev_err(drvdata->dev,
-				"invalid CP14 access to ETM reg: %#x", off);
-		}
-	} else {
-		val = readl_relaxed(drvdata->base + off);
-	}
-
+	val = readl_relaxed(drvdata->base + off);
 	return val;
 }
 
@@ -1591,14 +1576,14 @@ static struct attribute *coresight_etm_attrs[] = {
 	NULL,
 };
 
-#define coresight_simple_func(name, offset)                             \
-static ssize_t name##_show(struct device *_dev,                         \
-			   struct device_attribute *attr, char *buf)    \
-{                                                                       \
-	struct etm_drvdata *drvdata = dev_get_drvdata(_dev->parent);    \
-	return scnprintf(buf, PAGE_SIZE, "0x%x\n",                      \
-			 readl_relaxed(drvdata->base + offset));        \
-}                                                                       \
+#define coresight_simple_func(name, offset)				\
+static ssize_t name##_show(struct device *_dev,				\
+			   struct device_attribute *attr, char *buf)	\
+{									\
+	struct etm_drvdata *drvdata = dev_get_drvdata(_dev->parent);	\
+	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
+			 readl_relaxed(drvdata->base + offset));	\
+}									\
 DEVICE_ATTR_RO(name)
 
 coresight_simple_func(etmccr, ETMCCR);
@@ -1917,6 +1902,11 @@ static const struct dev_pm_ops etm_dev_pm_ops = {
 static struct amba_id etm_ids[] = {
 	{	/* ETM 3.3 */
 		.id	= 0x0003b921,
+		.mask	= 0x0003ffff,
+		.data	= "ETM 3.3",
+	},
+	{	/* ETM 3.3 */
+		.id	= 0x0003b931,
 		.mask	= 0x0003ffff,
 		.data	= "ETM 3.3",
 	},
