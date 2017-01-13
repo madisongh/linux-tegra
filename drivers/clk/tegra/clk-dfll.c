@@ -2198,6 +2198,17 @@ u32 tegra_dfll_get_thermal_floor_mv(void)
 EXPORT_SYMBOL(tegra_dfll_get_thermal_floor_mv);
 
 /**
+ * tegra_dfll_get_peak_thermal_floor_mv - get millivolts of peak thermal floor
+ */
+u32 tegra_dfll_get_peak_thermal_floor_mv(void)
+{
+	int mv = tegra_dfll_dev->soc->thermal_floor_table[0].millivolts;
+
+	return tegra_round_voltage(mv, &tegra_dfll_dev->soc->alignment, 1);
+}
+EXPORT_SYMBOL(tegra_dfll_get_peak_thermal_floor_mv);
+
+/**
  * tegra_dfll_get_thermal_index - return millivolts of thermal cap
  */
 u32 tegra_dfll_get_thermal_cap_mv(void)
@@ -2251,15 +2262,6 @@ u32 tegra_dfll_get_min_millivolts(void)
 	return tegra_dfll_dev->soc->min_millivolts;
 }
 EXPORT_SYMBOL(tegra_dfll_get_min_millivolts);
-
-/**
- * tegra_dfll_get_thermal_floor - return millivolts for thermal floor
- */
-u32 tegra_dfll_get_thermal_floor(int index)
-{
-	return tegra_dfll_dev->soc->thermal_floor_table[index].millivolts;
-}
-EXPORT_SYMBOL(tegra_dfll_get_thermal_floor);
 
 /**
  * tegra_dfll_get_alignment - return DFLL alignment
