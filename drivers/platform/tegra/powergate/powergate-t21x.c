@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -191,7 +191,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			[5] = { .clk_name = "vi_slcg_ovr" },
 			[6] = { .clk_name = "ispa_slcg_ovr" },
 		},
-		.reset_id = { TEGRA210_CLK_ISP, TEGRA210_CLK_VI,
+		.reset_id = { TEGRA210_CLK_ISPA, TEGRA210_CLK_VI,
 			      TEGRA210_CLK_CSI, TEGRA210_CLK_VI_I2C },
 		.reset_id_num = 4,
 	},
