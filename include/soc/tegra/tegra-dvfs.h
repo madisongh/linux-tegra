@@ -166,7 +166,6 @@ struct dvfs {
 	bool use_alt_freqs;
 	bool therm_dvfs;
 	bool na_dvfs;
-	bool na_therm_update;
 
 	/* Maximum rate safe at minimum voltage across all thermal ranges */
 	unsigned long fmax_at_vmin_safe_t;
