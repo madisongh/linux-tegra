@@ -1592,6 +1592,7 @@ static int __tegra_xudc_ep_disable(struct tegra_xudc_ep *ep)
 		u32 val;
 
 		xudc->device_state = USB_STATE_ADDRESS;
+		usb_gadget_set_state(&xudc->gadget, xudc->device_state);
 
 		val = xudc_readl(xudc, CTRL);
 		val &= ~CTRL_RUN;
@@ -1683,6 +1684,7 @@ static int __tegra_xudc_ep_enable(struct tegra_xudc_ep *ep,
 		xudc_writel(xudc, val, CTRL);
 
 		xudc->device_state = USB_STATE_CONFIGURED;
+		usb_gadget_set_state(&xudc->gadget, xudc->device_state);
 	}
 
 	if (usb_endpoint_xfer_isoc(desc)) {
@@ -1833,6 +1835,7 @@ static void tegra_xudc_resume_device_state(struct tegra_xudc *xudc)
 
 	if (xudc->device_state == USB_STATE_SUSPENDED) {
 		xudc->device_state = xudc->resume_state;
+		usb_gadget_set_state(&xudc->gadget, xudc->device_state);
 		xudc->resume_state = 0;
 	}
 
@@ -1929,6 +1932,7 @@ static int tegra_xudc_gadget_start(struct usb_gadget *gadget,
 
 	xudc->setup_state = WAIT_FOR_SETUP;
 	xudc->device_state = USB_STATE_DEFAULT;
+	usb_gadget_set_state(&xudc->gadget, xudc->device_state);
 
 	ret = __tegra_xudc_ep_enable(&xudc->ep[0], &tegra_xudc_ep0_desc);
 	if (ret < 0)
@@ -2308,11 +2312,14 @@ static void set_address_complete(struct usb_ep *ep, struct usb_request *req)
 	struct tegra_xudc *xudc = req->context;
 
 	if ((xudc->device_state == USB_STATE_DEFAULT) &&
-	    (xudc->dev_addr != 0))
+	    (xudc->dev_addr != 0)) {
 		xudc->device_state = USB_STATE_ADDRESS;
-	else if ((xudc->device_state == USB_STATE_ADDRESS) &&
-		   (xudc->dev_addr == 0))
+		usb_gadget_set_state(&xudc->gadget, xudc->device_state);
+	} else if ((xudc->device_state == USB_STATE_ADDRESS) &&
+		   (xudc->dev_addr == 0)) {
 		xudc->device_state = USB_STATE_DEFAULT;
+		usb_gadget_set_state(&xudc->gadget, xudc->device_state);
+	}
 }
 
 static int tegra_xudc_ep0_set_address(struct tegra_xudc *xudc,
@@ -2618,6 +2625,7 @@ static void tegra_xudc_reset(struct tegra_xudc *xudc)
 
 	xudc->setup_state = WAIT_FOR_SETUP;
 	xudc->device_state = USB_STATE_DEFAULT;
+	usb_gadget_set_state(&xudc->gadget, xudc->device_state);
 
 	ep_unpause_all(xudc);
 
@@ -2670,6 +2678,8 @@ static void tegra_xudc_port_connect(struct tegra_xudc *xudc)
 	}
 
 	xudc->device_state = USB_STATE_DEFAULT;
+	usb_gadget_set_state(&xudc->gadget, xudc->device_state);
+
 	xudc->setup_state = WAIT_FOR_SETUP;
 
 	if (xudc->gadget.speed == USB_SPEED_SUPER)
@@ -2714,6 +2724,9 @@ static void tegra_xudc_port_disconnect(struct tegra_xudc *xudc)
 		spin_lock(&xudc->lock);
 	}
 
+	xudc->device_state = USB_STATE_NOTATTACHED;
+	usb_gadget_set_state(&xudc->gadget, xudc->device_state);
+
 	complete(&xudc->disconnect_complete);
 }
 
@@ -2733,6 +2746,7 @@ static void tegra_xudc_port_suspend(struct tegra_xudc *xudc)
 	dev_dbg(xudc->dev, "port suspend\n");
 	xudc->resume_state = xudc->device_state;
 	xudc->device_state = USB_STATE_SUSPENDED;
+	usb_gadget_set_state(&xudc->gadget, xudc->device_state);
 	if (xudc->driver->suspend) {
 		spin_unlock(&xudc->lock);
 		xudc->driver->suspend(&xudc->gadget);
