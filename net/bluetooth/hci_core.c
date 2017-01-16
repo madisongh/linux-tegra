@@ -2,6 +2,7 @@
    BlueZ - Bluetooth protocol stack for Linux
    Copyright (C) 2000-2001 Qualcomm Incorporated
    Copyright (C) 2011 ProFUSION Embedded Systems
+   Copyright (c) 2017, NVIDIA CORPORATION. All rights reserved.
 
    Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>
 
@@ -838,9 +839,6 @@ static void hci_init3_req(struct hci_request *req, unsigned long opt)
 		}
 
 		if (hdev->le_features[0] & HCI_LE_DATA_LEN_EXT) {
-			/* Read LE Maximum Data Length */
-			hci_req_add(req, HCI_OP_LE_READ_MAX_DATA_LEN, 0, NULL);
-
 			/* Read LE Suggested Default Data Length */
 			hci_req_add(req, HCI_OP_LE_READ_DEF_DATA_LEN, 0, NULL);
 		}
