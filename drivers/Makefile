@@ -176,6 +176,7 @@ obj-$(CONFIG_STM)		+= hwtracing/stm/
 obj-$(CONFIG_ANDROID)		+= android/
 obj-$(CONFIG_NVMEM)		+= nvmem/
 obj-$(CONFIG_FPGA)		+= fpga/
+obj-$(CONFIG_NVPMODEL_EMC)	+= nvpmodel/
 
 # The wildcard hack is necessary for kernel's make clean.
 ifneq ($(wildcard $(srctree)/../t18x/drivers/Makefile.*),)
