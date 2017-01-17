@@ -1,9 +1,8 @@
-From d9adabf26e20b9703a271c30854fb7c4cd521714 Mon Sep 17 00:00:00 2001
+From 6c348d146969e0535ab834e3cc92bbc7ac01ceb5 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 21 Jan 2016 15:58:56 +0100
-Subject: [PATCH 271/351] sched: fixup migrate disable (all tasks were bound to
+Subject: [PATCH 271/365] sched: fixup migrate disable (all tasks were bound to
  CPU0)
-X-NVConfidentiality: public
 
 Includes:
 |From: Thomas Gleixner <tglx@linutronix.de>
@@ -39,7 +38,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  6 files changed, 48 insertions(+), 104 deletions(-)
 
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index eb165902ae60..a6a87095ca40 100644
+index eb16590..a6a8709 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -3300,14 +3300,19 @@ static inline int __migrate_disabled(struct task_struct *p)
@@ -66,10 +65,10 @@ index eb165902ae60..a6a87095ca40 100644
  extern long sched_getaffinity(pid_t pid, struct cpumask *mask);
  
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 0add633db364..6bbe7ab5eca7 100644
+index 88bfe2d..c4cc43d 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -1093,15 +1093,6 @@ void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
+@@ -1096,15 +1096,6 @@ void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
  		rq_clock_skip_update(rq, true);
  }
  
@@ -85,7 +84,7 @@ index 0add633db364..6bbe7ab5eca7 100644
  #ifdef CONFIG_SMP
  /*
   * This is how migration works:
-@@ -1226,7 +1217,7 @@ void do_set_cpus_allowed(struct task_struct *p, const struct cpumask *new_mask)
+@@ -1229,7 +1220,7 @@ void do_set_cpus_allowed(struct task_struct *p, const struct cpumask *new_mask)
  
  	lockdep_assert_held(&p->pi_lock);
  
@@ -94,7 +93,7 @@ index 0add633db364..6bbe7ab5eca7 100644
  		cpumask_copy(&p->cpus_allowed, new_mask);
  		return;
  	}
-@@ -1775,7 +1766,7 @@ int select_task_rq(struct task_struct *p, int cpu, int sd_flags, int wake_flags)
+@@ -1778,7 +1769,7 @@ int select_task_rq(struct task_struct *p, int cpu, int sd_flags, int wake_flags)
  {
  	lockdep_assert_held(&p->pi_lock);
  
@@ -103,7 +102,7 @@ index 0add633db364..6bbe7ab5eca7 100644
  		cpu = p->sched_class->select_task_rq(p, cpu, sd_flags, wake_flags);
  
  	/*
-@@ -3174,38 +3165,6 @@ static inline void schedule_debug(struct task_struct *prev)
+@@ -3199,38 +3190,6 @@ static inline void schedule_debug(struct task_struct *prev)
  
  #if defined(CONFIG_PREEMPT_RT_FULL) && defined(CONFIG_SMP)
  
@@ -142,7 +141,7 @@ index 0add633db364..6bbe7ab5eca7 100644
  void migrate_disable(void)
  {
  	struct task_struct *p = current;
-@@ -3233,6 +3192,7 @@ void migrate_disable(void)
+@@ -3258,6 +3217,7 @@ void migrate_disable(void)
  	preempt_lazy_disable();
  	pin_current_cpu();
  	p->migrate_disable = 1;
@@ -150,7 +149,7 @@ index 0add633db364..6bbe7ab5eca7 100644
  	preempt_enable();
  }
  EXPORT_SYMBOL(migrate_disable);
-@@ -3240,9 +3200,6 @@ EXPORT_SYMBOL(migrate_disable);
+@@ -3265,9 +3225,6 @@ EXPORT_SYMBOL(migrate_disable);
  void migrate_enable(void)
  {
  	struct task_struct *p = current;
@@ -160,7 +159,7 @@ index 0add633db364..6bbe7ab5eca7 100644
  
  	if (in_atomic()) {
  #ifdef CONFIG_SCHED_DEBUG
-@@ -3259,33 +3216,17 @@ void migrate_enable(void)
+@@ -3284,33 +3241,17 @@ void migrate_enable(void)
  #endif
  	WARN_ON_ONCE(p->migrate_disable <= 0);
  
@@ -200,7 +199,7 @@ index 0add633db364..6bbe7ab5eca7 100644
  
  	unpin_current_cpu();
  	preempt_enable();
-@@ -3409,8 +3350,6 @@ static void __sched notrace __schedule(bool preempt)
+@@ -3434,8 +3375,6 @@ static void __sched notrace __schedule(bool preempt)
  	raw_spin_lock_irq(&rq->lock);
  	lockdep_pin_lock(&rq->lock);
  
@@ -210,7 +209,7 @@ index 0add633db364..6bbe7ab5eca7 100644
  
  	switch_count = &prev->nivcsw;
 diff --git a/kernel/sched/cpudeadline.c b/kernel/sched/cpudeadline.c
-index 5a75b08cfd85..5be58820465c 100644
+index 5a75b08..5be5882 100644
 --- a/kernel/sched/cpudeadline.c
 +++ b/kernel/sched/cpudeadline.c
 @@ -103,10 +103,10 @@ int cpudl_find(struct cpudl *cp, struct task_struct *p,
@@ -227,7 +226,7 @@ index 5a75b08cfd85..5be58820465c 100644
  		best_cpu = cpudl_maximum(cp);
  		if (later_mask)
 diff --git a/kernel/sched/cpupri.c b/kernel/sched/cpupri.c
-index 981fcd7dc394..11e9705bf937 100644
+index 981fcd7..11e9705 100644
 --- a/kernel/sched/cpupri.c
 +++ b/kernel/sched/cpupri.c
 @@ -103,11 +103,11 @@ int cpupri_find(struct cpupri *cp, struct task_struct *p,
@@ -245,7 +244,7 @@ index 981fcd7dc394..11e9705bf937 100644
  			/*
  			 * We have to ensure that we have at least one bit
 diff --git a/kernel/sched/deadline.c b/kernel/sched/deadline.c
-index 4547e41520f8..37d2427104d5 100644
+index 4547e41..37d2427 100644
 --- a/kernel/sched/deadline.c
 +++ b/kernel/sched/deadline.c
 @@ -134,7 +134,7 @@ static void inc_dl_migration(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
@@ -372,7 +371,7 @@ index 4547e41520f8..37d2427104d5 100644
  #else
  		if (dl_task(rq->curr))
 diff --git a/kernel/sched/rt.c b/kernel/sched/rt.c
-index 90b770a39951..72e23c57921b 100644
+index 90b770a..72e23c5 100644
 --- a/kernel/sched/rt.c
 +++ b/kernel/sched/rt.c
 @@ -328,7 +328,7 @@ static void inc_rt_migration(struct sched_rt_entity *rt_se, struct rt_rq *rt_rq)
@@ -478,5 +477,5 @@ index 90b770a39951..72e23c57921b 100644
  #else
  		if (p->prio < rq->curr->prio)
 -- 
-2.10.1
+2.7.4
 

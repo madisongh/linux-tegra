@@ -1,8 +1,7 @@
-From 81986c6e05a9b20a62ea29db8d420ea1d0624ea9 Mon Sep 17 00:00:00 2001
+From fdb99949a781d0c3d919eb30189de91650c02641 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 5 Oct 2011 11:59:38 -0700
-Subject: [PATCH 130/351] rcu: Merge RCU-bh into RCU-preempt
-X-NVConfidentiality: public
+Subject: [PATCH 130/365] rcu: Merge RCU-bh into RCU-preempt
 
 The Linux kernel has long RCU-bh read-side critical sections that
 intolerably increase scheduling latency under mainline's RCU-bh rules,
@@ -32,7 +31,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  4 files changed, 57 insertions(+), 2 deletions(-)
 
 diff --git a/include/linux/rcupdate.h b/include/linux/rcupdate.h
-index 1eef045c95d1..ddacc7e62911 100644
+index 1eef045..ddacc7e 100644
 --- a/include/linux/rcupdate.h
 +++ b/include/linux/rcupdate.h
 @@ -169,6 +169,9 @@ void call_rcu(struct rcu_head *head,
@@ -111,7 +110,7 @@ index 1eef045c95d1..ddacc7e62911 100644
  }
  
 diff --git a/include/linux/rcutree.h b/include/linux/rcutree.h
-index 60d15a080d7c..436c9e62bfc6 100644
+index 60d15a0..436c9e6 100644
 --- a/include/linux/rcutree.h
 +++ b/include/linux/rcutree.h
 @@ -44,7 +44,11 @@ static inline void rcu_virt_note_context_switch(int cpu)
@@ -167,7 +166,7 @@ index 60d15a080d7c..436c9e62bfc6 100644
  
  #endif /* __LINUX_RCUTREE_H */
 diff --git a/kernel/rcu/tree.c b/kernel/rcu/tree.c
-index f07343b54fe5..d52db2c442e3 100644
+index f07343b..d52db2c 100644
 --- a/kernel/rcu/tree.c
 +++ b/kernel/rcu/tree.c
 @@ -266,6 +266,7 @@ void rcu_sched_qs(void)
@@ -257,7 +256,7 @@ index f07343b54fe5..d52db2c442e3 100644
  /**
   * rcu_barrier_sched - Wait for in-flight call_rcu_sched() callbacks.
 diff --git a/kernel/rcu/update.c b/kernel/rcu/update.c
-index 5f748c5a40f0..9a3904603ff6 100644
+index 5f748c5..9a39046 100644
 --- a/kernel/rcu/update.c
 +++ b/kernel/rcu/update.c
 @@ -276,6 +276,7 @@ int rcu_read_lock_held(void)
@@ -277,5 +276,5 @@ index 5f748c5a40f0..9a3904603ff6 100644
  #endif /* #ifdef CONFIG_DEBUG_LOCK_ALLOC */
  
 -- 
-2.10.1
+2.7.4
 

@@ -1,8 +1,7 @@
-From da2a8b90963c49f4a80d16296ba2d9d39e80fc11 Mon Sep 17 00:00:00 2001
+From 1d68ce7a1b8f947eee0ce12850650f8df6ac22b3 Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Tue, 14 Jul 2015 14:26:34 +0200
-Subject: [PATCH 116/351] futex: Fix bug on when a requeued RT task times out
-X-NVConfidentiality: public
+Subject: [PATCH 116/365] futex: Fix bug on when a requeued RT task times out
 
 Requeue with timeout causes a bug with PREEMPT_RT_FULL.
 
@@ -56,7 +55,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  2 files changed, 32 insertions(+), 1 deletion(-)
 
 diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
-index 1a30a891037d..f0326471a922 100644
+index 1a30a89..f032647 100644
 --- a/kernel/locking/rtmutex.c
 +++ b/kernel/locking/rtmutex.c
 @@ -71,7 +71,8 @@ static void fixup_rt_mutex_waiters(struct rt_mutex *lock)
@@ -106,7 +105,7 @@ index 1a30a891037d..f0326471a922 100644
  	ret = task_blocks_on_rt_mutex(lock, waiter, task,
  				      RT_MUTEX_FULL_CHAINWALK);
 diff --git a/kernel/locking/rtmutex_common.h b/kernel/locking/rtmutex_common.h
-index 1c1bcc5cbd69..11f2f51e1373 100644
+index 1c1bcc5..11f2f51 100644
 --- a/kernel/locking/rtmutex_common.h
 +++ b/kernel/locking/rtmutex_common.h
 @@ -98,6 +98,7 @@ enum rtmutex_chainwalk {
@@ -118,5 +117,5 @@ index 1c1bcc5cbd69..11f2f51e1373 100644
  extern struct task_struct *rt_mutex_next_owner(struct rt_mutex *lock);
  extern void rt_mutex_init_proxy_locked(struct rt_mutex *lock,
 -- 
-2.10.1
+2.7.4
 

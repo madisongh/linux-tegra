@@ -1,8 +1,7 @@
-From 3d4d3512abcfe4cdd75dc05270a8e9ee5e469741 Mon Sep 17 00:00:00 2001
+From d17499f0f214d22d3472d964f846c92852bba10c Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 23 Jun 2015 15:32:51 +0200
-Subject: [PATCH 182/351] irqwork: push most work into softirq context
-X-NVConfidentiality: public
+Subject: [PATCH 182/365] irqwork: push most work into softirq context
 
 Initially we defered all irqwork into softirq because we didn't want the
 latency spikes if perf or another user was busy and delayed the RT task.
@@ -29,7 +28,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  5 files changed, 47 insertions(+), 14 deletions(-)
 
 diff --git a/include/linux/irq_work.h b/include/linux/irq_work.h
-index 47b9ebd4a74f..0e427a9997f3 100644
+index 47b9ebd..0e427a9 100644
 --- a/include/linux/irq_work.h
 +++ b/include/linux/irq_work.h
 @@ -16,6 +16,7 @@
@@ -41,7 +40,7 @@ index 47b9ebd4a74f..0e427a9997f3 100644
  struct irq_work {
  	unsigned long flags;
 diff --git a/kernel/irq_work.c b/kernel/irq_work.c
-index bcf107ce0854..0ddaf1e66d8c 100644
+index bcf107c..0ddaf1e 100644
 --- a/kernel/irq_work.c
 +++ b/kernel/irq_work.c
 @@ -17,6 +17,7 @@
@@ -148,7 +147,7 @@ index bcf107ce0854..0ddaf1e66d8c 100644
  EXPORT_SYMBOL_GPL(irq_work_run);
  
 diff --git a/kernel/sched/rt.c b/kernel/sched/rt.c
-index 55e0b4b9c8d9..90b770a39951 100644
+index 55e0b4b..90b770a 100644
 --- a/kernel/sched/rt.c
 +++ b/kernel/sched/rt.c
 @@ -94,6 +94,7 @@ void init_rt_rq(struct rt_rq *rt_rq)
@@ -160,7 +159,7 @@ index 55e0b4b9c8d9..90b770a39951 100644
  #endif /* CONFIG_SMP */
  	/* We start is dequeued state, because no RT tasks are queued */
 diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-index aa46c515931b..d536824cbd36 100644
+index aa46c51..d536824 100644
 --- a/kernel/time/tick-sched.c
 +++ b/kernel/time/tick-sched.c
 @@ -181,6 +181,11 @@ static bool can_stop_full_tick(void)
@@ -184,7 +183,7 @@ index aa46c515931b..d536824cbd36 100644
  
  /*
 diff --git a/kernel/time/timer.c b/kernel/time/timer.c
-index 161fd57c1426..acfd69bfa194 100644
+index 161fd57..acfd69b 100644
 --- a/kernel/time/timer.c
 +++ b/kernel/time/timer.c
 @@ -1484,7 +1484,7 @@ void update_process_times(int user_tick)
@@ -208,5 +207,5 @@ index 161fd57c1426..acfd69bfa194 100644
  		__run_timers(base);
  }
 -- 
-2.10.1
+2.7.4
 

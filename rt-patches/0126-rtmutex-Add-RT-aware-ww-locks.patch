@@ -1,8 +1,7 @@
-From 759f784a11361d506c662716b31ceb730a030c3b Mon Sep 17 00:00:00 2001
+From 1b4e2052ec92940792c8f9b0b7fc0af1582250a2 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
 Date: Mon, 28 Oct 2013 09:36:37 +0100
-Subject: [PATCH 126/351] rtmutex: Add RT aware ww locks
-X-NVConfidentiality: public
+Subject: [PATCH 126/365] rtmutex: Add RT aware ww locks
 
 lockdep says:
 | --------------------------------------------------------------------------
@@ -28,7 +27,7 @@ Signed-off-by: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
  1 file changed, 226 insertions(+), 25 deletions(-)
 
 diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
-index 8275f474d685..7b59f6328598 100644
+index 8275f47..7b59f63 100644
 --- a/kernel/locking/rtmutex.c
 +++ b/kernel/locking/rtmutex.c
 @@ -21,6 +21,7 @@
@@ -426,5 +425,5 @@ index 8275f474d685..7b59f6328598 100644
 +EXPORT_SYMBOL(ww_mutex_unlock);
  #endif
 -- 
-2.10.1
+2.7.4
 

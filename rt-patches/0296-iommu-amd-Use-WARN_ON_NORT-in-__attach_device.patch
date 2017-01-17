@@ -1,8 +1,7 @@
-From ce9e94357336df28a8e22b3db5a09ac435aac813 Mon Sep 17 00:00:00 2001
+From 63a8be65b593441a9ad374a23ac63ba447bfa71c Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sat, 27 Feb 2016 10:22:23 +0100
-Subject: [PATCH 296/351] iommu/amd: Use WARN_ON_NORT in __attach_device()
-X-NVConfidentiality: public
+Subject: [PATCH 296/365] iommu/amd: Use WARN_ON_NORT in __attach_device()
 
 RT does not disable interrupts here, but the protection is still
 correct. Fixup the WARN_ON so it won't yell on RT.
@@ -17,10 +16,10 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
-index b9319b76a8a1..ee52fddbc1a7 100644
+index 5975d76..c8fc4c6 100644
 --- a/drivers/iommu/amd_iommu.c
 +++ b/drivers/iommu/amd_iommu.c
-@@ -2017,10 +2017,10 @@ static int __attach_device(struct iommu_dev_data *dev_data,
+@@ -2022,10 +2022,10 @@ static int __attach_device(struct iommu_dev_data *dev_data,
  	int ret;
  
  	/*
@@ -34,7 +33,7 @@ index b9319b76a8a1..ee52fddbc1a7 100644
  
  	/* lock domain */
  	spin_lock(&domain->lock);
-@@ -2183,10 +2183,10 @@ static void __detach_device(struct iommu_dev_data *dev_data)
+@@ -2188,10 +2188,10 @@ static void __detach_device(struct iommu_dev_data *dev_data)
  	struct protection_domain *domain;
  
  	/*
@@ -49,5 +48,5 @@ index b9319b76a8a1..ee52fddbc1a7 100644
  	if (WARN_ON(!dev_data->domain))
  		return;
 -- 
-2.10.1
+2.7.4
 

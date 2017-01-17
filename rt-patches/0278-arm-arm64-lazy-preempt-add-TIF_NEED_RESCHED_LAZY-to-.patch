@@ -1,9 +1,8 @@
-From 46353f1b0ff2d1df32e572d644cf9e577d2f1569 Mon Sep 17 00:00:00 2001
+From a6e559b0bba192b1690b16df17176aa98b38e589 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 22 Jan 2016 21:33:39 +0100
-Subject: [PATCH 278/351] arm+arm64: lazy-preempt: add TIF_NEED_RESCHED_LAZY to
+Subject: [PATCH 278/365] arm+arm64: lazy-preempt: add TIF_NEED_RESCHED_LAZY to
  _TIF_WORK_MASK
-X-NVConfidentiality: public
 
 _TIF_WORK_MASK is used to check for TIF_NEED_RESCHED so we need to check
 for TIF_NEED_RESCHED_LAZY here, too.
@@ -16,7 +15,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  3 files changed, 13 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index 46cc07b5cae6..1f36a4eccc72 100644
+index 46cc07b..1f36a4e 100644
 --- a/arch/arm/include/asm/thread_info.h
 +++ b/arch/arm/include/asm/thread_info.h
 @@ -143,8 +143,8 @@ extern int vfp_restore_user_hwstate(struct user_vfp __user *,
@@ -41,7 +40,7 @@ index 46cc07b5cae6..1f36a4eccc72 100644
  #endif /* __KERNEL__ */
  #endif /* __ASM_ARM_THREAD_INFO_H */
 diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 30a7228eaceb..c3bd6cbfce4b 100644
+index 30a7228..c3bd6cb 100644
 --- a/arch/arm/kernel/entry-common.S
 +++ b/arch/arm/kernel/entry-common.S
 @@ -36,7 +36,9 @@ ret_fast_syscall:
@@ -69,7 +68,7 @@ index 30a7228eaceb..c3bd6cbfce4b 100644
  ENDPROC(ret_fast_syscall)
  
 diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index b1d2e3292dd0..0a3bf9638918 100644
+index b1d2e32..0a3bf96 100644
 --- a/arch/arm64/include/asm/thread_info.h
 +++ b/arch/arm64/include/asm/thread_info.h
 @@ -131,7 +131,8 @@ static inline struct thread_info *current_thread_info(void)
@@ -83,5 +82,5 @@ index b1d2e3292dd0..0a3bf9638918 100644
  #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
  				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
 -- 
-2.10.1
+2.7.4
 

@@ -1,9 +1,8 @@
-From cf1dd893a5e6546d629be6485e411b41fa1f065b Mon Sep 17 00:00:00 2001
+From 96c79e57732815e2d9063eb43f299e4e7e839431 Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Mon, 19 Aug 2013 17:33:25 -0400
-Subject: [PATCH 025/351] hwlat-detector: Update hwlat_detector to add outer
+Subject: [PATCH 025/365] hwlat-detector: Update hwlat_detector to add outer
  loop detection
-X-NVConfidentiality: public
 
 The hwlat_detector reads two timestamps in a row, then reports any
 gap between those calls. The problem is, it misses everything between
@@ -48,7 +47,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 26 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/misc/hwlat_detector.c b/drivers/misc/hwlat_detector.c
-index 6864f3c24c8b..c07e85932cbf 100644
+index 6864f3c..c07e859 100644
 --- a/drivers/misc/hwlat_detector.c
 +++ b/drivers/misc/hwlat_detector.c
 @@ -143,6 +143,7 @@ static void detector_exit(void);
@@ -129,5 +128,5 @@ index 6864f3c24c8b..c07e85932cbf 100644
  
  	/* handling partial reads is more trouble than it's worth */
 -- 
-2.10.1
+2.7.4
 

@@ -1,8 +1,7 @@
-From 7a90658d94aed8fa0a825e36011b87c1d12211d0 Mon Sep 17 00:00:00 2001
+From 364a14f6660f56519fc5eb00c8bff99ed0534712 Mon Sep 17 00:00:00 2001
 From: Daniel Wagner <daniel.wagner@bmw-carit.de>
 Date: Fri, 11 Jul 2014 15:26:11 +0200
-Subject: [PATCH 141/351] work-simple: Simple work queue implemenation
-X-NVConfidentiality: public
+Subject: [PATCH 141/365] work-simple: Simple work queue implemenation
 
 Provides a framework for enqueuing callbacks from irq context
 PREEMPT_RT_FULL safe. The callbacks are executed in kthread context.
@@ -21,7 +20,7 @@ Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
 diff --git a/include/linux/work-simple.h b/include/linux/work-simple.h
 new file mode 100644
-index 000000000000..f175fa9a6016
+index 0000000..f175fa9
 --- /dev/null
 +++ b/include/linux/work-simple.h
 @@ -0,0 +1,24 @@
@@ -50,7 +49,7 @@ index 000000000000..f175fa9a6016
 +
 +#endif /* _LINUX_SWORK_H */
 diff --git a/kernel/sched/Makefile b/kernel/sched/Makefile
-index 26505c182fcf..6202e8dfb0ba 100644
+index 26505c1..6202e8d 100644
 --- a/kernel/sched/Makefile
 +++ b/kernel/sched/Makefile
 @@ -15,7 +15,7 @@ endif
@@ -64,7 +63,7 @@ index 26505c182fcf..6202e8dfb0ba 100644
  obj-$(CONFIG_SCHEDSTATS) += stats.o
 diff --git a/kernel/sched/work-simple.c b/kernel/sched/work-simple.c
 new file mode 100644
-index 000000000000..e57a0522573f
+index 0000000..e57a052
 --- /dev/null
 +++ b/kernel/sched/work-simple.c
 @@ -0,0 +1,173 @@
@@ -242,5 +241,5 @@ index 000000000000..e57a0522573f
 +}
 +EXPORT_SYMBOL_GPL(swork_put);
 -- 
-2.10.1
+2.7.4
 

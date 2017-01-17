@@ -1,9 +1,8 @@
-From 487c61889e7ca65af066751a7bfc0461789b8b75 Mon Sep 17 00:00:00 2001
+From 26507a5b67c64f7710a8fff2b11e4613496a5fea Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 20 Jan 2016 15:39:05 +0100
-Subject: [PATCH 277/351] net: provide a way to delegate processing a softirq
+Subject: [PATCH 277/365] net: provide a way to delegate processing a softirq
  to ksoftirqd
-X-NVConfidentiality: public
 
 If the NET_RX uses up all of his budget it moves the following NAPI
 invocations into the `ksoftirqd`. On -RT it does not do so. Instead it
@@ -21,7 +20,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  3 files changed, 30 insertions(+), 1 deletion(-)
 
 diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 79a9622b5a38..655cee096aed 100644
+index 79a9622..655cee0 100644
 --- a/include/linux/interrupt.h
 +++ b/include/linux/interrupt.h
 @@ -465,6 +465,14 @@ extern void thread_do_softirq(void);
@@ -40,7 +39,7 @@ index 79a9622b5a38..655cee096aed 100644
  extern void raise_softirq_irqoff(unsigned int nr);
  extern void raise_softirq(unsigned int nr);
 diff --git a/kernel/softirq.c b/kernel/softirq.c
-index aff764fad236..d1e999e74d23 100644
+index aff764f..d1e999e 100644
 --- a/kernel/softirq.c
 +++ b/kernel/softirq.c
 @@ -673,6 +673,27 @@ void __raise_softirq_irqoff(unsigned int nr)
@@ -72,10 +71,10 @@ index aff764fad236..d1e999e74d23 100644
   */
  void raise_softirq_irqoff(unsigned int nr)
 diff --git a/net/core/dev.c b/net/core/dev.c
-index 01a06bbeb932..88cc76252c50 100644
+index 33c5130..0aaf93b 100644
 --- a/net/core/dev.c
 +++ b/net/core/dev.c
-@@ -4965,7 +4965,7 @@ static void net_rx_action(struct softirq_action *h)
+@@ -4983,7 +4983,7 @@ static void net_rx_action(struct softirq_action *h)
  	list_splice_tail(&repoll, &list);
  	list_splice(&list, &sd->poll_list);
  	if (!list_empty(&sd->poll_list))
@@ -85,5 +84,5 @@ index 01a06bbeb932..88cc76252c50 100644
  	net_rps_action_and_irq_enable(sd);
  }
 -- 
-2.10.1
+2.7.4
 

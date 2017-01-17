@@ -1,8 +1,7 @@
-From e39e0f0e2ec383011547b0f6089a0babc7b76265 Mon Sep 17 00:00:00 2001
+From 47100a29b71b54dfd1a57c7f5655bb50d07412cb Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 13 Jan 2016 11:25:38 +0100
-Subject: [PATCH 286/351] rtmutex: Make wait_lock irq safe
-X-NVConfidentiality: public
+Subject: [PATCH 286/365] rtmutex: Make wait_lock irq safe
 
 Sasha reported a lockdep splat about a potential deadlock between RCU boosting
 rtmutex and the posix timer it_lock.
@@ -43,7 +42,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  2 files changed, 102 insertions(+), 94 deletions(-)
 
 diff --git a/kernel/futex.c b/kernel/futex.c
-index 67cd1f970f80..ad38af0bcff3 100644
+index 67cd1f9..ad38af0 100644
 --- a/kernel/futex.c
 +++ b/kernel/futex.c
 @@ -1226,7 +1226,7 @@ static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_q *this,
@@ -99,7 +98,7 @@ index 67cd1f970f80..ad38af0bcff3 100644
  		goto out;
  	}
 diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
-index e1ddae39d56b..a6f5326e4056 100644
+index e1ddae3..a6f5326 100644
 --- a/kernel/locking/rtmutex.c
 +++ b/kernel/locking/rtmutex.c
 @@ -111,13 +111,14 @@ static inline void mark_rt_mutex_waiters(struct rt_mutex *lock)
@@ -746,5 +745,5 @@ index e1ddae39d56b..a6f5326e4056 100644
  	return ret;
  }
 -- 
-2.10.1
+2.7.4
 

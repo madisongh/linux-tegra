@@ -1,8 +1,7 @@
-From a69961476cf04774781f31724828ab676ed9213c Mon Sep 17 00:00:00 2001
+From 2f711843ed49f2ab7a524882b050794fa226db33 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 30 Oct 2015 11:59:07 +0100
-Subject: [PATCH 075/351] ipc/msg: Implement lockless pipelined wakeups
-X-NVConfidentiality: public
+Subject: [PATCH 075/365] ipc/msg: Implement lockless pipelined wakeups
 
 This patch moves the wakeup_process() invocation so it is not done under
 the perm->lock by making use of a lockless wake_q. With this change, the
@@ -26,7 +25,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 28 insertions(+), 73 deletions(-)
 
 diff --git a/ipc/msg.c b/ipc/msg.c
-index 1471db9a7e61..b8c5e7f2bebc 100644
+index c6521c2..996d890 100644
 --- a/ipc/msg.c
 +++ b/ipc/msg.c
 @@ -183,20 +183,14 @@ static void ss_wakeup(struct list_head *h, int kill)
@@ -229,5 +228,5 @@ index 1471db9a7e61..b8c5e7f2bebc 100644
  		if (msg != ERR_PTR(-EAGAIN))
  			goto out_unlock0;
 -- 
-2.10.1
+2.7.4
 

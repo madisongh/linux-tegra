@@ -1,8 +1,7 @@
-From 2342ae3dd715b821ae9ad4ea5b19f57200f206df Mon Sep 17 00:00:00 2001
+From 65d27640fad1fa05a0c6753d3dd91a6ea30576e6 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 31 Jul 2013 19:00:35 +0200
-Subject: [PATCH 142/351] rcu: use simple waitqueues
-X-NVConfidentiality: public
+Subject: [PATCH 142/365] rcu: use simple waitqueues
 
 Convert RCU's wait-queues into simple waitqueues.
 
@@ -24,7 +23,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  3 files changed, 22 insertions(+), 21 deletions(-)
 
 diff --git a/kernel/rcu/tree.c b/kernel/rcu/tree.c
-index 136eb9533148..a0b2db46d900 100644
+index 136eb953..a0b2db4 100644
 --- a/kernel/rcu/tree.c
 +++ b/kernel/rcu/tree.c
 @@ -1633,7 +1633,7 @@ static void rcu_gp_kthread_wake(struct rcu_state *rsp)
@@ -93,7 +92,7 @@ index 136eb9533148..a0b2db46d900 100644
  	for_each_possible_cpu(i) {
  		while (i > rnp->grphi)
 diff --git a/kernel/rcu/tree.h b/kernel/rcu/tree.h
-index 9fb4e238d4dc..e7e0939d12cf 100644
+index 9fb4e23..e7e0939 100644
 --- a/kernel/rcu/tree.h
 +++ b/kernel/rcu/tree.h
 @@ -28,6 +28,7 @@
@@ -141,7 +140,7 @@ index 9fb4e238d4dc..e7e0939d12cf 100644
  
  	unsigned long jiffies_force_qs;		/* Time at which to invoke */
 diff --git a/kernel/rcu/tree_plugin.h b/kernel/rcu/tree_plugin.h
-index 13ce51b08de0..cf4c0e955ae0 100644
+index 019a1eb5..86af123 100644
 --- a/kernel/rcu/tree_plugin.h
 +++ b/kernel/rcu/tree_plugin.h
 @@ -1830,7 +1830,7 @@ early_param("rcu_nocb_poll", parse_rcu_nocb_poll);
@@ -209,7 +208,7 @@ index 13ce51b08de0..cf4c0e955ae0 100644
  						 READ_ONCE(rdp->nocb_follower_head));
  		} else if (firsttime) {
  			/* Don't drown trace log with "Poll"! */
-@@ -2370,7 +2370,7 @@ void __init rcu_init_nohz(void)
+@@ -2371,7 +2371,7 @@ void __init rcu_init_nohz(void)
  static void __init rcu_boot_init_nocb_percpu_data(struct rcu_data *rdp)
  {
  	rdp->nocb_tail = &rdp->nocb_head;
@@ -219,5 +218,5 @@ index 13ce51b08de0..cf4c0e955ae0 100644
  }
  
 -- 
-2.10.1
+2.7.4
 

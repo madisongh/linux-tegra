@@ -1,8 +1,7 @@
-From 38dad50cedace4389f7b90d19bd5d64be090d2be Mon Sep 17 00:00:00 2001
+From 40a00245cdfbfb07859e8f72b8dab0b62ba5cf97 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 29 Aug 2013 18:21:04 +0200
-Subject: [PATCH 127/351] ptrace: fix ptrace vs tasklist_lock race
-X-NVConfidentiality: public
+Subject: [PATCH 127/365] ptrace: fix ptrace vs tasklist_lock race
 
 As explained by Alexander Fyodorov <halcy@yandex.ru>:
 
@@ -31,7 +30,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  3 files changed, 66 insertions(+), 6 deletions(-)
 
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 9b78143797f9..d144d8cac9dd 100644
+index 9b78143..d144d8c 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -243,10 +243,7 @@ extern char ___assert_task_state[1 - 2*!!(
@@ -98,7 +97,7 @@ index 9b78143797f9..d144d8cac9dd 100644
   * cond_resched() and cond_resched_lock(): latency reduction via
   * explicit rescheduling in places that are safe. The return
 diff --git a/kernel/ptrace.c b/kernel/ptrace.c
-index 3189e51db7e8..b85205122e86 100644
+index 3189e51..b852051 100644
 --- a/kernel/ptrace.c
 +++ b/kernel/ptrace.c
 @@ -129,7 +129,12 @@ static bool ptrace_freeze_traced(struct task_struct *task)
@@ -116,10 +115,10 @@ index 3189e51db7e8..b85205122e86 100644
  	}
  	spin_unlock_irq(&task->sighand->siglock);
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 936593053e58..c19edd67f2fa 100644
+index 7df7852..7b7a0d3 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -1436,6 +1436,18 @@ out:
+@@ -1439,6 +1439,18 @@ out:
  	return ret;
  }
  
@@ -138,7 +137,7 @@ index 936593053e58..c19edd67f2fa 100644
  /*
   * wait_task_inactive - wait for a thread to unschedule.
   *
-@@ -1480,7 +1492,7 @@ unsigned long wait_task_inactive(struct task_struct *p, long match_state)
+@@ -1483,7 +1495,7 @@ unsigned long wait_task_inactive(struct task_struct *p, long match_state)
  		 * is actually now running somewhere else!
  		 */
  		while (task_running(rq, p)) {
@@ -147,7 +146,7 @@ index 936593053e58..c19edd67f2fa 100644
  				return 0;
  			cpu_relax();
  		}
-@@ -1495,7 +1507,8 @@ unsigned long wait_task_inactive(struct task_struct *p, long match_state)
+@@ -1498,7 +1510,8 @@ unsigned long wait_task_inactive(struct task_struct *p, long match_state)
  		running = task_running(rq, p);
  		queued = task_on_rq_queued(p);
  		ncsw = 0;
@@ -158,5 +157,5 @@ index 936593053e58..c19edd67f2fa 100644
  		task_rq_unlock(rq, p, &flags);
  
 -- 
-2.10.1
+2.7.4
 

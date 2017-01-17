@@ -1,8 +1,7 @@
-From 43a71535c977d3ce71d99a5e848f3d8109e2c11e Mon Sep 17 00:00:00 2001
+From 0472f459c09932375f62c8ca41982f089a71a248 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 4 Oct 2012 14:20:47 +0100
-Subject: [PATCH 111/351] softirq: Split softirq locks
-X-NVConfidentiality: public
+Subject: [PATCH 111/365] softirq: Split softirq locks
 
 The 3.x RT series removed the split softirq implementation in favour
 of pushing softirq processing into the context of the thread which
@@ -37,7 +36,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  8 files changed, 477 insertions(+), 94 deletions(-)
 
 diff --git a/include/linux/bottom_half.h b/include/linux/bottom_half.h
-index 8fdcb783197d..d07dbeec7bc1 100644
+index 8fdcb78..d07dbee 100644
 --- a/include/linux/bottom_half.h
 +++ b/include/linux/bottom_half.h
 @@ -3,6 +3,39 @@
@@ -88,7 +87,7 @@ index 8fdcb783197d..d07dbeec7bc1 100644
  
  #endif /* _LINUX_BH_H */
 diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 44f401a09a14..7033381d81ee 100644
+index 44f401a..7033381 100644
 --- a/include/linux/interrupt.h
 +++ b/include/linux/interrupt.h
 @@ -443,10 +443,11 @@ struct softirq_action
@@ -137,7 +136,7 @@ index 44f401a09a14..7033381d81ee 100644
   * Autoprobing for irqs:
   *
 diff --git a/include/linux/preempt.h b/include/linux/preempt.h
-index 2b761d0c89d6..5f733773f54e 100644
+index 2b761d0..5f73377 100644
 --- a/include/linux/preempt.h
 +++ b/include/linux/preempt.h
 @@ -50,7 +50,11 @@
@@ -179,7 +178,7 @@ index 2b761d0c89d6..5f733773f54e 100644
  /*
   * Are we in NMI context?
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 1b5aecab38e9..eb695cbcbdbb 100644
+index 1b5aeca..eb695cb 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1846,6 +1846,8 @@ struct task_struct {
@@ -200,7 +199,7 @@ index 1b5aecab38e9..eb695cbcbdbb 100644
  #define PF_EXITPIDONE	0x00000008	/* pi exit done on shut down */
  #define PF_VCPU		0x00000010	/* I'm a virtual CPU */
 diff --git a/init/main.c b/init/main.c
-index 9e64d7097f1a..4a76e629c137 100644
+index fb35a98..04c08fc 100644
 --- a/init/main.c
 +++ b/init/main.c
 @@ -530,6 +530,7 @@ asmlinkage __visible void __init start_kernel(void)
@@ -212,7 +211,7 @@ index 9e64d7097f1a..4a76e629c137 100644
  
  	build_all_zonelists(NULL, NULL);
 diff --git a/kernel/softirq.c b/kernel/softirq.c
-index b7e9846d5906..61de6e9d1e68 100644
+index b7e9846..61de6e9 100644
 --- a/kernel/softirq.c
 +++ b/kernel/softirq.c
 @@ -26,6 +26,7 @@
@@ -798,7 +797,7 @@ index b7e9846d5906..61de6e9d1e68 100644
  	.thread_fn		= run_ksoftirqd,
  	.thread_comm		= "ksoftirqd/%u",
 diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-index f92ba9983ab9..aa46c515931b 100644
+index f92ba99..aa46c51 100644
 --- a/kernel/time/tick-sched.c
 +++ b/kernel/time/tick-sched.c
 @@ -758,14 +758,7 @@ static bool can_stop_idle_tick(int cpu, struct tick_sched *ts)
@@ -818,10 +817,10 @@ index f92ba9983ab9..aa46c515931b 100644
  	}
  
 diff --git a/net/core/dev.c b/net/core/dev.c
-index 74b90ce46396..5c052dc38a33 100644
+index 98997de..bfbf0b6 100644
 --- a/net/core/dev.c
 +++ b/net/core/dev.c
-@@ -3595,11 +3595,9 @@ int netif_rx_ni(struct sk_buff *skb)
+@@ -3596,11 +3596,9 @@ int netif_rx_ni(struct sk_buff *skb)
  
  	trace_netif_rx_ni_entry(skb);
  
@@ -836,5 +835,5 @@ index 74b90ce46396..5c052dc38a33 100644
  	return err;
  }
 -- 
-2.10.1
+2.7.4
 

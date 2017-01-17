@@ -1,8 +1,7 @@
-From e660492301b70129bd0b6d07a146f5d84de03368 Mon Sep 17 00:00:00 2001
+From e67ce1d7518afb6b0d24c8d56f05334b3ff66d0f Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 4 Feb 2016 14:08:06 +0100
-Subject: [PATCH 283/351] latencyhist: disable jump-labels
-X-NVConfidentiality: public
+Subject: [PATCH 283/365] latencyhist: disable jump-labels
 
 Atleast on X86 we die a recursive death
 
@@ -52,7 +51,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 1 insertion(+)
 
 diff --git a/arch/Kconfig b/arch/Kconfig
-index 186fc15c825f..acd9c21f6785 100644
+index 186fc15..acd9c21 100644
 --- a/arch/Kconfig
 +++ b/arch/Kconfig
 @@ -53,6 +53,7 @@ config KPROBES
@@ -64,5 +63,5 @@ index 186fc15c825f..acd9c21f6785 100644
           This option enables a transparent branch optimization that
  	 makes certain almost-always-true or almost-always-false branch
 -- 
-2.10.1
+2.7.4
 

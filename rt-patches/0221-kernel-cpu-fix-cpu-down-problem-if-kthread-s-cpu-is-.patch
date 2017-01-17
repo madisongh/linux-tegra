@@ -1,9 +1,8 @@
-From a18e3ecc99ca427e66269cf600dbb56f19ed0409 Mon Sep 17 00:00:00 2001
+From 9ccdf9fac7804bc9cd9233a5909800efdb4e85c3 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 7 Jun 2013 22:37:06 +0200
-Subject: [PATCH 221/351] kernel/cpu: fix cpu down problem if kthread's cpu is
+Subject: [PATCH 221/365] kernel/cpu: fix cpu down problem if kthread's cpu is
  going down
-X-NVConfidentiality: public
 
 If kthread is pinned to CPUx and CPUx is going down then we get into
 trouble:
@@ -28,7 +27,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 13 insertions(+), 2 deletions(-)
 
 diff --git a/kernel/cpu.c b/kernel/cpu.c
-index 2d65c464e504..7f72fd59bd4b 100644
+index 4522046..cc095ff 100644
 --- a/kernel/cpu.c
 +++ b/kernel/cpu.c
 @@ -111,6 +111,7 @@ struct hotplug_pcp {
@@ -80,8 +79,8 @@ index 2d65c464e504..7f72fd59bd4b 100644
  	return 0;
  }
  
-@@ -673,6 +683,7 @@ static int _cpu_down(unsigned int cpu, int tasks_frozen)
- 	else
+@@ -674,6 +684,7 @@ static int _cpu_down(unsigned int cpu, int tasks_frozen)
+ 	} else
  		synchronize_rcu();
  
 +	__cpu_unplug_wait(cpu);
@@ -89,5 +88,5 @@ index 2d65c464e504..7f72fd59bd4b 100644
  
  	/* Notifiers are done. Don't let any more tasks pin this CPU. */
 -- 
-2.10.1
+2.7.4
 

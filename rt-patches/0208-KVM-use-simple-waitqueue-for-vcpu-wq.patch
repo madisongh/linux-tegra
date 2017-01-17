@@ -1,8 +1,7 @@
-From cc3d11ec4fc78ab5380fd44840b1e5b5b8214a39 Mon Sep 17 00:00:00 2001
+From a72e2f6375c89ab94ac522406c8f5e42baebc02c Mon Sep 17 00:00:00 2001
 From: Marcelo Tosatti <mtosatti@redhat.com>
 Date: Wed, 8 Apr 2015 20:33:24 -0300
-Subject: [PATCH 208/351] KVM: use simple waitqueue for vcpu->wq
-X-NVConfidentiality: public
+Subject: [PATCH 208/365] KVM: use simple waitqueue for vcpu->wq
 
 The problem:
 
@@ -47,10 +46,10 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  10 files changed, 37 insertions(+), 38 deletions(-)
 
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index e06fd299de08..4f5c42a0924c 100644
+index d7bef21..0310e51 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -498,18 +498,18 @@ static void kvm_arm_resume_guest(struct kvm *kvm)
+@@ -496,18 +496,18 @@ static void kvm_arm_resume_guest(struct kvm *kvm)
  	struct kvm_vcpu *vcpu;
  
  	kvm_for_each_vcpu(i, vcpu, kvm) {
@@ -74,7 +73,7 @@ index e06fd299de08..4f5c42a0924c 100644
  }
  
 diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index a9b3b905e661..08148c46c8d0 100644
+index a9b3b90..08148c4 100644
 --- a/arch/arm/kvm/psci.c
 +++ b/arch/arm/kvm/psci.c
 @@ -70,7 +70,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
@@ -96,7 +95,7 @@ index a9b3b905e661..08148c46c8d0 100644
  	return PSCI_RET_SUCCESS;
  }
 diff --git a/arch/powerpc/include/asm/kvm_host.h b/arch/powerpc/include/asm/kvm_host.h
-index cfa758c6b4f6..b439518f0253 100644
+index cfa758c..b439518 100644
 --- a/arch/powerpc/include/asm/kvm_host.h
 +++ b/arch/powerpc/include/asm/kvm_host.h
 @@ -286,7 +286,7 @@ struct kvmppc_vcore {
@@ -118,7 +117,7 @@ index cfa758c6b4f6..b439518f0253 100644
  	int ret;
  	int trap;
 diff --git a/arch/powerpc/kvm/book3s_hv.c b/arch/powerpc/kvm/book3s_hv.c
-index a7352b59e6f9..32be32b61d4c 100644
+index a7352b5..32be32b 100644
 --- a/arch/powerpc/kvm/book3s_hv.c
 +++ b/arch/powerpc/kvm/book3s_hv.c
 @@ -114,11 +114,11 @@ static bool kvmppc_ipi_thread(int cpu)
@@ -197,7 +196,7 @@ index a7352b59e6f9..32be32b61d4c 100644
  
  	}
 diff --git a/arch/s390/include/asm/kvm_host.h b/arch/s390/include/asm/kvm_host.h
-index e9a983f40a24..2a84c76265ec 100644
+index e9a983f..2a84c76 100644
 --- a/arch/s390/include/asm/kvm_host.h
 +++ b/arch/s390/include/asm/kvm_host.h
 @@ -427,7 +427,7 @@ struct kvm_s390_irq_payload {
@@ -210,7 +209,7 @@ index e9a983f40a24..2a84c76265ec 100644
  	DECLARE_BITMAP(sigp_emerg_pending, KVM_MAX_VCPUS);
  	struct kvm_s390_irq_payload irq;
 diff --git a/arch/s390/kvm/interrupt.c b/arch/s390/kvm/interrupt.c
-index 6a75352f453c..8b4516b99bcd 100644
+index 6a75352..8b4516b 100644
 --- a/arch/s390/kvm/interrupt.c
 +++ b/arch/s390/kvm/interrupt.c
 @@ -868,13 +868,13 @@ no_timer:
@@ -230,7 +229,7 @@ index 6a75352f453c..8b4516b99bcd 100644
  	}
  }
 diff --git a/arch/x86/kvm/lapic.c b/arch/x86/kvm/lapic.c
-index b8393e285f37..906a1ecb7606 100644
+index b8393e2..906a1ec 100644
 --- a/arch/x86/kvm/lapic.c
 +++ b/arch/x86/kvm/lapic.c
 @@ -1195,7 +1195,7 @@ static void apic_update_lvtt(struct kvm_lapic *apic)
@@ -254,7 +253,7 @@ index b8393e285f37..906a1ecb7606 100644
  	if (apic_lvtt_tscdeadline(apic))
  		ktimer->expired_tscdeadline = ktimer->tscdeadline;
 diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index c923350ca20a..d856ccde77b4 100644
+index c923350..d856ccd 100644
 --- a/include/linux/kvm_host.h
 +++ b/include/linux/kvm_host.h
 @@ -243,7 +243,7 @@ struct kvm_vcpu {
@@ -276,7 +275,7 @@ index c923350ca20a..d856ccde77b4 100644
  #ifdef __KVM_HAVE_ARCH_WQP
  	return vcpu->arch.wqp;
 diff --git a/virt/kvm/async_pf.c b/virt/kvm/async_pf.c
-index 4f70d12e392d..57d9436f7a9c 100644
+index 4f70d12..57d9436 100644
 --- a/virt/kvm/async_pf.c
 +++ b/virt/kvm/async_pf.c
 @@ -98,8 +98,8 @@ static void async_pf_execute(struct work_struct *work)
@@ -291,10 +290,10 @@ index 4f70d12e392d..57d9436f7a9c 100644
  	mmput(mm);
  	kvm_put_kvm(vcpu->kvm);
 diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index fefbf2d148ef..0be613c3f144 100644
+index 336ed26..abdf387 100644
 --- a/virt/kvm/kvm_main.c
 +++ b/virt/kvm/kvm_main.c
-@@ -227,7 +227,7 @@ int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
+@@ -229,7 +229,7 @@ int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
  	vcpu->vcpu_id = id;
  	vcpu->pid = NULL;
  	vcpu->halt_poll_ns = 0;
@@ -303,7 +302,7 @@ index fefbf2d148ef..0be613c3f144 100644
  	kvm_async_pf_vcpu_init(vcpu);
  
  	vcpu->pre_pcpu = -1;
-@@ -2003,7 +2003,7 @@ static int kvm_vcpu_check_block(struct kvm_vcpu *vcpu)
+@@ -2005,7 +2005,7 @@ static int kvm_vcpu_check_block(struct kvm_vcpu *vcpu)
  void kvm_vcpu_block(struct kvm_vcpu *vcpu)
  {
  	ktime_t start, cur;
@@ -312,7 +311,7 @@ index fefbf2d148ef..0be613c3f144 100644
  	bool waited = false;
  	u64 block_ns;
  
-@@ -2028,7 +2028,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
+@@ -2030,7 +2030,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
  	kvm_arch_vcpu_blocking(vcpu);
  
  	for (;;) {
@@ -321,7 +320,7 @@ index fefbf2d148ef..0be613c3f144 100644
  
  		if (kvm_vcpu_check_block(vcpu) < 0)
  			break;
-@@ -2037,7 +2037,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
+@@ -2039,7 +2039,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
  		schedule();
  	}
  
@@ -330,7 +329,7 @@ index fefbf2d148ef..0be613c3f144 100644
  	cur = ktime_get();
  
  	kvm_arch_vcpu_unblocking(vcpu);
-@@ -2069,11 +2069,11 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
+@@ -2071,11 +2071,11 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
  {
  	int me;
  	int cpu = vcpu->cpu;
@@ -345,7 +344,7 @@ index fefbf2d148ef..0be613c3f144 100644
  		++vcpu->stat.halt_wakeup;
  	}
  
-@@ -2174,7 +2174,7 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me)
+@@ -2176,7 +2176,7 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me)
  				continue;
  			if (vcpu == me)
  				continue;
@@ -355,5 +354,5 @@ index fefbf2d148ef..0be613c3f144 100644
  			if (!kvm_vcpu_eligible_for_directed_yield(vcpu))
  				continue;
 -- 
-2.10.1
+2.7.4
 

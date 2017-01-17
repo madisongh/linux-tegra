@@ -1,9 +1,8 @@
-From 0d1f4ede67026169c1ce8551a89cae13b37e7c57 Mon Sep 17 00:00:00 2001
+From 648cd0863fddced497f01a956afb355955829aea Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 29 Jan 2015 17:19:44 +0100
-Subject: [PATCH 046/351] mm/workingset: Do not protect workingset_shadow_nodes
+Subject: [PATCH 046/365] mm/workingset: Do not protect workingset_shadow_nodes
  with irq off
-X-NVConfidentiality: public
 
 workingset_shadow_nodes is protected by local_irq_disable(). Some users
 use spin_lock_irq().
@@ -19,7 +18,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  4 files changed, 28 insertions(+), 17 deletions(-)
 
 diff --git a/include/linux/swap.h b/include/linux/swap.h
-index 7ba7dccaf0e7..0528e5d2f579 100644
+index d8ca2ea..973b384 100644
 --- a/include/linux/swap.h
 +++ b/include/linux/swap.h
 @@ -11,6 +11,7 @@
@@ -41,21 +40,10 @@ index 7ba7dccaf0e7..0528e5d2f579 100644
  static inline unsigned int workingset_node_pages(struct radix_tree_node *node)
  {
 diff --git a/mm/filemap.c b/mm/filemap.c
-index debd1a09b65a..68d076775280 100644
+index fad46b1..7fb06d4 100644
 --- a/mm/filemap.c
 +++ b/mm/filemap.c
-@@ -168,7 +168,9 @@ static void page_cache_tree_delete(struct address_space *mapping,
- 	if (!workingset_node_pages(node) &&
- 	    list_empty(&node->private_list)) {
- 		node->private_data = mapping;
--		list_lru_add(&workingset_shadow_nodes, &node->private_list);
-+		local_lock(workingset_shadow_lock);
-+		list_lru_add(&__workingset_shadow_nodes, &node->private_list);
-+		local_unlock(workingset_shadow_lock);
- 	}
- }
- 
-@@ -602,9 +604,12 @@ static int page_cache_tree_insert(struct address_space *mapping,
+@@ -144,9 +144,12 @@ static int page_cache_tree_insert(struct address_space *mapping,
  		 * node->private_list is protected by
  		 * mapping->tree_lock.
  		 */
@@ -70,8 +58,19 @@ index debd1a09b65a..68d076775280 100644
  	}
  	return 0;
  }
+@@ -218,7 +221,9 @@ static void page_cache_tree_delete(struct address_space *mapping,
+ 	if (!workingset_node_pages(node) &&
+ 	    list_empty(&node->private_list)) {
+ 		node->private_data = mapping;
+-		list_lru_add(&workingset_shadow_nodes, &node->private_list);
++		local_lock(workingset_shadow_lock);
++		list_lru_add(&__workingset_shadow_nodes, &node->private_list);
++		local_unlock(workingset_shadow_lock);
+ 	}
+ }
+ 
 diff --git a/mm/truncate.c b/mm/truncate.c
-index 76e35ad97102..5f196420020c 100644
+index 76e35ad..5f19642 100644
 --- a/mm/truncate.c
 +++ b/mm/truncate.c
 @@ -56,8 +56,11 @@ static void clear_exceptional_entry(struct address_space *mapping,
@@ -89,7 +88,7 @@ index 76e35ad97102..5f196420020c 100644
  unlock:
  	spin_unlock_irq(&mapping->tree_lock);
 diff --git a/mm/workingset.c b/mm/workingset.c
-index aa017133744b..263d0194734a 100644
+index df66f42..6db7b24 100644
 --- a/mm/workingset.c
 +++ b/mm/workingset.c
 @@ -264,7 +264,8 @@ void workingset_activation(struct page *page)
@@ -115,7 +114,7 @@ index aa017133744b..263d0194734a 100644
  
  	pages = node_present_pages(sc->nid);
  	/*
-@@ -363,9 +364,9 @@ static enum lru_status shadow_lru_isolate(struct list_head *item,
+@@ -361,9 +362,9 @@ static enum lru_status shadow_lru_isolate(struct list_head *item,
  	spin_unlock(&mapping->tree_lock);
  	ret = LRU_REMOVED_RETRY;
  out:
@@ -127,7 +126,7 @@ index aa017133744b..263d0194734a 100644
  	spin_lock(lru_lock);
  	return ret;
  }
-@@ -376,10 +377,10 @@ static unsigned long scan_shadow_nodes(struct shrinker *shrinker,
+@@ -374,10 +375,10 @@ static unsigned long scan_shadow_nodes(struct shrinker *shrinker,
  	unsigned long ret;
  
  	/* list_lru lock nests inside IRQ-safe mapping->tree_lock */
@@ -141,7 +140,7 @@ index aa017133744b..263d0194734a 100644
  	return ret;
  }
  
-@@ -400,7 +401,7 @@ static int __init workingset_init(void)
+@@ -398,7 +399,7 @@ static int __init workingset_init(void)
  {
  	int ret;
  
@@ -150,7 +149,7 @@ index aa017133744b..263d0194734a 100644
  	if (ret)
  		goto err;
  	ret = register_shrinker(&workingset_shadow_shrinker);
-@@ -408,7 +409,7 @@ static int __init workingset_init(void)
+@@ -406,7 +407,7 @@ static int __init workingset_init(void)
  		goto err_list_lru;
  	return 0;
  err_list_lru:
@@ -160,5 +159,5 @@ index aa017133744b..263d0194734a 100644
  	return ret;
  }
 -- 
-2.10.1
+2.7.4
 

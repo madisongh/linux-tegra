@@ -1,9 +1,8 @@
-From 4489bc7de777d35dc4d3b4ceee2d6e3272d4081d Mon Sep 17 00:00:00 2001
+From da947f0cb6690ffe80272c95f3b2178e8ec60dda Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 5 Feb 2016 18:26:11 +0100
-Subject: [PATCH 290/351] rtmutex: push down migrate_disable() into
+Subject: [PATCH 290/365] rtmutex: push down migrate_disable() into
  rt_spin_lock()
-X-NVConfidentiality: public
 
 No point in having the migrate disable/enable invocations in all the
 macro/inlines. That's just more code for no win as we do a function
@@ -26,7 +25,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  6 files changed, 54 insertions(+), 29 deletions(-)
 
 diff --git a/include/linux/locallock.h b/include/linux/locallock.h
-index 339ba00adb9a..6fe5928fc2ab 100644
+index 339ba00..6fe5928 100644
 --- a/include/linux/locallock.h
 +++ b/include/linux/locallock.h
 @@ -43,9 +43,9 @@ struct local_irq_lock {
@@ -43,7 +42,7 @@ index 339ba00adb9a..6fe5928fc2ab 100644
  # define spin_lock_local(lock)			spin_lock(lock)
  # define spin_trylock_local(lock)		spin_trylock(lock)
 diff --git a/include/linux/spinlock_rt.h b/include/linux/spinlock_rt.h
-index f757096b230c..3b2825537531 100644
+index f757096..3b28255 100644
 --- a/include/linux/spinlock_rt.h
 +++ b/include/linux/spinlock_rt.h
 @@ -18,6 +18,10 @@ do {							\
@@ -132,7 +131,7 @@ index f757096b230c..3b2825537531 100644
  	} while (0)
  
 diff --git a/kernel/cpu.c b/kernel/cpu.c
-index ff7556a81112..28d89309f2c5 100644
+index 1dff86e..f99a82e 100644
 --- a/kernel/cpu.c
 +++ b/kernel/cpu.c
 @@ -129,8 +129,8 @@ struct hotplug_pcp {
@@ -147,7 +146,7 @@ index ff7556a81112..28d89309f2c5 100644
  # define hotplug_lock(hp) mutex_lock(&(hp)->mutex)
  # define hotplug_unlock(hp) mutex_unlock(&(hp)->mutex)
 diff --git a/kernel/locking/lglock.c b/kernel/locking/lglock.c
-index d8be4fcc14f8..51bfe64e7d16 100644
+index d8be4fc..51bfe64 100644
 --- a/kernel/locking/lglock.c
 +++ b/kernel/locking/lglock.c
 @@ -10,7 +10,7 @@
@@ -160,7 +159,7 @@ index d8be4fcc14f8..51bfe64e7d16 100644
  #endif
  /*
 diff --git a/kernel/locking/rt.c b/kernel/locking/rt.c
-index 1bbbcad5e360..d4ab61c1848b 100644
+index 1bbbcad5..d4ab61c 100644
 --- a/kernel/locking/rt.c
 +++ b/kernel/locking/rt.c
 @@ -235,7 +235,6 @@ EXPORT_SYMBOL(rt_read_trylock);
@@ -180,7 +179,7 @@ index 1bbbcad5e360..d4ab61c1848b 100644
  		__rt_spin_lock(lock);
  	}
 diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
-index a6f5326e4056..913aa40f3b5e 100644
+index a6f5326..913aa40 100644
 --- a/kernel/locking/rtmutex.c
 +++ b/kernel/locking/rtmutex.c
 @@ -1103,8 +1103,16 @@ static void  noinline __sched rt_spin_lock_slowunlock(struct rt_mutex *lock)
@@ -285,5 +284,5 @@ index a6f5326e4056..913aa40f3b5e 100644
  }
  EXPORT_SYMBOL(atomic_dec_and_spin_lock);
 -- 
-2.10.1
+2.7.4
 

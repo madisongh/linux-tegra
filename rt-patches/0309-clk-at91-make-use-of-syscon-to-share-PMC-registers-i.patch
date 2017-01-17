@@ -1,9 +1,8 @@
-From d99d64599385a89007ac10f82ecb4bf6d3b0db0c Mon Sep 17 00:00:00 2001
+From fb2cc33e70b04f76862db24ef0a14a2c46cdb7a6 Mon Sep 17 00:00:00 2001
 From: Boris Brezillon <boris.brezillon@free-electrons.com>
 Date: Fri, 5 Sep 2014 09:54:13 +0200
-Subject: [PATCH 309/351] clk: at91: make use of syscon to share PMC registers
+Subject: [PATCH 309/365] clk: at91: make use of syscon to share PMC registers
  in several drivers
-X-NVConfidentiality: public
 
 The PMC block is providing several functionnalities:
  - system clk management
@@ -25,7 +24,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  3 files changed, 17 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 28656c2b54a0..3f501305ca26 100644
+index 28656c2..3f50130 100644
 --- a/arch/arm/mach-at91/Kconfig
 +++ b/arch/arm/mach-at91/Kconfig
 @@ -99,6 +99,7 @@ config HAVE_AT91_USB_CLK
@@ -37,7 +36,7 @@ index 28656c2b54a0..3f501305ca26 100644
  config HAVE_AT91_SMD
  	bool
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 8476b570779b..481146029b2e 100644
+index 8476b57..4811460 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
 @@ -19,6 +19,7 @@
@@ -88,7 +87,7 @@ index 8476b570779b..481146029b2e 100644
  		return;
  	for_each_child_of_node(np, childnp) {
 diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index f65739272779..e1fc0b0e1d8c 100644
+index f657392..e1fc0b0 100644
 --- a/drivers/clk/at91/pmc.h
 +++ b/drivers/clk/at91/pmc.h
 @@ -14,6 +14,7 @@
@@ -128,5 +127,5 @@ index f65739272779..e1fc0b0e1d8c 100644
  
  int of_at91_get_clk_range(struct device_node *np, const char *propname,
 -- 
-2.10.1
+2.7.4
 

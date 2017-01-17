@@ -1,9 +1,8 @@
-From bc6fe9407b1a52c0153a6a92aff85e2275b7f99e Mon Sep 17 00:00:00 2001
+From a9fcac38c87105fa95a52934bf2e9513e4592bf5 Mon Sep 17 00:00:00 2001
 From: Russ Dill <Russ.Dill@ti.com>
 Date: Wed, 5 Aug 2015 15:30:44 +0530
-Subject: [PATCH 005/351] ARM: OMAP2: Drop the concept of certain power domains
+Subject: [PATCH 005/365] ARM: OMAP2: Drop the concept of certain power domains
  not being able to lose context.
-X-NVConfidentiality: public
 
 It isn't much of a win, and with hibernation, everything loses context.
 
@@ -19,7 +18,7 @@ Signed-off-by: Keerthy <j-keerthy@ti.com>
  5 files changed, 14 insertions(+), 65 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index 7a577145b68b..689a1af47c80 100644
+index 7a57714..689a1af 100644
 --- a/arch/arm/mach-omap2/gpio.c
 +++ b/arch/arm/mach-omap2/gpio.c
 @@ -130,7 +130,6 @@ static int __init omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
@@ -31,7 +30,7 @@ index 7a577145b68b..689a1af47c80 100644
  	pdev = omap_device_build(name, id - 1, oh, pdata, sizeof(*pdata));
  	kfree(pdata);
 diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 78af6d8cf2e2..ef4227ffa3b6 100644
+index 78af6d8..ef4227f 100644
 --- a/arch/arm/mach-omap2/powerdomain.c
 +++ b/arch/arm/mach-omap2/powerdomain.c
 @@ -1166,43 +1166,3 @@ int pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
@@ -79,7 +78,7 @@ index 78af6d8cf2e2..ef4227ffa3b6 100644
 -	return 0;
 -}
 diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index 28a796ce07d7..5e0c033a21db 100644
+index 28a796c..5e0c033 100644
 --- a/arch/arm/mach-omap2/powerdomain.h
 +++ b/arch/arm/mach-omap2/powerdomain.h
 @@ -244,7 +244,6 @@ int pwrdm_state_switch(struct powerdomain *pwrdm);
@@ -91,7 +90,7 @@ index 28a796ce07d7..5e0c033a21db 100644
  extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u8 state);
  
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index e183351d047c..4423b6dcc34f 100644
+index e183351..4423b6d 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
 @@ -69,7 +69,7 @@ struct gpio_bank {
@@ -175,7 +174,7 @@ index e183351d047c..4423b6dcc34f 100644
  
  		pm_runtime_get_sync(bank->dev);
 diff --git a/include/linux/platform_data/gpio-omap.h b/include/linux/platform_data/gpio-omap.h
-index cb2618147c34..ff43e01b8ca9 100644
+index cb26181..ff43e01 100644
 --- a/include/linux/platform_data/gpio-omap.h
 +++ b/include/linux/platform_data/gpio-omap.h
 @@ -198,7 +198,6 @@ struct omap_gpio_platform_data {
@@ -187,5 +186,5 @@ index cb2618147c34..ff43e01b8ca9 100644
  	u32 non_wakeup_gpios;
  
 -- 
-2.10.1
+2.7.4
 

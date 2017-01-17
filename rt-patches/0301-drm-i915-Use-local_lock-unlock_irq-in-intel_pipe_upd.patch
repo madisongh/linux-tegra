@@ -1,9 +1,8 @@
-From 5dd971d790ce258d97b9e7a4d225fe2b1417ee3e Mon Sep 17 00:00:00 2001
+From 51e5e6700eec5a99de86b8f7b268af1c5e68954c Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sat, 27 Feb 2016 09:01:42 +0100
-Subject: [PATCH 301/351] drm,i915: Use local_lock/unlock_irq() in
+Subject: [PATCH 301/365] drm,i915: Use local_lock/unlock_irq() in
  intel_pipe_update_start/end()
-X-NVConfidentiality: public
 
 [    8.014039] BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:918
 [    8.014041] in_atomic(): 0, irqs_disabled(): 1, pid: 78, name: kworker/u4:4
@@ -62,7 +61,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/i915/intel_sprite.c b/drivers/gpu/drm/i915/intel_sprite.c
-index 7c08e4f29032..7c6a2393ca2f 100644
+index 7c08e4f..7c6a239 100644
 --- a/drivers/gpu/drm/i915/intel_sprite.c
 +++ b/drivers/gpu/drm/i915/intel_sprite.c
 @@ -38,6 +38,7 @@
@@ -115,5 +114,5 @@ index 7c08e4f29032..7c6a2393ca2f 100644
  	if (crtc->debug.start_vbl_count &&
  	    crtc->debug.start_vbl_count != end_vbl_count) {
 -- 
-2.10.1
+2.7.4
 

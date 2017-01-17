@@ -1,8 +1,7 @@
-From ae3f1ba73d98f2075a85049dae847db94b9e6d07 Mon Sep 17 00:00:00 2001
+From 6aa95974acedd8996865808370117748cd111447 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 10 Jun 2011 11:04:15 +0200
-Subject: [PATCH 115/351] rtmutex: Handle the various new futex race conditions
-X-NVConfidentiality: public
+Subject: [PATCH 115/365] rtmutex: Handle the various new futex race conditions
 
 RT opens a few new interesting race conditions in the rtmutex/futex
 combo due to futex hash bucket lock being a 'sleeping' spinlock and
@@ -16,7 +15,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  3 files changed, 94 insertions(+), 21 deletions(-)
 
 diff --git a/kernel/futex.c b/kernel/futex.c
-index 9d8163afd87c..33ddc995c9e7 100644
+index 9d8163a..33ddc99 100644
 --- a/kernel/futex.c
 +++ b/kernel/futex.c
 @@ -1822,6 +1822,16 @@ retry_private:
@@ -141,7 +140,7 @@ index 9d8163afd87c..33ddc995c9e7 100644
  		 * Fixup the pi_state owner and possibly acquire the lock if we
  		 * haven't already.
 diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
-index 01f4dc1c3789..1a30a891037d 100644
+index 01f4dc1..1a30a89 100644
 --- a/kernel/locking/rtmutex.c
 +++ b/kernel/locking/rtmutex.c
 @@ -69,6 +69,11 @@ static void fixup_rt_mutex_waiters(struct rt_mutex *lock)
@@ -237,7 +236,7 @@ index 01f4dc1c3789..1a30a891037d 100644
  		raw_spin_unlock_irqrestore(&task->pi_lock, flags);
  		return;
 diff --git a/kernel/locking/rtmutex_common.h b/kernel/locking/rtmutex_common.h
-index 4f5f83c7d2d3..1c1bcc5cbd69 100644
+index 4f5f83c..1c1bcc5 100644
 --- a/kernel/locking/rtmutex_common.h
 +++ b/kernel/locking/rtmutex_common.h
 @@ -97,6 +97,8 @@ enum rtmutex_chainwalk {
@@ -250,5 +249,5 @@ index 4f5f83c7d2d3..1c1bcc5cbd69 100644
  extern void rt_mutex_init_proxy_locked(struct rt_mutex *lock,
  				       struct task_struct *proxy_owner);
 -- 
-2.10.1
+2.7.4
 

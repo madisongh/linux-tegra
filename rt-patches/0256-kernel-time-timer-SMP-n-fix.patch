@@ -1,8 +1,7 @@
-From 437fcc511df0d92aa6ffc54babb71852604883ec Mon Sep 17 00:00:00 2001
+From d1eaf31637fd08ad11af59e4776eb10f1c4a1d8f Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:42:54 +0100
-Subject: [PATCH 256/351] kernel/time/timer: SMP=n fix
-X-NVConfidentiality: public
+Subject: [PATCH 256/365] kernel/time/timer: SMP=n fix
 
 Reported-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -11,7 +10,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/kernel/time/timer.c b/kernel/time/timer.c
-index c3314fc41316..a460cbb60055 100644
+index c3314fc..a460cbb 100644
 --- a/kernel/time/timer.c
 +++ b/kernel/time/timer.c
 @@ -1118,7 +1118,7 @@ int try_to_del_timer_sync(struct timer_list *timer)
@@ -24,5 +23,5 @@ index c3314fc41316..a460cbb60055 100644
   * del_timer_sync - deactivate a timer and wait for the handler to finish.
   * @timer: the timer to be deactivated
 -- 
-2.10.1
+2.7.4
 

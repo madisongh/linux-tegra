@@ -1,8 +1,7 @@
-From 7fd9cc73b53dfe58a54f265569d66ac7ee77faee Mon Sep 17 00:00:00 2001
+From c6448a68c2c14a76890ecc74a2d4096691311ecc Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 11 Jan 2013 11:23:51 +0100
-Subject: [PATCH 143/351] completion: Use simple wait queues
-X-NVConfidentiality: public
+Subject: [PATCH 143/365] completion: Use simple wait queues
 
 Completions have no long lasting callbacks and therefor do not need
 the complex waitqueue variant. Use simple waitqueues which reduces the
@@ -20,7 +19,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  7 files changed, 33 insertions(+), 27 deletions(-)
 
 diff --git a/drivers/net/wireless/orinoco/orinoco_usb.c b/drivers/net/wireless/orinoco/orinoco_usb.c
-index f2cd513d54b2..6c0f4c9638a2 100644
+index f2cd513..6c0f4c9 100644
 --- a/drivers/net/wireless/orinoco/orinoco_usb.c
 +++ b/drivers/net/wireless/orinoco/orinoco_usb.c
 @@ -697,7 +697,7 @@ static void ezusb_req_ctx_wait(struct ezusb_priv *upriv,
@@ -33,7 +32,7 @@ index f2cd513d54b2..6c0f4c9638a2 100644
  		}
  		break;
 diff --git a/drivers/usb/gadget/function/f_fs.c b/drivers/usb/gadget/function/f_fs.c
-index 44e2419c7ca9..6d3ba5c6518d 100644
+index 12a7906..cf435d8 100644
 --- a/drivers/usb/gadget/function/f_fs.c
 +++ b/drivers/usb/gadget/function/f_fs.c
 @@ -1405,7 +1405,7 @@ static void ffs_data_put(struct ffs_data *ffs)
@@ -46,7 +45,7 @@ index 44e2419c7ca9..6d3ba5c6518d 100644
  		kfree(ffs);
  	}
 diff --git a/drivers/usb/gadget/legacy/inode.c b/drivers/usb/gadget/legacy/inode.c
-index 55386619a0f1..fb2791048cdf 100644
+index e57f48f..7544a54 100644
 --- a/drivers/usb/gadget/legacy/inode.c
 +++ b/drivers/usb/gadget/legacy/inode.c
 @@ -345,7 +345,7 @@ ep_io (struct ep_data *epdata, void *buf, unsigned len)
@@ -68,7 +67,7 @@ index 55386619a0f1..fb2791048cdf 100644
  					epdata->status = -EINTR;
  			} else {
 diff --git a/include/linux/completion.h b/include/linux/completion.h
-index 5d5aaae3af43..3fe8d14c98c0 100644
+index 5d5aaae..3fe8d14 100644
 --- a/include/linux/completion.h
 +++ b/include/linux/completion.h
 @@ -7,8 +7,7 @@
@@ -105,7 +104,7 @@ index 5d5aaae3af43..3fe8d14c98c0 100644
  
  /**
 diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index 4a29c75b146e..0a294e950df8 100644
+index 4a29c75..0a294e9 100644
 --- a/include/linux/uprobes.h
 +++ b/include/linux/uprobes.h
 @@ -27,6 +27,7 @@
@@ -117,7 +116,7 @@ index 4a29c75b146e..0a294e950df8 100644
  struct vm_area_struct;
  struct mm_struct;
 diff --git a/kernel/sched/completion.c b/kernel/sched/completion.c
-index 8d0f35debf35..45ebcffd9feb 100644
+index 8d0f35d..45ebcff 100644
 --- a/kernel/sched/completion.c
 +++ b/kernel/sched/completion.c
 @@ -30,10 +30,10 @@ void complete(struct completion *x)
@@ -211,10 +210,10 @@ index 8d0f35debf35..45ebcffd9feb 100644
  }
  EXPORT_SYMBOL(completion_done);
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index c19edd67f2fa..5c953134c480 100644
+index 7b7a0d3..061effa 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -3155,7 +3155,10 @@ void migrate_disable(void)
+@@ -3180,7 +3180,10 @@ void migrate_disable(void)
  	}
  
  #ifdef CONFIG_SCHED_DEBUG
@@ -226,7 +225,7 @@ index c19edd67f2fa..5c953134c480 100644
  #endif
  
  	if (p->migrate_disable) {
-@@ -3185,7 +3188,10 @@ void migrate_enable(void)
+@@ -3210,7 +3213,10 @@ void migrate_enable(void)
  	}
  
  #ifdef CONFIG_SCHED_DEBUG
@@ -239,5 +238,5 @@ index c19edd67f2fa..5c953134c480 100644
  	WARN_ON_ONCE(p->migrate_disable <= 0);
  
 -- 
-2.10.1
+2.7.4
 

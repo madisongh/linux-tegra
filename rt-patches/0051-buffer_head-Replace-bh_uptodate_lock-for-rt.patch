@@ -1,8 +1,7 @@
-From ffdbe4a1f29dfe80acf0d23f1393ca969d11cc95 Mon Sep 17 00:00:00 2001
+From dc889690afae2f3325107f54e10c1eedf8dcc097 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 18 Mar 2011 09:18:52 +0100
-Subject: [PATCH 051/351] buffer_head: Replace bh_uptodate_lock for -rt
-X-NVConfidentiality: public
+Subject: [PATCH 051/365] buffer_head: Replace bh_uptodate_lock for -rt
 
 Wrap the bit_spin_lock calls into a separate inline and add the RT
 replacements with a real spinlock.
@@ -15,7 +14,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  3 files changed, 44 insertions(+), 21 deletions(-)
 
 diff --git a/fs/buffer.c b/fs/buffer.c
-index 4f4cd959da7c..72b27e17b907 100644
+index 4f4cd95..72b27e1 100644
 --- a/fs/buffer.c
 +++ b/fs/buffer.c
 @@ -305,8 +305,7 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
@@ -86,7 +85,7 @@ index 4f4cd959da7c..72b27e17b907 100644
  		__this_cpu_inc(bh_accounting.nr);
  		recalc_bh_state();
 diff --git a/fs/ntfs/aops.c b/fs/ntfs/aops.c
-index 7521e11db728..39b08f5b8c76 100644
+index 7521e11..39b08f5 100644
 --- a/fs/ntfs/aops.c
 +++ b/fs/ntfs/aops.c
 @@ -107,8 +107,7 @@ static void ntfs_end_buffer_async_read(struct buffer_head *bh, int uptodate)
@@ -121,7 +120,7 @@ index 7521e11db728..39b08f5b8c76 100644
  
  /**
 diff --git a/include/linux/buffer_head.h b/include/linux/buffer_head.h
-index 89d9aa9e79bf..ab045274704b 100644
+index 89d9aa9..ab04527 100644
 --- a/include/linux/buffer_head.h
 +++ b/include/linux/buffer_head.h
 @@ -75,8 +75,42 @@ struct buffer_head {
@@ -168,5 +167,5 @@ index 89d9aa9e79bf..ab045274704b 100644
   * macro tricks to expand the set_buffer_foo(), clear_buffer_foo()
   * and buffer_foo() functions.
 -- 
-2.10.1
+2.7.4
 

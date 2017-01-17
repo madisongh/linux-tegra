@@ -1,8 +1,7 @@
-From e66d6828e299357ba747bc9678c25a10501115fa Mon Sep 17 00:00:00 2001
+From c85a1a254f1541fa8b2046882154d516cb3dd768 Mon Sep 17 00:00:00 2001
 From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
 Date: Mon, 4 Nov 2013 13:21:10 -0800
-Subject: [PATCH 235/351] rcu: Eliminate softirq processing from rcutree
-X-NVConfidentiality: public
+Subject: [PATCH 235/365] rcu: Eliminate softirq processing from rcutree
 
 Running RCU out of softirq is a problem for some workloads that would
 like to manage RCU core processing independently of other softirq work,
@@ -24,7 +23,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  3 files changed, 123 insertions(+), 147 deletions(-)
 
 diff --git a/kernel/rcu/tree.c b/kernel/rcu/tree.c
-index a0b2db46d900..5359091fecaa 100644
+index a0b2db4..5359091 100644
 --- a/kernel/rcu/tree.c
 +++ b/kernel/rcu/tree.c
 @@ -56,6 +56,11 @@
@@ -182,7 +181,7 @@ index a0b2db46d900..5359091fecaa 100644
  	/*
  	 * We don't need protection against CPU-hotplug here because
 diff --git a/kernel/rcu/tree.h b/kernel/rcu/tree.h
-index e7e0939d12cf..588509d94bbd 100644
+index e7e0939..588509d 100644
 --- a/kernel/rcu/tree.h
 +++ b/kernel/rcu/tree.h
 @@ -563,12 +563,10 @@ extern struct rcu_state rcu_bh_state;
@@ -211,7 +210,7 @@ index e7e0939d12cf..588509d94bbd 100644
  						 struct rcu_node *rnp);
  #endif /* #ifdef CONFIG_RCU_BOOST */
 diff --git a/kernel/rcu/tree_plugin.h b/kernel/rcu/tree_plugin.h
-index cf4c0e955ae0..0d2f27f2f38d 100644
+index 86af123..246cbd8 100644
 --- a/kernel/rcu/tree_plugin.h
 +++ b/kernel/rcu/tree_plugin.h
 @@ -24,26 +24,10 @@
@@ -441,5 +440,5 @@ index cf4c0e955ae0..0d2f27f2f38d 100644
  {
  	return false;
 -- 
-2.10.1
+2.7.4
 

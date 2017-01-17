@@ -1,8 +1,7 @@
-From 2de96eef97581ddd47581133e82a885f95ba45a7 Mon Sep 17 00:00:00 2001
+From 3f32dd4381cc40e23f07969327f0574eb7df35d9 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 14 Feb 2013 22:36:59 +0100
-Subject: [PATCH 007/351] timekeeping: Split jiffies seqlock
-X-NVConfidentiality: public
+Subject: [PATCH 007/365] timekeeping: Split jiffies seqlock
 
 Replace jiffies_lock seqlock with a simple seqcounter and a rawlock so
 it can be taken in atomic context on RT.
@@ -17,7 +16,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  5 files changed, 28 insertions(+), 17 deletions(-)
 
 diff --git a/kernel/time/jiffies.c b/kernel/time/jiffies.c
-index 347fecf86a3f..2ede47408a3e 100644
+index 347fecf..2ede474 100644
 --- a/kernel/time/jiffies.c
 +++ b/kernel/time/jiffies.c
 @@ -74,7 +74,8 @@ static struct clocksource clocksource_jiffies = {
@@ -43,7 +42,7 @@ index 347fecf86a3f..2ede47408a3e 100644
  }
  EXPORT_SYMBOL(get_jiffies_64);
 diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
-index 4fcd99e12aa0..5a47f2e98faf 100644
+index 4fcd99e..5a47f2e 100644
 --- a/kernel/time/tick-common.c
 +++ b/kernel/time/tick-common.c
 @@ -79,13 +79,15 @@ int tick_is_oneshot_available(void)
@@ -77,7 +76,7 @@ index 4fcd99e12aa0..5a47f2e98faf 100644
  		clockevents_switch_state(dev, CLOCK_EVT_STATE_ONESHOT);
  
 diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-index 22c57e191a23..9579f7985093 100644
+index 22c57e1..9579f79 100644
 --- a/kernel/time/tick-sched.c
 +++ b/kernel/time/tick-sched.c
 @@ -62,7 +62,8 @@ static void tick_do_update_jiffies64(ktime_t now)
@@ -136,10 +135,10 @@ index 22c57e191a23..9579f7985093 100644
  
  	if (rcu_needs_cpu(basemono, &next_rcu) ||
 diff --git a/kernel/time/timekeeping.c b/kernel/time/timekeeping.c
-index 99188ee5d9d0..a1c5c6fc233a 100644
+index 445601c..8744b0d 100644
 --- a/kernel/time/timekeeping.c
 +++ b/kernel/time/timekeeping.c
-@@ -2047,8 +2047,10 @@ EXPORT_SYMBOL(hardpps);
+@@ -2070,8 +2070,10 @@ EXPORT_SYMBOL(hardpps);
   */
  void xtime_update(unsigned long ticks)
  {
@@ -153,7 +152,7 @@ index 99188ee5d9d0..a1c5c6fc233a 100644
  	update_wall_time();
  }
 diff --git a/kernel/time/timekeeping.h b/kernel/time/timekeeping.h
-index 704f595ce83f..763a3e5121ff 100644
+index 704f595..763a3e5 100644
 --- a/kernel/time/timekeeping.h
 +++ b/kernel/time/timekeeping.h
 @@ -19,7 +19,8 @@ extern void timekeeping_resume(void);
@@ -167,5 +166,5 @@ index 704f595ce83f..763a3e5121ff 100644
  #define CS_NAME_LEN	32
  
 -- 
-2.10.1
+2.7.4
 

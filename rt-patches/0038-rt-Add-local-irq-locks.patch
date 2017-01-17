@@ -1,8 +1,7 @@
-From 96d58d44ffc7de7367c394779d2e731f2f7924e4 Mon Sep 17 00:00:00 2001
+From f22dba5de7c896942dc78b56240283899ccfac52 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 20 Jun 2011 09:03:47 +0200
-Subject: [PATCH 038/351] rt: Add local irq locks
-X-NVConfidentiality: public
+Subject: [PATCH 038/365] rt: Add local irq locks
 
 Introduce locallock. For !RT this maps to preempt_disable()/
 local_irq_disable() so there is not much that changes. For RT this will
@@ -21,7 +20,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 
 diff --git a/include/linux/locallock.h b/include/linux/locallock.h
 new file mode 100644
-index 000000000000..58056edcbb93
+index 0000000..58056ed
 --- /dev/null
 +++ b/include/linux/locallock.h
 @@ -0,0 +1,264 @@
@@ -290,7 +289,7 @@ index 000000000000..58056edcbb93
 +
 +#endif
 diff --git a/include/linux/percpu.h b/include/linux/percpu.h
-index caebf2a758dc..53a60a51c758 100644
+index caebf2a..53a60a5 100644
 --- a/include/linux/percpu.h
 +++ b/include/linux/percpu.h
 @@ -24,6 +24,35 @@
@@ -330,5 +329,5 @@ index caebf2a758dc..53a60a51c758 100644
  #define PCPU_MIN_UNIT_SIZE		PFN_ALIGN(32 << 10)
  
 -- 
-2.10.1
+2.7.4
 

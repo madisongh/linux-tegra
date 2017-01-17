@@ -1,9 +1,8 @@
-From 79553f9fe95ff63d91c0af2918f91067455a8176 Mon Sep 17 00:00:00 2001
+From 4cfd1d55ab0510be5618d297ef5d68750c96f490 Mon Sep 17 00:00:00 2001
 From: Josh Cartwright <joshc@ni.com>
 Date: Tue, 27 Oct 2015 07:31:53 -0500
-Subject: [PATCH 179/351] net: Make synchronize_rcu_expedited() conditional on
+Subject: [PATCH 179/365] net: Make synchronize_rcu_expedited() conditional on
  !RT_FULL
-X-NVConfidentiality: public
 
 While the use of synchronize_rcu_expedited() might make
 synchronize_net() "faster", it does so at significant cost on RT
@@ -26,10 +25,10 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/net/core/dev.c b/net/core/dev.c
-index 5c052dc38a33..8fe0edbb502f 100644
+index bfbf0b6..071f0b1 100644
 --- a/net/core/dev.c
 +++ b/net/core/dev.c
-@@ -7224,7 +7224,7 @@ EXPORT_SYMBOL(free_netdev);
+@@ -7248,7 +7248,7 @@ EXPORT_SYMBOL(free_netdev);
  void synchronize_net(void)
  {
  	might_sleep();
@@ -39,5 +38,5 @@ index 5c052dc38a33..8fe0edbb502f 100644
  	else
  		synchronize_rcu();
 -- 
-2.10.1
+2.7.4
 

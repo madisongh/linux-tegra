@@ -1,12 +1,11 @@
-From 53fad9d2729d8f23571b4f5043c3eca3f266844d Mon Sep 17 00:00:00 2001
+From 3824144acf875bfb0146231aecced0d258ab4546 Mon Sep 17 00:00:00 2001
 From: "Yadi.hu" <yadi.hu@windriver.com>
 Date: Wed, 10 Dec 2014 10:32:09 +0800
-Subject: [PATCH 192/351] ARM: enable irq in translation/section permission
+Subject: [PATCH 192/365] ARM: enable irq in translation/section permission
  fault handlers
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
-X-NVConfidentiality: public
 
 Probably happens on all ARM, with
 CONFIG_PREEMPT_RT_FULL
@@ -68,7 +67,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 506c225c66cc..e3355a88bafc 100644
+index 506c225..e3355a8 100644
 --- a/arch/arm/mm/fault.c
 +++ b/arch/arm/mm/fault.c
 @@ -430,6 +430,9 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
@@ -92,5 +91,5 @@ index 506c225c66cc..e3355a88bafc 100644
  	return 0;
  }
 -- 
-2.10.1
+2.7.4
 

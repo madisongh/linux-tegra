@@ -1,9 +1,8 @@
-From 6d6831dc79fcb4b2a93b095f8deff0ff94682240 Mon Sep 17 00:00:00 2001
+From 18ae33d8efb4d7b28bef1b5366da362562fae348 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 14:09:05 +0100
-Subject: [PATCH 262/351] ptrace: don't open IRQs in ptrace_freeze_traced() too
+Subject: [PATCH 262/365] ptrace: don't open IRQs in ptrace_freeze_traced() too
  early
-X-NVConfidentiality: public
 
 In the non-RT case the spin_lock_irq() here disables interrupts as well
 as raw_spin_lock_irq(). So in the unlock case the interrupts are enabled
@@ -17,7 +16,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/kernel/ptrace.c b/kernel/ptrace.c
-index b85205122e86..1004af706be7 100644
+index b852051..1004af7 100644
 --- a/kernel/ptrace.c
 +++ b/kernel/ptrace.c
 @@ -129,12 +129,14 @@ static bool ptrace_freeze_traced(struct task_struct *task)
@@ -38,5 +37,5 @@ index b85205122e86..1004af706be7 100644
  	}
  	spin_unlock_irq(&task->sighand->siglock);
 -- 
-2.10.1
+2.7.4
 

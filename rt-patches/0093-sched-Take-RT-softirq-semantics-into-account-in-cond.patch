@@ -1,9 +1,8 @@
-From 34dd2f3ffc2d0ae1ec52ccc48a167cca92d96388 Mon Sep 17 00:00:00 2001
+From f9a1a33017a42ffe8f25c3f250a1253776fc08d6 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 14 Jul 2011 09:56:44 +0200
-Subject: [PATCH 093/351] sched: Take RT softirq semantics into account in
+Subject: [PATCH 093/365] sched: Take RT softirq semantics into account in
  cond_resched()
-X-NVConfidentiality: public
 
 The softirq semantics work different on -RT. There is no SOFTIRQ_MASK in
 the preemption counter which leads to the BUG_ON() statement in
@@ -17,7 +16,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  2 files changed, 6 insertions(+)
 
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 0295180ca7a1..1b5aecab38e9 100644
+index 0295180..1b5aeca 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -2999,12 +2999,16 @@ extern int __cond_resched_lock(spinlock_t *lock);
@@ -38,10 +37,10 @@ index 0295180ca7a1..1b5aecab38e9 100644
  static inline void cond_resched_rcu(void)
  {
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 80d61bf22c0e..9b6d30f93794 100644
+index ebd392e..78a96a3cb 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -4844,6 +4844,7 @@ int __cond_resched_lock(spinlock_t *lock)
+@@ -4869,6 +4869,7 @@ int __cond_resched_lock(spinlock_t *lock)
  }
  EXPORT_SYMBOL(__cond_resched_lock);
  
@@ -49,7 +48,7 @@ index 80d61bf22c0e..9b6d30f93794 100644
  int __sched __cond_resched_softirq(void)
  {
  	BUG_ON(!in_softirq());
-@@ -4857,6 +4858,7 @@ int __sched __cond_resched_softirq(void)
+@@ -4882,6 +4883,7 @@ int __sched __cond_resched_softirq(void)
  	return 0;
  }
  EXPORT_SYMBOL(__cond_resched_softirq);
@@ -58,5 +57,5 @@ index 80d61bf22c0e..9b6d30f93794 100644
  /**
   * yield - yield the current processor to other threads.
 -- 
-2.10.1
+2.7.4
 

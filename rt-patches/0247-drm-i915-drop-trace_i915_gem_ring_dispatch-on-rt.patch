@@ -1,8 +1,7 @@
-From b0dfb1e82a40cb44d960bd43b5bdce8b87fede18 Mon Sep 17 00:00:00 2001
+From 4e4738a1cc7e08d6f5b9d5473b4bd6b41dbc1ea2 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 25 Apr 2013 18:12:52 +0200
-Subject: [PATCH 247/351] drm/i915: drop trace_i915_gem_ring_dispatch on rt
-X-NVConfidentiality: public
+Subject: [PATCH 247/365] drm/i915: drop trace_i915_gem_ring_dispatch on rt
 
 This tracepoint is responsible for:
 
@@ -47,7 +46,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 2 insertions(+)
 
 diff --git a/drivers/gpu/drm/i915/i915_gem_execbuffer.c b/drivers/gpu/drm/i915/i915_gem_execbuffer.c
-index e26d0d246842..f91d82384139 100644
+index e26d0d2..f91d8238 100644
 --- a/drivers/gpu/drm/i915/i915_gem_execbuffer.c
 +++ b/drivers/gpu/drm/i915/i915_gem_execbuffer.c
 @@ -1302,7 +1302,9 @@ i915_gem_ringbuffer_submission(struct i915_execbuffer_params *params,
@@ -61,5 +60,5 @@ index e26d0d246842..f91d82384139 100644
  	i915_gem_execbuffer_move_to_active(vmas, params->request);
  
 -- 
-2.10.1
+2.7.4
 

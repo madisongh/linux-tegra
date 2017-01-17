@@ -1,8 +1,7 @@
-From 79b9b924860455351cf1c9de130c6295ac50688a Mon Sep 17 00:00:00 2001
+From 7498a347e52b654580c392204a1b54e3140561d1 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 9 Mar 2016 11:24:03 +0100
-Subject: [PATCH 322/351] Add upstream swait
-X-NVConfidentiality: public
+Subject: [PATCH 322/365] Add upstream swait
 
 This patch includes the chanages queued for upstream currently sitting in
 the TIP tree:
@@ -52,10 +51,10 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  delete mode 100644 kernel/sched/wait-simple.c
 
 diff --git a/Makefile b/Makefile
-index d41f698d72e1..04ff84120592 100644
+index 807037d..90ff4e2 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -782,6 +782,9 @@ KBUILD_CFLAGS   += $(call cc-option,-Werror=strict-prototypes)
+@@ -798,6 +798,9 @@ KBUILD_CFLAGS   += $(call cc-option,-Werror=strict-prototypes)
  # Prohibit date/time macros, which would make the build non-deterministic
  KBUILD_CFLAGS   += $(call cc-option,-Werror=date-time)
  
@@ -66,10 +65,10 @@ index d41f698d72e1..04ff84120592 100644
  KBUILD_ARFLAGS := $(call ar-option,D)
  
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 2ce9cc2717ac..bb43bc396f06 100644
+index 64037a6..36a3e51 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -498,16 +498,16 @@ static void kvm_arm_resume_guest(struct kvm *kvm)
+@@ -496,16 +496,16 @@ static void kvm_arm_resume_guest(struct kvm *kvm)
  	struct kvm_vcpu *vcpu;
  
  	kvm_for_each_vcpu(i, vcpu, kvm) {
@@ -90,7 +89,7 @@ index 2ce9cc2717ac..bb43bc396f06 100644
  	swait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
  				       (!vcpu->arch.pause)));
 diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 08148c46c8d0..c2b131527a64 100644
+index 08148c4..c2b1315 100644
 --- a/arch/arm/kvm/psci.c
 +++ b/arch/arm/kvm/psci.c
 @@ -70,7 +70,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
@@ -112,10 +111,10 @@ index 08148c46c8d0..c2b131527a64 100644
  	return PSCI_RET_SUCCESS;
  }
 diff --git a/arch/mips/kvm/mips.c b/arch/mips/kvm/mips.c
-index 2683d04fdda5..8a113298b6cc 100644
+index e86b749..b2a2f67 100644
 --- a/arch/mips/kvm/mips.c
 +++ b/arch/mips/kvm/mips.c
-@@ -445,8 +445,8 @@ int kvm_vcpu_ioctl_interrupt(struct kvm_vcpu *vcpu,
+@@ -454,8 +454,8 @@ int kvm_vcpu_ioctl_interrupt(struct kvm_vcpu *vcpu,
  
  	dvcpu->arch.wait = 0;
  
@@ -126,7 +125,7 @@ index 2683d04fdda5..8a113298b6cc 100644
  
  	return 0;
  }
-@@ -1174,8 +1174,8 @@ static void kvm_mips_comparecount_func(unsigned long data)
+@@ -1183,8 +1183,8 @@ static void kvm_mips_comparecount_func(unsigned long data)
  	kvm_mips_callbacks->queue_timer_int(vcpu);
  
  	vcpu->arch.wait = 0;
@@ -138,7 +137,7 @@ index 2683d04fdda5..8a113298b6cc 100644
  
  /* low level hrtimer wake routine */
 diff --git a/arch/powerpc/include/asm/kvm_host.h b/arch/powerpc/include/asm/kvm_host.h
-index b439518f0253..f8673ff84b31 100644
+index b439518..f8673ff 100644
 --- a/arch/powerpc/include/asm/kvm_host.h
 +++ b/arch/powerpc/include/asm/kvm_host.h
 @@ -286,7 +286,7 @@ struct kvmppc_vcore {
@@ -160,7 +159,7 @@ index b439518f0253..f8673ff84b31 100644
  	int ret;
  	int trap;
 diff --git a/arch/powerpc/kvm/book3s_hv.c b/arch/powerpc/kvm/book3s_hv.c
-index 32be32b61d4c..df34a6432873 100644
+index 32be32b..df34a64 100644
 --- a/arch/powerpc/kvm/book3s_hv.c
 +++ b/arch/powerpc/kvm/book3s_hv.c
 @@ -114,11 +114,11 @@ static bool kvmppc_ipi_thread(int cpu)
@@ -238,7 +237,7 @@ index 32be32b61d4c..df34a6432873 100644
  
  	}
 diff --git a/arch/s390/include/asm/kvm_host.h b/arch/s390/include/asm/kvm_host.h
-index 2a84c76265ec..bbdc539fb3c6 100644
+index 2a84c76..bbdc539 100644
 --- a/arch/s390/include/asm/kvm_host.h
 +++ b/arch/s390/include/asm/kvm_host.h
 @@ -427,7 +427,7 @@ struct kvm_s390_irq_payload {
@@ -251,7 +250,7 @@ index 2a84c76265ec..bbdc539fb3c6 100644
  	DECLARE_BITMAP(sigp_emerg_pending, KVM_MAX_VCPUS);
  	struct kvm_s390_irq_payload irq;
 diff --git a/arch/s390/kvm/interrupt.c b/arch/s390/kvm/interrupt.c
-index 8b4516b99bcd..cc862c486002 100644
+index 8b4516b..cc862c4 100644
 --- a/arch/s390/kvm/interrupt.c
 +++ b/arch/s390/kvm/interrupt.c
 @@ -868,13 +868,13 @@ no_timer:
@@ -271,7 +270,7 @@ index 8b4516b99bcd..cc862c486002 100644
  	}
  }
 diff --git a/arch/x86/kvm/lapic.c b/arch/x86/kvm/lapic.c
-index 906a1ecb7606..20d9e9fb3b74 100644
+index 906a1ec..20d9e9f 100644
 --- a/arch/x86/kvm/lapic.c
 +++ b/arch/x86/kvm/lapic.c
 @@ -1195,7 +1195,7 @@ static void apic_update_lvtt(struct kvm_lapic *apic)
@@ -295,10 +294,10 @@ index 906a1ecb7606..20d9e9fb3b74 100644
  	if (apic_lvtt_tscdeadline(apic))
  		ktimer->expired_tscdeadline = ktimer->tscdeadline;
 diff --git a/block/blk-core.c b/block/blk-core.c
-index 7cf98d55031a..8c6243597b48 100644
+index a535290..c00cd9c 100644
 --- a/block/blk-core.c
 +++ b/block/blk-core.c
-@@ -680,7 +680,7 @@ static void blk_queue_usage_counter_release(struct percpu_ref *ref)
+@@ -682,7 +682,7 @@ static void blk_queue_usage_counter_release(struct percpu_ref *ref)
  	struct request_queue *q =
  		container_of(ref, struct request_queue, q_usage_counter);
  
@@ -307,7 +306,7 @@ index 7cf98d55031a..8c6243597b48 100644
  }
  
  struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
-@@ -742,7 +742,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
+@@ -744,7 +744,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
  	q->bypass_depth = 1;
  	__set_bit(QUEUE_FLAG_BYPASS, &q->queue_flags);
  
@@ -317,7 +316,7 @@ index 7cf98d55031a..8c6243597b48 100644
  	/*
  	 * Init percpu_ref in atomic mode so that it's faster to shutdown.
 diff --git a/block/blk-mq.c b/block/blk-mq.c
-index 3c70813cb6b6..7cdf19e4aaea 100644
+index f887155..03dfc2c9 100644
 --- a/block/blk-mq.c
 +++ b/block/blk-mq.c
 @@ -130,7 +130,7 @@ void blk_mq_unfreeze_queue(struct request_queue *q)
@@ -339,7 +338,7 @@ index 3c70813cb6b6..7cdf19e4aaea 100644
  
  bool blk_mq_can_queue(struct blk_mq_hw_ctx *hctx)
 diff --git a/drivers/usb/gadget/function/f_fs.c b/drivers/usb/gadget/function/f_fs.c
-index 6d3ba5c6518d..033ab2a86738 100644
+index cf435d8..cf8c50f 100644
 --- a/drivers/usb/gadget/function/f_fs.c
 +++ b/drivers/usb/gadget/function/f_fs.c
 @@ -1405,7 +1405,7 @@ static void ffs_data_put(struct ffs_data *ffs)
@@ -352,7 +351,7 @@ index 6d3ba5c6518d..033ab2a86738 100644
  		kfree(ffs);
  	}
 diff --git a/include/linux/blkdev.h b/include/linux/blkdev.h
-index e1dbf567d930..ba7ed493e8bc 100644
+index 686ad42..4b934a1 100644
 --- a/include/linux/blkdev.h
 +++ b/include/linux/blkdev.h
 @@ -456,7 +456,7 @@ struct request_queue {
@@ -365,7 +364,7 @@ index e1dbf567d930..ba7ed493e8bc 100644
  	struct list_head	all_q_node;
  
 diff --git a/include/linux/completion.h b/include/linux/completion.h
-index 3fe8d14c98c0..3bca1590e29f 100644
+index 3fe8d14..3bca159 100644
 --- a/include/linux/completion.h
 +++ b/include/linux/completion.h
 @@ -7,7 +7,7 @@
@@ -401,7 +400,7 @@ index 3fe8d14c98c0..3bca1590e29f 100644
  
  /**
 diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index d856ccde77b4..c690acc6900e 100644
+index d856ccd..c690acc 100644
 --- a/include/linux/kvm_host.h
 +++ b/include/linux/kvm_host.h
 @@ -25,6 +25,7 @@
@@ -432,7 +431,7 @@ index d856ccde77b4..c690acc6900e 100644
  	return vcpu->arch.wqp;
 diff --git a/include/linux/swait.h b/include/linux/swait.h
 new file mode 100644
-index 000000000000..83f004a72320
+index 0000000..83f004a
 --- /dev/null
 +++ b/include/linux/swait.h
 @@ -0,0 +1,173 @@
@@ -611,7 +610,7 @@ index 000000000000..83f004a72320
 +#endif /* _LINUX_SWAIT_H */
 diff --git a/include/linux/wait-simple.h b/include/linux/wait-simple.h
 deleted file mode 100644
-index f86bca2c41d5..000000000000
+index f86bca2..0000000
 --- a/include/linux/wait-simple.h
 +++ /dev/null
 @@ -1,207 +0,0 @@
@@ -823,7 +822,7 @@ index f86bca2c41d5..000000000000
 -
 -#endif
 diff --git a/kernel/rcu/tree.c b/kernel/rcu/tree.c
-index 64098d35de19..d862a203fce0 100644
+index 64098d3..d862a20 100644
 --- a/kernel/rcu/tree.c
 +++ b/kernel/rcu/tree.c
 @@ -1621,7 +1621,6 @@ static int rcu_future_gp_cleanup(struct rcu_state *rsp, struct rcu_node *rnp)
@@ -909,7 +908,7 @@ index 64098d35de19..d862a203fce0 100644
  	for_each_possible_cpu(i) {
  		while (i > rnp->grphi)
 diff --git a/kernel/rcu/tree.h b/kernel/rcu/tree.h
-index 2ba8f6c2e81e..c75834d8de24 100644
+index 2ba8f6c..c75834d 100644
 --- a/kernel/rcu/tree.h
 +++ b/kernel/rcu/tree.h
 @@ -27,8 +27,8 @@
@@ -969,7 +968,7 @@ index 2ba8f6c2e81e..c75834d8de24 100644
  static bool __call_rcu_nocb(struct rcu_data *rdp, struct rcu_head *rhp,
  			    bool lazy, unsigned long flags);
 diff --git a/kernel/rcu/tree_plugin.h b/kernel/rcu/tree_plugin.h
-index 0d2f27f2f38d..8e119cf647ba 100644
+index 246cbd8..45e3e3e 100644
 --- a/kernel/rcu/tree_plugin.h
 +++ b/kernel/rcu/tree_plugin.h
 @@ -1717,9 +1717,9 @@ early_param("rcu_nocb_poll", parse_rcu_nocb_poll);
@@ -1020,7 +1019,7 @@ index 0d2f27f2f38d..8e119cf647ba 100644
  		}
  	}
  
-@@ -2259,7 +2264,7 @@ void __init rcu_init_nohz(void)
+@@ -2260,7 +2265,7 @@ void __init rcu_init_nohz(void)
  static void __init rcu_boot_init_nocb_percpu_data(struct rcu_data *rdp)
  {
  	rdp->nocb_tail = &rdp->nocb_head;
@@ -1029,7 +1028,7 @@ index 0d2f27f2f38d..8e119cf647ba 100644
  	rdp->nocb_follower_tail = &rdp->nocb_follower_head;
  }
  
-@@ -2409,7 +2414,7 @@ static bool rcu_nocb_cpu_needs_barrier(struct rcu_state *rsp, int cpu)
+@@ -2410,7 +2415,7 @@ static bool rcu_nocb_cpu_needs_barrier(struct rcu_state *rsp, int cpu)
  	return false;
  }
  
@@ -1038,7 +1037,7 @@ index 0d2f27f2f38d..8e119cf647ba 100644
  {
  }
  
-@@ -2417,6 +2422,11 @@ static void rcu_nocb_gp_set(struct rcu_node *rnp, int nrq)
+@@ -2418,6 +2423,11 @@ static void rcu_nocb_gp_set(struct rcu_node *rnp, int nrq)
  {
  }
  
@@ -1051,7 +1050,7 @@ index 0d2f27f2f38d..8e119cf647ba 100644
  {
  }
 diff --git a/kernel/sched/Makefile b/kernel/sched/Makefile
-index 6202e8dfb0ba..f093796c48f4 100644
+index 6202e8d..f093796 100644
 --- a/kernel/sched/Makefile
 +++ b/kernel/sched/Makefile
 @@ -15,7 +15,7 @@ endif
@@ -1064,7 +1063,7 @@ index 6202e8dfb0ba..f093796c48f4 100644
  obj-$(CONFIG_SCHED_AUTOGROUP) += auto_group.o
  obj-$(CONFIG_SCHEDSTATS) += stats.o
 diff --git a/kernel/sched/completion.c b/kernel/sched/completion.c
-index 45ebcffd9feb..b62cf6400fe0 100644
+index 45ebcff..b62cf64 100644
 --- a/kernel/sched/completion.c
 +++ b/kernel/sched/completion.c
 @@ -32,7 +32,7 @@ void complete(struct completion *x)
@@ -1108,7 +1107,7 @@ index 45ebcffd9feb..b62cf6400fe0 100644
  	}
 diff --git a/kernel/sched/swait.c b/kernel/sched/swait.c
 new file mode 100644
-index 000000000000..8459561f0379
+index 0000000..8459561
 --- /dev/null
 +++ b/kernel/sched/swait.c
 @@ -0,0 +1,140 @@
@@ -1254,7 +1253,7 @@ index 000000000000..8459561f0379
 +EXPORT_SYMBOL(finish_swait);
 diff --git a/kernel/sched/wait-simple.c b/kernel/sched/wait-simple.c
 deleted file mode 100644
-index 7dfa86d1f654..000000000000
+index 7dfa86d..0000000
 --- a/kernel/sched/wait-simple.c
 +++ /dev/null
 @@ -1,115 +0,0 @@
@@ -1374,7 +1373,7 @@ index 7dfa86d1f654..000000000000
 -}
 -EXPORT_SYMBOL(__swait_wake);
 diff --git a/kernel/sched/work-simple.c b/kernel/sched/work-simple.c
-index e57a0522573f..9ffe40543c81 100644
+index e57a052..9ffe405 100644
 --- a/kernel/sched/work-simple.c
 +++ b/kernel/sched/work-simple.c
 @@ -5,7 +5,7 @@
@@ -1414,7 +1413,7 @@ index e57a0522573f..9ffe40543c81 100644
  }
  EXPORT_SYMBOL_GPL(swork_queue);
 diff --git a/virt/kvm/async_pf.c b/virt/kvm/async_pf.c
-index 57d9436f7a9c..9378d0919ed8 100644
+index 57d9436..9378d09 100644
 --- a/virt/kvm/async_pf.c
 +++ b/virt/kvm/async_pf.c
 @@ -98,8 +98,8 @@ static void async_pf_execute(struct work_struct *work)
@@ -1429,10 +1428,10 @@ index 57d9436f7a9c..9378d0919ed8 100644
  	mmput(mm);
  	kvm_put_kvm(vcpu->kvm);
 diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 0be613c3f144..9c75003e06a4 100644
+index abdf387..7748ca3 100644
 --- a/virt/kvm/kvm_main.c
 +++ b/virt/kvm/kvm_main.c
-@@ -226,8 +226,7 @@ int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
+@@ -228,8 +228,7 @@ int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
  	vcpu->kvm = kvm;
  	vcpu->vcpu_id = id;
  	vcpu->pid = NULL;
@@ -1442,7 +1441,7 @@ index 0be613c3f144..9c75003e06a4 100644
  	kvm_async_pf_vcpu_init(vcpu);
  
  	vcpu->pre_pcpu = -1;
-@@ -2003,7 +2002,7 @@ static int kvm_vcpu_check_block(struct kvm_vcpu *vcpu)
+@@ -2005,7 +2004,7 @@ static int kvm_vcpu_check_block(struct kvm_vcpu *vcpu)
  void kvm_vcpu_block(struct kvm_vcpu *vcpu)
  {
  	ktime_t start, cur;
@@ -1451,7 +1450,7 @@ index 0be613c3f144..9c75003e06a4 100644
  	bool waited = false;
  	u64 block_ns;
  
-@@ -2028,7 +2027,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
+@@ -2030,7 +2029,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
  	kvm_arch_vcpu_blocking(vcpu);
  
  	for (;;) {
@@ -1460,7 +1459,7 @@ index 0be613c3f144..9c75003e06a4 100644
  
  		if (kvm_vcpu_check_block(vcpu) < 0)
  			break;
-@@ -2037,7 +2036,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
+@@ -2039,7 +2038,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
  		schedule();
  	}
  
@@ -1469,7 +1468,7 @@ index 0be613c3f144..9c75003e06a4 100644
  	cur = ktime_get();
  
  	kvm_arch_vcpu_unblocking(vcpu);
-@@ -2069,11 +2068,11 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
+@@ -2071,11 +2070,11 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
  {
  	int me;
  	int cpu = vcpu->cpu;
@@ -1484,7 +1483,7 @@ index 0be613c3f144..9c75003e06a4 100644
  		++vcpu->stat.halt_wakeup;
  	}
  
-@@ -2174,7 +2173,7 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me)
+@@ -2176,7 +2175,7 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me)
  				continue;
  			if (vcpu == me)
  				continue;
@@ -1494,5 +1493,5 @@ index 0be613c3f144..9c75003e06a4 100644
  			if (!kvm_vcpu_eligible_for_directed_yield(vcpu))
  				continue;
 -- 
-2.10.1
+2.7.4
 

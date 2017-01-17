@@ -1,9 +1,8 @@
-From 18a6e6b6763455f6e0313a1eed6806eb5b5737ca Mon Sep 17 00:00:00 2001
+From e6212834b5e64f3e18b15a9764878c9a9ca20dee Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sat, 27 Feb 2016 08:34:43 +0100
-Subject: [PATCH 299/351] locking/lglocks: Use preempt_enable/disable_nort() in
+Subject: [PATCH 299/365] locking/lglocks: Use preempt_enable/disable_nort() in
  lg_double_[un]lock
-X-NVConfidentiality: public
 
 Let's not do that when snagging an rtmutex.
 
@@ -16,7 +15,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/kernel/locking/lglock.c b/kernel/locking/lglock.c
-index 51bfe64e7d16..57e0ea72c28a 100644
+index 51bfe64..57e0ea7 100644
 --- a/kernel/locking/lglock.c
 +++ b/kernel/locking/lglock.c
 @@ -86,7 +86,7 @@ void lg_double_lock(struct lglock *lg, int cpu1, int cpu2)
@@ -38,5 +37,5 @@ index 51bfe64e7d16..57e0ea72c28a 100644
  
  void lg_global_lock(struct lglock *lg)
 -- 
-2.10.1
+2.7.4
 

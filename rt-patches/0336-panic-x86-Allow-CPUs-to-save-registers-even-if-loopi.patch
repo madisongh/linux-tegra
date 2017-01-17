@@ -1,9 +1,8 @@
-From a5695a76a5803e92b4792f3976338fcdf7f61bfb Mon Sep 17 00:00:00 2001
+From d16459afda9c798cc125c6576a02e31b2bb9a655 Mon Sep 17 00:00:00 2001
 From: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
 Date: Mon, 14 Dec 2015 11:19:10 +0100
-Subject: [PATCH 336/351] panic, x86: Allow CPUs to save registers even if
+Subject: [PATCH 336/365] panic, x86: Allow CPUs to save registers even if
  looping in NMI context
-X-NVConfidentiality: public
 
 Currently, kdump_nmi_shootdown_cpus(), a subroutine of crash_kexec(),
 sends an NMI IPI to CPUs which haven't called panic() to stop them,
@@ -108,7 +107,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  5 files changed, 45 insertions(+), 8 deletions(-)
 
 diff --git a/arch/x86/kernel/nmi.c b/arch/x86/kernel/nmi.c
-index fca87938d739..424aec4a4c71 100644
+index fca8793..424aec4 100644
 --- a/arch/x86/kernel/nmi.c
 +++ b/arch/x86/kernel/nmi.c
 @@ -231,7 +231,7 @@ pci_serr_error(unsigned char reason, struct pt_regs *regs)
@@ -139,7 +138,7 @@ index fca87938d739..424aec4a4c71 100644
  	pr_emerg("Dazed and confused, but trying to continue\n");
  }
 diff --git a/arch/x86/kernel/reboot.c b/arch/x86/kernel/reboot.c
-index f660d63f40fe..8384207adde2 100644
+index f660d63..8384207 100644
 --- a/arch/x86/kernel/reboot.c
 +++ b/arch/x86/kernel/reboot.c
 @@ -726,6 +726,7 @@ static int crashing_cpu;
@@ -184,7 +183,7 @@ index f660d63f40fe..8384207adde2 100644
  void nmi_shootdown_cpus(nmi_shootdown_cb callback)
  {
 diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-index a814bc014a2b..8a4a50381763 100644
+index 5252478..3cd9b629 100644
 --- a/include/linux/kernel.h
 +++ b/include/linux/kernel.h
 @@ -259,6 +259,7 @@ extern long (*panic_blink)(int state);
@@ -195,7 +194,7 @@ index a814bc014a2b..8a4a50381763 100644
  extern void oops_enter(void);
  extern void oops_exit(void);
  void print_oops_end_marker(void);
-@@ -459,14 +460,21 @@ extern atomic_t panic_cpu;
+@@ -461,14 +462,21 @@ extern atomic_t panic_cpu;
  
  /*
   * A variant of panic() called from NMI context. We return if we've already
@@ -222,7 +221,7 @@ index a814bc014a2b..8a4a50381763 100644
  
  /*
 diff --git a/kernel/panic.c b/kernel/panic.c
-index 71498388d039..59379029d64e 100644
+index 7149838..5937902 100644
 --- a/kernel/panic.c
 +++ b/kernel/panic.c
 @@ -64,6 +64,15 @@ void __weak panic_smp_self_stop(void)
@@ -242,7 +241,7 @@ index 71498388d039..59379029d64e 100644
  
  /**
 diff --git a/kernel/watchdog.c b/kernel/watchdog.c
-index 63073a177b14..8025fc36d8c1 100644
+index 63073a1..8025fc3 100644
 --- a/kernel/watchdog.c
 +++ b/kernel/watchdog.c
 @@ -436,7 +436,7 @@ static void watchdog_overflow_callback(struct perf_event *event,
@@ -255,5 +254,5 @@ index 63073a177b14..8025fc36d8c1 100644
  		__this_cpu_write(hard_watchdog_warn, true);
  		return;
 -- 
-2.10.1
+2.7.4
 

@@ -1,9 +1,8 @@
-From efabb966684c57439cc1df09fd9233b34fa3553f Mon Sep 17 00:00:00 2001
+From 3b91f0bb2f7d37e4ccdcf0b0cf5f579e9f9b0e41 Mon Sep 17 00:00:00 2001
 From: Yong Zhang <yong.zhang0@gmail.com>
 Date: Thu, 28 Jul 2011 11:16:00 +0800
-Subject: [PATCH 103/351] hotplug: Reread hotplug_pcp on pin_current_cpu()
+Subject: [PATCH 103/365] hotplug: Reread hotplug_pcp on pin_current_cpu()
  retry
-X-NVConfidentiality: public
 
 When retry happens, it's likely that the task has been migrated to
 another cpu (except unplug failed), but it still derefernces the
@@ -21,7 +20,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/kernel/cpu.c b/kernel/cpu.c
-index 95db72a5b927..654f8db185c4 100644
+index 218c7a1..04df252 100644
 --- a/kernel/cpu.c
 +++ b/kernel/cpu.c
 @@ -109,9 +109,11 @@ static DEFINE_PER_CPU(struct hotplug_pcp, hotplug_pcp);
@@ -38,5 +37,5 @@ index 95db72a5b927..654f8db185c4 100644
  	    hp->unplug == current) {
  		hp->refcount++;
 -- 
-2.10.1
+2.7.4
 

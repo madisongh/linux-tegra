@@ -1,8 +1,7 @@
-From 25c9e0d3f7ee356f57153f9b7771ce7d63752004 Mon Sep 17 00:00:00 2001
+From 00d9c20516ab1053697f42407cb9a23c855aa983 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:44:47 +0100
-Subject: [PATCH 258/351] Revert "mm/rmap: retry lock check in anon_vma_free()"
-X-NVConfidentiality: public
+Subject: [PATCH 258/365] Revert "mm/rmap: retry lock check in anon_vma_free()"
 
 This is probably just a duct tape patch and root cause has been
 fixed in the meantime.
@@ -13,7 +12,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 1 insertion(+), 11 deletions(-)
 
 diff --git a/mm/rmap.c b/mm/rmap.c
-index 950d79743e8f..b577fbb98d4b 100644
+index 950d797..b577fbb 100644
 --- a/mm/rmap.c
 +++ b/mm/rmap.c
 @@ -89,10 +89,8 @@ static inline struct anon_vma *anon_vma_alloc(void)
@@ -47,5 +46,5 @@ index 950d79743e8f..b577fbb98d4b 100644
  
  	kmem_cache_free(anon_vma_cachep, anon_vma);
 -- 
-2.10.1
+2.7.4
 

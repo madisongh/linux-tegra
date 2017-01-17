@@ -1,9 +1,8 @@
-From 69974095727f93469b7eac9d755fa47fbf78fd57 Mon Sep 17 00:00:00 2001
+From 2dfa3f09f640789ea273d76c7b211b2b1fd5f47b Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sat, 25 Jun 2011 09:21:04 +0200
-Subject: [PATCH 091/351] sched: Add saved_state for tasks blocked on sleeping
+Subject: [PATCH 091/365] sched: Add saved_state for tasks blocked on sleeping
  locks
-X-NVConfidentiality: public
 
 Spinlocks are state preserving in !RT. RT changes the state when a
 task gets blocked on a lock. So we need to remember the state before
@@ -19,7 +18,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  3 files changed, 33 insertions(+), 1 deletion(-)
 
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 5925cc4ac9b4..0295180ca7a1 100644
+index 5925cc4..0295180 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1390,6 +1390,7 @@ struct tlbflush_unmap_batch {
@@ -39,10 +38,10 @@ index 5925cc4ac9b4..0295180ca7a1 100644
  #ifdef CONFIG_SMP
   extern void kick_process(struct task_struct *tsk);
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index fa7bbd29b6de..7c19c7d878ee 100644
+index c0e6f2b..e6b63f0 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -1959,8 +1959,25 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
+@@ -1962,8 +1962,25 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
  	 */
  	smp_mb__before_spinlock();
  	raw_spin_lock_irqsave(&p->pi_lock, flags);
@@ -69,7 +68,7 @@ index fa7bbd29b6de..7c19c7d878ee 100644
  
  	trace_sched_waking(p);
  
-@@ -2093,6 +2110,18 @@ int wake_up_process(struct task_struct *p)
+@@ -2118,6 +2135,18 @@ int wake_up_process(struct task_struct *p)
  }
  EXPORT_SYMBOL(wake_up_process);
  
@@ -89,7 +88,7 @@ index fa7bbd29b6de..7c19c7d878ee 100644
  {
  	return try_to_wake_up(p, state, 0);
 diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-index b6543967888e..7012cde9fb89 100644
+index b654396..7012cde 100644
 --- a/kernel/sched/sched.h
 +++ b/kernel/sched/sched.h
 @@ -1111,6 +1111,7 @@ static inline void finish_lock_switch(struct rq *rq, struct task_struct *prev)
@@ -101,5 +100,5 @@ index b6543967888e..7012cde9fb89 100644
  /*
   * To aid in avoiding the subversion of "niceness" due to uneven distribution
 -- 
-2.10.1
+2.7.4
 

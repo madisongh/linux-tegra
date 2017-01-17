@@ -1,8 +1,7 @@
-From 262ad979e2a79a8eaba07cb1696dbaa1c4de94b5 Mon Sep 17 00:00:00 2001
+From a291356c6829d639ad99c83c7453c21428e090e2 Mon Sep 17 00:00:00 2001
 From: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
 Date: Tue, 22 Mar 2016 14:27:17 -0700
-Subject: [PATCH 337/351] panic: change nmi_panic from macro to function
-X-NVConfidentiality: public
+Subject: [PATCH 337/365] panic: change nmi_panic from macro to function
 
 Commit 1717f2096b54 ("panic, x86: Fix re-entrance problem due to panic
 on NMI") and commit 58c5661f2144 ("panic, x86: Allow CPUs to save
@@ -46,7 +45,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  2 files changed, 21 insertions(+), 20 deletions(-)
 
 diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-index 8a4a50381763..a3ff969ec316 100644
+index 3cd9b629..8d08e98 100644
 --- a/include/linux/kernel.h
 +++ b/include/linux/kernel.h
 @@ -259,7 +259,7 @@ extern long (*panic_blink)(int state);
@@ -58,7 +57,7 @@ index 8a4a50381763..a3ff969ec316 100644
  extern void oops_enter(void);
  extern void oops_exit(void);
  void print_oops_end_marker(void);
-@@ -459,25 +459,6 @@ extern atomic_t panic_cpu;
+@@ -461,25 +461,6 @@ extern atomic_t panic_cpu;
  #define PANIC_CPU_INVALID	-1
  
  /*
@@ -85,7 +84,7 @@ index 8a4a50381763..a3ff969ec316 100644
   * CONFIG_PANIC_TIMEOUT, honor it.
   */
 diff --git a/kernel/panic.c b/kernel/panic.c
-index 59379029d64e..4c62a4fe97aa 100644
+index 5937902..4c62a4f 100644
 --- a/kernel/panic.c
 +++ b/kernel/panic.c
 @@ -75,6 +75,26 @@ void __weak nmi_panic_self_stop(struct pt_regs *regs)
@@ -116,5 +115,5 @@ index 59379029d64e..4c62a4fe97aa 100644
   *	panic - halt the system
   *	@fmt: The text string to print
 -- 
-2.10.1
+2.7.4
 

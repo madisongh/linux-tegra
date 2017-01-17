@@ -1,9 +1,8 @@
-From 602956ee156c75f2e94d69298eeeb30bc260e7ed Mon Sep 17 00:00:00 2001
+From 435b781727d5267fbdeb8d17a0a098eba6bb9765 Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Wed, 26 Jun 2013 15:28:11 -0400
-Subject: [PATCH 251/351] rt,ntp: Move call to schedule_delayed_work() to
+Subject: [PATCH 251/365] rt,ntp: Move call to schedule_delayed_work() to
  helper thread
-X-NVConfidentiality: public
 
 The ntp code for notify_cmos_timer() is called from a hard interrupt
 context. schedule_delayed_work() under PREEMPT_RT_FULL calls spinlocks
@@ -26,7 +25,7 @@ Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
  1 file changed, 43 insertions(+)
 
 diff --git a/kernel/time/ntp.c b/kernel/time/ntp.c
-index 149cc8086aea..cd925efb239a 100644
+index ab86177..0f6868f 100644
 --- a/kernel/time/ntp.c
 +++ b/kernel/time/ntp.c
 @@ -10,6 +10,7 @@
@@ -91,5 +90,5 @@ index 149cc8086aea..cd925efb239a 100644
  #else
  void ntp_notify_cmos_timer(void) { }
 -- 
-2.10.1
+2.7.4
 

@@ -1,9 +1,8 @@
-From 3e08d34a40b01794bba1ee43971c5d82e7f5c2d5 Mon Sep 17 00:00:00 2001
+From 1b5d8aeb7df59e41a8cf313cdf8e5741450bc44d Mon Sep 17 00:00:00 2001
 From: Frederic Weisbecker <fweisbec@gmail.com>
 Date: Thu, 19 Nov 2015 16:47:30 +0100
-Subject: [PATCH 340/351] sched/cputime: Clarify vtime symbols and document
+Subject: [PATCH 340/365] sched/cputime: Clarify vtime symbols and document
  them
-X-NVConfidentiality: public
 
 VTIME_SLEEPING state happens either when:
 
@@ -36,7 +35,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  3 files changed, 8 insertions(+), 5 deletions(-)
 
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 4beaa1499758..bc11cd8bac72 100644
+index 4beaa14..bc11cd8 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1554,8 +1554,11 @@ struct task_struct {
@@ -53,10 +52,10 @@ index 4beaa1499758..bc11cd8bac72 100644
  	} vtime_snap_whence;
  #endif
 diff --git a/kernel/fork.c b/kernel/fork.c
-index e66a95364543..c45c69bf4291 100644
+index 72279e3..cdc3a16 100644
 --- a/kernel/fork.c
 +++ b/kernel/fork.c
-@@ -1382,7 +1382,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+@@ -1403,7 +1403,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
  #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
  	seqlock_init(&p->vtime_seqlock);
  	p->vtime_snap = 0;
@@ -66,10 +65,10 @@ index e66a95364543..c45c69bf4291 100644
  
  #if defined(SPLIT_RSS_COUNTING)
 diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
-index f74ea89e77a8..0fb1ff7f8e6b 100644
+index a1aecbe..ac7559b 100644
 --- a/kernel/sched/cputime.c
 +++ b/kernel/sched/cputime.c
-@@ -680,7 +680,7 @@ static cputime_t get_vtime_delta(struct task_struct *tsk)
+@@ -685,7 +685,7 @@ static cputime_t get_vtime_delta(struct task_struct *tsk)
  {
  	unsigned long long delta = vtime_delta(tsk);
  
@@ -78,7 +77,7 @@ index f74ea89e77a8..0fb1ff7f8e6b 100644
  	tsk->vtime_snap += delta;
  
  	/* CHECKME: always safe to convert nsecs to cputime? */
-@@ -764,7 +764,7 @@ void vtime_account_idle(struct task_struct *tsk)
+@@ -769,7 +769,7 @@ void vtime_account_idle(struct task_struct *tsk)
  void arch_vtime_task_switch(struct task_struct *prev)
  {
  	write_seqlock(&prev->vtime_seqlock);
@@ -87,7 +86,7 @@ index f74ea89e77a8..0fb1ff7f8e6b 100644
  	write_sequnlock(&prev->vtime_seqlock);
  
  	write_seqlock(&current->vtime_seqlock);
-@@ -829,7 +829,7 @@ fetch_task_cputime(struct task_struct *t,
+@@ -834,7 +834,7 @@ fetch_task_cputime(struct task_struct *t,
  			*s_dst = *s_src;
  
  		/* Task is sleeping, nothing to add */
@@ -97,5 +96,5 @@ index f74ea89e77a8..0fb1ff7f8e6b 100644
  			continue;
  
 -- 
-2.10.1
+2.7.4
 

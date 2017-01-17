@@ -1,8 +1,7 @@
-From 20c58f2bc88759368ae4ad656c234902f5e96160 Mon Sep 17 00:00:00 2001
+From 830a9d2fb0c571544760f8e9b5a3e36f9c7c69f9 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 25 May 2012 16:59:47 +0200
-Subject: [PATCH 284/351] genirq: Add default affinity mask command line option
-X-NVConfidentiality: public
+Subject: [PATCH 284/365] genirq: Add default affinity mask command line option
 
 If we isolate CPUs, then we don't want random device interrupts on them. Even
 w/o the user space irq balancer enabled we can end up with irqs on non boot
@@ -18,10 +17,10 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  2 files changed, 28 insertions(+), 2 deletions(-)
 
 diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index dfdb38df7a03..9e02ffc20cf4 100644
+index 1154924..5d097a6 100644
 --- a/Documentation/kernel-parameters.txt
 +++ b/Documentation/kernel-parameters.txt
-@@ -1635,6 +1635,15 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+@@ -1642,6 +1642,15 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
  	ip=		[IP_PNP]
  			See Documentation/filesystems/nfs/nfsroot.txt.
  
@@ -38,7 +37,7 @@ index dfdb38df7a03..9e02ffc20cf4 100644
  			When an interrupt is not handled search all handlers
  			for it. Intended to get systems with badly broken
 diff --git a/kernel/irq/irqdesc.c b/kernel/irq/irqdesc.c
-index 239e2ae2c947..0b73349a42d5 100644
+index 239e2ae..0b73349 100644
 --- a/kernel/irq/irqdesc.c
 +++ b/kernel/irq/irqdesc.c
 @@ -24,10 +24,27 @@
@@ -72,5 +71,5 @@ index 239e2ae2c947..0b73349a42d5 100644
  #else
  static void __init init_irq_default_affinity(void)
 -- 
-2.10.1
+2.7.4
 

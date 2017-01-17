@@ -1,8 +1,7 @@
-From b7a7bedee5305b6be7c732c8daf129c898fd9527 Mon Sep 17 00:00:00 2001
+From 4c8feec085667a9620fbe9d286bb44c1348a9298 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 16 Dec 2010 14:25:18 +0100
-Subject: [PATCH 152/351] x86: stackprotector: Avoid random pool on rt
-X-NVConfidentiality: public
+Subject: [PATCH 152/365] x86: stackprotector: Avoid random pool on rt
 
 CPU bringup calls into the random pool to initialize the stack
 canary. During boot that works nicely even on RT as the might sleep
@@ -19,7 +18,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/arch/x86/include/asm/stackprotector.h b/arch/x86/include/asm/stackprotector.h
-index 58505f01962f..02fa39652cd6 100644
+index 58505f0..02fa396 100644
 --- a/arch/x86/include/asm/stackprotector.h
 +++ b/arch/x86/include/asm/stackprotector.h
 @@ -59,7 +59,7 @@
@@ -48,5 +47,5 @@ index 58505f01962f..02fa39652cd6 100644
  	canary += tsc + (tsc << 32UL);
  
 -- 
-2.10.1
+2.7.4
 

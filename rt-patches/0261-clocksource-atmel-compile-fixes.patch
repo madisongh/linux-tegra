@@ -1,8 +1,7 @@
-From f59efe45e6622353d53a2f4e0cd1e010fdfcb2d2 Mon Sep 17 00:00:00 2001
+From 3a3c93fa18d67a715ffd382e05560e522984fc9f Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:54:36 +0100
-Subject: [PATCH 261/351] clocksource: atmel: compile fixes
-X-NVConfidentiality: public
+Subject: [PATCH 261/365] clocksource: atmel: compile fixes
 
 Reported-by: kernel test robot <ying.huang@linux.intel.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -12,7 +11,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  2 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
-index 80d74c4adcbe..a7abdb6638cd 100644
+index 80d74c4..a7abdb6 100644
 --- a/drivers/clocksource/timer-atmel-pit.c
 +++ b/drivers/clocksource/timer-atmel-pit.c
 @@ -96,10 +96,11 @@ static int pit_clkevt_shutdown(struct clock_event_device *dev)
@@ -37,7 +36,7 @@ index 80d74c4adcbe..a7abdb6638cd 100644
  	/*
  	 * Use our actual MCK to figure out how many MCK/16 ticks per
 diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
-index ea37afc26e1b..103d0fd70cc4 100644
+index ea37afc..103d0fd 100644
 --- a/drivers/clocksource/timer-atmel-st.c
 +++ b/drivers/clocksource/timer-atmel-st.c
 @@ -150,7 +150,7 @@ static int clkevt32k_set_oneshot(struct clock_event_device *dev)
@@ -61,5 +60,5 @@ index ea37afc26e1b..103d0fd70cc4 100644
  
  	sclk = of_clk_get(node, 0);
 -- 
-2.10.1
+2.7.4
 

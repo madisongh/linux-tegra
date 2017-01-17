@@ -1,8 +1,7 @@
-From d0ea6aac5107d86786824809001a75d3c9079180 Mon Sep 17 00:00:00 2001
+From 08142006a86254e0c8acffab22212bed2fb037ee Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 22 Feb 2016 22:19:25 +0000
-Subject: [PATCH 342/351] perf/x86/intel/rapl: Make PMU lock raw
-X-NVConfidentiality: public
+Subject: [PATCH 342/365] perf/x86/intel/rapl: Make PMU lock raw
 
 Upstream commit: a208749c6426 ("perf/x86/intel/rapl: Make PMU lock raw")
 
@@ -32,7 +31,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 10 insertions(+), 10 deletions(-)
 
 diff --git a/arch/x86/kernel/cpu/perf_event_intel_rapl.c b/arch/x86/kernel/cpu/perf_event_intel_rapl.c
-index ed446bdcbf31..d2ac364e2118 100644
+index ed446bd..d2ac364 100644
 --- a/arch/x86/kernel/cpu/perf_event_intel_rapl.c
 +++ b/arch/x86/kernel/cpu/perf_event_intel_rapl.c
 @@ -117,7 +117,7 @@ static struct perf_pmu_events_attr event_attr_##v = {			\
@@ -117,5 +116,5 @@ index ed446bdcbf31..d2ac364e2118 100644
  	INIT_LIST_HEAD(&pmu->active_list);
  
 -- 
-2.10.1
+2.7.4
 

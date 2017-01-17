@@ -1,9 +1,8 @@
-From 4c31c1889586e9b1c418de589cbc4f775c0f28b4 Mon Sep 17 00:00:00 2001
+From 4866097e9db1f0e797631761b304616c60e3a2aa Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 10 Feb 2016 18:25:16 +0100
-Subject: [PATCH 292/351] kernel/stop_machine: partly revert "stop_machine: Use
+Subject: [PATCH 292/365] kernel/stop_machine: partly revert "stop_machine: Use
  raw spinlocks"
-X-NVConfidentiality: public
 
 With completion using swait and so rawlocks we don't need this anymore.
 Further, bisect thinks this patch is responsible for:
@@ -47,7 +46,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 8 insertions(+), 32 deletions(-)
 
 diff --git a/kernel/stop_machine.c b/kernel/stop_machine.c
-index 2c5acc882bad..f84d3b45cda7 100644
+index 2c5acc8..f84d3b4 100644
 --- a/kernel/stop_machine.c
 +++ b/kernel/stop_machine.c
 @@ -30,7 +30,7 @@ struct cpu_stop_done {
@@ -155,5 +154,5 @@ index 2c5acc882bad..f84d3b45cda7 100644
  
  	mutex_unlock(&stop_cpus_mutex);
 -- 
-2.10.1
+2.7.4
 

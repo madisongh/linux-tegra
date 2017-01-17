@@ -1,9 +1,8 @@
-From 930cc33b7e1e7787d221ec5d3bc0915be5c1453b Mon Sep 17 00:00:00 2001
+From ba9528fd05d25f3a07bfea07a44fc11137cce234 Mon Sep 17 00:00:00 2001
 From: Clark Williams <williams@redhat.com>
 Date: Fri, 26 Feb 2016 13:19:20 -0600
-Subject: [PATCH 306/351] rcu/torture: Comment out rcu_bh ops on
+Subject: [PATCH 306/365] rcu/torture: Comment out rcu_bh ops on
  PREEMPT_RT_FULL
-X-NVConfidentiality: public
 
 RT has dropped support of rcu_bh, comment out in rcutorture.
 
@@ -15,7 +14,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 7 insertions(+)
 
 diff --git a/kernel/rcu/rcutorture.c b/kernel/rcu/rcutorture.c
-index d89328e260df..5bb3364a6284 100644
+index d89328e..5bb3364 100644
 --- a/kernel/rcu/rcutorture.c
 +++ b/kernel/rcu/rcutorture.c
 @@ -390,6 +390,7 @@ static struct rcu_torture_ops rcu_ops = {
@@ -40,5 +39,5 @@ index d89328e260df..5bb3364a6284 100644
   * Don't even think about trying any of these in real life!!!
   * The names includes "busted", and they really means it!
 -- 
-2.10.1
+2.7.4
 

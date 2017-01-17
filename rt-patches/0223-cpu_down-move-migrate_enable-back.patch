@@ -1,8 +1,7 @@
-From 7ecbf0c3c3343df0b13e66b52149b1fa2eceeaae Mon Sep 17 00:00:00 2001
+From 5ca431f513195d19c7165d977eb5e471bf2537d7 Mon Sep 17 00:00:00 2001
 From: Tiejun Chen <tiejun.chen@windriver.com>
 Date: Thu, 7 Nov 2013 10:06:07 +0800
-Subject: [PATCH 223/351] cpu_down: move migrate_enable() back
-X-NVConfidentiality: public
+Subject: [PATCH 223/365] cpu_down: move migrate_enable() back
 
 Commit 08c1ab68, "hotplug-use-migrate-disable.patch", intends to
 use migrate_enable()/migrate_disable() to replace that combination
@@ -35,7 +34,7 @@ Signed-off-by: Tiejun Chen <tiejun.chen@windriver.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/kernel/cpu.c b/kernel/cpu.c
-index a32b15ac586c..05a3f0312014 100644
+index 2635738..10dea0b 100644
 --- a/kernel/cpu.c
 +++ b/kernel/cpu.c
 @@ -659,6 +659,7 @@ static int _cpu_down(unsigned int cpu, int tasks_frozen)
@@ -46,7 +45,7 @@ index a32b15ac586c..05a3f0312014 100644
  
  	cpu_hotplug_begin();
  	err = cpu_unplug_begin(cpu);
-@@ -743,7 +744,6 @@ static int _cpu_down(unsigned int cpu, int tasks_frozen)
+@@ -744,7 +745,6 @@ static int _cpu_down(unsigned int cpu, int tasks_frozen)
  out_release:
  	cpu_unplug_done(cpu);
  out_cancel:
@@ -55,5 +54,5 @@ index a32b15ac586c..05a3f0312014 100644
  	trace_sched_cpu_hotplug(cpu, err, 0);
  	if (!err)
 -- 
-2.10.1
+2.7.4
 

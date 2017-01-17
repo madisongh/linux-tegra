@@ -1,8 +1,7 @@
-From c32d87554e0f20b7fd53dafdcedf74036ef18636 Mon Sep 17 00:00:00 2001
+From 74e26d744afbb898775ed5b949d5d085a45b04d3 Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <srostedt@redhat.com>
 Date: Mon, 16 Jul 2012 08:07:43 +0000
-Subject: [PATCH 219/351] cpu/rt: Rework cpu down for PREEMPT_RT
-X-NVConfidentiality: public
+Subject: [PATCH 219/365] cpu/rt: Rework cpu down for PREEMPT_RT
 
 Bringing a CPU down is a pain with the PREEMPT_RT kernel because
 tasks can be preempted in many more places than in non-RT. In
@@ -56,7 +55,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  3 files changed, 283 insertions(+), 46 deletions(-)
 
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index c2c6b056c494..e474bd0f35c5 100644
+index c2c6b05..e474bd0 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -2297,6 +2297,10 @@ extern void do_set_cpus_allowed(struct task_struct *p,
@@ -81,7 +80,7 @@ index c2c6b056c494..e474bd0f35c5 100644
  
  #ifdef CONFIG_NO_HZ_COMMON
 diff --git a/kernel/cpu.c b/kernel/cpu.c
-index ba24394f5574..bd2adcfcd980 100644
+index 5d8be91..d3e2928 100644
 --- a/kernel/cpu.c
 +++ b/kernel/cpu.c
 @@ -62,16 +62,10 @@ static int cpu_hotplug_disabled;
@@ -435,7 +434,7 @@ index ba24394f5574..bd2adcfcd980 100644
  	cpuhp_lock_release();
  }
  
-@@ -518,6 +667,9 @@ static int _cpu_down(unsigned int cpu, int tasks_frozen)
+@@ -519,6 +668,9 @@ static int _cpu_down(unsigned int cpu, int tasks_frozen)
  
  	smpboot_park_threads(cpu);
  
@@ -446,10 +445,10 @@ index ba24394f5574..bd2adcfcd980 100644
  	 * Prevent irq alloc/free while the dying cpu reorganizes the
  	 * interrupt affinities.
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index cd9dd64a6c04..bcd6f6bbb5a9 100644
+index 41814f6..0f7a78d 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -1221,6 +1221,84 @@ void do_set_cpus_allowed(struct task_struct *p, const struct cpumask *new_mask)
+@@ -1224,6 +1224,84 @@ void do_set_cpus_allowed(struct task_struct *p, const struct cpumask *new_mask)
  		enqueue_task(rq, p, ENQUEUE_RESTORE);
  }
  
@@ -534,7 +533,7 @@ index cd9dd64a6c04..bcd6f6bbb5a9 100644
  /*
   * Change a given task's CPU affinity. Migrate the thread to a
   * proper CPU and schedule it away if the CPU it's executing on
-@@ -3097,7 +3175,7 @@ void migrate_disable(void)
+@@ -3122,7 +3200,7 @@ void migrate_disable(void)
  {
  	struct task_struct *p = current;
  
@@ -543,7 +542,7 @@ index cd9dd64a6c04..bcd6f6bbb5a9 100644
  #ifdef CONFIG_SCHED_DEBUG
  		p->migrate_disable_atomic++;
  #endif
-@@ -3130,7 +3208,7 @@ void migrate_enable(void)
+@@ -3155,7 +3233,7 @@ void migrate_enable(void)
  	unsigned long flags;
  	struct rq *rq;
  
@@ -553,5 +552,5 @@ index cd9dd64a6c04..bcd6f6bbb5a9 100644
  		p->migrate_disable_atomic--;
  #endif
 -- 
-2.10.1
+2.7.4
 

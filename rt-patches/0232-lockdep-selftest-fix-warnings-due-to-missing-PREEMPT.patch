@@ -1,9 +1,8 @@
-From 930358521dcbe464e241e6c4aa18a4a211d39c9e Mon Sep 17 00:00:00 2001
+From 70f9bdb3d0884a99e158158f5722580518b3ea7e Mon Sep 17 00:00:00 2001
 From: Josh Cartwright <josh.cartwright@ni.com>
 Date: Wed, 28 Jan 2015 13:08:45 -0600
-Subject: [PATCH 232/351] lockdep: selftest: fix warnings due to missing
+Subject: [PATCH 232/365] lockdep: selftest: fix warnings due to missing
  PREEMPT_RT conditionals
-X-NVConfidentiality: public
 
 "lockdep: Selftest: Only do hardirq context test for raw spinlock"
 disabled the execution of certain tests with PREEMPT_RT_FULL, but did
@@ -30,7 +29,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 27 insertions(+)
 
 diff --git a/lib/locking-selftest.c b/lib/locking-selftest.c
-index 19ae2366a7a9..b93a6103fa4d 100644
+index 19ae236..b93a610 100644
 --- a/lib/locking-selftest.c
 +++ b/lib/locking-selftest.c
 @@ -590,6 +590,8 @@ GENERATE_TESTCASE(init_held_rsem)
@@ -145,5 +144,5 @@ index 19ae2366a7a9..b93a6103fa4d 100644
   * read-lock / write-lock recursion that is unsafe.
   */
 -- 
-2.10.1
+2.7.4
 

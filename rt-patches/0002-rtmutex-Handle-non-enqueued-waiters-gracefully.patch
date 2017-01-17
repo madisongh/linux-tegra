@@ -1,8 +1,7 @@
-From af685631667449b064cf56b8466a7b53d0d67bb3 Mon Sep 17 00:00:00 2001
+From 83e8df0f3a7f282fd602911191ca3090bb662c03 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 6 Nov 2015 18:51:03 +0100
-Subject: [PATCH 002/351] rtmutex: Handle non enqueued waiters gracefully
-X-NVConfidentiality: public
+Subject: [PATCH 002/365] rtmutex: Handle non enqueued waiters gracefully
 
 Yimin debugged that in case of a PI wakeup in progress when
 rt_mutex_start_proxy_lock() calls task_blocks_on_rt_mutex() the latter
@@ -21,7 +20,7 @@ Cc: stable-rt@vger.kernel.org
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
-index 8251e75dd9c0..397bd9ea14bf 100644
+index 8251e75..397bd9e 100644
 --- a/kernel/locking/rtmutex.c
 +++ b/kernel/locking/rtmutex.c
 @@ -1617,7 +1617,7 @@ int rt_mutex_start_proxy_lock(struct rt_mutex *lock,
@@ -34,5 +33,5 @@ index 8251e75dd9c0..397bd9ea14bf 100644
  
  	raw_spin_unlock(&lock->wait_lock);
 -- 
-2.10.1
+2.7.4
 

@@ -1,9 +1,8 @@
-From 69771b06f787136a95e0a80b5f55c54be3b40cff Mon Sep 17 00:00:00 2001
+From e266671d9a91f26520462f8b969aa92ccd68d33f Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Fri, 2 May 2014 13:13:34 +0200
-Subject: [PATCH 135/351] stomp-machine: use lg_global_trylock_relax() to dead
+Subject: [PATCH 135/365] stomp-machine: use lg_global_trylock_relax() to dead
  with stop_cpus_lock lglock
-X-NVConfidentiality: public
 
 If the stop machinery is called from inactive CPU we cannot use
 lg_global_lock(), because some other stomp machine invocation might be
@@ -19,7 +18,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 15 insertions(+), 10 deletions(-)
 
 diff --git a/kernel/stop_machine.c b/kernel/stop_machine.c
-index f33914197161..2c5acc882bad 100644
+index f339141..2c5acc8 100644
 --- a/kernel/stop_machine.c
 +++ b/kernel/stop_machine.c
 @@ -276,7 +276,7 @@ int stop_two_cpus(unsigned int cpu1, unsigned int cpu2, cpu_stop_fn_t fn, void *
@@ -99,5 +98,5 @@ index f33914197161..2c5acc882bad 100644
  
  	/* Busy wait for completion. */
 -- 
-2.10.1
+2.7.4
 

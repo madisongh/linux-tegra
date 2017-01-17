@@ -1,8 +1,7 @@
-From e6ba27deaeb8bfb302e7880ce011e6acd0635a00 Mon Sep 17 00:00:00 2001
+From 014dac029287bf7a528150e9be67a7da207884ec Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 19 Sep 2012 14:50:37 +0200
-Subject: [PATCH 185/351] printk: Make rt aware
-X-NVConfidentiality: public
+Subject: [PATCH 185/365] printk: Make rt aware
 
 Drop the lock before calling the console driver and do not disable
 interrupts while printing to a serial console.
@@ -13,7 +12,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 23 insertions(+), 4 deletions(-)
 
 diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index 67d2df8db436..e60ae11ec815 100644
+index 67d2df8..e60ae11 100644
 --- a/kernel/printk/printk.c
 +++ b/kernel/printk/printk.c
 @@ -1447,6 +1447,7 @@ static void call_console_drivers(int level,
@@ -104,5 +103,5 @@ index 67d2df8db436..e60ae11ec815 100644
  			cond_resched();
  	}
 -- 
-2.10.1
+2.7.4
 

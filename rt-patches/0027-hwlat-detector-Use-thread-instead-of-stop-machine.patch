@@ -1,8 +1,7 @@
-From c510784ca46e7e821a4c38f8a2f577e355c20efd Mon Sep 17 00:00:00 2001
+From c8c157e19290ed5e25dcb40195d506f6aa0b9fba Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Mon, 19 Aug 2013 17:33:27 -0400
-Subject: [PATCH 027/351] hwlat-detector: Use thread instead of stop machine
-X-NVConfidentiality: public
+Subject: [PATCH 027/365] hwlat-detector: Use thread instead of stop machine
 
 There's no reason to use stop machine to search for hardware latency.
 Simply disabling interrupts while running the loop will do enough to
@@ -19,7 +18,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 26 insertions(+), 34 deletions(-)
 
 diff --git a/drivers/misc/hwlat_detector.c b/drivers/misc/hwlat_detector.c
-index 0fcc0e38df42..6e88113bc098 100644
+index 0fcc0e3..6e88113 100644
 --- a/drivers/misc/hwlat_detector.c
 +++ b/drivers/misc/hwlat_detector.c
 @@ -41,7 +41,6 @@
@@ -186,5 +185,5 @@ index 0fcc0e38df42..6e88113bc098 100644
  static ssize_t simple_data_write(struct file *filp, const char __user *ubuf,
  				 size_t cnt, loff_t *ppos, u64 *entry)
 -- 
-2.10.1
+2.7.4
 

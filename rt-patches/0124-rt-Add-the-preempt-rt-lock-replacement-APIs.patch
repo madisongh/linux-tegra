@@ -1,8 +1,7 @@
-From da098c23878614cedd8fcb6cc190509528b08961 Mon Sep 17 00:00:00 2001
+From 056508405e548cf4cc754f9b23a4c86c4e598315 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 26 Jul 2009 19:39:56 +0200
-Subject: [PATCH 124/351] rt: Add the preempt-rt lock replacement APIs
-X-NVConfidentiality: public
+Subject: [PATCH 124/365] rt: Add the preempt-rt lock replacement APIs
 
 Map spinlocks, rwlocks, rw_semaphores and semaphores to the rt_mutex
 based locking functions for preempt-rt.
@@ -43,7 +42,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  create mode 100644 kernel/locking/rt.c
 
 diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-index 628e4c235fe3..3e768ec1c3ad 100644
+index 88b819e..bebc293 100644
 --- a/include/linux/kernel.h
 +++ b/include/linux/kernel.h
 @@ -188,6 +188,9 @@ extern int _cond_resched(void);
@@ -65,7 +64,7 @@ index 628e4c235fe3..3e768ec1c3ad 100644
  #endif
  
 diff --git a/include/linux/locallock.h b/include/linux/locallock.h
-index 58056edcbb93..339ba00adb9a 100644
+index 58056ed..339ba00 100644
 --- a/include/linux/locallock.h
 +++ b/include/linux/locallock.h
 @@ -42,9 +42,15 @@ struct local_irq_lock {
@@ -85,7 +84,7 @@ index 58056edcbb93..339ba00adb9a 100644
  static inline void __local_lock(struct local_irq_lock *lv)
  {
 diff --git a/include/linux/mutex.h b/include/linux/mutex.h
-index 2cb7531e7d7a..b3fdfc820216 100644
+index 2cb7531..b3fdfc8 100644
 --- a/include/linux/mutex.h
 +++ b/include/linux/mutex.h
 @@ -19,6 +19,17 @@
@@ -131,7 +130,7 @@ index 2cb7531e7d7a..b3fdfc820216 100644
  #endif /* __LINUX_MUTEX_H */
 diff --git a/include/linux/mutex_rt.h b/include/linux/mutex_rt.h
 new file mode 100644
-index 000000000000..c38a44b14da5
+index 0000000..c38a44b
 --- /dev/null
 +++ b/include/linux/mutex_rt.h
 @@ -0,0 +1,84 @@
@@ -220,7 +219,7 @@ index 000000000000..c38a44b14da5
 +
 +#endif
 diff --git a/include/linux/rtmutex.h b/include/linux/rtmutex.h
-index 2ed41c408043..30211c627511 100644
+index 2ed41c4..30211c62 100644
 --- a/include/linux/rtmutex.h
 +++ b/include/linux/rtmutex.h
 @@ -13,11 +13,15 @@
@@ -291,7 +290,7 @@ index 2ed41c408043..30211c627511 100644
  	struct rt_mutex mutexname = __RT_MUTEX_INITIALIZER(mutexname)
 diff --git a/include/linux/rwlock_rt.h b/include/linux/rwlock_rt.h
 new file mode 100644
-index 000000000000..49ed2d45d3be
+index 0000000..49ed2d4
 --- /dev/null
 +++ b/include/linux/rwlock_rt.h
 @@ -0,0 +1,99 @@
@@ -396,7 +395,7 @@ index 000000000000..49ed2d45d3be
 +#endif
 diff --git a/include/linux/rwlock_types_rt.h b/include/linux/rwlock_types_rt.h
 new file mode 100644
-index 000000000000..b13832119591
+index 0000000..b138321
 --- /dev/null
 +++ b/include/linux/rwlock_types_rt.h
 @@ -0,0 +1,33 @@
@@ -434,7 +433,7 @@ index 000000000000..b13832119591
 +
 +#endif
 diff --git a/include/linux/rwsem.h b/include/linux/rwsem.h
-index 8f498cdde280..2b2148431f14 100644
+index 8f498cd..2b21484 100644
 --- a/include/linux/rwsem.h
 +++ b/include/linux/rwsem.h
 @@ -18,6 +18,10 @@
@@ -457,7 +456,7 @@ index 8f498cdde280..2b2148431f14 100644
  #endif /* _LINUX_RWSEM_H */
 diff --git a/include/linux/rwsem_rt.h b/include/linux/rwsem_rt.h
 new file mode 100644
-index 000000000000..f97860b2e2a4
+index 0000000..f97860b
 --- /dev/null
 +++ b/include/linux/rwsem_rt.h
 @@ -0,0 +1,152 @@
@@ -614,7 +613,7 @@ index 000000000000..f97860b2e2a4
 +#endif
 +#endif
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index eb695cbcbdbb..9b78143797f9 100644
+index eb695cb..9b78143 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -312,6 +312,11 @@ extern char ___assert_task_state[1 - 2*!!(
@@ -651,7 +650,7 @@ index eb695cbcbdbb..9b78143797f9 100644
  /*
   * sched-domains (multiprocessor balancing) declarations:
 diff --git a/include/linux/spinlock.h b/include/linux/spinlock.h
-index 47dd0cebd204..b241cc044bd3 100644
+index 47dd0ce..b241cc0 100644
 --- a/include/linux/spinlock.h
 +++ b/include/linux/spinlock.h
 @@ -271,7 +271,11 @@ static inline void do_raw_spin_unlock(raw_spinlock_t *lock) __releases(lock)
@@ -686,7 +685,7 @@ index 47dd0cebd204..b241cc044bd3 100644
 +
  #endif /* __LINUX_SPINLOCK_H */
 diff --git a/include/linux/spinlock_api_smp.h b/include/linux/spinlock_api_smp.h
-index 5344268e6e62..043263f30e81 100644
+index 5344268..043263f 100644
 --- a/include/linux/spinlock_api_smp.h
 +++ b/include/linux/spinlock_api_smp.h
 @@ -189,6 +189,8 @@ static inline int __raw_spin_trylock_bh(raw_spinlock_t *lock)
@@ -701,7 +700,7 @@ index 5344268e6e62..043263f30e81 100644
  #endif /* __LINUX_SPINLOCK_API_SMP_H */
 diff --git a/include/linux/spinlock_rt.h b/include/linux/spinlock_rt.h
 new file mode 100644
-index 000000000000..ca08d3b2d9e8
+index 0000000..ca08d3b
 --- /dev/null
 +++ b/include/linux/spinlock_rt.h
 @@ -0,0 +1,173 @@
@@ -879,7 +878,7 @@ index 000000000000..ca08d3b2d9e8
 +
 +#endif
 diff --git a/include/linux/spinlock_types.h b/include/linux/spinlock_types.h
-index 5c8664d57fb8..10bac715ea96 100644
+index 5c8664d..10bac71 100644
 --- a/include/linux/spinlock_types.h
 +++ b/include/linux/spinlock_types.h
 @@ -11,8 +11,13 @@
@@ -901,7 +900,7 @@ index 5c8664d57fb8..10bac715ea96 100644
  #endif /* __LINUX_SPINLOCK_TYPES_H */
 diff --git a/include/linux/spinlock_types_rt.h b/include/linux/spinlock_types_rt.h
 new file mode 100644
-index 000000000000..9fd431967abc
+index 0000000..9fd4319
 --- /dev/null
 +++ b/include/linux/spinlock_types_rt.h
 @@ -0,0 +1,51 @@
@@ -957,7 +956,7 @@ index 000000000000..9fd431967abc
 +
 +#endif
 diff --git a/kernel/futex.c b/kernel/futex.c
-index 1ec060b5c6af..67cd1f970f80 100644
+index 1ec060b..67cd1f9 100644
 --- a/kernel/futex.c
 +++ b/kernel/futex.c
 @@ -1212,6 +1212,7 @@ static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_q *this,
@@ -999,7 +998,7 @@ index 1ec060b5c6af..67cd1f970f80 100644
  	ret = get_futex_key(uaddr2, flags & FLAGS_SHARED, &key2, VERIFY_WRITE);
  	if (unlikely(ret != 0))
 diff --git a/kernel/locking/Makefile b/kernel/locking/Makefile
-index 8e96f6cc2a4a..447b03082d88 100644
+index 8e96f6c..447b030 100644
 --- a/kernel/locking/Makefile
 +++ b/kernel/locking/Makefile
 @@ -1,5 +1,5 @@
@@ -1034,7 +1033,7 @@ index 8e96f6cc2a4a..447b03082d88 100644
  obj-$(CONFIG_LOCK_TORTURE_TEST) += locktorture.o
 diff --git a/kernel/locking/rt.c b/kernel/locking/rt.c
 new file mode 100644
-index 000000000000..1bbbcad5e360
+index 0000000..1bbbcad5
 --- /dev/null
 +++ b/kernel/locking/rt.c
 @@ -0,0 +1,476 @@
@@ -1515,7 +1514,7 @@ index 000000000000..1bbbcad5e360
 +}
 +EXPORT_SYMBOL(atomic_dec_and_mutex_lock);
 diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
-index d75967b781a3..f3e3e44bdf6c 100644
+index d75967b..f3e3e44 100644
 --- a/kernel/locking/rtmutex.c
 +++ b/kernel/locking/rtmutex.c
 @@ -7,6 +7,11 @@
@@ -2102,7 +2101,7 @@ index d75967b781a3..f3e3e44bdf6c 100644
 +EXPORT_SYMBOL_GPL(ww_mutex_unlock);
 +#endif
 diff --git a/kernel/locking/rtmutex_common.h b/kernel/locking/rtmutex_common.h
-index 11f2f51e1373..289f062f26cd 100644
+index 11f2f51..289f062 100644
 --- a/kernel/locking/rtmutex_common.h
 +++ b/kernel/locking/rtmutex_common.h
 @@ -27,6 +27,7 @@ struct rt_mutex_waiter {
@@ -2139,7 +2138,7 @@ index 11f2f51e1373..289f062f26cd 100644
 +
  #endif
 diff --git a/kernel/locking/spinlock.c b/kernel/locking/spinlock.c
-index db3ccb1dd614..909779647bd1 100644
+index db3ccb1..9097796 100644
 --- a/kernel/locking/spinlock.c
 +++ b/kernel/locking/spinlock.c
 @@ -124,8 +124,11 @@ void __lockfunc __raw_##op##_lock_bh(locktype##_t *lock)		\
@@ -2173,7 +2172,7 @@ index db3ccb1dd614..909779647bd1 100644
  
  void __lockfunc _raw_spin_lock_nested(raw_spinlock_t *lock, int subclass)
 diff --git a/kernel/locking/spinlock_debug.c b/kernel/locking/spinlock_debug.c
-index 0374a596cffa..94970338d518 100644
+index 0374a59..9497033 100644
 --- a/kernel/locking/spinlock_debug.c
 +++ b/kernel/locking/spinlock_debug.c
 @@ -31,6 +31,7 @@ void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
@@ -2207,7 +2206,7 @@ index 0374a596cffa..94970338d518 100644
 +
 +#endif
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 9e8fbbdbe274..936593053e58 100644
+index 3fa109f..7df7852 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
 @@ -548,7 +548,7 @@ void wake_q_add(struct wake_q_head *head, struct task_struct *task)
@@ -2232,5 +2231,5 @@ index 9e8fbbdbe274..936593053e58 100644
  	}
  }
 -- 
-2.10.1
+2.7.4
 

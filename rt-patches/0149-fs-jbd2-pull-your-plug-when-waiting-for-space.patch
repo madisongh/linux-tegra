@@ -1,8 +1,7 @@
-From 61814aa9dd937d0013ac92e3b19209891da5fd6e Mon Sep 17 00:00:00 2001
+From 4789b813219072837fbd3aece25720aabac1aaba Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Mon, 17 Feb 2014 17:30:03 +0100
-Subject: [PATCH 149/351] fs: jbd2: pull your plug when waiting for space
-X-NVConfidentiality: public
+Subject: [PATCH 149/365] fs: jbd2: pull your plug when waiting for space
 
 Two cps in parallel managed to stall the the ext4 fs. It seems that
 journal code is either waiting for locks or sleeping waiting for
@@ -21,7 +20,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 2 insertions(+)
 
 diff --git a/fs/jbd2/checkpoint.c b/fs/jbd2/checkpoint.c
-index 684996c8a3a4..6e18a06aaabe 100644
+index 684996c..6e18a06 100644
 --- a/fs/jbd2/checkpoint.c
 +++ b/fs/jbd2/checkpoint.c
 @@ -116,6 +116,8 @@ void __jbd2_log_wait_for_space(journal_t *journal)
@@ -34,5 +33,5 @@ index 684996c8a3a4..6e18a06aaabe 100644
  
  		/*
 -- 
-2.10.1
+2.7.4
 

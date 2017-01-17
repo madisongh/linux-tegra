@@ -1,8 +1,7 @@
-From 027fef9a3fa1b5817aa356f15d1d33d6ef86e03f Mon Sep 17 00:00:00 2001
+From 040bdbf6ee0d3044378de21a3db39c3b325bf352 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 14 Apr 2016 14:42:55 +0200
-Subject: [PATCH 339/351] Revert "vtime: Split lock and seqcount"
-X-NVConfidentiality: public
+Subject: [PATCH 339/365] Revert "vtime: Split lock and seqcount"
 
 This reverts commit f9b9ebddb16501de52ac6384b012148996fde77f.
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -14,7 +13,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  4 files changed, 25 insertions(+), 46 deletions(-)
 
 diff --git a/include/linux/init_task.h b/include/linux/init_task.h
-index d8ec0f202eee..c52f61d08fbb 100644
+index d8ec0f2..c52f61d 100644
 --- a/include/linux/init_task.h
 +++ b/include/linux/init_task.h
 @@ -156,8 +156,7 @@ extern struct task_group root_task_group;
@@ -28,7 +27,7 @@ index d8ec0f202eee..c52f61d08fbb 100644
  	.vtime_snap_whence = VTIME_SYS,
  #else
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 79d8479039c5..4beaa1499758 100644
+index 79d8479..4beaa14 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1551,8 +1551,7 @@ struct task_struct {
@@ -42,10 +41,10 @@ index 79d8479039c5..4beaa1499758 100644
  	enum {
  		VTIME_SLEEPING = 0,
 diff --git a/kernel/fork.c b/kernel/fork.c
-index 86ed414535f6..e66a95364543 100644
+index 95cc913..72279e3 100644
 --- a/kernel/fork.c
 +++ b/kernel/fork.c
-@@ -1380,8 +1380,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+@@ -1401,8 +1401,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
  	prev_cputime_init(&p->prev_cputime);
  
  #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
@@ -56,10 +55,10 @@ index 86ed414535f6..e66a95364543 100644
  	p->vtime_snap_whence = VTIME_SLEEPING;
  #endif
 diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
-index c45f4b026230..f74ea89e77a8 100644
+index 09c2e7a..a1aecbe 100644
 --- a/kernel/sched/cputime.c
 +++ b/kernel/sched/cputime.c
-@@ -696,45 +696,37 @@ static void __vtime_account_system(struct task_struct *tsk)
+@@ -701,45 +701,37 @@ static void __vtime_account_system(struct task_struct *tsk)
  
  void vtime_account_system(struct task_struct *tsk)
  {
@@ -113,7 +112,7 @@ index c45f4b026230..f74ea89e77a8 100644
  }
  
  void vtime_guest_enter(struct task_struct *tsk)
-@@ -746,23 +738,19 @@ void vtime_guest_enter(struct task_struct *tsk)
+@@ -751,23 +743,19 @@ void vtime_guest_enter(struct task_struct *tsk)
  	 * synchronization against the reader (task_gtime())
  	 * that can thus safely catch up with a tickless delta.
  	 */
@@ -141,7 +140,7 @@ index c45f4b026230..f74ea89e77a8 100644
  }
  EXPORT_SYMBOL_GPL(vtime_guest_exit);
  
-@@ -775,30 +763,24 @@ void vtime_account_idle(struct task_struct *tsk)
+@@ -780,30 +768,24 @@ void vtime_account_idle(struct task_struct *tsk)
  
  void arch_vtime_task_switch(struct task_struct *prev)
  {
@@ -178,7 +177,7 @@ index c45f4b026230..f74ea89e77a8 100644
  }
  
  cputime_t task_gtime(struct task_struct *t)
-@@ -810,13 +792,13 @@ cputime_t task_gtime(struct task_struct *t)
+@@ -815,13 +797,13 @@ cputime_t task_gtime(struct task_struct *t)
  		return t->gtime;
  
  	do {
@@ -194,7 +193,7 @@ index c45f4b026230..f74ea89e77a8 100644
  
  	return gtime;
  }
-@@ -839,7 +821,7 @@ fetch_task_cputime(struct task_struct *t,
+@@ -844,7 +826,7 @@ fetch_task_cputime(struct task_struct *t,
  		*udelta = 0;
  		*sdelta = 0;
  
@@ -203,7 +202,7 @@ index c45f4b026230..f74ea89e77a8 100644
  
  		if (u_dst)
  			*u_dst = *u_src;
-@@ -863,7 +845,7 @@ fetch_task_cputime(struct task_struct *t,
+@@ -868,7 +850,7 @@ fetch_task_cputime(struct task_struct *t,
  			if (t->vtime_snap_whence == VTIME_SYS)
  				*sdelta = delta;
  		}
@@ -213,5 +212,5 @@ index c45f4b026230..f74ea89e77a8 100644
  
  
 -- 
-2.10.1
+2.7.4
 

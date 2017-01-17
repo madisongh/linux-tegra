@@ -1,8 +1,7 @@
-From 1203f7981ddd827823f85ef5f78728ba8c5b71b9 Mon Sep 17 00:00:00 2001
+From f088ef8c0d3df92f85d56602f7137e858468b147 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 8 Feb 2016 16:15:28 +0100
-Subject: [PATCH 291/351] rt/locking: Reenable migration accross schedule
-X-NVConfidentiality: public
+Subject: [PATCH 291/365] rt/locking: Reenable migration accross schedule
 
 We currently disable migration across lock acquisition. That includes the part
 where we block on the lock and schedule out. We cannot disable migration after
@@ -19,7 +18,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 20 insertions(+), 12 deletions(-)
 
 diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
-index 913aa40f3b5e..66971005cc12 100644
+index 913aa40..6697100 100644
 --- a/kernel/locking/rtmutex.c
 +++ b/kernel/locking/rtmutex.c
 @@ -924,14 +924,19 @@ takeit:
@@ -114,5 +113,5 @@ index 913aa40f3b5e..66971005cc12 100644
  EXPORT_SYMBOL(rt_spin_lock_nested);
  #endif
 -- 
-2.10.1
+2.7.4
 

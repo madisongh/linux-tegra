@@ -1,9 +1,8 @@
-From a1c24d9f0714beda735f0b26fbaf1a53ba7c293c Mon Sep 17 00:00:00 2001
+From 943c4e144da04cffb8857e9169b09bc59badfd39 Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Mon, 18 Mar 2013 15:12:49 -0400
-Subject: [PATCH 098/351] sched/workqueue: Only wake up idle workers if not
+Subject: [PATCH 098/365] sched/workqueue: Only wake up idle workers if not
  blocked on sleeping spin lock
-X-NVConfidentiality: public
 
 In -rt, most spin_locks() turn into mutexes. One of these spin_lock
 conversions is performed on the workqueue gcwq->lock. When the idle
@@ -25,10 +24,10 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index e93e03c09159..9e8fbbdbe274 100644
+index 0ea89e6..3fa109f 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -3338,8 +3338,10 @@ static void __sched notrace __schedule(bool preempt)
+@@ -3363,8 +3363,10 @@ static void __sched notrace __schedule(bool preempt)
  			 * If a worker went to sleep, notify and ask workqueue
  			 * whether it wants to wake up a task to maintain
  			 * concurrency.
@@ -41,5 +40,5 @@ index e93e03c09159..9e8fbbdbe274 100644
  
  				to_wakeup = wq_worker_sleeping(prev, cpu);
 -- 
-2.10.1
+2.7.4
 

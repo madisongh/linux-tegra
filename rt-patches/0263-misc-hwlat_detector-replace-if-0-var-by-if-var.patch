@@ -1,9 +1,8 @@
-From 3a8fd6c4165931d34b3e587fedeb46b6566ff2ea Mon Sep 17 00:00:00 2001
+From f6fcc23456bf408d59dcbbc8e594c7407ee2868c Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:56:45 +0100
-Subject: [PATCH 263/351] misc: hwlat_detector: replace "if (0 != var)" by "if
+Subject: [PATCH 263/365] misc: hwlat_detector: replace "if (0 != var)" by "if
  (var)"
-X-NVConfidentiality: public
 
 Suggested by Julia based on
 scripts/coccinelle/misc/compare_const_fl.cocci.
@@ -15,7 +14,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/misc/hwlat_detector.c b/drivers/misc/hwlat_detector.c
-index 2429c4331e68..52f5ad5fd9c0 100644
+index 2429c43..52f5ad5 100644
 --- a/drivers/misc/hwlat_detector.c
 +++ b/drivers/misc/hwlat_detector.c
 @@ -616,7 +616,7 @@ static ssize_t  debug_enable_fwrite(struct file *filp,
@@ -60,5 +59,5 @@ index 2429c4331e68..52f5ad5fd9c0 100644
  
  	if (enabled)
 -- 
-2.10.1
+2.7.4
 

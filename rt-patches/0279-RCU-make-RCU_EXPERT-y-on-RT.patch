@@ -1,8 +1,7 @@
-From 1789fb628bf513e834302189d79e89144d873ad2 Mon Sep 17 00:00:00 2001
+From 6f8590f3836c5bddceab874c06be09bf1e737bf7 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 22 Jan 2016 21:42:32 +0100
-Subject: [PATCH 279/351] RCU: make RCU_EXPERT y on RT
-X-NVConfidentiality: public
+Subject: [PATCH 279/365] RCU: make RCU_EXPERT y on RT
 
 because we want RCU_BOOST y on RT
 
@@ -12,7 +11,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/init/Kconfig b/init/Kconfig
-index 59d1fa8c9e64..7afc0e2dde01 100644
+index 59d1fa8..7afc0e2 100644
 --- a/init/Kconfig
 +++ b/init/Kconfig
 @@ -498,7 +498,7 @@ config TINY_RCU
@@ -25,5 +24,5 @@ index 59d1fa8c9e64..7afc0e2dde01 100644
  	  This option needs to be enabled if you wish to make
  	  expert-level adjustments to RCU configuration.  By default,
 -- 
-2.10.1
+2.7.4
 

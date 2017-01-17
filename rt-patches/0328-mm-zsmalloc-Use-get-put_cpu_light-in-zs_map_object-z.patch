@@ -1,9 +1,8 @@
-From 40eb3cbdfeec6281ac09032f97521c3854cb2554 Mon Sep 17 00:00:00 2001
+From fab1335953d7066885671a18113ed09c253dae93 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Tue, 22 Mar 2016 11:16:09 +0100
-Subject: [PATCH 328/351] mm/zsmalloc: Use get/put_cpu_light in
+Subject: [PATCH 328/365] mm/zsmalloc: Use get/put_cpu_light in
  zs_map_object()/zs_unmap_object()
-X-NVConfidentiality: public
 
 Otherwise, we get a ___might_sleep() splat.
 
@@ -14,7 +13,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/mm/zsmalloc.c b/mm/zsmalloc.c
-index c1ea19478119..b552fd607df8 100644
+index c1ea194..b552fd6 100644
 --- a/mm/zsmalloc.c
 +++ b/mm/zsmalloc.c
 @@ -1289,7 +1289,7 @@ void *zs_map_object(struct zs_pool *pool, unsigned long handle,
@@ -36,5 +35,5 @@ index c1ea19478119..b552fd607df8 100644
  }
  EXPORT_SYMBOL_GPL(zs_unmap_object);
 -- 
-2.10.1
+2.7.4
 

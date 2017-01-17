@@ -1,8 +1,7 @@
-From cdc2f57d625a1d324a4d94a1ca3a1d8f08c3e1b2 Mon Sep 17 00:00:00 2001
+From 2bf3ddd5933719827f141b8861b8357e14de51cf Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 10 Feb 2016 18:30:56 +0100
-Subject: [PATCH 293/351] rcu: disable more spots of rcu_bh
-X-NVConfidentiality: public
+Subject: [PATCH 293/365] rcu: disable more spots of rcu_bh
 
 We don't use ru_bh on -RT but we still fork a thread for it and keep it
 as a flavour. No more.
@@ -14,7 +13,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  2 files changed, 8 insertions(+)
 
 diff --git a/kernel/rcu/tree.c b/kernel/rcu/tree.c
-index 5359091fecaa..64098d35de19 100644
+index 5359091..64098d3 100644
 --- a/kernel/rcu/tree.c
 +++ b/kernel/rcu/tree.c
 @@ -454,11 +454,13 @@ EXPORT_SYMBOL_GPL(rcu_batches_started_sched);
@@ -54,7 +53,7 @@ index 5359091fecaa..64098d35de19 100644
  	if (dump_tree)
  		rcu_dump_rcu_node_tree(&rcu_sched_state);
 diff --git a/kernel/rcu/tree.h b/kernel/rcu/tree.h
-index 588509d94bbd..2ba8f6c2e81e 100644
+index 588509d..2ba8f6c 100644
 --- a/kernel/rcu/tree.h
 +++ b/kernel/rcu/tree.h
 @@ -557,7 +557,9 @@ extern struct list_head rcu_struct_flavors;
@@ -68,5 +67,5 @@ index 588509d94bbd..2ba8f6c2e81e 100644
  #ifdef CONFIG_PREEMPT_RCU
  extern struct rcu_state rcu_preempt_state;
 -- 
-2.10.1
+2.7.4
 

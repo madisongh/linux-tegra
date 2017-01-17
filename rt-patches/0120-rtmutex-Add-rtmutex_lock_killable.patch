@@ -1,8 +1,7 @@
-From 3d30bd18dd9eafad5f87ed6a6a2df7fef0827f6c Mon Sep 17 00:00:00 2001
+From 72236ec1b4cd555d4226aaf697c44b07b287d6ea Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 9 Jun 2011 11:43:52 +0200
-Subject: [PATCH 120/351] rtmutex: Add rtmutex_lock_killable()
-X-NVConfidentiality: public
+Subject: [PATCH 120/365] rtmutex: Add rtmutex_lock_killable()
 
 Add "killable" type to rtmutex. We need this since rtmutex are used as
 "normal" mutexes which do use this type.
@@ -14,7 +13,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  2 files changed, 20 insertions(+)
 
 diff --git a/include/linux/rtmutex.h b/include/linux/rtmutex.h
-index 1abba5ce2a2f..51dc12e3860c 100644
+index 1abba5c..51dc12e 100644
 --- a/include/linux/rtmutex.h
 +++ b/include/linux/rtmutex.h
 @@ -91,6 +91,7 @@ extern void rt_mutex_destroy(struct rt_mutex *lock);
@@ -26,7 +25,7 @@ index 1abba5ce2a2f..51dc12e3860c 100644
  			       struct hrtimer_sleeper *timeout);
  
 diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
-index f0326471a922..d75967b781a3 100644
+index f032647..d75967b 100644
 --- a/kernel/locking/rtmutex.c
 +++ b/kernel/locking/rtmutex.c
 @@ -1458,6 +1458,25 @@ int rt_mutex_timed_futex_lock(struct rt_mutex *lock,
@@ -56,5 +55,5 @@ index f0326471a922..d75967b781a3 100644
   *			the timeout structure is provided
   *			by the caller
 -- 
-2.10.1
+2.7.4
 

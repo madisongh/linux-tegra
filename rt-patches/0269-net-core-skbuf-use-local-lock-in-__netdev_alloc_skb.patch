@@ -1,9 +1,8 @@
-From 827a40d34c71f538d4612c955d3b29fe4762201c Mon Sep 17 00:00:00 2001
+From 61b2607136ca5484a847bcb8948c6238ec770cfd Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 15 Jan 2016 14:51:34 +0100
-Subject: [PATCH 269/351] net/core: skbuf use local lock in
+Subject: [PATCH 269/365] net/core: skbuf use local lock in
  __netdev_alloc_skb()
-X-NVConfidentiality: public
 
 local_irq_save() was introduced in v4.2-rc1 via 9451980a6646
 ("net: Use cached copy of pfmemalloc to avoid accessing page").
@@ -14,7 +13,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/net/core/skbuff.c b/net/core/skbuff.c
-index 9c9af7cfed01..9b2f5f6778f5 100644
+index d76b2d7..c8d778f 100644
 --- a/net/core/skbuff.c
 +++ b/net/core/skbuff.c
 @@ -436,13 +436,13 @@ struct sk_buff *__netdev_alloc_skb(struct net_device *dev, unsigned int len,
@@ -34,5 +33,5 @@ index 9c9af7cfed01..9b2f5f6778f5 100644
  	if (unlikely(!data))
  		return NULL;
 -- 
-2.10.1
+2.7.4
 

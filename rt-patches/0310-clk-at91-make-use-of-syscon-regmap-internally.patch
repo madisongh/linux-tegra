@@ -1,8 +1,7 @@
-From 14c08453f2715850b84f9946853b798faa52729b Mon Sep 17 00:00:00 2001
+From ad2fa591f4ad7ab40e8d7ba2462c6b6e18e96389 Mon Sep 17 00:00:00 2001
 From: Boris Brezillon <boris.brezillon@free-electrons.com>
 Date: Sun, 7 Sep 2014 08:14:29 +0200
-Subject: [PATCH 310/351] clk: at91: make use of syscon/regmap internally
-X-NVConfidentiality: public
+Subject: [PATCH 310/365] clk: at91: make use of syscon/regmap internally
 
 Use the regmap coming from syscon to access the registers instead of using
 pmc_read/pmc_write. This allows to avoid passing the at91_pmc structure to
@@ -34,7 +33,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  15 files changed, 692 insertions(+), 694 deletions(-)
 
 diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-index abc80949e1dd..5866684a6657 100644
+index abc8094..5866684 100644
 --- a/drivers/clk/at91/clk-generated.c
 +++ b/drivers/clk/at91/clk-generated.c
 @@ -17,6 +17,8 @@
@@ -224,7 +223,7 @@ index abc80949e1dd..5866684a6657 100644
 +CLK_OF_DECLARE(of_sama5d2_clk_generated_setup, "atmel,sama5d2-clk-generated",
 +	       of_sama5d2_clk_generated_setup);
 diff --git a/drivers/clk/at91/clk-h32mx.c b/drivers/clk/at91/clk-h32mx.c
-index a165230e7eda..e28984fdc859 100644
+index a165230..e28984f 100644
 --- a/drivers/clk/at91/clk-h32mx.c
 +++ b/drivers/clk/at91/clk-h32mx.c
 @@ -24,6 +24,8 @@
@@ -318,7 +317,7 @@ index a165230e7eda..e28984fdc859 100644
 +CLK_OF_DECLARE(of_sama5d4_clk_h32mx_setup, "atmel,sama5d4-clk-h32mx",
 +	       of_sama5d4_clk_h32mx_setup);
 diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
-index fd7247deabdc..c1f119748bdc 100644
+index fd7247d..c1f1197 100644
 --- a/drivers/clk/at91/clk-main.c
 +++ b/drivers/clk/at91/clk-main.c
 @@ -18,6 +18,8 @@
@@ -969,7 +968,7 @@ index fd7247deabdc..c1f119748bdc 100644
 +CLK_OF_DECLARE(at91sam9x5_clk_main, "atmel,at91sam9x5-clk-main",
 +	       of_at91sam9x5_clk_main_setup);
 diff --git a/drivers/clk/at91/clk-master.c b/drivers/clk/at91/clk-master.c
-index 620ea323356b..8d94ddfc9c72 100644
+index 620ea32..8d94ddfc 100644
 --- a/drivers/clk/at91/clk-master.c
 +++ b/drivers/clk/at91/clk-master.c
 @@ -19,6 +19,8 @@
@@ -1150,7 +1149,7 @@ index 620ea323356b..8d94ddfc9c72 100644
 +CLK_OF_DECLARE(at91sam9x5_clk_master, "atmel,at91sam9x5-clk-master",
 +	       of_at91sam9x5_clk_master_setup);
 diff --git a/drivers/clk/at91/clk-peripheral.c b/drivers/clk/at91/clk-peripheral.c
-index 58f3b568e9cb..814f6491b2ee 100644
+index 58f3b56..814f649 100644
 --- a/drivers/clk/at91/clk-peripheral.c
 +++ b/drivers/clk/at91/clk-peripheral.c
 @@ -14,9 +14,13 @@
@@ -1478,7 +1477,7 @@ index 58f3b568e9cb..814f6491b2ee 100644
 +CLK_OF_DECLARE(at91sam9x5_clk_periph, "atmel,at91sam9x5-clk-peripheral",
 +	       of_at91sam9x5_clk_periph_setup);
 diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-index 18b60f4895a6..5f4c6ce628e0 100644
+index 18b60f4..5f4c6ce 100644
 --- a/drivers/clk/at91/clk-pll.c
 +++ b/drivers/clk/at91/clk-pll.c
 @@ -20,6 +20,8 @@
@@ -1733,7 +1732,7 @@ index 18b60f4895a6..5f4c6ce628e0 100644
 +CLK_OF_DECLARE(sama5d3_clk_pll, "atmel,sama5d3-clk-pll",
 +	       of_sama5d3_clk_pll_setup);
 diff --git a/drivers/clk/at91/clk-plldiv.c b/drivers/clk/at91/clk-plldiv.c
-index ea226562bb40..f43e93738a99 100644
+index ea22656..f43e937 100644
 --- a/drivers/clk/at91/clk-plldiv.c
 +++ b/drivers/clk/at91/clk-plldiv.c
 @@ -14,6 +14,8 @@
@@ -1844,7 +1843,7 @@ index ea226562bb40..f43e93738a99 100644
 +CLK_OF_DECLARE(at91sam9x5_clk_plldiv, "atmel,at91sam9x5-clk-plldiv",
 +	       of_at91sam9x5_clk_plldiv_setup);
 diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
-index 14b270b85fec..78814ba448c4 100644
+index 14b270b..78814ba 100644
 --- a/drivers/clk/at91/clk-programmable.c
 +++ b/drivers/clk/at91/clk-programmable.c
 @@ -16,6 +16,8 @@
@@ -2067,7 +2066,7 @@ index 14b270b85fec..78814ba448c4 100644
 +CLK_OF_DECLARE(at91sam9x5_clk_prog, "atmel,at91sam9x5-clk-programmable",
 +	       of_at91sam9x5_clk_prog_setup);
 diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-index d0d5076a9b94..dd52c7ab798f 100644
+index d0d5076..dd52c7ab 100644
 --- a/drivers/clk/at91/clk-slow.c
 +++ b/drivers/clk/at91/clk-slow.c
 @@ -22,6 +22,8 @@
@@ -2167,7 +2166,7 @@ index d0d5076a9b94..dd52c7ab798f 100644
  /*
   * FIXME: All slow clk users are not properly claiming it (get + prepare +
 diff --git a/drivers/clk/at91/clk-smd.c b/drivers/clk/at91/clk-smd.c
-index a7f8501cfa05..0f6e8d67e630 100644
+index a7f8501..0f6e8d6 100644
 --- a/drivers/clk/at91/clk-smd.c
 +++ b/drivers/clk/at91/clk-smd.c
 @@ -14,6 +14,8 @@
@@ -2312,7 +2311,7 @@ index a7f8501cfa05..0f6e8d67e630 100644
 +CLK_OF_DECLARE(at91sam9x5_clk_smd, "atmel,at91sam9x5-clk-smd",
 +	       of_at91sam9x5_clk_smd_setup);
 diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
-index 3f5314344286..0593adf1bf4b 100644
+index 3f53143..0593adf 100644
 --- a/drivers/clk/at91/clk-system.c
 +++ b/drivers/clk/at91/clk-system.c
 @@ -19,6 +19,8 @@
@@ -2471,7 +2470,7 @@ index 3f5314344286..0593adf1bf4b 100644
 +CLK_OF_DECLARE(at91rm9200_clk_sys, "atmel,at91rm9200-clk-system",
 +	       of_at91rm9200_clk_sys_setup);
 diff --git a/drivers/clk/at91/clk-usb.c b/drivers/clk/at91/clk-usb.c
-index 8ab8502778a2..617e24f6ef76 100644
+index 8ab8502..617e24f 100644
 --- a/drivers/clk/at91/clk-usb.c
 +++ b/drivers/clk/at91/clk-usb.c
 @@ -14,6 +14,8 @@
@@ -2801,7 +2800,7 @@ index 8ab8502778a2..617e24f6ef76 100644
 +CLK_OF_DECLARE(at91rm9200_clk_usb, "atmel,at91rm9200-clk-usb",
 +	       of_at91rm9200_clk_usb_setup);
 diff --git a/drivers/clk/at91/clk-utmi.c b/drivers/clk/at91/clk-utmi.c
-index ca561e90a60f..58a310e5768c 100644
+index ca561e9..58a310e 100644
 --- a/drivers/clk/at91/clk-utmi.c
 +++ b/drivers/clk/at91/clk-utmi.c
 @@ -19,6 +19,8 @@
@@ -2936,7 +2935,7 @@ index ca561e90a60f..58a310e5768c 100644
 +CLK_OF_DECLARE(at91sam9x5_clk_utmi, "atmel,at91sam9x5-clk-utmi",
 +	       of_at91sam9x5_clk_utmi_setup);
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 481146029b2e..295b17b9c689 100644
+index 4811460..295b17b 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
 @@ -20,6 +20,7 @@
@@ -3171,7 +3170,7 @@ index 481146029b2e..295b17b9c689 100644
  
  static void __init of_at91rm9200_pmc_setup(struct device_node *np)
 diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index e1fc0b0e1d8c..e160cb640e4a 100644
+index e1fc0b0..e160cb6 100644
 --- a/drivers/clk/at91/pmc.h
 +++ b/drivers/clk/at91/pmc.h
 @@ -17,6 +17,8 @@
@@ -3284,5 +3283,5 @@ index e1fc0b0e1d8c..e160cb640e4a 100644
 -
  #endif /* __PMC_H_ */
 -- 
-2.10.1
+2.7.4
 

@@ -1,9 +1,8 @@
-From b7f22b3ff0bf625f38aca4173ccc702c675bc66a Mon Sep 17 00:00:00 2001
+From 85535d9c6d395dbcba49d21ab187d0b1c6e511de Mon Sep 17 00:00:00 2001
 From: Yong Zhang <yong.zhang0@gmail.com>
 Date: Tue, 15 May 2012 13:53:56 +0800
-Subject: [PATCH 146/351] mm: Protect activate_mm() by
+Subject: [PATCH 146/365] mm: Protect activate_mm() by
  preempt_[disable&enable]_rt()
-X-NVConfidentiality: public
 
 User preempt_*_rt instead of local_irq_*_rt or otherwise there will be
 warning on ARM like below:
@@ -38,7 +37,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  2 files changed, 4 insertions(+)
 
 diff --git a/fs/exec.c b/fs/exec.c
-index b06623a9347f..e7760b7b692c 100644
+index b06623a..e7760b7 100644
 --- a/fs/exec.c
 +++ b/fs/exec.c
 @@ -865,12 +865,14 @@ static int exec_mmap(struct mm_struct *mm)
@@ -57,7 +56,7 @@ index b06623a9347f..e7760b7b692c 100644
  	if (old_mm) {
  		up_read(&old_mm->mmap_sem);
 diff --git a/mm/mmu_context.c b/mm/mmu_context.c
-index f802c2d216a7..b1b6f238e42d 100644
+index f802c2d..b1b6f23 100644
 --- a/mm/mmu_context.c
 +++ b/mm/mmu_context.c
 @@ -23,6 +23,7 @@ void use_mm(struct mm_struct *mm)
@@ -77,5 +76,5 @@ index f802c2d216a7..b1b6f238e42d 100644
  #ifdef finish_arch_post_lock_switch
  	finish_arch_post_lock_switch();
 -- 
-2.10.1
+2.7.4
 

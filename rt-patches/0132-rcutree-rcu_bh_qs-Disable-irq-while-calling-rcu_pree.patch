@@ -1,9 +1,8 @@
-From 3b6c5861043624909456f8badd4728589cb069eb Mon Sep 17 00:00:00 2001
+From 5536b09c6e521538752647c9664b07e7da48b4e8 Mon Sep 17 00:00:00 2001
 From: Tiejun Chen <tiejun.chen@windriver.com>
 Date: Wed, 18 Dec 2013 17:51:49 +0800
-Subject: [PATCH 132/351] rcutree/rcu_bh_qs: Disable irq while calling
+Subject: [PATCH 132/365] rcutree/rcu_bh_qs: Disable irq while calling
  rcu_preempt_qs()
-X-NVConfidentiality: public
 
 Any callers to the function rcu_preempt_qs() must disable irqs in
 order to protect the assignment to ->rcu_read_unlock_special. In
@@ -35,7 +34,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 5 insertions(+)
 
 diff --git a/kernel/rcu/tree.c b/kernel/rcu/tree.c
-index eadbeb631f55..136eb9533148 100644
+index eadbeb6..136eb953 100644
 --- a/kernel/rcu/tree.c
 +++ b/kernel/rcu/tree.c
 @@ -271,7 +271,12 @@ static void rcu_preempt_qs(void);
@@ -52,5 +51,5 @@ index eadbeb631f55..136eb9533148 100644
  #else
  void rcu_bh_qs(void)
 -- 
-2.10.1
+2.7.4
 

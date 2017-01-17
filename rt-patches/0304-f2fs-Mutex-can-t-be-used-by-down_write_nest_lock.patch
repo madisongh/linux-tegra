@@ -1,8 +1,7 @@
-From 29a06a93e37c45224fc628a0ca6c95b7e2577fc2 Mon Sep 17 00:00:00 2001
+From 7e741417bcec85745df7f8faad2627bccdc2c22f Mon Sep 17 00:00:00 2001
 From: Yang Shi <yang.shi@linaro.org>
 Date: Fri, 26 Feb 2016 16:25:25 -0800
-Subject: [PATCH 304/351] f2fs: Mutex can't be used by down_write_nest_lock()
-X-NVConfidentiality: public
+Subject: [PATCH 304/365] f2fs: Mutex can't be used by down_write_nest_lock()
 
 fsf2_lock_all() calls down_write_nest_lock() to acquire a rw_sem and check
 a mutex, but down_write_nest_lock() is designed for two rw_sem accoring to the
@@ -40,7 +39,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/fs/f2fs/f2fs.h b/fs/f2fs/f2fs.h
-index 9db5500d63d9..5951c495d124 100644
+index 9db5500..5951c49 100644
 --- a/fs/f2fs/f2fs.h
 +++ b/fs/f2fs/f2fs.h
 @@ -24,7 +24,6 @@
@@ -69,5 +68,5 @@ index 9db5500d63d9..5951c495d124 100644
  
  static inline void f2fs_unlock_all(struct f2fs_sb_info *sbi)
 -- 
-2.10.1
+2.7.4
 

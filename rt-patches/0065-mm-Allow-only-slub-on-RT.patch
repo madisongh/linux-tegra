@@ -1,8 +1,7 @@
-From cd33f1c00ad646a27b94933de8deebe7044370e8 Mon Sep 17 00:00:00 2001
+From 4228a44e21c8d92ae8f4848a98a0e566685c89f8 Mon Sep 17 00:00:00 2001
 From: Ingo Molnar <mingo@elte.hu>
 Date: Fri, 3 Jul 2009 08:44:03 -0500
-Subject: [PATCH 065/351] mm: Allow only slub on RT
-X-NVConfidentiality: public
+Subject: [PATCH 065/365] mm: Allow only slub on RT
 
 Disable SLAB and SLOB on -RT. Only SLUB is adopted to -RT needs.
 
@@ -13,7 +12,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 2 insertions(+)
 
 diff --git a/init/Kconfig b/init/Kconfig
-index b4c3fc7b9d8e..868315c617b3 100644
+index b4c3fc7..868315c 100644
 --- a/init/Kconfig
 +++ b/init/Kconfig
 @@ -1733,6 +1733,7 @@ choice
@@ -33,5 +32,5 @@ index b4c3fc7b9d8e..868315c617b3 100644
  	   SLOB replaces the stock allocator with a drastically simpler
  	   allocator. SLOB is generally more space efficient but
 -- 
-2.10.1
+2.7.4
 

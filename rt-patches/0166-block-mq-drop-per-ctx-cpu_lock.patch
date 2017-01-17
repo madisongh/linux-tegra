@@ -1,8 +1,7 @@
-From 9e7cf8530705c2e16a42041a3f406c7eaa2aeffe Mon Sep 17 00:00:00 2001
+From 7fda12c18cd6c56ee9c2eb71158bcc236e7a3e6b Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 18 Feb 2015 18:37:26 +0100
-Subject: [PATCH 166/351] block/mq: drop per ctx cpu_lock
-X-NVConfidentiality: public
+Subject: [PATCH 166/365] block/mq: drop per ctx cpu_lock
 
 While converting the get_cpu() to get_cpu_light() I added a cpu lock to
 ensure the same code is not invoked twice on the same CPU. And now I run
@@ -64,10 +63,10 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  2 files changed, 12 deletions(-)
 
 diff --git a/block/blk-mq.c b/block/blk-mq.c
-index b3ac9690f25a..3c70813cb6b6 100644
+index d1d71a6..f887155 100644
 --- a/block/blk-mq.c
 +++ b/block/blk-mq.c
-@@ -1405,9 +1405,7 @@ static blk_qc_t blk_sq_make_request(struct request_queue *q, struct bio *bio)
+@@ -1407,9 +1407,7 @@ static blk_qc_t blk_sq_make_request(struct request_queue *q, struct bio *bio)
  		blk_mq_put_ctx(data.ctx);
  
  		if (request_count >= BLK_MAX_REQUEST_COUNT) {
@@ -77,7 +76,7 @@ index b3ac9690f25a..3c70813cb6b6 100644
  			trace_block_plug(q);
  		}
  
-@@ -1609,7 +1607,6 @@ static int blk_mq_hctx_cpu_offline(struct blk_mq_hw_ctx *hctx, int cpu)
+@@ -1611,7 +1609,6 @@ static int blk_mq_hctx_cpu_offline(struct blk_mq_hw_ctx *hctx, int cpu)
  		blk_mq_hctx_clear_pending(hctx, ctx);
  	}
  	spin_unlock(&ctx->lock);
@@ -85,7 +84,7 @@ index b3ac9690f25a..3c70813cb6b6 100644
  
  	if (list_empty(&tmp))
  		return NOTIFY_OK;
-@@ -1803,7 +1800,6 @@ static void blk_mq_init_cpu_queues(struct request_queue *q,
+@@ -1805,7 +1802,6 @@ static void blk_mq_init_cpu_queues(struct request_queue *q,
  		memset(__ctx, 0, sizeof(*__ctx));
  		__ctx->cpu = i;
  		spin_lock_init(&__ctx->lock);
@@ -94,7 +93,7 @@ index b3ac9690f25a..3c70813cb6b6 100644
  		__ctx->queue = q;
  
 diff --git a/block/blk-mq.h b/block/blk-mq.h
-index 26b160598c67..3cb6feb4fe23 100644
+index 26b1605..3cb6feb 100644
 --- a/block/blk-mq.h
 +++ b/block/blk-mq.h
 @@ -9,7 +9,6 @@ struct blk_mq_ctx {
@@ -129,5 +128,5 @@ index 26b160598c67..3cb6feb4fe23 100644
  }
  
 -- 
-2.10.1
+2.7.4
 

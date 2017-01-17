@@ -1,8 +1,7 @@
-From 43976f6df2760a1f925091af42b1667c2d309b04 Mon Sep 17 00:00:00 2001
+From 782cb248008f5314a4408a003f5438c9a3ab8c3c Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 14 Jul 2015 14:26:34 +0200
-Subject: [PATCH 246/351] gpu/i915: don't open code these things
-X-NVConfidentiality: public
+Subject: [PATCH 246/365] gpu/i915: don't open code these things
 
 The opencode part is gone in 1f83fee0 ("drm/i915: clear up wedged transitions")
 the owner check is still there.
@@ -13,7 +12,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/i915/i915_gem_shrinker.c b/drivers/gpu/drm/i915/i915_gem_shrinker.c
-index 6f10b421487b..dd3a9a6ace11 100644
+index 6f10b42..dd3a9a6 100644
 --- a/drivers/gpu/drm/i915/i915_gem_shrinker.c
 +++ b/drivers/gpu/drm/i915/i915_gem_shrinker.c
 @@ -40,7 +40,7 @@ static bool mutex_is_locked_by(struct mutex *mutex, struct task_struct *task)
@@ -26,5 +25,5 @@ index 6f10b421487b..dd3a9a6ace11 100644
  #else
  	/* Since UP may be pre-empted, we cannot assume that we own the lock */
 -- 
-2.10.1
+2.7.4
 

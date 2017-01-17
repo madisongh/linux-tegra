@@ -1,8 +1,7 @@
-From f313ed4a5791ab2d02bb92297e94293005ec247d Mon Sep 17 00:00:00 2001
+From a221f9d5892ea617e01e3c4a4cc3c75915cc76fa Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 1 Nov 2012 10:14:11 +0100
-Subject: [PATCH 240/351] powerpc: Add support for lazy preemption
-X-NVConfidentiality: public
+Subject: [PATCH 240/365] powerpc: Add support for lazy preemption
 
 Implement the powerpc pieces for lazy preempt.
 
@@ -16,7 +15,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  5 files changed, 33 insertions(+), 11 deletions(-)
 
 diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index 52a9853b8ebf..1d2be228661c 100644
+index 52a9853..1d2be22 100644
 --- a/arch/powerpc/Kconfig
 +++ b/arch/powerpc/Kconfig
 @@ -142,6 +142,7 @@ config PPC
@@ -28,7 +27,7 @@ index 52a9853b8ebf..1d2be228661c 100644
  	select MODULES_USE_ELF_RELA
  	select CLONE_BACKWARDS
 diff --git a/arch/powerpc/include/asm/thread_info.h b/arch/powerpc/include/asm/thread_info.h
-index 7efee4a3240b..40e6fa1b85b2 100644
+index 7efee4a..40e6fa1 100644
 --- a/arch/powerpc/include/asm/thread_info.h
 +++ b/arch/powerpc/include/asm/thread_info.h
 @@ -42,6 +42,8 @@ struct thread_info {
@@ -78,7 +77,7 @@ index 7efee4a3240b..40e6fa1b85b2 100644
  /* Bits in local_flags */
  /* Don't move TLF_NAPPING without adjusting the code in entry_32.S */
 diff --git a/arch/powerpc/kernel/asm-offsets.c b/arch/powerpc/kernel/asm-offsets.c
-index 221d584d089f..d6d0c59ef8ae 100644
+index 221d584..d6d0c59 100644
 --- a/arch/powerpc/kernel/asm-offsets.c
 +++ b/arch/powerpc/kernel/asm-offsets.c
 @@ -160,6 +160,7 @@ int main(void)
@@ -90,7 +89,7 @@ index 221d584d089f..d6d0c59ef8ae 100644
  	DEFINE(TI_CPU, offsetof(struct thread_info, cpu));
  
 diff --git a/arch/powerpc/kernel/entry_32.S b/arch/powerpc/kernel/entry_32.S
-index 2405631e91a2..c21b4b42eaa0 100644
+index 2405631..c21b4b4 100644
 --- a/arch/powerpc/kernel/entry_32.S
 +++ b/arch/powerpc/kernel/entry_32.S
 @@ -818,7 +818,14 @@ resume_kernel:
@@ -142,7 +141,7 @@ index 2405631e91a2..c21b4b42eaa0 100644
  	andi.	r0,r9,_TIF_USER_WORK_MASK
  	beq	restore_user
 diff --git a/arch/powerpc/kernel/entry_64.S b/arch/powerpc/kernel/entry_64.S
-index a94f155db78e..5bb3148e592b 100644
+index edba294..1aae3fd 100644
 --- a/arch/powerpc/kernel/entry_64.S
 +++ b/arch/powerpc/kernel/entry_64.S
 @@ -683,7 +683,7 @@ _GLOBAL(ret_from_except_lite)
@@ -184,5 +183,5 @@ index a94f155db78e..5bb3148e592b 100644
  
  	/*
 -- 
-2.10.1
+2.7.4
 

@@ -1,8 +1,7 @@
-From dbdf6b79e6e6a204f7006e812de5c0d899397256 Mon Sep 17 00:00:00 2001
+From 02867e7ab90e1df2bf85a7ee863b644314773900 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 13 Feb 2013 11:03:11 +0100
-Subject: [PATCH 204/351] arm: Enable highmem for rt
-X-NVConfidentiality: public
+Subject: [PATCH 204/365] arm: Enable highmem for rt
 
 fixup highmem for ARM.
 
@@ -14,7 +13,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  3 files changed, 49 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/include/asm/switch_to.h b/arch/arm/include/asm/switch_to.h
-index 12ebfcc1d539..c962084605bc 100644
+index 12ebfcc..c962084 100644
 --- a/arch/arm/include/asm/switch_to.h
 +++ b/arch/arm/include/asm/switch_to.h
 @@ -3,6 +3,13 @@
@@ -40,7 +39,7 @@ index 12ebfcc1d539..c962084605bc 100644
  } while (0)
  
 diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index eb4b225d28c9..deabc36c936c 100644
+index eb4b225d..deabc36 100644
 --- a/arch/arm/mm/highmem.c
 +++ b/arch/arm/mm/highmem.c
 @@ -54,12 +54,13 @@ EXPORT_SYMBOL(kunmap);
@@ -138,7 +137,7 @@ index eb4b225d28c9..deabc36c936c 100644
 +}
 +#endif
 diff --git a/include/linux/highmem.h b/include/linux/highmem.h
-index 2f56829181ee..a2a50f599ea9 100644
+index 2f56829..a2a50f5 100644
 --- a/include/linux/highmem.h
 +++ b/include/linux/highmem.h
 @@ -7,6 +7,7 @@
@@ -150,5 +149,5 @@ index 2f56829181ee..a2a50f599ea9 100644
  #include <asm/cacheflush.h>
  
 -- 
-2.10.1
+2.7.4
 

@@ -1,8 +1,7 @@
-From b4a496943e514806e636376da89e66f2517f7501 Mon Sep 17 00:00:00 2001
+From 50a03d3fbfe4bf1db18c4fc78c63b023a3372f69 Mon Sep 17 00:00:00 2001
 From: Josh Cartwright <joshc@ni.com>
 Date: Thu, 18 Feb 2016 11:26:12 -0600
-Subject: [PATCH 305/351] sc16is7xx: Drop bogus use of IRQF_ONESHOT
-X-NVConfidentiality: public
+Subject: [PATCH 305/365] sc16is7xx: Drop bogus use of IRQF_ONESHOT
 
 The use of IRQF_ONESHOT when registering an interrupt handler with
 request_irq() is non-sensical.
@@ -44,7 +43,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/tty/serial/sc16is7xx.c b/drivers/tty/serial/sc16is7xx.c
-index cc86c348d809..ac51f0d98ba8 100644
+index cc86c34..ac51f0d 100644
 --- a/drivers/tty/serial/sc16is7xx.c
 +++ b/drivers/tty/serial/sc16is7xx.c
 @@ -1230,7 +1230,7 @@ static int sc16is7xx_probe(struct device *dev,
@@ -57,5 +56,5 @@ index cc86c348d809..ac51f0d98ba8 100644
  		return 0;
  
 -- 
-2.10.1
+2.7.4
 

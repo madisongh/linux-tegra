@@ -1,8 +1,7 @@
-From c3a30b3b7b068d2d4fcaea027657653dab096f43 Mon Sep 17 00:00:00 2001
+From 27c16da40467f75a9a00c185ee7cd1bcefbd73cd Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Mon, 16 Feb 2015 18:49:10 +0100
-Subject: [PATCH 144/351] fs/aio: simple simple work
-X-NVConfidentiality: public
+Subject: [PATCH 144/365] fs/aio: simple simple work
 
 |BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:768
 |in_atomic(): 1, irqs_disabled(): 0, pid: 26, name: rcuos/2
@@ -30,7 +29,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 17 insertions(+), 7 deletions(-)
 
 diff --git a/fs/aio.c b/fs/aio.c
-index 155f84253f33..14af01540288 100644
+index fe4f492..a879f87 100644
 --- a/fs/aio.c
 +++ b/fs/aio.c
 @@ -40,6 +40,7 @@
@@ -50,7 +49,7 @@ index 155f84253f33..14af01540288 100644
  
  	/*
  	 * signals when all in-flight requests are done
-@@ -253,6 +254,7 @@ static int __init aio_setup(void)
+@@ -258,6 +259,7 @@ static int __init aio_setup(void)
  		.mount		= aio_mount,
  		.kill_sb	= kill_anon_super,
  	};
@@ -58,7 +57,7 @@ index 155f84253f33..14af01540288 100644
  	aio_mnt = kern_mount(&aio_fs);
  	if (IS_ERR(aio_mnt))
  		panic("Failed to create aio fs mount.");
-@@ -568,9 +570,9 @@ static int kiocb_cancel(struct aio_kiocb *kiocb)
+@@ -573,9 +575,9 @@ static int kiocb_cancel(struct aio_kiocb *kiocb)
  	return cancel(&kiocb->common);
  }
  
@@ -70,7 +69,7 @@ index 155f84253f33..14af01540288 100644
  
  	pr_debug("freeing %p\n", ctx);
  
-@@ -589,8 +591,8 @@ static void free_ioctx_reqs(struct percpu_ref *ref)
+@@ -594,8 +596,8 @@ static void free_ioctx_reqs(struct percpu_ref *ref)
  	if (ctx->rq_wait && atomic_dec_and_test(&ctx->rq_wait->count))
  		complete(&ctx->rq_wait->comp);
  
@@ -81,7 +80,7 @@ index 155f84253f33..14af01540288 100644
  }
  
  /*
-@@ -598,9 +600,9 @@ static void free_ioctx_reqs(struct percpu_ref *ref)
+@@ -603,9 +605,9 @@ static void free_ioctx_reqs(struct percpu_ref *ref)
   * and ctx->users has dropped to 0, so we know no more kiocbs can be submitted -
   * now it's safe to cancel any that need to be.
   */
@@ -93,7 +92,7 @@ index 155f84253f33..14af01540288 100644
  	struct aio_kiocb *req;
  
  	spin_lock_irq(&ctx->ctx_lock);
-@@ -619,6 +621,14 @@ static void free_ioctx_users(struct percpu_ref *ref)
+@@ -624,6 +626,14 @@ static void free_ioctx_users(struct percpu_ref *ref)
  	percpu_ref_put(&ctx->reqs);
  }
  
@@ -109,5 +108,5 @@ index 155f84253f33..14af01540288 100644
  {
  	unsigned i, new_nr;
 -- 
-2.10.1
+2.7.4
 

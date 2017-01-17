@@ -1,8 +1,7 @@
-From f7c24e10405c1dc6947bad58eeb0b3af3fdd182f Mon Sep 17 00:00:00 2001
+From 74e16de3e8f838bd1f2e7a22ee0e6bd64d5df2a0 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sat, 20 Jun 2009 11:36:54 +0200
-Subject: [PATCH 057/351] drivers/net: fix livelock issues
-X-NVConfidentiality: public
+Subject: [PATCH 057/365] drivers/net: fix livelock issues
 
 Preempt-RT runs into a live lock issue with the NETDEV_TX_LOCKED micro
 optimization. The reason is that the softirq thread is rescheduling
@@ -23,7 +22,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  7 files changed, 9 insertions(+), 31 deletions(-)
 
 diff --git a/drivers/net/ethernet/atheros/atl1c/atl1c_main.c b/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
-index 8b5988e210d5..cf9928ccdd7e 100644
+index 8b5988e..cf9928c 100644
 --- a/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
 +++ b/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
 @@ -2221,11 +2221,7 @@ static netdev_tx_t atl1c_xmit_frame(struct sk_buff *skb,
@@ -40,7 +39,7 @@ index 8b5988e210d5..cf9928ccdd7e 100644
  	if (atl1c_tpd_avail(adapter, type) < tpd_req) {
  		/* no enough descriptor, just stop queue */
 diff --git a/drivers/net/ethernet/atheros/atl1e/atl1e_main.c b/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
-index 59a03a193e83..734f7a7ad2c3 100644
+index 59a03a1..734f7a7 100644
 --- a/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
 +++ b/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
 @@ -1880,8 +1880,7 @@ static netdev_tx_t atl1e_xmit_frame(struct sk_buff *skb,
@@ -54,7 +53,7 @@ index 59a03a193e83..734f7a7ad2c3 100644
  	if (atl1e_tpd_avail(adapter) < tpd_req) {
  		/* no enough descriptor, just stop queue */
 diff --git a/drivers/net/ethernet/chelsio/cxgb/sge.c b/drivers/net/ethernet/chelsio/cxgb/sge.c
-index 526ea74e82d9..86f467a2c485 100644
+index 526ea74..86f467a 100644
 --- a/drivers/net/ethernet/chelsio/cxgb/sge.c
 +++ b/drivers/net/ethernet/chelsio/cxgb/sge.c
 @@ -1664,8 +1664,7 @@ static int t1_sge_tx(struct sk_buff *skb, struct adapter *adapter,
@@ -68,7 +67,7 @@ index 526ea74e82d9..86f467a2c485 100644
  	reclaim_completed_tx(sge, q);
  
 diff --git a/drivers/net/ethernet/neterion/s2io.c b/drivers/net/ethernet/neterion/s2io.c
-index 9ba975853ec6..813cfa698160 100644
+index 9ba9758..813cfa6 100644
 --- a/drivers/net/ethernet/neterion/s2io.c
 +++ b/drivers/net/ethernet/neterion/s2io.c
 @@ -4084,12 +4084,7 @@ static netdev_tx_t s2io_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -86,7 +85,7 @@ index 9ba975853ec6..813cfa698160 100644
  	if (sp->config.multiq) {
  		if (__netif_subqueue_stopped(dev, fifo->fifo_no)) {
 diff --git a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-index 3b98b263bad0..ca4add749410 100644
+index 3b98b263b..ca4add7 100644
 --- a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
 +++ b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
 @@ -2137,10 +2137,8 @@ static int pch_gbe_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
@@ -103,7 +102,7 @@ index 3b98b263bad0..ca4add749410 100644
  		netif_stop_queue(netdev);
  		spin_unlock_irqrestore(&tx_ring->tx_lock, flags);
 diff --git a/drivers/net/ethernet/tehuti/tehuti.c b/drivers/net/ethernet/tehuti/tehuti.c
-index 14c9d1baa85c..e1a5305418a8 100644
+index 14c9d1b..e1a5305 100644
 --- a/drivers/net/ethernet/tehuti/tehuti.c
 +++ b/drivers/net/ethernet/tehuti/tehuti.c
 @@ -1629,13 +1629,8 @@ static netdev_tx_t bdx_tx_transmit(struct sk_buff *skb,
@@ -123,7 +122,7 @@ index 14c9d1baa85c..e1a5305418a8 100644
  	/* build tx descriptor */
  	BDX_ASSERT(f->m.wptr >= f->m.memsz);	/* started with valid wptr */
 diff --git a/drivers/net/rionet.c b/drivers/net/rionet.c
-index e7034c55e796..2e4ee0f912bf 100644
+index e7034c5..2e4ee0f 100644
 --- a/drivers/net/rionet.c
 +++ b/drivers/net/rionet.c
 @@ -174,11 +174,7 @@ static int rionet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
@@ -140,5 +139,5 @@ index e7034c55e796..2e4ee0f912bf 100644
  	if (is_multicast_ether_addr(eth->h_dest))
  		add_num = nets[rnet->mport->id].nact;
 -- 
-2.10.1
+2.7.4
 

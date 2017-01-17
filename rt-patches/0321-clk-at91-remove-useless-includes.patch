@@ -1,8 +1,7 @@
-From cec252d0610bf145cebe582aa14c11fe559e30c8 Mon Sep 17 00:00:00 2001
+From a14510b0ce5e555354cb95b03d100b3ac5f02acf Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 27 Jan 2016 15:17:37 +0100
-Subject: [PATCH 321/351] clk: at91: remove useless includes
-X-NVConfidentiality: public
+Subject: [PATCH 321/365] clk: at91: remove useless includes
 
 Over time, some includes were copy pasted from other clocks drivers but are
 not necessary.
@@ -22,7 +21,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  8 files changed, 30 deletions(-)
 
 diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-index 5866684a6657..4ad3298eb372 100644
+index 5866684..4ad3298 100644
 --- a/drivers/clk/at91/clk-generated.c
 +++ b/drivers/clk/at91/clk-generated.c
 @@ -15,8 +15,6 @@
@@ -35,7 +34,7 @@ index 5866684a6657..4ad3298eb372 100644
  #include <linux/regmap.h>
  
 diff --git a/drivers/clk/at91/clk-h32mx.c b/drivers/clk/at91/clk-h32mx.c
-index e28984fdc859..8e20c8a76db7 100644
+index e28984f..8e20c8a 100644
 --- a/drivers/clk/at91/clk-h32mx.c
 +++ b/drivers/clk/at91/clk-h32mx.c
 @@ -15,15 +15,7 @@
@@ -55,7 +54,7 @@ index e28984fdc859..8e20c8a76db7 100644
  #include <linux/mfd/syscon.h>
  
 diff --git a/drivers/clk/at91/clk-peripheral.c b/drivers/clk/at91/clk-peripheral.c
-index 814f6491b2ee..d69cd2a121b1 100644
+index 814f649..d69cd2a 100644
 --- a/drivers/clk/at91/clk-peripheral.c
 +++ b/drivers/clk/at91/clk-peripheral.c
 @@ -12,8 +12,6 @@
@@ -68,7 +67,7 @@ index 814f6491b2ee..d69cd2a121b1 100644
  #include <linux/regmap.h>
  
 diff --git a/drivers/clk/at91/clk-plldiv.c b/drivers/clk/at91/clk-plldiv.c
-index f43e93738a99..2bed26481027 100644
+index f43e937..2bed264 100644
 --- a/drivers/clk/at91/clk-plldiv.c
 +++ b/drivers/clk/at91/clk-plldiv.c
 @@ -12,8 +12,6 @@
@@ -81,7 +80,7 @@ index f43e93738a99..2bed26481027 100644
  #include <linux/regmap.h>
  
 diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
-index 78814ba448c4..bc0be629671b 100644
+index 78814ba..bc0be62 100644
 --- a/drivers/clk/at91/clk-programmable.c
 +++ b/drivers/clk/at91/clk-programmable.c
 @@ -12,10 +12,6 @@
@@ -96,7 +95,7 @@ index 78814ba448c4..bc0be629671b 100644
  #include <linux/regmap.h>
  
 diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-index dd52c7ab798f..221c09684ba3 100644
+index dd52c7ab..221c096 100644
 --- a/drivers/clk/at91/clk-slow.c
 +++ b/drivers/clk/at91/clk-slow.c
 @@ -13,19 +13,11 @@
@@ -120,7 +119,7 @@ index dd52c7ab798f..221c09684ba3 100644
  #include "pmc.h"
  #include "sckc.h"
 diff --git a/drivers/clk/at91/clk-smd.c b/drivers/clk/at91/clk-smd.c
-index 0f6e8d67e630..e6948a52005a 100644
+index 0f6e8d6..e6948a5 100644
 --- a/drivers/clk/at91/clk-smd.c
 +++ b/drivers/clk/at91/clk-smd.c
 @@ -12,8 +12,6 @@
@@ -133,7 +132,7 @@ index 0f6e8d67e630..e6948a52005a 100644
  #include <linux/regmap.h>
  
 diff --git a/drivers/clk/at91/clk-usb.c b/drivers/clk/at91/clk-usb.c
-index 617e24f6ef76..650ca45892c0 100644
+index 617e24f..650ca45 100644
 --- a/drivers/clk/at91/clk-usb.c
 +++ b/drivers/clk/at91/clk-usb.c
 @@ -12,8 +12,6 @@
@@ -146,5 +145,5 @@ index 617e24f6ef76..650ca45892c0 100644
  #include <linux/regmap.h>
  
 -- 
-2.10.1
+2.7.4
 

@@ -1,8 +1,7 @@
-From 09934c8e3d0069dffcacb26920fcc69e24fe74e7 Mon Sep 17 00:00:00 2001
+From e4435abc72bccde924f567d7c73cb2a539a95510 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 3 Jul 2009 08:29:20 -0500
-Subject: [PATCH 012/351] posix-timers: Prevent broadcast signals
-X-NVConfidentiality: public
+Subject: [PATCH 012/365] posix-timers: Prevent broadcast signals
 
 Posix timers should not send broadcast signals and kernel only
 signals. Prevent it.
@@ -13,7 +12,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/kernel/time/posix-timers.c b/kernel/time/posix-timers.c
-index f2826c35e918..81aec84e65e7 100644
+index f2826c3..81aec84 100644
 --- a/kernel/time/posix-timers.c
 +++ b/kernel/time/posix-timers.c
 @@ -506,6 +506,7 @@ static enum hrtimer_restart posix_timer_fn(struct hrtimer *timer)
@@ -35,5 +34,5 @@ index f2826c35e918..81aec84e65e7 100644
  
  	return task_pid(rtn);
 -- 
-2.10.1
+2.7.4
 

@@ -1,8 +1,7 @@
-From a321030f1589ba8a63e422b017626ac170d8c716 Mon Sep 17 00:00:00 2001
+From 6b5508220b2dc35b84860d8c28e43e0200b64dc9 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 17 Jul 2011 22:51:33 +0200
-Subject: [PATCH 094/351] sched: Use the proper LOCK_OFFSET for cond_resched()
-X-NVConfidentiality: public
+Subject: [PATCH 094/365] sched: Use the proper LOCK_OFFSET for cond_resched()
 
 RT does not increment preempt count when a 'sleeping' spinlock is
 locked. Update PREEMPT_LOCK_OFFSET for that case.
@@ -13,7 +12,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 4 insertions(+)
 
 diff --git a/include/linux/preempt.h b/include/linux/preempt.h
-index 57c7731bfe04..210bd26b1882 100644
+index 57c7731..210bd26 100644
 --- a/include/linux/preempt.h
 +++ b/include/linux/preempt.h
 @@ -91,7 +91,11 @@
@@ -29,5 +28,5 @@ index 57c7731bfe04..210bd26b1882 100644
  /*
   * The preempt_count offset needed for things like:
 -- 
-2.10.1
+2.7.4
 

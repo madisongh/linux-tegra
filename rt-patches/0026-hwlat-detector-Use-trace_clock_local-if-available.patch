@@ -1,8 +1,7 @@
-From ff3462026ed3f974cd263bd3474da6550e006568 Mon Sep 17 00:00:00 2001
+From 252e7984160ee2ceb9dc0f3843764652f8e4dccd Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Mon, 19 Aug 2013 17:33:26 -0400
-Subject: [PATCH 026/351] hwlat-detector: Use trace_clock_local if available
-X-NVConfidentiality: public
+Subject: [PATCH 026/365] hwlat-detector: Use trace_clock_local if available
 
 As ktime_get() calls into the timing code which does a read_seq(), it
 may be affected by other CPUS that touch that lock. To remove this
@@ -17,7 +16,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 25 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/misc/hwlat_detector.c b/drivers/misc/hwlat_detector.c
-index c07e85932cbf..0fcc0e38df42 100644
+index c07e859..0fcc0e3 100644
 --- a/drivers/misc/hwlat_detector.c
 +++ b/drivers/misc/hwlat_detector.c
 @@ -51,6 +51,7 @@
@@ -95,5 +94,5 @@ index c07e85932cbf..0fcc0e38df42 100644
  		/* This shouldn't happen */
  		if (diff < 0) {
 -- 
-2.10.1
+2.7.4
 

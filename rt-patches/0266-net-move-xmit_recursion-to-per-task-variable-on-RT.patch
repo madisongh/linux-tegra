@@ -1,8 +1,7 @@
-From 8346e9a3adb9145e1a5abb24e1220f2da94d7099 Mon Sep 17 00:00:00 2001
+From 6b37b87f1623eb8c1a3a81d6c98f73596d1ffd31 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 15:55:02 +0100
-Subject: [PATCH 266/351] net: move xmit_recursion to per-task variable on -RT
-X-NVConfidentiality: public
+Subject: [PATCH 266/365] net: move xmit_recursion to per-task variable on -RT
 
 A softirq on -RT can be preempted. That means one task is in
 __dev_queue_xmit(), gets preempted and another task may enter
@@ -23,10 +22,10 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  3 files changed, 50 insertions(+), 3 deletions(-)
 
 diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
-index 95e7f30a95fa..530529e820f3 100644
+index 7690924..a7f37ec 100644
 --- a/include/linux/netdevice.h
 +++ b/include/linux/netdevice.h
-@@ -2249,11 +2249,20 @@ void netdev_freemem(struct net_device *dev);
+@@ -2286,11 +2286,20 @@ void netdev_freemem(struct net_device *dev);
  void synchronize_net(void);
  int init_dummy_netdev(struct net_device *dev);
  
@@ -48,7 +47,7 @@ index 95e7f30a95fa..530529e820f3 100644
  struct net_device *dev_get_by_index(struct net *net, int ifindex);
  struct net_device *__dev_get_by_index(struct net *net, int ifindex);
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 96becac3e0e9..eb165902ae60 100644
+index 96becac..eb16590 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1871,6 +1871,9 @@ struct task_struct {
@@ -62,10 +61,10 @@ index 96becac3e0e9..eb165902ae60 100644
  /* CPU-specific state of this task */
  	struct thread_struct thread;
 diff --git a/net/core/dev.c b/net/core/dev.c
-index 56133064b3e0..01a06bbeb932 100644
+index 45b7dc7..33c5130 100644
 --- a/net/core/dev.c
 +++ b/net/core/dev.c
-@@ -2951,9 +2951,44 @@ static void skb_update_prio(struct sk_buff *skb)
+@@ -2952,9 +2952,44 @@ static void skb_update_prio(struct sk_buff *skb)
  #define skb_update_prio(skb)
  #endif
  
@@ -110,7 +109,7 @@ index 56133064b3e0..01a06bbeb932 100644
  #define RECURSION_LIMIT 10
  
  /**
-@@ -3146,7 +3181,7 @@ static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
+@@ -3147,7 +3182,7 @@ static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
  
  		if (txq->xmit_lock_owner != cpu) {
  
@@ -119,7 +118,7 @@ index 56133064b3e0..01a06bbeb932 100644
  				goto recursion_alert;
  
  			skb = validate_xmit_skb(skb, dev);
-@@ -3156,9 +3191,9 @@ static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
+@@ -3157,9 +3192,9 @@ static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
  			HARD_TX_LOCK(dev, txq, cpu);
  
  			if (!netif_xmit_stopped(txq)) {
@@ -132,5 +131,5 @@ index 56133064b3e0..01a06bbeb932 100644
  					HARD_TX_UNLOCK(dev, txq);
  					goto out;
 -- 
-2.10.1
+2.7.4
 

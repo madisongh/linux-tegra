@@ -1,9 +1,8 @@
-From 8f596e17275fd015bc9f8153a259f39c54a24f06 Mon Sep 17 00:00:00 2001
+From be9e509c805e12fe63e89bc456e856aa0eab8f7a Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 7 Jun 2011 09:19:06 +0200
-Subject: [PATCH 092/351] sched: Do not account rcu_preempt_depth on RT in
+Subject: [PATCH 092/365] sched: Do not account rcu_preempt_depth on RT in
  might_sleep()
-X-NVConfidentiality: public
 
 RT changes the rcu_preempt_depth semantics, so we cannot check for it
 in might_sleep().
@@ -15,7 +14,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  2 files changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/include/linux/rcupdate.h b/include/linux/rcupdate.h
-index a0189ba67fde..1eef045c95d1 100644
+index a0189ba..1eef045 100644
 --- a/include/linux/rcupdate.h
 +++ b/include/linux/rcupdate.h
 @@ -292,6 +292,11 @@ void synchronize_rcu(void);
@@ -40,10 +39,10 @@ index a0189ba67fde..1eef045c95d1 100644
  
  /* Internal to kernel */
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 7c19c7d878ee..80d61bf22c0e 100644
+index e6b63f0..ebd392e 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -7751,7 +7751,7 @@ void __init sched_init(void)
+@@ -7778,7 +7778,7 @@ void __init sched_init(void)
  #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
  static inline int preempt_count_equals(int preempt_offset)
  {
@@ -53,5 +52,5 @@ index 7c19c7d878ee..80d61bf22c0e 100644
  	return (nested == preempt_offset);
  }
 -- 
-2.10.1
+2.7.4
 

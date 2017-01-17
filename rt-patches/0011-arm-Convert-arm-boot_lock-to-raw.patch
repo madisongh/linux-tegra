@@ -1,8 +1,7 @@
-From 0ee39bc258bb9e8bba7877a7b72f22da70543161 Mon Sep 17 00:00:00 2001
+From ca080df20b630c36b95e4abed1ee22f6e4036f9a Mon Sep 17 00:00:00 2001
 From: Frank Rowand <frank.rowand@am.sony.com>
 Date: Mon, 19 Sep 2011 14:51:14 -0700
-Subject: [PATCH 011/351] arm: Convert arm boot_lock to raw
-X-NVConfidentiality: public
+Subject: [PATCH 011/365] arm: Convert arm boot_lock to raw
 
 The arm boot_lock is used by the secondary processor startup code.  The locking
 task is the idle thread, which has idle->sched_class == &idle_sched_class.
@@ -32,7 +31,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  8 files changed, 47 insertions(+), 47 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 98a2c0cbb833..310dce500d3e 100644
+index 98a2c0c..310dce5 100644
 --- a/arch/arm/mach-exynos/platsmp.c
 +++ b/arch/arm/mach-exynos/platsmp.c
 @@ -230,7 +230,7 @@ static void __iomem *scu_base_addr(void)
@@ -83,7 +82,7 @@ index 98a2c0cbb833..310dce500d3e 100644
  	return pen_release != -1 ? ret : 0;
  }
 diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
-index b5f8f5ffda79..9753a84df9c4 100644
+index b5f8f5f..9753a84 100644
 --- a/arch/arm/mach-hisi/platmcpm.c
 +++ b/arch/arm/mach-hisi/platmcpm.c
 @@ -61,7 +61,7 @@
@@ -172,7 +171,7 @@ index b5f8f5ffda79..9753a84df9c4 100644
  }
  #endif
 diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 79e1f876d1c9..7e625c17f78e 100644
+index 79e1f87..7e625c1 100644
 --- a/arch/arm/mach-omap2/omap-smp.c
 +++ b/arch/arm/mach-omap2/omap-smp.c
 @@ -43,7 +43,7 @@
@@ -214,7 +213,7 @@ index 79e1f876d1c9..7e625c17f78e 100644
  	return 0;
  }
 diff --git a/arch/arm/mach-prima2/platsmp.c b/arch/arm/mach-prima2/platsmp.c
-index e46c91094dde..dcb3ed0c26da 100644
+index e46c910..dcb3ed0 100644
 --- a/arch/arm/mach-prima2/platsmp.c
 +++ b/arch/arm/mach-prima2/platsmp.c
 @@ -22,7 +22,7 @@
@@ -256,7 +255,7 @@ index e46c91094dde..dcb3ed0c26da 100644
  	return pen_release != -1 ? -ENOSYS : 0;
  }
 diff --git a/arch/arm/mach-qcom/platsmp.c b/arch/arm/mach-qcom/platsmp.c
-index 9b00123a315d..0a49fe1bc8cf 100644
+index 9b00123..0a49fe1 100644
 --- a/arch/arm/mach-qcom/platsmp.c
 +++ b/arch/arm/mach-qcom/platsmp.c
 @@ -46,7 +46,7 @@
@@ -298,7 +297,7 @@ index 9b00123a315d..0a49fe1bc8cf 100644
  	return ret;
  }
 diff --git a/arch/arm/mach-spear/platsmp.c b/arch/arm/mach-spear/platsmp.c
-index fd4297713d67..b0553b2c2d53 100644
+index fd42977..b0553b2 100644
 --- a/arch/arm/mach-spear/platsmp.c
 +++ b/arch/arm/mach-spear/platsmp.c
 @@ -32,7 +32,7 @@ static void write_pen_release(int val)
@@ -340,7 +339,7 @@ index fd4297713d67..b0553b2c2d53 100644
  	return pen_release != -1 ? -ENOSYS : 0;
  }
 diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
-index c4ad6eae67fa..e830b20b212f 100644
+index c4ad6ea..e830b20 100644
 --- a/arch/arm/mach-sti/platsmp.c
 +++ b/arch/arm/mach-sti/platsmp.c
 @@ -35,7 +35,7 @@ static void write_pen_release(int val)
@@ -382,7 +381,7 @@ index c4ad6eae67fa..e830b20b212f 100644
  	return pen_release != -1 ? -ENOSYS : 0;
  }
 diff --git a/arch/arm/plat-versatile/platsmp.c b/arch/arm/plat-versatile/platsmp.c
-index 53feb90c840c..b4a8d54fc3f3 100644
+index 53feb90..b4a8d54 100644
 --- a/arch/arm/plat-versatile/platsmp.c
 +++ b/arch/arm/plat-versatile/platsmp.c
 @@ -30,7 +30,7 @@ static void write_pen_release(int val)
@@ -424,5 +423,5 @@ index 53feb90c840c..b4a8d54fc3f3 100644
  	return pen_release != -1 ? -ENOSYS : 0;
  }
 -- 
-2.10.1
+2.7.4
 

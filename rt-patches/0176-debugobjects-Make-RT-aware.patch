@@ -1,8 +1,7 @@
-From 22f4ba00c39498a048b971af95b513d7cf19c362 Mon Sep 17 00:00:00 2001
+From aa52421547e04ba0b21fe17419838b46d55ca500 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 17 Jul 2011 21:41:35 +0200
-Subject: [PATCH 176/351] debugobjects: Make RT aware
-X-NVConfidentiality: public
+Subject: [PATCH 176/365] debugobjects: Make RT aware
 
 Avoid filling the pool / allocating memory with irqs off().
 
@@ -12,7 +11,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/lib/debugobjects.c b/lib/debugobjects.c
-index 547f7f923dbc..8fcdbc2fc6d0 100644
+index 547f7f9..8fcdbc2 100644
 --- a/lib/debugobjects.c
 +++ b/lib/debugobjects.c
 @@ -309,7 +309,10 @@ __debug_object_init(void *addr, struct debug_obj_descr *descr, int onstack)
@@ -28,5 +27,5 @@ index 547f7f923dbc..8fcdbc2fc6d0 100644
  	db = get_bucket((unsigned long) addr);
  
 -- 
-2.10.1
+2.7.4
 

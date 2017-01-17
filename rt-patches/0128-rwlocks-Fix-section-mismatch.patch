@@ -1,8 +1,7 @@
-From 7ea13e457b46cb8b46220c325bb2131cb3f19221 Mon Sep 17 00:00:00 2001
+From 582b049eee58eea6a0060cc1fab3984f535b9eb7 Mon Sep 17 00:00:00 2001
 From: John Kacur <jkacur@redhat.com>
 Date: Mon, 19 Sep 2011 11:09:27 +0200
-Subject: [PATCH 128/351] rwlocks: Fix section mismatch
-X-NVConfidentiality: public
+Subject: [PATCH 128/365] rwlocks: Fix section mismatch
 
 This fixes the following build error for the preempt-rt kernel.
 
@@ -34,7 +33,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  2 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/include/linux/rwlock_types.h b/include/linux/rwlock_types.h
-index 5317cd957292..d0da966ad7a0 100644
+index 5317cd9..d0da966 100644
 --- a/include/linux/rwlock_types.h
 +++ b/include/linux/rwlock_types.h
 @@ -47,6 +47,7 @@ typedef struct {
@@ -47,7 +46,7 @@ index 5317cd957292..d0da966ad7a0 100644
  
  #endif /* __LINUX_RWLOCK_TYPES_H */
 diff --git a/kernel/fork.c b/kernel/fork.c
-index f205d0fbe84d..86ed414535f6 100644
+index ad52eda..95cc913 100644
 --- a/kernel/fork.c
 +++ b/kernel/fork.c
 @@ -108,7 +108,7 @@ int max_threads;		/* tunable limit on nr_threads */
@@ -60,5 +59,5 @@ index f205d0fbe84d..86ed414535f6 100644
  #ifdef CONFIG_PROVE_RCU
  int lockdep_tasklist_lock_is_held(void)
 -- 
-2.10.1
+2.7.4
 

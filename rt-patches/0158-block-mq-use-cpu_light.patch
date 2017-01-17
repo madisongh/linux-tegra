@@ -1,8 +1,7 @@
-From 267b47a62becf014171ef5db594275d226e7971a Mon Sep 17 00:00:00 2001
+From ef7c7974f90632d83ea28bc05d280841f7ca81e0 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 9 Apr 2014 10:37:23 +0200
-Subject: [PATCH 158/351] block: mq: use cpu_light()
-X-NVConfidentiality: public
+Subject: [PATCH 158/365] block: mq: use cpu_light()
 
 there is a might sleep splat because get_cpu() disables preemption and
 later we grab a lock. As a workaround for this we use get_cpu_light()
@@ -18,10 +17,10 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  2 files changed, 18 insertions(+), 3 deletions(-)
 
 diff --git a/block/blk-mq.c b/block/blk-mq.c
-index 6d6f8feb48c0..208ac7985725 100644
+index c3e461ec..2d9a255 100644
 --- a/block/blk-mq.c
 +++ b/block/blk-mq.c
-@@ -1385,7 +1385,9 @@ static blk_qc_t blk_sq_make_request(struct request_queue *q, struct bio *bio)
+@@ -1387,7 +1387,9 @@ static blk_qc_t blk_sq_make_request(struct request_queue *q, struct bio *bio)
  		blk_mq_put_ctx(data.ctx);
  
  		if (request_count >= BLK_MAX_REQUEST_COUNT) {
@@ -31,7 +30,7 @@ index 6d6f8feb48c0..208ac7985725 100644
  			trace_block_plug(q);
  		}
  
-@@ -1587,6 +1589,7 @@ static int blk_mq_hctx_cpu_offline(struct blk_mq_hw_ctx *hctx, int cpu)
+@@ -1589,6 +1591,7 @@ static int blk_mq_hctx_cpu_offline(struct blk_mq_hw_ctx *hctx, int cpu)
  		blk_mq_hctx_clear_pending(hctx, ctx);
  	}
  	spin_unlock(&ctx->lock);
@@ -39,7 +38,7 @@ index 6d6f8feb48c0..208ac7985725 100644
  
  	if (list_empty(&tmp))
  		return NOTIFY_OK;
-@@ -1780,6 +1783,7 @@ static void blk_mq_init_cpu_queues(struct request_queue *q,
+@@ -1782,6 +1785,7 @@ static void blk_mq_init_cpu_queues(struct request_queue *q,
  		memset(__ctx, 0, sizeof(*__ctx));
  		__ctx->cpu = i;
  		spin_lock_init(&__ctx->lock);
@@ -48,7 +47,7 @@ index 6d6f8feb48c0..208ac7985725 100644
  		__ctx->queue = q;
  
 diff --git a/block/blk-mq.h b/block/blk-mq.h
-index 713820b47b31..26b160598c67 100644
+index 713820b..26b1605 100644
 --- a/block/blk-mq.h
 +++ b/block/blk-mq.h
 @@ -9,6 +9,7 @@ struct blk_mq_ctx {
@@ -94,5 +93,5 @@ index 713820b47b31..26b160598c67 100644
  
  struct blk_mq_alloc_data {
 -- 
-2.10.1
+2.7.4
 

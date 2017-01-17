@@ -1,9 +1,8 @@
-From b909d37edca3d82e6d96778404ed71de916961f8 Mon Sep 17 00:00:00 2001
+From 594516602fb6285adb35f35336522beb5c339edb Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sun, 5 Jun 2016 08:16:10 +0200
-Subject: [PATCH 350/351] work-simple: Rename work-simple.[ch] to swork.[ch]
+Subject: [PATCH 350/365] work-simple: Rename work-simple.[ch] to swork.[ch]
  for consistency
-X-NVConfidentiality: public
 
 The internal bits are already swork_blah, rename source to match.
 
@@ -27,7 +26,7 @@ Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
  delete mode 100644 kernel/sched/work-simple.c
 
 diff --git a/arch/x86/kernel/cpu/mcheck/mce.c b/arch/x86/kernel/cpu/mcheck/mce.c
-index a080b4939019..430a4ec07811 100644
+index a080b49..430a4ec 100644
 --- a/arch/x86/kernel/cpu/mcheck/mce.c
 +++ b/arch/x86/kernel/cpu/mcheck/mce.c
 @@ -42,7 +42,7 @@
@@ -40,7 +39,7 @@ index a080b4939019..430a4ec07811 100644
  #include <asm/processor.h>
  #include <asm/traps.h>
 diff --git a/drivers/thermal/x86_pkg_temp_thermal.c b/drivers/thermal/x86_pkg_temp_thermal.c
-index a774f0c8d22b..e03fa17b8670 100644
+index a774f0c..e03fa17 100644
 --- a/drivers/thermal/x86_pkg_temp_thermal.c
 +++ b/drivers/thermal/x86_pkg_temp_thermal.c
 @@ -29,7 +29,7 @@
@@ -53,7 +52,7 @@ index a774f0c8d22b..e03fa17b8670 100644
  #include <asm/mce.h>
  
 diff --git a/fs/aio.c b/fs/aio.c
-index 14af01540288..dd8d6f234a0b 100644
+index a879f87..c3194af 100644
 --- a/fs/aio.c
 +++ b/fs/aio.c
 @@ -40,7 +40,7 @@
@@ -66,7 +65,7 @@ index 14af01540288..dd8d6f234a0b 100644
  #include <asm/kmap_types.h>
  #include <asm/uaccess.h>
 diff --git a/include/linux/cgroup-defs.h b/include/linux/cgroup-defs.h
-index f5993929957d..b3ba731f3343 100644
+index f599392..b3ba731 100644
 --- a/include/linux/cgroup-defs.h
 +++ b/include/linux/cgroup-defs.h
 @@ -16,7 +16,7 @@
@@ -80,7 +79,7 @@ index f5993929957d..b3ba731f3343 100644
  
 diff --git a/include/linux/swork.h b/include/linux/swork.h
 new file mode 100644
-index 000000000000..f175fa9a6016
+index 0000000..f175fa9
 --- /dev/null
 +++ b/include/linux/swork.h
 @@ -0,0 +1,24 @@
@@ -110,7 +109,7 @@ index 000000000000..f175fa9a6016
 +#endif /* _LINUX_SWORK_H */
 diff --git a/include/linux/work-simple.h b/include/linux/work-simple.h
 deleted file mode 100644
-index f175fa9a6016..000000000000
+index f175fa9..0000000
 --- a/include/linux/work-simple.h
 +++ /dev/null
 @@ -1,24 +0,0 @@
@@ -139,7 +138,7 @@ index f175fa9a6016..000000000000
 -
 -#endif /* _LINUX_SWORK_H */
 diff --git a/kernel/sched/Makefile b/kernel/sched/Makefile
-index f093796c48f4..18cc28f11af7 100644
+index f093796..18cc28f 100644
 --- a/kernel/sched/Makefile
 +++ b/kernel/sched/Makefile
 @@ -15,7 +15,7 @@ endif
@@ -153,7 +152,7 @@ index f093796c48f4..18cc28f11af7 100644
  obj-$(CONFIG_SCHEDSTATS) += stats.o
 diff --git a/kernel/sched/swork.c b/kernel/sched/swork.c
 new file mode 100644
-index 000000000000..1950f40ca725
+index 0000000..1950f40
 --- /dev/null
 +++ b/kernel/sched/swork.c
 @@ -0,0 +1,173 @@
@@ -332,7 +331,7 @@ index 000000000000..1950f40ca725
 +EXPORT_SYMBOL_GPL(swork_put);
 diff --git a/kernel/sched/work-simple.c b/kernel/sched/work-simple.c
 deleted file mode 100644
-index 9ffe40543c81..000000000000
+index 9ffe405..0000000
 --- a/kernel/sched/work-simple.c
 +++ /dev/null
 @@ -1,173 +0,0 @@
@@ -510,5 +509,5 @@ index 9ffe40543c81..000000000000
 -}
 -EXPORT_SYMBOL_GPL(swork_put);
 -- 
-2.10.1
+2.7.4
 

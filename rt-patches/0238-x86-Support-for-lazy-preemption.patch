@@ -1,8 +1,7 @@
-From cc03f5905dd0bd01ed799a77c5163f687e6d4824 Mon Sep 17 00:00:00 2001
+From 62c2f697d908a389ea7e5935555719106afdd7e5 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 1 Nov 2012 11:03:47 +0100
-Subject: [PATCH 238/351] x86: Support for lazy preemption
-X-NVConfidentiality: public
+Subject: [PATCH 238/365] x86: Support for lazy preemption
 
 Implement the x86 pieces for lazy preempt.
 
@@ -17,7 +16,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  6 files changed, 42 insertions(+), 1 deletion(-)
 
 diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index ae23556955d5..bfd831d63320 100644
+index ae23556..bfd831d 100644
 --- a/arch/x86/Kconfig
 +++ b/arch/x86/Kconfig
 @@ -17,6 +17,7 @@ config X86_64
@@ -29,7 +28,7 @@ index ae23556955d5..bfd831d63320 100644
  	select ACPI_SYSTEM_POWER_STATES_SUPPORT	if ACPI
  	select ANON_INODES
 diff --git a/arch/x86/entry/common.c b/arch/x86/entry/common.c
-index d6db3ad6c18f..0f241053e8bf 100644
+index d6db3ad..0f24105 100644
 --- a/arch/x86/entry/common.c
 +++ b/arch/x86/entry/common.c
 @@ -236,7 +236,7 @@ static void exit_to_usermode_loop(struct pt_regs *regs, u32 cached_flags)
@@ -42,7 +41,7 @@ index d6db3ad6c18f..0f241053e8bf 100644
  
  #ifdef ARCH_RT_DELAYS_SIGNAL_SEND
 diff --git a/arch/x86/entry/entry_32.S b/arch/x86/entry/entry_32.S
-index f3b6d54e0042..2d722ee01fc2 100644
+index f3b6d54..2d722ee 100644
 --- a/arch/x86/entry/entry_32.S
 +++ b/arch/x86/entry/entry_32.S
 @@ -278,8 +278,24 @@ END(ret_from_exception)
@@ -71,7 +70,7 @@ index f3b6d54e0042..2d722ee01fc2 100644
  	jz	restore_all
  	call	preempt_schedule_irq
 diff --git a/arch/x86/entry/entry_64.S b/arch/x86/entry/entry_64.S
-index 5783f8f5ef2c..316081a2ca85 100644
+index 5783f8f..316081a 100644
 --- a/arch/x86/entry/entry_64.S
 +++ b/arch/x86/entry/entry_64.S
 @@ -579,7 +579,23 @@ retint_kernel:
@@ -99,7 +98,7 @@ index 5783f8f5ef2c..316081a2ca85 100644
  	jmp	0b
  1:
 diff --git a/arch/x86/include/asm/thread_info.h b/arch/x86/include/asm/thread_info.h
-index c7b551028740..ddb63bd90e3c 100644
+index c7b5510..ddb63bd 100644
 --- a/arch/x86/include/asm/thread_info.h
 +++ b/arch/x86/include/asm/thread_info.h
 @@ -58,6 +58,8 @@ struct thread_info {
@@ -137,7 +136,7 @@ index c7b551028740..ddb63bd90e3c 100644
  
  /*
 diff --git a/arch/x86/kernel/asm-offsets.c b/arch/x86/kernel/asm-offsets.c
-index 439df975bc7a..b7954ddd6a0a 100644
+index 439df97..b7954dd 100644
 --- a/arch/x86/kernel/asm-offsets.c
 +++ b/arch/x86/kernel/asm-offsets.c
 @@ -32,6 +32,7 @@ void common(void) {
@@ -155,5 +154,5 @@ index 439df975bc7a..b7954ddd6a0a 100644
 +	DEFINE(_PREEMPT_ENABLED, PREEMPT_ENABLED);
  }
 -- 
-2.10.1
+2.7.4
 

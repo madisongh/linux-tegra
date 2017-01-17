@@ -1,9 +1,8 @@
-From 1a911482102149683a64bdbae02628cecbb3742e Mon Sep 17 00:00:00 2001
+From f2026ab95a3cee03145a08474c3feec39cbaad22 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 21 Aug 2013 17:48:46 +0200
-Subject: [PATCH 056/351] genirq: Do not invoke the affinity callback via a
+Subject: [PATCH 056/365] genirq: Do not invoke the affinity callback via a
  workqueue on RT
-X-NVConfidentiality: public
 
 Joe Korty reported, that __irq_set_affinity_locked() schedules a
 workqueue while holding a rawlock which results in a might_sleep()
@@ -18,7 +17,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  2 files changed, 77 insertions(+), 3 deletions(-)
 
 diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 48407e6d3441..248380d4ec36 100644
+index 48407e6..248380d 100644
 --- a/include/linux/interrupt.h
 +++ b/include/linux/interrupt.h
 @@ -217,6 +217,7 @@ struct irq_affinity_notify {
@@ -30,7 +29,7 @@ index 48407e6d3441..248380d4ec36 100644
  	void (*release)(struct kref *ref);
  };
 diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 8ca0dcdcc23e..8842388560a4 100644
+index 8ca0dcd..8842388 100644
 --- a/kernel/irq/manage.c
 +++ b/kernel/irq/manage.c
 @@ -183,6 +183,62 @@ static inline void
@@ -150,5 +149,5 @@ index 8ca0dcdcc23e..8842388560a4 100644
  
  	raw_spin_lock_irqsave(&desc->lock, flags);
 -- 
-2.10.1
+2.7.4
 

@@ -1,8 +1,7 @@
-From 39e7cc67efa389609de3bac4b71c83fcffd0a78e Mon Sep 17 00:00:00 2001
+From a07f9eb70da4c9c563dfd1067688571763eab842 Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <srostedt@redhat.com>
 Date: Thu, 6 Oct 2011 10:48:39 -0400
-Subject: [PATCH 194/351] net: Avoid livelock in net_tx_action() on RT
-X-NVConfidentiality: public
+Subject: [PATCH 194/365] net: Avoid livelock in net_tx_action() on RT
 
 qdisc_lock is taken w/o disabling interrupts or bottom halfs. So code
 holding a qdisc_lock() can be interrupted and softirqs can run on the
@@ -44,10 +43,10 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 31 insertions(+), 1 deletion(-)
 
 diff --git a/net/core/dev.c b/net/core/dev.c
-index 0d719e88007e..83eaec934d54 100644
+index 9b3b0aa..12b76f9 100644
 --- a/net/core/dev.c
 +++ b/net/core/dev.c
-@@ -3603,6 +3603,36 @@ int netif_rx_ni(struct sk_buff *skb)
+@@ -3604,6 +3604,36 @@ int netif_rx_ni(struct sk_buff *skb)
  }
  EXPORT_SYMBOL(netif_rx_ni);
  
@@ -84,7 +83,7 @@ index 0d719e88007e..83eaec934d54 100644
  static void net_tx_action(struct softirq_action *h)
  {
  	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
-@@ -3644,7 +3674,7 @@ static void net_tx_action(struct softirq_action *h)
+@@ -3645,7 +3675,7 @@ static void net_tx_action(struct softirq_action *h)
  			head = head->next_sched;
  
  			root_lock = qdisc_lock(q);
@@ -94,5 +93,5 @@ index 0d719e88007e..83eaec934d54 100644
  				clear_bit(__QDISC_STATE_SCHED,
  					  &q->state);
 -- 
-2.10.1
+2.7.4
 

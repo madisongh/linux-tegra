@@ -1,9 +1,8 @@
-From 5973af9dc12cb0ebc986b857be811ca441607a78 Mon Sep 17 00:00:00 2001
+From cbfc0ce6323ba1038111ffcabc1b9d9a5aba96f6 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 21 Jul 2011 15:23:39 +0200
-Subject: [PATCH 080/351] timers: Avoid the switch timers base set to NULL
+Subject: [PATCH 080/365] timers: Avoid the switch timers base set to NULL
  trick on RT
-X-NVConfidentiality: public
 
 On RT that code is preemptible, so we cannot assign NULL to timers
 base as a preempter would spin forever in lock_timer_base().
@@ -14,7 +13,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 35 insertions(+), 10 deletions(-)
 
 diff --git a/kernel/time/timer.c b/kernel/time/timer.c
-index f1a3c4a095ef..161fd57c1426 100644
+index f1a3c4a..161fd57 100644
 --- a/kernel/time/timer.c
 +++ b/kernel/time/timer.c
 @@ -780,6 +780,39 @@ static struct tvec_base *lock_timer_base(struct timer_list *timer,
@@ -77,5 +76,5 @@ index f1a3c4a095ef..161fd57c1426 100644
  
  	timer->expires = expires;
 -- 
-2.10.1
+2.7.4
 

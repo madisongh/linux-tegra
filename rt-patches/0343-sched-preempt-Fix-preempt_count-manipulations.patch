@@ -1,8 +1,7 @@
-From 299d843ef3d6b6de79a9a08b649be0700c61a566 Mon Sep 17 00:00:00 2001
+From d0b12642d9f4092f70aa451716f110022c51cf76 Mon Sep 17 00:00:00 2001
 From: Peter Zijlstra <peterz@infradead.org>
 Date: Mon, 16 May 2016 15:01:11 +0200
-Subject: [PATCH 343/351] sched,preempt: Fix preempt_count manipulations
-X-NVConfidentiality: public
+Subject: [PATCH 343/365] sched,preempt: Fix preempt_count manipulations
 
 Vikram reported that his ARM64 compiler managed to 'optimize' away the
 preempt_count manipulations in code like:
@@ -37,7 +36,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/include/asm-generic/preempt.h b/include/asm-generic/preempt.h
-index 5d8ffa3e6f8c..c1cde3577551 100644
+index 5d8ffa3..c1cde35 100644
 --- a/include/asm-generic/preempt.h
 +++ b/include/asm-generic/preempt.h
 @@ -7,10 +7,10 @@
@@ -54,5 +53,5 @@ index 5d8ffa3e6f8c..c1cde3577551 100644
  	return &current_thread_info()->preempt_count;
  }
 -- 
-2.10.1
+2.7.4
 

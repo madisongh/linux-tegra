@@ -1,8 +1,7 @@
-From 4768135ef96a530d76faa2ed54b581a9fd75b465 Mon Sep 17 00:00:00 2001
+From e52e09be77de68a0380f9aabb8f0c40fa20c4ded Mon Sep 17 00:00:00 2001
 From: Ingo Molnar <mingo@elte.hu>
 Date: Fri, 3 Jul 2009 08:29:58 -0500
-Subject: [PATCH 034/351] bug: BUG_ON/WARN_ON variants dependend on RT/!RT
-X-NVConfidentiality: public
+Subject: [PATCH 034/365] bug: BUG_ON/WARN_ON variants dependend on RT/!RT
 
 Introduce RT/NON-RT WARN/BUG statements to avoid ifdefs in the code.
 
@@ -13,7 +12,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 14 insertions(+)
 
 diff --git a/include/asm-generic/bug.h b/include/asm-generic/bug.h
-index 630dd2372238..850e4d993a88 100644
+index 630dd23..850e4d9 100644
 --- a/include/asm-generic/bug.h
 +++ b/include/asm-generic/bug.h
 @@ -206,6 +206,20 @@ extern void warn_slowpath_null(const char *file, const int line);
@@ -38,5 +37,5 @@ index 630dd2372238..850e4d993a88 100644
  
  #endif
 -- 
-2.10.1
+2.7.4
 

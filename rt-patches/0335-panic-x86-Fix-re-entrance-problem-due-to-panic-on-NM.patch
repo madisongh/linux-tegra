@@ -1,9 +1,8 @@
-From b16992a27335617eb67b4702e7ba5edc2b3db369 Mon Sep 17 00:00:00 2001
+From b895f372d8c2c744b8fbd8a6d973e98c09da0ef3 Mon Sep 17 00:00:00 2001
 From: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
 Date: Mon, 14 Dec 2015 11:19:09 +0100
-Subject: [PATCH 335/351] panic, x86: Fix re-entrance problem due to panic on
+Subject: [PATCH 335/365] panic, x86: Fix re-entrance problem due to panic on
  NMI
-X-NVConfidentiality: public
 
 If panic on NMI happens just after panic() on the same CPU, panic() is
 recursively called. Kernel stalls, as a result, after failing to acquire
@@ -62,7 +61,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  4 files changed, 46 insertions(+), 8 deletions(-)
 
 diff --git a/arch/x86/kernel/nmi.c b/arch/x86/kernel/nmi.c
-index 697f90db0e37..fca87938d739 100644
+index 697f90d..fca8793 100644
 --- a/arch/x86/kernel/nmi.c
 +++ b/arch/x86/kernel/nmi.c
 @@ -231,7 +231,7 @@ pci_serr_error(unsigned char reason, struct pt_regs *regs)
@@ -103,10 +102,10 @@ index 697f90db0e37..fca87938d739 100644
  	pr_emerg("Dazed and confused, but trying to continue\n");
  }
 diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-index 3e768ec1c3ad..a814bc014a2b 100644
+index bebc293..5252478 100644
 --- a/include/linux/kernel.h
 +++ b/include/linux/kernel.h
-@@ -450,6 +450,26 @@ extern int sysctl_panic_on_stackoverflow;
+@@ -452,6 +452,26 @@ extern int sysctl_panic_on_stackoverflow;
  extern bool crash_kexec_post_notifiers;
  
  /*
@@ -134,7 +133,7 @@ index 3e768ec1c3ad..a814bc014a2b 100644
   * CONFIG_PANIC_TIMEOUT, honor it.
   */
 diff --git a/kernel/panic.c b/kernel/panic.c
-index f9badcf39d04..71498388d039 100644
+index f9badcf..7149838 100644
 --- a/kernel/panic.c
 +++ b/kernel/panic.c
 @@ -64,6 +64,8 @@ void __weak panic_smp_self_stop(void)
@@ -185,7 +184,7 @@ index f9badcf39d04..71498388d039 100644
  
  	console_verbose();
 diff --git a/kernel/watchdog.c b/kernel/watchdog.c
-index 88b20a01af23..63073a177b14 100644
+index 88b20a0..63073a1 100644
 --- a/kernel/watchdog.c
 +++ b/kernel/watchdog.c
 @@ -436,7 +436,7 @@ static void watchdog_overflow_callback(struct perf_event *event,
@@ -198,5 +197,5 @@ index 88b20a01af23..63073a177b14 100644
  		__this_cpu_write(hard_watchdog_warn, true);
  		return;
 -- 
-2.10.1
+2.7.4
 

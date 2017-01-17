@@ -1,12 +1,11 @@
-From c28c9e62e0823fffe59e376bb7394cc8436ca3e6 Mon Sep 17 00:00:00 2001
+From 1390b7a7ced55cc71f45e2e811fd3097a50bd4f2 Mon Sep 17 00:00:00 2001
 From: Benedikt Spranger <b.spranger@linutronix.de>
 Date: Sat, 6 Mar 2010 17:47:10 +0100
-Subject: [PATCH 015/351] ARM: AT91: PIT: Remove irq handler when clock event
+Subject: [PATCH 015/365] ARM: AT91: PIT: Remove irq handler when clock event
  is unused
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
-X-NVConfidentiality: public
 
 Setup and remove the interrupt handler in clock event mode selection.
 This avoids calling the (shared) interrupt handler when the device is
@@ -24,7 +23,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  2 files changed, 28 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
-index d911c5dca8f1..80d74c4adcbe 100644
+index d911c5d..80d74c4 100644
 --- a/drivers/clocksource/timer-atmel-pit.c
 +++ b/drivers/clocksource/timer-atmel-pit.c
 @@ -96,6 +96,7 @@ static int pit_clkevt_shutdown(struct clock_event_device *dev)
@@ -64,7 +63,7 @@ index d911c5dca8f1..80d74c4adcbe 100644
  	data->clkevt.name = "pit";
  	data->clkevt.features = CLOCK_EVT_FEAT_PERIODIC;
 diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
-index 29d21d68df5a..ea37afc26e1b 100644
+index 29d21d6..ea37afc 100644
 --- a/drivers/clocksource/timer-atmel-st.c
 +++ b/drivers/clocksource/timer-atmel-st.c
 @@ -115,18 +115,29 @@ static void clkdev32k_disable_and_flush_irq(void)
@@ -138,5 +137,5 @@ index 29d21d68df5a..ea37afc26e1b 100644
  	if (IS_ERR(sclk))
  		panic(pr_fmt("Unable to get slow clock\n"));
 -- 
-2.10.1
+2.7.4
 

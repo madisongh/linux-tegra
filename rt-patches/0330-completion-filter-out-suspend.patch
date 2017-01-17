@@ -1,8 +1,7 @@
-From 0866cb26c5ece9bd97493ff9e6c965d23c116ee7 Mon Sep 17 00:00:00 2001
+From 1b88df6066276e31ba54ecb555cb4642bf8dba6c Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 1 Apr 2016 11:47:54 +0200
-Subject: [PATCH 330/351] completion: filter out suspend
-X-NVConfidentiality: public
+Subject: [PATCH 330/365] completion: filter out suspend
 
 Clark Williams that he saw a few backtraces while comming out of
 suspend. So for now we filter suspends out.
@@ -16,7 +15,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  4 files changed, 22 insertions(+), 1 deletion(-)
 
 diff --git a/include/linux/suspend.h b/include/linux/suspend.h
-index c59803dc68de..56b6945dde7f 100644
+index c59803d..56b6945 100644
 --- a/include/linux/suspend.h
 +++ b/include/linux/suspend.h
 @@ -194,6 +194,12 @@ struct platform_freeze_ops {
@@ -33,7 +32,7 @@ index c59803dc68de..56b6945dde7f 100644
  /**
   * suspend_set_ops - set platform dependent suspend operations
 diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-index 9bc40c18ebc8..908ee58cc11c 100644
+index 6207810..c1b9815 100644
 --- a/kernel/power/hibernate.c
 +++ b/kernel/power/hibernate.c
 @@ -649,6 +649,10 @@ static void power_down(void)
@@ -65,18 +64,18 @@ index 9bc40c18ebc8..908ee58cc11c 100644
  }
  
 diff --git a/kernel/power/suspend.c b/kernel/power/suspend.c
-index 9660d38885c8..c1b5249506b8 100644
+index 9660d38..5e5d61d 100644
 --- a/kernel/power/suspend.c
 +++ b/kernel/power/suspend.c
-@@ -551,6 +551,8 @@ static void pm_suspend_marker(char *annotation)
- 		tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
+@@ -539,6 +539,8 @@ static int enter_state(suspend_state_t state)
+ 	return error;
  }
  
 +bool pm_in_action;
 +
- /**
-  * pm_suspend - Externally visible function for suspending the system.
-  * @state: System sleep state to enter.
+ static void pm_suspend_marker(char *annotation)
+ {
+ 	struct timespec ts;
 @@ -565,6 +567,8 @@ int pm_suspend(suspend_state_t state)
  	if (state <= PM_SUSPEND_ON || state >= PM_SUSPEND_MAX)
  		return -EINVAL;
@@ -95,7 +94,7 @@ index 9660d38885c8..c1b5249506b8 100644
  	return error;
  }
 diff --git a/kernel/sched/swait.c b/kernel/sched/swait.c
-index 8459561f0379..205fe36868f9 100644
+index 8459561..205fe36 100644
 --- a/kernel/sched/swait.c
 +++ b/kernel/sched/swait.c
 @@ -1,5 +1,6 @@
@@ -117,5 +116,5 @@ index 8459561f0379..205fe36868f9 100644
  EXPORT_SYMBOL(swake_up_all_locked);
  
 -- 
-2.10.1
+2.7.4
 

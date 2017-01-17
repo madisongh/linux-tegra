@@ -1,8 +1,7 @@
-From a74a1f2fa4635518034dd7b5862b6ca18e99bf20 Mon Sep 17 00:00:00 2001
+From f86ccaf5b8989f33e46a7326f9bd8423f2102c28 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 16 Sep 2015 23:47:39 +0200
-Subject: [PATCH 311/351] clk: at91: remove IRQ handling and use polling
-X-NVConfidentiality: public
+Subject: [PATCH 311/365] clk: at91: remove IRQ handling and use polling
 
 The AT91 clock drivers make use of IRQs to avoid polling when waiting for
 some clocks to be enabled. Unfortunately, this leads to a crash when those
@@ -25,7 +24,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  7 files changed, 37 insertions(+), 446 deletions(-)
 
 diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
-index c1f119748bdc..4bfc94d6c26e 100644
+index c1f1197..4bfc94d 100644
 --- a/drivers/clk/at91/clk-main.c
 +++ b/drivers/clk/at91/clk-main.c
 @@ -13,15 +13,8 @@
@@ -365,7 +364,7 @@ index c1f119748bdc..4bfc94d6c26e 100644
  	if (IS_ERR(clk))
  		return;
 diff --git a/drivers/clk/at91/clk-master.c b/drivers/clk/at91/clk-master.c
-index 8d94ddfc9c72..7d4a1864ea7c 100644
+index 8d94ddfc..7d4a186 100644
 --- a/drivers/clk/at91/clk-master.c
 +++ b/drivers/clk/at91/clk-master.c
 @@ -12,13 +12,6 @@
@@ -476,7 +475,7 @@ index 8d94ddfc9c72..7d4a1864ea7c 100644
  				       characteristics);
  	if (IS_ERR(clk))
 diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-index 5f4c6ce628e0..fb2e0b56d4b7 100644
+index 5f4c6ce..fb2e0b5 100644
 --- a/drivers/clk/at91/clk-pll.c
 +++ b/drivers/clk/at91/clk-pll.c
 @@ -12,14 +12,6 @@
@@ -596,7 +595,7 @@ index 5f4c6ce628e0..fb2e0b56d4b7 100644
  	if (IS_ERR(clk))
  		goto out_free_characteristics;
 diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
-index 0593adf1bf4b..8f35d8172909 100644
+index 0593adf..8f35d81 100644
 --- a/drivers/clk/at91/clk-system.c
 +++ b/drivers/clk/at91/clk-system.c
 @@ -12,13 +12,6 @@
@@ -721,7 +720,7 @@ index 0593adf1bf4b..8f35d8172909 100644
  			continue;
  
 diff --git a/drivers/clk/at91/clk-utmi.c b/drivers/clk/at91/clk-utmi.c
-index 58a310e5768c..61fcf399e58c 100644
+index 58a310e..61fcf39 100644
 --- a/drivers/clk/at91/clk-utmi.c
 +++ b/drivers/clk/at91/clk-utmi.c
 @@ -11,14 +11,7 @@
@@ -836,7 +835,7 @@ index 58a310e5768c..61fcf399e58c 100644
  		return;
  
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 295b17b9c689..f17a2a1f1e85 100644
+index 295b17b..f17a2a1 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
 @@ -13,12 +13,6 @@
@@ -1033,7 +1032,7 @@ index 295b17b9c689..f17a2a1f1e85 100644
  		return;
  }
 diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index e160cb640e4a..b06a332b056a 100644
+index e160cb6..b06a332 100644
 --- a/drivers/clk/at91/pmc.h
 +++ b/drivers/clk/at91/pmc.h
 @@ -32,10 +32,7 @@ struct at91_pmc_caps {
@@ -1048,5 +1047,5 @@ index e160cb640e4a..b06a332b056a 100644
  
  int of_at91_get_clk_range(struct device_node *np, const char *propname,
 -- 
-2.10.1
+2.7.4
 

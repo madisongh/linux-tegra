@@ -1,8 +1,7 @@
-From d833ba96df037e5de11cbd839271ded005ed1661 Mon Sep 17 00:00:00 2001
+From 8877575de65d6ce7963024d8c21c4f4c764c464d Mon Sep 17 00:00:00 2001
 From: Clark Williams <williams@redhat.com>
 Date: Sat, 30 Jul 2011 21:55:53 -0500
-Subject: [PATCH 197/351] sysfs: Add /sys/kernel/realtime entry
-X-NVConfidentiality: public
+Subject: [PATCH 197/365] sysfs: Add /sys/kernel/realtime entry
 
 Add a /sys/kernel entry to indicate that the kernel is a
 realtime kernel.
@@ -20,7 +19,7 @@ Signed-off-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
  1 file changed, 12 insertions(+)
 
 diff --git a/kernel/ksysfs.c b/kernel/ksysfs.c
-index e83b26464061..c0e08d1cf33e 100644
+index e83b264..c0e08d1 100644
 --- a/kernel/ksysfs.c
 +++ b/kernel/ksysfs.c
 @@ -136,6 +136,15 @@ KERNEL_ATTR_RO(vmcoreinfo);
@@ -50,5 +49,5 @@ index e83b26464061..c0e08d1cf33e 100644
  };
  
 -- 
-2.10.1
+2.7.4
 

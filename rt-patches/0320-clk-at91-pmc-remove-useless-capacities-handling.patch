@@ -1,8 +1,7 @@
-From c57648b5c3e049b5ed72fca58bc7f9d6d0aa9966 Mon Sep 17 00:00:00 2001
+From 1bd368c5bb7fc6d068153d12742c180ac36b25eb Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 27 Jan 2016 15:05:55 +0100
-Subject: [PATCH 320/351] clk: at91: pmc: remove useless capacities handling
-X-NVConfidentiality: public
+Subject: [PATCH 320/365] clk: at91: pmc: remove useless capacities handling
 
 Capacities only handles interrupts and they are not use anymore. Remove the
 whole initialisation.
@@ -15,7 +14,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 128 deletions(-)
 
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index dce285549de2..526df5ba042d 100644
+index dce2855..526df5b 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
 @@ -19,15 +19,6 @@
@@ -158,5 +157,5 @@ index dce285549de2..526df5ba042d 100644
 -CLK_OF_DECLARE(sama5d3_clk_pmc, "atmel,sama5d3-pmc",
 -	       of_sama5d3_pmc_setup);
 -- 
-2.10.1
+2.7.4
 

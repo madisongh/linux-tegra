@@ -1,8 +1,7 @@
-From 21e7ea897beb4f6ee23ff72e567e077b49e5b800 Mon Sep 17 00:00:00 2001
+From 580a65262b2dcbd3389f7ce88bc8d5ef6256e93a Mon Sep 17 00:00:00 2001
 From: John Stultz <johnstul@us.ibm.com>
 Date: Fri, 3 Jul 2009 08:29:58 -0500
-Subject: [PATCH 087/351] posix-timers: Thread posix-cpu-timers on -rt
-X-NVConfidentiality: public
+Subject: [PATCH 087/365] posix-timers: Thread posix-cpu-timers on -rt
 
 posix-cpu-timer code takes non -rt safe locks in hard irq
 context. Move it to a thread.
@@ -19,7 +18,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  4 files changed, 202 insertions(+), 4 deletions(-)
 
 diff --git a/include/linux/init_task.h b/include/linux/init_task.h
-index 6b42f297c53e..d8ec0f202eee 100644
+index 6b42f297..d8ec0f2 100644
 --- a/include/linux/init_task.h
 +++ b/include/linux/init_task.h
 @@ -148,6 +148,12 @@ extern struct task_group root_task_group;
@@ -44,7 +43,7 @@ index 6b42f297c53e..d8ec0f202eee 100644
  		[PIDTYPE_PID]  = INIT_PID_LINK(PIDTYPE_PID),		\
  		[PIDTYPE_PGID] = INIT_PID_LINK(PIDTYPE_PGID),		\
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index a1126904ca36..4228b4280850 100644
+index a112690..4228b42 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1556,6 +1556,9 @@ struct task_struct {
@@ -58,10 +57,10 @@ index a1126904ca36..4228b4280850 100644
  /* process credentials */
  	const struct cred __rcu *real_cred; /* objective and real subjective task
 diff --git a/kernel/fork.c b/kernel/fork.c
-index 004719da039d..b728f09a240d 100644
+index 71ea3df..06523cd 100644
 --- a/kernel/fork.c
 +++ b/kernel/fork.c
-@@ -1219,6 +1219,9 @@ static void rt_mutex_init_task(struct task_struct *p)
+@@ -1240,6 +1240,9 @@ static void rt_mutex_init_task(struct task_struct *p)
   */
  static void posix_cpu_timers_init(struct task_struct *tsk)
  {
@@ -72,7 +71,7 @@ index 004719da039d..b728f09a240d 100644
  	tsk->cputime_expires.virt_exp = 0;
  	tsk->cputime_expires.sched_exp = 0;
 diff --git a/kernel/time/posix-cpu-timers.c b/kernel/time/posix-cpu-timers.c
-index f5e86d282d52..bf28ef601e0e 100644
+index 80016b3..b7342b6 100644
 --- a/kernel/time/posix-cpu-timers.c
 +++ b/kernel/time/posix-cpu-timers.c
 @@ -3,6 +3,7 @@
@@ -92,7 +91,7 @@ index f5e86d282d52..bf28ef601e0e 100644
  
  	ret = 0;
  	old_incr = timer->it.cpu.incr;
-@@ -1091,7 +1092,7 @@ void posix_cpu_timer_schedule(struct k_itimer *timer)
+@@ -1092,7 +1093,7 @@ void posix_cpu_timer_schedule(struct k_itimer *timer)
  	/*
  	 * Now re-arm for the new expiry time.
  	 */
@@ -101,7 +100,7 @@ index f5e86d282d52..bf28ef601e0e 100644
  	arm_timer(timer);
  	unlock_task_sighand(p, &flags);
  
-@@ -1182,13 +1183,13 @@ static inline int fastpath_timer_check(struct task_struct *tsk)
+@@ -1183,13 +1184,13 @@ static inline int fastpath_timer_check(struct task_struct *tsk)
   * already updated our counts.  We need to check if any timers fire now.
   * Interrupts are disabled.
   */
@@ -117,7 +116,7 @@ index f5e86d282d52..bf28ef601e0e 100644
  
  	/*
  	 * The fast path checks that there are no expired thread or thread
-@@ -1242,6 +1243,190 @@ void run_posix_cpu_timers(struct task_struct *tsk)
+@@ -1243,6 +1244,190 @@ void run_posix_cpu_timers(struct task_struct *tsk)
  	}
  }
  
@@ -309,5 +308,5 @@ index f5e86d282d52..bf28ef601e0e 100644
   * Set one of the process-wide special case CPU timers or RLIMIT_CPU.
   * The tsk->sighand->siglock must be held by the caller.
 -- 
-2.10.1
+2.7.4
 

@@ -1,9 +1,8 @@
-From ad1d7a51f553aea5b9a16366bea190cac0f67023 Mon Sep 17 00:00:00 2001
+From 21b964cd0686022d3c1d3607ed952bd9b7fe3cd8 Mon Sep 17 00:00:00 2001
 From: Yong Zhang <yong.zhang@windriver.com>
 Date: Mon, 16 Apr 2012 15:01:56 +0800
-Subject: [PATCH 231/351] lockdep: selftest: Only do hardirq context test for
+Subject: [PATCH 231/365] lockdep: selftest: Only do hardirq context test for
  raw spinlock
-X-NVConfidentiality: public
 
 On -rt there is no softirq context any more and rwlock is sleepable,
 disable softirq context test and rwlock+irq test.
@@ -17,7 +16,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 23 insertions(+)
 
 diff --git a/lib/locking-selftest.c b/lib/locking-selftest.c
-index 872a15a2a637..19ae2366a7a9 100644
+index 872a15a..19ae236 100644
 --- a/lib/locking-selftest.c
 +++ b/lib/locking-selftest.c
 @@ -1858,6 +1858,7 @@ void locking_selftest(void)
@@ -58,5 +57,5 @@ index 872a15a2a637..19ae2366a7a9 100644
  	ww_tests();
  
 -- 
-2.10.1
+2.7.4
 

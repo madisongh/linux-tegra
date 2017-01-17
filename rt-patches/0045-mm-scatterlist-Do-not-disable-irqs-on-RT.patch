@@ -1,8 +1,7 @@
-From fc9eb3e0642f821ba4165e028006603882c7c11a Mon Sep 17 00:00:00 2001
+From c869201a074134780c5ebd12f6b23f1cf2959ece Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 3 Jul 2009 08:44:34 -0500
-Subject: [PATCH 045/351] mm/scatterlist: Do not disable irqs on RT
-X-NVConfidentiality: public
+Subject: [PATCH 045/365] mm/scatterlist: Do not disable irqs on RT
 
 The local_irq_save() is not only used to get things done "fast" but
 also to ensure that in case of SG_MITER_ATOMIC we are in "atomic"
@@ -15,7 +14,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/lib/scatterlist.c b/lib/scatterlist.c
-index bafa9933fa76..ebe3b7edd086 100644
+index bafa993..ebe3b7e 100644
 --- a/lib/scatterlist.c
 +++ b/lib/scatterlist.c
 @@ -620,7 +620,7 @@ void sg_miter_stop(struct sg_mapping_iter *miter)
@@ -46,5 +45,5 @@ index bafa9933fa76..ebe3b7edd086 100644
  }
  EXPORT_SYMBOL(sg_copy_buffer);
 -- 
-2.10.1
+2.7.4
 

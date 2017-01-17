@@ -1,9 +1,8 @@
-From eea459344195ce3038bc0050412d7b93138f0270 Mon Sep 17 00:00:00 2001
+From 5835bdc09769f3773aff8b75a827319123f66717 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 1 Mar 2013 11:17:42 +0100
-Subject: [PATCH 117/351] futex: Ensure lock/unlock symetry versus pi_lock and
+Subject: [PATCH 117/365] futex: Ensure lock/unlock symetry versus pi_lock and
  hash bucket lock
-X-NVConfidentiality: public
 
 In exit_pi_state_list() we have the following locking construct:
 
@@ -32,7 +31,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 2 insertions(+)
 
 diff --git a/kernel/futex.c b/kernel/futex.c
-index 33ddc995c9e7..1ec060b5c6af 100644
+index 33ddc99..1ec060b 100644
 --- a/kernel/futex.c
 +++ b/kernel/futex.c
 @@ -815,7 +815,9 @@ void exit_pi_state_list(struct task_struct *curr)
@@ -46,5 +45,5 @@ index 33ddc995c9e7..1ec060b5c6af 100644
  		}
  
 -- 
-2.10.1
+2.7.4
 

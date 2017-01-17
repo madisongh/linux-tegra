@@ -1,8 +1,7 @@
-From e48900997ebc069410ded69045bfae8764756ac3 Mon Sep 17 00:00:00 2001
+From 4e15ea76a755de2c233b4c5d5d259cd21384152b Mon Sep 17 00:00:00 2001
 From: Ingo Molnar <mingo@elte.hu>
 Date: Fri, 3 Jul 2009 08:29:24 -0500
-Subject: [PATCH 017/351] drivers/net: Use disable_irq_nosync() in 8139too
-X-NVConfidentiality: public
+Subject: [PATCH 017/365] drivers/net: Use disable_irq_nosync() in 8139too
 
 Use disable_irq_nosync() instead of disable_irq() as this might be
 called in atomic context with netpoll.
@@ -14,7 +13,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/realtek/8139too.c b/drivers/net/ethernet/realtek/8139too.c
-index ef668d300800..d987d571fdd6 100644
+index ef668d3..d987d57 100644
 --- a/drivers/net/ethernet/realtek/8139too.c
 +++ b/drivers/net/ethernet/realtek/8139too.c
 @@ -2229,7 +2229,7 @@ static void rtl8139_poll_controller(struct net_device *dev)
@@ -27,5 +26,5 @@ index ef668d300800..d987d571fdd6 100644
  	enable_irq(irq);
  }
 -- 
-2.10.1
+2.7.4
 

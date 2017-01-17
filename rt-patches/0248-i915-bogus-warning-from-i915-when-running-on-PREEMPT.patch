@@ -1,9 +1,8 @@
-From e43a05d43564db9e0b33d72c8b3f131eb3b1a895 Mon Sep 17 00:00:00 2001
+From 48f7756b62bb8fa6d047e14d29eb2a234a1ef47c Mon Sep 17 00:00:00 2001
 From: Clark Williams <williams@redhat.com>
 Date: Tue, 26 May 2015 10:43:43 -0500
-Subject: [PATCH 248/351] i915: bogus warning from i915 when running on
+Subject: [PATCH 248/365] i915: bogus warning from i915 when running on
  PREEMPT_RT
-X-NVConfidentiality: public
 
 The i915 driver has a 'WARN_ON(!in_interrupt())' in the display
 handler, which whines constanly on the RT kernel (since the interrupt
@@ -20,7 +19,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/i915/intel_display.c b/drivers/gpu/drm/i915/intel_display.c
-index 175595fc3e45..d2439b8ea774 100644
+index 175595f..d2439b8e 100644
 --- a/drivers/gpu/drm/i915/intel_display.c
 +++ b/drivers/gpu/drm/i915/intel_display.c
 @@ -11613,7 +11613,7 @@ void intel_check_page_flip(struct drm_i915_private *dev_priv, int pipe)
@@ -33,5 +32,5 @@ index 175595fc3e45..d2439b8ea774 100644
  	if (crtc == NULL)
  		return;
 -- 
-2.10.1
+2.7.4
 

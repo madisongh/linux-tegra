@@ -1,8 +1,7 @@
-From 3c6c74e7fb2750c30a9741f4203a14927c31cba7 Mon Sep 17 00:00:00 2001
+From 0188b34b01a3c1a5de02d6bd013c09a6e1c5c231 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 27 Jun 2014 16:24:52 +0200
-Subject: [PATCH 253/351] workqueue: Prevent deadlock/stall on RT
-X-NVConfidentiality: public
+Subject: [PATCH 253/365] workqueue: Prevent deadlock/stall on RT
 
 Austin reported a XFS deadlock/stall on RT where scheduled work gets
 never exececuted and tasks are waiting for each other for ever.
@@ -43,10 +42,10 @@ Cc: Steven Rostedt <rostedt@goodmis.org>
  2 files changed, 53 insertions(+), 15 deletions(-)
 
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 5a020175587e..57fb87e74771 100644
+index c9792d8..672dab3 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -3451,9 +3451,8 @@ static void __sched notrace __schedule(bool preempt)
+@@ -3476,9 +3476,8 @@ static void __sched notrace __schedule(bool preempt)
  
  static inline void sched_submit_work(struct task_struct *tsk)
  {
@@ -57,7 +56,7 @@ index 5a020175587e..57fb87e74771 100644
  	/*
  	 * If a worker went to sleep, notify and ask workqueue whether
  	 * it wants to wake up a task to maintain concurrency.
-@@ -3461,6 +3460,10 @@ static inline void sched_submit_work(struct task_struct *tsk)
+@@ -3486,6 +3485,10 @@ static inline void sched_submit_work(struct task_struct *tsk)
  	if (tsk->flags & PF_WQ_WORKER)
  		wq_worker_sleeping(tsk);
  
@@ -69,7 +68,7 @@ index 5a020175587e..57fb87e74771 100644
  	 * If we are going to sleep and we have plugged IO queued,
  	 * make sure to submit it to avoid deadlocks.
 diff --git a/kernel/workqueue.c b/kernel/workqueue.c
-index 6065a6dee963..b328c0d5050e 100644
+index 71f6fe8..60c2cee 100644
 --- a/kernel/workqueue.c
 +++ b/kernel/workqueue.c
 @@ -123,6 +123,11 @@ enum {
@@ -204,5 +203,5 @@ index 6065a6dee963..b328c0d5050e 100644
  	wake_up_process(worker->task);
  }
 -- 
-2.10.1
+2.7.4
 

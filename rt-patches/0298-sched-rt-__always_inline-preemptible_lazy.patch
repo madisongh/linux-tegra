@@ -1,8 +1,7 @@
-From 74f577560ab36861a1c55f11afbf47450a6b68f0 Mon Sep 17 00:00:00 2001
+From 42cc0531750670a2f96d72f6a28e9b74ffa168e4 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sun, 21 Feb 2016 16:11:30 +0100
-Subject: [PATCH 298/351] sched,rt: __always_inline preemptible_lazy()
-X-NVConfidentiality: public
+Subject: [PATCH 298/365] sched,rt: __always_inline preemptible_lazy()
 
 homer: # nm kernel/sched/core.o|grep preemptible_lazy
 00000000000000b5 t preemptible_lazy
@@ -20,10 +19,10 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index bcf3b79057c0..6d852e7f16ff 100644
+index 0962338..a28c11c 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -3481,7 +3481,7 @@ static void __sched notrace preempt_schedule_common(void)
+@@ -3506,7 +3506,7 @@ static void __sched notrace preempt_schedule_common(void)
   * set by a RT task. Oterwise we try to avoid beeing scheduled out as long as
   * preempt_lazy_count counter >0.
   */
@@ -33,5 +32,5 @@ index bcf3b79057c0..6d852e7f16ff 100644
  	if (test_thread_flag(TIF_NEED_RESCHED))
  		return 1;
 -- 
-2.10.1
+2.7.4
 

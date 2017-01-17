@@ -1,9 +1,8 @@
-From 0e58421ef62b2b7281a21e67f2138ea99ad2395c Mon Sep 17 00:00:00 2001
+From e875cc5dbe87733ff12641735669ccb114d7bdbd Mon Sep 17 00:00:00 2001
 From: Rik van Riel <riel@redhat.com>
 Date: Mon, 21 Mar 2016 15:13:27 +0100
-Subject: [PATCH 327/351] kvm, rt: change async pagefault code locking for
+Subject: [PATCH 327/365] kvm, rt: change async pagefault code locking for
  PREEMPT_RT
-X-NVConfidentiality: public
 
 The async pagefault wake code can run from the idle task in exception
 context, so everything here needs to be made non-preemptible.
@@ -18,7 +17,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 19 insertions(+), 18 deletions(-)
 
 diff --git a/arch/x86/kernel/kvm.c b/arch/x86/kernel/kvm.c
-index 47190bd399e7..807950860fb7 100644
+index 47190bd..8079508 100644
 --- a/arch/x86/kernel/kvm.c
 +++ b/arch/x86/kernel/kvm.c
 @@ -36,6 +36,7 @@
@@ -161,5 +160,5 @@ index 47190bd399e7..807950860fb7 100644
  		x86_init.irqs.trap_init = kvm_apf_trap_init;
  
 -- 
-2.10.1
+2.7.4
 

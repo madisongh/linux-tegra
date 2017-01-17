@@ -1,8 +1,7 @@
-From 87914d90fa5ced7da9365aa6f48754f69a7a0579 Mon Sep 17 00:00:00 2001
+From a3837d7703040f5ccfb2081a0bba4ebc104695e5 Mon Sep 17 00:00:00 2001
 From: Yang Shi <yang.shi@linaro.org>
 Date: Thu, 3 Mar 2016 01:08:57 -0800
-Subject: [PATCH 326/351] tracing, writeback: Replace cgroup path to cgroup ino
-X-NVConfidentiality: public
+Subject: [PATCH 326/365] tracing, writeback: Replace cgroup path to cgroup ino
 
 commit 5634cc2aa9aebc77bc862992e7805469dcf83dac ("writeback: update writeback
 tracepoints to report cgroup") made writeback tracepoints print out cgroup
@@ -52,7 +51,7 @@ Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
  1 file changed, 45 insertions(+), 76 deletions(-)
 
 diff --git a/include/trace/events/writeback.h b/include/trace/events/writeback.h
-index fff846b512e6..73614ce1d204 100644
+index fff846b..73614ce 100644
 --- a/include/trace/events/writeback.h
 +++ b/include/trace/events/writeback.h
 @@ -134,58 +134,28 @@ DEFINE_EVENT(writeback_dirty_inode_template, writeback_dirty_inode,
@@ -395,5 +394,5 @@ index fff846b512e6..73614ce1d204 100644
  );
  
 -- 
-2.10.1
+2.7.4
 

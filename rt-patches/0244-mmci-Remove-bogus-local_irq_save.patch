@@ -1,8 +1,7 @@
-From 4f7dba4e255c5867d036d21b2939666537d039b4 Mon Sep 17 00:00:00 2001
+From 7c5dbf8cb6b79c83127ee3d3b02c33dc3affb051 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 9 Jan 2013 12:11:12 +0100
-Subject: [PATCH 244/351] mmci: Remove bogus local_irq_save()
-X-NVConfidentiality: public
+Subject: [PATCH 244/365] mmci: Remove bogus local_irq_save()
 
 On !RT interrupt runs with interrupts disabled. On RT it's in a
 thread, so no need to disable interrupts at all.
@@ -13,7 +12,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 5 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index acece3299756..58ea04a03fa9 100644
+index acece32..58ea04a 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
 @@ -1155,15 +1155,12 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id)
@@ -42,5 +41,5 @@ index acece3299756..58ea04a03fa9 100644
  	 * If we have less than the fifo 'half-full' threshold to transfer,
  	 * trigger a PIO interrupt as soon as any data is available.
 -- 
-2.10.1
+2.7.4
 

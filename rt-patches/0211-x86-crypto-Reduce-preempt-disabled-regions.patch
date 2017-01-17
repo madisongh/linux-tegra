@@ -1,8 +1,7 @@
-From 0d8496b5d00c7f9047c1b815c3a900d652dcf714 Mon Sep 17 00:00:00 2001
+From 8ce737eec87034cb860e8e270a3386991c4f6b88 Mon Sep 17 00:00:00 2001
 From: Peter Zijlstra <peterz@infradead.org>
 Date: Mon, 14 Nov 2011 18:19:27 +0100
-Subject: [PATCH 211/351] x86: crypto: Reduce preempt disabled regions
-X-NVConfidentiality: public
+Subject: [PATCH 211/365] x86: crypto: Reduce preempt disabled regions
 
 Restrict the preempt disabled regions to the actual floating point
 operations and enable preemption for the administrative actions.
@@ -19,7 +18,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 13 insertions(+), 11 deletions(-)
 
 diff --git a/arch/x86/crypto/aesni-intel_glue.c b/arch/x86/crypto/aesni-intel_glue.c
-index 3633ad6145c5..c6d5458ee7f9 100644
+index 3633ad6..c6d5458 100644
 --- a/arch/x86/crypto/aesni-intel_glue.c
 +++ b/arch/x86/crypto/aesni-intel_glue.c
 @@ -383,14 +383,14 @@ static int ecb_encrypt(struct blkcipher_desc *desc,
@@ -115,5 +114,5 @@ index 3633ad6145c5..c6d5458ee7f9 100644
  	return err;
  }
 -- 
-2.10.1
+2.7.4
 

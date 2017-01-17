@@ -1,8 +1,7 @@
-From 69d790451660b90707c3ca7c59a1ff7b83b7d0ac Mon Sep 17 00:00:00 2001
+From 8d8b28e79bac0a9b3a26ee9e1fc3fe5f6ad9659c Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sun, 2 Nov 2014 08:31:37 +0100
-Subject: [PATCH 154/351] x86: UV: raw_spinlock conversion
-X-NVConfidentiality: public
+Subject: [PATCH 154/365] x86: UV: raw_spinlock conversion
 
 Shrug.  Lots of hobbyists have a beast in their basement, right?
 
@@ -18,7 +17,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  5 files changed, 35 insertions(+), 30 deletions(-)
 
 diff --git a/arch/x86/include/asm/uv/uv_bau.h b/arch/x86/include/asm/uv/uv_bau.h
-index fc808b83fccb..ebb40118abf5 100644
+index fc808b8..ebb4011 100644
 --- a/arch/x86/include/asm/uv/uv_bau.h
 +++ b/arch/x86/include/asm/uv/uv_bau.h
 @@ -615,9 +615,9 @@ struct bau_control {
@@ -55,7 +54,7 @@ index fc808b83fccb..ebb40118abf5 100644
  }
  
 diff --git a/arch/x86/include/asm/uv/uv_hub.h b/arch/x86/include/asm/uv/uv_hub.h
-index ea7074784cc4..01ec643ce66e 100644
+index ea707478..01ec643 100644
 --- a/arch/x86/include/asm/uv/uv_hub.h
 +++ b/arch/x86/include/asm/uv/uv_hub.h
 @@ -492,7 +492,7 @@ struct uv_blade_info {
@@ -68,7 +67,7 @@ index ea7074784cc4..01ec643ce66e 100644
  };
  extern struct uv_blade_info *uv_blade_info;
 diff --git a/arch/x86/kernel/apic/x2apic_uv_x.c b/arch/x86/kernel/apic/x2apic_uv_x.c
-index 4a139465f1d4..ad2afff02b36 100644
+index 4a13946..ad2afff 100644
 --- a/arch/x86/kernel/apic/x2apic_uv_x.c
 +++ b/arch/x86/kernel/apic/x2apic_uv_x.c
 @@ -947,7 +947,7 @@ void __init uv_system_init(void)
@@ -81,7 +80,7 @@ index 4a139465f1d4..ad2afff02b36 100644
  			max_pnode = max(pnode, max_pnode);
  			blade++;
 diff --git a/arch/x86/platform/uv/tlb_uv.c b/arch/x86/platform/uv/tlb_uv.c
-index 3b6ec42718e4..7871083de089 100644
+index 3b6ec42..7871083 100644
 --- a/arch/x86/platform/uv/tlb_uv.c
 +++ b/arch/x86/platform/uv/tlb_uv.c
 @@ -714,9 +714,9 @@ static void destination_plugged(struct bau_desc *bau_desc,
@@ -171,7 +170,7 @@ index 3b6ec42718e4..7871083de089 100644
  }
  
 diff --git a/arch/x86/platform/uv/uv_time.c b/arch/x86/platform/uv/uv_time.c
-index 2b158a9fa1d7..5e0b122620cb 100644
+index 2b158a9..5e0b122 100644
 --- a/arch/x86/platform/uv/uv_time.c
 +++ b/arch/x86/platform/uv/uv_time.c
 @@ -57,7 +57,7 @@ static DEFINE_PER_CPU(struct clock_event_device, cpu_ced);
@@ -255,5 +254,5 @@ index 2b158a9fa1d7..5e0b122620cb 100644
  
  /*
 -- 
-2.10.1
+2.7.4
 

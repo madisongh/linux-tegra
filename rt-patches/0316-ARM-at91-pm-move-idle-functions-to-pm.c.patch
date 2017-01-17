@@ -1,8 +1,7 @@
-From c2228c8e7213482c432bded158570b70cf22a50a Mon Sep 17 00:00:00 2001
+From c8f1c26debbd65bd7773eecdc6e31ed943ed4867 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 01:58:40 +0200
-Subject: [PATCH 316/351] ARM: at91: pm: move idle functions to pm.c
-X-NVConfidentiality: public
+Subject: [PATCH 316/365] ARM: at91: pm: move idle functions to pm.c
 
 Avoid using code from clk/at91 for PM.
 This also has the bonus effect of setting arm_pm_idle for sama5 platforms.
@@ -20,7 +19,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  6 files changed, 35 insertions(+), 29 deletions(-)
 
 diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index c1a7c6cc00e1..63b4fa25b48a 100644
+index c1a7c6c..63b4fa2 100644
 --- a/arch/arm/mach-at91/at91rm9200.c
 +++ b/arch/arm/mach-at91/at91rm9200.c
 @@ -12,7 +12,6 @@
@@ -40,7 +39,7 @@ index c1a7c6cc00e1..63b4fa25b48a 100644
  }
  
 diff --git a/arch/arm/mach-at91/at91sam9.c b/arch/arm/mach-at91/at91sam9.c
-index 7eb64f763034..cada2a6412b3 100644
+index 7eb64f7..cada2a6 100644
 --- a/arch/arm/mach-at91/at91sam9.c
 +++ b/arch/arm/mach-at91/at91sam9.c
 @@ -62,8 +62,6 @@ static void __init at91sam9_common_init(void)
@@ -53,7 +52,7 @@ index 7eb64f763034..cada2a6412b3 100644
  
  static void __init at91sam9_dt_device_init(void)
 diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index b0fa7dc7286d..d224e195706a 100644
+index b0fa7dc..d224e19 100644
 --- a/arch/arm/mach-at91/generic.h
 +++ b/arch/arm/mach-at91/generic.h
 @@ -18,20 +18,18 @@
@@ -80,7 +79,7 @@ index b0fa7dc7286d..d224e195706a 100644
  
  #endif /* _AT91_GENERIC_H */
 diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 8923efbfa7fa..f06270198bf1 100644
+index 8923efb..f062701 100644
 --- a/arch/arm/mach-at91/pm.c
 +++ b/arch/arm/mach-at91/pm.c
 @@ -31,6 +31,7 @@
@@ -175,7 +174,7 @@ index 8923efbfa7fa..f06270198bf1 100644
 +	at91_pm_init(NULL);
  }
 diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
-index d9cf6799aec0..df8fdf1cf66d 100644
+index d9cf679..df8fdf1 100644
 --- a/arch/arm/mach-at91/sama5.c
 +++ b/arch/arm/mach-at91/sama5.c
 @@ -51,7 +51,7 @@ static void __init sama5_dt_device_init(void)
@@ -188,7 +187,7 @@ index d9cf6799aec0..df8fdf1cf66d 100644
  
  static const char *const sama5_dt_board_compat[] __initconst = {
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 0b255e7fc718..361ea0c1d3c9 100644
+index 0b255e7..361ea0c 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
 @@ -32,21 +32,6 @@ struct at91_pmc {
@@ -214,5 +213,5 @@ index 0b255e7fc718..361ea0c1d3c9 100644
  			  struct clk_range *range)
  {
 -- 
-2.10.1
+2.7.4
 

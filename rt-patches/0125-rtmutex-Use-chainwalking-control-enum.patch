@@ -1,8 +1,7 @@
-From 1910ab6f04b9538d5e0f8740f242e2b295f66a18 Mon Sep 17 00:00:00 2001
+From 22cf75deacc5268a800bd4fd9d5f48117e2faa69 Mon Sep 17 00:00:00 2001
 From: "bmouring@ni.com" <bmouring@ni.com>
 Date: Tue, 15 Dec 2015 17:07:30 -0600
-Subject: [PATCH 125/351] rtmutex: Use chainwalking control enum
-X-NVConfidentiality: public
+Subject: [PATCH 125/365] rtmutex: Use chainwalking control enum
 
 In 8930ed80 (rtmutex: Cleanup deadlock detector debug logic),
 chainwalking control enums were introduced to limit the deadlock
@@ -17,7 +16,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
-index f3e3e44bdf6c..8275f474d685 100644
+index f3e3e44..8275f47 100644
 --- a/kernel/locking/rtmutex.c
 +++ b/kernel/locking/rtmutex.c
 @@ -1020,7 +1020,7 @@ static void  noinline __sched rt_spin_lock_slowlock(struct rt_mutex *lock)
@@ -30,5 +29,5 @@ index f3e3e44bdf6c..8275f474d685 100644
  
  	for (;;) {
 -- 
-2.10.1
+2.7.4
 

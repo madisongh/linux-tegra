@@ -1,8 +1,7 @@
-From 3b1ff3bca1b8f2d80b6e684c1c9feca6bd875801 Mon Sep 17 00:00:00 2001
+From 6de82414e10f5a7045655094f38e99b6f9dee7d2 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 24 May 2016 12:56:38 +0200
-Subject: [PATCH 346/351] arm: lazy preempt: correct resched condition
-X-NVConfidentiality: public
+Subject: [PATCH 346/365] arm: lazy preempt: correct resched condition
 
 If we get out of preempt_schedule_irq() then we check for NEED_RESCHED
 and call the former function again if set because the preemption counter
@@ -17,7 +16,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index d66b1aef2083..d044cea59f54 100644
+index d66b1ae..d044cea 100644
 --- a/arch/arm/kernel/entry-armv.S
 +++ b/arch/arm/kernel/entry-armv.S
 @@ -244,7 +244,11 @@ svc_preempt:
@@ -34,5 +33,5 @@ index d66b1aef2083..d044cea59f54 100644
  
  __und_fault:
 -- 
-2.10.1
+2.7.4
 

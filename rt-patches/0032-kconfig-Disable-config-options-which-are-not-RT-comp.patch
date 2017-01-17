@@ -1,9 +1,8 @@
-From eb8fbb268cff4b5769a0dc09cae3cfbdadb4f9bd Mon Sep 17 00:00:00 2001
+From 7ccf32eb6cb0f7a1b5fb47b48f67346bbda5d876 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 24 Jul 2011 12:11:43 +0200
-Subject: [PATCH 032/351] kconfig: Disable config options which are not RT
+Subject: [PATCH 032/365] kconfig: Disable config options which are not RT
  compatible
-X-NVConfidentiality: public
 
 Disable stuff which is known to have issues on RT
 
@@ -14,7 +13,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  2 files changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/Kconfig b/arch/Kconfig
-index 31a318a56d98..186fc15c825f 100644
+index 31a318a..186fc15 100644
 --- a/arch/Kconfig
 +++ b/arch/Kconfig
 @@ -9,6 +9,7 @@ config OPROFILE
@@ -26,7 +25,7 @@ index 31a318a56d98..186fc15c825f 100644
  	select RING_BUFFER_ALLOW_SWAP
  	help
 diff --git a/mm/Kconfig b/mm/Kconfig
-index be355e2ca0bd..d42d6ed75534 100644
+index be355e2..d42d6ed 100644
 --- a/mm/Kconfig
 +++ b/mm/Kconfig
 @@ -393,7 +393,7 @@ config NOMMU_INITIAL_TRIM_EXCESS
@@ -39,5 +38,5 @@ index be355e2ca0bd..d42d6ed75534 100644
  	help
  	  Transparent Hugepages allows the kernel to use huge pages and
 -- 
-2.10.1
+2.7.4
 

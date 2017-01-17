@@ -1,8 +1,7 @@
-From 3bb278a9b4e0a805697ebc442339d7adc0fa0527 Mon Sep 17 00:00:00 2001
+From 95721e3be87b3c98d17aad281bfd7d301d860118 Mon Sep 17 00:00:00 2001
 From: Ingo Molnar <mingo@elte.hu>
 Date: Fri, 3 Jul 2009 08:29:34 -0500
-Subject: [PATCH 077/351] timers: Prepare for full preemption
-X-NVConfidentiality: public
+Subject: [PATCH 077/365] timers: Prepare for full preemption
 
 When softirqs can be preempted we need to make sure that cancelling
 the timer from the active thread can not deadlock vs. a running timer
@@ -17,7 +16,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  3 files changed, 45 insertions(+), 5 deletions(-)
 
 diff --git a/include/linux/timer.h b/include/linux/timer.h
-index 61aa61dc410c..299d2b78591f 100644
+index 61aa61d..299d2b7 100644
 --- a/include/linux/timer.h
 +++ b/include/linux/timer.h
 @@ -225,7 +225,7 @@ extern void add_timer(struct timer_list *timer);
@@ -30,7 +29,7 @@ index 61aa61dc410c..299d2b78591f 100644
  #else
  # define del_timer_sync(t)		del_timer(t)
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 7680e1da828b..7892c1ebe893 100644
+index e7fe1ce..ddedd34 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
 @@ -619,11 +619,14 @@ void resched_cpu(int cpu)
@@ -50,7 +49,7 @@ index 7680e1da828b..7892c1ebe893 100644
  
  	rcu_read_lock();
  	for_each_domain(cpu, sd) {
-@@ -639,6 +642,8 @@ int get_nohz_timer_target(void)
+@@ -642,6 +645,8 @@ int get_nohz_timer_target(void)
  		cpu = housekeeping_any_cpu();
  unlock:
  	rcu_read_unlock();
@@ -60,7 +59,7 @@ index 7680e1da828b..7892c1ebe893 100644
  }
  /*
 diff --git a/kernel/time/timer.c b/kernel/time/timer.c
-index bbc5d1114583..5fa215eefa52 100644
+index bbc5d11..5fa215e 100644
 --- a/kernel/time/timer.c
 +++ b/kernel/time/timer.c
 @@ -80,6 +80,9 @@ struct tvec_root {
@@ -146,5 +145,5 @@ index bbc5d1114583..5fa215eefa52 100644
  	base->timer_jiffies = jiffies;
  	base->next_timer = base->timer_jiffies;
 -- 
-2.10.1
+2.7.4
 

@@ -1,8 +1,7 @@
-From 0c07eb068519fb716104d279f57cb5d20602cf04 Mon Sep 17 00:00:00 2001
+From 4fdc3315799b40d9861b6852d7021f501e987b39 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 22 Feb 2012 12:03:30 +0100
-Subject: [PATCH 217/351] seqlock: Prevent rt starvation
-X-NVConfidentiality: public
+Subject: [PATCH 217/365] seqlock: Prevent rt starvation
 
 If a low prio writer gets preempted while holding the seqlock write
 locked, a high prio reader spins forever on RT.
@@ -27,7 +26,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  3 files changed, 47 insertions(+), 15 deletions(-)
 
 diff --git a/include/linux/seqlock.h b/include/linux/seqlock.h
-index e0582106ef4f..b14f4d2368aa 100644
+index e058210..b14f4d2 100644
 --- a/include/linux/seqlock.h
 +++ b/include/linux/seqlock.h
 @@ -220,20 +220,30 @@ static inline int read_seqcount_retry(const seqcount_t *s, unsigned start)
@@ -160,7 +159,7 @@ index e0582106ef4f..b14f4d2368aa 100644
  }
  
 diff --git a/include/net/dst.h b/include/net/dst.h
-index c7329dcd90cc..35c3dba16728 100644
+index c7329dc..35c3dba 100644
 --- a/include/net/dst.h
 +++ b/include/net/dst.h
 @@ -437,7 +437,7 @@ static inline void dst_confirm(struct dst_entry *dst)
@@ -173,7 +172,7 @@ index c7329dcd90cc..35c3dba16728 100644
  	if (dst->pending_confirm) {
  		unsigned long now = jiffies;
 diff --git a/include/net/neighbour.h b/include/net/neighbour.h
-index 8b683841e574..bf656008f6e7 100644
+index 8b68384..bf65600 100644
 --- a/include/net/neighbour.h
 +++ b/include/net/neighbour.h
 @@ -446,7 +446,7 @@ static inline int neigh_hh_bridge(struct hh_cache *hh, struct sk_buff *skb)
@@ -195,5 +194,5 @@ index 8b683841e574..bf656008f6e7 100644
  {
  	unsigned int seq;
 -- 
-2.10.1
+2.7.4
 

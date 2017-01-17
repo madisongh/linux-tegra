@@ -1,8 +1,7 @@
-From 1705f8074c75217f5810f7deb4518c39591b373c Mon Sep 17 00:00:00 2001
+From 488ebdb2417ab0b9f78bdd12f731c7895134a56c Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 28 Feb 2016 15:14:43 +0100
-Subject: [PATCH 303/351] trace/writeback: Block cgroup path tracing on RT
-X-NVConfidentiality: public
+Subject: [PATCH 303/365] trace/writeback: Block cgroup path tracing on RT
 
 Yang reported that with CGROUP_WRITEBACK enabled the tracer triggers the
 following backtrace:
@@ -45,7 +44,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/include/trace/events/writeback.h b/include/trace/events/writeback.h
-index fff846b512e6..253ef2833c46 100644
+index fff846b..253ef28 100644
 --- a/include/trace/events/writeback.h
 +++ b/include/trace/events/writeback.h
 @@ -132,7 +132,7 @@ DEFINE_EVENT(writeback_dirty_inode_template, writeback_dirty_inode,
@@ -58,5 +57,5 @@ index fff846b512e6..253ef2833c46 100644
  static inline size_t __trace_wb_cgroup_size(struct bdi_writeback *wb)
  {
 -- 
-2.10.1
+2.7.4
 

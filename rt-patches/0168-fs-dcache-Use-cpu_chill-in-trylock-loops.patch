@@ -1,8 +1,7 @@
-From 13fb4ea992153b82ec71e359edc7dcbfa3a25d5f Mon Sep 17 00:00:00 2001
+From c96845331ba7c8c3eb817968981c24f9182b8241 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 7 Mar 2012 21:00:34 +0100
-Subject: [PATCH 168/351] fs: dcache: Use cpu_chill() in trylock loops
-X-NVConfidentiality: public
+Subject: [PATCH 168/365] fs: dcache: Use cpu_chill() in trylock loops
 
 Retry loops on RT might loop forever when the modifying side was
 preempted. Use cpu_chill() instead of cpu_relax() to let the system
@@ -10,14 +9,14 @@ make progress.
 
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 ---
- fs/autofs4/autofs_i.h | 1 +
- fs/autofs4/expire.c   | 2 +-
- fs/dcache.c           | 5 +++--
- fs/namespace.c        | 3 ++-
- 4 files changed, 7 insertions(+), 4 deletions(-)
+ fs/autofs4/autofs_i.h |  1 +
+ fs/autofs4/expire.c   |  2 +-
+ fs/dcache.c           | 10 ++++++++--
+ fs/namespace.c        |  3 ++-
+ 4 files changed, 12 insertions(+), 4 deletions(-)
 
 diff --git a/fs/autofs4/autofs_i.h b/fs/autofs4/autofs_i.h
-index c37149b929be..4c541347308e 100644
+index 502d389..05af8d3 100644
 --- a/fs/autofs4/autofs_i.h
 +++ b/fs/autofs4/autofs_i.h
 @@ -34,6 +34,7 @@
@@ -29,7 +28,7 @@ index c37149b929be..4c541347308e 100644
  #include <asm/uaccess.h>
  
 diff --git a/fs/autofs4/expire.c b/fs/autofs4/expire.c
-index 1cebc3c52fa5..d487fa27add5 100644
+index 7a5a598..d08bcdc 100644
 --- a/fs/autofs4/expire.c
 +++ b/fs/autofs4/expire.c
 @@ -150,7 +150,7 @@ again:
@@ -42,7 +41,7 @@ index 1cebc3c52fa5..d487fa27add5 100644
  			}
  			spin_unlock(&p->d_lock);
 diff --git a/fs/dcache.c b/fs/dcache.c
-index d04920036269..a31da689b575 100644
+index 9e50999..2ee5a8e6 100644
 --- a/fs/dcache.c
 +++ b/fs/dcache.c
 @@ -19,6 +19,7 @@
@@ -53,16 +52,21 @@ index d04920036269..a31da689b575 100644
  #include <linux/slab.h>
  #include <linux/init.h>
  #include <linux/hash.h>
-@@ -578,7 +579,7 @@ static struct dentry *dentry_kill(struct dentry *dentry)
- 
- failed:
- 	spin_unlock(&dentry->d_lock);
--	cpu_relax();
-+	cpu_chill();
- 	return dentry; /* try again with same dentry */
+@@ -785,7 +786,12 @@ repeat:
+ kill_it:
+ 	dentry = dentry_kill(dentry);
+ 	if (dentry) {
+-		cond_resched();
++		int r;
++
++		/* the task with the highest priority won't schedule */
++		r = cond_resched();
++		if (!r)
++			cpu_chill();
+ 		goto repeat;
+ 	}
  }
- 
-@@ -2391,7 +2392,7 @@ again:
+@@ -2394,7 +2400,7 @@ again:
  	if (dentry->d_lockref.count == 1) {
  		if (!spin_trylock(&inode->i_lock)) {
  			spin_unlock(&dentry->d_lock);
@@ -72,7 +76,7 @@ index d04920036269..a31da689b575 100644
  		}
  		dentry->d_flags &= ~DCACHE_CANT_MOUNT;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index b52c0aea9e1a..62588bfcddf4 100644
+index 97f7f9f..1f3725b 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -14,6 +14,7 @@
@@ -93,5 +97,5 @@ index b52c0aea9e1a..62588bfcddf4 100644
  	}
  	/*
 -- 
-2.10.1
+2.7.4
 

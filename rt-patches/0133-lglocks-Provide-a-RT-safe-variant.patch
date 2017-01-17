@@ -1,8 +1,7 @@
-From 70b985cdd18e478b6183f126448ea8cbcfeb39de Mon Sep 17 00:00:00 2001
+From 483a43fc7727c1f807d519e01d38078c406ce892 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 15 Jun 2011 11:02:21 +0200
-Subject: [PATCH 133/351] lglocks: Provide a RT safe variant
-X-NVConfidentiality: public
+Subject: [PATCH 133/365] lglocks: Provide a RT safe variant
 
 lglocks by itself will spin in order to get the lock. This will end up
 badly if a task with the highest priority keeps spinning while a task
@@ -18,7 +17,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  2 files changed, 58 insertions(+), 22 deletions(-)
 
 diff --git a/include/linux/lglock.h b/include/linux/lglock.h
-index c92ebd100d9b..492005d40f7c 100644
+index c92ebd1..492005d 100644
 --- a/include/linux/lglock.h
 +++ b/include/linux/lglock.h
 @@ -34,13 +34,30 @@
@@ -61,7 +60,7 @@ index c92ebd100d9b..492005d40f7c 100644
  void lg_lock_init(struct lglock *lg, char *name);
  
 diff --git a/kernel/locking/lglock.c b/kernel/locking/lglock.c
-index 951cfcd10b4a..390dfc188f28 100644
+index 951cfcd..390dfc1 100644
 --- a/kernel/locking/lglock.c
 +++ b/kernel/locking/lglock.c
 @@ -4,6 +4,15 @@
@@ -204,5 +203,5 @@ index 951cfcd10b4a..390dfc188f28 100644
  }
  EXPORT_SYMBOL(lg_global_unlock);
 -- 
-2.10.1
+2.7.4
 

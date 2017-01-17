@@ -1,8 +1,7 @@
-From c04fb576680108ab240eb8f03867964fe23b7f48 Mon Sep 17 00:00:00 2001
+From f636c7e0274fa302366f54d96d242714d6e61834 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 15 Jun 2011 12:36:06 +0200
-Subject: [PATCH 101/351] hotplug: Lightweight get online cpus
-X-NVConfidentiality: public
+Subject: [PATCH 101/365] hotplug: Lightweight get online cpus
 
 get_online_cpus() is a heavy weight function which involves a global
 mutex. migrate_disable() wants a simpler construct which prevents only
@@ -19,7 +18,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  2 files changed, 122 insertions(+), 4 deletions(-)
 
 diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-index 06c4b6fc2992..493ef08ba56a 100644
+index 06c4b6f..493ef08 100644
 --- a/include/linux/cpu.h
 +++ b/include/linux/cpu.h
 @@ -222,9 +222,6 @@ static inline void smpboot_thread_init(void)
@@ -51,7 +50,7 @@ index 06c4b6fc2992..493ef08ba56a 100644
  #define __hotcpu_notifier(fn, pri)	do { (void)(fn); } while (0)
  /* These aren't inline functions due to a GCC bug. */
 diff --git a/kernel/cpu.c b/kernel/cpu.c
-index 91776f3d67d3..47ff136d8408 100644
+index 35bb9c6..cfac14c 100644
 --- a/kernel/cpu.c
 +++ b/kernel/cpu.c
 @@ -91,6 +91,100 @@ static struct {
@@ -199,7 +198,7 @@ index 91776f3d67d3..47ff136d8408 100644
  
  	err = __cpu_notify(CPU_DOWN_PREPARE | mod, hcpu, -1, &nr_calls);
  	if (err) {
-@@ -426,6 +541,8 @@ static int _cpu_down(unsigned int cpu, int tasks_frozen)
+@@ -427,6 +542,8 @@ static int _cpu_down(unsigned int cpu, int tasks_frozen)
  	check_for_tasks(cpu);
  
  out_release:
@@ -209,5 +208,5 @@ index 91776f3d67d3..47ff136d8408 100644
  	trace_sched_cpu_hotplug(cpu, err, 0);
  	if (!err)
 -- 
-2.10.1
+2.7.4
 

@@ -1,8 +1,7 @@
-From 42ab4f00b5b147e6b97fd87b1d9adc104fa2b1c4 Mon Sep 17 00:00:00 2001
+From 82ddc1a502edb4bd64eb86d84350d4e93869bbf3 Mon Sep 17 00:00:00 2001
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 Date: Fri, 9 Oct 2015 09:25:49 -0500
-Subject: [PATCH 181/351] net/core/cpuhotplug: Drain input_pkt_queue lockless
-X-NVConfidentiality: public
+Subject: [PATCH 181/365] net/core/cpuhotplug: Drain input_pkt_queue lockless
 
 I can constantly see below error report with 4.1 RT-kernel on TI ARM dra7-evm
 if I'm trying to unplug cpu1:
@@ -36,10 +35,10 @@ Cc: stable-rt@vger.kernel.org
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/net/core/dev.c b/net/core/dev.c
-index 36471bdcc5e0..0d719e88007e 100644
+index 3d7f869..9b3b0aa 100644
 --- a/net/core/dev.c
 +++ b/net/core/dev.c
-@@ -7475,7 +7475,7 @@ static int dev_cpu_callback(struct notifier_block *nfb,
+@@ -7499,7 +7499,7 @@ static int dev_cpu_callback(struct notifier_block *nfb,
  		netif_rx_ni(skb);
  		input_queue_head_incr(oldsd);
  	}
@@ -49,5 +48,5 @@ index 36471bdcc5e0..0d719e88007e 100644
  		input_queue_head_incr(oldsd);
  	}
 -- 
-2.10.1
+2.7.4
 

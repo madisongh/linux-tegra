@@ -1,8 +1,7 @@
-From f0f7be871b5e24c9801657afdec92d4cb6fd79bb Mon Sep 17 00:00:00 2001
+From 6f2acbe9cf1d07e0b5b78f4cab1180cb2b139df3 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 6 Jun 2011 12:20:33 +0200
-Subject: [PATCH 090/351] sched: Move mmdrop to RCU on RT
-X-NVConfidentiality: public
+Subject: [PATCH 090/365] sched: Move mmdrop to RCU on RT
 
 Takes sleeping locks and calls into the memory allocator, so nothing
 we want to do in task switch and oder atomic contexts.
@@ -16,7 +15,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  4 files changed, 45 insertions(+), 2 deletions(-)
 
 diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
-index 0a732c5e0de1..3c5910690562 100644
+index 0a732c5..3c59106 100644
 --- a/include/linux/mm_types.h
 +++ b/include/linux/mm_types.h
 @@ -11,6 +11,7 @@
@@ -38,7 +37,7 @@ index 0a732c5e0de1..3c5910690562 100644
  	/* address of the bounds directory */
  	void __user *bd_addr;
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 8f75cbbfad4c..5925cc4ac9b4 100644
+index 8f75cbb..5925cc4 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -2618,12 +2618,24 @@ extern struct mm_struct * mm_alloc(void);
@@ -67,7 +66,7 @@ index 8f75cbbfad4c..5925cc4ac9b4 100644
  extern void mmput(struct mm_struct *);
  /* Grab a reference to a task's mm, if it is not already going away */
 diff --git a/kernel/fork.c b/kernel/fork.c
-index 7c0a64ec85f1..f205d0fbe84d 100644
+index a94dde7..ad52eda 100644
 --- a/kernel/fork.c
 +++ b/kernel/fork.c
 @@ -702,6 +702,19 @@ void __mmdrop(struct mm_struct *mm)
@@ -91,10 +90,10 @@ index 7c0a64ec85f1..f205d0fbe84d 100644
   * Decrement the use count and release all resources for an mm.
   */
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 446d3bf06d5c..fa7bbd29b6de 100644
+index 9b5ddd8..c0e6f2b 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -2613,8 +2613,12 @@ static struct rq *finish_task_switch(struct task_struct *prev)
+@@ -2638,8 +2638,12 @@ static struct rq *finish_task_switch(struct task_struct *prev)
  	finish_arch_post_lock_switch();
  
  	fire_sched_in_preempt_notifiers(current);
@@ -108,7 +107,7 @@ index 446d3bf06d5c..fa7bbd29b6de 100644
  	if (unlikely(prev_state == TASK_DEAD)) {
  		if (prev->sched_class->task_dead)
  			prev->sched_class->task_dead(prev);
-@@ -5329,6 +5333,8 @@ void sched_setnuma(struct task_struct *p, int nid)
+@@ -5356,6 +5360,8 @@ void sched_setnuma(struct task_struct *p, int nid)
  #endif /* CONFIG_NUMA_BALANCING */
  
  #ifdef CONFIG_HOTPLUG_CPU
@@ -117,7 +116,7 @@ index 446d3bf06d5c..fa7bbd29b6de 100644
  /*
   * Ensures that the idle task is using init_mm right before its cpu goes
   * offline.
-@@ -5343,7 +5349,11 @@ void idle_task_exit(void)
+@@ -5370,7 +5376,11 @@ void idle_task_exit(void)
  		switch_mm(mm, &init_mm, current);
  		finish_arch_post_lock_switch();
  	}
@@ -130,7 +129,7 @@ index 446d3bf06d5c..fa7bbd29b6de 100644
  }
  
  /*
-@@ -5716,6 +5726,10 @@ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
+@@ -5743,6 +5753,10 @@ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
  
  	case CPU_DEAD:
  		calc_load_migrate(rq);
@@ -142,5 +141,5 @@ index 446d3bf06d5c..fa7bbd29b6de 100644
  #endif
  	}
 -- 
-2.10.1
+2.7.4
 

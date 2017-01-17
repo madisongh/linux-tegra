@@ -1,8 +1,7 @@
-From ebeaba46127d222e98233518de9dc4a8441e310f Mon Sep 17 00:00:00 2001
+From 073811484a17cef51e89c3308722f8e1f7dc27f2 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 13:02:01 +0200
-Subject: [PATCH 319/351] clk: at91: pmc: drop at91_pmc_base
-X-NVConfidentiality: public
+Subject: [PATCH 319/365] clk: at91: pmc: drop at91_pmc_base
 
 at91_pmc_base is not used anymore, remove it along with at91_pmc_read and
 at91_pmc_write.
@@ -17,7 +16,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  2 files changed, 19 deletions(-)
 
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 361ea0c1d3c9..dce285549de2 100644
+index 361ea0c..dce2855 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
 @@ -12,7 +12,6 @@
@@ -51,7 +50,7 @@ index 361ea0c1d3c9..dce285549de2 100644
  	if (IS_ERR(regmap))
  		panic("Could not retrieve syscon regmap");
 diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
-index 1e6932222e11..17f413bbbedf 100644
+index 1e69322..17f413b 100644
 --- a/include/linux/clk/at91_pmc.h
 +++ b/include/linux/clk/at91_pmc.h
 @@ -16,18 +16,6 @@
@@ -74,5 +73,5 @@ index 1e6932222e11..17f413bbbedf 100644
  #define	AT91_PMC_SCDR		0x04			/* System Clock Disable Register */
  
 -- 
-2.10.1
+2.7.4
 

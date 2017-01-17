@@ -1,8 +1,7 @@
-From 3fe2a383c4675345cbd14f18131b6461ca36bd02 Mon Sep 17 00:00:00 2001
+From aea3dbc3adaf1137a8ad111964d49fdb6cc010eb Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 12:57:10 +0200
-Subject: [PATCH 318/351] usb: gadget: atmel: access the PMC using regmap
-X-NVConfidentiality: public
+Subject: [PATCH 318/365] usb: gadget: atmel: access the PMC using regmap
 
 Use regmap to access the PMC to avoid using at91_pmc_read and
 at91_pmc_write.
@@ -17,7 +16,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  2 files changed, 12 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index f92f5aff0dd5..f9bba26e3655 100644
+index f92f5af..f9bba26 100644
 --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
 +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
 @@ -17,7 +17,9 @@
@@ -67,7 +66,7 @@ index f92f5aff0dd5..f9bba26e3655 100644
  	udc->num_ep = 0;
  
 diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
-index ea448a344767..3e1c9d589dfa 100644
+index ea448a3..3e1c9d5 100644
 --- a/drivers/usb/gadget/udc/atmel_usba_udc.h
 +++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
 @@ -354,6 +354,8 @@ struct usba_udc {
@@ -80,5 +79,5 @@ index ea448a344767..3e1c9d589dfa 100644
  
  static inline struct usba_ep *to_usba_ep(struct usb_ep *ep)
 -- 
-2.10.1
+2.7.4
 

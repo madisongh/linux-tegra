@@ -1,9 +1,8 @@
-From 0e134b629e986dec12706566acd51c1b63c8ed80 Mon Sep 17 00:00:00 2001
+From 60e67bfd47766f8fa26fb279bb8a393a85b99b66 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 12 Jul 2011 11:39:36 +0200
-Subject: [PATCH 157/351] mm/vmalloc: Another preempt disable region which
+Subject: [PATCH 157/365] mm/vmalloc: Another preempt disable region which
  sucks
-X-NVConfidentiality: public
 
 Avoid the preempt disable version of get_cpu_var(). The inner-lock should
 provide enough serialisation.
@@ -14,7 +13,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 8 insertions(+), 5 deletions(-)
 
 diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index 7de4b7901677..07f85779234d 100644
+index 7de4b79..07f8577 100644
 --- a/mm/vmalloc.c
 +++ b/mm/vmalloc.c
 @@ -835,7 +835,7 @@ static void *new_vmap_block(unsigned int order, gfp_t gfp_mask)
@@ -69,5 +68,5 @@ index 7de4b7901677..07f85779234d 100644
  
  	/* Allocate new block if nothing was found */
 -- 
-2.10.1
+2.7.4
 

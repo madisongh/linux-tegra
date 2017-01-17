@@ -1,8 +1,7 @@
-From 5ebd4054b6b5da32bc1b61c6a5ccfa14a35c86af Mon Sep 17 00:00:00 2001
+From 39799c47de850f169b88a7af4aeb0b8fccd1fa19 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 01:31:34 +0200
-Subject: [PATCH 315/351] ARM: at91: pm: find and remap the pmc
-X-NVConfidentiality: public
+Subject: [PATCH 315/365] ARM: at91: pm: find and remap the pmc
 
 To avoid relying on at91_pmc_read(), find the pmc node and remap it
 locally.
@@ -15,7 +14,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 27 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index db32bf846cef..8923efbfa7fa 100644
+index db32bf8..8923efb 100644
 --- a/arch/arm/mach-at91/pm.c
 +++ b/arch/arm/mach-at91/pm.c
 @@ -35,6 +35,8 @@
@@ -93,5 +92,5 @@ index db32bf846cef..8923efbfa7fa 100644
  		suspend_set_ops(&at91_pm_ops);
  	else
 -- 
-2.10.1
+2.7.4
 

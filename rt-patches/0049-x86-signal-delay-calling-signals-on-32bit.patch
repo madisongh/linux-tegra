@@ -1,8 +1,7 @@
-From ffd4f4b757c39ac6dbf7835f690e567e4b6b83d1 Mon Sep 17 00:00:00 2001
+From a573d91126ec0f761dd808ac1431935e08e3e06e Mon Sep 17 00:00:00 2001
 From: Yang Shi <yang.shi@linaro.org>
 Date: Thu, 10 Dec 2015 10:58:51 -0800
-Subject: [PATCH 049/351] x86/signal: delay calling signals on 32bit
-X-NVConfidentiality: public
+Subject: [PATCH 049/365] x86/signal: delay calling signals on 32bit
 
 When running some ptrace single step tests on x86-32 machine, the below problem
 is triggered:
@@ -32,7 +31,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/x86/include/asm/signal.h b/arch/x86/include/asm/signal.h
-index a32fe27f27c3..3f5b4ee2e2c1 100644
+index a32fe27..3f5b4ee 100644
 --- a/arch/x86/include/asm/signal.h
 +++ b/arch/x86/include/asm/signal.h
 @@ -32,7 +32,7 @@ typedef struct {
@@ -45,5 +44,5 @@ index a32fe27f27c3..3f5b4ee2e2c1 100644
  #endif
  
 -- 
-2.10.1
+2.7.4
 

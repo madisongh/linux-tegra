@@ -1,9 +1,8 @@
-From 545cb61fe6f66b4756ce04b8dbeefb5e3802494a Mon Sep 17 00:00:00 2001
+From 3146b806c5ee8102030cac61d2066756d444711f Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 27 Jan 2016 14:59:47 +0100
-Subject: [PATCH 312/351] clk: at91: pmc: merge at91_pmc_init in
+Subject: [PATCH 312/365] clk: at91: pmc: merge at91_pmc_init in
  atmel_pmc_probe
-X-NVConfidentiality: public
 
 at91_pmc_init() doesn't do much anymore, merge it in atmel_pmc_probe().
 
@@ -16,7 +15,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 9 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index f17a2a1f1e85..01d049d4248a 100644
+index f17a2a1..01d049d 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
 @@ -110,30 +110,6 @@ static const struct at91_pmc_caps sama5d3_caps = {
@@ -74,5 +73,5 @@ index f17a2a1f1e85..01d049d4248a 100644
  
  static void __init of_at91rm9200_pmc_setup(struct device_node *np)
 -- 
-2.10.1
+2.7.4
 

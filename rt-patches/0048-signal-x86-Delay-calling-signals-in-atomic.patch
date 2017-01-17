@@ -1,8 +1,7 @@
-From ef76557b45de9ac9691a87d252d509d6e22d9674 Mon Sep 17 00:00:00 2001
+From 2769f76172d317f28241df92c1e26de69adde934 Mon Sep 17 00:00:00 2001
 From: Oleg Nesterov <oleg@redhat.com>
 Date: Tue, 14 Jul 2015 14:26:34 +0200
-Subject: [PATCH 048/351] signal/x86: Delay calling signals in atomic
-X-NVConfidentiality: public
+Subject: [PATCH 048/365] signal/x86: Delay calling signals in atomic
 
 On x86_64 we must disable preemption before we enable interrupts
 for stack faults, int3 and debugging, because the current task is using
@@ -38,7 +37,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  4 files changed, 59 insertions(+), 2 deletions(-)
 
 diff --git a/arch/x86/entry/common.c b/arch/x86/entry/common.c
-index 1a4477cedc49..d6db3ad6c18f 100644
+index 1a4477c..d6db3ad 100644
 --- a/arch/x86/entry/common.c
 +++ b/arch/x86/entry/common.c
 @@ -239,6 +239,13 @@ static void exit_to_usermode_loop(struct pt_regs *regs, u32 cached_flags)
@@ -56,7 +55,7 @@ index 1a4477cedc49..d6db3ad6c18f 100644
  			uprobe_notify_resume(regs);
  
 diff --git a/arch/x86/include/asm/signal.h b/arch/x86/include/asm/signal.h
-index 2138c9ae19ee..a32fe27f27c3 100644
+index 2138c9a..a32fe27 100644
 --- a/arch/x86/include/asm/signal.h
 +++ b/arch/x86/include/asm/signal.h
 @@ -23,6 +23,19 @@ typedef struct {
@@ -80,7 +79,7 @@ index 2138c9ae19ee..a32fe27f27c3 100644
  typedef sigset_t compat_sigset_t;
  #endif
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index b9901e82640c..a1126904ca36 100644
+index b9901e8..a112690 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1591,6 +1591,10 @@ struct task_struct {
@@ -95,7 +94,7 @@ index b9901e82640c..a1126904ca36 100644
  	unsigned long sas_ss_sp;
  	size_t sas_ss_size;
 diff --git a/kernel/signal.c b/kernel/signal.c
-index 575bcb4e9547..bc2c990f3f63 100644
+index 575bcb4..bc2c990 100644
 --- a/kernel/signal.c
 +++ b/kernel/signal.c
 @@ -1216,8 +1216,8 @@ int do_send_sig_info(int sig, struct siginfo *info, struct task_struct *p,
@@ -150,5 +149,5 @@ index 575bcb4e9547..bc2c990f3f63 100644
   * Nuke all other threads in the group.
   */
 -- 
-2.10.1
+2.7.4
 

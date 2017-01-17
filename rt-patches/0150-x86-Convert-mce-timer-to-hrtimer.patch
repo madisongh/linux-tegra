@@ -1,8 +1,7 @@
-From e64dd21f05f2cc851efdebe29ec65004256ef96c Mon Sep 17 00:00:00 2001
+From dd754ed7ecdcaf50413a670848b1c23260ffa8af Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 13 Dec 2010 16:33:39 +0100
-Subject: [PATCH 150/351] x86: Convert mce timer to hrtimer
-X-NVConfidentiality: public
+Subject: [PATCH 150/365] x86: Convert mce timer to hrtimer
 
 mce_timer is started in atomic contexts of cpu bringup. This results
 in might_sleep() warnings on RT. Convert mce_timer to a hrtimer to
@@ -27,7 +26,7 @@ fold in:
  1 file changed, 20 insertions(+), 32 deletions(-)
 
 diff --git a/arch/x86/kernel/cpu/mcheck/mce.c b/arch/x86/kernel/cpu/mcheck/mce.c
-index 7e8a736d09db..6e7eee8c3d5c 100644
+index 7e8a736..6e7eee8 100644
 --- a/arch/x86/kernel/cpu/mcheck/mce.c
 +++ b/arch/x86/kernel/cpu/mcheck/mce.c
 @@ -41,6 +41,7 @@
@@ -182,5 +181,5 @@ index 7e8a736d09db..6e7eee8c3d5c 100644
  	}
  
 -- 
-2.10.1
+2.7.4
 
