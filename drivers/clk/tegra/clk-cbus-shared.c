@@ -1204,6 +1204,10 @@ struct clk *tegra_clk_register_cascade_master(const char *name,
 	cascade_master->bus_update = _simple_shared_update;
 	cascade_master->u.shared_bus_user.rate = clk_get_rate(parent_clk);
 	cascade_master->top_clk = sbus_clk;
+	cascade_master->min_rate = parent_cbus->min_rate;
+	cascade_master->max_rate = parent_cbus->max_rate;
+	if (sbusclkname)
+		cascade_master->max_rate /= 2;
 
 	/* Data in .init is copied by clk_register(), so stack variable OK */
 	cascade_master->hw.init = &init;

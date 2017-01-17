@@ -3341,12 +3341,12 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 		clk = tegra_clk_register_sbus_cmplx("sbus",
 				__clk_get_name(clk), "sclk_mux", "sclk", 0,
 				"pclk", "hclk", "pll_p", sclk_high_clk,
-				204000000, 12000000, 384000000);
+				204000000, 12000000, 408000000);
 	} else {
 		clk = tegra_clk_register_sbus_cmplx("sbus", "sclk", "sclk_mux",
 				NULL, 0, "pclk", "hclk", sclk_high_clk,
 				"pll_c_out1", 204000000, 12000000,
-				384000000);
+				408000000);
 	}
 	clk_register_clkdev(clk, "sbus", NULL);
 	clks[TEGRA210_CLK_SBUS] = clk;
