@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2003 Russell King, All Rights Reserved.
  *  Copyright 2007 Pierre Ossman
- *  Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (c) 2016-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -95,6 +95,5 @@ int mmc_ddr_to_hs400(struct mmc_card *card);
 int mmc_hs200_to_ddr(struct mmc_card *card);
 int mmc_ddr_to_hs200(struct mmc_card *card);
 
-int mmc_cmdq_initiate_halt(struct mmc_host *host, bool halt);
 #endif
 

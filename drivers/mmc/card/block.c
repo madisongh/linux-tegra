@@ -3,7 +3,7 @@
  *
  * Copyright 2002 Hewlett-Packard Company
  * Copyright 2005-2008 Pierre Ossman
- * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * Use consistent with the GNU GPL is permitted,
  * provided that this copyright notice is
@@ -793,6 +793,15 @@ static int __mmc_blk_ioctl_cmd(struct mmc_card *card, struct mmc_blk_data *md,
 			       __func__, err);
 
 		return err;
+	}
+
+	if (mmc_card_cmdq(card)) {
+		err = mmc_cmdq_initiate_halt(card->host, true);
+		if (err) {
+			pr_err("%s: %s: CQE Halt failed. err = %d\n",
+				mmc_hostname(card->host), __func__, err);
+			return err;
+		}
 	}
 
 	mmc_wait_for_req(card->host, &mrq);
