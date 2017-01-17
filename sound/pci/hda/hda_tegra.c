@@ -560,6 +560,8 @@ static int hda_tegra_create(struct snd_card *card,
 	if (err < 0)
 		return err;
 
+	chip->bus.needs_damn_long_delay = 1;
+
 	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops);
 	if (err < 0) {
 		dev_err(card->dev, "Error creating device\n");
@@ -577,8 +579,7 @@ MODULE_DEVICE_TABLE(of, hda_tegra_match);
 
 static int hda_tegra_probe(struct platform_device *pdev)
 {
-	const unsigned int driver_flags = AZX_DCAPS_CORBRP_SELF_CLEAR |
-									AZX_DCAPS_PM_RUNTIME;
+	const unsigned int driver_flags = AZX_DCAPS_CORBRP_SELF_CLEAR | AZX_DCAPS_PM_RUNTIME;
 	struct snd_card *card;
 	struct azx *chip;
 	struct hda_tegra *hda;
