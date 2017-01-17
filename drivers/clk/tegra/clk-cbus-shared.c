@@ -31,6 +31,36 @@
 /* there should be only 1 instance of sclk, so we can keep this global for now */
 static unsigned long sclk_pclk_unity_ratio_rate_max = 136000000;
 
+static int shared_bus_clk_notifier(struct notifier_block *nb,
+				   unsigned long action, void *data)
+{
+	struct clk_notifier_data *cnd = data;
+	struct clk_hw *chw = __clk_get_hw(cnd->clk);
+	struct tegra_clk_cbus_shared *bus = to_clk_cbus_shared(chw);
+
+	switch (action) {
+	case PRE_SUBTREE_CHANGE:
+		bus->rate_propagating = 1;
+		break;
+	case POST_SUBTREE_CHANGE:
+		bus->rate_propagating = 0;
+		break;
+	}
+	pr_debug("%s: %s: event %lu\n",
+		 __func__, clk_hw_get_name(&bus->hw), action);
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block shared_bus_clk_nb = {
+	.notifier_call = shared_bus_clk_notifier,
+};
+
+static int register_bus_clk_notifier(struct clk *bus_clk)
+{
+	clk_notifier_register(bus_clk, &shared_bus_clk_nb);
+	return 0;
+}
+
 static int cbus_switch_one(struct clk *client, struct clk *p)
 {
 	int ret = 0;
@@ -420,6 +450,11 @@ static int clk_shared_set_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long parent_rate)
 {
 	struct tegra_clk_cbus_shared *shared = to_clk_cbus_shared(hw);
+	struct tegra_clk_cbus_shared *bus =
+		to_clk_cbus_shared(clk_hw_get_parent(hw));
+
+	if (bus->rate_propagating)
+		return 0;
 
 	shared->u.shared_bus_user.rate = rate;
 
@@ -463,7 +498,14 @@ static unsigned long clk_shared_recalc_rate(struct clk_hw *hw,
 {
 	struct tegra_clk_cbus_shared *shared = to_clk_cbus_shared(hw);
 
-	return shared->u.shared_bus_user.rate;
+	if (shared->u.shared_bus_user.mode == SHARED_CEILING)
+		return shared->u.shared_bus_user.rate;
+
+	if (shared->u.shared_bus_user.client &&
+	    (~shared->flags & TEGRA_SHARED_BUS_RACE_TO_SLEEP)) {
+		/* FIXME: for clocks with clients that can be divided down */
+	}
+	return parent_rate;
 }
 
 static int shared_read_op(void *data, u64 *state)
@@ -487,6 +529,28 @@ static int clk_shared_debug(struct clk_hw *hw, struct dentry *dir)
 		return -EINVAL;
 
 	return 0;
+}
+
+static unsigned long clk_cascade_master_recalc_rate(struct clk_hw *hw,
+						    unsigned long parent_rate)
+{
+	struct clk *bus_clk;
+	struct clk_hw *cascade_div_hw;
+	struct tegra_clk_cbus_shared *bus;
+	struct tegra_clk_cbus_shared *cascade_master = to_clk_cbus_shared(hw);
+
+
+	if (cascade_master->top_clk) {
+		bus_clk = cascade_master->top_clk;
+		bus = to_clk_cbus_shared(__clk_get_hw(bus_clk));
+		cascade_div_hw = clk_hw_get_parent(bus->u.system.pclk);
+	} else {
+		bus_clk = clk_get_parent(hw->clk);
+		bus = to_clk_cbus_shared(__clk_get_hw(bus_clk));
+		cascade_div_hw = clk_hw_get_parent(bus->u.system.hclk);
+	}
+
+	return tegra_clk_frac_div_ops.recalc_rate(cascade_div_hw, parent_rate);
 }
 
 static int clk_system_set_rate(struct clk_hw *hw, unsigned long rate,
@@ -852,7 +916,7 @@ static const struct clk_ops tegra_clk_cascade_master_ops = {
 	.unprepare = clk_shared_unprepare,
 	.set_rate = clk_shared_set_rate,
 	.round_rate = clk_shared_round_rate,
-	.recalc_rate = clk_shared_recalc_rate,
+	.recalc_rate = clk_cascade_master_recalc_rate,
 };
 
 struct clk *tegra_clk_register_sbus_cmplx(const char *name,
@@ -941,6 +1005,7 @@ struct clk *tegra_clk_register_sbus_cmplx(const char *name,
 	if (!c)
 		kfree(system);
 
+	register_bus_clk_notifier(c);
 	return c;
 }
 
@@ -985,6 +1050,7 @@ struct clk *tegra_clk_register_cbus(const char *name,
 	if (!c)
 		kfree(cbus);
 
+	register_bus_clk_notifier(c);
 	return c;
 }
 
@@ -1115,6 +1181,7 @@ struct clk *tegra_clk_register_shared_connect(const char *name,
 	if (!c)
 		kfree(shared);
 
+	register_bus_clk_notifier(c);
 	return c;
 }
 /*
@@ -1155,6 +1222,7 @@ struct clk *tegra_clk_register_shared_master(const char *name,
 	if (!c)
 		kfree(master);
 
+	register_bus_clk_notifier(c);
 	return c;
 }
 
@@ -1212,5 +1280,6 @@ struct clk *tegra_clk_register_cascade_master(const char *name,
 	if (!c)
 		kfree(cascade_master);
 
+	register_bus_clk_notifier(c);
 	return c;
 }

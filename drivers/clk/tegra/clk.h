@@ -851,6 +851,7 @@ struct tegra_clk_cbus_shared {
 	unsigned long		max_rate;
 	bool			rate_update_started;
 	bool			rate_updating;
+	bool			rate_propagating;
 	int			(*bus_update)(struct tegra_clk_cbus_shared *);
 	struct clk_hw		*top_user;
 	struct clk_hw		*slow_user;
