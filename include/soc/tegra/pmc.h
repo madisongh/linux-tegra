@@ -308,18 +308,6 @@ int tegra_io_pads_padctrl_init(struct device *dev)
 }
 #endif
 
-static inline int tegra_pmc_padctrl_init(struct device *dev,
-					 struct device_node *np)
-{
-#ifdef CONFIG_PADCTRL_TEGRA210_PMC
-	return tegra210_pmc_padctrl_init(dev, np);
-#endif
-#ifdef CONFIG_PADCTRL_TEGRA186_PMC
-	return tegra186_pmc_padctrl_init(dev, np);
-#endif
-	return 0;
-}
-
 void tegra186_pmc_register_update(int offset, unsigned long mask,
 				  unsigned long val);
 unsigned long tegra_pmc_register_get(u32 offset);
