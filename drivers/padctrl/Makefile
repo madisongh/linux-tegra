@@ -3,6 +3,5 @@
 #
 subdir-ccflags-y	= -Werror
 
-obj-$(CONFIG_PADCTRL)			+= padctrl-core.o
-obj-$(CONFIG_PADCTRL_TEGRA210_PMC)	+= padctrl-tegra210-pmc.o
+obj-$(CONFIG_PADCTRL)				+= padctrl-core.o
 obj-$(CONFIG_PADCTRL_GENERIC_TEGRA_IO_PAD)	+= padctrl-tegra-io-pads.o

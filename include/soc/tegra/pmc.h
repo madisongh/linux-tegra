@@ -296,9 +296,6 @@ void tegra_pmc_config_thermal_trip(struct tegra_thermtrip_pmic_data *data);
 void tegra_pmc_enable_thermal_trip(void);
 void tegra_pmc_lock_thermal_shutdown(void);
 
-int tegra210_pmc_padctrl_init(struct device *dev, struct device_node *np);
-int tegra186_pmc_padctrl_init(struct device *dev, struct device_node *np);
-
 #if defined(CONFIG_PADCTRL_GENERIC_TEGRA_IO_PAD)
 int tegra_io_pads_padctrl_init(struct device *dev);
 #else
