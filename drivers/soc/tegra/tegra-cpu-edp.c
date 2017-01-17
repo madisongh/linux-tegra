@@ -39,7 +39,7 @@
 struct cpu_edp_platform_data {
 	int n_caps;
 	int freq_step;
-	int reg_edp;
+	unsigned int reg_edp;
 };
 
 struct cpu_edp {
@@ -189,7 +189,36 @@ bool tegra_cpu_edp_ready(void)
 EXPORT_SYMBOL(tegra_cpu_edp_ready);
 
 #ifdef CONFIG_DEBUG_FS
-static int cpu_edp_limit_get(void *data, u64 *val)
+static int cpu_edp_limit_ma_get(void *data, u64 *val)
+{
+	struct cpu_edp *ctx = data;
+
+	*val = ctx->pdata.reg_edp;
+
+	return 0;
+}
+
+static int cpu_edp_limit_ma_set(void *data, u64 val)
+{
+	struct cpu_edp *ctx = data;
+
+	if (val > UINT_MAX)
+		return -EINVAL;
+
+	ctx->pdata.reg_edp = (unsigned int)val;
+
+	mutex_lock(&ctx->edp_lock);
+	tegra_edp_update_limit(&ctx->pdev->dev);
+	mutex_unlock(&ctx->edp_lock);
+
+	cpufreq_update_policy(0);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(cpu_edp_limit_ma_fops, cpu_edp_limit_ma_get,
+			cpu_edp_limit_ma_set, "%llu\n");
+
+static int cpu_edp_limit_hz_get(void *data, u64 *val)
 {
 	struct cpu_edp *ctx = data;
 	int online_cpus = cpumask_weight(&ctx->edp_cpumask);
@@ -198,7 +227,8 @@ static int cpu_edp_limit_get(void *data, u64 *val)
 
 	return 0;
 }
-DEFINE_SIMPLE_ATTRIBUTE(cpu_edp_limit_fops, cpu_edp_limit_get, NULL, "%lld\n");
+DEFINE_SIMPLE_ATTRIBUTE(cpu_edp_limit_hz_fops, cpu_edp_limit_hz_get, NULL,
+			"%lld\n");
 
 static int tegra_edp_debugfs_init(struct cpu_edp *ctx, const char *name)
 {
@@ -206,12 +236,12 @@ static int tegra_edp_debugfs_init(struct cpu_edp *ctx, const char *name)
 	if (IS_ERR_OR_NULL(ctx->debugfs_dir))
 		return -ENOMEM;
 
-	debugfs_create_u32("reg_edp_ma", S_IRUGO | S_IWUSR,
-			   ctx->debugfs_dir, &ctx->pdata.reg_edp);
 	debugfs_create_u32("temperature", S_IRUGO,
 			   ctx->debugfs_dir, &ctx->temperature);
+	debugfs_create_file("reg_edp_ma", S_IRUGO | S_IWUSR,
+			    ctx->debugfs_dir, ctx, &cpu_edp_limit_ma_fops);
 	debugfs_create_file("cpu_edp_limit", S_IRUGO,
-			    ctx->debugfs_dir, ctx, &cpu_edp_limit_fops);
+			    ctx->debugfs_dir, ctx, &cpu_edp_limit_hz_fops);
 
 	return 0;
 }
