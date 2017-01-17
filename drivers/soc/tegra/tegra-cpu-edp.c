@@ -37,7 +37,6 @@
 #include <soc/tegra/tegra-ppm.h>
 
 struct cpu_edp_platform_data {
-	int n_caps;
 	int freq_step;
 	unsigned int reg_edp;
 };
