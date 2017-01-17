@@ -591,9 +591,9 @@ static long fixed_src_bus_round_updown(struct clk_hw *src, u8 width, u8 frac,
 	source_rate = clk_get_rate(src->clk);
 
 	if (up)
-		flags |= TEGRA_DIVIDER_ROUND_UP;
-	else
 		flags &= ~TEGRA_DIVIDER_ROUND_UP;
+	else
+		flags |= TEGRA_DIVIDER_ROUND_UP;
 
 	rate += up ? -1 : 1;
 
