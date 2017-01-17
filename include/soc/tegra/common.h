@@ -36,7 +36,7 @@ extern phys_addr_t tegra_fb3_size;
 extern phys_addr_t tegra_lut_start;
 extern phys_addr_t tegra_lut_size;
 
-#ifdef CONFIG_ARCH_TEGRA
+#ifdef CONFIG_ARCH_OR_PLATFORM_TEGRA
 bool soc_is_tegra210_n_before(void);
 bool soc_is_tegra186_n_later(void);
 #else

@@ -1,8 +1,8 @@
 obj-y += fuse/
 
 obj-y += pmc.o
-ifeq ($(CONFIG_ARCH_TEGRA),y)
 obj-y += common.o
+ifeq ($(CONFIG_ARCH_TEGRA),y)
 obj-y += flowctrl.o
 endif
 
