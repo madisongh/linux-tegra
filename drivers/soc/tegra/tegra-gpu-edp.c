@@ -22,7 +22,7 @@
 #include <linux/of.h>
 #include <linux/pm_qos.h>
 #include <linux/debugfs.h>
-#include <linux/tegra-fuse.h>
+#include <soc/tegra/fuse.h>
 #include <linux/thermal.h>
 
 #include <soc/tegra/tegra-dvfs.h>
