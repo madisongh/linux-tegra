@@ -1273,6 +1273,9 @@ static const struct of_device_id tegra_adma_of_match[] = {
 		.compatible = "nvidia,tegra210-adma-hv",
 		.data = &tegra210_adma_chip_data,
 	}, {
+		.compatible = "nvidia,tegra186-adma",
+		.data = &tegra210_adma_chip_data,
+	}, {
 	},
 };
 MODULE_DEVICE_TABLE(of, tegra_adma_of_match);
