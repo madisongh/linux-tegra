@@ -514,7 +514,7 @@ static int clk_system_set_rate(struct clk_hw *hw, unsigned long rate,
 	struct tegra_clk_frac_div *sclk_frac_div =
 				to_clk_frac_div(system->u.system.div_clk);
 	struct clk_div_sel *new_sel = NULL;
-	unsigned long div_parent_rate;
+	unsigned long div_parent_rate, div_rate;
 
 	if (system->rate_updating)
 		return 0;
@@ -523,7 +523,6 @@ static int clk_system_set_rate(struct clk_hw *hw, unsigned long rate,
 
 	clk_set_rate(hclk, parent_rate);
 	clk_set_rate(pclk, parent_rate / 2);
-	clk_set_rate(clk_get_parent(hw->clk), system->max_rate);
 
 	for (i = 0; i < system->u.system.round_table_size; i++) {
 		if (rate == system->u.system.round_table[i].rate) {
@@ -537,11 +536,15 @@ static int clk_system_set_rate(struct clk_hw *hw, unsigned long rate,
 		goto out;
 	}
 
+	div_rate = clk_get_rate(div_clk);
+	if (div_rate == rate)
+		goto out;
+
 	div_parent_rate = clk_get_rate(clk_get_parent(div_clk));
-	current_div = div71_get(clk_get_rate(div_clk), div_parent_rate,
+	current_div = div71_get(div_rate, div_parent_rate,
 				sclk_frac_div->width,
 				sclk_frac_div->frac_width,
-				sclk_frac_div->flags);
+				sclk_frac_div->flags) + 2; /* match 7.1 format*/
 	if (current_div < new_sel->div) {
 		unsigned long sdiv_rate;
 
@@ -567,7 +570,7 @@ static int clk_system_set_rate(struct clk_hw *hw, unsigned long rate,
 	}
 
 	if (current_div > new_sel->div) {
-		err = clk_set_rate(system->u.system.div_clk->clk, rate + 1);
+		err = clk_set_rate(system->u.system.div_clk->clk, rate);
 		if (err < 0) {
 			pr_err("%s: Failed to set %s rate to %lu\n",
 				__func__,
@@ -816,10 +819,17 @@ static int _sbus_update(struct tegra_clk_cbus_shared *cbus)
 		p_rate = min(p_rate, h_rate / 2);
 
 	/* Set new sclk rate in safe 1:1:2, rounded "up" configuration */
+	cbus->rate_updating = true;
+	clk_set_rate(skipper, cbus->max_rate);
+	cbus->rate_updating = false;
+
 	err = clk_set_rate(cbus->hw.clk, s_rate);
 	if (err)
 		return err;
+
+	cbus->rate_updating = true;
 	clk_set_rate(skipper, s_rate_raw);
+	cbus->rate_updating = false;
 
 	/* Finally settle new bus divider values */
 	clk_set_rate(cbus->u.system.hclk->clk, h_rate);
