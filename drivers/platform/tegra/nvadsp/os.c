@@ -36,6 +36,7 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+#include <linux/tegra-firmwares.h>
 
 #include <asm/uaccess.h>
 
@@ -1549,6 +1550,13 @@ static int adsp_create_os_version(struct dentry *adsp_debugfs_root)
 }
 #endif
 
+static ssize_t tegrafw_read_adsp(struct device *dev,
+				char *data, size_t size)
+{
+	nvadsp_get_os_version(data, size);
+	return strlen(data);
+}
+
 int __init nvadsp_os_probe(struct platform_device *pdev)
 {
 	struct nvadsp_drv_data *drv_data = platform_get_drvdata(pdev);
@@ -1625,6 +1633,8 @@ int __init nvadsp_os_probe(struct platform_device *pdev)
 
 #endif /* CONFIG_DEBUG_FS */
 
+	devm_tegrafw_register(dev, "APE", TFW_DONT_CACHE,
+			tegrafw_read_adsp, NULL);
 end:
 	return ret;
 }
