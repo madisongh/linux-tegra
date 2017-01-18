@@ -374,22 +374,20 @@ static int _connect_shared_update(struct tegra_clk_cbus_shared *bus)
 	return err;
 }
 
-static bool shared_clk_set_rate;
-
 static int clk_shared_bus_update(struct clk *bus)
 {
 	struct tegra_clk_cbus_shared *cbus =
 		to_clk_cbus_shared(__clk_get_hw(bus));
 	int err;
 
-	if (shared_clk_set_rate)
+	if (cbus->rate_update_started)
 		return 0;
 
-	shared_clk_set_rate = true;
+	cbus->rate_update_started = true;
 
 	err = cbus->bus_update(cbus);
 
-	shared_clk_set_rate = false;
+	cbus->rate_update_started = false;
 
 	return err;
 }
@@ -489,18 +487,6 @@ static int clk_shared_debug(struct clk_hw *hw, struct dentry *dir)
 		return -EINVAL;
 
 	return 0;
-}
-
-static long clk_cascade_master_round_rate(struct clk_hw *hw,
-					  unsigned long rate,
-					  unsigned long *parent_rate)
-{
-	struct tegra_clk_cbus_shared *cascade_master = to_clk_cbus_shared(hw);
-
-	if (cascade_master->top_clk)
-		return clk_round_rate(cascade_master->top_clk, rate) / 2;
-	else
-		return clk_round_rate(clk_get_parent(hw->clk), rate);
 }
 
 static int clk_system_set_rate(struct clk_hw *hw, unsigned long rate,
@@ -865,7 +851,7 @@ static const struct clk_ops tegra_clk_cascade_master_ops = {
 	.prepare = clk_shared_prepare,
 	.unprepare = clk_shared_unprepare,
 	.set_rate = clk_shared_set_rate,
-	.round_rate = clk_cascade_master_round_rate,
+	.round_rate = clk_shared_round_rate,
 	.recalc_rate = clk_shared_recalc_rate,
 };
 

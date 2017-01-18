@@ -849,6 +849,7 @@ struct tegra_clk_cbus_shared {
 	unsigned long		iso_usages;
 	unsigned long		min_rate;
 	unsigned long		max_rate;
+	bool			rate_update_started;
 	bool			rate_updating;
 	int			(*bus_update)(struct tegra_clk_cbus_shared *);
 	struct clk_hw		*top_user;
