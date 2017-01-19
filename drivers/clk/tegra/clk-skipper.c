@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -24,13 +24,14 @@
 #include "clk.h"
 
 #define SKIPPER_DIVISOR 256
+#define SKIPPER_ENABLE BIT(31)
 
 static int calc_skipper_mul(unsigned long rate, unsigned long prate)
 {
 	int mul;
 
 	rate = rate * 256;
-	mul = rate / prate;
+	mul = DIV_ROUND_UP(rate, prate);
 	mul = max(mul, 1);
 	mul = min(mul, 256);
 
@@ -51,8 +52,12 @@ static int clk_skipper_set_rate(struct clk_hw *hw, unsigned long rate,
 		spin_lock_irqsave(skipper->lock, flags);
 
 	val = readl_relaxed(skipper->reg);
-	val &= (0xff << 8);
+	val &= ~(0xff << 8);
 	val |= (mul - 1) << 8;
+	if (mul == SKIPPER_DIVISOR)
+		val &= ~SKIPPER_ENABLE;	/* disable for 1:1 */
+	else
+		val |= SKIPPER_ENABLE;	/* enable to skip */
 	writel_relaxed(val, skipper->reg);
 
 	if (skipper->lock)
@@ -89,58 +94,10 @@ static unsigned long clk_skipper_recalc_rate(struct clk_hw *hw,
 	return (prate * mul) / SKIPPER_DIVISOR;
 }
 
-static int clk_skipper_enable(struct clk_hw *hw)
-{
-	struct tegra_clk_skipper *skipper = to_clk_skipper(hw);
-	unsigned long flags = 0;
-	u32 val;
-
-	if (skipper->lock)
-		spin_lock_irqsave(skipper->lock, flags);
-
-	val = readl_relaxed(skipper->reg);
-	val |= BIT(31);
-	writel_relaxed(val, skipper->reg);
-
-	if (skipper->lock)
-		spin_unlock_irqrestore(skipper->lock, flags);
-
-	return 0;
-}
-
-static void clk_skipper_disable(struct clk_hw *hw)
-{
-	struct tegra_clk_skipper *skipper = to_clk_skipper(hw);
-	unsigned long flags = 0;
-	u32 val;
-
-	if (skipper->lock)
-		spin_lock_irqsave(skipper->lock, flags);
-
-	val = readl_relaxed(skipper->reg);
-	val &= ~BIT(31);
-	writel_relaxed(val, skipper->reg);
-
-	if (skipper->lock)
-		spin_unlock_irqrestore(skipper->lock, flags);
-
-	return;
-}
-
-static int clk_skipper_is_enabled(struct clk_hw *hw)
-{
-	struct tegra_clk_skipper *skipper = to_clk_skipper(hw);
-
-	return !!(readl_relaxed(skipper->reg) & BIT(31));
-}
-
 const struct clk_ops tegra_clk_skipper_ops = {
 	.recalc_rate = clk_skipper_recalc_rate,
 	.set_rate = clk_skipper_set_rate,
 	.determine_rate = clk_skipper_determine_rate,
-	.enable = clk_skipper_enable,
-	.disable = clk_skipper_disable,
-	.is_enabled = clk_skipper_is_enabled,
 };
 
 struct clk *tegra_clk_register_skipper(const char *name,
@@ -174,7 +131,7 @@ struct clk *tegra_clk_register_skipper(const char *name,
 	if (IS_ERR(clk))
 		kfree(skipper);
 
-	val = readl_relaxed(skipper->reg);
+	val = readl_relaxed(skipper->reg) & (~SKIPPER_ENABLE);
 	val |= (SKIPPER_DIVISOR - 1) << 8;
 	val |= SKIPPER_DIVISOR - 1;
 	writel(val, skipper->reg);
