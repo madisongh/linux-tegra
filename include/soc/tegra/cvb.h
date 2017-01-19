@@ -95,6 +95,7 @@ const struct cvb_table *tegra_cvb_build_opp_table(
 		int speedo_value,
 		unsigned long max_rate,
 		struct device *opp_dev);
+int tegra_round_voltage(int mv, const struct rail_alignment *align, int up);
 #else
 static inline const struct cvb_table *tegra_cvb_build_opp_table(
 		const struct cvb_table *cvb_tables,
@@ -108,13 +109,20 @@ static inline const struct cvb_table *tegra_cvb_build_opp_table(
 {
 	return ERR_PTR(-ENODEV);
 }
+
+static inline int tegra_round_voltage(
+		int mv,
+		const struct rail_alignment *align,
+		int up)
+{
+	return mv;
+}
 #endif
 
 int tegra_get_cvb_voltage(int speedo, int s_scale,
 			  const struct cvb_coefficients *cvb);
 int tegra_round_cvb_voltage(int mv, int v_scale,
 			    const struct rail_alignment *align);
-int tegra_round_voltage(int mv, const struct rail_alignment *align, int up);
 int tegra_get_cvb_t_voltage(int speedo, int s_scale, int t, int t_scale,
 			    struct cvb_coefficients *cvb);
 int tegra_cvb_build_thermal_table(const struct thermal_table *table,
