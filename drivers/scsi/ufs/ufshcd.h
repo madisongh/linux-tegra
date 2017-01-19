@@ -474,6 +474,11 @@ struct ufs_hba {
 	 */
 	#define UFSHCD_QUIRK_ENABLE_BKOPS			UFS_BIT(6)
 
+	/*
+         * Enable this quirk to support UFS WLUNS
+	 */
+	#define UFSHCD_QUIRK_ENABLE_WLUNS			UFS_BIT(7)
+
 	unsigned int quirks;	/* Deviations from standard UFSHCI spec. */
 
 	wait_queue_head_t tm_wq;
