@@ -20,6 +20,7 @@
 #include <linux/cpu.h>
 #include <asm/cpu.h>
 
+#ifdef CONFIG_TRUSTY
 static ssize_t tegrafw_read_trusty(struct device *dev,
 				char *data, size_t size)
 {
@@ -39,6 +40,7 @@ static ssize_t tegrafw_read_trusty(struct device *dev,
 	}
 	return 0;
 }
+#endif
 
 static ssize_t tegrafw_read_denver(struct device *dev,
 				char *version, size_t size)
@@ -80,9 +82,11 @@ static int __init tegra_firmwares_init(void)
 	check_out_of_bounds(dev, 0);
 	*dev++ = tegrafw_register("MTS", TFW_NORMAL, tegrafw_read_denver, NULL);
 
+#ifdef CONFIG_TRUSTY
 	check_out_of_bounds(dev, 0);
 	*dev++ = tegrafw_register("trusty", TFW_DONT_CACHE,
 				tegrafw_read_trusty, NULL);
+#endif
 
 	for (v = 0; v < ARRAY_SIZE(versions); v++) {
 		check_out_of_bounds(dev, 0);
