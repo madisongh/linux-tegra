@@ -17,10 +17,7 @@
 #ifndef __SOC_TEGRA_FUSE_H__
 #define __SOC_TEGRA_FUSE_H__
 
-#include <linux/tegra-soc.h>
 #include <soc/tegra/chip-id.h>
-#include <linux/sysfs.h>
-#include <linux/platform_device.h>
 
 #define TEGRA20		0x20
 #define TEGRA30		0x30
