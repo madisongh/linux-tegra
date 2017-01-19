@@ -16,7 +16,7 @@
 
 #include <linux/printk.h>
 #include <linux/io.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 #include <linux/ioport.h>
 #include <linux/platform_device.h>
 #include <linux/of_device.h>

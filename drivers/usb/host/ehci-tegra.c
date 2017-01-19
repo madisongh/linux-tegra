@@ -29,7 +29,7 @@
 #include <linux/delay.h>
 #include <linux/of_gpio.h>
 #include <linux/pm_runtime.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 
 #include <linux/reset.h>
 #include <linux/slab.h>

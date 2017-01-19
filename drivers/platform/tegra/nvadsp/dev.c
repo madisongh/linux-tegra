@@ -27,7 +27,7 @@
 #include <linux/moduleparam.h>
 #include <linux/io.h>
 #include <linux/tegra_nvadsp.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 #include <linux/pm_runtime.h>
 #include <linux/tegra_pm_domains.h>
 #include <linux/clk/tegra.h>

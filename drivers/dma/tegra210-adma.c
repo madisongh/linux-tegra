@@ -38,7 +38,7 @@
 #include <linux/slab.h>
 #include <linux/clk/tegra.h>
 #include <linux/tegra_pm_domains.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 
 #include "dmaengine.h"
 

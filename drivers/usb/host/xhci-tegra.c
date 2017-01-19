@@ -31,7 +31,7 @@
 #include <linux/extcon.h>
 
 #include <linux/tegra-powergate.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 #include <linux/tegra_pm_domains.h>
 #include <soc/tegra/xusb.h>
 

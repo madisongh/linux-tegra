@@ -49,7 +49,7 @@
 #include <linux/spinlock.h>
 #include <linux/syscore_ops.h>
 #include <linux/wakeup_reason.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 #include <linux/power/reset/system-pmic.h>
 #include <linux/notifier.h>
 #include <linux/regulator/consumer.h>

@@ -48,7 +48,7 @@
 #include <linux/uaccess.h>
 #include <linux/brcmphy.h>
 #include <linux/atomic.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 
 #include <asm/irq.h>
 

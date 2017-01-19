@@ -17,7 +17,7 @@
 #include <linux/delay.h>
 #include <linux/regulator/consumer.h>
 #include <linux/tegra-powergate.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 #include <linux/tegra_soctherm.h>
 #include <soc/tegra/tegra-dvfs.h>
 #include <trace/events/power.h>

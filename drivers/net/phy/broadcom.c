@@ -31,7 +31,7 @@
 #include <linux/phy.h>
 #include <linux/brcmphy.h>
 #include <linux/netdevice.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 
 
 #define BRCM_PHY_MODEL(phydev) \

@@ -39,7 +39,7 @@
 #include <linux/padctrl/padctrl.h>
 #include <linux/mmc/cmdq_hci.h>
 #include <linux/pm_runtime.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 #include <linux/ktime.h>
 
 #include "sdhci-pltfm.h"

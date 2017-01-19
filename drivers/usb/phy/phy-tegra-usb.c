@@ -30,7 +30,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/usb/otg.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 
 /* HACK -- need to pass this through DT */
 #include "../../../arch/arm/mach-tegra/iomap.h"

@@ -15,7 +15,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/tegra_smmu.h>
 #include <linux/dma-contiguous.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 
 #include <soc/tegra/fuse.h>
 

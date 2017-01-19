@@ -53,7 +53,7 @@ extern ULONG eqos_base_addr;
 #include "yregacc.h"
 #include "nvregacc.h"
 #include <linux/inet_lro.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 
 static INT eqos_status;
 static int handle_txrx_completions(struct eqos_prv_data *pdata, int qinx);

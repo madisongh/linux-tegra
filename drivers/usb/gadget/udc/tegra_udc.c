@@ -44,7 +44,7 @@
 #include <linux/usb/tegra_usb_phy.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/timer.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 
 #include <asm/byteorder.h>
 #include <asm/io.h>

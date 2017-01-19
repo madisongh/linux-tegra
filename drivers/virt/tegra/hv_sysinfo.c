@@ -13,7 +13,7 @@
 
 #include <linux/errno.h>
 #include <linux/bug.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 #include <linux/io.h>
 #include "guest_sysinfo.h"
 #include <soc/tegra/virt/syscalls.h>

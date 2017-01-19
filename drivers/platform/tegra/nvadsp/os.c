@@ -27,7 +27,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/firmware.h>
 #include <linux/tegra_nvadsp.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 #include <linux/elf.h>
 #include <linux/device.h>
 #include <linux/clk.h>

@@ -27,7 +27,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/clk/tegra.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 #include <soc/tegra/fuse.h>
 #include <linux/usb/tegra_usb_pmc.h>
 #include <linux/usb/tegra_usb_pad_ctrl.h>

@@ -19,7 +19,7 @@
 #include <linux/trusty/sm_err.h>
 #include <linux/device.h>
 #include <linux/pagemap.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 
 enum {
 	TRUSTY_DEV_UNINIT = -1,

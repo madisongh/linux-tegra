@@ -39,7 +39,7 @@
 #include <linux/export.h>
 #include <linux/slab.h>
 #include <linux/clk/tegra.h>
-#include <linux/tegra-soc.h>
+#include <soc/tegra/chip-id.h>
 #include <linux/module.h>
 
 #include <linux/notifier.h>
