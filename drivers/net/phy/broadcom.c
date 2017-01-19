@@ -14,7 +14,7 @@
  *	2 of the License, or (at your option) any later version.
  */
 /*
- * Copyright (c) 2015-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -443,22 +443,24 @@ void bcm_phy_ultra_low_power(struct phy_device *phydev)
 	phydev->dev_flags |= BCM_IDDQ_EN;
 }
 
-void bcm54xx_low_power_mode(struct phy_device *phydev, bool lp_mode_en)
+static int bcm54xx_low_power_mode(struct phy_device *phydev,
+			 bool lp_mode_en)
 {
 	if (lp_mode_en) {
 		if (phydev->dev_flags & BCM_IDDQ_EN) {
 			pr_debug("%s(): bcm-phy already in iddq-lp mode\n",
 				 __func__);
-			return;
+			return 0;
 		}
 		pr_info("%s(): put phy in iddq-lp mode\n", __func__);
 		bcm_phy_ultra_low_power(phydev);
 	} else {
 		pr_debug("%s(): re-initialze phy after exiting "
 					"from iddq-lp mode\n", __func__);
-		phydev->drv->config_init(phydev);
+		phy_init_hw(phydev);
 		phydev->dev_flags &= ~BCM_IDDQ_EN;
 	}
+	return 0;
 }
 
 static int bcm54xx_config_init(struct phy_device *phydev)
