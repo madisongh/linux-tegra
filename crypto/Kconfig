@@ -126,9 +126,16 @@ config CRYPTO_DH
 	help
 	  Generic implementation of the Diffie-Hellman algorithm.
 
+config CRYPTO_ECC
+	tristate "ECC functions"
+	help
+	  Implementation of ECC functions
+
+
 config CRYPTO_ECDH
 	tristate "ECDH algorithm"
 	select CRYTPO_KPP
+	select CRYPTO_ECC
 	help
 	  Generic implementation of the ECDH algorithm
 
