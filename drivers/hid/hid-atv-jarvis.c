@@ -1687,7 +1687,6 @@ static void atvr_exit(void)
 	}
 
 	hid_unregister_driver(&atvr_driver);
-	switch_dev_unregister(&shdr_mic_switch);
 }
 
 module_init(atvr_init);
