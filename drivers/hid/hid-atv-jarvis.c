@@ -379,10 +379,8 @@ static int atvr_mic_ctrl(struct hid_device *hdev, bool enable)
 
 	report[3] = enable ? 0x01 : 0x00;
 	hid_info(hdev, "%s remote mic\n", enable ? "enable" : "disable");
-	ret = hid_hw_output_report(hdev, report, sizeof(report));
-	if (ret == -ENOSYS)
-		ret = hid_hw_raw_request(hdev, report[0], report,
-			sizeof(report), HID_OUTPUT_REPORT, HID_REQ_SET_REPORT);
+	ret =  hdev->hid_output_raw_report(hdev, report, sizeof(report),
+					HID_OUTPUT_REPORT);
 	if (ret < 0)
 		hid_info(hdev, "failed to send mic ctrl report, err=%d\n", ret);
 	else
@@ -954,7 +952,7 @@ static void snd_atvr_timer_callback(unsigned long data)
 		snd_atvr_schedule_timer(substream);
 }
 
-static int snd_atvr_timer_start(struct snd_pcm_substream *substream)
+static void snd_atvr_timer_start(struct snd_pcm_substream *substream)
 {
 	struct snd_atvr *atvr_snd = snd_pcm_substream_chip(substream);
 
@@ -972,7 +970,6 @@ static int snd_atvr_timer_start(struct snd_pcm_substream *substream)
 		(unsigned long)substream);
 
 	snd_atvr_schedule_timer(substream);
-	return 0;
 }
 
 static void snd_atvr_timer_stop(struct snd_pcm_substream *substream)
@@ -1172,6 +1169,8 @@ static int snd_atvr_pcm_open(struct snd_pcm_substream *substream)
 		runtime->hw.info &= ~(SNDRV_PCM_INFO_MMAP
 			| SNDRV_PCM_INFO_MMAP_VALID);
 
+	snd_atvr_log("%s, built %s %s\n", __func__, __DATE__, __TIME__);
+
 	/*
 	 * Allocate the maximum buffer now and then just use part of it when
 	 * the substream starts. We don't need DMA because it will just
@@ -1338,10 +1337,10 @@ static int atvr_snd_initialize(struct hid_device *hdev)
 		dev++;
 		return -ENOENT;
 	}
-	err = snd_card_new(&hdev->dev, index[dev], id[dev], THIS_MODULE,
+	err = snd_card_create(index[dev], id[dev], THIS_MODULE,
 			      sizeof(struct snd_atvr), &atvr_card);
 	if (err < 0) {
-		pr_err("%s: snd_card_new() returned err %d\n",
+		pr_err("%s: snd_card_create() returned err %d\n",
 		       __func__, err);
 		return err;
 	}
@@ -1571,9 +1570,10 @@ err_parse:
 static void atvr_remove(struct hid_device *hdev)
 {
 	struct snd_atvr *atvr_snd;
+	unsigned long flags;
 
 	if (atvr_card == NULL)
-		return;
+		return -EIO;
 
 	atvr_snd = atvr_card->private_data;
 	mutex_lock(&atvr_snd->hdev_lock);
