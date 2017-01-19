@@ -2268,6 +2268,8 @@ EXPORT_SYMBOL(tegra_dfll_get_min_millivolts);
  */
 struct rail_alignment *tegra_dfll_get_alignment(void)
 {
+	if (!tegra_dfll_dev)
+		return ERR_PTR(-EPROBE_DEFER);
 	return &tegra_dfll_dev->soc->alignment;
 }
 EXPORT_SYMBOL(tegra_dfll_get_alignment);
