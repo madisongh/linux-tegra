@@ -3,7 +3,7 @@
  *  providing keys and microphone audio functionality
  *
  * Copyright (C) 2014 Google, Inc.
- * Copyright (c) 2015-2016, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2015, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -379,7 +379,9 @@ static int atvr_mic_ctrl(struct hid_device *hdev, bool enable)
 
 	report[3] = enable ? 0x01 : 0x00;
 	hid_info(hdev, "%s remote mic\n", enable ? "enable" : "disable");
-	ret = hid_hw_raw_request(hdev, report[0], report,
+	ret = hid_hw_output_report(hdev, report, sizeof(report));
+	if (ret == -ENOSYS)
+		ret = hid_hw_raw_request(hdev, report[0], report,
 			sizeof(report), HID_OUTPUT_REPORT, HID_REQ_SET_REPORT);
 	if (ret < 0)
 		hid_info(hdev, "failed to send mic ctrl report, err=%d\n", ret);
