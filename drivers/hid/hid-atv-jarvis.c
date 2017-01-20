@@ -412,8 +412,10 @@ static int atvr_mic_ctrl(struct hid_device *hdev, bool enable)
 	if (hdev->product == USB_DEVICE_ID_NVIDIA_THUNDERSTRIKE)
 		report_size = TS_HOSTCMD_REPORT_SIZE;
 
-	ret =  hdev->hid_output_raw_report(hdev, report, report_size,
-					HID_OUTPUT_REPORT);
+	ret = hid_hw_output_report(hdev, report, report_size);
+	if (ret == -ENOSYS)
+		ret = hid_hw_raw_request(hdev, report[0], report,
+			report_size, HID_OUTPUT_REPORT, HID_REQ_SET_REPORT);
 	if (ret < 0)
 		hid_info(hdev, "failed to send mic ctrl report, err=%d\n", ret);
 	else
@@ -441,8 +443,11 @@ int atvr_ts_sensor_set(struct hid_device *hdev, bool enable)
 		hid_info(hdev, "disable ts sensor\n");
 	}
 
-	ret =  hdev->hid_output_raw_report(hdev, report,
-			TS_HOSTCMD_REPORT_SIZE, HID_OUTPUT_REPORT);
+	ret = hid_hw_output_report(hdev, report, TS_HOSTCMD_REPORT_SIZE);
+	if (ret == -ENOSYS)
+		ret = hid_hw_raw_request(hdev, report[0], report,
+			TS_HOSTCMD_REPORT_SIZE, HID_OUTPUT_REPORT,
+			HID_REQ_SET_REPORT);
 	if (ret < 0)
 		hid_info(hdev, "failed to send ts sensor ctrl report, err=%d\n",
 				ret);
@@ -1097,7 +1102,7 @@ lock_err:
 		snd_atvr_schedule_timer(substream);
 }
 
-static void snd_atvr_timer_start(struct snd_pcm_substream *substream)
+static int snd_atvr_timer_start(struct snd_pcm_substream *substream)
 {
 	struct snd_atvr *atvr_snd = snd_pcm_substream_chip(substream);
 	atvr_snd->timer_enabled = true;
@@ -1111,6 +1116,7 @@ static void snd_atvr_timer_start(struct snd_pcm_substream *substream)
 		(unsigned long)substream);
 
 	snd_atvr_schedule_timer(substream);
+	return 0;
 }
 
 static void snd_atvr_timer_stop(struct snd_pcm_substream *substream)
@@ -1281,8 +1287,6 @@ static int snd_atvr_pcm_open(struct snd_pcm_substream *substream)
 		runtime->hw.info &= ~(SNDRV_PCM_INFO_MMAP
 			| SNDRV_PCM_INFO_MMAP_VALID);
 
-	snd_atvr_log("%s, built %s %s\n", __func__, __DATE__, __TIME__);
-
 	return ret;
 }
 
@@ -1422,10 +1426,10 @@ static int atvr_snd_initialize(struct hid_device *hdev,
 	}
 	cards_in_use[dev] = true;
 
-	err = snd_card_create(index[dev], id[dev], THIS_MODULE,
-			      sizeof(struct snd_atvr), &shdr_card);
+	err = snd_card_new(&hdev->dev, index[dev], id[dev], THIS_MODULE,
+			   sizeof(struct snd_atvr), &shdr_card);
 	if (err < 0) {
-		pr_err("%s: snd_card_create() returned err %d\n",
+		pr_err("%s: snd_card_new() returned err %d\n",
 		       __func__, err);
 		cards_in_use[dev] = false;
 		return err;
@@ -1472,7 +1476,7 @@ static int atvr_snd_initialize(struct hid_device *hdev,
 	if (err)
 		goto __nodev;
 
-	err = sysfs_create_link(&(hdev->dev.kobj), &(shdr_card->card_dev->kobj),
+	err = sysfs_create_link(&(hdev->dev.kobj), &(shdr_card->card_dev.kobj),
 			"sound");
 
 	if (err < 0)
@@ -1761,7 +1765,7 @@ static void atvr_remove(struct hid_device *hdev)
 	struct snd_atvr *atvr_snd;
 
 	if (shdr_card == NULL)
-		return -EIO;
+		return;
 
 	if (shdr_dev->snsr_fns && shdr_dev->snsr_fns->remove)
 		shdr_dev->snsr_fns->remove(shdr_dev->st);
