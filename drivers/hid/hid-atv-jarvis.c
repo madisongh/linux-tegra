@@ -1899,6 +1899,7 @@ static void atvr_exit(void)
 #endif
 
 	hid_unregister_driver(&atvr_driver);
+	switch_dev_unregister(&shdr_mic_switch);
 	mutex_destroy(&snd_cards_lock);
 }
 
