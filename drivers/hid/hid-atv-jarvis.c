@@ -1115,8 +1115,7 @@ static int snd_atvr_timer_start(struct snd_pcm_substream *substream)
 		snd_atvr_timer_callback,
 		(unsigned long)substream);
 
-	snd_atvr_schedule_timer(substream);
-	return 0;
+	return snd_atvr_schedule_timer(substream);
 }
 
 static void snd_atvr_timer_stop(struct snd_pcm_substream *substream)
@@ -1139,6 +1138,8 @@ static void snd_atvr_timer_stop(struct snd_pcm_substream *substream)
 static int snd_atvr_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_atvr *atvr_snd = snd_pcm_substream_chip(substream);
+	int ret;
+
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
@@ -1167,7 +1168,10 @@ static int snd_atvr_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 
 		atvr_snd->pcm_stopped = false;
 		smp_wmb();
-		snd_atvr_timer_start(substream);
+		ret = snd_atvr_timer_start(substream);
+		if (ret)
+			return ret;
+
 		return 0;
 
 	case SNDRV_PCM_TRIGGER_STOP:
@@ -1332,6 +1336,7 @@ static int snd_atvr_pcm_copy(struct snd_pcm_substream *substream,
 			  void __user *dst, snd_pcm_uframes_t count)
 {
 	struct snd_atvr *atvr_snd = snd_pcm_substream_chip(substream);
+	int ret;
 
 	/* TODO Needs to be modified if we support more than 1 channel. */
 	/*
@@ -1343,18 +1348,24 @@ static int snd_atvr_pcm_copy(struct snd_pcm_substream *substream,
 		int16_t __user *destination = dst;
 		size_t num_frames = atvr_snd->frames_per_buffer - pos;
 		size_t num_bytes = num_frames * sizeof(int16_t);
-		copy_to_user(destination, source, num_bytes);
+		ret = copy_to_user(destination, source, num_bytes);
+		if (ret)
+			return -EFAULT;
 
 		source = &atvr_snd->pcm_buffer[0];
 		destination += num_frames;
 		num_frames = count - num_frames;
 		num_bytes = num_frames * sizeof(int16_t);
-		copy_to_user(destination, source, num_bytes);
+		ret = copy_to_user(destination, source, num_bytes);
+		if (ret)
+			return -EFAULT;
 	} else {
 		const int16_t *source = &atvr_snd->pcm_buffer[pos];
 		int16_t __user *destination = dst;
 		size_t num_bytes = count * sizeof(int16_t);
-		copy_to_user(destination, source, num_bytes);
+		ret = copy_to_user(destination, source, num_bytes);
+		if (ret)
+			return -EFAULT;
 	}
 
 	return 0;
