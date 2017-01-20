@@ -1944,9 +1944,10 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 			signal_voltage = MMC_SIGNAL_VOLTAGE_180;
 		rc = tegra_sdhci_signal_voltage_switch(host, signal_voltage);
 		if (rc) {
-			dev_dbg(&pdev->dev,
-				" voltage switch failed in probe, err: %d\n"
-				, rc);
+			if (rc != -ENOTSUPP)
+				dev_dbg(&pdev->dev,
+				  " voltage switch failed in probe, err: %d\n"
+				  , rc);
 		} else {
 			if (host->mmc->rem_card_present)
 				rc = tegra_sdhci_configure_regulators(host,
