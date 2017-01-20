@@ -217,11 +217,11 @@ static long clk_cbus_round_rate(struct clk_hw *hw, unsigned long rate,
 		return *parent_rate;
 	}
 
-	new_rate = clk_round_rate(parent, rate);
+	new_rate = tegra_dvfs_round_rate(hw->clk, rate);
+
+	new_rate = clk_round_rate(parent, new_rate);
 	if (new_rate < 0)
 		return *parent_rate;
-
-	new_rate = tegra_dvfs_round_rate(hw->clk, new_rate);
 
 	return new_rate;
 }
