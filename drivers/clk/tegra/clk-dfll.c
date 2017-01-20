@@ -2202,9 +2202,10 @@ EXPORT_SYMBOL(tegra_dfll_get_thermal_floor_mv);
  */
 u32 tegra_dfll_get_peak_thermal_floor_mv(void)
 {
-	int mv = tegra_dfll_dev->soc->thermal_floor_table[0].millivolts;
+	if (WARN_ON(!tegra_dfll_dev))
+		return 0;
 
-	return tegra_round_voltage(mv, &tegra_dfll_dev->soc->alignment, 1);
+	return tegra_dfll_dev->soc->thermal_floor_table[0].millivolts;
 }
 EXPORT_SYMBOL(tegra_dfll_get_peak_thermal_floor_mv);
 
