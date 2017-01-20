@@ -28,6 +28,8 @@
 
 #define KHz 1000
 
+static void add_possible_rates_file(struct clk *c);
+
 /* there should be only 1 instance of sclk, so we can keep this global for now */
 static unsigned long sclk_pclk_unity_ratio_rate_max = 136000000;
 
@@ -1002,10 +1004,13 @@ struct clk *tegra_clk_register_sbus_cmplx(const char *name,
 	system->hw.init = &init;
 
 	c = clk_register(NULL, &system->hw);
-	if (!c)
+	if (!c) {
 		kfree(system);
+		return c;
+	}
 
 	register_bus_clk_notifier(c);
+	add_possible_rates_file(c);
 	return c;
 }
 
@@ -1047,10 +1052,13 @@ struct clk *tegra_clk_register_cbus(const char *name,
 	cbus->hw.init = &init;
 
 	c = clk_register(NULL, &cbus->hw);
-	if (!c)
+	if (!c) {
 		kfree(cbus);
+		return c;
+	}
 
 	register_bus_clk_notifier(c);
+	add_possible_rates_file(c);
 	return c;
 }
 
@@ -1178,8 +1186,10 @@ struct clk *tegra_clk_register_shared_connect(const char *name,
 	shared->hw.init = &init;
 
 	c = clk_register(NULL, &shared->hw);
-	if (!c)
+	if (!c) {
 		kfree(shared);
+		return c;
+	}
 
 	register_bus_clk_notifier(c);
 	return c;
@@ -1219,10 +1229,13 @@ struct clk *tegra_clk_register_shared_master(const char *name,
 	master->hw.init = &init;
 
 	c = clk_register(NULL, &master->hw);
-	if (!c)
+	if (!c) {
 		kfree(master);
+		return c;
+	}
 
 	register_bus_clk_notifier(c);
+	add_possible_rates_file(c);
 	return c;
 }
 
@@ -1277,9 +1290,70 @@ struct clk *tegra_clk_register_cascade_master(const char *name,
 	cascade_master->hw.init = &init;
 
 	c = clk_register(NULL, &cascade_master->hw);
-	if (!c)
+	if (!c) {
 		kfree(cascade_master);
+		return c;
+	}
 
 	register_bus_clk_notifier(c);
 	return c;
 }
+
+#ifdef CONFIG_TEGRA_CLK_DEBUG
+static int possible_rates_show(struct seq_file *s, void *data)
+{
+	struct clk *c = s->private;
+	struct tegra_clk_cbus_shared *bus = to_clk_cbus_shared(__clk_get_hw(c));
+	unsigned long rate = bus->min_rate;
+	unsigned long end_rate = clk_round_rate(c, bus->max_rate);
+
+	if (IS_ERR_VALUE(end_rate)) {
+		seq_printf(s, "max boundary rounding broken\n");
+		return 0;
+	}
+
+	/* shared bus clock must round up, unless top of range reached */
+	while (rate < end_rate) {
+		unsigned long rounded_rate = clk_round_rate(c, rate);
+		if (IS_ERR_VALUE(rounded_rate) || (rounded_rate < rate)) {
+			seq_printf(s, "...rates rounding broken\n");
+			return 0;
+		}
+
+		if ((rate == rounded_rate) && (rate > bus->min_rate)) {
+			seq_printf(s, "... %lu ", bus->max_rate / 1000);
+			break;
+		}
+
+		rate = rounded_rate + 2000;	/* 2kHz resolution */
+		seq_printf(s, "%ld ", rounded_rate / 1000);
+	}
+	seq_printf(s, "(kHz)\n");
+	return 0;
+}
+
+static int possible_rates_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, possible_rates_show, inode->i_private);
+}
+
+static const struct file_operations possible_rates_fops = {
+	.open		= possible_rates_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static void add_possible_rates_file(struct clk *c)
+{
+	struct dentry *d = __clk_debugfs_add_file(
+		c, "clk_possible_rates", S_IRUGO, c, &possible_rates_fops);
+
+	if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
+		pr_err("debugfs clk_possible_rates failed %s\n",
+		       __clk_get_name(c));
+}
+#else
+static void add_possible_rates_file(struct clk *c)
+{ }
+#endif
