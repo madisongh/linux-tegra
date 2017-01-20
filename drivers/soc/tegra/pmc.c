@@ -1621,7 +1621,7 @@ static struct notifier_block tegra_pmc_wake_notifier = {
 
 static int __init tegra_pmc_lp0_wakeup_init(void)
 {
-	if (!soc_is_tegra())
+	if (!soc_is_tegra210_n_before())
 		return 0;
 
 	bus_register_notifier(&platform_bus_type, &tegra_pmc_wake_notifier);
@@ -3844,7 +3844,7 @@ static int __init tegra_pmc_early_init(void)
 		 * SoC data can't be matched and therefore powergating is
 		 * disabled.
 		 */
-		if (IS_ENABLED(CONFIG_ARM) && soc_is_tegra()) {
+		if (IS_ENABLED(CONFIG_ARM) && soc_is_tegra210_n_before()) {
 			pr_warn("DT node not found, powergating disabled\n");
 
 			regs.start = 0x7000e400;

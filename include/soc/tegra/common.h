@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 NVIDIA Corporation
+ * Copyright (C) 2014-2017 NVIDIA Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -37,7 +37,25 @@ extern phys_addr_t tegra_lut_start;
 extern phys_addr_t tegra_lut_size;
 
 #ifdef CONFIG_ARCH_TEGRA
-bool soc_is_tegra(void);
+bool soc_is_tegra210_n_before(void);
+bool soc_is_tegra186_n_later(void);
+#else
+static inline bool soc_is_tegra210_n_before(void)
+{
+	return false;
+}
+static inline bool soc_is_tegra186_n_later(void)
+{
+	return false;
+}
+#endif
+
+static inline bool soc_is_tegra(void)
+{
+	return soc_is_tegra210_n_before() || soc_is_tegra186_n_later();
+}
+
+#ifdef CONFIG_ARCH_TEGRA
 int tegra_get_usb_port_owner_info(void);
 void tegra_get_display_board_info(struct board_info *bi);
 int tegra_get_board_panel_id(void);
@@ -45,12 +63,6 @@ void __tegra_move_framebuffer(struct platform_device *pdev,
 				phys_addr_t to, phys_addr_t from, size_t size);
 void __tegra_clear_framebuffer(struct platform_device *pdev,
 				unsigned long to, unsigned long size);
-#else
-static inline bool soc_is_tegra(void)
-{
-	return 0;
-}
 #endif
-
 
 #endif /* __SOC_TEGRA_COMMON_H__ */

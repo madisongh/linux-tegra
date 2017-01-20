@@ -1,7 +1,7 @@
 /*
  * functions and macros to control the flowcontroller
  *
- * Copyright (c) 2010-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -166,7 +166,7 @@ static int __init tegra_flowctrl_init(void)
 	unsigned long size;
 	struct device_node *np;
 
-	if (!soc_is_tegra())
+	if (!soc_is_tegra210_n_before())
 		goto out;
 
 	np = of_find_matching_node(NULL, matches);
