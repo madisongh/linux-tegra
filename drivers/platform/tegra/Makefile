@@ -52,7 +52,6 @@ obj-$(CONFIG_TEGRA_HMP_CLUSTER_CONTROL) += sysfs-cluster.o
 
 obj-$(CONFIG_PSTORE_RAM) += tegra_ramoops.o
 
-obj-y += io.o
 obj-$(CONFIG_TEGRA_CENTRAL_ACTMON) += central_actmon/
 obj-$(CONFIG_TEGRA_CPU_VOLT_CAP)	+= tegra_volt_cap.o
 
