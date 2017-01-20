@@ -157,7 +157,7 @@ static struct chip_revision tegra_chip_revisions[] = {
 
 void tegra_init_revision(void)
 {
-	u32 id, chipid, major, minor, subrev, reg;
+	u32 id, chipid, major, minor, subrev;
 	enum tegra_revision revision = TEGRA_REVISION_UNKNOWN;
 	char sub_type = 0;
 	int i;
