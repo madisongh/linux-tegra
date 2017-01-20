@@ -597,9 +597,15 @@ static void decode_adpcm_nibble(uint8_t nibble, struct snd_atvr *atvr_snd,
 {
 	int step_index = atvr_snd->step_index;
 	int value = atvr_snd->pcm_value;
-	int step = ima_step_table[step_index];
+	int step;
 	int diff;
 
+	if (unlikely(step_index < 0))
+		step_index = 0;
+	else if (unlikely(step_index >= ARRAY_SIZE(ima_step_table)))
+		step_index = ARRAY_SIZE(ima_step_table) - 1;
+
+	step = ima_step_table[step_index];
 	diff = step >> 3;
 	if (nibble & 1)
 		diff += (step >> 2);
