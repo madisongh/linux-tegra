@@ -81,13 +81,6 @@ config TEGRA_CBUS_CAN_USE_SKIPPERS
 	  When enabled, clock skippers for cbus modules can be used to provide
 	  fine granularity clock rate control
 
-config TEGRA_KFUSE
-	bool "Tegra kfuse support"
-	default y
-	help
-	  Enable Tegra kfuse support. The kfuse block stores downstream and
-	  upstream HDCP keys for use by the HDMI module.
-
 config TEGRA_CENTRAL_ACTMON
 	bool "Tegra Activity Monitor"
 	depends on ARCH_TEGRA_18x_SOC || ARCH_TEGRA_21x_SOC
