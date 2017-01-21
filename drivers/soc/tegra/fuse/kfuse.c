@@ -27,7 +27,7 @@
 #include <linux/mutex.h>
 #include <linux/of_device.h>
 #include <soc/tegra/chip-id.h>
-#include <linux/platform/tegra/tegra_kfuse.h>
+#include <soc/tegra/kfuse.h>
 #include <linux/platform/tegra/clock.h>
 
 /* SOC specific Tegra kfuse information */
