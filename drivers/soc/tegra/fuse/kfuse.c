@@ -35,7 +35,7 @@ struct tegra_kfuse_soc {
 	bool sensing_support;
 };
 
-struct kfuse {
+struct tegra_kfuse {
 	struct device *dev;
 	struct clk *clk;
 	void __iomem *aperture;
@@ -47,7 +47,7 @@ struct kfuse {
 };
 
 /* Public API does not provide kfuse structure or device */
-static struct kfuse *global_kfuse;
+static struct tegra_kfuse *global_kfuse;
 
 /* register definition */
 #define KFUSE_PD		0x24
@@ -63,23 +63,23 @@ static struct kfuse *global_kfuse;
 #define KFUSE_KEYS		0x8c
 #define KFUSE_CG1_0		0x90
 
-static u32 tegra_kfuse_readl(struct kfuse *kfuse, unsigned long offset)
+static u32 tegra_kfuse_readl(struct tegra_kfuse *kfuse, unsigned long offset)
 {
 	return readl(kfuse->aperture + offset);
 }
 
-static void tegra_kfuse_writel(struct kfuse *kfuse, u32 value,
+static void tegra_kfuse_writel(struct tegra_kfuse *kfuse, u32 value,
 			       unsigned long offset)
 {
 	writel(value, kfuse->aperture + offset);
 }
 
-static struct kfuse *tegra_kfuse_get(void)
+static struct tegra_kfuse *tegra_kfuse_get(void)
 {
 	return global_kfuse;
 }
 
-static int wait_for_done(struct kfuse *kfuse)
+static int tegra_kfuse_wait_for_done(struct tegra_kfuse *kfuse)
 {
 	u32 reg;
 	int retries = 50;
@@ -95,7 +95,7 @@ static int wait_for_done(struct kfuse *kfuse)
 
 int tegra_kfuse_enable_sensing(void)
 {
-	struct kfuse *kfuse = tegra_kfuse_get();
+	struct tegra_kfuse *kfuse = tegra_kfuse_get();
 	int err = 0;
 
 	/* check that kfuse driver is available.. */
@@ -136,7 +136,7 @@ EXPORT_SYMBOL(tegra_kfuse_enable_sensing);
 
 void tegra_kfuse_disable_sensing(void)
 {
-	struct kfuse *kfuse = tegra_kfuse_get();
+	struct tegra_kfuse *kfuse = tegra_kfuse_get();
 
 	/* check that kfuse driver is available.. */
 	if (!kfuse)
@@ -170,7 +170,7 @@ EXPORT_SYMBOL(tegra_kfuse_disable_sensing);
  */
 int tegra_kfuse_read(void *dest, size_t len)
 {
-	struct kfuse *kfuse = tegra_kfuse_get();
+	struct tegra_kfuse *kfuse = tegra_kfuse_get();
 	int err;
 	u32 v;
 	unsigned cnt;
@@ -199,7 +199,7 @@ int tegra_kfuse_read(void *dest, size_t len)
 
 	tegra_kfuse_writel(kfuse, KFUSE_KEYADDR_AUTOINC, KFUSE_KEYADDR);
 
-	err = wait_for_done(kfuse);
+	err = tegra_kfuse_wait_for_done(kfuse);
 	if (err) {
 		dev_err(kfuse->dev, "kfuse: read timeout\n");
 		clk_disable_unprepare(kfuse->clk);
@@ -231,9 +231,9 @@ int tegra_kfuse_read(void *dest, size_t len)
 }
 EXPORT_SYMBOL(tegra_kfuse_read);
 
-static int kfuse_probe(struct platform_device *pdev)
+static int tegra_kfuse_probe(struct platform_device *pdev)
 {
-	struct kfuse *kfuse;
+	struct tegra_kfuse *kfuse;
 	struct resource *resource;
 	int err;
 
@@ -283,9 +283,9 @@ static int kfuse_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int kfuse_remove(struct platform_device *pdev)
+static int tegra_kfuse_remove(struct platform_device *pdev)
 {
-	struct kfuse *kfuse = platform_get_drvdata(pdev);
+	struct tegra_kfuse *kfuse = platform_get_drvdata(pdev);
 	int ret = 0;
 
 	/* ensure that no-one is using sensing now */
@@ -324,8 +324,8 @@ static const struct of_device_id tegra_kfuse_of_match[] = {
 };
 
 static struct platform_driver kfuse_driver = {
-	.probe = kfuse_probe,
-	.remove = kfuse_remove,
+	.probe = tegra_kfuse_probe,
+	.remove = tegra_kfuse_remove,
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = "kfuse",
