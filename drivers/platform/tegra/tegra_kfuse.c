@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2010-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -24,42 +24,57 @@
 #include <linux/delay.h>
 #include <linux/clk.h>
 #include <linux/module.h>
-
+#include <linux/mutex.h>
+#include <linux/of_device.h>
+#include <soc/tegra/chip-id.h>
 #include <linux/platform/tegra/tegra_kfuse.h>
-
 #include <linux/platform/tegra/clock.h>
 
-#include "tegra_kfuse_priv.h"
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-#include "tegra18_kfuse_priv.h"
-#include <linux/platform/tegra/tegra18_kfuse.h>
-#endif
+/* SOC specific Tegra kfuse information */
+struct tegra_kfuse_soc {
+	bool sensing_support;
+};
+
+struct kfuse {
+	struct device *dev;
+	struct clk *clk;
+	void __iomem *aperture;
+	const struct tegra_kfuse_soc *soc;
+	unsigned int cg_refcount;
+
+	/* Mutex for handling clockgating reference count */
+	struct mutex cg_refcount_mutex;
+};
 
 /* Public API does not provide kfuse structure or device */
 static struct kfuse *global_kfuse;
 
 /* register definition */
-#define KFUSE_PD                0x24
-#define KFUSE_PD_PU             (0u << 0)
-#define KFUSE_PD_PD             (1u << 0)
-#define KFUSE_STATE             0x80
-#define KFUSE_STATE_DONE        (1u << 16)
-#define KFUSE_STATE_CRCPASS     (1u << 17)
-#define KFUSE_KEYADDR           0x88
-#define KFUSE_KEYADDR_AUTOINC   (1u << 16)
-#define KFUSE_KEYS              0x8c
+#define KFUSE_PD		0x24
+#define KFUSE_PD_PU		0u
+#define KFUSE_PD_PD		BIT(0)
 
-u32 tegra_kfuse_readl(struct kfuse *kfuse, unsigned long offset)
+#define KFUSE_STATE		0x80
+#define KFUSE_STATE_DONE	BIT(16)
+#define KFUSE_STATE_CRCPASS	BIT(17)
+
+#define KFUSE_KEYADDR		0x88
+#define KFUSE_KEYADDR_AUTOINC	BIT(16)
+#define KFUSE_KEYS		0x8c
+#define KFUSE_CG1_0		0x90
+
+static u32 tegra_kfuse_readl(struct kfuse *kfuse, unsigned long offset)
 {
 	return readl(kfuse->aperture + offset);
 }
 
-void tegra_kfuse_writel(struct kfuse *kfuse, u32 value, unsigned long offset)
+static void tegra_kfuse_writel(struct kfuse *kfuse, u32 value,
+			       unsigned long offset)
 {
 	writel(value, kfuse->aperture + offset);
 }
 
-struct kfuse *tegra_kfuse_get(void)
+static struct kfuse *tegra_kfuse_get(void)
 {
 	return global_kfuse;
 }
@@ -78,6 +93,78 @@ static int wait_for_done(struct kfuse *kfuse)
 	return -ETIMEDOUT;
 }
 
+int tegra_kfuse_enable_sensing(void)
+{
+	struct kfuse *kfuse = tegra_kfuse_get();
+	int err = 0;
+
+	/* check that kfuse driver is available.. */
+	if (!kfuse)
+		return -ENODEV;
+
+	mutex_lock(&kfuse->cg_refcount_mutex);
+
+	/* increment refcount */
+	kfuse->cg_refcount++;
+
+	/* if clock was already up, quit */
+	if (kfuse->cg_refcount > 1)
+		goto exit_unlock;
+
+	/* enable kfuse clock */
+	err = clk_prepare_enable(kfuse->clk);
+	if (err) {
+		kfuse->cg_refcount--;
+		goto exit_unlock;
+	}
+
+	/* WAR to simulator bug in clockgating behavior; The register must
+	 * not be written or the users will not be able to access kfuse
+	 */
+	if (tegra_platform_is_linsim())
+		goto exit_unlock;
+
+	/* enable kfuse sensing */
+	tegra_kfuse_writel(kfuse, 1, KFUSE_CG1_0);
+
+exit_unlock:
+	mutex_unlock(&kfuse->cg_refcount_mutex);
+
+	return err;
+}
+EXPORT_SYMBOL(tegra_kfuse_enable_sensing);
+
+void tegra_kfuse_disable_sensing(void)
+{
+	struct kfuse *kfuse = tegra_kfuse_get();
+
+	/* check that kfuse driver is available.. */
+	if (!kfuse)
+		return;
+
+	mutex_lock(&kfuse->cg_refcount_mutex);
+
+	if (WARN_ON(kfuse->cg_refcount == 0))
+		goto exit_unlock;
+
+	/* decrement refcount */
+	kfuse->cg_refcount--;
+
+	/* if there are still users, quit */
+	if (kfuse->cg_refcount > 0)
+		goto exit_unlock;
+
+	/* disable kfuse sensing */
+	tegra_kfuse_writel(kfuse, 0, KFUSE_CG1_0);
+
+	/* ..and disable kfuse clock */
+	clk_disable_unprepare(kfuse->clk);
+
+exit_unlock:
+	mutex_unlock(&kfuse->cg_refcount_mutex);
+}
+EXPORT_SYMBOL(tegra_kfuse_disable_sensing);
+
 /* read up to KFUSE_DATA_SZ bytes into dest.
  * always starts at the first kfuse.
  */
@@ -87,9 +174,6 @@ int tegra_kfuse_read(void *dest, size_t len)
 	int err;
 	u32 v;
 	unsigned cnt;
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-	int ret;
-#endif
 
 	if (!kfuse)
 		return -ENODEV;
@@ -97,11 +181,11 @@ int tegra_kfuse_read(void *dest, size_t len)
 	if (len > KFUSE_DATA_SZ)
 		return -EINVAL;
 
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-	ret = tegra_kfuse_enable_sensing();
-	if (ret)
-		return ret;
-#endif
+	if (kfuse->soc->sensing_support) {
+		err = tegra_kfuse_enable_sensing();
+		if (err)
+			return err;
+	}
 
 	err = clk_prepare_enable(kfuse->clk);
 	if (err)
@@ -117,14 +201,14 @@ int tegra_kfuse_read(void *dest, size_t len)
 
 	err = wait_for_done(kfuse);
 	if (err) {
-		pr_err("kfuse: read timeout\n");
+		dev_err(kfuse->dev, "kfuse: read timeout\n");
 		clk_disable_unprepare(kfuse->clk);
 		return err;
 	}
 
 	if ((tegra_kfuse_readl(kfuse, KFUSE_STATE) &
 			       KFUSE_STATE_CRCPASS) == 0) {
-		pr_err("kfuse: crc failed\n");
+		dev_err(kfuse->dev, "kfuse: crc failed\n");
 		clk_disable_unprepare(kfuse->clk);
 		return -EIO;
 	}
@@ -139,9 +223,9 @@ int tegra_kfuse_read(void *dest, size_t len)
 		tegra_kfuse_writel(kfuse, KFUSE_PD_PD, KFUSE_PD);
 
 	clk_disable_unprepare(kfuse->clk);
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-	tegra_kfuse_disable_sensing();
-#endif
+
+	if (kfuse->soc->sensing_support)
+		tegra_kfuse_disable_sensing();
 
 	return 0;
 }
@@ -160,6 +244,9 @@ static int kfuse_probe(struct platform_device *pdev)
 	if (!kfuse)
 		return -ENOMEM;
 
+	kfuse->soc = of_device_get_match_data(&pdev->dev);
+	kfuse->dev = &pdev->dev;
+
 	if (IS_ENABLED(CONFIG_COMMON_CLK))
 		kfuse->clk = devm_clk_get(&pdev->dev, "kfuse");
 	else
@@ -167,58 +254,48 @@ static int kfuse_probe(struct platform_device *pdev)
 
 	if (IS_ERR(kfuse->clk)) {
 		err = PTR_ERR(kfuse->clk);
-		goto err_get_clk;
+		dev_err(&pdev->dev, "Failed to get kfuse clk: %d\n", err);
+		return err;
 	}
 
 	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!resource) {
-		err = -EINVAL;
-		goto err_get_resource;
+		dev_err(&pdev->dev, "Failed to get MEM resource\n");
+		return -EINVAL;
 	}
 
 	kfuse->aperture = devm_ioremap_resource(&pdev->dev, resource);
 	if (IS_ERR(kfuse->aperture)) {
 		err = PTR_ERR(kfuse->aperture);
-		goto err_ioremap;
+		dev_err(&pdev->dev, "Failed to ioremap: %d\n", err);
+		return err;
 	}
 
-	kfuse->pdev = pdev;
+	mutex_init(&kfuse->cg_refcount_mutex);
 
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-	err = tegra18_kfuse_init(kfuse);
-	if (err)
-		goto err_tegra18_init;
-#endif
+	platform_set_drvdata(pdev, kfuse);
 
 	/* for public API */
 	global_kfuse = kfuse;
-	platform_set_drvdata(pdev, kfuse);
 
 	dev_info(&pdev->dev, "initialized\n");
 
 	return 0;
-
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-err_tegra18_init:
-#endif
-
-err_ioremap:
-err_get_resource:
-err_get_clk:
-	kfuse = NULL;
-	return err;
 }
 
-static int __exit kfuse_remove(struct platform_device *pdev)
+static int kfuse_remove(struct platform_device *pdev)
 {
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
 	struct kfuse *kfuse = platform_get_drvdata(pdev);
-	int err;
+	int ret = 0;
 
-	err = tegra18_kfuse_deinit(kfuse);
-	if (err)
-		return err;
-#endif
+	/* ensure that no-one is using sensing now */
+	mutex_lock(&kfuse->cg_refcount_mutex);
+	if (kfuse->cg_refcount)
+		ret = -EBUSY;
+	mutex_unlock(&kfuse->cg_refcount_mutex);
+
+	if (ret < 0)
+		return ret;
 
 	global_kfuse = NULL;
 
@@ -227,18 +304,28 @@ static int __exit kfuse_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static struct of_device_id tegra_kfuse_of_match[] = {
-	{ .compatible = "nvidia,tegra124-kfuse" },
-	{ .compatible = "nvidia,tegra210-kfuse" },
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-	{ .compatible = "nvidia,tegra186-kfuse" },
-#endif
+static const struct tegra_kfuse_soc tegra124_kfuse_soc = {
+	.sensing_support = false,
+};
+
+static const struct tegra_kfuse_soc tegra210_kfuse_soc = {
+	.sensing_support = false,
+};
+
+static const struct tegra_kfuse_soc tegra186_kfuse_soc = {
+	.sensing_support = true,
+};
+
+static const struct of_device_id tegra_kfuse_of_match[] = {
+	{ .compatible = "nvidia,tegra124-kfuse", .data = &tegra124_kfuse_soc, },
+	{ .compatible = "nvidia,tegra210-kfuse", .data = &tegra210_kfuse_soc, },
+	{ .compatible = "nvidia,tegra186-kfuse", .data = &tegra186_kfuse_soc, },
 	{ },
 };
 
 static struct platform_driver kfuse_driver = {
 	.probe = kfuse_probe,
-	.remove = __exit_p(kfuse_remove),
+	.remove = kfuse_remove,
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = "kfuse",

@@ -20,6 +20,8 @@
 
 #ifdef CONFIG_TEGRA_KFUSE
 int tegra_kfuse_read(void *dest, size_t len);
+void tegra_kfuse_disable_sensing(void);
+int tegra_kfuse_enable_sensing(void);
 #else
 static inline int tegra_kfuse_read(void *dest, size_t len)
 {
