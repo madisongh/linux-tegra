@@ -1034,6 +1034,10 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
 			i2c_dev->msg_err |= I2C_ERR_NO_ACK;
 		if (status & I2C_INT_ARBITRATION_LOST)
 			i2c_dev->msg_err |= I2C_ERR_ARBITRATION_LOST;
+		if (status & I2C_INT_TX_FIFO_OVERFLOW)
+			i2c_dev->msg_err |= I2C_INT_TX_FIFO_OVERFLOW;
+		if (status & I2C_INT_RX_FIFO_UNDERFLOW)
+			i2c_dev->msg_err |= I2C_INT_RX_FIFO_UNDERFLOW;
 		goto err;
 	}
 
@@ -1073,7 +1077,6 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
 			else
 				i2c_dev->msg_rx_remaining = 0;
 		}
-
 		WARN_ON(i2c_dev->msg_tx_remaining || i2c_dev->msg_rx_remaining);
 
 		if ((!i2c_dev->msg_rx_remaining) &&
@@ -1089,9 +1092,6 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
 			else
 				i2c_dev->msg_rx_remaining = 0;
 		}
-
-		WARN_ON(i2c_dev->msg_tx_remaining || i2c_dev->msg_rx_remaining);
-
 		if ((!i2c_dev->msg_rx_remaining) &&
 				(!i2c_dev->msg_tx_remaining))
 			complete(&i2c_dev->msg_complete);
@@ -1101,7 +1101,8 @@ err:
 	/* An error occurred, mask all interrupts */
 	mask = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
 		I2C_INT_PACKET_XFER_COMPLETE | I2C_INT_TX_FIFO_DATA_REQ |
-		I2C_INT_RX_FIFO_DATA_REQ | I2C_INT_ALL_PACKETS_XFER_COMPLETE;
+		I2C_INT_RX_FIFO_DATA_REQ | I2C_INT_ALL_PACKETS_XFER_COMPLETE |
+		I2C_INT_RX_FIFO_UNDERFLOW | I2C_INT_TX_FIFO_OVERFLOW;
 
 	if (i2c_dev->hw->has_hw_arb_support)
 		mask |= I2C_INT_BUS_CLEAR_DONE;
@@ -1280,8 +1281,8 @@ static int tegra_i2c_start_pio_xfer(struct tegra_i2c_dev *i2c_dev, u8 *buffer,
 	i2c_writel(i2c_dev, val, I2C_FIFO_CONTROL);
 
 	/* Enable error interrupts */
-	int_mask = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST
-					| I2C_INT_TX_FIFO_OVERFLOW;
+	int_mask = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST |
+		I2C_INT_TX_FIFO_OVERFLOW | I2C_INT_RX_FIFO_UNDERFLOW;
 	tegra_i2c_unmask_irq(i2c_dev, int_mask);
 
 	/* Acquire the lock before posting the data to FIFO */
@@ -1313,8 +1314,6 @@ static int tegra_i2c_start_pio_xfer(struct tegra_i2c_dev *i2c_dev, u8 *buffer,
 static int tegra_i2c_pre_xfer_config(struct tegra_i2c_dev *i2c_dev,
 		u8 *buffer, size_t length, bool tx)
 {
-	tegra_i2c_flush_fifos(i2c_dev);
-
 	if (tx) {
 		i2c_dev->msg_tx_buf = buffer + I2C_PACKET_HEADER_SIZE * 4;
 		i2c_dev->msg_tx_remaining = length - I2C_PACKET_HEADER_SIZE * 4;
@@ -1327,8 +1326,9 @@ static int tegra_i2c_pre_xfer_config(struct tegra_i2c_dev *i2c_dev,
 		i2c_dev->msg_tx_remaining = 0;
 	}
 	i2c_writel(i2c_dev, 0, I2C_FIFO_CONTROL);
-	i2c_dev->msg_err = I2C_ERR_NONE;
 	i2c_writel(i2c_dev, 0, I2C_INT_MASK);
+	i2c_dev->msg_err = I2C_ERR_NONE;
+	reinit_completion(&i2c_dev->msg_complete);
 
 	return 0;
 }
@@ -1349,6 +1349,9 @@ static int tegra_i2c_handle_xfer_error(struct tegra_i2c_dev *i2c_dev)
 				i2c_dev->msg_add);
 	if (i2c_dev->msg_err & I2C_INT_TX_FIFO_OVERFLOW)
 		dev_warn(i2c_dev->dev, "Tx fifo overflow to add 0x%x\n",
+				i2c_dev->msg_add);
+	if (i2c_dev->msg_err & I2C_INT_RX_FIFO_UNDERFLOW)
+		dev_warn(i2c_dev->dev, "Rx fifo underflow to add 0x%x\n",
 				i2c_dev->msg_add);
 	/*
 	 * NACK interrupt is generated before the I2C controller generates the
@@ -1800,7 +1803,6 @@ static int tegra_i2c_is_multi_pkt_supported(struct tegra_i2c_dev *i2c_dev,
 {
 	int i;
 
-	return false;
 	for (i = 0; i < num; i++) {
 		if (msgs[i].flags & I2C_M_NOSTART)
 			return false;
@@ -1819,6 +1821,7 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	i2c_dev->msgs = msgs;
 	i2c_dev->msg_num = num;
 	i2c_dev->has_rx = false;
+	tegra_i2c_flush_fifos(i2c_dev);
 
 	if (i2c_dev->is_suspended)
 		return -EBUSY;
@@ -1908,7 +1911,6 @@ static void tegra_i2c_parse_dt(struct tegra_i2c_dev *i2c_dev)
 
 	i2c_dev->disable_dma_mode = of_property_read_bool(np,
 			"nvidia,disable-dma-mode");
-
 	i2c_dev->is_clkon_always = of_property_read_bool(np,
 			"nvidia,clock-always-on");
 }
