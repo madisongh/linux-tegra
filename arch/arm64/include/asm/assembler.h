@@ -66,7 +66,7 @@
  * Enable and disable debug exceptions.
  */
 	.macro	disable_dbg
-	msr	daifclr, #8
+	msr	daifset, #8
 	.endm
 
 	.macro	enable_dbg
