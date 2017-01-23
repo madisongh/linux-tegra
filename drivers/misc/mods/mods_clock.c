@@ -513,12 +513,7 @@ int esc_mods_clock_reset_assert(struct file *pfile,
 		mods_error_printk("unrecognized clock handle: 0x%x\n",
 				  p->clock_handle);
 	} else {
-#if defined(CONFIG_TEGRA_CLK_FRAMEWORK)
-		tegra_periph_reset_assert(pclk);
-		mods_debug_printk(DEBUG_CLOCK, "clock 0x%x reset asserted\n",
-				  p->clock_handle);
-		ret = OK;
-#elif defined(MODS_COMMON_CLK) && defined(CONFIG_RESET_CONTROLLER)
+#if defined(MODS_COMMON_CLK)
 		const char *clk_name = 0;
 		struct reset_control *prst = 0;
 		struct device_node *mods_np = 0;
@@ -576,12 +571,7 @@ int esc_mods_clock_reset_deassert(struct file *pfile,
 		mods_error_printk("unrecognized clock handle: 0x%x\n",
 				  p->clock_handle);
 	} else {
-#if defined(CONFIG_TEGRA_CLK_FRAMEWORK)
-		tegra_periph_reset_deassert(pclk);
-		mods_debug_printk(DEBUG_CLOCK, "clock 0x%x reset deasserted\n",
-				  p->clock_handle);
-		ret = OK;
-#elif defined(MODS_COMMON_CLK) && defined(CONFIG_RESET_CONTROLLER)
+#if defined(MODS_COMMON_CLK)
 		const char *clk_name = 0;
 		struct reset_control *prst = 0;
 		struct device_node *mods_np = 0;
