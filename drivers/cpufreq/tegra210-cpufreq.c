@@ -357,6 +357,30 @@ static int percpu_cpufreq_exit(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static int __init tegra_cpufreq_set_max(void)
+{
+	/*
+	 * At this point, cpufreq driver and core interface is up,
+	 * scaling up can start: set the CPU frequency, maximum possible
+	 */
+	struct cpufreq_policy *policy;
+
+	policy = cpufreq_cpu_get(0);
+	if (!policy || __cpufreq_driver_target(policy, policy->max,
+						CPUFREQ_RELATION_H))
+		pr_warn("Failed to set maximum possible CPU frequency\n");
+	 else
+		pr_info("Set maximum possible CPU frequency %u\n",
+			get_cpu_freq(policy->cpu));
+
+	if (policy)
+		cpufreq_cpu_put(policy);
+
+	return 0;
+}
+
+late_initcall_sync(tegra_cpufreq_set_max);
+
 /* Cpufreq driver data */
 static struct cpufreq_driver tegra_cpufreq_driver = {
 	.name = "tegra-cpufreq",
