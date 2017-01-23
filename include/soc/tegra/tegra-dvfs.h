@@ -86,6 +86,7 @@ struct dvfs_rail {
 	int max_millivolts;
 	int nominal_millivolts;
 	int override_millivolts;
+	int dbg_mv_offs;
 
 	int step;
 	int step_up;
