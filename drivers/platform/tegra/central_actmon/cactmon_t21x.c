@@ -208,7 +208,9 @@ static void actmon_dev_reg_ops_init(struct actmon_dev *adev)
 static void actmon_dev_clk_enable
 		(struct actmon_dev *adev)
 {
+#ifndef CONFIG_COMMON_CLK
 	tegra_clk_prepare_enable(aclk(adev->clnt));
+#endif
 }
 
 static void actmon_dev_set_rate(struct actmon_dev *adev,
@@ -246,8 +248,8 @@ int actmon_dev_platform_init_t21x(struct actmon_dev *adev,
 
 	prnt = clk_get_parent(aclk(adev->clnt));
 	BUG_ON(!prnt);
-
 	if (adev->rate_change_nb.notifier_call) {
+#ifndef CONFIG_COMMON_CLK
 		ret = tegra_register_clk_rate_notifier(prnt,
 				&adev->rate_change_nb);
 		if (ret) {
@@ -255,8 +257,8 @@ int actmon_dev_platform_init_t21x(struct actmon_dev *adev,
 				prnt->name, adev->dev_name);
 			return ret;
 		}
+#endif
 	}
-
 	return ret;
 }
 
@@ -289,7 +291,9 @@ static void cactmon_free_resource_t21x(
 	struct clk *prnt;
 
 	prnt = clk_get_parent(aclk(adev->clnt));
+#ifndef CONFIG_COMMON_CLK
 	tegra_unregister_clk_rate_notifier(prnt, &adev->rate_change_nb);
+#endif
 }
 
 static int cactmon_reset_deinit_t21x(struct platform_device *pdev)
@@ -319,7 +323,9 @@ static int cactmon_clk_disable_t21x(struct platform_device *pdev)
 	int ret = 0;
 
 	if (actmon->actmon_clk) {
+#ifndef CONFIG_COMMON_CLK
 		tegra_clk_disable_unprepare(actmon->actmon_clk);
+#endif
 		actmon->actmon_clk = NULL;
 		dev_dbg(mon_dev, "actmon clocks disabled\n");
 	}
@@ -339,12 +345,13 @@ static int cactmon_clk_enable_t21x(struct platform_device *pdev)
 		ret = PTR_ERR(actmon->actmon_clk);
 		return ret;
 	}
-
+#ifndef CONFIG_COMMON_CLK
 	ret = tegra_clk_prepare_enable(actmon->actmon_clk);
 	if (ret) {
 		pr_err("%s: Failed to enable actmon clock\n", __func__);
 		return ret;
 	}
+#endif
 	actmon->freq = clk_get_rate(actmon->actmon_clk) / 1000;
 
 	return ret;
