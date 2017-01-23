@@ -133,8 +133,8 @@ enum tegra_clk_ex_param {
 	TEGRA_CLK_MIPI_CSI_OUT_ENB,
 };
 
-void tegra_periph_reset_deassert(struct clk *c);
-void tegra_periph_reset_assert(struct clk *c);
+static inline void tegra_periph_reset_deassert(struct clk *c) { }
+static inline void tegra_periph_reset_assert(struct clk *c) { }
 
 #ifdef CONFIG_COMMON_CLK
 /* Keep using these functions until the replacement in place */
