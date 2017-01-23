@@ -610,26 +610,6 @@ static void _tegra_pmc_writel(u32 value, unsigned long offset)
 	writel(value, pmc->base + offset);
 }
 
-static void _tegra_pmc_register_update(int offset,
-		unsigned long mask, unsigned long val)
-{
-	u32 pmc_reg;
-
-	pmc_reg = _tegra_pmc_readl(offset);
-	pmc_reg = (pmc_reg & ~mask) | (val & mask);
-	_tegra_pmc_writel(pmc_reg, offset);
-}
-
-static void _tegra_pmc_register_update_lock(int offset,
-		unsigned long mask, unsigned long val)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&pwr_lock, flags);
-	_tegra_pmc_register_update(offset, mask, val);
-	spin_unlock_irqrestore(&pwr_lock, flags);
-}
-
 /* PMC register read/write/update with pmc register enums */
 static u32 tegra_pmc_readl(enum pmc_regs reg)
 {
