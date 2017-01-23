@@ -570,6 +570,10 @@ struct tegra_xudc_soc_data {
 	bool u2_enable;
 	bool lpm_enable;
 	bool invalid_seq_num;
+	int (*set_vbus_override)(struct phy *utmi_phy);
+	int (*clear_vbus_override)(struct phy *utmi_phy);
+	void (*utmi_pad_power_on)(struct phy *utmi_phy);
+	void (*utmi_pad_power_off)(struct phy *utmi_phy);
 };
 
 static bool u1_enable;
@@ -672,8 +676,10 @@ static void tegra_xudc_device_mode_on(struct tegra_xudc *xudc)
 
 	spin_lock_irqsave(&xudc->lock, flags);
 	dev_info(xudc->dev, "device mode on\n");
-	tegra_phy_xusb_utmi_pad_power_on(xudc->utmi_phy);
-	tegra_phy_xusb_set_vbus_override(xudc->utmi_phy);
+	if (xudc->soc->utmi_pad_power_on)
+		xudc->soc->utmi_pad_power_on(xudc->utmi_phy);
+	if (xudc->soc->set_vbus_override)
+		xudc->soc->set_vbus_override(xudc->utmi_phy);
 
 	xudc->device_mode = true;
 	spin_unlock_irqrestore(&xudc->lock, flags);
@@ -696,8 +702,10 @@ static void tegra_xudc_device_mode_off(struct tegra_xudc *xudc)
 	connected = !!(xudc_readl(xudc, PORTSC) & PORTSC_CCS);
 	reinit_completion(&xudc->disconnect_complete);
 
-	tegra_phy_xusb_clear_vbus_override(xudc->utmi_phy);
-	tegra_phy_xusb_utmi_pad_power_down(xudc->utmi_phy);
+	if (xudc->soc->clear_vbus_override)
+		xudc->soc->clear_vbus_override(xudc->utmi_phy);
+	if (xudc->soc->utmi_pad_power_off)
+		xudc->soc->utmi_pad_power_off(xudc->utmi_phy);
 
 	pls = (xudc_readl(xudc, PORTSC) >> PORTSC_PLS_SHIFT) &
 		PORTSC_PLS_MASK;
@@ -782,8 +790,10 @@ static void tegra_xudc_plc_reset_work(struct work_struct *work)
 			  PORTSC_PLS_MASK;
 		if (pls == PORTSC_PLS_INACTIVE) {
 			dev_info(xudc->dev, "PLS = Inactive. Toggle VBUS\n");
-			tegra_phy_xusb_clear_vbus_override(xudc->utmi_phy);
-			tegra_phy_xusb_set_vbus_override(xudc->utmi_phy);
+			if (xudc->soc->clear_vbus_override)
+				xudc->soc->clear_vbus_override(xudc->utmi_phy);
+			if (xudc->soc->set_vbus_override)
+				xudc->soc->set_vbus_override(xudc->utmi_phy);
 			xudc->wait_csc = false;
 		}
 	}
@@ -3374,6 +3384,10 @@ static struct tegra_xudc_soc_data tegra210_xudc_soc_data = {
 	.u2_enable = true,
 	.lpm_enable = false,
 	.invalid_seq_num = true,
+	.set_vbus_override = tegra21x_phy_xusb_set_vbus_override,
+	.clear_vbus_override = tegra21x_phy_xusb_clear_vbus_override,
+	.utmi_pad_power_on = tegra21x_phy_xusb_utmi_pad_power_on,
+	.utmi_pad_power_off = tegra21x_phy_xusb_utmi_pad_power_down,
 };
 
 static struct tegra_xudc_soc_data tegra186_xudc_soc_data = {
@@ -3384,6 +3398,10 @@ static struct tegra_xudc_soc_data tegra186_xudc_soc_data = {
 	.u2_enable = true,
 	.lpm_enable = false,
 	.invalid_seq_num = false,
+	.set_vbus_override = tegra18x_phy_xusb_set_vbus_override,
+	.clear_vbus_override = tegra18x_phy_xusb_clear_vbus_override,
+	.utmi_pad_power_on = tegra18x_phy_xusb_utmi_pad_power_on,
+	.utmi_pad_power_off = tegra18x_phy_xusb_utmi_pad_power_down,
 };
 
 static struct tegra_xudc_soc_data tegra194_xudc_soc_data = {
@@ -3394,6 +3412,11 @@ static struct tegra_xudc_soc_data tegra194_xudc_soc_data = {
 	.u2_enable = false,
 	.lpm_enable = false,
 	.invalid_seq_num = false,
+	/* TODO: Update function overrides with T19x pinctrl API's */
+	.set_vbus_override = tegra18x_phy_xusb_set_vbus_override,
+	.clear_vbus_override = tegra18x_phy_xusb_clear_vbus_override,
+	.utmi_pad_power_on = tegra18x_phy_xusb_utmi_pad_power_on,
+	.utmi_pad_power_off = tegra18x_phy_xusb_utmi_pad_power_down,
 };
 
 static struct of_device_id tegra_xudc_of_match[] = {

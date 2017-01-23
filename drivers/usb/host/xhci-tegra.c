@@ -331,6 +331,23 @@ struct tegra_xhci_soc_config {
 	unsigned int num_phys[MAX_PHY_TYPES];
 	unsigned int utmi_port_offset;
 	unsigned int hsic_port_offset;
+	void (*utmi_pad_power_on)(struct phy *utmi_phy);
+	void (*utmi_pad_power_off)(struct phy *utmi_phy);
+	void (*set_protection_level)(struct phy *utmi_phy,
+		int level, enum tegra_vbus_dir dir);
+	int (*utmi_vbus_power_on)(struct phy *phy);
+	int (*utmi_vbus_power_off)(struct phy *phy);
+	int (*overcurrent_detected)(struct phy *phy);
+	void (*handle_overcurrent)(struct phy *phy);
+	int (*set_id_override)(struct phy *phy);
+	int (*clear_id_override)(struct phy *phy);
+	bool (*has_otg_cap)(struct phy *phy);
+	int (*enable_sleepwalk)(struct phy *phy, int speed);
+	int (*disable_sleepwalk)(struct phy *phy);
+	int (*enable_wake)(struct phy *phy);
+	int (*disable_wake)(struct phy *phy);
+	int (*pretend_connected)(struct phy *phy);
+	int (*remote_wake_detected)(struct phy *phy);
 
 	int num_supplies;
 	const char *supply_names[];
@@ -1326,6 +1343,24 @@ static const struct tegra_xhci_soc_config tegra186_soc_config = {
 
 	.utmi_port_offset = 3,
 	.hsic_port_offset = 6,
+
+	.utmi_pad_power_on = tegra18x_phy_xusb_utmi_pad_power_on,
+	.utmi_pad_power_off = tegra18x_phy_xusb_utmi_pad_power_down,
+	.set_protection_level =
+		tegra18x_phy_xusb_utmi_pad_set_protection_level,
+	.utmi_vbus_power_on = tegra18x_phy_xusb_utmi_vbus_power_on,
+	.utmi_vbus_power_off = tegra18x_phy_xusb_utmi_vbus_power_off,
+	.overcurrent_detected = tegra18x_phy_xusb_overcurrent_detected,
+	.handle_overcurrent = tegra18x_phy_xusb_handle_overcurrent,
+	.set_id_override = tegra18x_phy_xusb_set_id_override,
+	.clear_id_override = tegra18x_phy_xusb_clear_id_override,
+	.has_otg_cap = tegra18x_phy_xusb_has_otg_cap,
+	.enable_sleepwalk = tegra18x_phy_xusb_enable_sleepwalk,
+	.disable_sleepwalk = tegra18x_phy_xusb_disable_sleepwalk,
+	.enable_wake = tegra18x_phy_xusb_enable_wake,
+	.disable_wake = tegra18x_phy_xusb_disable_wake,
+	.pretend_connected = tegra18x_phy_xusb_pretend_connected,
+	.remote_wake_detected = tegra18x_phy_xusb_remote_wake_detected,
 };
 MODULE_FIRMWARE("tegra18x_xusb_firmware");
 
@@ -1348,6 +1383,24 @@ static const struct tegra_xhci_soc_config tegra210_soc_config = {
 
 	.utmi_port_offset = 4,
 	.hsic_port_offset = 8,
+
+	.utmi_pad_power_on = tegra21x_phy_xusb_utmi_pad_power_on,
+	.utmi_pad_power_off = tegra21x_phy_xusb_utmi_pad_power_down,
+	.set_protection_level =
+		tegra21x_phy_xusb_utmi_pad_set_protection_level,
+	.utmi_vbus_power_on = tegra21x_phy_xusb_utmi_vbus_power_on,
+	.utmi_vbus_power_off = tegra21x_phy_xusb_utmi_vbus_power_off,
+	.overcurrent_detected = tegra21x_phy_xusb_overcurrent_detected,
+	.handle_overcurrent = tegra21x_phy_xusb_handle_overcurrent,
+	.set_id_override = tegra21x_phy_xusb_set_id_override,
+	.clear_id_override = tegra21x_phy_xusb_clear_id_override,
+	.has_otg_cap = tegra21x_phy_xusb_has_otg_cap,
+	.enable_sleepwalk = tegra21x_phy_xusb_enable_sleepwalk,
+	.disable_sleepwalk = tegra21x_phy_xusb_disable_sleepwalk,
+	.enable_wake = tegra21x_phy_xusb_enable_wake,
+	.disable_wake = tegra21x_phy_xusb_disable_wake,
+	.pretend_connected = tegra21x_phy_xusb_pretend_connected,
+	.remote_wake_detected = tegra21x_phy_xusb_remote_wake_detected,
 };
 MODULE_FIRMWARE("tegra21x_xusb_firmware");
 
@@ -1421,7 +1474,7 @@ static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 	int port = tegra->utmi_otg_port_base_1 - 1;
 	struct phy *otg_phy;
 	u32 status;
-	int wait, ret;
+	int wait, ret = -1;
 
 	if (!tegra->utmi_otg_port_base_1)
 		return;
@@ -1459,10 +1512,14 @@ static void tegra_xhci_set_host_mode(struct tegra_xhci_hcd *tegra, bool on)
 		}
 	}
 
-	if (on)
-		ret = tegra_phy_xusb_set_id_override(otg_phy);
-	else
-		ret = tegra_phy_xusb_clear_id_override(otg_phy);
+	if (on) {
+		if (tegra->soc_config->set_id_override)
+			ret = tegra->soc_config->set_id_override(otg_phy);
+	} else {
+		if (tegra->soc_config->clear_id_override)
+			ret = tegra->soc_config->clear_id_override(otg_phy);
+	}
+
 	if (ret) {
 		dev_dbg(tegra->dev, "%s ID override failed\n",
 			on ? "set" : "clear");
@@ -1627,7 +1684,8 @@ static void tegra_xhci_oc_work(struct work_struct *work)
 	/* it doesn't matter which phy instance we pass to this function
 	 * since it will handle all overcurrent events there
 	 */
-	tegra_phy_xusb_handle_overcurrent(tegra->phys[UTMI_PHY][0]);
+	if (tegra->soc_config->handle_overcurrent)
+		tegra->soc_config->handle_overcurrent(tegra->phys[UTMI_PHY][0]);
 }
 
 static void tegra_xhci_probe_finish(const struct firmware *fw, void *context);
@@ -1761,7 +1819,8 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	for (i = 0; i < tegra->soc_config->num_phys[HSIC_PHY]; i++) {
 		struct phy *hsic_phy = tegra->phys[HSIC_PHY][i];
 
-		ret = tegra_phy_xusb_pretend_connected(hsic_phy);
+		if (tegra->soc_config->pretend_connected)
+			ret = tegra->soc_config->pretend_connected(hsic_phy);
 		if (ret)
 			dev_dbg(dev, "HSIC phy %d pretend connect failed\n", i);
 	}
@@ -1881,7 +1940,8 @@ static irqreturn_t tegra_xhci_padctl_irq(int irq, void *dev_id)
 		bool oc = false;
 
 		for (i = 0; i < tegra->soc_config->num_phys[UTMI_PHY]; i++) {
-			if (tegra_phy_xusb_overcurrent_detected(
+			if (tegra->soc_config->overcurrent_detected &&
+				tegra->soc_config->overcurrent_detected(
 						tegra->phys[UTMI_PHY][i]) > 0) {
 				dev_warn(tegra->dev,
 					"over-current detected on UTMI pad %u\n",
@@ -2219,14 +2279,16 @@ skip_clocks:
 				if (phy && strstr(prop, "usb3")) {
 					tegra->enabled_ss_ports |= BIT(j);
 
-					if (tegra_phy_xusb_has_otg_cap(phy)) {
+					if (tegra->soc_config->has_otg_cap &&
+					tegra->soc_config->has_otg_cap(phy)) {
 						tegra->usb3_otg_port_base_1 =
 									  j + 1;
 					}
 				}
 
 				if (phy && strstr(prop, "utmi")) {
-					if (tegra_phy_xusb_has_otg_cap(phy)) {
+					if (tegra->soc_config->has_otg_cap &&
+					tegra->soc_config->has_otg_cap(phy)) {
 						tegra->utmi_otg_port_base_1 =
 									  j + 1;
 					}
@@ -2591,12 +2653,15 @@ static void tegra_xhci_program_utmi_power_lp0_exit(
 		hs_pls = FPCI_CTX_HS_PLS(tegra->fpci_ctx.hs_pls, i);
 
 		if (hs_pls == ARU_CONTEXT_HS_PLS_SUSPEND ||
-			hs_pls == ARU_CONTEXT_HS_PLS_FS_MODE)
-			tegra_phy_xusb_utmi_pad_power_on(
+			hs_pls == ARU_CONTEXT_HS_PLS_FS_MODE) {
+			if (tegra->soc_config->utmi_pad_power_on)
+				tegra->soc_config->utmi_pad_power_on(
 					tegra->phys[UTMI_PHY][i]);
-		else
-			tegra_phy_xusb_utmi_pad_power_down(
+		} else {
+			if (tegra->soc_config->utmi_pad_power_off)
+				tegra->soc_config->utmi_pad_power_off(
 					tegra->phys[UTMI_PHY][i]);
+		}
 	}
 }
 
@@ -2706,7 +2771,8 @@ static int tegra_xhci_powergate(struct tegra_xhci_hcd *tegra, bool runtime)
 			if (i == UTMI_PHY) {
 				offset = tegra->soc_config->utmi_port_offset;
 				speed = port_speed(tegra, offset + j);
-				tegra_phy_xusb_utmi_pad_power_down(phy);
+				if (tegra->soc_config->utmi_pad_power_off)
+					tegra->soc_config->utmi_pad_power_off(phy);
 			}
 
 			if (i == HSIC_PHY)
@@ -2724,14 +2790,13 @@ static int tegra_xhci_powergate(struct tegra_xhci_hcd *tegra, bool runtime)
 				&& tegra->pmc_usb_wakes_disabled)
 				continue;
 
-			ret = tegra_phy_xusb_enable_sleepwalk(phy, speed);
-			if (ret) {
+			if (tegra->soc_config->enable_sleepwalk &&
+				tegra->soc_config->enable_sleepwalk(phy, speed))
 				dev_info(dev, "failed to enable sleepwalk for %s phy %d\n"
 					, tegra_phy_names[i], j);
-			}
 
-			ret = tegra_phy_xusb_enable_wake(phy);
-			if (ret) {
+			if (tegra->soc_config->enable_wake &&
+				tegra->soc_config->enable_wake(phy)) {
 				dev_info(dev, "failed to enable wake for %s phy %d\n"
 					, tegra_phy_names[i], j);
 			}
@@ -2830,17 +2895,18 @@ static int tegra_xhci_unpowergate(struct tegra_xhci_hcd *tegra)
 		for (j = 0; j < tegra->soc_config->num_phys[i]; j++) {
 			struct phy *phy = tegra->phys[i][j];
 
-			if (tegra_phy_xusb_remote_wake_detected(phy) > 0) {
+			if (tegra->soc_config->remote_wake_detected &&
+			(tegra->soc_config->remote_wake_detected(phy) > 0)) {
 				dev_dbg(dev, "%s port %d remote wake detected\n"
 					, tegra_phy_names[i], j);
-				if (i == UTMI_PHY)
-					tegra_phy_xusb_utmi_pad_power_on(phy);
+				if (i == UTMI_PHY &&
+					tegra->soc_config->utmi_pad_power_on)
+					tegra->soc_config->utmi_pad_power_on(phy);
 			}
-			ret = tegra_phy_xusb_disable_wake(phy);
-			if (ret) {
+			if (tegra->soc_config->disable_wake &&
+				tegra->soc_config->disable_wake(phy))
 				dev_dbg(dev, "%s port %d disable wake failed\n",
 					tegra_phy_names[i], j);
-			}
 
 			/* power on SS phy after unpowergating SS partition */
 			if (i == USB3_PHY)
@@ -2898,11 +2964,10 @@ static int tegra_xhci_unpowergate(struct tegra_xhci_hcd *tegra)
 				&& tegra->pmc_usb_wakes_disabled)
 				continue;
 
-			ret = tegra_phy_xusb_disable_sleepwalk(phy);
-			if (ret) {
+			if (tegra->soc_config->disable_sleepwalk &&
+				tegra->soc_config->disable_sleepwalk(phy))
 				dev_dbg(dev, "%s port %d disable sleepwalk failed\n",
 					tegra_phy_names[i], j);
-			}
 		}
 	}
 
@@ -2965,8 +3030,9 @@ static int tegra_xhci_suspend(struct device *dev)
 			 */
 			if (XHCI_IS_T186(tegra) &&
 					(j != tegra->utmi_otg_port_base_1 - 1 ||
-					tegra->host_mode))
-				tegra_phy_xusb_utmi_vbus_power_off(
+					tegra->host_mode) &&
+					tegra->soc_config->utmi_vbus_power_off)
+				tegra->soc_config->utmi_vbus_power_off(
 						tegra->phys[UTMI_PHY][j]);
 
 		}
@@ -3014,8 +3080,9 @@ static int tegra_xhci_resume_common(struct device *dev)
 			/* skip vbus on for OTG port when it isn't host role */
 			if (XHCI_IS_T186(tegra) &&
 					(j != tegra->utmi_otg_port_base_1 - 1 ||
-					tegra->host_mode))
-				tegra_phy_xusb_utmi_vbus_power_on(
+					tegra->host_mode) &&
+					tegra->soc_config->utmi_vbus_power_on)
+				tegra->soc_config->utmi_vbus_power_on(
 						tegra->phys[UTMI_PHY][j]);
 		}
 	}
@@ -3143,9 +3210,10 @@ static int tegra_xhci_hub_control(struct usb_hcd *hcd, u16 type_req,
 
 	if (hcd->speed == HCD_USB2) {
 		if ((type_req == ClearPortFeature) &&
-			(value == USB_PORT_FEAT_SUSPEND))
-			tegra_phy_xusb_utmi_pad_power_on(
-					tegra->phys[UTMI_PHY][port]);
+			(value == USB_PORT_FEAT_SUSPEND) &&
+			tegra->soc_config->utmi_pad_power_on)
+			tegra->soc_config->utmi_pad_power_on(
+				tegra->phys[UTMI_PHY][port]);
 	}
 
 	ret = xhci_hub_control(hcd, type_req, value, index, buf, length);
@@ -3158,17 +3226,19 @@ static int tegra_xhci_hub_control(struct usb_hcd *hcd, u16 type_req,
 			 */
 			if (!((hcd->self.otg_port == (port + 1)) &&
 				(hcd->self.b_hnp_enable ||
-				hcd->self.otg_quick_hnp)))
-				tegra_phy_xusb_utmi_pad_power_down(
-						tegra->phys[UTMI_PHY][port]);
+				hcd->self.otg_quick_hnp)) &&
+				tegra->soc_config->utmi_pad_power_off)
+				tegra->soc_config->utmi_pad_power_off(
+					tegra->phys[UTMI_PHY][port]);
 
 		if ((type_req == ClearPortFeature) &&
 			(value == USB_PORT_FEAT_C_CONNECTION)) {
 			struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 			u32 portsc = readl(xhci->usb2_ports[port]);
 
-			if (portsc & PORT_CONNECT)
-				tegra_phy_xusb_utmi_pad_power_on(
+			if ((portsc & PORT_CONNECT)
+				&& tegra->soc_config->utmi_pad_power_on)
+				tegra->soc_config->utmi_pad_power_on(
 						tegra->phys[UTMI_PHY][port]);
 			else {
 				/* We dont suspend the PAD while HNP
@@ -3176,8 +3246,9 @@ static int tegra_xhci_hub_control(struct usb_hcd *hcd, u16 type_req,
 				 */
 				if (!((hcd->self.otg_port == (port + 1))
 					&& (hcd->self.b_hnp_enable ||
-					hcd->self.otg_quick_hnp)))
-					tegra_phy_xusb_utmi_pad_power_down(
+					hcd->self.otg_quick_hnp)) &&
+					tegra->soc_config->utmi_pad_power_off)
+					tegra->soc_config->utmi_pad_power_off(
 						tegra->phys[UTMI_PHY][port]);
 			}
 		}
@@ -3214,9 +3285,10 @@ static int tegra_xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 
 			if ((hcd->speed == HCD_USB2) &&
 				(i < tegra->soc_config->num_phys[UTMI_PHY]) &&
-				((portsc & PORT_PLS_MASK) == XDEV_RESUME))
-				tegra_phy_xusb_utmi_pad_power_on(
-						tegra->phys[UTMI_PHY][i]);
+				((portsc & PORT_PLS_MASK) == XDEV_RESUME) &&
+				tegra->soc_config->utmi_pad_power_on)
+				tegra->soc_config->utmi_pad_power_on(
+					tegra->phys[UTMI_PHY][i]);
 
 			if (!(portsc & PORT_CONNECT)) {
 				bus_state->resume_done[i] = 0;
@@ -3317,8 +3389,9 @@ static int tegra_xhci_alloc_dev(struct usb_hcd *hcd, struct usb_device *udev)
 				 * set pad protection circuit to >= 2A
 				 * CDP current range: 1.5A~5A see [BC1.2] p36
 				 */
-				if (XHCI_IS_T186(tegra))
-					tegra_phy_xusb_utmi_pad_set_protection_level(
+				if (XHCI_IS_T186(tegra) &&
+					tegra->soc_config->set_protection_level)
+					tegra->soc_config->set_protection_level(
 						tegra->phys[UTMI_PHY][i], 3,
 						TEGRA_VBUS_SOURCE);
 			}
@@ -3349,9 +3422,10 @@ static void tegra_xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 				__func__, port);
 		tegra->connected_utmi_ports[port] = 0;
 
-		if (XHCI_IS_T186(tegra))
+		if (XHCI_IS_T186(tegra) &&
+			tegra->soc_config->set_protection_level)
 			/* disable pad protection circuit on this UTMI pad */
-			tegra_phy_xusb_utmi_pad_set_protection_level(
+			tegra->soc_config->set_protection_level(
 				tegra->phys[UTMI_PHY][port], -1,
 				TEGRA_VBUS_DEFAULT);
 	}

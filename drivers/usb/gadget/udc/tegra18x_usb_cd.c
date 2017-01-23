@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2016-2017, NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -24,11 +24,11 @@ static bool tegra18x_usb_dcp_charger_detect(struct tegra_usb_cd *ucd)
 {
 	bool status;
 
-	status = tegra_phy_xusb_utmi_pad_dcd(ucd->phy);
+	status = tegra18x_phy_xusb_utmi_pad_dcd(ucd->phy);
 	dev_dbg(ucd->dev, "DCD: %d\n", status);
 
 	/* Primary Detection step */
-	status = tegra_phy_xusb_utmi_pad_primary_charger_detect(ucd->phy);
+	status = tegra18x_phy_xusb_utmi_pad_primary_charger_detect(ucd->phy);
 	if (status)
 		dev_dbg(ucd->dev, "Voltage from D+ to D-, CDP/DCP detected\n");
 
@@ -42,7 +42,7 @@ static bool tegra18x_usb_cdp_charger_detect(struct tegra_usb_cd *ucd)
 	bool status;
 
 	/* Secondary Detection step */
-	status = tegra_phy_xusb_utmi_pad_secondary_charger_detect(ucd->phy);
+	status = tegra18x_phy_xusb_utmi_pad_secondary_charger_detect(ucd->phy);
 	if (status)
 		dev_dbg(ucd->dev, "No Voltage from D- to D+, CDP detected\n");
 
@@ -55,7 +55,7 @@ static int tegra18x_usb_apple_charger_detect(struct tegra_usb_cd *ucd)
 {
 	u32 val;
 
-	val = tegra_phy_xusb_noncompliant_div_detect(ucd->phy);
+	val = tegra18x_phy_xusb_noncompliant_div_detect(ucd->phy);
 	if ((val & VOP_DIV2P0_DET) && (val & VON_DIV2P0_DET))
 		return APPLE_500MA;
 	if ((val & VOP_DIV2P0_DET) && (val & VON_DIV2P7_DET))
@@ -68,17 +68,17 @@ static int tegra18x_usb_apple_charger_detect(struct tegra_usb_cd *ucd)
 
 static int tegra18x_pad_power_on(struct tegra_usb_cd *ucd)
 {
-	tegra_phy_xusb_utmi_pad_charger_detect_on(ucd->phy);
-	tegra_phy_xusb_set_dcd_debounce_time(ucd->phy, 0xa);
-	tegra_phy_xusb_utmi_pad_enable_detect_filters(ucd->phy);
+	tegra18x_phy_xusb_utmi_pad_charger_detect_on(ucd->phy);
+	tegra18x_phy_xusb_set_dcd_debounce_time(ucd->phy, 0xa);
+	tegra18x_phy_xusb_utmi_pad_enable_detect_filters(ucd->phy);
 
 	return 0;
 }
 
 static int tegra18x_pad_power_off(struct tegra_usb_cd *ucd)
 {
-	tegra_phy_xusb_utmi_pad_disable_detect_filters(ucd->phy);
-	tegra_phy_xusb_utmi_pad_charger_detect_off(ucd->phy);
+	tegra18x_phy_xusb_utmi_pad_disable_detect_filters(ucd->phy);
+	tegra18x_phy_xusb_utmi_pad_charger_detect_off(ucd->phy);
 
 	return 0;
 }
@@ -87,25 +87,25 @@ static void tegra18x_usb_vbus_pad_protection(struct tegra_usb_cd *ucd,
 			bool enable)
 {
 	if (!enable) {
-		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, -1,
+		tegra18x_phy_xusb_utmi_pad_set_protection_level(ucd->phy, -1,
 				TEGRA_VBUS_DEFAULT);
 		return;
 	}
 
 	if (ucd->current_limit_ma >= 500 &&
 			ucd->current_limit_ma <= 899)
-		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 0,
+		tegra18x_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 0,
 				TEGRA_VBUS_SINK);
 	else if (ucd->current_limit_ma >= 900 &&
 			ucd->current_limit_ma <= 1499)
-		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 1,
+		tegra18x_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 1,
 				TEGRA_VBUS_SINK);
 	else if (ucd->current_limit_ma >= 1500 &&
 			ucd->current_limit_ma <= 1999)
-		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 2,
+		tegra18x_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 2,
 				TEGRA_VBUS_SINK);
 	else if (ucd->current_limit_ma >= 2000)
-		tegra_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 3,
+		tegra18x_phy_xusb_utmi_pad_set_protection_level(ucd->phy, 3,
 				TEGRA_VBUS_SINK);
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2016, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2014-2017, NVIDIA Corporation.  All rights reserved.
  * Copyright (C) 2014 Google, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -46,43 +46,6 @@ struct tegra_xusb_mbox_msg {
 	u32 data;
 };
 
-struct phy;
-
-int tegra_phy_xusb_set_vbus_override(struct phy *phy);
-int tegra_phy_xusb_clear_vbus_override(struct phy *phy);
-
-int tegra_phy_xusb_set_id_override(struct phy *phy);
-int tegra_phy_xusb_clear_id_override(struct phy *phy);
-bool tegra_phy_xusb_has_otg_cap(struct phy *phy);
-
-int tegra_phy_xusb_enable_sleepwalk(struct phy *phy,
-				    enum usb_device_speed speed);
-int tegra_phy_xusb_disable_sleepwalk(struct phy *phy);
-
-int tegra_phy_xusb_enable_wake(struct phy *phy);
-int tegra_phy_xusb_disable_wake(struct phy *phy);
-
-int tegra_phy_xusb_pretend_connected(struct phy *phy);
-
-/* tegra_phy_xusb_remote_wake_detected()
- *   check if a XUSB phy has detected remote wake.
- *   return values:
- *         0: no
- *       > 0: yes
- *       < 0: error
- */
-int tegra_phy_xusb_remote_wake_detected(struct phy *phy);
-void tegra_phy_xusb_utmi_pad_power_on(struct phy *phy);
-void tegra_phy_xusb_utmi_pad_power_down(struct phy *phy);
-
-void tegra_phy_xusb_set_dcd_debounce_time(struct phy *phy, u32 val);
-
-void tegra_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy);
-void tegra_phy_xusb_utmi_pad_charger_detect_off(struct phy *phy);
-
-void tegra_phy_xusb_utmi_pad_enable_detect_filters(struct phy *phy);
-void tegra_phy_xusb_utmi_pad_disable_detect_filters(struct phy *phy);
-
 /*
  * Tegra OTG port VBUS direction:
  * default (based on port capability) or
@@ -93,21 +56,373 @@ enum tegra_vbus_dir {
 	TEGRA_VBUS_SOURCE,
 	TEGRA_VBUS_SINK
 };
+struct phy;
 
+#ifdef CONFIG_PINCTRL_TEGRA21x_PADCTL_UPHY
+int tegra21x_phy_xusb_set_vbus_override(struct phy *phy);
+int tegra21x_phy_xusb_clear_vbus_override(struct phy *phy);
+void tegra21x_phy_xusb_utmi_pad_power_on(struct phy *phy);
+void tegra21x_phy_xusb_utmi_pad_power_down(struct phy *phy);
+void tegra21x_phy_xusb_set_dcd_debounce_time(struct phy *phy, u32 val);
+void tegra21x_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy);
+void tegra21x_phy_xusb_utmi_pad_charger_detect_off(struct phy *phy);
+void tegra21x_phy_xusb_utmi_pad_enable_detect_filters(struct phy *phy);
+void tegra21x_phy_xusb_utmi_pad_disable_detect_filters(struct phy *phy);
+bool tegra21x_phy_xusb_utmi_pad_primary_charger_detect(struct phy *phy);
+bool tegra21x_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy);
+/* data contact detection */
+bool tegra21x_phy_xusb_utmi_pad_dcd(struct phy *phy);
 /* level < 0: disable protection */
-void tegra_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level,
+void tegra21x_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level,
 						  enum tegra_vbus_dir dir);
+u32 tegra21x_phy_xusb_noncompliant_div_detect(struct phy *phy);
+int tegra21x_phy_xusb_utmi_vbus_power_on(struct phy *phy);
+int tegra21x_phy_xusb_utmi_vbus_power_off(struct phy *phy);
+int tegra21x_phy_xusb_overcurrent_detected(struct phy *phy);
+void tegra21x_phy_xusb_handle_overcurrent(struct phy *phy);
+int tegra21x_phy_xusb_set_id_override(struct phy *phy);
+int tegra21x_phy_xusb_clear_id_override(struct phy *phy);
+bool tegra21x_phy_xusb_has_otg_cap(struct phy *phy);
+int tegra21x_phy_xusb_enable_sleepwalk(struct phy *phy,
+				    enum usb_device_speed speed);
+int tegra21x_phy_xusb_disable_sleepwalk(struct phy *phy);
+int tegra21x_phy_xusb_enable_wake(struct phy *phy);
+int tegra21x_phy_xusb_disable_wake(struct phy *phy);
+int tegra21x_phy_xusb_pretend_connected(struct phy *phy);
+
+/* tegra_phy_xusb_remote_wake_detected()
+ *   check if a XUSB phy has detected remote wake.
+ *   return values:
+ *         0: no
+ *       > 0: yes
+ *       < 0: error
+ */
+int tegra21x_phy_xusb_remote_wake_detected(struct phy *phy);
+#else
+static inline int tegra21x_phy_xusb_set_vbus_override(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_clear_vbus_override(struct phy *phy)
+{
+	return 0;
+}
+
+static inline void tegra21x_phy_xusb_utmi_pad_power_on(struct phy *phy)
+{
+}
+
+static inline void tegra21x_phy_xusb_utmi_pad_power_down(struct phy *phy)
+{
+}
+static inline void tegra21x_phy_xusb_set_dcd_debounce_time(struct phy *phy,
+								u32 val)
+{
+}
+
+static inline void tegra21x_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy)
+{
+}
+
+static inline void tegra21x_phy_xusb_utmi_pad_charger_detect_off
+							(struct phy *phy)
+{
+}
+
+static inline void tegra21x_phy_xusb_utmi_pad_enable_detect_filters
+							(struct phy *phy)
+{
+}
+
+static inline void tegra21x_phy_xusb_utmi_pad_disable_detect_filters
+							(struct phy *phy)
+{
+}
+
+static inline bool tegra21x_phy_xusb_utmi_pad_primary_charger_detect
+							(struct phy *phy)
+{
+	return 0;
+}
+
+static inline bool tegra21x_phy_xusb_utmi_pad_secondary_charger_detect
+							(struct phy *phy)
+{
+	return 0;
+}
 
 /* data contact detection */
-bool tegra_phy_xusb_utmi_pad_dcd(struct phy *phy);
-u32 tegra_phy_xusb_noncompliant_div_detect(struct phy *phy);
+static inline bool tegra21x_phy_xusb_utmi_pad_dcd(struct phy *phy)
+{
+	return 0;
+}
 
-bool tegra_phy_xusb_utmi_pad_primary_charger_detect(struct phy *phy);
-bool tegra_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy);
+/* level < 0: disable protection */
+static inline void tegra21x_phy_xusb_utmi_pad_set_protection_level
+						(struct phy *phy, int level,
+						enum tegra_vbus_dir dir)
+{
+}
 
-int tegra_phy_xusb_utmi_vbus_power_on(struct phy *phy);
-int tegra_phy_xusb_utmi_vbus_power_off(struct phy *phy);
+static inline u32 tegra21x_phy_xusb_noncompliant_div_detect(struct phy *phy)
+{
+	return 0;
+}
 
-int tegra_phy_xusb_overcurrent_detected(struct phy *phy);
-void tegra_phy_xusb_handle_overcurrent(struct phy *phy);
+static inline int tegra21x_phy_xusb_utmi_vbus_power_on(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_utmi_vbus_power_off(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_overcurrent_detected(struct phy *phy)
+{
+	return 0;
+}
+
+static inline void tegra21x_phy_xusb_handle_overcurrent(struct phy *phy)
+{
+}
+
+static inline int tegra21x_phy_xusb_set_id_override(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_clear_id_override(struct phy *phy)
+{
+	return 0;
+}
+
+static inline bool tegra21x_phy_xusb_has_otg_cap(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_enable_sleepwalk(struct phy *phy,
+				    enum usb_device_speed speed)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_disable_sleepwalk(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_enable_wake(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_disable_wake(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_phy_xusb_pretend_connected(struct phy *phy)
+{
+	return 0;
+}
+
+/* tegra_phy_xusb_remote_wake_detected()
+ *   check if a XUSB phy has detected remote wake.
+ *   return values:
+ *         0: no
+ *       > 0: yes
+ *       < 0: error
+ */
+static inline int tegra21x_phy_xusb_remote_wake_detected(struct phy *phy)
+{
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_PINCTRL_TEGRA186_PADCTL
+int tegra18x_phy_xusb_set_vbus_override(struct phy *phy);
+int tegra18x_phy_xusb_clear_vbus_override(struct phy *phy);
+void tegra18x_phy_xusb_utmi_pad_power_on(struct phy *phy);
+void tegra18x_phy_xusb_utmi_pad_power_down(struct phy *phy);
+void tegra18x_phy_xusb_set_dcd_debounce_time(struct phy *phy, u32 val);
+void tegra18x_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy);
+void tegra18x_phy_xusb_utmi_pad_charger_detect_off(struct phy *phy);
+void tegra18x_phy_xusb_utmi_pad_enable_detect_filters(struct phy *phy);
+void tegra18x_phy_xusb_utmi_pad_disable_detect_filters(struct phy *phy);
+void tegra18x_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level,
+					enum tegra_vbus_dir dir);
+bool tegra18x_phy_xusb_utmi_pad_dcd(struct phy *phy);
+u32 tegra18x_phy_xusb_noncompliant_div_detect(struct phy *phy);
+bool tegra18x_phy_xusb_utmi_pad_primary_charger_detect(struct phy *phy);
+bool tegra18x_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy);
+int tegra18x_phy_xusb_utmi_vbus_power_on(struct phy *phy);
+int tegra18x_phy_xusb_utmi_vbus_power_off(struct phy *phy);
+int tegra18x_phy_xusb_overcurrent_detected(struct phy *phy);
+void tegra18x_phy_xusb_handle_overcurrent(struct phy *phy);
+int tegra18x_phy_xusb_set_id_override(struct phy *phy);
+int tegra18x_phy_xusb_clear_id_override(struct phy *phy);
+bool tegra18x_phy_xusb_has_otg_cap(struct phy *phy);
+
+int tegra18x_phy_xusb_enable_sleepwalk(struct phy *phy,
+				    enum usb_device_speed speed);
+int tegra18x_phy_xusb_disable_sleepwalk(struct phy *phy);
+int tegra18x_phy_xusb_enable_wake(struct phy *phy);
+int tegra18x_phy_xusb_disable_wake(struct phy *phy);
+int tegra18x_phy_xusb_pretend_connected(struct phy *phy);
+
+/* tegra_phy_xusb_remote_wake_detected()
+ *   check if a XUSB phy has detected remote wake.
+ *   return values:
+ *         0: no
+ *       > 0: yes
+ *       < 0: error
+ */
+int tegra18x_phy_xusb_remote_wake_detected(struct phy *phy);
+#else
+static inline int tegra18x_phy_xusb_set_vbus_override(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_clear_vbus_override(struct phy *phy)
+{
+	return 0;
+}
+
+static inline void tegra18x_phy_xusb_utmi_pad_power_on(struct phy *phy)
+{
+}
+
+static inline void tegra18x_phy_xusb_utmi_pad_power_down(struct phy *phy)
+{
+}
+
+static inline void tegra18x_phy_xusb_set_dcd_debounce_time(struct phy *phy,
+								u32 val)
+{
+}
+
+static inline void tegra18x_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy)
+{
+}
+
+static inline void tegra18x_phy_xusb_utmi_pad_charger_detect_off
+							(struct phy *phy)
+{
+}
+
+static inline void tegra18x_phy_xusb_utmi_pad_enable_detect_filters
+							(struct phy *phy)
+{
+}
+
+static inline void tegra18x_phy_xusb_utmi_pad_disable_detect_filters
+							(struct phy *phy)
+{
+}
+
+static inline void tegra18x_phy_xusb_utmi_pad_set_protection_level
+						(struct phy *phy, int level,
+						enum tegra_vbus_dir dir)
+{
+}
+
+static inline bool tegra18x_phy_xusb_utmi_pad_dcd(struct phy *phy)
+{
+	return 0;
+}
+
+static inline u32 tegra18x_phy_xusb_noncompliant_div_detect(struct phy *phy)
+{
+	return 0;
+}
+
+static inline bool tegra18x_phy_xusb_utmi_pad_primary_charger_detect
+							(struct phy *phy)
+{
+	return 0;
+}
+
+static inline bool tegra18x_phy_xusb_utmi_pad_secondary_charger_detect
+							(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_utmi_vbus_power_on(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_utmi_vbus_power_off(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_overcurrent_detected(struct phy *phy)
+{
+	return 0;
+}
+
+static inline void tegra18x_phy_xusb_handle_overcurrent(struct phy *phy)
+{
+}
+
+static inline int tegra18x_phy_xusb_set_id_override(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_clear_id_override(struct phy *phy)
+{
+	return 0;
+}
+
+static inline bool tegra18x_phy_xusb_has_otg_cap(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_enable_sleepwalk(struct phy *phy,
+				    enum usb_device_speed speed)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_disable_sleepwalk(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_enable_wake(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_disable_wake(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_phy_xusb_pretend_connected(struct phy *phy)
+{
+	return 0;
+}
+
+/* tegra_phy_xusb_remote_wake_detected()
+ *   check if a XUSB phy has detected remote wake.
+ *   return values:
+ *         0: no
+ *       > 0: yes
+ *       < 0: error
+ */
+static inline int tegra18x_phy_xusb_remote_wake_detected(struct phy *phy)
+{
+	return 0;
+}
+#endif
 #endif /* __SOC_TEGRA_XUSB_H__ */

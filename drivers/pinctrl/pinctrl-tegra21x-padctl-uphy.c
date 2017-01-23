@@ -277,12 +277,12 @@
 #define XUSB_PADCTL_USB2_BATTERY_CHRG_TDCD_DBNC_TIMER_0 (0x280)
 #define   TDCD_DBNC(x)                          (((x) & 0x7ff) << 0)
 
-static const struct of_device_id tegra_xusbb_pd[] = {
+static struct of_device_id tegra_xusbb_pd[] = {
 		{ .compatible = "nvidia,tegra210-xusbb-pd", },
 		{},
 };
 
-static const struct of_device_id tegra_xusbc_pd[] = {
+static struct of_device_id tegra_xusbc_pd[] = {
 		{ .compatible = "nvidia,tegra210-xusbc-pd", },
 		{},
 };
@@ -2395,7 +2395,6 @@ static int tegra21x_usb3_phy_init(struct phy *phy)
 	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
 	int port = usb3_phy_to_port(phy);
 	unsigned uphy_lane;
-	u32 value;
 
 	if (port < 0)
 		return port;
@@ -2416,7 +2415,6 @@ static int tegra21x_usb3_phy_exit(struct phy *phy)
 	struct device *dev = uphy->dev;
 	int port = usb3_phy_to_port(phy);
 	unsigned uphy_lane;
-	u32 value;
 
 	if (port < 0)
 		return port;
@@ -2901,24 +2899,24 @@ static int tegra21x_utmi_phy_power_off(struct phy *phy)
 	return 0;
 }
 
-int tegra_phy_xusb_utmi_vbus_power_on(struct phy *phy)
+int tegra21x_phy_xusb_utmi_vbus_power_on(struct phy *phy)
 {
 	/* dummy function, needed for kernel unification */
 	return 0;
 }
 
-int tegra_phy_xusb_utmi_vbus_power_off(struct phy *phy)
+int tegra21x_phy_xusb_utmi_vbus_power_off(struct phy *phy)
 {
 	/* dummy function, needed for kernel unification */
 	return 0;
 }
 
-int tegra_phy_xusb_overcurrent_detected(struct phy *phy)
+int tegra21x_phy_xusb_overcurrent_detected(struct phy *phy)
 {
 	return 0;
 }
 
-void tegra_phy_xusb_handle_overcurrent(struct phy *phy)
+void tegra21x_phy_xusb_handle_overcurrent(struct phy *phy)
 {
 }
 
@@ -4029,7 +4027,7 @@ static struct platform_driver tegra21x_padctl_uphy_driver = {
 module_platform_driver(tegra21x_padctl_uphy_driver);
 
 /* Tegra Generic PHY Extensions */
-void tegra_phy_xusb_utmi_pad_power_on(struct phy *phy)
+void tegra21x_phy_xusb_utmi_pad_power_on(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4049,9 +4047,9 @@ void tegra_phy_xusb_utmi_pad_power_on(struct phy *phy)
 	reg &= ~USB2_OTG_PD_DR;
 	padctl_writel(uphy, reg, XUSB_PADCTL_USB2_OTG_PADX_CTL_1(port));
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_power_on);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_pad_power_on);
 
-void tegra_phy_xusb_utmi_pad_power_down(struct phy *phy)
+void tegra21x_phy_xusb_utmi_pad_power_down(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4071,9 +4069,9 @@ void tegra_phy_xusb_utmi_pad_power_down(struct phy *phy)
 	reg |= USB2_OTG_PD_DR;
 	padctl_writel(uphy, reg, XUSB_PADCTL_USB2_OTG_PADX_CTL_1(port));
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_power_down);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_pad_power_down);
 
-void tegra_phy_xusb_set_dcd_debounce_time(struct phy *phy, u32 val)
+void tegra21x_phy_xusb_set_dcd_debounce_time(struct phy *phy, u32 val)
 {
 	struct tegra_padctl_uphy *uphy;
 	u32 reg;
@@ -4090,16 +4088,16 @@ void tegra_phy_xusb_set_dcd_debounce_time(struct phy *phy, u32 val)
 	padctl_writel(uphy, reg,
 		XUSB_PADCTL_USB2_BATTERY_CHRG_TDCD_DBNC_TIMER_0);
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_set_dcd_debounce_time);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_set_dcd_debounce_time);
 
-u32 tegra_phy_xusb_noncompliant_div_detect(struct phy *phy)
+u32 tegra21x_phy_xusb_noncompliant_div_detect(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
 	u32 reg;
 
 	if (!phy)
-		return;
+		return 0;
 
 	uphy = phy_get_drvdata(phy);
 	port = utmi_phy_to_port(phy);
@@ -4117,9 +4115,9 @@ u32 tegra_phy_xusb_noncompliant_div_detect(struct phy *phy)
 	dev_dbg(uphy->dev, "reg = 0x%x", reg);
 	return reg;
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_noncompliant_div_detect);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_noncompliant_div_detect);
 
-void tegra_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy)
+void tegra21x_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4171,9 +4169,9 @@ void tegra_phy_xusb_utmi_pad_charger_detect_on(struct phy *phy)
 	padctl_writel(uphy, reg,
 		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_charger_detect_on);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_pad_charger_detect_on);
 
-void tegra_phy_xusb_utmi_pad_charger_detect_off(struct phy *phy)
+void tegra21x_phy_xusb_utmi_pad_charger_detect_off(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4209,9 +4207,9 @@ void tegra_phy_xusb_utmi_pad_charger_detect_off(struct phy *phy)
 
 	tegra21x_usb2_trk_off(uphy);
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_charger_detect_off);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_pad_charger_detect_off);
 
-void tegra_phy_xusb_utmi_pad_enable_detect_filters(struct phy *phy)
+void tegra21x_phy_xusb_utmi_pad_enable_detect_filters(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4230,9 +4228,9 @@ void tegra_phy_xusb_utmi_pad_enable_detect_filters(struct phy *phy)
 	padctl_writel(uphy, reg,
 	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_enable_detect_filters);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_pad_enable_detect_filters);
 
-void tegra_phy_xusb_utmi_pad_disable_detect_filters(struct phy *phy)
+void tegra21x_phy_xusb_utmi_pad_disable_detect_filters(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4251,9 +4249,9 @@ void tegra_phy_xusb_utmi_pad_disable_detect_filters(struct phy *phy)
 	padctl_writel(uphy, reg,
 	XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_disable_detect_filters);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_pad_disable_detect_filters);
 
-bool tegra_phy_xusb_utmi_pad_primary_charger_detect(struct phy *phy)
+bool tegra21x_phy_xusb_utmi_pad_primary_charger_detect(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4289,9 +4287,9 @@ bool tegra_phy_xusb_utmi_pad_primary_charger_detect(struct phy *phy)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_primary_charger_detect);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_pad_primary_charger_detect);
 
-bool tegra_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy)
+bool tegra21x_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4327,10 +4325,10 @@ bool tegra_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_secondary_charger_detect);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_pad_secondary_charger_detect);
 
 /* ignoring dir since T210 doesn't support VREG_DIR bits */
-void tegra_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level,
+void tegra21x_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level,
 						  enum tegra_vbus_dir dir)
 {
 	struct tegra_padctl_uphy *uphy;
@@ -4357,9 +4355,9 @@ void tegra_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level,
 	padctl_writel(uphy, reg,
 		XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL1(port));
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_set_protection_level);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_pad_set_protection_level);
 
-bool tegra_phy_xusb_utmi_pad_dcd(struct phy *phy)
+bool tegra21x_phy_xusb_utmi_pad_dcd(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4427,9 +4425,9 @@ bool tegra_phy_xusb_utmi_pad_dcd(struct phy *phy)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_utmi_pad_dcd);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_pad_dcd);
 
-int tegra_phy_xusb_enable_sleepwalk(struct phy *phy,
+int tegra21x_phy_xusb_enable_sleepwalk(struct phy *phy,
 				    enum usb_device_speed speed)
 {
 	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
@@ -4456,9 +4454,9 @@ int tegra_phy_xusb_enable_sleepwalk(struct phy *phy,
 	} else
 		return -EINVAL;
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_enable_sleepwalk);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_enable_sleepwalk);
 
-int tegra_phy_xusb_disable_sleepwalk(struct phy *phy)
+int tegra21x_phy_xusb_disable_sleepwalk(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
 	int port;
@@ -4481,7 +4479,7 @@ int tegra_phy_xusb_disable_sleepwalk(struct phy *phy)
 	} else
 		return -EINVAL;
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_disable_sleepwalk);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_disable_sleepwalk);
 
 static int tegra21x_padctl_vbus_override(struct tegra_padctl_uphy *uphy,
 					 bool on)
@@ -4502,7 +4500,7 @@ static int tegra21x_padctl_vbus_override(struct tegra_padctl_uphy *uphy,
 	return 0;
 }
 
-int tegra_phy_xusb_set_vbus_override(struct phy *phy)
+int tegra21x_phy_xusb_set_vbus_override(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 
@@ -4513,9 +4511,9 @@ int tegra_phy_xusb_set_vbus_override(struct phy *phy)
 
 	return tegra21x_padctl_vbus_override(uphy, true);
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_set_vbus_override);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_set_vbus_override);
 
-int tegra_phy_xusb_clear_vbus_override(struct phy *phy)
+int tegra21x_phy_xusb_clear_vbus_override(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 
@@ -4526,7 +4524,7 @@ int tegra_phy_xusb_clear_vbus_override(struct phy *phy)
 
 	return tegra21x_padctl_vbus_override(uphy, false);
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_clear_vbus_override);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_clear_vbus_override);
 
 static int tegra21x_padctl_id_override(struct tegra_padctl_uphy *uphy,
 					 bool grounded)
@@ -4556,7 +4554,7 @@ static int tegra21x_padctl_id_override(struct tegra_padctl_uphy *uphy,
 	return 0;
 }
 
-int tegra_phy_xusb_set_id_override(struct phy *phy)
+int tegra21x_phy_xusb_set_id_override(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 
@@ -4567,9 +4565,9 @@ int tegra_phy_xusb_set_id_override(struct phy *phy)
 
 	return tegra21x_padctl_id_override(uphy, true);
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_set_id_override);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_set_id_override);
 
-int tegra_phy_xusb_clear_id_override(struct phy *phy)
+int tegra21x_phy_xusb_clear_id_override(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 
@@ -4580,9 +4578,9 @@ int tegra_phy_xusb_clear_id_override(struct phy *phy)
 
 	return tegra21x_padctl_id_override(uphy, false);
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_clear_id_override);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_clear_id_override);
 
-bool tegra_phy_xusb_has_otg_cap(struct phy *phy)
+bool tegra21x_phy_xusb_has_otg_cap(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 
@@ -4602,7 +4600,7 @@ bool tegra_phy_xusb_has_otg_cap(struct phy *phy)
 
 	return false;
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_has_otg_cap);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_has_otg_cap);
 
 static int tegra21x_usb3_phy_set_wake(struct tegra_padctl_uphy *uphy,
 					 int port, bool enable)
@@ -4737,7 +4735,7 @@ static int tegra21x_hsic_phy_set_wake(struct tegra_padctl_uphy *uphy,
 	return 0;
 }
 
-int tegra_phy_xusb_enable_wake(struct phy *phy)
+int tegra21x_phy_xusb_enable_wake(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4766,9 +4764,9 @@ int tegra_phy_xusb_enable_wake(struct phy *phy)
 	} else
 		return -EINVAL;
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_enable_wake);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_enable_wake);
 
-int tegra_phy_xusb_disable_wake(struct phy *phy)
+int tegra21x_phy_xusb_disable_wake(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4797,7 +4795,7 @@ int tegra_phy_xusb_disable_wake(struct phy *phy)
 
 	return -EINVAL;
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_disable_wake);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_disable_wake);
 
 static int tegra21x_usb3_phy_remote_wake_detected(struct tegra_padctl_uphy *uphy
 					, int port)
@@ -4838,7 +4836,7 @@ static int tegra21x_hsic_phy_remote_wake_detected(struct tegra_padctl_uphy *uphy
 		return false;
 }
 
-int tegra_phy_xusb_remote_wake_detected(struct phy *phy)
+int tegra21x_phy_xusb_remote_wake_detected(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4867,9 +4865,9 @@ int tegra_phy_xusb_remote_wake_detected(struct phy *phy)
 
 	return -EINVAL;
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_remote_wake_detected);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_remote_wake_detected);
 
-int tegra_phy_xusb_pretend_connected(struct phy *phy)
+int tegra21x_phy_xusb_pretend_connected(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy;
 	int port;
@@ -4889,7 +4887,7 @@ int tegra_phy_xusb_pretend_connected(struct phy *phy)
 
 	return -EINVAL;
 }
-EXPORT_SYMBOL_GPL(tegra_phy_xusb_pretend_connected);
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_pretend_connected);
 
 MODULE_AUTHOR("BH Hsieh <bhsieh@nvidia.com>");
 MODULE_DESCRIPTION("Tegra 21x XUSB PADCTL and UPHY PLL/Lane driver");
