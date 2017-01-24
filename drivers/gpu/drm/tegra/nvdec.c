@@ -191,25 +191,11 @@ static int nvdec_boot(struct nvdec *nvdec)
 		return err;
 
 	/* ensure that the engine is in sane state */
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	if (nvdec->rst) {
-		reset_control_assert(nvdec->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(nvdec->rst);
-	} else {
-		tegra_mc_flush(true);
-		tegra_periph_reset_assert(nvdec->clk);
-		usleep_range(10, 100);
-		tegra_periph_reset_deassert(nvdec->clk);
-		tegra_mc_flush_done(true);
-	}
-#else
 	if (nvdec->rst) {
 		reset_control_assert(nvdec->rst);
 		usleep_range(10, 100);
 		reset_control_deassert(nvdec->rst);
 	}
-#endif
 
 	if (client->ops->load_regs)
 		client->ops->load_regs(client);
@@ -350,25 +336,11 @@ static int nvdec_exit(struct host1x_client *client)
 	host1x_channel_free(nvdec->channel);
 
 	if (nvdec->booted) {
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		if (nvdec->rst) {
-			reset_control_assert(nvdec->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(nvdec->rst);
-		} else {
-			tegra_mc_flush(true);
-			tegra_periph_reset_assert(nvdec->clk);
-			usleep_range(10, 100);
-			tegra_periph_reset_deassert(nvdec->clk);
-			tegra_mc_flush_done(true);
-		}
-#else
 		if (nvdec->rst) {
 			reset_control_assert(nvdec->rst);
 			usleep_range(10, 100);
 			reset_control_deassert(nvdec->rst);
 		}
-#endif
 	}
 
 	if (tegra_nvdec_bootloader_enabled)
