@@ -300,7 +300,7 @@ static int cactmon_reset_deinit_t21x(struct platform_device *pdev)
 {
 	struct actmon_drv_data *actmon = platform_get_drvdata(pdev);
 
-	tegra_periph_reset_assert(actmon->actmon_clk);
+	reset_control_assert(actmon->actmon_rst);
 
 	return 0;
 }
@@ -308,11 +308,20 @@ static int cactmon_reset_deinit_t21x(struct platform_device *pdev)
 static int cactmon_reset_init_t21x(struct platform_device *pdev)
 {
 	struct actmon_drv_data *actmon = platform_get_drvdata(pdev);
+	int ret;
+
+	actmon->actmon_rst = devm_reset_control_get(&pdev->dev, "actmon");
+	if (IS_ERR(actmon->actmon_rst)) {
+		ret = PTR_ERR(actmon->actmon_rst);
+		dev_err(&pdev->dev, "Reset control is not found: %d\n", ret);
+		return ret;
+	}
 
 	/* Reset ACTMON */
-	tegra_periph_reset_assert(actmon->actmon_clk);
+	reset_control_assert(actmon->actmon_rst);
 	udelay(10);
-	tegra_periph_reset_deassert(actmon->actmon_clk);
+	reset_control_deassert(actmon->actmon_rst);
+
 	return 0;
 }
 
