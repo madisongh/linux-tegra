@@ -30,7 +30,7 @@
  * =========================================================================
  */
 /*
- * Copyright (c) 2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -116,4 +116,5 @@ static int eqos_vlan_rx_add_vid(struct net_device *dev, __be16 proto, u16 vid);
 static int eqos_vlan_rx_kill_vid(struct net_device *dev, __be16 proto, u16 vid);
 void eqos_stop_dev(struct eqos_prv_data *pdata);
 void eqos_start_dev(struct eqos_prv_data *pdata);
+int eqos_config_mac_loopback_mode(struct net_device *dev, unsigned int flags);
 #endif
