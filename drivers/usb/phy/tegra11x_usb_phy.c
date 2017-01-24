@@ -2192,9 +2192,14 @@ static int uhsic_phy_open(struct tegra_usb_phy *phy)
 		return -EINVAL;
 	}
 	/* reset controller for reenumerating hsic device */
-	tegra_periph_reset_assert(phy->ctrlr_clk);
+	/* tegra_periph reset deassert APIs are deprecated
+	 * commenting these functions and adding warn print
+	 * TBD: Replace with common clock reset framework API
+	 */
+	pr_warn("Need CCF reset frawework API to reset\n");
+	/* tegra_periph_reset_assert(phy->ctrlr_clk); */
 	udelay(2);
-	tegra_periph_reset_deassert(phy->ctrlr_clk);
+	/* tegra_periph_reset_deassert(phy->ctrlr_clk); */
 	udelay(2);
 
 	uhsic_phy_set_snps_trking_data();
