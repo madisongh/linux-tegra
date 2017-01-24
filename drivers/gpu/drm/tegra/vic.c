@@ -113,25 +113,11 @@ static int vic_boot(struct vic *vic)
 	}
 
 	/* ensure that the engine is in sane state */
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	if (vic->rst) {
-		reset_control_assert(vic->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(vic->rst);
-	} else {
-		tegra_mc_flush(true);
-		tegra_periph_reset_assert(vic->clk);
-		usleep_range(10, 100);
-		tegra_periph_reset_deassert(vic->clk);
-		tegra_mc_flush_done(true);
-	}
-#else
 	if (vic->rst) {
 		reset_control_assert(vic->rst);
 		usleep_range(10, 100);
 		reset_control_deassert(vic->rst);
 	}
-#endif
 
 	/* setup clockgating registers */
 	vic_writel(vic, CG_IDLE_CG_DLY_CNT(4) |
@@ -275,25 +261,11 @@ static int vic_exit(struct host1x_client *client)
 	host1x_channel_free(vic->channel);
 
 	if (vic->booted) {
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		if (vic->rst) {
-			reset_control_assert(vic->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(vic->rst);
-		} else {
-			tegra_mc_flush(true);
-			tegra_periph_reset_assert(vic->clk);
-			usleep_range(10, 100);
-			tegra_periph_reset_deassert(vic->clk);
-			tegra_mc_flush_done(true);
-		}
-#else
 		if (vic->rst) {
 			reset_control_assert(vic->rst);
 			usleep_range(10, 100);
 			reset_control_deassert(vic->rst);
 		}
-#endif
 	}
 
 	falcon_exit(&vic->falcon);
