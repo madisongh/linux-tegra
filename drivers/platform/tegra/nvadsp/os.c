@@ -909,7 +909,12 @@ static int __deassert_adsp(struct nvadsp_drv_data *drv_data)
 
 	if (drv_data->adsp_clk) {
 		dev_dbg(dev, "deasserting adsp...\n");
-		tegra_periph_reset_deassert(drv_data->adsp_clk);
+		/* tegra_periph reset deassert APIs are deprecated
+		 * commenting these functions and adding warn print
+		 * TBD: Replace with common clock reset framework API
+		 */
+		/* tegra_periph_reset_deassert(drv_data->adsp_clk); */
+		dev_warn(dev, "Need CCF reset frawework API to reset\n");
 		udelay(200);
 		return 0;
 	}
@@ -941,7 +946,12 @@ static int __assert_adsp(struct nvadsp_drv_data *drv_data)
 	}
 
 	if (drv_data->adsp_clk) {
-		tegra_periph_reset_assert(drv_data->adsp_clk);
+		/* tegra_periph reset deassert APIs are deprecated
+		 * commenting these functions and adding warn print
+		 * TBD: Replace with common clock reset framework API
+		 */
+		/* tegra_periph_reset_assert(drv_data->adsp_clk); */
+		dev_warn(dev, "Need CCF reset frawework API to reset\n");
 		udelay(200);
 		return 0;
 	}
