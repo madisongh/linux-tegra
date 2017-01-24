@@ -108,25 +108,11 @@ static int nvenc_boot(struct nvenc *nvenc)
 	}
 
 	/* ensure that the engine is in sane state */
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	if (nvenc->rst) {
-		reset_control_assert(nvenc->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(nvenc->rst);
-	} else {
-		tegra_mc_flush(true);
-		tegra_periph_reset_assert(nvenc->clk);
-		usleep_range(10, 100);
-		tegra_periph_reset_deassert(nvenc->clk);
-		tegra_mc_flush_done(true);
-	}
-#else
 	if (nvenc->rst) {
 		reset_control_assert(nvenc->rst);
 		usleep_range(10, 100);
 		reset_control_deassert(nvenc->rst);
 	}
-#endif
 
 	if (client->ops->load_regs)
 		client->ops->load_regs(client);
@@ -251,25 +237,11 @@ static int nvenc_exit(struct host1x_client *client)
 	host1x_channel_free(nvenc->channel);
 
 	if (nvenc->booted) {
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		if (nvenc->rst) {
-			reset_control_assert(nvenc->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(nvenc->rst);
-		} else {
-			tegra_mc_flush(true);
-			tegra_periph_reset_assert(nvenc->clk);
-			usleep_range(10, 100);
-			tegra_periph_reset_deassert(nvenc->clk);
-			tegra_mc_flush_done(true);
-		}
-#else
 		if (nvenc->rst) {
 			reset_control_assert(nvenc->rst);
 			usleep_range(10, 100);
 			reset_control_deassert(nvenc->rst);
 		}
-#endif
 	}
 
 	falcon_exit(&nvenc->falcon);
