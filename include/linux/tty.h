@@ -241,6 +241,7 @@ struct tty_port {
 						   based drain is needed else
 						   set to size of fifo */
 	struct kref		kref;		/* Ref counter */
+	struct task_struct	*tty_kthread;	/* RT thread to flush data */
 };
 
 /*
@@ -676,3 +677,6 @@ static inline void proc_tty_unregister_driver(struct tty_driver *d) {}
 	} while (0)
 
 #endif
+
+extern int tty_buffer_start_rt_thread(struct tty_port *port, int id);
+extern void tty_buffer_stop_rt_thread(struct tty_port *port);
