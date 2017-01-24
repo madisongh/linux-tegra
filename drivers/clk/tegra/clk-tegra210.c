@@ -3460,7 +3460,7 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 	sbus_cbus->u.system.apb_bus = __clk_get_hw(clk);
 
 	clk = tegra_clk_register_cbus("cbus", "pll_c", 0, "pll_p", 0,
-					307200000);
+				      1000000000);
 	clk_register_clkdev(clk, "cbus", NULL);
 	clks[TEGRA210_CLK_CBUS] = clk;
 
