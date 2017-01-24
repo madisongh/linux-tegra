@@ -966,6 +966,7 @@ struct tegra_pto_table {
 	u32 presel_value;
 	u32 presel_reg;
 	u32 presel_mask;
+	u8 cycle_count;
 };
 void tegra_register_ptos(struct tegra_pto_table *ptodefs, int num_pto_defs);
 #endif /* TEGRA_CLK_H */
