@@ -1085,9 +1085,14 @@ static irqreturn_t handle_cpu_based_xfer(struct tegra_qspi_data *tqspi)
 				tqspi->status_reg);
 		dev_err(tqspi->dev, "CpuXfer 0x%08x:0x%08x\n",
 				tqspi->command1_reg, tqspi->dma_control_reg);
-		tegra_periph_reset_assert(tqspi->clk);
+		/* tegra_periph reset deassert APIs are deprecated
+		 * commenting these functions and adding warn print
+		 * TBD: Replace with common clock reset framework API
+		 */
+		dev_warn(tqspi->dev, "Need CCF reset frawework API to reset\n");
+		/* tegra_periph_reset_assert(tqspi->clk); */
 		udelay(2);
-		tegra_periph_reset_deassert(tqspi->clk);
+		/* tegra_periph_reset_deassert(tqspi->clk); */
 		complete(&tqspi->xfer_completion);
 		tqspi->tx_status = 0;
 		tqspi->rx_status = 0;
@@ -1159,9 +1164,14 @@ static irqreturn_t handle_dma_based_xfer(struct tegra_qspi_data *tqspi)
 				tqspi->status_reg);
 		dev_err(tqspi->dev, "DmaXfer 0x%08x:0x%08x\n",
 				tqspi->command1_reg, tqspi->dma_control_reg);
-		tegra_periph_reset_assert(tqspi->clk);
+		/* tegra_periph reset deassert APIs are deprecated
+		 * commenting these functions and adding warn print
+		 * TBD: Replace with common clock reset framework API
+		 */
+		dev_warn(tqspi->dev, "Need CCF reset frawework API to reset\n");
+		/* tegra_periph_reset_assert(tqspi->clk); */
 		udelay(2);
-		tegra_periph_reset_deassert(tqspi->clk);
+		/* tegra_periph_reset_deassert(tqspi->clk); */
 		complete(&tqspi->xfer_completion);
 		tqspi->rx_status = 0;
 		tqspi->tx_status = 0;
