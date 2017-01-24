@@ -77,25 +77,11 @@ static int tsec_boot(struct tsec *tsec)
 	}
 
 	/* ensure that the engine is in sane state */
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	if (tsec->rst) {
-		reset_control_assert(tsec->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(tsec->rst);
-	} else {
-		tegra_mc_flush(true);
-		tegra_periph_reset_assert(tsec->clk);
-		usleep_range(10, 100);
-		tegra_periph_reset_deassert(tsec->clk);
-		tegra_mc_flush_done(true);
-	}
-#else
 	if (tsec->rst) {
 		reset_control_assert(tsec->rst);
 		usleep_range(10, 100);
 		reset_control_deassert(tsec->rst);
 	}
-#endif
 
 	if (client->ops->load_regs)
 		client->ops->load_regs(client);
@@ -222,25 +208,11 @@ static int tsec_exit(struct host1x_client *client)
 	host1x_channel_free(tsec->channel);
 
 	if (tsec->booted) {
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		if (tsec->rst) {
-			reset_control_assert(tsec->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(tsec->rst);
-		} else {
-			tegra_mc_flush(true);
-			tegra_periph_reset_assert(tsec->clk);
-			usleep_range(10, 100);
-			tegra_periph_reset_deassert(tsec->clk);
-			tegra_mc_flush_done(true);
-		}
-#else
 		if (tsec->rst) {
 			reset_control_assert(tsec->rst);
 			usleep_range(10, 100);
 			reset_control_deassert(tsec->rst);
 		}
-#endif
 	}
 
 	falcon_exit(&tsec->falcon);
