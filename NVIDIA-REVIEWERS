@@ -133,11 +133,8 @@ L:	sw-mobile-camera@exchange.nvidia.com
 S:	Supported
 F:	drivers/media/i2c/*
 F:	drivers/media/platform/soc_camera/tegra_camera/*
-F:	drivers/media/platform/tegra/*
-F:	drivers/media/platform/tegra/cam_dev/*
-F:	drivers/media/platform/tegra/camera/
-F:	drivers/media/platform/tegra/vi/*
-F:	drivers/media/platform/tegra/vivid/*
+F:	drivers/media/platform/tegra/
+F:	drivers/media/platform/vivid/
 F:	drivers/media/usb/uvc/*
 F:	drivers/media/v4l2-core/*
 F:	drivers/video/tegra/camera/*
