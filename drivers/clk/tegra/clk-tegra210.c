@@ -3404,7 +3404,8 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 					0, "nvdec");
 	clks[TEGRA210_CLK_NVDEC_CBUS] = clk;
 
-	clk = tegra_clk_register_cbus("abus", "pll_a1", 0, "pll_p", 0, 1000000000);
+	clk = tegra_clk_register_cbus("abus", "pll_a1", 0, "pll_p", 38400000,
+				      1000000000);
 	clks[TEGRA210_CLK_ABUS] = clk;
 
 	clk = tegra_clk_register_shared("adsp.cpu.abus", &abus_parents[0] , 1,
