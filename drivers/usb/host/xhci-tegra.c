@@ -3028,8 +3028,7 @@ static int tegra_xhci_suspend(struct device *dev)
 			 * turn off VBUS for CDP enabled case.
 			 * skip vbus off for OTG port when it isn't host role
 			 */
-			if (XHCI_IS_T186(tegra) &&
-					(j != tegra->utmi_otg_port_base_1 - 1 ||
+			if ((j != tegra->utmi_otg_port_base_1 - 1 ||
 					tegra->host_mode) &&
 					tegra->soc_config->utmi_vbus_power_off)
 				tegra->soc_config->utmi_vbus_power_off(
@@ -3078,8 +3077,7 @@ static int tegra_xhci_resume_common(struct device *dev)
 					__func__, j);
 
 			/* skip vbus on for OTG port when it isn't host role */
-			if (XHCI_IS_T186(tegra) &&
-					(j != tegra->utmi_otg_port_base_1 - 1 ||
+			if ((j != tegra->utmi_otg_port_base_1 - 1 ||
 					tegra->host_mode) &&
 					tegra->soc_config->utmi_vbus_power_on)
 				tegra->soc_config->utmi_vbus_power_on(
@@ -3389,8 +3387,7 @@ static int tegra_xhci_alloc_dev(struct usb_hcd *hcd, struct usb_device *udev)
 				 * set pad protection circuit to >= 2A
 				 * CDP current range: 1.5A~5A see [BC1.2] p36
 				 */
-				if (XHCI_IS_T186(tegra) &&
-					tegra->soc_config->set_protection_level)
+				if (tegra->soc_config->set_protection_level)
 					tegra->soc_config->set_protection_level(
 						tegra->phys[UTMI_PHY][i], 3,
 						TEGRA_VBUS_SOURCE);
@@ -3422,8 +3419,7 @@ static void tegra_xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 				__func__, port);
 		tegra->connected_utmi_ports[port] = 0;
 
-		if (XHCI_IS_T186(tegra) &&
-			tegra->soc_config->set_protection_level)
+		if (tegra->soc_config->set_protection_level)
 			/* disable pad protection circuit on this UTMI pad */
 			tegra->soc_config->set_protection_level(
 				tegra->phys[UTMI_PHY][port], -1,
