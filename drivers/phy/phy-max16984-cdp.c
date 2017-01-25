@@ -5,7 +5,7 @@
  * specifically for USB controller driver to turn on CDP (charging
  * downstream port) support of this chip.
  *
- * Copyright (c) 2016, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2016-2017, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -112,11 +112,17 @@ static struct phy *max16984_phy_xlate(struct device *dev,
 	return ERR_PTR(-EINVAL);
 }
 
+static const struct max16984_tegra_soc_config tegra210_soc_config = {
+	.num_phy = 4,
+};
+
 static const struct max16984_tegra_soc_config tegra186_soc_config = {
 	.num_phy = 3,
 };
 
 static const struct of_device_id max16984_of_match[] = {
+	{  .compatible = "maxim,max16984-tegra210-cdp-phy",
+	   .data = &tegra210_soc_config },
 	{  .compatible = "maxim,max16984-tegra186-cdp-phy",
 	   .data = &tegra186_soc_config },
 	{}
