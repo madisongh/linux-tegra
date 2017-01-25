@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2010 Google, Inc
- * Copyright (C) 2011-2015, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2011-2017, NVIDIA Corporation. All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@google.com>
@@ -16,18 +16,14 @@
  *
  */
 
-#ifndef _MACH_TEGRA_POWERGATE_H_
-#define _MACH_TEGRA_POWERGATE_H_
+#ifndef _LINUX_TEGRA_POWERGATE_H_
+#define _LINUX_TEGRA_POWERGATE_H_
 
 #include <linux/init.h>
 #include <linux/notifier.h>
 
-#ifndef CONFIG_ARCH_TEGRA_18x_SOC
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC) || defined(CONFIG_ARCH_TEGRA_3x_SOC)
-#define TEGRA_POWERGATE_CPU0	0
-#else
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 #define TEGRA_POWERGATE_CRAIL	0
-#endif
 #define TEGRA_POWERGATE_3D	1
 #define TEGRA_POWERGATE_3D0	TEGRA_POWERGATE_3D
 #define TEGRA_POWERGATE_GPU	TEGRA_POWERGATE_3D
@@ -45,9 +41,7 @@
 #define TEGRA_POWERGATE_CPU3	11
 #define TEGRA_POWERGATE_CELP	12
 #define TEGRA_POWERGATE_3D1	13
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC) && !defined(CONFIG_ARCH_TEGRA_3x_SOC)
 #define TEGRA_POWERGATE_CPU0	14
-#endif
 #define TEGRA_POWERGATE_C0NC	15
 #define TEGRA_POWERGATE_C1NC	16
 #define TEGRA_POWERGATE_SOR	17
@@ -56,33 +50,17 @@
 #define TEGRA_POWERGATE_XUSBA	20
 #define TEGRA_POWERGATE_XUSBB	21
 #define TEGRA_POWERGATE_XUSBC	22
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 #define TEGRA_POWERGATE_VIC	23
-#endif
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 #define TEGRA_POWERGATE_NVDEC	25
 #define TEGRA_POWERGATE_NVJPG	26
 #define TEGRA_POWERGATE_APE	27
 #define TEGRA_POWERGATE_VE2	29
-#endif
 
 #define TEGRA_POWERGATE_CPU	TEGRA_POWERGATE_CPU0
 
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
-#define TEGRA_NUM_POWERGATE	7
-#define TEGRA_CPU_POWERGATE_ID(cpu)	(TEGRA_POWERGATE_CPU)
-#define TEGRA_IS_CPU_POWERGATE_ID(id)	((id) == TEGRA_POWERGATE_CPU)
-#else
-#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
-#define TEGRA_NUM_POWERGATE	14
-#elif defined(CONFIG_ARCH_TEGRA_11x_SOC)
-#define TEGRA_NUM_POWERGATE	23
-#elif defined(CONFIG_ARCH_TEGRA_21x_SOC)
 #define TEGRA_NUM_POWERGATE	30
-#else
-#define TEGRA_NUM_POWERGATE	24
-#endif
+
 #define TEGRA_CPU_POWERGATE_ID(cpu)	((cpu == 0) ? TEGRA_POWERGATE_CPU0 : \
 						(cpu + TEGRA_POWERGATE_CPU1 - 1))
 #define TEGRA_IS_CPU_POWERGATE_ID(id)  (((id) == TEGRA_POWERGATE_CPU0) || \
@@ -96,7 +74,8 @@
 #define TEGRA_IS_PCIE_POWERGATE_ID(id)  ((id) == TEGRA_POWERGATE_PCIE)
 #define TEGRA_IS_XUSBC_POWERGATE_ID(id) ((id) == TEGRA_POWERGATE_XUSBC)
 #endif
-#else /* CONFIG_ARCH_TEGRA_18x_SOC */
+
+#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
 #include <dt-bindings/soc/nvidia,tegra186-powergate.h>
 
 #define TEGRA_CPU_POWERGATE_ID(cpu)	-1
@@ -188,4 +167,4 @@ static inline int slcg_register_notifier(int id, struct notifier_block *nb)
 static inline int slcg_unregister_notifier(int id, struct notifier_block *nb)
 { return 0; }
 #endif
-#endif /* _MACH_TEGRA_POWERGATE_H_ */
+#endif /* _LINUX_TEGRA_POWERGATE_H_ */
