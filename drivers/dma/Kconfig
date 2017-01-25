@@ -453,7 +453,7 @@ config TXX9_DMAC
 
 config TEGRA20_APB_DMA
 	bool "NVIDIA Tegra20 APB DMA support"
-	depends on ARCH_OR_PLATFORM_TEGRA
+	depends on ARCH_TEGRA
 	select DMA_ENGINE
 	help
 	  Support for the NVIDIA Tegra20 APB DMA controller driver. The
@@ -465,7 +465,7 @@ config TEGRA20_APB_DMA
 
 config TEGRA210_ADMA
 	bool "NVIDIA Tegra210 ADMA support"
-	depends on ARCH_OR_PLATFORM_TEGRA && ARCH_TEGRA_APE && TEGRA_APE_AGIC
+	depends on ARCH_TEGRA && ARCH_TEGRA_APE && TEGRA_APE_AGIC
 	select DMA_ENGINE
 	help
 	  Support for the NVIDIA Tegra210 ADMA controller driver. The
@@ -476,7 +476,7 @@ config TEGRA210_ADMA
 
 config TEGRA186_ADMA
 	bool "NVIDIA Tegra186 ADMA support"
-	depends on PLATFORM_TEGRA && ARCH_TEGRA_APE
+	depends on ARCH_TEGRA && ARCH_TEGRA_APE
 	depends on TEGRA_APE_AGIC && ARCH_TEGRA_18x_SOC
 	select DMA_ENGINE
 	help
