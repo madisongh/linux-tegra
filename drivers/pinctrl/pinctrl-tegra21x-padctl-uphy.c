@@ -3490,6 +3490,14 @@ static const char * const tegra21x_supply_names[] = {
 	"dvddio_sata",
 };
 
+static const char * const tegra21xb01_supply_names[] = {
+	"avdd_pll_uerefe",
+	"hvdd_pex_pll_e",
+	"dvdd_pex_pll",
+	"hvddio_pex",
+	"dvddio_pex",
+};
+
 static const struct tegra_padctl_uphy_soc tegra21x_soc = {
 	.num_pins = ARRAY_SIZE(tegra21x_pins),
 	.pins = tegra21x_pins,
@@ -3502,8 +3510,27 @@ static const struct tegra_padctl_uphy_soc tegra21x_soc = {
 	.num_supplies = ARRAY_SIZE(tegra21x_supply_names),
 };
 
+static const struct tegra_padctl_uphy_soc tegra21xb01_soc = {
+	.num_pins = ARRAY_SIZE(tegra21x_pins),
+	.pins = tegra21x_pins,
+	.num_functions = ARRAY_SIZE(tegra21x_functions),
+	.functions = tegra21x_functions,
+	.num_lanes = ARRAY_SIZE(tegra21x_lanes),
+	.lanes = tegra21x_lanes,
+	.hsic_port_offset = 8,
+	.supply_names = tegra21xb01_supply_names,
+	.num_supplies = ARRAY_SIZE(tegra21xb01_supply_names),
+};
+
 static const struct of_device_id tegra_padctl_uphy_of_match[] = {
-	{.compatible = "nvidia,tegra21x-padctl-uphy", .data = &tegra21x_soc},
+	{
+		.compatible = "nvidia,tegra21x-padctl-uphy",
+		.data = &tegra21x_soc
+	},
+	{
+		.compatible = "nvidia,tegra21xb01-padctl-uphy",
+		.data = &tegra21xb01_soc
+	},
 	{ }
 };
 MODULE_DEVICE_TABLE(of, tegra_padctl_uphy_of_match);
