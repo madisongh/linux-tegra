@@ -117,7 +117,7 @@ int tegra_pmc_cpu_remove_clamping(int cpuid);
 #define FORCED_RECOVERY_MODE    BIT(1)
 
 #ifndef CONFIG_TEGRA_POWERGATE
-#if defined CONFIG_ARCH_TEGRA || CONFIG_PLATFORM_TEGRA
+#if defined CONFIG_ARCH_TEGRA
 int tegra_powergate_is_powered(int id);
 int tegra_powergate_power_on(int id);
 int tegra_powergate_power_off(int id);
@@ -154,7 +154,7 @@ static inline int tegra_powergate_sequence_power_up(int id, struct clk *clk,
 	return -ENOSYS;
 }
 
-#endif /* CONFIG_ARCH_TEGRA || CONFIG_PLATFORM_TEGRA */
+#endif /* CONFIG_ARCH_TEGRA */
 #endif /* CONFIG_TEGRA_POWERGATE */
 
 int tegra_pmc_set_reboot_reason(u32 reboot_reason);
@@ -163,7 +163,7 @@ int tegra_pmc_clear_reboot_reason(u32 reboot_reason);
 void tegra_pmc_write_bootrom_command(u32 command_offset, unsigned long val);
 void tegra_pmc_reset_system(void);
 
-#if defined(CONFIG_ARCH_OR_PLATFORM_TEGRA) && !defined(CONFIG_TEGRA186_PMC)
+#if defined(CONFIG_ARCH_TEGRA) && !defined(CONFIG_TEGRA186_PMC)
 void tegra_pmc_io_dpd_clear(void);
 int tegra_pmc_io_pad_low_power_enable(const char *pad_name);
 int tegra_pmc_io_pad_low_power_disable(const char *pad_name);
