@@ -183,7 +183,7 @@ config POWER_RESET_ZX
 
 config SYSTEM_PMIC
 	bool "System PMIC reset ot power off"
-	def_bool y if ARCH_OR_PLATFORM_TEGRA
+	def_bool y if ARCH_TEGRA
 
 endif
 
