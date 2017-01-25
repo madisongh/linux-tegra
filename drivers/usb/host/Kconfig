@@ -51,7 +51,7 @@ config USB_XHCI_MVEBU
 
 config USB_XHCI_TEGRA
 	tristate "Enable NVIDIA's Tegra XHCI host controller"
-	depends on ARCH_TEGRA || PLATFORM_TEGRA || COMPILE_TEST
+	depends on ARCH_TEGRA || COMPILE_TEST
         depends on MAILBOX
         select FW_LOADER
         ---help---

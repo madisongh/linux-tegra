@@ -386,7 +386,7 @@ config USB_TEGRA
 
 config USB_TEGRA_XUDC
 	tristate "NVIDIA Superspeed USB 3.0 Device Controller"
-	depends on ARCH_TEGRA || PLATFORM_TEGRA
+	depends on ARCH_TEGRA
 	default n
 	help
 	 Enables TEGRA USB 3.0 device mode controller driver.
@@ -426,7 +426,7 @@ config USB_DUMMY_HCD
 
 config USB_TEGRA_CD
 	bool "TEGRA USB charger detection"
-	depends on ARCH_TEGRA || PLATFORM_TEGRA
+	depends on ARCH_TEGRA
 	default n
 	help
 	  Say y to enable tegra charger detection driver.
