@@ -369,7 +369,7 @@ config PWM_SUN4I
 
 config PWM_TEGRA
 	tristate "NVIDIA Tegra PWM support"
-	depends on ARCH_TEGRA || PLATFORM_TEGRA
+	depends on ARCH_TEGRA
 	help
 	  Generic PWM framework driver for the PWFM controller found on NVIDIA
 	  Tegra SoCs.
@@ -379,7 +379,7 @@ config PWM_TEGRA
 
 config PWM_TEGRA_DFLL
 	tristate "NVIDIA Tegra DFLL PWM support"
-	depends on ARCH_TEGRA || PLATFORM_TEGRA
+	depends on ARCH_TEGRA
 	help
 	  PWM driver support for the Tegra DFLL module found on NVIDIA
 	  Tegra SoCs.
