@@ -73,7 +73,7 @@ config OF_NET
 
 config OF_PLUGIN_MANAGER
 	def_bool y
-	depends on ARCH_TEGRA || PLATFORM_TEGRA
+	depends on ARCH_TEGRA
 
 config OF_MDIO
 	def_tristate PHYLIB
