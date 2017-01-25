@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -170,6 +170,9 @@ static const struct clk_ops tegra_clk_periph_no_gate_ops = {
 	.recalc_rate = clk_periph_recalc_rate,
 	.determine_rate = clk_periph_determine_rate,
 	.set_rate = clk_periph_set_rate,
+	.is_prepared = clk_periph_is_prepared,
+	.prepare = clk_periph_prepare,
+	.unprepare = clk_periph_unprepare,
 };
 
 static struct clk *_tegra_clk_register_periph(const char *name,
