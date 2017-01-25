@@ -54,9 +54,7 @@ obj-$(CONFIG_PSTORE_RAM) += tegra_ramoops.o
 obj-$(CONFIG_TEGRA_CENTRAL_ACTMON) += central_actmon/
 obj-$(CONFIG_TEGRA_CPU_VOLT_CAP)	+= tegra_volt_cap.o
 
-ifeq ($(CONFIG_PM_SLEEP),y)
-obj-y += tegra-wakeups.o
-endif
+obj-$(CONFIG_PM_SLEEP) += tegra-wakeups.o
 
 ifneq ($(CONFIG_ARM64),)
 
