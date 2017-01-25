@@ -173,6 +173,7 @@ unsigned long clk_get_rate_all_locked(struct clk *c);
 int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting);
 #endif
 
+#ifdef CONFIG_ARCH_TEGRA_210_SOC
 extern bool tegra210_xusb_pll_hw_sequence_is_enabled(void);
 extern void tegra210_xusb_pll_hw_control_enable(void);
 extern void tegra210_xusb_pll_hw_sequence_start(void);
@@ -184,11 +185,46 @@ extern void tegra210_put_utmipll_in_iddq(void);
 extern void tegra210_put_utmipll_out_iddq(void);
 extern bool tegra210_plle_hw_sequence_is_enabled(void);
 extern void tegra210_plle_hw_sequence_start(void);
-
-#ifdef CONFIG_ARCH_TEGRA_210_SOC
 extern void tegra210_csi_source_from_brick(void);
 extern void tegra210_csi_source_from_plld(void);
 #else
+static inline bool tegra210_xusb_pll_hw_sequence_is_enabled(void)
+{
+	return false;
+}
+static inline void tegra210_xusb_pll_hw_control_enable(void)
+{
+}
+static inline void tegra210_xusb_pll_hw_sequence_start(void)
+{
+}
+static inline bool tegra210_sata_pll_hw_sequence_is_enabled(void)
+{
+	return false;
+}
+static inline void tegra210_sata_pll_hw_control_enable(void)
+{
+}
+static inline void tegra210_sata_pll_hw_sequence_start(void)
+{
+}
+static inline void tegra210_set_sata_pll_seq_sw(bool state)
+{
+}
+static inline void tegra210_put_utmipll_in_iddq(void)
+{
+}
+static inline void tegra210_put_utmipll_out_iddq(void)
+{
+}
+static inline bool tegra210_plle_hw_sequence_is_enabled(void)
+{
+	return false;
+}
+static inline void tegra210_plle_hw_sequence_start(void)
+{
+}
+
 static inline void tegra210_csi_source_from_brick(void)
 {
 }
