@@ -190,8 +190,10 @@ int powergate_module(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains)
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
+	}
 
 	tegra_powergate_mc_flush(id);
 
@@ -205,8 +207,10 @@ int unpowergate_module(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains)
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
+	}
 
 	return tegra_powergate_set(id, true);
 }
@@ -383,8 +387,10 @@ bool tegra_powergate_check_clamping(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains)
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
+	}
 
 	return pg_ops->powergate_check_clamping(id);
 }
@@ -399,8 +405,10 @@ int tegra_powergate_remove_clamping(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains)
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
+	}
 
 	/*
 	 * PCIE and VDE clamping masks are swapped with respect to their
@@ -445,8 +453,10 @@ bool tegra_powergate_is_powered(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains)
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
+	}
 
 	if (pg_ops->powergate_is_powered)
 		return pg_ops->powergate_is_powered(id);
@@ -487,8 +497,8 @@ int tegra_powergate_partition(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains) {
-		pr_info("%s: invalid powergate id\n", __func__);
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
 	}
 
@@ -512,8 +522,8 @@ int tegra_unpowergate_partition(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains) {
-		pr_info("%s: invalid powergate id\n", __func__);
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
 	}
 
@@ -537,8 +547,8 @@ int tegra_powergate_partition_with_clk_off(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains) {
-		pr_info("%s: invalid powergate id\n", __func__);
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
 	}
 
@@ -562,8 +572,8 @@ int tegra_unpowergate_partition_with_clk_on(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains) {
-		pr_info("%s: invalid powergate id\n", __func__);
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
 	}
 
@@ -587,8 +597,8 @@ int tegra_powergate_mc_enable(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains) {
-		pr_info("%s: invalid powergate id\n", __func__);
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
 	}
 
@@ -608,8 +618,8 @@ int tegra_powergate_mc_disable(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains) {
-		pr_info("%s: invalid powergate id\n", __func__);
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
 	}
 
@@ -629,8 +639,8 @@ int tegra_powergate_mc_flush(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains) {
-		pr_info("%s: invalid powergate id\n", __func__);
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
 	}
 
@@ -650,8 +660,8 @@ int tegra_powergate_mc_flush_done(int id)
 		return -EINVAL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains) {
-		pr_info("%s: invalid powergate id\n", __func__);
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return -EINVAL;
 	}
 
@@ -671,8 +681,8 @@ const char *tegra_powergate_get_name(int id)
 		return NULL;
 	}
 
-	if (id < 0 || id >= pg_ops->num_powerdomains) {
-		pr_info("invalid powergate id\n");
+	if (!pg_ops->powergate_id_is_soc_valid(id)) {
+		pr_info("%s: invalid powergate id %d\n", __func__, id);
 		return "invalid";
 	}
 
