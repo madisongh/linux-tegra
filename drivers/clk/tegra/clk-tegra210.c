@@ -3429,7 +3429,7 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 	sbus_cbus = to_clk_cbus_shared(__clk_get_hw(clk));
 
 	clk = tegra_clk_register_shared_master("emc_master", "emc", 0,
-						12750000, 1800000000);
+						12750000, 1600000000);
 	clks[TEGRA210_CLK_EMC_MASTER] = clk;
 
 	clk = tegra_clk_register_shared_master("gbus", "gpcclk", 0,
