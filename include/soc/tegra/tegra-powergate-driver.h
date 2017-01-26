@@ -76,4 +76,14 @@ struct tegra_powergate_driver_ops *tegra186_powergate_init_chip_support(void)
 }
 #endif
 
+#if defined(CONFIG_ARCH_TEGRA_19x_SOC)
+struct tegra_powergate_driver_ops *tegra194_powergate_init_chip_support(void);
+#else
+static inline
+struct tegra_powergate_driver_ops *tegra194_powergate_init_chip_support(void)
+{
+	return NULL;
+}
+#endif
+
 #endif /* _SOC_TEGRA_POWERGATE_DRIVER_H_ */

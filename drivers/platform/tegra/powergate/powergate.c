@@ -402,6 +402,10 @@ static int __init tegra_powergate_init(void)
 		TEGRA_POWERGATE_SOR = TEGRA186_POWER_DOMAIN_DISP;
 		break;
 
+	case TEGRA194:
+		pg_ops = tegra194_powergate_init_chip_support();
+		break;
+
 	default:
 		pg_ops = NULL;
 		pr_info("%s: Unknown Tegra variant. Disabling powergate\n", __func__);
