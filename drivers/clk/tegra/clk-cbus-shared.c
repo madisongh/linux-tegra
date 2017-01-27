@@ -1295,6 +1295,9 @@ struct clk *tegra_clk_register_cascade_master(const char *name,
 		return c;
 	}
 
+	/* Adjust for possible divider from parent */
+	cascade_master->u.shared_bus_user.rate = clk_get_rate(c);
+
 	register_bus_clk_notifier(c);
 	return c;
 }
