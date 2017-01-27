@@ -233,7 +233,7 @@ config TEGRA_IOMMU_GART
 
 config OF_TEGRA_IOMMU_SMMU
 	bool
-	depends on PLATFORM_TEGRA
+	depends on ARCH_TEGRA
 
 config TEGRA_IOMMU_SMMU
 	bool "NVIDIA Tegra SMMU Support"
