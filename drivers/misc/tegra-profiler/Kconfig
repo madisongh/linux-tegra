@@ -1,6 +1,6 @@
 config TEGRA_PROFILER
 	bool "Enable Tegra profiler"
-	depends on ARCH_TEGRA || PLATFORM_TEGRA
+	depends on ARCH_TEGRA
 	help
 	  This option enables Tegra profiler
 	  The main responsibility of this module is sampling
