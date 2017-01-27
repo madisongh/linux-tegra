@@ -54,6 +54,6 @@ obj-$(CONFIG_VIDEO_AM437X_VPFE)		+= am437x/
 
 obj-$(CONFIG_VIDEO_XILINX)		+= xilinx/
 
-obj-$(CONFIG_PLATFORM_TEGRA) += tegra/
+obj-$(CONFIG_ARCH_TEGRA) += tegra/
 ccflags-y += -I$(srctree)/drivers/media/i2c
 ccflags-y += -I$(srctree)/../nvhost/drivers/video/tegra/host

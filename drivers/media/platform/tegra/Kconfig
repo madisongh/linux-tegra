@@ -5,7 +5,7 @@ source "drivers/media/platform/tegra/mipical/Kconfig"
 
 config VIDEO_CAMERA
 	tristate "generic camera device support"
-	depends on I2C && PLATFORM_TEGRA
+	depends on I2C && ARCH_TEGRA
 	select REGMAP_I2C
 	---help---
 	  This is a driver for generic camera devices
@@ -27,7 +27,7 @@ config VIDEO_TEGRA_VI
 
 config VIDEO_ISC
 	tristate "ISC(Image Sensor Control) device support"
-	depends on I2C && PLATFORM_TEGRA
+	depends on I2C && ARCH_TEGRA
 	---help---
 	  This is a driver for the ISC
 	  for controlling power, interrupt and registering
