@@ -4052,7 +4052,7 @@ static int tegra210_reset_assert(unsigned long id)
 	if (id == TEGRA210_RST_DFLL_DVCO)
 		tegra210_clock_assert_dfll_dvco_reset();
 	else if (id == TEGRA210_RST_ADSP)
-		writel(GENMASK(26,21),
+		writel(GENMASK(26, 21) | BIT(7),
 			clk_base + CLK_RST_CONTROLLER_RST_DEV_Y_SET);
 	else
 		return -EINVAL;
@@ -4064,9 +4064,17 @@ static int tegra210_reset_deassert(unsigned long id)
 {
 	if (id == TEGRA210_RST_DFLL_DVCO)
 		tegra210_clock_deassert_dfll_dvco_reset();
-	else if (id == TEGRA210_RST_ADSP)
-		writel(GENMASK(26,21),
+	else if (id == TEGRA210_RST_ADSP) {
+		writel(BIT(21), clk_base + CLK_RST_CONTROLLER_RST_DEV_Y_CLR);
+		/*
+		 * Considering adsp cpu clock (min: 12.5MHZ, max: 1GHz)
+		 * a delay of 5us ensures that it's at least
+		 * 6 * adsp_cpu_cycle_period long.
+		 */
+		udelay(5);
+		writel(GENMASK(26, 22) | BIT(7),
 			clk_base + CLK_RST_CONTROLLER_RST_DEV_Y_CLR);
+	}
 	else
 		return -EINVAL;
 
