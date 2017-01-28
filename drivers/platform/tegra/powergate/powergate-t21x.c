@@ -1518,11 +1518,27 @@ static bool tegra210_powergate_id_is_valid(int id)
 	return true;
 }
 
+static int tegra210_powergate_cpuid_to_powergate_id(int cpu)
+{
+	if (cpu == 0)
+		return TEGRA_POWERGATE_CPU0;
+
+	return cpu + TEGRA_POWERGATE_CPU1 - 1;
+}
+
+static bool tegra210_powergate_id_matching(int id, int powergate_id)
+{
+	return (id == powergate_id);
+}
+
 static struct powergate_ops tegra210_pg_ops = {
 	.soc_name = "tegra210",
 
 	.num_powerdomains = TEGRA_NUM_POWERGATE,
 	.powergate_id_is_soc_valid = tegra210_powergate_id_is_valid,
+	.powergate_cpuid_to_powergate_id =
+				tegra210_powergate_cpuid_to_powergate_id,
+	.powergate_id_matching = tegra210_powergate_id_matching,
 
 	.get_powergate_lock = tegra210_pg_get_lock,
 	.get_powergate_domain_name = tegra210_pg_get_name,

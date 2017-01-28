@@ -366,6 +366,24 @@ const char *tegra_powergate_get_name(int id)
 }
 EXPORT_SYMBOL(tegra_powergate_get_name);
 
+int tegra_powergate_cpuid_to_powergate_id(int cpu)
+{
+	if (pg_ops->powergate_cpuid_to_powergate_id)
+		return pg_ops->powergate_cpuid_to_powergate_id(cpu);
+
+	return -1;
+}
+EXPORT_SYMBOL(tegra_powergate_cpuid_to_powergate_id);
+
+bool tegra_powergate_id_matching(int id, int powergate_id)
+{
+	if (pg_ops->powergate_id_matching)
+		return pg_ops->powergate_id_matching(id, powergate_id);
+
+	return false;
+}
+EXPORT_SYMBOL(tegra_powergate_id_matching);
+
 static int tegra_powergate_init_refcount(void)
 {
 	if ((!pg_ops) || (!pg_ops->powergate_init_refcount))

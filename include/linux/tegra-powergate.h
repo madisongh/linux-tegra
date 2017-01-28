@@ -24,32 +24,36 @@
 
 #if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 #include <dt-bindings/soc/nvidia,tegra210-powergate.h>
-
-#define TEGRA_CPU_POWERGATE_ID(cpu)    ((cpu == 0) ? TEGRA_POWERGATE_CPU0 : \
-					(cpu + TEGRA_POWERGATE_CPU1 - 1))
-#define TEGRA_IS_CPU_POWERGATE_ID(id)  (((id) == TEGRA_POWERGATE_CPU0) || \
-					((id) == TEGRA_POWERGATE_CPU1) || \
-					((id) == TEGRA_POWERGATE_CPU2) || \
-					((id) == TEGRA_POWERGATE_CPU3))
-#define TEGRA_IS_GPU_POWERGATE_ID(id)  ((id) == TEGRA_POWERGATE_GPU)
-#define TEGRA_IS_DISP_POWERGATE_ID(id) (((id) == TEGRA_POWERGATE_DISA) || \
-					((id) == TEGRA_POWERGATE_DISB))
-#define TEGRA_IS_VENC_POWERGATE_ID(id)  ((id) == TEGRA_POWERGATE_VENC)
-#define TEGRA_IS_PCIE_POWERGATE_ID(id)  ((id) == TEGRA_POWERGATE_PCIE)
-#define TEGRA_IS_XUSBC_POWERGATE_ID(id) ((id) == TEGRA_POWERGATE_XUSBC)
 #endif
 
 #if defined(CONFIG_ARCH_TEGRA_18x_SOC)
 #include <dt-bindings/soc/nvidia,tegra186-powergate.h>
-
-#define TEGRA_CPU_POWERGATE_ID(cpu)	-1
-#define TEGRA_IS_CPU_POWERGATE_ID(id)	0
-#define TEGRA_IS_GPU_POWERGATE_ID(id)	0
-#define TEGRA_IS_DISP_POWERGATE_ID(id)	0
-#define TEGRA_IS_VENC_POWERGATE_ID(id)	0
-#define TEGRA_IS_PCIE_POWERGATE_ID(id)	0
-#define TEGRA_IS_XUSBC_POWERGATE_ID(id)	0
 #endif
+
+#define TEGRA_CPU_POWERGATE_ID(cpu)					\
+		tegra_powergate_cpuid_to_powergate_id(cpu)
+
+#define TEGRA_IS_CPU_POWERGATE_ID(id)					\
+	(tegra_powergate_id_matching(id, TEGRA_POWERGATE_CPU0) ||	\
+	 tegra_powergate_id_matching(id, TEGRA_POWERGATE_CPU1) ||	\
+	 tegra_powergate_id_matching(id, TEGRA_POWERGATE_CPU2) ||	\
+	 tegra_powergate_id_matching(id, TEGRA_POWERGATE_CPU3))
+
+#define TEGRA_IS_GPU_POWERGATE_ID(id)					\
+	tegra_powergate_id_matching(id, TEGRA_POWERGATE_GPU)
+
+#define TEGRA_IS_DISP_POWERGATE_ID(id)					\
+	(tegra_powergate_id_matching(id, TEGRA_POWERGATE_DISA) ||	\
+	 tegra_powergate_id_matching(id, TEGRA_POWERGATE_DISB))
+
+#define TEGRA_IS_VENC_POWERGATE_ID(id)					\
+	tegra_powergate_id_matching(id, TEGRA_POWERGATE_VENC)
+
+#define TEGRA_IS_PCIE_POWERGATE_ID(id)					\
+	tegra_powergate_id_matching(id, TEGRA_POWERGATE_PCIE)
+
+#define TEGRA_IS_XUSBC_POWERGATE_ID(id)					\
+	tegra_powergate_id_matching(id, TEGRA_POWERGATE_XUSB)
 
 #ifdef CONFIG_TEGRA_POWERGATE
 int tegra_cpu_powergate_id(int cpuid);
@@ -95,6 +99,8 @@ int tegra_powergate_partition(int id);
 int tegra_unpowergate_partition(int id);
 int slcg_register_notifier(int id, struct notifier_block *nb);
 int slcg_unregister_notifier(int id, struct notifier_block *nb);
+int tegra_powergate_cpuid_to_powergate_id(int cpu);
+bool tegra_powergate_id_matching(int id, int powergate_id);
 #else
 static inline bool tegra_powergate_is_powered(int id)
 {
@@ -135,6 +141,14 @@ static inline int slcg_register_notifier(int id, struct notifier_block *nb)
 static inline int slcg_unregister_notifier(int id, struct notifier_block *nb)
 {
 	return 0;
+}
+static inline int tegra_powergate_cpuid_to_powergate_id(int cpu)
+{
+	return -1;
+}
+static inline bool tegra_powergate_id_matching(int id, int powergate_id)
+{
+	return false;
 }
 #endif
 
