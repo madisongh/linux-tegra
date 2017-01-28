@@ -485,6 +485,52 @@ static struct mc_client_hotreset_reg tegra210_mc_reg[] = {
 	[1] = { .control_reg = 0x970, .status_reg = 0x974 },
 };
 
+struct tegra210_powergate_info {
+	bool valid;
+	unsigned int mask;
+	struct tegra210_mc_client_info *mc_info;
+	struct powergate_partition_info *part_info;
+};
+
+#define T210_POWERGATE_INFO(_pg_id, _pg_bit, _part_id, _mc_id)		\
+[TEGRA_POWERGATE_##_pg_id] = {						\
+	.valid = true,							\
+	.mask = BIT(_pg_bit),						\
+	.mc_info = &tegra210_pg_mc_info[TEGRA_POWERGATE_##_mc_id],	\
+	.part_info = &tegra210_pg_partition_info[TEGRA_POWERGATE_##_part_id], \
+}
+
+static struct tegra210_powergate_info t210_pg_info[TEGRA_NUM_POWERGATE] = {
+	T210_POWERGATE_INFO(CRAIL, 0, CRAIL, CRAIL),
+	T210_POWERGATE_INFO(GPU, 1, GPU, GPU),
+	T210_POWERGATE_INFO(VENC, 2, VENC, VENC),
+	T210_POWERGATE_INFO(PCIE, 3, PCIE, PCIE),
+	T210_POWERGATE_INFO(VDEC, 4, VDEC, VDEC),
+	T210_POWERGATE_INFO(L2, 5, L2, L2),
+	T210_POWERGATE_INFO(MPE, 6, MPE, MPE),
+	T210_POWERGATE_INFO(HEG, 7, HEG, HEG),
+	T210_POWERGATE_INFO(SATA, 8, SATA, SATA),
+	T210_POWERGATE_INFO(CPU1, 9, CPU1, CPU1),
+	T210_POWERGATE_INFO(CPU2, 10, CPU2, CPU2),
+	T210_POWERGATE_INFO(CPU3, 11, CPU3, CPU3),
+	T210_POWERGATE_INFO(CELP, 12, CELP, CELP),
+	T210_POWERGATE_INFO(3D1, 13, 3D1, 3D1),
+	T210_POWERGATE_INFO(CPU0, 14, CPU0, CPU0),
+	T210_POWERGATE_INFO(C0NC, 15, C0NC, C0NC),
+	T210_POWERGATE_INFO(C1NC, 16, C1NC, C1NC),
+	T210_POWERGATE_INFO(SOR, 17, SOR, SOR),
+	T210_POWERGATE_INFO(DISA, 18, DISA, DISA),
+	T210_POWERGATE_INFO(DISB, 19, DISB, DISB),
+	T210_POWERGATE_INFO(XUSBA, 20, XUSBA, XUSBA),
+	T210_POWERGATE_INFO(XUSBB, 21, XUSBB, XUSBB),
+	T210_POWERGATE_INFO(XUSBC, 22, XUSBC, XUSBC),
+	T210_POWERGATE_INFO(VIC, 23, VIC, VIC),
+	T210_POWERGATE_INFO(NVDEC, 25, NVDEC, NVDEC),
+	T210_POWERGATE_INFO(NVJPG, 26, NVJPG, NVJPG),
+	T210_POWERGATE_INFO(APE, 27, APE, APE),
+	T210_POWERGATE_INFO(VE2, 29, VE2, VE2),
+};
+
 #define PMC_GPU_RG_CONTROL		0x2d4
 
 #define PWRGATE_CLAMP_STATUS		0x2c
@@ -529,7 +575,7 @@ static void pmc_write(u32 val, unsigned long reg)
 
 static const char *tegra210_pg_get_name(int id)
 {
-	return tegra210_pg_partition_info[id].name;
+	return t210_pg_info[id].part_info->name;
 }
 
 static spinlock_t *tegra210_pg_get_lock(void)
@@ -568,7 +614,7 @@ static int tegra_powergate_set(int id, bool new_state)
 
 	spin_lock_irqsave(lock, flags);
 
-	status = !!(pmc_read(PWRGATE_STATUS) & (1 << id));
+	status = !!(pmc_read(PWRGATE_STATUS) & t210_pg_info[id].mask);
 
 	if (status == new_state) {
 		spin_unlock_irqrestore(lock, flags);
@@ -615,7 +661,8 @@ static int tegra_powergate_set(int id, bool new_state)
 	do {
 		do {
 			udelay(1);
-			status = !!(pmc_read(PWRGATE_STATUS) & (1 << id));
+			status = !!(pmc_read(PWRGATE_STATUS) &
+				    t210_pg_info[id].mask);
 
 			toggle_timeout--;
 		} while ((status != new_state) && (toggle_timeout > 0));
@@ -795,7 +842,7 @@ void get_slcg_info(struct powergate_partition_info *pg_info)
 
 static int tegra210_slcg_register_notifier(int id, struct notifier_block *nb)
 {
-	struct powergate_partition_info *pg_info = &tegra210_pg_partition_info[id];
+	struct powergate_partition_info *pg_info = t210_pg_info[id].part_info;
 
 	if (!pg_info || !nb)
 		return -EINVAL;
@@ -805,8 +852,7 @@ static int tegra210_slcg_register_notifier(int id, struct notifier_block *nb)
 
 static int tegra210_slcg_unregister_notifier(int id, struct notifier_block *nb)
 {
-	struct powergate_partition_info *pg_info =
-			&tegra210_pg_partition_info[id];
+	struct powergate_partition_info *pg_info = t210_pg_info[id].part_info;
 
 	if (!pg_info || !nb)
 		return -EINVAL;
@@ -824,11 +870,11 @@ static int tegra210_powergate_remove_clamping(int id)
 	 * partition ids
 	 */
 	if (id ==  TEGRA_POWERGATE_VDEC)
-		mask = (1 << TEGRA_POWERGATE_PCIE);
+		mask = t210_pg_info[TEGRA_POWERGATE_PCIE].mask;
 	else if (id == TEGRA_POWERGATE_PCIE)
-		mask = (1 << TEGRA_POWERGATE_VDEC);
+		mask = t210_pg_info[TEGRA_POWERGATE_VDEC].mask;
 	else
-		mask = (1 << id);
+		mask = t210_pg_info[id].mask;
 
 	pmc_write(mask, REMOVE_CLAMPING);
 	/* Wait until clamp is removed */
@@ -1037,7 +1083,8 @@ static int tegra210_pg_mc_flush(int id)
 	int reg_idx;
 
 	for (idx = 0; idx < MAX_HOTRESET_CLIENT_NUM; idx++) {
-		mc_client_bit = tegra210_pg_mc_info[id].hot_reset_clients[idx];
+		mc_client_bit =
+			t210_pg_info[id].mc_info->hot_reset_clients[idx];
 		if (mc_client_bit == MC_CLIENT_LAST)
 			break;
 
@@ -1080,7 +1127,8 @@ static int tegra210_pg_mc_flush_done(int id)
 	int reg_idx;
 
 	for (idx = 0; idx < MAX_HOTRESET_CLIENT_NUM; idx++) {
-		mc_client_bit = tegra210_pg_mc_info[id].hot_reset_clients[idx];
+		mc_client_bit =
+			t210_pg_info[id].mc_info->hot_reset_clients[idx];
 		if (mc_client_bit == MC_CLIENT_LAST)
 			break;
 
@@ -1102,8 +1150,7 @@ static int tegra210_pg_mc_flush_done(int id)
 
 static int tegra210_pg_powergate(int id)
 {
-	struct powergate_partition_info *partition =
-				&tegra210_pg_partition_info[id];
+	struct powergate_partition_info *partition = t210_pg_info[id].part_info;
 	int ret = 0;
 
 	trace_powergate(__func__, tegra210_pg_get_name(id), id, 1, 0);
@@ -1128,8 +1175,7 @@ exit_unlock:
 
 static int tegra210_pg_unpowergate(int id)
 {
-	struct powergate_partition_info *partition =
-				&tegra210_pg_partition_info[id];
+	struct powergate_partition_info *partition = t210_pg_info[id].part_info;
 	int ret = 0;
 
 	trace_powergate(__func__, tegra210_pg_get_name(id), id, 1, 0);
@@ -1155,8 +1201,7 @@ exit_unlock:
 static int tegra210_pg_gpu_powergate(int id)
 {
 	int ret = 0;
-	struct powergate_partition_info *partition =
-				&tegra210_pg_partition_info[id];
+	struct powergate_partition_info *partition = t210_pg_info[id].part_info;
 
 	trace_powergate(__func__, tegra210_pg_get_name(id), id, 1, 0);
 	mutex_lock(&partition->pg_mutex);
@@ -1211,8 +1256,7 @@ static int tegra210_pg_gpu_unpowergate(int id)
 {
 	int ret = 0;
 	bool first = false;
-	struct powergate_partition_info *partition =
-				&tegra210_pg_partition_info[id];
+	struct powergate_partition_info *partition = t210_pg_info[id].part_info;
 
 	trace_powergate(__func__, tegra210_pg_get_name(id), id, 1, 0);
 	mutex_lock(&partition->pg_mutex);
@@ -1414,8 +1458,7 @@ static int tegra210_pg_unpowergate_partition(int id)
 static int tegra210_pg_powergate_clk_off(int id)
 {
 	int ret = 0;
-	struct powergate_partition_info *partition =
-				&tegra210_pg_partition_info[id];
+	struct powergate_partition_info *partition = t210_pg_info[id].part_info;
 
 	BUG_ON(TEGRA_IS_GPU_POWERGATE_ID(id));
 
@@ -1435,7 +1478,7 @@ static int tegra210_pg_powergate_clk_off(int id)
 		tegra210_set_sata_pll_seq_sw(true);
 
 	ret = tegra1xx_powergate_partition_with_clk_off(id,
-			&tegra210_pg_partition_info[id]);
+			t210_pg_info[id].part_info);
 
 exit_unlock:
 	mutex_unlock(&partition->pg_mutex);
@@ -1447,8 +1490,7 @@ exit_unlock:
 static int tegra210_pg_unpowergate_clk_on(int id)
 {
 	int ret = 0;
-	struct powergate_partition_info *partition =
-				&tegra210_pg_partition_info[id];
+	struct powergate_partition_info *partition = t210_pg_info[id].part_info;
 
 	BUG_ON(TEGRA_IS_GPU_POWERGATE_ID(id));
 	trace_powergate(__func__, tegra210_pg_get_name(id), id, 1, 0);
@@ -1458,7 +1500,7 @@ static int tegra210_pg_unpowergate_clk_on(int id)
 		goto exit_unlock;
 
 	ret = tegra1xx_unpowergate_partition_with_clk_on(id,
-			&tegra210_pg_partition_info[id]);
+			t210_pg_info[id].part_info);
 
 	if (id == TEGRA_POWERGATE_SATA)
 		tegra210_set_sata_pll_seq_sw(false);
@@ -1478,7 +1520,7 @@ static bool tegra210_pg_is_powered(int id)
 		if (gpu_rail)
 			status = tegra_dvfs_is_rail_up(gpu_rail);
 	} else {
-		status = pmc_read(PWRGATE_STATUS) & (1 << id);
+		status = pmc_read(PWRGATE_STATUS) & t210_pg_info[id].mask;
 	}
 
 	return !!status;
@@ -1489,16 +1531,19 @@ static int tegra210_pg_init_refcount(void)
 	int i;
 
 	for (i = 0; i < TEGRA_NUM_POWERGATE; i++) {
-		if (tegra_powergate_is_powered(i))
-			tegra210_pg_partition_info[i].refcount = 1;
-		else
-			tegra210_pg_partition_info[i].disable_after_boot = 0;
+		if (!t210_pg_info[i].valid)
+			continue;
 
-		mutex_init(&tegra210_pg_partition_info[i].pg_mutex);
+		if (tegra_powergate_is_powered(i))
+			t210_pg_info[i].part_info->refcount = 1;
+		else
+			t210_pg_info[i].part_info->disable_after_boot = 0;
+
+		mutex_init(&t210_pg_info[i].part_info->pg_mutex);
 	}
 
 	/* SOR refcount depends on other units */
-	tegra210_pg_partition_info[TEGRA_POWERGATE_SOR].refcount =
+	t210_pg_info[TEGRA_POWERGATE_SOR].part_info->refcount =
 		(tegra_powergate_is_powered(TEGRA_POWERGATE_DISA) ? 1 : 0) +
 		(tegra_powergate_is_powered(TEGRA_POWERGATE_DISB) ? 1 : 0) +
 		(tegra_powergate_is_powered(TEGRA_POWERGATE_VE) ? 1 : 0);
@@ -1515,15 +1560,25 @@ static bool tegra210_powergate_id_is_valid(int id)
 	if ((id < 0) || (id >= TEGRA_NUM_POWERGATE))
 		return false;
 
-	return true;
+	return t210_pg_info[id].valid;
 }
 
 static int tegra210_powergate_cpuid_to_powergate_id(int cpu)
 {
-	if (cpu == 0)
+	switch (cpu) {
+	case 0:
 		return TEGRA_POWERGATE_CPU0;
+	case 1:
+		return TEGRA_POWERGATE_CPU1;
+	case 2:
+		return TEGRA_POWERGATE_CPU2;
+	case 3:
+		return TEGRA_POWERGATE_CPU3;
+	default:
+		return -1;
+	}
 
-	return cpu + TEGRA_POWERGATE_CPU1 - 1;
+	return -1;
 }
 
 static bool tegra210_powergate_id_matching(int id, int powergate_id)
@@ -1580,12 +1635,16 @@ static int __init tegra210_disable_boot_partitions(void)
 	int i;
 
 	pr_info("Disable partitions left on by BL\n");
-	for (i = 0; i < TEGRA_NUM_POWERGATE; i++)
-		if (tegra210_pg_partition_info[i].disable_after_boot &&
+	for (i = 0; i < TEGRA_NUM_POWERGATE; i++) {
+		if (!t210_pg_info[i].valid)
+			continue;
+
+		if (t210_pg_info[i].part_info->disable_after_boot &&
 			(i != TEGRA_POWERGATE_GPU)) {
-			pr_info("    %s\n", tegra210_pg_partition_info[i].name);
+			pr_info("  %s\n", t210_pg_info[i].part_info->name);
 			tegra210_pg_powergate_partition(i);
 		}
+	}
 
 	return 0;
 }
