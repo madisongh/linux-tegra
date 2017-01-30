@@ -354,7 +354,7 @@ const char *tegra_powergate_get_name(int id)
 
 	if (!pg_ops->powergate_id_is_soc_valid(id)) {
 		pr_info("%s: invalid powergate id %d\n", __func__, id);
-		return "invalid";
+		return NULL;
 	}
 
 	if (pg_ops->get_powergate_domain_name)
@@ -362,7 +362,7 @@ const char *tegra_powergate_get_name(int id)
 	else
 		WARN_ON_ONCE("This SOC does not support CPU powergate");
 
-	return "invalid";
+	return NULL;
 }
 EXPORT_SYMBOL(tegra_powergate_get_name);
 
@@ -528,16 +528,17 @@ int __init tegra_powergate_debugfs_init(void)
 		name = tegra_powergate_get_name(i);
 		if (name) {
 			ret = powergate_debugfs_register_one(i, name);
-			if (ret)
-				goto err_out;
+
+			/* Continue even if error is there */
+			if (ret) {
+				pr_info("powerdomain debugfs not created for %s(%d): %d\n",
+					name, i, ret);
+				continue;
+			}
 		}
 	}
 
 	return 0;
-
-err_out:
-	debugfs_remove_recursive(pg_debugfs_root);
-	return -ENOMEM;
 }
 late_initcall(tegra_powergate_debugfs_init);
 
