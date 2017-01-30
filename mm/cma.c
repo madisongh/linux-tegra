@@ -527,7 +527,8 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
 
 	VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
 
-	__dma_remap(pages, count << PAGE_SHIFT, PAGE_KERNEL_EXEC);
+	__dma_remap((struct page *)pages, count << PAGE_SHIFT,
+			PAGE_KERNEL_EXEC);
 
 	free_contig_range(pfn, count);
 	cma_clear_bitmap(cma, pfn, count);
