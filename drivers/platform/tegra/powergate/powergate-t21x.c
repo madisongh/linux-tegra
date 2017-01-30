@@ -593,6 +593,20 @@ static bool tegra210_pg_skip(int id)
 	}
 }
 
+static bool tegra210_pg_is_powered(int id)
+{
+	u32 status = 0;
+
+	if (TEGRA_IS_GPU_POWERGATE_ID(id)) {
+		if (gpu_rail)
+			status = tegra_dvfs_is_rail_up(gpu_rail);
+	} else {
+		status = pmc_read(PWRGATE_STATUS) & t210_pg_info[id].mask;
+	}
+
+	return !!status;
+}
+
 static int tegra_powergate_set(int id, bool new_state)
 {
 	bool status;
@@ -953,7 +967,7 @@ static int __tegra1xx_unpowergate(int id, struct powergate_partition_info *pg_in
 	if (!pg_info->slcg_info[0].clk_ptr)
 		get_slcg_info(pg_info);
 
-	if (tegra_powergate_is_powered(id)) {
+	if (tegra210_pg_is_powered(id)) {
 		if (!clk_disable) {
 			ret = partition_clk_enable(pg_info);
 			if (ret)
@@ -1159,7 +1173,7 @@ static int tegra210_pg_powergate(int id)
 	if (--partition->refcount > 0)
 		goto exit_unlock;
 
-	if ((partition->refcount < 0) || !tegra_powergate_is_powered(id)) {
+	if ((partition->refcount < 0) || !tegra210_pg_is_powered(id)) {
 		WARN(1, "Partition %s already powergated, refcount and status mismatch\n",
 		     partition->name);
 		goto exit_unlock;
@@ -1184,7 +1198,7 @@ static int tegra210_pg_unpowergate(int id)
 	if (partition->refcount++ > 0)
 		goto exit_unlock;
 
-	if (tegra_powergate_is_powered(id)) {
+	if (tegra210_pg_is_powered(id)) {
 		WARN(1, "Partition %s is already unpowergated, refcount and status mismatch\n",
 		     partition->name);
 		goto exit_unlock;
@@ -1209,7 +1223,7 @@ static int tegra210_pg_gpu_powergate(int id)
 	if (--partition->refcount > 0)
 		goto exit_unlock;
 
-	if (!tegra_powergate_is_powered(id)) {
+	if (!tegra210_pg_is_powered(id)) {
 		WARN(1, "GPU rail is already off, refcount and status mismatch\n");
 		goto exit_unlock;
 	}
@@ -1273,7 +1287,7 @@ static int tegra210_pg_gpu_unpowergate(int id)
 		first = true;
 	}
 
-	if (tegra_powergate_is_powered(id)) {
+	if (tegra210_pg_is_powered(id)) {
 		WARN(1, "GPU rail is already on, refcount and status mismatch\n");
 		goto exit_unlock;
 	}
@@ -1468,7 +1482,7 @@ static int tegra210_pg_powergate_clk_off(int id)
 	if (--partition->refcount > 0)
 		goto exit_unlock;
 
-	if ((partition->refcount < 0) || !tegra_powergate_is_powered(id)) {
+	if ((partition->refcount < 0) || !tegra210_pg_is_powered(id)) {
 		WARN(1, "Partition %s already powergated, refcount and status mismatch\n",
 		     partition->name);
 		goto exit_unlock;
@@ -1512,20 +1526,6 @@ exit_unlock:
 	return ret;
 }
 
-static bool tegra210_pg_is_powered(int id)
-{
-	u32 status = 0;
-
-	if (TEGRA_IS_GPU_POWERGATE_ID(id)) {
-		if (gpu_rail)
-			status = tegra_dvfs_is_rail_up(gpu_rail);
-	} else {
-		status = pmc_read(PWRGATE_STATUS) & t210_pg_info[id].mask;
-	}
-
-	return !!status;
-}
-
 static int tegra210_pg_init_refcount(void)
 {
 	int i;
@@ -1534,7 +1534,7 @@ static int tegra210_pg_init_refcount(void)
 		if (!t210_pg_info[i].valid)
 			continue;
 
-		if (tegra_powergate_is_powered(i))
+		if (tegra210_pg_is_powered(i))
 			t210_pg_info[i].part_info->refcount = 1;
 		else
 			t210_pg_info[i].part_info->disable_after_boot = 0;
@@ -1544,9 +1544,9 @@ static int tegra210_pg_init_refcount(void)
 
 	/* SOR refcount depends on other units */
 	t210_pg_info[TEGRA_POWERGATE_SOR].part_info->refcount =
-		(tegra_powergate_is_powered(TEGRA_POWERGATE_DISA) ? 1 : 0) +
-		(tegra_powergate_is_powered(TEGRA_POWERGATE_DISB) ? 1 : 0) +
-		(tegra_powergate_is_powered(TEGRA_POWERGATE_VE) ? 1 : 0);
+		(tegra210_pg_is_powered(TEGRA_POWERGATE_DISA) ? 1 : 0) +
+		(tegra210_pg_is_powered(TEGRA_POWERGATE_DISB) ? 1 : 0) +
+		(tegra210_pg_is_powered(TEGRA_POWERGATE_VE) ? 1 : 0);
 
 	tegra210_pg_powergate_partition(TEGRA_POWERGATE_XUSBA);
 	tegra210_pg_powergate_partition(TEGRA_POWERGATE_XUSBB);
