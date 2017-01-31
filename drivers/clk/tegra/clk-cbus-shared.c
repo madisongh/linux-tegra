@@ -537,6 +537,33 @@ static void clk_gbus_unprepare(struct clk_hw *hw)
 	tegra_dvfs_set_rate(hw->clk, 0);
 }
 
+static int clk_gbus_set_rate(struct clk_hw *hw, unsigned long rate,
+			unsigned long parent_rate)
+{
+	int ret;
+	struct clk *parent;
+	struct tegra_clk_cbus_shared *gbus = to_clk_cbus_shared(hw);
+
+	if (gbus->rate_updating)
+		return 0;
+
+	if (rate == 0)
+		return 0;
+
+	gbus->rate_updating = true;
+
+	parent = clk_get_parent(hw->clk);
+	if (!parent) {
+		gbus->rate_updating = false;
+		return -EINVAL;
+	}
+
+	ret = clk_set_rate(parent, rate);
+
+	gbus->rate_updating = false;
+	return ret;
+}
+
 static unsigned long clk_cascade_master_recalc_rate(struct clk_hw *hw,
 						    unsigned long parent_rate)
 {
@@ -918,6 +945,9 @@ static const struct clk_ops tegra_clk_shared_ops = {
 static const struct clk_ops tegra_clk_gbus_ops = {
 	.prepare = clk_gbus_prepare,
 	.unprepare = clk_gbus_unprepare,
+	.recalc_rate = clk_cbus_recalc_rate,	/* re-used */
+	.round_rate = clk_cbus_round_rate,	/* re-used */
+	.set_rate = clk_gbus_set_rate,
 };
 
 static const struct clk_ops tegra_clk_shared_master_ops;
@@ -1218,25 +1248,28 @@ struct clk *tegra_clk_register_gbus(const char *name,
 
 	INIT_LIST_HEAD(&master->shared_bus_list);
 
-	flags |= CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE;
-
 	init.name = name;
 	init.ops = &tegra_clk_gbus_ops;
-	init.flags = flags;
+	init.flags = CLK_GET_RATE_NOCACHE;
 	init.parent_names = &parent;
 	init.num_parents = 1;
 
 	master->min_rate = min_rate;
 	master->max_rate = max_rate;
 	master->bus_update = _simple_shared_update;
+	master->flags = flags;
 
 	/* Data in .init is copied by clk_register(), so stack variable OK */
 	master->hw.init = &init;
 
 	c = clk_register(NULL, &master->hw);
-	if (!c)
+	if (!c) {
 		kfree(master);
+		return c;
+	}
 
+	register_bus_clk_notifier(c);
+	add_possible_rates_file(c);
 	return c;
 }
 
