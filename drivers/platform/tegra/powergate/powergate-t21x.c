@@ -488,6 +488,7 @@ static struct mc_client_hotreset_reg tegra210_mc_reg[] = {
 struct tegra210_powergate_info {
 	bool valid;
 	unsigned int mask;
+	int part_id;
 	struct tegra210_mc_client_info *mc_info;
 	struct powergate_partition_info *part_info;
 };
@@ -496,6 +497,7 @@ struct tegra210_powergate_info {
 [TEGRA_POWERGATE_##_pg_id] = {						\
 	.valid = true,							\
 	.mask = BIT(_pg_bit),						\
+	.part_id = TEGRA_POWERGATE_##_part_id,				\
 	.mc_info = &tegra210_pg_mc_info[TEGRA_POWERGATE_##_mc_id],	\
 	.part_info = &tegra210_pg_partition_info[TEGRA_POWERGATE_##_part_id], \
 }
@@ -585,7 +587,7 @@ static spinlock_t *tegra210_pg_get_lock(void)
 
 static bool tegra210_pg_skip(int id)
 {
-	switch (id) {
+	switch (t210_pg_info[id].part_id) {
 	case TEGRA_POWERGATE_GPU:
 		return true;
 	default:
@@ -1421,7 +1423,7 @@ static int tegra210_pg_powergate_partition(int id)
 {
 	int ret;
 
-	switch (id) {
+	switch (t210_pg_info[id].part_id) {
 		case TEGRA_POWERGATE_GPU:
 			ret = tegra210_pg_gpu_powergate(id);
 			break;
@@ -1447,7 +1449,7 @@ static int tegra210_pg_unpowergate_partition(int id)
 {
 	int ret;
 
-	switch (id) {
+	switch (t210_pg_info[id].part_id) {
 		case TEGRA_POWERGATE_GPU:
 			ret = tegra210_pg_gpu_unpowergate(id);
 			break;
@@ -1488,7 +1490,7 @@ static int tegra210_pg_powergate_clk_off(int id)
 		goto exit_unlock;
 	}
 
-	if (id == TEGRA_POWERGATE_SATA)
+	if (t210_pg_info[id].part_id == TEGRA_POWERGATE_SATA)
 		tegra210_set_sata_pll_seq_sw(true);
 
 	ret = tegra1xx_powergate_partition_with_clk_off(id,
@@ -1516,7 +1518,7 @@ static int tegra210_pg_unpowergate_clk_on(int id)
 	ret = tegra1xx_unpowergate_partition_with_clk_on(id,
 			t210_pg_info[id].part_info);
 
-	if (id == TEGRA_POWERGATE_SATA)
+	if (t210_pg_info[id].part_id == TEGRA_POWERGATE_SATA)
 		tegra210_set_sata_pll_seq_sw(false);
 
 exit_unlock:
@@ -1532,6 +1534,10 @@ static int tegra210_pg_init_refcount(void)
 
 	for (i = 0; i < TEGRA_NUM_POWERGATE; i++) {
 		if (!t210_pg_info[i].valid)
+			continue;
+
+		/* Consider main partion ID only */
+		if (i != t210_pg_info[i].part_id)
 			continue;
 
 		if (tegra210_pg_is_powered(i))
@@ -1583,7 +1589,7 @@ static int tegra210_powergate_cpuid_to_powergate_id(int cpu)
 
 static bool tegra210_powergate_id_matching(int id, int powergate_id)
 {
-	return (id == powergate_id);
+	return (t210_pg_info[id].part_id == t210_pg_info[powergate_id].part_id);
 }
 
 static struct powergate_ops tegra210_pg_ops = {
@@ -1639,8 +1645,12 @@ static int __init tegra210_disable_boot_partitions(void)
 		if (!t210_pg_info[i].valid)
 			continue;
 
+		/* consider main partion ID only */
+		if (i != t210_pg_info[i].part_id)
+			continue;
+
 		if (t210_pg_info[i].part_info->disable_after_boot &&
-			(i != TEGRA_POWERGATE_GPU)) {
+			(t210_pg_info[i].part_id != TEGRA_POWERGATE_GPU)) {
 			pr_info("  %s\n", t210_pg_info[i].part_info->name);
 			tegra210_pg_powergate_partition(i);
 		}
