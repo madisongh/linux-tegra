@@ -833,6 +833,7 @@ enum shared_bus_users_mode {
 #define TEGRA_SHARED_BUS_RATE_LIMIT	BIT(0)
 #define TEGRA_SHARED_BUS_RETENTION	BIT(1)
 #define TEGRA_SHARED_BUS_RACE_TO_SLEEP	BIT(2)
+#define TEGRA_SHARED_BUS_ROUND_PASS_THRU	BIT(3)
 
 struct clk_div_sel {
 	struct clk_hw *src;

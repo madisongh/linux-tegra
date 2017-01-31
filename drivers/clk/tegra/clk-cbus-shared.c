@@ -29,6 +29,7 @@
 #define KHz 1000
 
 static void add_possible_rates_file(struct clk *c);
+static void add_pass_thru_file(struct clk *c);
 
 /* there should be only 1 instance of sclk, so we can keep this global for now */
 static unsigned long sclk_pclk_unity_ratio_rate_max = 136000000;
@@ -211,7 +212,8 @@ static long clk_cbus_round_rate(struct clk_hw *hw, unsigned long rate,
 			unsigned long *parent_rate)
 {
 	struct clk *parent;
-	long new_rate;
+	long new_rate = rate;
+	struct tegra_clk_cbus_shared *cbus = to_clk_cbus_shared(hw);
 
 	parent = clk_get_parent(hw->clk);
 	if (IS_ERR(parent)) {
@@ -219,7 +221,8 @@ static long clk_cbus_round_rate(struct clk_hw *hw, unsigned long rate,
 		return *parent_rate;
 	}
 
-	new_rate = tegra_dvfs_round_rate(hw->clk, rate);
+	if (~cbus->flags & TEGRA_SHARED_BUS_ROUND_PASS_THRU)
+		new_rate = tegra_dvfs_round_rate(hw->clk, new_rate);
 
 	new_rate = clk_round_rate(parent, new_rate);
 	if (new_rate < 0)
@@ -1270,6 +1273,7 @@ struct clk *tegra_clk_register_gbus(const char *name,
 
 	register_bus_clk_notifier(c);
 	add_possible_rates_file(c);
+	add_pass_thru_file(c);
 	return c;
 }
 
@@ -1436,7 +1440,39 @@ static void add_possible_rates_file(struct clk *c)
 		pr_err("debugfs clk_possible_rates failed %s\n",
 		       __clk_get_name(c));
 }
+
+static int pass_thru_get(void *data, u64 *val)
+{
+	*val = *((u32 *)data) & TEGRA_SHARED_BUS_ROUND_PASS_THRU ? 1 : 0;
+	return 0;
+}
+
+static int pass_thru_set(void *data, u64 val)
+{
+	if (val)
+		*((u32 *)data) |= TEGRA_SHARED_BUS_ROUND_PASS_THRU;
+	else
+		*((u32 *)data) &= ~TEGRA_SHARED_BUS_ROUND_PASS_THRU;
+	return 0;
+}
+
+
+DEFINE_SIMPLE_ATTRIBUTE(pass_thru_fops, pass_thru_get, pass_thru_set, "%llu\n");
+
+static void add_pass_thru_file(struct clk *c)
+{
+	struct tegra_clk_cbus_shared *bus = to_clk_cbus_shared(__clk_get_hw(c));
+
+	struct dentry *d = __clk_debugfs_add_file(c, "clk_round_pass_thru",
+		S_IRUGO | S_IWUGO, &bus->flags, &pass_thru_fops);
+
+	if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
+		pr_err("debugfs round_pass_thru failed %s\n",
+		       __clk_get_name(c));
+}
 #else
 static void add_possible_rates_file(struct clk *c)
+{ }
+static void add_pass_thru_file(struct clk *c)
 { }
 #endif
