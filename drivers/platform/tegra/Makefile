@@ -14,6 +14,7 @@ subdir-ccflags-y += -I$(srctree)/drivers/platform/tegra/include \
 ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
 obj-$(CONFIG_USB_SUPPORT)		+= tegra_usb_pmc.o
 endif
+
 obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
 obj-$(CONFIG_TEGRA_BOOTLOADER_DEBUG)    += tegra_bootloader_debug.o
 obj-$(CONFIG_TEGRA_BOOTLOADER_DEBUG_INIT) += tegra_bootloader_debug_init.o
@@ -24,9 +25,7 @@ obj-y					+= smc-calls.o
 obj-$(CONFIG_TEGRA_NVADSP)		+= nvadsp/
 obj-$(CONFIG_TEGRA_MC) += mc/
 
-ifeq ($(CONFIG_TEGRA_PTM),y)
-obj-$(CONFIG_ARCH_TEGRA_21x_SOC)         += tegra_ptm_t210.o
-endif
+obj-$(CONFIG_TEGRA_PTM)         += tegra_ptm_t210.o
 
 obj-y += nvdumper/
 obj-$(CONFIG_PM) += pm.o
