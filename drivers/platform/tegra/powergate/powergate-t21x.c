@@ -26,6 +26,7 @@
 #include <linux/clk-provider.h>
 #include <linux/clk/tegra.h>
 #include <soc/tegra/reset.h>
+#include <soc/tegra/common.h>
 
 #include "powergate-priv.h"
 
@@ -1639,6 +1640,9 @@ struct powergate_ops *tegra210_powergate_init_chip_support(void)
 static int __init tegra210_disable_boot_partitions(void)
 {
 	int i;
+
+	if (!soc_is_tegra210_n_before())
+		return 0;
 
 	pr_info("Disable partitions left on by BL\n");
 	for (i = 0; i < TEGRA_NUM_POWERGATE; i++) {
