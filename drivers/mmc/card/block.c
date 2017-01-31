@@ -2618,10 +2618,10 @@ int mmc_blk_cmdq_complete_rq(struct request *rq)
 		return 0;
 	}
 
-	blk_end_request(rq, 0, cmdq_req->data.bytes_xfered);
-
 	if (test_and_clear_bit(0, &ctx_info->req_starved))
 		blk_run_queue(rq->q);
+
+	blk_end_request(rq, 0, cmdq_req->data.bytes_xfered);
 	return 0;
 }
 
