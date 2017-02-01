@@ -421,6 +421,7 @@ F:	security/tlk_driver/
 
 SECURITY
 M:	Vincent Chen <zochen@nvidia.com>
+M:	Mallikarjun Kasoju <mkasoju@nvidia.com>
 L:	sw-mobile-security@exchange.nvidia.com
 S:	Supported
 F:	crypto/*
@@ -433,7 +434,6 @@ SENSORS AND INPUT
 M:	Robert Collins <rcollins@nvidia.com>
 L:	sw-mobile-sensors@exchange.nvidia.com
 S:	Supported
-F:	drivers/hid/*
 F:	drivers/iio/common/nvs/*
 F:	drivers/iio/imu/*
 F:	drivers/iio/light/*
@@ -447,6 +447,11 @@ F:	drivers/input/misc/*
 F:	drivers/misc/nvs/*
 F:	drivers/misc/nvs-dfsh/*
 F:	drivers/staging/iio/*
+
+HOST INPUT DEVICES
+M:	Suresh Mangipudi <smangipudi@nvidia.com>
+S:	Supported
+F:	drivers/hid/*
 
 STORAGE
 M:	Venu Byravarasu <vbyravarasu@nvidia.com>
@@ -495,6 +500,7 @@ F:	drivers/input/touchscreen/*
 USB
 M:	Rama Kandhala <rkandhala@nvidia.com>
 M:	Ashu Jha <ajha@nvidia.com>
+M:	Suresh Mangipudi <smangipudi@nvidia.com>
 L:	usb3-sweng@exchange.nvidia.com
 S:	Supported
 F:	drivers/mailbox/tegra-xusb-mailbox.c
