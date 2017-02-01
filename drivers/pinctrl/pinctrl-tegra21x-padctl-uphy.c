@@ -30,6 +30,7 @@
 #include <linux/usb.h>
 #include <linux/tegra_prod.h>
 #include <linux/tegra-powergate.h>
+#include <linux/string.h>
 
 #include <soc/tegra/fuse.h>
 #include <soc/tegra/pmc.h>
@@ -294,6 +295,12 @@ enum tegra21x_function {
 	TEGRA21x_FUNC_PCIE,
 	TEGRA21x_FUNC_USB3,
 	TEGRA21x_FUNC_SATA,
+};
+
+enum tegra21xb01_function {
+	TEGRA21xB01_FUNC_XUSB,
+	TEGRA21xB01_FUNC_PCIE,
+	TEGRA21xB01_FUNC_USB3,
 };
 
 struct tegra_padctl_uphy_function {
@@ -581,6 +588,66 @@ static inline u32 uphy_lane_readl(struct tegra_padctl_uphy *uphy, int lane,
 }
 #endif
 
+static inline int is_chip_t210b01(struct tegra_padctl_uphy *uphy)
+{
+	struct device_node *np;
+	const char *compatible;
+
+	np = uphy->dev->of_node;
+	compatible = of_get_property(np, "compatible", NULL);
+
+	if (!compatible) {
+		dev_err(uphy->dev, "Unable to find compatible property\n");
+		return -ENODEV;
+	}
+
+	if (strstr(compatible, "tegra21xb01") != NULL)
+		return 1;
+	return 0;
+}
+
+static int str_to_func(char *func_name)
+{
+	if (!func_name)
+		return -EINVAL;
+
+	if (strstr(func_name, "hsic"))
+		return TEGRA21x_FUNC_HSIC;
+	else if (strstr(func_name, "usb3"))
+		return TEGRA21x_FUNC_USB3;
+	else if (strstr(func_name, "xusb"))
+		return TEGRA21x_FUNC_XUSB;
+	else if (strstr(func_name, "pcie"))
+		return TEGRA21x_FUNC_PCIE;
+	else
+		return TEGRA21x_FUNC_SATA;
+}
+
+static int get_function(struct tegra_padctl_uphy *uphy, char *func)
+{
+	int ret;
+
+	ret = is_chip_t210b01(uphy);
+	if (ret < 0)
+		return ret;
+
+	switch (str_to_func(func)) {
+	case TEGRA21x_FUNC_HSIC:
+		return ret ? -1 : TEGRA21x_FUNC_HSIC;
+	case TEGRA21x_FUNC_XUSB:
+		return ret ? TEGRA21xB01_FUNC_XUSB : TEGRA21x_FUNC_XUSB;
+	case TEGRA21x_FUNC_PCIE:
+		return ret ? TEGRA21xB01_FUNC_PCIE : TEGRA21x_FUNC_PCIE;
+	case TEGRA21x_FUNC_SATA:
+		return ret ? -1 : TEGRA21x_FUNC_SATA;
+	case TEGRA21x_FUNC_USB3:
+		return ret ? TEGRA21xB01_FUNC_USB3 : TEGRA21x_FUNC_USB3;
+	default:
+		dev_err(uphy->dev, "Invalid function\n");
+	}
+	return -1;
+}
+
 static int tegra21x_padctl_uphy_regulators_init(struct tegra_padctl_uphy *uphy)
 {
 	struct device *dev = uphy->dev;
@@ -780,7 +847,7 @@ static int uphy_pll_hw_sequencer_enable(struct tegra_padctl_uphy *uphy, int pll,
 	TRACE(dev, "enable PLL%d HW power sequencer by function %d\n",
 						pll, func);
 
-	if (func == TEGRA21x_FUNC_SATA) {
+	if (func == get_function(uphy, "sata")) {
 		for_each_set_bit(uphy_lane, &uphy->sata_lanes,
 					T21x_UPHY_LANES) {
 			value = uphy_lane_readl(uphy, uphy_lane,
@@ -972,7 +1039,7 @@ static int uphy_pll_init_full(struct tegra_padctl_uphy *uphy, int pll,
 	/* power up PLL */
 	reg = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_4);
 	reg &= ~(TXCLKREF_SEL(~0) | REFCLK_SEL(~0));
-	if (func == TEGRA21x_FUNC_SATA)
+	if (func == get_function(uphy, "sata"))
 		reg |= (TXCLKREF_SEL(TXCLKREF_SEL_SATA_VAL) | TXCLKREF_EN);
 	else
 		reg |= (TXCLKREF_SEL(TXCLKREF_SEL_USB_VAL) | TXCLKREF_EN);
@@ -981,7 +1048,7 @@ static int uphy_pll_init_full(struct tegra_padctl_uphy *uphy, int pll,
 	reg = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_1);
 	reg &= ~(FREQ_MDIV(~0) | FREQ_NDIV(~0));
 	if (pll == 1) {
-		if (func == TEGRA21x_FUNC_SATA)
+		if (func == get_function(uphy, "sata"))
 			reg |= FREQ_NDIV(FREQ_NDIV_SATA_VAL);
 		else
 			reg |= FREQ_NDIV(FREQ_NDIV_USB_VAL);
@@ -1042,31 +1109,47 @@ static int uphy_pll_init(struct tegra_padctl_uphy *uphy,
 	if (rc)
 		return rc;
 
-	switch (func) {
-	case TEGRA21x_FUNC_PCIE:
-		rc = uphy_pll_init_full(uphy, 0, func);
-		break;
-	case TEGRA21x_FUNC_SATA:
-		rc = uphy_pll_init_full(uphy, 1, func);
-		break;
-	case TEGRA21x_FUNC_USB3:
-		rc = uphy_pll_init_full(uphy, 0, func);
-		if (rc)
-			return rc;
-		if (uphy->usb3_lanes & SATA_LANE_MASK)
-			rc = uphy_pll_init_full(uphy, 1, func);
-		break;
-	default:
+	if (is_chip_t210b01(uphy)) {
+		switch (func) {
+		case TEGRA21xB01_FUNC_PCIE:
+			rc = uphy_pll_init_full(uphy, 0, func);
+			break;
+		case TEGRA21xB01_FUNC_USB3:
+			rc = uphy_pll_init_full(uphy, 0, func);
+			if (rc)
+				return rc;
+			break;
+		default:
 		rc = -EINVAL;
 		break;
+		}
+	} else {
+		switch (func) {
+		case TEGRA21x_FUNC_PCIE:
+			rc = uphy_pll_init_full(uphy, 0, func);
+			break;
+		case TEGRA21x_FUNC_SATA:
+			rc = uphy_pll_init_full(uphy, 1, func);
+			break;
+		case TEGRA21x_FUNC_USB3:
+			rc = uphy_pll_init_full(uphy, 0, func);
+			if (rc)
+				return rc;
+			if (uphy->usb3_lanes & SATA_LANE_MASK)
+				rc = uphy_pll_init_full(uphy, 1, func);
+			break;
+		default:
+		rc = -EINVAL;
+		break;
+		}
 	}
 
 	if (rc == 0) {
-		if (func == TEGRA21x_FUNC_PCIE) {
+		if (func == get_function(uphy, "pcie")) {
 			uphy->uphy_pll_users[0] |= BIT(func);
-		} else if (func == TEGRA21x_FUNC_SATA) {
+		} else if (func == get_function(uphy, "sata")) {
 			uphy->uphy_pll_users[1] |= BIT(func);
-		} else if (func == TEGRA21x_FUNC_USB3) {
+		} else if (func == get_function(uphy, "usb3")) {
 			uphy->uphy_pll_users[0] |= BIT(func);
 			if (uphy->usb3_lanes & SATA_LANE_MASK)
 				uphy->uphy_pll_users[1] |= BIT(func);
@@ -1088,11 +1171,11 @@ int uphy_pll_deinit(struct tegra_padctl_uphy *uphy,
 	int rc;
 	int i;
 
-	if (func == TEGRA21x_FUNC_PCIE) {
+	if (func == get_function(uphy, "pcie")) {
 		uphy->uphy_pll_users[0] &= ~BIT(func);
-	} else if (func == TEGRA21x_FUNC_SATA) {
+	} else if (func == get_function(uphy, "sata")) {
 		uphy->uphy_pll_users[1] &= ~BIT(func);
-	} else if (func == TEGRA21x_FUNC_USB3) {
+	} else if (func == get_function(uphy, "usb3")) {
 		uphy->uphy_pll_users[0] &= ~BIT(func);
 		uphy->uphy_pll_users[1] &= ~BIT(func);
 	} else
@@ -1197,6 +1280,21 @@ struct tegra_padctl_uphy *mbox_work_to_uphy(struct work_struct *work)
 #define PIN_CDP_2	15
 #define PIN_CDP_3	16
 
+#define T21xB01_PIN_OTG_0	0
+#define T21xB01_PIN_OTG_1	1
+#define T21xB01_PIN_OTG_2	2
+#define T21xB01_PIN_OTG_3	3
+#define T21xB01_PIN_UPHY_0	4
+#define T21xB01_PIN_UPHY_1	5
+#define T21xB01_PIN_UPHY_2	6
+#define T21xB01_PIN_UPHY_3	7
+#define T21xB01_PIN_UPHY_4	8
+#define T21xB01_PIN_UPHY_5	9
+#define T21xB01_PIN_CDP_0	10
+#define T21xB01_PIN_CDP_1	11
+#define T21xB01_PIN_CDP_2	12
+#define T21xB01_PIN_CDP_3	13
+
 static inline bool lane_is_otg(unsigned int lane)
 {
 	return lane >= PIN_OTG_0 && lane <= PIN_OTG_3;
@@ -1212,8 +1310,18 @@ static inline bool pad_is_cdp(unsigned int pad)
 	return pad >= PIN_CDP_0 && pad <= PIN_CDP_3;
 }
 
-static inline bool lane_is_uphy(unsigned int lane)
+static inline int get_uphy_pin_zero(struct tegra_padctl_uphy *uphy)
 {
+	if (is_chip_t210b01(uphy))
+		return T21xB01_PIN_UPHY_0;
+	return PIN_UPHY_0;
+}
+
+static inline bool lane_is_uphy(struct tegra_padctl_uphy *uphy,
+					unsigned int lane)
+{
+	if (is_chip_t210b01(uphy))
+		return lane >= T21xB01_PIN_UPHY_0 && lane <= T21xB01_PIN_UPHY_5;
 	return lane >= PIN_UPHY_0 && lane <= PIN_SATA_0;
 }
 
@@ -1495,24 +1603,24 @@ static int tegra21x_padctl_uphy_pinmux_set(struct pinctrl_dev *pinctrl,
 		value |= (USB2_HSIC_PAD_PORTx_XUSB(0) | HSIC_PAD_TRK_XUSB |
 				HSIC_PORTx_CONFIG_HSIC(0));
 		padctl_writel(uphy, value, XUSB_PADCTL_USB2_PAD_MUX_0);
-	} else if (lane_is_uphy(group)) {
-		int uphy_lane = group - PIN_UPHY_0;
+	} else if (lane_is_uphy(uphy, group)) {
+		int uphy_lane = group - get_uphy_pin_zero(uphy);
 
-		if (function == TEGRA21x_FUNC_USB3) {
+		if (function == get_function(uphy, "usb3")) {
 			set_bit(uphy_lane, &uphy->usb3_lanes);
 			dev_info(uphy->dev, "uphy_lane = %d, set usb3_lanes = 0x%lx\n",
 					uphy_lane, uphy->usb3_lanes);
-		} else if (function == TEGRA21x_FUNC_PCIE) {
+		} else if (function == get_function(uphy, "pcie")) {
 			set_bit(uphy_lane, &uphy->pcie_lanes);
 			dev_info(uphy->dev, "uphy_lane = %d, set pcie_lanes = 0x%lx\n",
 					uphy_lane, uphy->pcie_lanes);
-		} else if (function == TEGRA21x_FUNC_SATA) {
+		} else if (function == get_function(uphy, "sata")) {
 			set_bit(uphy_lane, &uphy->sata_lanes);
 			dev_info(uphy->dev, "uphy_lane = %d, set sata_lanes = 0x%lx\n",
 					uphy_lane, uphy->sata_lanes);
 		}
 	} else if (pad_is_cdp(group)) {
-		if (function != TEGRA21x_FUNC_XUSB)
+		if (function != get_function(uphy, "xusb"))
 			dev_warn(uphy->dev, "group %s isn't for xusb!",
 				 lane->name);
 	} else
@@ -1544,7 +1652,7 @@ static int tegra_padctl_uphy_pinconf_group_get(struct pinctrl_dev *pinctrl,
 
 	switch (param) {
 	case TEGRA_PADCTL_UPHY_USB3_PORT:
-		uphy_lane = group - PIN_UPHY_0;
+		uphy_lane = group - get_uphy_pin_zero(uphy);
 		value = lane_to_usb3_port(uphy, uphy_lane);
 		if (value < 0) {
 			dev_err(dev, "Pin %d not mapped to USB3 port\n", group);
@@ -1553,7 +1661,7 @@ static int tegra_padctl_uphy_pinconf_group_get(struct pinctrl_dev *pinctrl,
 		break;
 
 	case TEGRA_PADCTL_UPHY_PCIE_CONTROLLER_NUM:
-		uphy_lane = group - PIN_UPHY_0;
+		uphy_lane = group - get_uphy_pin_zero(uphy);
 		value = lane_to_pcie_controller(uphy, uphy_lane);
 		if (value < 0) {
 			dev_err(dev, "Pin %d not mapped to PCIE controller\n",
@@ -1597,14 +1705,14 @@ static int tegra_padctl_uphy_pinconf_group_set(struct pinctrl_dev *pinctrl,
 				dev_err(dev, "Invalid USB3 port: %lu\n", value);
 				return -EINVAL;
 			}
-			if (!lane_is_uphy(group)) {
+			if (!lane_is_uphy(uphy, group)) {
 				dev_err(dev, "USB3 port not applicable for pin %d\n",
 					group);
 				return -EINVAL;
 			}
 
 			/* TODO: make sure lane configuration is valid */
-			uphy_lane = group - PIN_UPHY_0;
+			uphy_lane = group - get_uphy_pin_zero(uphy);
 			TRACE(dev, "USB3 port %lu uses uphy-lane-%u\n",
 			      value, uphy_lane);
 			uphy->usb3_ports[value].uphy_lane = uphy_lane;
@@ -1613,7 +1721,7 @@ static int tegra_padctl_uphy_pinconf_group_set(struct pinctrl_dev *pinctrl,
 			break;
 
 		case TEGRA_PADCTL_UPHY_USB2_MAP:
-			if (lane_is_uphy(group)) {
+			if (lane_is_uphy(uphy, group)) {
 				unsigned long port;
 
 				if (value >= TEGRA_UTMI_PHYS) {
@@ -1622,7 +1730,7 @@ static int tegra_padctl_uphy_pinconf_group_set(struct pinctrl_dev *pinctrl,
 					return -EINVAL;
 				}
 
-				uphy_lane = group - PIN_UPHY_0;
+				uphy_lane = group - get_uphy_pin_zero(uphy);
 				port = lane_to_usb3_port(uphy, uphy_lane);
 				dev_info(dev, "USB3 port %lu maps to USB2 port %lu\n",
 					  port, value);
@@ -1639,10 +1747,10 @@ static int tegra_padctl_uphy_pinconf_group_set(struct pinctrl_dev *pinctrl,
 				dev_err(dev, "Invalid port-cap: %lu\n", value);
 				return -EINVAL;
 			}
-			if (lane_is_uphy(group)) {
+			if (lane_is_uphy(uphy, group)) {
 				int port;
 
-				uphy_lane = group - PIN_UPHY_0;
+				uphy_lane = group - get_uphy_pin_zero(uphy);
 				port = lane_to_usb3_port(uphy, uphy_lane);
 				if (port < 0) {
 					dev_err(dev, "Pin %d not mapped to USB3 port\n",
@@ -1709,7 +1817,7 @@ static int tegra_padctl_uphy_pinconf_group_set(struct pinctrl_dev *pinctrl,
 					value);
 				return -EINVAL;
 			}
-			if (!lane_is_uphy(group)) {
+			if (!lane_is_uphy(uphy, group)) {
 				dev_err(dev,
 					"PCIE controller not applicable for pin %d\n",
 					group);
@@ -1717,7 +1825,7 @@ static int tegra_padctl_uphy_pinconf_group_set(struct pinctrl_dev *pinctrl,
 			}
 
 			/* TODO: make sure lane configuration is valid */
-			uphy_lane = group - PIN_UPHY_0;
+			uphy_lane = group - get_uphy_pin_zero(uphy);
 			TRACE(dev, "PCIE controller %lu uses uphy-lane-%u\n",
 			      value, uphy_lane);
 			uphy->pcie_controllers[value].uphy_lane_bitmap |=
@@ -1731,10 +1839,10 @@ static int tegra_padctl_uphy_pinconf_group_set(struct pinctrl_dev *pinctrl,
 					value);
 				return -EINVAL;
 			}
-			if (lane_is_uphy(group)) {
+			if (lane_is_uphy(uphy, group)) {
 				int controller;
 
-				uphy_lane = group - PIN_UPHY_0;
+				uphy_lane = group - get_uphy_pin_zero(uphy);
 				controller =
 				lane_to_pcie_controller(uphy, uphy_lane);
 				TRACE(dev,
@@ -1946,7 +2054,7 @@ static int tegra21x_pcie_uphy_pll_init(struct tegra_padctl_uphy *uphy)
 	if (rc)
 		goto unlock_out;
 
-	rc = uphy_pll_init(uphy, TEGRA21x_FUNC_PCIE);
+	rc = uphy_pll_init(uphy, get_function(uphy, "pcie"));
 	if (rc)
 		goto assert_pll0_reset;
 
@@ -1973,7 +2081,7 @@ static int tegra21x_pcie_uphy_pll_deinit(struct tegra_padctl_uphy *uphy)
 	if (rc)
 		goto unlock_out;
 
-	rc = uphy_pll_deinit(uphy, TEGRA21x_FUNC_PCIE);
+	rc = uphy_pll_deinit(uphy, get_function(uphy, "pcie"));
 	if (rc)
 		goto deassert_pll0_reset;
 
@@ -2136,7 +2244,7 @@ static int tegra21x_sata_uphy_pll_init(struct tegra_padctl_uphy *uphy)
 	if (rc)
 		goto unlock_out;
 
-	rc = uphy_pll_init(uphy, TEGRA21x_FUNC_SATA);
+	rc = uphy_pll_init(uphy, get_function(uphy, "sata"));
 	if (rc)
 		goto assert_pll1_reset;
 
@@ -2168,7 +2276,7 @@ static int tegra21x_sata_uphy_pll_deinit(struct tegra_padctl_uphy *uphy)
 	if (rc)
 		goto unlock_out;
 
-	rc = uphy_pll_deinit(uphy, TEGRA21x_FUNC_SATA);
+	rc = uphy_pll_deinit(uphy, get_function(uphy, "sata"));
 	if (rc)
 		goto deassert_pll1_reset;
 
@@ -2358,7 +2466,7 @@ static int tegra21x_usb3_uphy_pll_init(struct tegra_padctl_uphy *uphy)
 	if (rc)
 		goto assert_pll0_reset;
 
-	rc = uphy_pll_init(uphy, TEGRA21x_FUNC_USB3);
+	rc = uphy_pll_init(uphy, get_function(uphy, "usb3"));
 	if (rc)
 		goto assert_pll1_reset;
 
@@ -2393,7 +2501,7 @@ static int tegra21x_usb3_uphy_pll_deinit(struct tegra_padctl_uphy *uphy)
 	if (rc)
 		goto deassert_pll0_reset;
 
-	rc = uphy_pll_deinit(uphy, TEGRA21x_FUNC_USB3);
+	rc = uphy_pll_deinit(uphy, get_function(uphy, "usb3"));
 	if (rc)
 		goto deassert_pll1_reset;
 
@@ -3557,6 +3665,23 @@ static const struct pinctrl_pin_desc tegra21x_pins[] = {
 	PINCTRL_PIN(PIN_CDP_3,  "cdp-3"),
 };
 
+static const struct pinctrl_pin_desc tegra21xb01_pins[] = {
+	PINCTRL_PIN(T21xB01_PIN_OTG_0,  "otg-0"),
+	PINCTRL_PIN(T21xB01_PIN_OTG_1,  "otg-1"),
+	PINCTRL_PIN(T21xB01_PIN_OTG_2,  "otg-2"),
+	PINCTRL_PIN(T21xB01_PIN_OTG_3,  "otg-3"),
+	PINCTRL_PIN(T21xB01_PIN_UPHY_0, "uphy-lane-0"),
+	PINCTRL_PIN(T21xB01_PIN_UPHY_1, "uphy-lane-1"),
+	PINCTRL_PIN(T21xB01_PIN_UPHY_2, "uphy-lane-2"),
+	PINCTRL_PIN(T21xB01_PIN_UPHY_3, "uphy-lane-3"),
+	PINCTRL_PIN(T21xB01_PIN_UPHY_4, "uphy-lane-4"),
+	PINCTRL_PIN(T21xB01_PIN_UPHY_5, "uphy-lane-5"),
+	PINCTRL_PIN(T21xB01_PIN_CDP_0,  "cdp-0"),
+	PINCTRL_PIN(T21xB01_PIN_CDP_1,  "cdp-1"),
+	PINCTRL_PIN(T21xB01_PIN_CDP_2,  "cdp-2"),
+	PINCTRL_PIN(T21xB01_PIN_CDP_3,  "cdp-3"),
+};
+
 static const char * const tegra21x_hsic_groups[] = {
 	"hsic-0",
 };
@@ -3612,6 +3737,12 @@ static struct tegra_padctl_uphy_function tegra21x_functions[] = {
 	TEGRA21x_FUNCTION(sata),
 };
 
+static struct tegra_padctl_uphy_function tegra21xb01_functions[] = {
+	TEGRA21x_FUNCTION(xusb),
+	TEGRA21x_FUNCTION(pcie),
+	TEGRA21x_FUNCTION(usb3),
+};
+
 static const unsigned int tegra21x_otg_functions[] = {
 	TEGRA21x_FUNC_XUSB,
 };
@@ -3626,6 +3757,15 @@ static const unsigned int tegra21x_uphy_functions[] = {
 	TEGRA21x_FUNC_SATA,
 };
 
+static const unsigned int tegra21xb01_otg_functions[] = {
+	TEGRA21xB01_FUNC_XUSB,
+};
+
+static const unsigned int tegra21xb01_uphy_functions[] = {
+	TEGRA21xB01_FUNC_USB3,
+	TEGRA21xB01_FUNC_PCIE,
+};
+
 #define TEGRA21x_LANE(_name, _offset, _shift, _mask, _funcs)	\
 	{								\
 		.name = _name,						\
@@ -3634,6 +3774,16 @@ static const unsigned int tegra21x_uphy_functions[] = {
 		.mask = _mask,						\
 		.num_funcs = ARRAY_SIZE(tegra21x_##_funcs##_functions),	\
 		.funcs = tegra21x_##_funcs##_functions,			\
+	}
+
+#define TEGRA21xB01_LANE(_name, _offset, _shift, _mask, _funcs)	\
+	{								\
+		.name = _name,						\
+		.offset = _offset,					\
+		.shift = _shift,					\
+		.mask = _mask,						\
+		.num_funcs = ARRAY_SIZE(tegra21xb01_##_funcs##_functions),\
+		.funcs = tegra21xb01_##_funcs##_functions,		\
 	}
 
 static const struct tegra_padctl_uphy_lane tegra21x_lanes[] = {
@@ -3653,6 +3803,21 @@ static const struct tegra_padctl_uphy_lane tegra21x_lanes[] = {
 	TEGRA21x_LANE("uphy-lane-6", 0x28, 24, 0x3, uphy),
 	/* SATA_PAD_LANE0 */
 	TEGRA21x_LANE("uphy-lane-7", 0x28, 30, 0x3, uphy),
+};
+
+static const struct tegra_padctl_uphy_lane tegra21xb01_lanes[] = {
+	/* XUSB_PADCTL_USB2_PAD_MUX_0 */
+	TEGRA21xB01_LANE("otg-0",  0x004,  0, 0x3, otg),
+	TEGRA21xB01_LANE("otg-1",  0x004,  2, 0x3, otg),
+	TEGRA21xB01_LANE("otg-2",  0x004,  4, 0x3, otg),
+	TEGRA21xB01_LANE("otg-3",  0x004,  6, 0x3, otg),
+	/* XUSB_PADCTL_USB3_PAD_MUX_0 */
+	TEGRA21xB01_LANE("uphy-lane-0", 0x28, 12, 0x3, uphy),
+	TEGRA21xB01_LANE("uphy-lane-1", 0x28, 14, 0x3, uphy),
+	TEGRA21xB01_LANE("uphy-lane-2", 0x28, 16, 0x3, uphy),
+	TEGRA21xB01_LANE("uphy-lane-3", 0x28, 18, 0x3, uphy),
+	TEGRA21xB01_LANE("uphy-lane-4", 0x28, 20, 0x3, uphy),
+	TEGRA21xB01_LANE("uphy-lane-5", 0x28, 22, 0x3, uphy),
 };
 
 static const char * const tegra21x_supply_names[] = {
@@ -3689,12 +3854,12 @@ static const struct tegra_padctl_uphy_soc tegra21x_soc = {
 };
 
 static const struct tegra_padctl_uphy_soc tegra21xb01_soc = {
-	.num_pins = ARRAY_SIZE(tegra21x_pins),
-	.pins = tegra21x_pins,
-	.num_functions = ARRAY_SIZE(tegra21x_functions),
-	.functions = tegra21x_functions,
-	.num_lanes = ARRAY_SIZE(tegra21x_lanes),
-	.lanes = tegra21x_lanes,
+	.num_pins = ARRAY_SIZE(tegra21xb01_pins),
+	.pins = tegra21xb01_pins,
+	.num_functions = ARRAY_SIZE(tegra21xb01_functions),
+	.functions = tegra21xb01_functions,
+	.num_lanes = ARRAY_SIZE(tegra21xb01_lanes),
+	.lanes = tegra21xb01_lanes,
 	.hsic_port_offset = 8,
 	.supply_names = tegra21xb01_supply_names,
 	.num_supplies = ARRAY_SIZE(tegra21xb01_supply_names),
