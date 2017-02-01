@@ -17,7 +17,7 @@
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/regulator/consumer.h>
-#include <linux/tegra-powergate.h>
+#include <soc/tegra/tegra_powergate.h>
 #include <soc/tegra/chip-id.h>
 #include <linux/tegra_soctherm.h>
 #include <soc/tegra/tegra-dvfs.h>
@@ -31,6 +31,7 @@
 #include "powergate-priv.h"
 
 #define EMULATION_MC_FLUSH_TIMEOUT 100
+#define TEGRA210_POWER_DOMAIN_NVENC TEGRA210_POWER_DOMAIN_MPE
 
 enum mc_client {
 	MC_CLIENT_AFI		= 0,
@@ -67,12 +68,12 @@ struct tegra210_mc_client_info {
 };
 
 static struct tegra210_mc_client_info tegra210_pg_mc_info[] = {
-	[TEGRA_POWERGATE_CRAIL] = {
+	[TEGRA210_POWER_DOMAIN_CRAIL] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_LAST,
 		},
 	},
-	[TEGRA_POWERGATE_VE] = {
+	[TEGRA210_POWER_DOMAIN_VENC] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_ISP2,
 			[1] = MC_CLIENT_VI,
@@ -80,7 +81,7 @@ static struct tegra210_mc_client_info tegra210_pg_mc_info[] = {
 		},
 	},
 #ifdef CONFIG_ARCH_TEGRA_HAS_PCIE
-	[TEGRA_POWERGATE_PCIE] = {
+	[TEGRA210_POWER_DOMAIN_PCIE] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_AFI,
 			[1] = MC_CLIENT_LAST,
@@ -88,86 +89,86 @@ static struct tegra210_mc_client_info tegra210_pg_mc_info[] = {
 	},
 #endif
 #ifdef CONFIG_ARCH_TEGRA_HAS_SATA
-	[TEGRA_POWERGATE_SATA] = {
+	[TEGRA210_POWER_DOMAIN_SATA] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_SATA,
 			[1] = MC_CLIENT_LAST,
 		},
 	},
 #endif
-	[TEGRA_POWERGATE_NVENC] = {
+	[TEGRA210_POWER_DOMAIN_NVENC] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_NVENC,
 			[1] = MC_CLIENT_LAST,
 		},
 	},
-	[TEGRA_POWERGATE_SOR] = {
+	[TEGRA210_POWER_DOMAIN_SOR] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_LAST,
 		},
 	},
-	[TEGRA_POWERGATE_DISA] = {
+	[TEGRA210_POWER_DOMAIN_DISA] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_DC,
 			[1] = MC_CLIENT_LAST,
 		},
 	},
-	[TEGRA_POWERGATE_DISB] = {
+	[TEGRA210_POWER_DOMAIN_DISB] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_DCB,
 			[1] = MC_CLIENT_LAST,
 		},
 	},
-	[TEGRA_POWERGATE_XUSBA] = {
+	[TEGRA210_POWER_DOMAIN_XUSBA] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_LAST,
 		},
 	},
-	[TEGRA_POWERGATE_XUSBB] = {
+	[TEGRA210_POWER_DOMAIN_XUSBB] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_XUSB_DEV,
 			[1] = MC_CLIENT_LAST,
 		},
 	},
-	[TEGRA_POWERGATE_XUSBC] = {
+	[TEGRA210_POWER_DOMAIN_XUSBC] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_XUSB_HOST,
 			[1] = MC_CLIENT_LAST,
 		},
 	},
 #ifdef CONFIG_ARCH_TEGRA_VIC
-	[TEGRA_POWERGATE_VIC] = {
+	[TEGRA210_POWER_DOMAIN_VIC] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_VIC,
 			[1] = MC_CLIENT_LAST,
 		},
 	},
 #endif
-	[TEGRA_POWERGATE_NVDEC] = {
+	[TEGRA210_POWER_DOMAIN_NVDEC] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_NVDEC,
 			[1] = MC_CLIENT_LAST,
 		},
 	},
-	[TEGRA_POWERGATE_NVJPG] = {
+	[TEGRA210_POWER_DOMAIN_NVJPG] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_NVJPG,
 			[1] = MC_CLIENT_LAST,
 		},
 	},
-	[TEGRA_POWERGATE_APE] = {
+	[TEGRA210_POWER_DOMAIN_APE] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_APE,
 			[1] = MC_CLIENT_LAST,
 		},
 	},
-	[TEGRA_POWERGATE_VE2] = {
+	[TEGRA210_POWER_DOMAIN_VE2] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_ISP2B,
 			[1] = MC_CLIENT_LAST,
 		},
 	},
-	[TEGRA_POWERGATE_GPU] = {
+	[TEGRA210_POWER_DOMAIN_GPU] = {
 		.hot_reset_clients = {
 			[0] = MC_CLIENT_GPU,
 			[1] = MC_CLIENT_LAST,
@@ -176,7 +177,7 @@ static struct tegra210_mc_client_info tegra210_pg_mc_info[] = {
 };
 
 static struct powergate_partition_info tegra210_pg_partition_info[] = {
-	[TEGRA_POWERGATE_VE] = {
+	[TEGRA210_POWER_DOMAIN_VENC] = {
 		.name = "ve",
 		.clk_info = {
 			[0] = { .clk_name = "ispa", .clk_type = CLK_ONLY },
@@ -201,7 +202,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id_num = 4,
 	},
 #ifdef CONFIG_ARCH_TEGRA_HAS_PCIE
-	[TEGRA_POWERGATE_PCIE] = {
+	[TEGRA210_POWER_DOMAIN_PCIE] = {
 		.name = "pcie",
 		.clk_info = {
 			[0] = { .clk_name = "afi", .clk_type = CLK_ONLY },
@@ -214,7 +215,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 	},
 #endif
 #ifdef CONFIG_ARCH_TEGRA_HAS_SATA
-	[TEGRA_POWERGATE_SATA] = {
+	[TEGRA210_POWER_DOMAIN_SATA] = {
 		.name = "sata",
 		.disable_after_boot = false,
 		.clk_info = {
@@ -237,7 +238,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id_num = 3,
 	},
 #endif
-	[TEGRA_POWERGATE_NVENC] = {
+	[TEGRA210_POWER_DOMAIN_NVENC] = {
 		.name = "nvenc",
 		.clk_info = {
 			[0] = { .clk_name = "nvenc.cbus", .clk_type = CLK_ONLY },
@@ -252,7 +253,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id = { TEGRA210_CLK_NVENC },
 		.reset_id_num = 1,
 	},
-	[TEGRA_POWERGATE_SOR] = {
+	[TEGRA210_POWER_DOMAIN_SOR] = {
 		.name = "sor",
 		.clk_info = {
 			[0] = { .clk_name = "sor0", .clk_type = CLK_ONLY },
@@ -280,7 +281,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 			      TEGRA210_CLK_MIPI_CAL },
 		.reset_id_num = 5,
 	},
-	[TEGRA_POWERGATE_DISA] = {
+	[TEGRA210_POWER_DOMAIN_DISA] = {
 		.name = "disa",
 		.clk_info = {
 			[0] = { .clk_name = "disp1", .clk_type = CLK_ONLY },
@@ -297,7 +298,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id = { TEGRA210_CLK_DISP1 },
 		.reset_id_num = 1,
 	},
-	[TEGRA_POWERGATE_DISB] = {
+	[TEGRA210_POWER_DOMAIN_DISB] = {
 		.name = "disb",
 		.disable_after_boot = true,
 		.clk_info = {
@@ -315,7 +316,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id = { TEGRA210_CLK_DISP2 },
 		.reset_id_num = 1,
 	},
-	[TEGRA_POWERGATE_XUSBA] = {
+	[TEGRA210_POWER_DOMAIN_XUSBA] = {
 		.name = "xusba",
 		.clk_info = {
 			[0] = { .clk_name = "xusb_ss", .clk_type = CLK_ONLY },
@@ -337,7 +338,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id = { TEGRA210_CLK_XUSB_SS },
 		.reset_id_num = 1,
 	},
-	[TEGRA_POWERGATE_XUSBB] = {
+	[TEGRA210_POWER_DOMAIN_XUSBB] = {
 		.name = "xusbb",
 		.clk_info = {
 			[0] = { .clk_name = "xusb_dev", .clk_type = CLK_ONLY },
@@ -355,7 +356,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id = { 95 },
 		.reset_id_num = 1,
 	},
-	[TEGRA_POWERGATE_XUSBC] = {
+	[TEGRA210_POWER_DOMAIN_XUSBC] = {
 		.name = "xusbc",
 		.clk_info = {
 			[0] = { .clk_name = "xusb_host", .clk_type = CLK_ONLY },
@@ -374,7 +375,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id_num = 1,
 	},
 #ifdef CONFIG_ARCH_TEGRA_VIC
-	[TEGRA_POWERGATE_VIC] = {
+	[TEGRA210_POWER_DOMAIN_VIC] = {
 		.name = "vic",
 		.clk_info = {
 			[0] = { .clk_name = "vic03.cbus", .clk_type = CLK_ONLY },
@@ -391,7 +392,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id_num = 1,
 	},
 #endif
-	[TEGRA_POWERGATE_NVDEC] = {
+	[TEGRA210_POWER_DOMAIN_NVDEC] = {
 		.name = "nvdec",
 		.clk_info = {
 			[0] = { .clk_name = "nvdec", .clk_type = CLK_ONLY },
@@ -408,7 +409,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id = { TEGRA210_CLK_NVDEC },
 		.reset_id_num = 1,
 	},
-	[TEGRA_POWERGATE_NVJPG] = {
+	[TEGRA210_POWER_DOMAIN_NVJPG] = {
 		.name = "nvjpg",
 		.clk_info = {
 			[0] = { .clk_name = "nvjpg", .clk_type = CLK_ONLY },
@@ -425,7 +426,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id = { TEGRA210_CLK_NVJPG },
 		.reset_id_num = 1,
 	},
-	[TEGRA_POWERGATE_APE] = {
+	[TEGRA210_POWER_DOMAIN_APE] = {
 		.name = "ape",
 		.clk_info = {
 			[0] = { .clk_name = "ape", .clk_type = CLK_ONLY },
@@ -451,7 +452,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id = { TEGRA210_CLK_APE },
 		.reset_id_num = 1,
 	},
-	[TEGRA_POWERGATE_VE2] = {
+	[TEGRA210_POWER_DOMAIN_VE2] = {
 		.name = "ve2",
 		.clk_info = {
 			[0] = { .clk_name = "ispb", .clk_type = CLK_ONLY },
@@ -466,7 +467,7 @@ static struct powergate_partition_info tegra210_pg_partition_info[] = {
 		.reset_id = { TEGRA210_CLK_ISPB },
 		.reset_id_num = 1,
 	},
-	[TEGRA_POWERGATE_GPU] = {
+	[TEGRA210_POWER_DOMAIN_GPU] = {
 		.name = "gpu",
 		.clk_info = {
 			[0] = { .clk_name = "gpu_gate", .clk_type = CLK_AND_RST },
@@ -495,15 +496,15 @@ struct tegra210_powergate_info {
 };
 
 #define T210_POWERGATE_INFO(_pg_id, _pg_bit, _part_id, _mc_id)		\
-[TEGRA_POWERGATE_##_pg_id] = {						\
+[TEGRA210_POWER_DOMAIN_##_pg_id] = {						\
 	.valid = true,							\
 	.mask = BIT(_pg_bit),						\
-	.part_id = TEGRA_POWERGATE_##_part_id,				\
-	.mc_info = &tegra210_pg_mc_info[TEGRA_POWERGATE_##_mc_id],	\
-	.part_info = &tegra210_pg_partition_info[TEGRA_POWERGATE_##_part_id], \
+	.part_id = TEGRA210_POWER_DOMAIN_##_part_id,				\
+	.mc_info = &tegra210_pg_mc_info[TEGRA210_POWER_DOMAIN_##_mc_id],	\
+	.part_info = &tegra210_pg_partition_info[TEGRA210_POWER_DOMAIN_##_part_id], \
 }
 
-static struct tegra210_powergate_info t210_pg_info[TEGRA_NUM_POWERGATE] = {
+static struct tegra210_powergate_info t210_pg_info[TEGRA210_POWER_DOMAIN_MAX] = {
 	T210_POWERGATE_INFO(CRAIL, 0, CRAIL, CRAIL),
 	T210_POWERGATE_INFO(GPU, 1, GPU, GPU),
 	T210_POWERGATE_INFO(VENC, 2, VENC, VENC),
@@ -589,7 +590,7 @@ static spinlock_t *tegra210_pg_get_lock(void)
 static bool tegra210_pg_skip(int id)
 {
 	switch (t210_pg_info[id].part_id) {
-	case TEGRA_POWERGATE_GPU:
+	case TEGRA210_POWER_DOMAIN_GPU:
 		return true;
 	default:
 		return false;
@@ -886,10 +887,10 @@ static int tegra210_powergate_remove_clamping(int id)
 	 * PCIE and VDE clamping masks are swapped with respect to their
 	 * partition ids
 	 */
-	if (id ==  TEGRA_POWERGATE_VDEC)
-		mask = t210_pg_info[TEGRA_POWERGATE_PCIE].mask;
-	else if (id == TEGRA_POWERGATE_PCIE)
-		mask = t210_pg_info[TEGRA_POWERGATE_VDEC].mask;
+	if (id ==  TEGRA210_POWER_DOMAIN_VDEC)
+		mask = t210_pg_info[TEGRA210_POWER_DOMAIN_PCIE].mask;
+	else if (id == TEGRA210_POWER_DOMAIN_PCIE)
+		mask = t210_pg_info[TEGRA210_POWER_DOMAIN_VDEC].mask;
 	else
 		mask = t210_pg_info[id].mask;
 
@@ -1364,7 +1365,7 @@ static int tegra210_pg_powergate_sor(int id)
 	if (ret)
 		return ret;
 
-	ret = tegra210_pg_powergate_partition(TEGRA_POWERGATE_SOR);
+	ret = tegra210_pg_powergate_partition(TEGRA210_POWER_DOMAIN_SOR);
 	if (ret)
 		return ret;
 
@@ -1375,13 +1376,13 @@ static int tegra210_pg_unpowergate_sor(int id)
 {
 	int ret;
 
-	ret = tegra210_pg_unpowergate_partition(TEGRA_POWERGATE_SOR);
+	ret = tegra210_pg_unpowergate_partition(TEGRA210_POWER_DOMAIN_SOR);
 	if (ret)
 		return ret;
 
 	ret = tegra210_pg_unpowergate(id);
 	if (ret) {
-		tegra210_pg_powergate_partition(TEGRA_POWERGATE_SOR);
+		tegra210_pg_powergate_partition(TEGRA210_POWER_DOMAIN_SOR);
 		return ret;
 	}
 
@@ -1390,16 +1391,16 @@ static int tegra210_pg_unpowergate_sor(int id)
 
 static int tegra210_pg_nvdec_powergate(int id)
 {
-	tegra210_pg_powergate(TEGRA_POWERGATE_NVDEC);
-	tegra210_pg_powergate_partition(TEGRA_POWERGATE_NVJPG);
+	tegra210_pg_powergate(TEGRA210_POWER_DOMAIN_NVDEC);
+	tegra210_pg_powergate_partition(TEGRA210_POWER_DOMAIN_NVJPG);
 
 	return 0;
 }
 
 static int tegra210_pg_nvdec_unpowergate(int id)
 {
-	tegra210_pg_unpowergate_partition(TEGRA_POWERGATE_NVJPG);
-	tegra210_pg_unpowergate(TEGRA_POWERGATE_NVDEC);
+	tegra210_pg_unpowergate_partition(TEGRA210_POWER_DOMAIN_NVJPG);
+	tegra210_pg_unpowergate(TEGRA210_POWER_DOMAIN_NVDEC);
 
 	return 0;
 }
@@ -1407,14 +1408,14 @@ static int tegra210_pg_nvdec_unpowergate(int id)
 static int tegra210_pg_sata_powergate(int id)
 {
 	tegra210_set_sata_pll_seq_sw(true);
-	tegra210_pg_powergate(TEGRA_POWERGATE_SATA);
+	tegra210_pg_powergate(TEGRA210_POWER_DOMAIN_SATA);
 
 	return 0;
 }
 
 static int tegra210_pg_sata_unpowergate(int id)
 {
-	tegra210_pg_unpowergate(TEGRA_POWERGATE_SATA);
+	tegra210_pg_unpowergate(TEGRA210_POWER_DOMAIN_SATA);
 	tegra210_set_sata_pll_seq_sw(false);
 
 	return 0;
@@ -1425,18 +1426,18 @@ static int tegra210_pg_powergate_partition(int id)
 	int ret;
 
 	switch (t210_pg_info[id].part_id) {
-		case TEGRA_POWERGATE_GPU:
+		case TEGRA210_POWER_DOMAIN_GPU:
 			ret = tegra210_pg_gpu_powergate(id);
 			break;
-		case TEGRA_POWERGATE_DISA:
-		case TEGRA_POWERGATE_DISB:
-		case TEGRA_POWERGATE_VE:
+		case TEGRA210_POWER_DOMAIN_DISA:
+		case TEGRA210_POWER_DOMAIN_DISB:
+		case TEGRA210_POWER_DOMAIN_VENC:
 			ret = tegra210_pg_powergate_sor(id);
 			break;
-		case TEGRA_POWERGATE_NVDEC:
+		case TEGRA210_POWER_DOMAIN_NVDEC:
 			ret = tegra210_pg_nvdec_powergate(id);
 			break;
-		case TEGRA_POWERGATE_SATA:
+		case TEGRA210_POWER_DOMAIN_SATA:
 			ret = tegra210_pg_sata_powergate(id);
 			break;
 		default:
@@ -1451,18 +1452,18 @@ static int tegra210_pg_unpowergate_partition(int id)
 	int ret;
 
 	switch (t210_pg_info[id].part_id) {
-		case TEGRA_POWERGATE_GPU:
+		case TEGRA210_POWER_DOMAIN_GPU:
 			ret = tegra210_pg_gpu_unpowergate(id);
 			break;
-		case TEGRA_POWERGATE_DISA:
-		case TEGRA_POWERGATE_DISB:
-		case TEGRA_POWERGATE_VE:
+		case TEGRA210_POWER_DOMAIN_DISA:
+		case TEGRA210_POWER_DOMAIN_DISB:
+		case TEGRA210_POWER_DOMAIN_VENC:
 			ret = tegra210_pg_unpowergate_sor(id);
 			break;
-		case TEGRA_POWERGATE_NVDEC:
+		case TEGRA210_POWER_DOMAIN_NVDEC:
 			ret = tegra210_pg_nvdec_unpowergate(id);
 			break;
-		case TEGRA_POWERGATE_SATA:
+		case TEGRA210_POWER_DOMAIN_SATA:
 			ret = tegra210_pg_sata_unpowergate(id);
 			break;
 		default:
@@ -1491,7 +1492,7 @@ static int tegra210_pg_powergate_clk_off(int id)
 		goto exit_unlock;
 	}
 
-	if (t210_pg_info[id].part_id == TEGRA_POWERGATE_SATA)
+	if (t210_pg_info[id].part_id == TEGRA210_POWER_DOMAIN_SATA)
 		tegra210_set_sata_pll_seq_sw(true);
 
 	ret = tegra1xx_powergate_partition_with_clk_off(id,
@@ -1519,7 +1520,7 @@ static int tegra210_pg_unpowergate_clk_on(int id)
 	ret = tegra1xx_unpowergate_partition_with_clk_on(id,
 			t210_pg_info[id].part_info);
 
-	if (t210_pg_info[id].part_id == TEGRA_POWERGATE_SATA)
+	if (t210_pg_info[id].part_id == TEGRA210_POWER_DOMAIN_SATA)
 		tegra210_set_sata_pll_seq_sw(false);
 
 exit_unlock:
@@ -1533,7 +1534,7 @@ static int tegra210_pg_init_refcount(void)
 {
 	int i;
 
-	for (i = 0; i < TEGRA_NUM_POWERGATE; i++) {
+	for (i = 0; i < TEGRA210_POWER_DOMAIN_MAX; i++) {
 		if (!t210_pg_info[i].valid)
 			continue;
 
@@ -1550,21 +1551,21 @@ static int tegra210_pg_init_refcount(void)
 	}
 
 	/* SOR refcount depends on other units */
-	t210_pg_info[TEGRA_POWERGATE_SOR].part_info->refcount =
-		(tegra210_pg_is_powered(TEGRA_POWERGATE_DISA) ? 1 : 0) +
-		(tegra210_pg_is_powered(TEGRA_POWERGATE_DISB) ? 1 : 0) +
-		(tegra210_pg_is_powered(TEGRA_POWERGATE_VE) ? 1 : 0);
+	t210_pg_info[TEGRA210_POWER_DOMAIN_SOR].part_info->refcount =
+		(tegra210_pg_is_powered(TEGRA210_POWER_DOMAIN_DISA) ? 1 : 0) +
+		(tegra210_pg_is_powered(TEGRA210_POWER_DOMAIN_DISB) ? 1 : 0) +
+		(tegra210_pg_is_powered(TEGRA210_POWER_DOMAIN_VENC) ? 1 : 0);
 
-	tegra210_pg_powergate_partition(TEGRA_POWERGATE_XUSBA);
-	tegra210_pg_powergate_partition(TEGRA_POWERGATE_XUSBB);
-	tegra210_pg_powergate_partition(TEGRA_POWERGATE_XUSBC);
+	tegra210_pg_powergate_partition(TEGRA210_POWER_DOMAIN_XUSBA);
+	tegra210_pg_powergate_partition(TEGRA210_POWER_DOMAIN_XUSBB);
+	tegra210_pg_powergate_partition(TEGRA210_POWER_DOMAIN_XUSBC);
 
 	return 0;
 }
 
 static bool tegra210_powergate_id_is_valid(int id)
 {
-	if ((id < 0) || (id >= TEGRA_NUM_POWERGATE))
+	if ((id < 0) || (id >= TEGRA210_POWER_DOMAIN_MAX))
 		return false;
 
 	return t210_pg_info[id].valid;
@@ -1574,13 +1575,13 @@ static int tegra210_powergate_cpuid_to_powergate_id(int cpu)
 {
 	switch (cpu) {
 	case 0:
-		return TEGRA_POWERGATE_CPU0;
+		return TEGRA210_POWER_DOMAIN_CPU0;
 	case 1:
-		return TEGRA_POWERGATE_CPU1;
+		return TEGRA210_POWER_DOMAIN_CPU1;
 	case 2:
-		return TEGRA_POWERGATE_CPU2;
+		return TEGRA210_POWER_DOMAIN_CPU2;
 	case 3:
-		return TEGRA_POWERGATE_CPU3;
+		return TEGRA210_POWER_DOMAIN_CPU3;
 	default:
 		return -1;
 	}
@@ -1596,7 +1597,7 @@ static bool tegra210_powergate_id_matching(int id, int powergate_id)
 static struct powergate_ops tegra210_pg_ops = {
 	.soc_name = "tegra210",
 
-	.num_powerdomains = TEGRA_NUM_POWERGATE,
+	.num_powerdomains = TEGRA210_POWER_DOMAIN_MAX,
 	.powergate_id_is_soc_valid = tegra210_powergate_id_is_valid,
 	.powergate_cpuid_to_powergate_id =
 				tegra210_powergate_cpuid_to_powergate_id,
@@ -1645,7 +1646,7 @@ static int __init tegra210_disable_boot_partitions(void)
 		return 0;
 
 	pr_info("Disable partitions left on by BL\n");
-	for (i = 0; i < TEGRA_NUM_POWERGATE; i++) {
+	for (i = 0; i < TEGRA210_POWER_DOMAIN_MAX; i++) {
 		if (!t210_pg_info[i].valid)
 			continue;
 
@@ -1654,7 +1655,7 @@ static int __init tegra210_disable_boot_partitions(void)
 			continue;
 
 		if (t210_pg_info[i].part_info->disable_after_boot &&
-			(t210_pg_info[i].part_id != TEGRA_POWERGATE_GPU)) {
+			(t210_pg_info[i].part_id != TEGRA210_POWER_DOMAIN_GPU)) {
 			pr_info("  %s\n", t210_pg_info[i].part_info->name);
 			tegra210_pg_powergate_partition(i);
 		}
