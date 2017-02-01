@@ -1136,7 +1136,7 @@ static ssize_t wacom_show_remote_mode(struct kobject *kobj,
 	u8 mode;
 
 	mode = wacom->led.select[index];
-	if (mode >= 0 && mode < 3)
+	if (mode < 3)
 		return snprintf(buf, PAGE_SIZE, "%d\n", mode);
 	else
 		return snprintf(buf, PAGE_SIZE, "%d\n", -1);
