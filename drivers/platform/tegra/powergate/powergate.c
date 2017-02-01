@@ -525,6 +525,9 @@ int __init tegra_powergate_debugfs_init(void)
 	pg_debugfs_root = d;
 
 	for (i = 0; i < pg_ops->num_powerdomains; i++) {
+		if (!pg_ops->powergate_id_is_soc_valid(i))
+			continue;
+
 		name = tegra_powergate_get_name(i);
 		if (name) {
 			ret = powergate_debugfs_register_one(i, name);
