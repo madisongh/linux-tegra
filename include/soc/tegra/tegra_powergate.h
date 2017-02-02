@@ -19,16 +19,10 @@
 
 #include <linux/kernel.h>
 #include <linux/tegra-powergate.h>
+#include <dt-bindings/soc/tegra210-powergate.h>
+#include <dt-bindings/soc/tegra186-powergate.h>
 
 struct platform_device;
-
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-#include <dt-bindings/soc/tegra210-powergate.h>
-#endif
-
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
-#include <dt-bindings/soc/tegra186-powergate.h>
-#endif
 
 #ifdef CONFIG_POWERGATE_TEGRA_BPMP
 int tegra_bpmp_init_powergate(struct platform_device *pdev);
