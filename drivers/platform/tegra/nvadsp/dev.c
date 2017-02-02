@@ -199,7 +199,6 @@ static int __init nvadsp_probe(struct platform_device *pdev)
 {
 	struct nvadsp_drv_data *drv_data;
 	struct device *dev = &pdev->dev;
-	struct device_node *node = dev->of_node;
 	struct resource *res = NULL;
 	void __iomem *base = NULL;
 	uint32_t aram_addr;
@@ -309,7 +308,6 @@ static int __init nvadsp_probe(struct platform_device *pdev)
 
 	nvadsp_drv_data = drv_data;
 
-
 #ifdef CONFIG_PM
 	tegra_pd_add_device(dev);
 
@@ -362,10 +360,6 @@ static int __init nvadsp_probe(struct platform_device *pdev)
 	ret = aram_init(aram_addr, aram_size);
 	if (ret)
 		dev_err(dev, "Failed to init aram\n");
-
-	if (of_device_is_compatible(node, "nvidia,tegra18x-adsp-hv"))
-		writel(1, drv_data->base_regs[HWMB_REG_IDX] + HWMBOX5_REG);
-
 err:
 #ifdef CONFIG_PM
 	ret = pm_runtime_put_sync(dev);
