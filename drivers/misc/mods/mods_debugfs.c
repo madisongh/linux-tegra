@@ -31,7 +31,7 @@
 static struct dentry *mods_debugfs_dir;
 
 #if defined(MODS_TEGRA) && defined(MODS_HAS_KFUSE)
-#include <linux/platform/tegra/tegra_kfuse.h>
+#include <soc/tegra/kfuse.h>
 #endif
 
 #include <video/tegra_dc_ext_kernel.h>
