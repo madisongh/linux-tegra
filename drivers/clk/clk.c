@@ -2586,7 +2586,7 @@ static int clk_debug_create_one(struct clk_core *core, struct dentry *pdentry)
 		d = debugfs_create_file(debug_extra->name, debug_extra->mode,
 				core->dentry, debug_extra->data,
 				debug_extra->fops);
-		hlist_del(debug_extra);
+		hlist_del(&debug_extra->debug_node);
 		kfree(debug_extra);
 
 		if (!d)
@@ -2673,7 +2673,7 @@ struct dentry *__clk_debugfs_add_file(struct clk *clk, char *name,
 	else {
 		clk_debug_add_debugfs_extra_node(clk->core, name, mode, data,
 						 fops);
-		return PTR_ERR(-EAGAIN);
+		return ERR_PTR(-EAGAIN);
 	}
 
 	return d;
@@ -2691,7 +2691,7 @@ struct dentry *clk_debugfs_add_file(struct clk_hw *hw, char *name, umode_t mode,
 	else {
 		clk_debug_add_debugfs_extra_node(hw->core, name, mode, data,
 						 fops);
-		return PTR_ERR(-EAGAIN);
+		return ERR_PTR(-EAGAIN);
 	}
 
 	return d;
