@@ -1860,9 +1860,11 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 	/* prevent racing with updates to the clock topology */
 	clk_prepare_lock();
 
-	/* bail early if nothing to do */
-	if (rate == clk_core_get_rate_nolock(clk->core))
-		goto out;
+	if (!clk->core || !(clk->core->flags & CLK_SET_RATE_NOCACHE)) {
+		/* bail early if nothing to do */
+		if (rate == clk_core_get_rate_nolock(clk->core))
+			goto out;
+	}
 
 	ret = clk_core_set_rate_nolock(clk->core, rate);
 
