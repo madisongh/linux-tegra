@@ -1263,7 +1263,7 @@ struct clk *tegra_clk_register_shared(const char *name,
 	if (IS_ERR(shared))
 		return ERR_PTR(PTR_ERR(shared));
 
-	flags |= CLK_GET_RATE_NOCACHE;
+	flags |= CLK_GET_RATE_NOCACHE | CLK_SET_RATE_NOCACHE;
 
 	init.name = name;
 	init.ops = &tegra_clk_shared_ops;
@@ -1296,7 +1296,8 @@ struct clk *tegra_clk_register_shared_connect(const char *name,
 		return ERR_PTR(PTR_ERR(shared));
 
 	INIT_LIST_HEAD(&shared->shared_bus_list);
-	flags |= CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE;
+	flags |= CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE |
+		CLK_SET_RATE_NOCACHE;
 
 	init.name = name;
 	init.ops = &tegra_clk_shared_master_ops;
@@ -1433,7 +1434,7 @@ struct clk *tegra_clk_register_cascade_master(const char *name,
 	list_add_tail(&cascade_master->u.shared_bus_user.node,
 			&parent_cbus->shared_bus_list);
 
-	flags |= CLK_GET_RATE_NOCACHE;
+	flags |= CLK_GET_RATE_NOCACHE | CLK_SET_RATE_NOCACHE;
 
 	init.name = name;
 	init.ops = &tegra_clk_cascade_master_ops;
