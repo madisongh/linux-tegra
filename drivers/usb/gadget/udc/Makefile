@@ -23,7 +23,6 @@ obj-$(CONFIG_USB_TEGRA_CD)	+= tegra_usb_cd.o
 obj-$(CONFIG_USB_TEGRA_CD)	+= tegra18x_usb_cd.o
 obj-$(CONFIG_USB_TEGRA_CD)	+= tegra21x_usb_cd.o
 obj-$(CONFIG_USB_TEGRA_XUDC)	+= tegra_xudc.o
-obj-$(CONFIG_USB_TEGRA)		+= tegra_udc.o
 obj-$(CONFIG_USB_M66592)	+= m66592-udc.o
 obj-$(CONFIG_USB_R8A66597)	+= r8a66597-udc.o
 obj-$(CONFIG_USB_FSL_QE)	+= fsl_qe_udc.o

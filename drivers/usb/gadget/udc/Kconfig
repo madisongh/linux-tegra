@@ -373,17 +373,6 @@ config USB_GADGET_XILINX
 	  dynamically linked module called "udc-xilinx" and force all
 	  gadget drivers to also be dynamically linked.
 
-config USB_TEGRA
-        tristate "Nvidia Highspeed USB 2.0 device controller"
-        depends on ARCH_TEGRA
-        select USB_GADGET_DUALSPEED
-        help
-           Enables TEGRA USB 2.0 pheripheral driver.
-
-           Say "y" to link the driver statically, or "m" to build a
-           dynamically linked module called "tegra_udc" and force all
-           gadget drivers to also be dynamically linked.
-
 config USB_TEGRA_XUDC
 	tristate "NVIDIA Superspeed USB 3.0 Device Controller"
 	depends on ARCH_TEGRA
