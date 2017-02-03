@@ -27,7 +27,6 @@ struct tegra_powergate_driver_ops {
 
 	bool (*powergate_id_is_soc_valid)(int id);
 	int (*powergate_cpuid_to_powergate_id)(int cpu);
-	bool (*powergate_id_matching)(int id, int powergate_id);
 
 	int (*powergate_partition)(int);
 	int (*unpowergate_partition)(int id);

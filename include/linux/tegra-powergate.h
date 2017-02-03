@@ -78,7 +78,6 @@ int tegra_unpowergate_partition(int id);
 int slcg_register_notifier(int id, struct notifier_block *nb);
 int slcg_unregister_notifier(int id, struct notifier_block *nb);
 int tegra_powergate_cpuid_to_powergate_id(int cpu);
-bool tegra_powergate_id_matching(int id, int powergate_id);
 #else
 static inline bool tegra_powergate_is_powered(int id)
 {
@@ -123,10 +122,6 @@ static inline int slcg_unregister_notifier(int id, struct notifier_block *nb)
 static inline int tegra_powergate_cpuid_to_powergate_id(int cpu)
 {
 	return -1;
-}
-static inline bool tegra_powergate_id_matching(int id, int powergate_id)
-{
-	return false;
 }
 #endif
 

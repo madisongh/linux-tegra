@@ -375,15 +375,6 @@ int tegra_powergate_cpuid_to_powergate_id(int cpu)
 }
 EXPORT_SYMBOL(tegra_powergate_cpuid_to_powergate_id);
 
-bool tegra_powergate_id_matching(int id, int powergate_id)
-{
-	if (pg_ops->powergate_id_matching)
-		return pg_ops->powergate_id_matching(id, powergate_id);
-
-	return false;
-}
-EXPORT_SYMBOL(tegra_powergate_id_matching);
-
 static int tegra_powergate_init_refcount(void)
 {
 	if ((!pg_ops) || (!pg_ops->powergate_init_refcount))
