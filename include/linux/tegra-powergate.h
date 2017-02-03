@@ -33,28 +33,6 @@
 #define TEGRA_CPU_POWERGATE_ID(cpu)					\
 		tegra_powergate_cpuid_to_powergate_id(cpu)
 
-#define TEGRA_IS_CPU_POWERGATE_ID(id)					\
-	(tegra_powergate_id_matching(id, TEGRA_POWERGATE_CPU0) ||	\
-	 tegra_powergate_id_matching(id, TEGRA_POWERGATE_CPU1) ||	\
-	 tegra_powergate_id_matching(id, TEGRA_POWERGATE_CPU2) ||	\
-	 tegra_powergate_id_matching(id, TEGRA_POWERGATE_CPU3))
-
-#define TEGRA_IS_GPU_POWERGATE_ID(id)					\
-	tegra_powergate_id_matching(id, TEGRA_POWERGATE_GPU)
-
-#define TEGRA_IS_DISP_POWERGATE_ID(id)					\
-	(tegra_powergate_id_matching(id, TEGRA_POWERGATE_DISA) ||	\
-	 tegra_powergate_id_matching(id, TEGRA_POWERGATE_DISB))
-
-#define TEGRA_IS_VENC_POWERGATE_ID(id)					\
-	tegra_powergate_id_matching(id, TEGRA_POWERGATE_VENC)
-
-#define TEGRA_IS_PCIE_POWERGATE_ID(id)					\
-	tegra_powergate_id_matching(id, TEGRA_POWERGATE_PCIE)
-
-#define TEGRA_IS_XUSBC_POWERGATE_ID(id)					\
-	tegra_powergate_id_matching(id, TEGRA_POWERGATE_XUSB)
-
 #ifdef CONFIG_TEGRA_POWERGATE
 int tegra_cpu_powergate_id(int cpuid);
 bool tegra_powergate_is_powered(int id);

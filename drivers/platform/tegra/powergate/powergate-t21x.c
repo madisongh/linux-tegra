@@ -601,7 +601,7 @@ static bool tegra210_pg_is_powered(int id)
 {
 	u32 status = 0;
 
-	if (TEGRA_IS_GPU_POWERGATE_ID(id)) {
+	if (id == TEGRA210_POWER_DOMAIN_GPU) {
 		if (gpu_rail)
 			status = tegra_dvfs_is_rail_up(gpu_rail);
 	} else {
@@ -639,13 +639,20 @@ static int tegra_powergate_set(int id, bool new_state)
 		return 0;
 	}
 
-	if (TEGRA_IS_CPU_POWERGATE_ID(id)) {
+	switch (id) {
+	case TEGRA210_POWER_DOMAIN_CPU0:
+	case TEGRA210_POWER_DOMAIN_CPU1:
+	case TEGRA210_POWER_DOMAIN_CPU2:
+	case TEGRA210_POWER_DOMAIN_CPU3:
 		/* CPU ungated in s/w only during boot/resume with outer
 		   waiting loop and no contention from other CPUs */
 		pmc_write(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
 		pmc_read(PWRGATE_TOGGLE);
 		spin_unlock_irqrestore(lock, flags);
 		return 0;
+
+	default:
+		break;
 	}
 
 	/* Wait if PMC is already processing some other power gating request */
@@ -1478,7 +1485,7 @@ static int tegra210_pg_powergate_clk_off(int id)
 	int ret = 0;
 	struct powergate_partition_info *partition = t210_pg_info[id].part_info;
 
-	BUG_ON(TEGRA_IS_GPU_POWERGATE_ID(id));
+	BUG_ON(id == TEGRA210_POWER_DOMAIN_GPU);
 
 	trace_powergate(__func__, tegra210_pg_get_name(id), id, 1, 0);
 	mutex_lock(&partition->pg_mutex);
@@ -1510,7 +1517,7 @@ static int tegra210_pg_unpowergate_clk_on(int id)
 	int ret = 0;
 	struct powergate_partition_info *partition = t210_pg_info[id].part_info;
 
-	BUG_ON(TEGRA_IS_GPU_POWERGATE_ID(id));
+	BUG_ON(id == TEGRA210_POWER_DOMAIN_GPU);
 	trace_powergate(__func__, tegra210_pg_get_name(id), id, 1, 0);
 	mutex_lock(&partition->pg_mutex);
 
@@ -1589,11 +1596,6 @@ static int tegra210_powergate_cpuid_to_powergate_id(int cpu)
 	return -1;
 }
 
-static bool tegra210_powergate_id_matching(int id, int powergate_id)
-{
-	return (t210_pg_info[id].part_id == t210_pg_info[powergate_id].part_id);
-}
-
 static struct powergate_ops tegra210_pg_ops = {
 	.soc_name = "tegra210",
 
@@ -1601,7 +1603,6 @@ static struct powergate_ops tegra210_pg_ops = {
 	.powergate_id_is_soc_valid = tegra210_powergate_id_is_valid,
 	.powergate_cpuid_to_powergate_id =
 				tegra210_powergate_cpuid_to_powergate_id,
-	.powergate_id_matching = tegra210_powergate_id_matching,
 
 	.get_powergate_lock = tegra210_pg_get_lock,
 	.get_powergate_domain_name = tegra210_pg_get_name,
