@@ -64,6 +64,7 @@
 #define T21x_UPHY_PLLS		(2)
 #define T21x_UPHY_LANES		(8)
 #define SATA_LANE_MASK		BIT(7)
+#define TEGRA_CDP_PHYS		(4)
 
 #define TDCD_TIMEOUT_MS		400
 
@@ -427,6 +428,7 @@ struct tegra_padctl_uphy {
 	struct phy *usb3_phys[TEGRA_USB3_PHYS];
 	struct phy *utmi_phys[TEGRA_UTMI_PHYS];
 	struct phy *hsic_phys[TEGRA_HSIC_PHYS];
+	struct phy *cdp_phys[TEGRA_CDP_PHYS];
 	struct phy *pcie_phys[TEGRA_PCIE_PHYS];
 	struct phy *sata_phys[TEGRA_SATA_PHYS];
 	struct tegra_xusb_hsic_port hsic_ports[TEGRA_HSIC_PHYS];
@@ -470,6 +472,7 @@ struct tegra_padctl_uphy {
 	struct work_struct otg_vbus_work;
 	bool otg_vbus_on;
 	bool otg_vbus_alwayson;
+	bool cdp_used;
 
 	struct regulator_bulk_data *supplies;
 	struct padctl_context padctl_context;
@@ -1184,6 +1187,10 @@ struct tegra_padctl_uphy *mbox_work_to_uphy(struct work_struct *work)
 #define PIN_UPHY_5	10
 #define PIN_UPHY_6	11
 #define PIN_SATA_0	12
+#define PIN_CDP_0	13
+#define PIN_CDP_1	14
+#define PIN_CDP_2	15
+#define PIN_CDP_3	16
 
 static inline bool lane_is_otg(unsigned int lane)
 {
@@ -1193,6 +1200,11 @@ static inline bool lane_is_otg(unsigned int lane)
 static inline bool lane_is_hsic(unsigned int lane)
 {
 	return lane == PIN_HSIC_0;
+}
+
+static inline bool pad_is_cdp(unsigned int pad)
+{
+	return pad >= PIN_CDP_0 && pad <= PIN_CDP_3;
 }
 
 static inline bool lane_is_uphy(unsigned int lane)
@@ -1494,6 +1506,10 @@ static int tegra21x_padctl_uphy_pinmux_set(struct pinctrl_dev *pinctrl,
 			dev_info(uphy->dev, "uphy_lane = %d, set sata_lanes = 0x%lx\n",
 					uphy_lane, uphy->sata_lanes);
 		}
+	} else if (pad_is_cdp(group)) {
+		if (function != TEGRA21x_FUNC_XUSB)
+			dev_warn(uphy->dev, "group %s isn't for xusb!",
+				 lane->name);
 	} else
 		return -EINVAL;
 
@@ -2666,9 +2682,14 @@ static inline void tegra21x_usb2_trk(struct tegra_padctl_uphy *uphy, bool on)
 			return;
 		if (--uphy->bias_pad_enable > 0)
 			return;
-		reg = padctl_readl(uphy, XUSB_PADCTL_USB2_BIAS_PAD_CTL_0);
-		reg |= BIAS_PAD_PD;
-		padctl_writel(uphy, reg, XUSB_PADCTL_USB2_BIAS_PAD_CTL_0);
+		if (!uphy->cdp_used) {
+			/* only turn BIAS pad off when host CDP isn't enabled */
+			reg = padctl_readl(uphy,
+					XUSB_PADCTL_USB2_BIAS_PAD_CTL_0);
+			reg |= BIAS_PAD_PD;
+			padctl_writel(uphy, reg,
+					XUSB_PADCTL_USB2_BIAS_PAD_CTL_0);
+		}
 
 		reg = padctl_readl(uphy, XUSB_PADCTL_USB2_BIAS_PAD_CTL_1);
 		reg |= USB2_PD_TRK;
@@ -2901,15 +2922,69 @@ static int tegra21x_utmi_phy_power_off(struct phy *phy)
 
 int tegra21x_phy_xusb_utmi_vbus_power_on(struct phy *phy)
 {
-	/* dummy function, needed for kernel unification */
+	struct tegra_padctl_uphy *padctl;
+	int port;
+	int rc;
+	int status;
+
+	if (!phy)
+		return -EINVAL;
+
+	padctl = phy_get_drvdata(phy);
+	port = utmi_phy_to_port(phy);
+
+	status = regulator_is_enabled(padctl->vbus[port]);
+	mutex_lock(&padctl->lock);
+	if (padctl->vbus[port]) {
+		rc = regulator_enable(padctl->vbus[port]);
+		if (rc) {
+			dev_err(padctl->dev, "enable port %d vbus failed %d\n",
+				port, rc);
+			mutex_unlock(&padctl->lock);
+			return rc;
+		}
+	}
+	mutex_unlock(&padctl->lock);
+	dev_info(padctl->dev, "%s: port %d regulator status: %d->%d\n",
+		 __func__, port, status,
+		 regulator_is_enabled(padctl->vbus[port]));
+
 	return 0;
 }
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_vbus_power_on);
 
 int tegra21x_phy_xusb_utmi_vbus_power_off(struct phy *phy)
 {
-	/* dummy function, needed for kernel unification */
+	struct tegra_padctl_uphy *padctl;
+	int port;
+	int rc;
+	int status;
+
+	if (!phy)
+		return -EINVAL;
+
+	padctl = phy_get_drvdata(phy);
+	port = utmi_phy_to_port(phy);
+
+	status = regulator_is_enabled(padctl->vbus[port]);
+	mutex_lock(&padctl->lock);
+	if (padctl->vbus[port]) {
+		rc = regulator_disable(padctl->vbus[port]);
+		if (rc) {
+			dev_err(padctl->dev, "disable port %d vbus failed %d\n",
+				port, rc);
+			mutex_unlock(&padctl->lock);
+			return rc;
+		}
+	}
+	mutex_unlock(&padctl->lock);
+	dev_info(padctl->dev, "%s: port %d regulator status: %d->%d\n",
+		 __func__, port, status,
+		 regulator_is_enabled(padctl->vbus[port]));
+
 	return 0;
 }
+EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_utmi_vbus_power_off);
 
 int tegra21x_phy_xusb_overcurrent_detected(struct phy *phy)
 {
@@ -2925,6 +3000,86 @@ static const struct phy_ops utmi_phy_ops = {
 	.exit = tegra21x_utmi_phy_exit,
 	.power_on = tegra21x_utmi_phy_power_on,
 	.power_off = tegra21x_utmi_phy_power_off,
+	.owner = THIS_MODULE,
+};
+
+static int cdp_phy_to_port(struct phy *phy)
+{
+	struct tegra_padctl_uphy *padctl = phy_get_drvdata(phy);
+	unsigned int i;
+
+	for (i = 0; i < TEGRA_CDP_PHYS; i++) {
+		if (phy == padctl->cdp_phys[i])
+			return i;
+	}
+
+	dev_warn(padctl->dev, "failed to get valid port number for cdp phy\n");
+
+	return -EINVAL;
+}
+
+static int tegra210_cdp_phy_set_cdp(struct phy *phy, bool enable)
+{
+	struct tegra_padctl_uphy *padctl = phy_get_drvdata(phy);
+	int port = cdp_phy_to_port(phy);
+	u32 reg;
+
+	dev_info(padctl->dev, "%sable UTMI port %d Tegra CDP\n",
+		 enable ? "en" : "dis", port);
+	if (enable) {
+		reg = padctl_readl(padctl,
+			XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+		reg &= ~PD_CHG;
+		padctl_writel(padctl, reg,
+			XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+
+		reg = padctl_readl(padctl,
+				   XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+		reg |= (USB2_OTG_PD2 | USB2_OTG_PD2_OVRD_EN);
+		padctl_writel(padctl, reg,
+			      XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+
+		reg = padctl_readl(padctl,
+			XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+		reg |= ON_SRC_EN;
+		padctl_writel(padctl, reg,
+			XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	} else {
+		reg = padctl_readl(padctl,
+			XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+		reg |= PD_CHG;
+		padctl_writel(padctl, reg,
+			XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+
+		reg = padctl_readl(padctl,
+				   XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+		reg &= ~(USB2_OTG_PD2 | USB2_OTG_PD2_OVRD_EN);
+		padctl_writel(padctl, reg,
+			      XUSB_PADCTL_USB2_OTG_PADX_CTL_0(port));
+
+		reg = padctl_readl(padctl,
+			XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+		reg &= ~ON_SRC_EN;
+		padctl_writel(padctl, reg,
+			XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPADX_CTL0(port));
+	}
+
+	return 0;
+}
+
+static int tegra210_cdp_phy_power_on(struct phy *phy)
+{
+	return tegra210_cdp_phy_set_cdp(phy, true);
+}
+
+static int tegra210_cdp_phy_power_off(struct phy *phy)
+{
+	return tegra210_cdp_phy_set_cdp(phy, false);
+}
+
+static const struct phy_ops cdp_phy_ops = {
+	.power_on = tegra210_cdp_phy_power_on,
+	.power_off = tegra210_cdp_phy_power_off,
 	.owner = THIS_MODULE,
 };
 
@@ -3361,6 +3516,13 @@ static struct phy *tegra21x_padctl_uphy_xlate(struct device *dev,
 			phy = uphy->sata_phys[phy_index];
 			TRACE(dev, "returning sata_phys[%d]\n", phy_index);
 		}
+	} else if ((index >= TEGRA_PADCTL_PHY_CDP_BASE) &&
+		(index < TEGRA_PADCTL_PHY_CDP_BASE + 16)) {
+
+		phy_index = index - TEGRA_PADCTL_PHY_CDP_BASE;
+		if (phy_index < TEGRA_CDP_PHYS)
+			phy = uphy->cdp_phys[phy_index];
+		uphy->cdp_used = true;
 	}
 
 	return (phy) ? phy : ERR_PTR(-EINVAL);
@@ -3380,6 +3542,10 @@ static const struct pinctrl_pin_desc tegra21x_pins[] = {
 	PINCTRL_PIN(PIN_UPHY_5, "uphy-lane-5"),
 	PINCTRL_PIN(PIN_UPHY_6, "uphy-lane-6"),
 	PINCTRL_PIN(PIN_SATA_0, "uphy-lane-7"),
+	PINCTRL_PIN(PIN_CDP_0,  "cdp-0"),
+	PINCTRL_PIN(PIN_CDP_1,  "cdp-1"),
+	PINCTRL_PIN(PIN_CDP_2,  "cdp-2"),
+	PINCTRL_PIN(PIN_CDP_3,  "cdp-3"),
 };
 
 static const char * const tegra21x_hsic_groups[] = {
@@ -3395,6 +3561,10 @@ static const char * const tegra21x_xusb_groups[] = {
 	"otg-1",
 	"otg-2",
 	"otg-3",
+	"cdp-0",
+	"cdp-1",
+	"cdp-2",
+	"cdp-3",
 };
 
 static const char * const tegra21x_pcie_groups[] = {
@@ -3662,6 +3832,15 @@ static int tegra_xusb_setup_usb(struct tegra_padctl_uphy *uphy)
 			return PTR_ERR(phy);
 
 		uphy->hsic_phys[i] = phy;
+		phy_set_drvdata(phy, uphy);
+	}
+
+	for (i = 0; i < TEGRA_CDP_PHYS; i++) {
+		phy = devm_phy_create(uphy->dev, NULL, &cdp_phy_ops);
+		if (IS_ERR(phy))
+			return PTR_ERR(phy);
+
+		uphy->cdp_phys[i] = phy;
 		phy_set_drvdata(phy, uphy);
 	}
 
@@ -4011,6 +4190,7 @@ static int tegra21x_padctl_uphy_remove(struct platform_device *pdev)
 	pinctrl_unregister(uphy->pinctrl);
 	reset_control_assert(uphy->padctl_rst);
 	regulator_bulk_disable(uphy->soc->num_supplies, uphy->supplies);
+	uphy->cdp_used = false;
 
 	return 0;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2016-2017, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -27,6 +27,9 @@
 /* 80-95 for UFS */
 #define TEGRA_PADCTL_UPHY_SNPS_BASE	(80)
 #define TEGRA_PADCTL_UPHY_SNPS_P(x)	((x) + TEGRA_PADCTL_UPHY_SNPS_BASE)
+/* 96-112 for Tegra built-in CDP phy for UTMI */
+#define TEGRA_PADCTL_PHY_CDP_BASE	(96)
+#define TEGRA_PADCTL_PHY_CDP_P(x)	((x) + TEGRA_PADCTL_PHY_CDP_BASE)
 
 #define TEGRA_PADCTL_PORT_DISABLED	(0)
 #define TEGRA_PADCTL_PORT_HOST_ONLY	(1)

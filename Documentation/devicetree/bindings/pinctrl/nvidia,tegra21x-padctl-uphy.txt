@@ -82,6 +82,13 @@ divided into four groups:
     When function is pcie, nvidia,pcie-controller and nvidia,pcie-lane-select
     are required.
 
+  - cdp-0, cdp-1, cdp-2, cdp-3:
+
+    Valid functions for this group is: "xusb". No other property is required.
+    This type of lane is an abstraction of Tegra CDP (charging downstream port)
+    which can be turned on by host controller driver using generic phy API to
+    declare a UTMI host port as CDP.
+
 Example:
 ========
 
@@ -115,12 +122,14 @@ Board file extract:
 
 	...
 
-	# XUSB host mode takes UTMI pad#2 and SuperSpeed pad#2 for a USB 3.0 host port
+	# XUSB host mode takes UTMI pad#2 and SuperSpeed pad#2 for a USB 3.0 host port.
+	# Also add CDP support for that UTMI pad#2.
 	xusb@0x70090000 {
 		...
 		phys = 	<&board-padctl-uphy TEGRA_PADCTL_UPHY_UTMI_P(2)>,
 			<&board-padctl-uphy TEGRA_PADCTL_UPHY_USB3_P(2)>,
-		phy-names = "utmi-2", "usb3-2";
+			<&board-padctl-uphy TEGRA_PADCTL_UPHY_CDP_P(2)>;
+		phy-names = "utmi-2", "usb3-2", "cdp-2";
 
 		...
 	}
