@@ -4231,7 +4231,7 @@ static void __init tegra210_clock_init(struct device_node *np)
 
 	tegra_super_clk_gen5_init(clk_base, pmc_base, tegra210_clks,
 				  &pll_x_params);
-	tegra_init_special_resets(1, tegra210_reset_assert,
+	tegra_init_special_resets(2, tegra210_reset_assert,
 				tegra210_reset_deassert);
 
 	tegra210_shared_clk_init(sclk_high_clk);
