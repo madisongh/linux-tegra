@@ -2640,6 +2640,7 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
 	[tegra_clk_adsp_neon] = { .dt_id = TEGRA210_CLK_ADSP_NEON, .present = true },
 	[tegra_clk_bwmgr_emc] = { .dt_id = TEGRA210_CLK_BWMGR_EMC, .present = true },
 	[tegra_clk_override_cbus] = { .dt_id = TEGRA210_CLK_OVERRIDE_CBUS, .present = true },
+	[tegra_clk_wifi_sclk] = { .dt_id = TEGRA210_CLK_WIFI_SCLK, .present = true },
 };
 
 static struct tegra_devclk devclks[] __initdata = {
@@ -2828,6 +2829,7 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "extern1", .dt_id = TEGRA210_CLK_EXTERN1 },
 	{ .con_id = "extern2", .dt_id = TEGRA210_CLK_EXTERN2 },
 	{ .con_id = "extern3", .dt_id = TEGRA210_CLK_EXTERN3 },
+	{ .con_id = "sclk", .dev_id = "tegra-wifi", .dt_id = TEGRA210_CLK_WIFI_SCLK },
 };
 
 static struct tegra_audio_clk_info tegra210_audio_plls[] = {
