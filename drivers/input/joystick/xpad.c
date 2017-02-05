@@ -1227,8 +1227,6 @@ static void xpad_led_disconnect(struct usb_xpad *xpad) { }
 
 static int xpad_start_input(struct usb_xpad *xpad)
 {
-	int error;
-
 	if (usb_submit_urb(xpad->irq_in, GFP_KERNEL))
 		return -EIO;
 
