@@ -1,3 +1,5 @@
+subdir-ccflags-y += -Werror
+
 obj-$(CONFIG_RESET_CONTROLLER) += core.o
 obj-$(CONFIG_ARCH_LPC18XX) += reset-lpc18xx.o
 obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o

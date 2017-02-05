@@ -4,6 +4,7 @@
 
 # Each configuration option enables a list of files.
 
+subdir-ccflags-y += -Werror
 GCOV_PROFILE := y
 
 ccflags-y += -Werror

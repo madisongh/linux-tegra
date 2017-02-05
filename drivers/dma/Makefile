@@ -3,6 +3,7 @@ subdir-ccflags-$(CONFIG_DMADEVICES_DEBUG)  := -DDEBUG
 subdir-ccflags-$(CONFIG_DMADEVICES_VDEBUG) += -DVERBOSE_DEBUG
 subdir-ccflags-y += -I$(srctree)/../t18x
 subdir-ccflags-y += -I$(srctree)
+subdir-ccflags-y += -Werror
 
 #core
 obj-$(CONFIG_DMA_ENGINE) += dmaengine.o
