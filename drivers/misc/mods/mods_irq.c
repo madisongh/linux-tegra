@@ -1283,6 +1283,7 @@ int esc_mods_irq_handled(struct file *pfile,
 int esc_mods_map_irq(struct file *pfile,
 					 struct MODS_DT_INFO *p)
 {
+	struct platform_device *pdev;
 	int ret;
 	/* the physical irq */
 	int hwirq;
@@ -1307,7 +1308,7 @@ int esc_mods_map_irq(struct file *pfile,
 
 	hwirq = oirq.args[1];
 	/* Get the platform device handle */
-	struct platform_device *pdev = of_find_device_by_node(np);
+	pdev = of_find_device_by_node(np);
 
 	if (of_node_cmp(p->dt_name, "watchdog") == 0) {
 		/* Enable and unmask interrupt for watchdog */

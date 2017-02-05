@@ -177,7 +177,7 @@ int mods_dma_sync_wait(struct MODS_DMA_HANDLE *p_handle,
 
 int mods_dma_async_is_tx_complete(struct MODS_DMA_HANDLE *p_handle,
 				  mods_dma_cookie_t cookie,
-				  bool *p_is_complete)
+				  __u32 *p_is_complete)
 {
 	int ret = OK;
 	struct mods_dma_chan_info *p_mods_chan;
@@ -296,7 +296,7 @@ int esc_mods_dma_set_config(struct file *pfile,
 			  "ch: %d dir [%d], addr[%p -> %p], burst [%d %d]",
 			  p_config->handle.dma_id,
 			  config.direction,
-			  config.src_addr, config.dst_addr,
+			  (void *)config.src_addr, (void *)config.dst_addr,
 			  config.src_maxburst, config.dst_maxburst);
 	mods_debug_printk(DEBUG_TEGRADMA,
 			  "width [%d %d] slave id %d\n",
@@ -350,7 +350,7 @@ int esc_mods_dma_submit_request(struct file *pfile,
 	} else {
 		mods_debug_printk(DEBUG_TEGRADMA,
 				  "Phys Addr [%p], len [%d], dir [%d]\n",
-					p_mods_desc->phys,
+					(void *)p_mods_desc->phys,
 					p_mods_desc->length,
 					p_mods_desc->data_dir);
 		desc = dmaengine_prep_slave_single(
