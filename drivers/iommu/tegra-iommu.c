@@ -257,8 +257,8 @@ int iommu_get_linear_map(struct device *dev, struct iommu_linear_map **map)
 	if (!dev)
 		return 0;
 
-	switch (tegra_get_chipid()) {
-	case TEGRA_CHIPID_TEGRA18:
+	switch (tegra_get_chip_id()) {
+	case TEGRA186:
 		table = t186_linear_map;
 		break;
 	default:
