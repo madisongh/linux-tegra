@@ -342,7 +342,7 @@ struct tegra_xhci_soc_config {
 	int (*set_id_override)(struct phy *phy);
 	int (*clear_id_override)(struct phy *phy);
 	bool (*has_otg_cap)(struct phy *phy);
-	int (*enable_sleepwalk)(struct phy *phy, int speed);
+	int (*enable_sleepwalk)(struct phy *phy, enum usb_device_speed speed);
 	int (*disable_sleepwalk)(struct phy *phy);
 	int (*enable_wake)(struct phy *phy);
 	int (*disable_wake)(struct phy *phy);
