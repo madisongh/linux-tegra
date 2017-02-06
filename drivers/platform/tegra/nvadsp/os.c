@@ -37,6 +37,7 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 #include <linux/tegra-firmwares.h>
+#include <linux/reset.h>
 
 #include <asm/uaccess.h>
 
@@ -896,30 +897,25 @@ end:
 	return ret;
 }
 
-static int __deassert_adsp(struct nvadsp_drv_data *drv_data)
+static int __deassert_adsp(struct nvadsp_drv_data *d)
 {
-	struct device *dev = &priv.pdev->dev;
+	struct platform_device *pdev = d->pdev;
+	struct device *dev = &pdev->dev;
+	int ret = 0;
 
-	if (drv_data->adsp_unit_fpga) {
-		dev_info(dev, "De-asserting ADSP UNIT-FPGA\n");
-		writel(drv_data->unit_fpga_reset[ADSP_DEASSERT],
-				priv.unit_fpga_reset_reg);
-		return 0;
-	}
+	/*
+	 * The ADSP_ALL reset in BPMP-FW is overloaded to de-assert
+	 * all 7 resets i.e. ADSP, ADSPINTF, ADSPDBG, ADSPNEON, ADSPPERIPH,
+	 * ADSPSCU and ADSPWDT resets. The BPMP-FW also takes care
+	 * of specific de-assert sequence and delays between them.
+	 * So de-resetting only ADSP reset is sufficient to de-reset
+	 * all ADSP sub-modules.
+	 */
+	ret = reset_control_deassert(d->adspall_rst);
+	if (ret)
+		dev_err(dev, "failed to deassert adsp\n");
 
-	if (drv_data->adsp_clk) {
-		dev_dbg(dev, "deasserting adsp...\n");
-		/* tegra_periph reset deassert APIs are deprecated
-		 * commenting these functions and adding warn print
-		 * TBD: Replace with common clock reset framework API
-		 */
-		/* tegra_periph_reset_deassert(drv_data->adsp_clk); */
-		dev_warn(dev, "Need CCF reset frawework API to reset\n");
-		udelay(200);
-		return 0;
-	}
-
-	return -EINVAL;
+	return ret;
 }
 
 static int nvadsp_deassert_adsp(struct nvadsp_drv_data *drv_data)
@@ -932,31 +928,23 @@ static int nvadsp_deassert_adsp(struct nvadsp_drv_data *drv_data)
 	return ret;
 }
 
-static int __assert_adsp(struct nvadsp_drv_data *drv_data)
+static int __assert_adsp(struct nvadsp_drv_data *d)
 {
-	struct device *dev = &priv.pdev->dev;
+	struct platform_device *pdev = d->pdev;
+	struct device *dev = &pdev->dev;
+	int ret = 0;
 
-	if (drv_data->adsp_unit_fpga) {
-		if (drv_data->unit_fpga_reset[ADSP_ASSERT]) {
-			dev_info(dev, "Asserting ADSP UNIT-FPGA\n");
-			writel(drv_data->unit_fpga_reset[ADSP_ASSERT],
-				priv.unit_fpga_reset_reg);
-		}
-		return 0;
-	}
+	/*
+	 * The ADSP_ALL reset in BPMP-FW is overloaded to assert
+	 * all 7 resets i.e. ADSP, ADSPINTF, ADSPDBG, ADSPNEON,
+	 * ADSPPERIPH, ADSPSCU and ADSPWDT resets. So resetting
+	 * only ADSP reset is sufficient to reset all ADSP sub-modules.
+	 */
+	ret = reset_control_assert(d->adspall_rst);
+	if (ret)
+		dev_err(dev, "failed to assert adsp\n");
 
-	if (drv_data->adsp_clk) {
-		/* tegra_periph reset deassert APIs are deprecated
-		 * commenting these functions and adding warn print
-		 * TBD: Replace with common clock reset framework API
-		 */
-		/* tegra_periph_reset_assert(drv_data->adsp_clk); */
-		dev_warn(dev, "Need CCF reset frawework API to reset\n");
-		udelay(200);
-		return 0;
-	}
-
-	return -EINVAL;
+	return ret;
 }
 
 static int nvadsp_assert_adsp(struct nvadsp_drv_data *drv_data)
