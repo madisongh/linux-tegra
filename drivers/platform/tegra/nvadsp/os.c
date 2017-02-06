@@ -1562,7 +1562,6 @@ int __init nvadsp_os_probe(struct platform_device *pdev)
 	int wfi_virq = drv_data->agic_irqs[WFI_VIRQ];
 	uint16_t com_mid = ADSP_COM_MBOX_ID;
 	struct device *dev = &pdev->dev;
-	struct device_node *node = dev->of_node;
 	int ret = 0;
 
 	priv.unit_fpga_reset_reg = drv_data->base_regs[UNIT_FPGA_RST];
@@ -1595,12 +1594,10 @@ int __init nvadsp_os_probe(struct platform_device *pdev)
 		drv_data->deassert_adsp = __deassert_adsp;
 	}
 
-	if (!of_device_is_compatible(node, "nvidia,tegra18x-adsp-hv")) {
-		ret = nvadsp_os_init(pdev);
-		if (ret) {
-			dev_err(dev, "failed to init os\n");
-			goto end;
-		}
+	ret = nvadsp_os_init(pdev);
+	if (ret) {
+		dev_err(dev, "failed to init os\n");
+		goto end;
 	}
 
 	ret = nvadsp_mbox_open(&adsp_com_mbox, &com_mid, "adsp_com_mbox",
