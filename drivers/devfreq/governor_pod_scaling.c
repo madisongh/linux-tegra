@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host 3D clock scaling
  *
- * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -826,7 +826,7 @@ static int nvhost_pod_init(struct devfreq *df)
 	struct podgov_info_rec *podgov;
 	struct platform_device *d = to_platform_device(df->dev.parent);
 	ktime_t now = ktime_get();
-	enum tegra_chipid cid = tegra_get_chipid();
+	enum tegra_chipid cid = tegra_get_chip_id();
 
 	struct devfreq_dev_status dev_stat;
 	int stat = 0;
@@ -858,12 +858,12 @@ static int nvhost_pod_init(struct devfreq *df)
 		podgov->p_damp = 2;
 	} else {
 		switch (cid) {
-		case TEGRA_CHIPID_TEGRA14:
-		case TEGRA_CHIPID_TEGRA11:
-		case TEGRA_CHIPID_TEGRA12:
-		case TEGRA_CHIPID_TEGRA13:
-		case TEGRA_CHIPID_TEGRA21:
-		case TEGRA_CHIPID_TEGRA18:
+		case TEGRA148:
+		case TEGRA114:
+		case TEGRA124:
+		case TEGRA132:
+		case TEGRA210:
+		case TEGRA186:
 			podgov->p_load_max = 900;
 			podgov->p_load_target = 700;
 			podgov->p_bias = 80;
