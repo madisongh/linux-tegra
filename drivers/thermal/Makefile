@@ -2,6 +2,8 @@
 # Makefile for sensor chip drivers.
 #
 
+subdir-ccflags-y += -Werror
+
 GCOV_PROFILE := y
 
 obj-$(CONFIG_THERMAL)		+= thermal_sys.o
