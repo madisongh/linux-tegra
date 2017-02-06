@@ -19,15 +19,6 @@
 
 #include <soc/tegra/chip-id.h>
 
-#define TEGRA20		0x20
-#define TEGRA30		0x30
-#define TEGRA114	0x35
-#define TEGRA124	0x40
-#define TEGRA132	0x13
-#define TEGRA148       0x14
-#define TEGRA186       0x18
-#define TEGRA210	0x21
-
 #define TEGRA_FUSE_PRODUCTION_MODE	0x0
 #define FUSE_FUSEBYPASS_0		0x24
 #define FUSE_WRITE_ACCESS_SW_0		0x30
@@ -63,7 +54,6 @@ u32 tegra_read_straps(void);
 u32 tegra_read_ram_code(void);
 u32 tegra_read_chipid(void);
 enum tegra_chipid tegra_get_chipid(void);
-u8 tegra_get_chip_id(void);
 unsigned long long tegra_chip_uid(void);
 enum tegra_revision tegra_chip_get_revision(void);
 u32 tegra_fuse_get_subrevision(void);
