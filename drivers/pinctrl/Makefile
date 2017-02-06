@@ -1,5 +1,6 @@
 # generic pinmux support
 
+subdir-ccflags-y += -Werror
 subdir-ccflags-$(CONFIG_DEBUG_PINCTRL)	+= -DDEBUG
 
 obj-y				+= core.o pinctrl-utils.o

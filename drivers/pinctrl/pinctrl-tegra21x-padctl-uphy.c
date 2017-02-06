@@ -939,7 +939,7 @@ static int uphy_pll_init_full(struct tegra_padctl_uphy *uphy, int pll,
 	TRACE(dev, "PLL%d state %s\n", pll,
 			uphy_pll_states[uphy->uphy_pll_state[pll]]);
 
-	if (uphy->uphy_pll_state[pll] >= PLL_POWER_UP_SW_CTL) {
+	if (uphy->uphy_pll_state[pll] >= UPHY_PLL_POWER_UP_SW_CTL) {
 		TRACE(dev,
 		"PLL%d was already enabled in SW/HW, current function is %d",
 		pll, func);
