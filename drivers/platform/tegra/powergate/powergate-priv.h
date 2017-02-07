@@ -54,19 +54,6 @@ struct powergate_partition_info {
 	bool skip_reset;
 };
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-void get_slcg_info(struct powergate_partition_info *pg_info);
-int slcg_clk_enable(struct powergate_partition_info *pg_info);
-void slcg_clk_disable(struct powergate_partition_info *pg_info);
-#else
-static inline void get_slcg_info(struct powergate_partition_info *pg_info)
-{ return; }
-static inline int slcg_clk_enable(struct powergate_partition_info *pg_info)
-{ return 0; }
-static inline void slcg_clk_disable(struct powergate_partition_info *pg_info)
-{ return; }
-#endif
-
 /* INIT APIs: New SoC needs to add its support here */
 #if defined(CONFIG_ARCH_TEGRA_21x_SOC)
 struct powergate_ops *tegra210_powergate_init_chip_support(void);

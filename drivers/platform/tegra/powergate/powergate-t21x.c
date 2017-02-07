@@ -800,7 +800,7 @@ static void powergate_partition_deassert_reset(struct powergate_partition_info *
 	tegra_rst_deassertv(&pg_info->reset_id[0], pg_info->reset_id_num);
 }
 
-int slcg_clk_enable(struct powergate_partition_info *pg_info)
+static int slcg_clk_enable(struct powergate_partition_info *pg_info)
 {
 	int ret;
 	u32 idx;
@@ -830,7 +830,7 @@ err_clk_en:
 	return ret;
 }
 
-void slcg_clk_disable(struct powergate_partition_info *pg_info)
+static void slcg_clk_disable(struct powergate_partition_info *pg_info)
 {
 	u32 idx;
 	struct clk *clk;
@@ -847,7 +847,7 @@ void slcg_clk_disable(struct powergate_partition_info *pg_info)
 	}
 }
 
-void get_slcg_info(struct powergate_partition_info *pg_info)
+static void get_slcg_info(struct powergate_partition_info *pg_info)
 {
 	int idx;
 
