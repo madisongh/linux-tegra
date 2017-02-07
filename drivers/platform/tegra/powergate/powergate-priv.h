@@ -54,22 +54,4 @@ struct powergate_partition_info {
 	bool skip_reset;
 };
 
-/* INIT APIs: New SoC needs to add its support here */
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-struct powergate_ops *tegra210_powergate_init_chip_support(void);
-#else
-static inline struct powergate_ops *tegra210_powergate_init_chip_support(void)
-{
-	return NULL;
-}
-#endif
-
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
-struct powergate_ops *tegra186_powergate_init_chip_support(void);
-#else
-static inline struct powergate_ops *tegra186_powergate_init_chip_support(void)
-{
-	return NULL;
-}
-#endif
 #endif /* __POWERGATE_PRIV_H__ */

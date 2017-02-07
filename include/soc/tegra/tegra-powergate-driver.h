@@ -55,4 +55,25 @@ struct tegra_powergate_driver_ops {
 	int (*slcg_unregister_notifier)(int id, struct notifier_block *nb);
 };
 
+/* INIT APIs: New SoC needs to add its support here */
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+struct tegra_powergate_driver_ops *tegra210_powergate_init_chip_support(void);
+#else
+static inline
+struct tegra_powergate_driver_ops *tegra210_powergate_init_chip_support(void)
+{
+	return NULL;
+}
+#endif
+
+#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
+struct tegra_powergate_driver_ops *tegra186_powergate_init_chip_support(void);
+#else
+static inline
+struct tegra_powergate_driver_ops *tegra186_powergate_init_chip_support(void)
+{
+	return NULL;
+}
+#endif
+
 #endif /* _SOC_TEGRA_POWERGATE_DRIVER_H_ */
