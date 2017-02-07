@@ -13,11 +13,13 @@
  */
 
 #include <dt-bindings/clock/tegra210-car.h>
+#include <linux/err.h>
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/regulator/consumer.h>
 #include <soc/tegra/tegra_powergate.h>
+#include <soc/tegra/tegra-powergate-driver.h>
 #include <soc/tegra/chip-id.h>
 #include <linux/tegra_soctherm.h>
 #include <soc/tegra/tegra-dvfs.h>
@@ -28,7 +30,35 @@
 #include <soc/tegra/reset.h>
 #include <soc/tegra/common.h>
 
-#include "powergate-priv.h"
+#define MAX_CLK_EN_NUM			15
+#define MAX_HOTRESET_CLIENT_NUM		4
+
+#define powergate_ops tegra_powergate_driver_ops
+
+enum clk_type {
+	CLK_AND_RST,
+	RST_ONLY,
+	CLK_ONLY,
+};
+
+struct partition_clk_info {
+	const char *clk_name;
+	enum clk_type clk_type;
+	struct clk *clk_ptr;
+};
+
+struct powergate_partition_info {
+	const char *name;
+	struct partition_clk_info clk_info[MAX_CLK_EN_NUM];
+	struct partition_clk_info slcg_info[MAX_CLK_EN_NUM];
+	unsigned long reset_id[MAX_CLK_EN_NUM];
+	int reset_id_num;
+	struct raw_notifier_head slcg_notifier;
+	int refcount;
+	bool disable_after_boot;
+	struct mutex pg_mutex;
+	bool skip_reset;
+};
 
 #define EMULATION_MC_FLUSH_TIMEOUT 100
 #define TEGRA210_POWER_DOMAIN_NVENC TEGRA210_POWER_DOMAIN_MPE

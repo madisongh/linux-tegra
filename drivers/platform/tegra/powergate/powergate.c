@@ -2,7 +2,7 @@
  * arch/arm/mach-tegra/powergate.c
  *
  * Copyright (c) 2010 Google, Inc
- * Copyright (c) 2011 - 2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011 - 2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@google.com>
@@ -28,13 +28,13 @@
 #include <linux/io.h>
 #include <linux/seq_file.h>
 #include <linux/spinlock.h>
-#include <linux/tegra-powergate.h>
 #include <soc/tegra/fuse.h>
+#include <soc/tegra/tegra_powergate.h>
+#include <soc/tegra/tegra-powergate-driver.h>
 #include <trace/events/power.h>
 #include <asm/atomic.h>
 
-#include "board.h"
-#include "powergate-priv.h"
+#define powergate_ops tegra_powergate_driver_ops
 
 static struct powergate_ops *pg_ops;
 
