@@ -50,7 +50,7 @@
 
 #include <soc/tegra/virt/syscalls.h>
 
-#include "trusty-virtio-work.h"
+#include "trusty-workitem.h"
 
 #define  RSC_DESCR_VER  1
 
@@ -138,7 +138,7 @@ static int trusty_call_notify(struct notifier_block *nb,
 		return NOTIFY_DONE;
 
 	tctx = container_of(nb, struct trusty_ctx, call_notifier);
-	queue_work(tctx->check_wq, &tctx->check_vqs);
+	schedule_workitem(tctx->check_wq, &tctx->check_vqs);
 
 	return NOTIFY_OK;
 }
@@ -186,7 +186,7 @@ static bool trusty_virtio_notify(struct virtqueue *vq)
 
 	if (api_ver < TRUSTY_API_VERSION_SMP_NOP) {
 		atomic_set(&tvr->needs_kick, 1);
-		queue_work(tctx->kick_wq, &tctx->kick_vqs);
+		schedule_workitem(tctx->kick_wq, &tctx->kick_vqs);
 	} else {
 		trusty_enqueue_nop(tctx->dev->parent, &tvr->kick_nop);
 	}
