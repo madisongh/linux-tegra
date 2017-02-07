@@ -22,14 +22,6 @@
 #include <linux/init.h>
 #include <linux/notifier.h>
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-#include <dt-bindings/soc/nvidia,tegra210-powergate.h>
-#endif
-
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
-#include <dt-bindings/soc/nvidia,tegra186-powergate.h>
-#endif
-
 #define TEGRA_CPU_POWERGATE_ID(cpu)					\
 		tegra_powergate_cpuid_to_powergate_id(cpu)
 
