@@ -65,6 +65,7 @@ struct tegra_sdhci_platform_data {
 	bool rate_change_needs_clk;
 	bool disable_clk_gate;
 	bool disable_runtime_pm;
+	bool update_pinctrl_settings;
 };
 
 #endif

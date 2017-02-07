@@ -41,6 +41,9 @@
 #include <linux/pm_runtime.h>
 #include <soc/tegra/chip-id.h>
 #include <linux/ktime.h>
+#include <linux/pinctrl/pinctrl.h>
+#include <linux/pinctrl/consumer.h>
+#include <linux/pinctrl/pinconf-tegra.h>
 
 #include "sdhci-pltfm.h"
 
@@ -107,6 +110,7 @@
 #define NVQUIRK_DISABLE_DDR50		BIT(5)
 /* Do not enable auto calibration if the platform doesn't support */
 #define NVQUIRK_DISABLE_AUTO_CALIBRATION	BIT(6)
+#define NVQUIRK_UPDATE_PIN_CNTRL_REG		BIT(7)
 #define NVQUIRK2_SET_PLL_CLK_PARENT		BIT(0)
 /* Tegra register write WAR - needs follow on register read */
 #define NVQUIRK2_TEGRA_WRITE_REG		BIT(1)
@@ -224,6 +228,12 @@ struct sdhci_tegra {
 	unsigned int cd_irq;
 	bool wake_enable_failed;
 	ktime_t timestamp;
+	struct pinctrl_dev *pinctrl;
+	struct pinctrl *pinctrl_sdmmc;
+	struct pinctrl_state *schmitt_enable[2];
+	struct pinctrl_state *schmitt_disable[2];
+	struct pinctrl_state *drv_code_strength;
+	struct pinctrl_state *default_drv_code_strength;
 };
 
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
@@ -238,6 +248,8 @@ static inline int sdhci_tegra_set_tap_delay(struct sdhci_host *sdhci,
 static inline int sdhci_tegra_set_dqs_trim_delay(struct sdhci_host *sdhci,
 	int dqs_trim_delay);
 static void vendor_trim_clear_sel_vreg(struct sdhci_host *host, bool enable);
+static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
+		bool set);
 
 static u16 tegra_sdhci_readw(struct sdhci_host *host, int reg)
 {
@@ -1051,6 +1063,54 @@ static int tegra_sdhci_configure_regulators(struct sdhci_host *sdhci,
 	return rc;
 }
 
+static void tegra_sdhci_update_sdmmc_pinctrl_register(struct sdhci_host *sdhci,
+	bool set)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+	struct pinctrl_state *set_schmitt[2];
+	int ret;
+	int i;
+
+	if (!(soc_data->nvquirks & NVQUIRK_UPDATE_PIN_CNTRL_REG))
+			return;
+
+	if (set) {
+		set_schmitt[0] = tegra_host->schmitt_enable[0];
+		set_schmitt[1] = tegra_host->schmitt_enable[1];
+
+		if (!IS_ERR_OR_NULL(tegra_host->drv_code_strength)) {
+			ret = pinctrl_select_state(tegra_host->pinctrl_sdmmc,
+				tegra_host->drv_code_strength);
+			if (ret < 0)
+				dev_warn(mmc_dev(sdhci->mmc),
+				"setting drive code strength failed\n");
+		}
+	} else {
+		set_schmitt[0] = tegra_host->schmitt_disable[0];
+		set_schmitt[1] = tegra_host->schmitt_disable[1];
+
+		if (!IS_ERR_OR_NULL(tegra_host->default_drv_code_strength)) {
+			ret = pinctrl_select_state(tegra_host->pinctrl_sdmmc,
+				tegra_host->default_drv_code_strength);
+			if (ret < 0)
+				dev_warn(mmc_dev(sdhci->mmc),
+				"setting default drive code strength failed\n");
+		}
+	}
+
+	for (i = 0; i < 2; i++) {
+		if (IS_ERR_OR_NULL(set_schmitt[i]))
+			continue;
+		ret = pinctrl_select_state(tegra_host->pinctrl_sdmmc,
+				set_schmitt[i]);
+		if (ret < 0)
+			dev_warn(mmc_dev(sdhci->mmc),
+				"setting schmitt state failed\n");
+	}
+}
+
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
 	unsigned char signal_voltage)
 {
@@ -1286,6 +1346,10 @@ static void tegra_sdhci_post_voltage_switch(struct sdhci_host *sdhci,
 				change_padctrl) {
 			tegra_sdhci_set_padctrl(sdhci, SDHOST_LOW_VOLT_MAX);
 		}
+
+		if (!IS_ERR_OR_NULL(tegra_host->pinctrl_sdmmc))
+			tegra_sdhci_update_sdmmc_pinctrl_register(sdhci, set);
+		tegra_host->check_pad_ctrl_setting = false;
 	}
 	return;
 }
@@ -1463,6 +1527,87 @@ static int sdhci_tegra_get_pll_from_dt(struct platform_device *pdev,
 	return 0;
 }
 
+static int sdhci_tegra_init_pinctrl_info(struct device *dev,
+		struct sdhci_tegra *tegra_host,
+		const struct tegra_sdhci_platform_data *plat)
+{
+	struct device_node *np = dev->of_node;
+	int i = 0;
+	int ret = 0;
+
+	if (!np)
+		return 0;
+
+	if (plat->pwrdet_support) {
+		tegra_host->sdmmc_padctrl = devm_padctrl_get(dev, "sdmmc");
+		if (IS_ERR(tegra_host->sdmmc_padctrl)) {
+			ret = PTR_ERR(tegra_host->sdmmc_padctrl);
+			tegra_host->sdmmc_padctrl = NULL;
+			dev_err(dev, "pad control get failed, error:%d\n", ret);
+		}
+	}
+
+	tegra_host->prods = devm_tegra_prod_get(dev);
+	if (IS_ERR_OR_NULL(tegra_host->prods)) {
+		dev_info(dev, "Prod-setting not available\n");
+		tegra_host->prods = NULL;
+	}
+
+	if (plat->update_pinctrl_settings) {
+		tegra_host->pinctrl_sdmmc = devm_pinctrl_get(dev);
+		if (IS_ERR_OR_NULL(tegra_host->pinctrl_sdmmc)) {
+			dev_err(dev, "Missing pinctrl info\n");
+			return -EINVAL;
+		}
+
+		tegra_host->schmitt_enable[0] =
+			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+			"sdmmc_schmitt_enable");
+		if (IS_ERR_OR_NULL(tegra_host->schmitt_enable[0]))
+			dev_dbg(dev, "Missing schmitt enable state\n");
+
+		tegra_host->schmitt_enable[1] =
+			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+			"sdmmc_clk_schmitt_enable");
+		if (IS_ERR_OR_NULL(tegra_host->schmitt_enable[1]))
+			dev_dbg(dev, "Missing clk schmitt enable state\n");
+
+		tegra_host->schmitt_disable[0] =
+			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+			"sdmmc_schmitt_disable");
+		if (IS_ERR_OR_NULL(tegra_host->schmitt_disable[0]))
+			dev_dbg(dev, "Missing schmitt disable state\n");
+
+		tegra_host->schmitt_disable[1] =
+			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+			"sdmmc_clk_schmitt_disable");
+		if (IS_ERR_OR_NULL(tegra_host->schmitt_disable[1]))
+			dev_dbg(dev, "Missing clk schmitt disable state\n");
+
+		for (i = 0; i < 2; i++) {
+			if (!IS_ERR_OR_NULL(tegra_host->schmitt_disable[i])) {
+				ret = pinctrl_select_state(tegra_host->pinctrl_sdmmc,
+						tegra_host->schmitt_disable[i]);
+				if (ret < 0)
+					dev_warn(dev, "setting schmitt state failed\n");
+			}
+		}
+		tegra_host->drv_code_strength =
+			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+			"sdmmc_drv_code");
+		if (IS_ERR_OR_NULL(tegra_host->drv_code_strength))
+			dev_dbg(dev, "Missing sdmmc drive code state\n");
+
+		tegra_host->default_drv_code_strength =
+			pinctrl_lookup_state(tegra_host->pinctrl_sdmmc,
+			"sdmmc_default_drv_code");
+		if (IS_ERR_OR_NULL(tegra_host->default_drv_code_strength))
+			dev_dbg(dev, "Missing sdmmc default drive code state\n");
+	}
+
+	return 0;
+}
+
 static void tegra_sdhci_pre_regulator_config(struct sdhci_host *sdhci, int vdd)
 {
 	if (!vdd)
@@ -1612,6 +1757,7 @@ static const struct sdhci_pltfm_data sdhci_tegra210_pdata = {
 
 static const struct sdhci_tegra_soc_data soc_data_tegra210 = {
 	.pdata = &sdhci_tegra210_pdata,
+	.nvquirks = NVQUIRK_UPDATE_PIN_CNTRL_REG,
 	.nvquirks2 = NVQUIRK2_TEGRA_WRITE_REG |
 		NVQUIRK2_DISABLE_CARD_CLK |
 		NVQUIRK2_SET_PLL_CLK_PARENT,
@@ -1696,6 +1842,10 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	plat->rate_change_needs_clk = of_property_read_bool(np,
 		"nvidia,rate-change-needs-clock-enabled");
 
+	plat->pwrdet_support = of_property_read_bool(np, "pwrdet-support");
+	plat->update_pinctrl_settings = of_property_read_bool(np,
+		"nvidia,update-pinctrl-settings");
+
 	tegra_host->plat = plat;
 	return mmc_of_parse(host->mmc);
 }
@@ -1773,20 +1923,6 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 		dev_info(mmc_dev(host->mmc), "Parent select= %s rate=%ld\n",
 				parent_clk_list[i],
 				tegra_host->pll_source[i].pll_rate);
-	}
-
-	tegra_host->prods = devm_tegra_prod_get(&pdev->dev);
-	if (IS_ERR_OR_NULL(tegra_host->prods)) {
-		dev_info(&pdev->dev, "Prod-setting not available\n");
-		tegra_host->prods = NULL;
-	}
-	if (plat->pwrdet_support) {
-		tegra_host->sdmmc_padctrl = devm_padctrl_get(&pdev->dev, "sdmmc");
-		if (IS_ERR(tegra_host->sdmmc_padctrl)) {
-			rc = PTR_ERR(tegra_host->sdmmc_padctrl);\
-			      tegra_host->sdmmc_padctrl = NULL;
-			dev_err(&pdev->dev, "pad control get failed, error:%d\n", rc);
-		}
 	}
 
 	if (gpio_is_valid(plat->cd_gpio) && plat->cd_wakeup_capable) {
@@ -1878,6 +2014,8 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 	tegra_host->max_clk_limit = plat->max_clk_limit;
 	host->mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY;
+
+	sdhci_tegra_init_pinctrl_info(&pdev->dev, tegra_host, plat);
 
 	/*
 	 * We don't support Extended GP in VDK even if the EXT_CSD might
