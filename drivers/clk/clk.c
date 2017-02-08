@@ -2662,6 +2662,7 @@ static void clk_debug_add_debugfs_extra_node(struct clk_core *core, char *name,
 	hlist_add_head(&debugfs_extra->debug_node, &core->debug_extra_nodes);
 }
 
+#ifdef CONFIG_DEBUG_FS
 struct dentry *__clk_debugfs_add_file(struct clk *clk, char *name,
 	umode_t mode, void *data, const struct file_operations *fops)
 {
@@ -2697,6 +2698,7 @@ struct dentry *clk_debugfs_add_file(struct clk_hw *hw, char *name, umode_t mode,
 	return d;
 }
 EXPORT_SYMBOL_GPL(clk_debugfs_add_file);
+#endif
 
 /**
  * clk_debug_init - lazily populate the debugfs clk directory
