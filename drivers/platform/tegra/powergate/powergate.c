@@ -34,9 +34,7 @@
 #include <trace/events/power.h>
 #include <asm/atomic.h>
 
-#define powergate_ops tegra_powergate_driver_ops
-
-static struct powergate_ops *pg_ops;
+static struct tegra_powergate_driver_ops *pg_ops;
 
 static inline bool tegra_powergate_check_skip_list(int id)
 {

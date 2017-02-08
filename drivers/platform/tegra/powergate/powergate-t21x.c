@@ -33,8 +33,6 @@
 #define MAX_CLK_EN_NUM			15
 #define MAX_HOTRESET_CLIENT_NUM		4
 
-#define powergate_ops tegra_powergate_driver_ops
-
 enum clk_type {
 	CLK_AND_RST,
 	RST_ONLY,
@@ -1626,7 +1624,7 @@ static int tegra210_powergate_cpuid_to_powergate_id(int cpu)
 	return -1;
 }
 
-static struct powergate_ops tegra210_pg_ops = {
+static struct tegra_powergate_driver_ops tegra210_pg_ops = {
 	.soc_name = "tegra210",
 
 	.num_powerdomains = TEGRA210_POWER_DOMAIN_MAX,
@@ -1658,7 +1656,7 @@ static struct powergate_ops tegra210_pg_ops = {
 
 #define TEGRA_PMC_BASE  0x7000E400
 #define TEGRA_MC_BASE   0x70019000
-struct powergate_ops *tegra210_powergate_init_chip_support(void)
+struct tegra_powergate_driver_ops *tegra210_powergate_init_chip_support(void)
 {
 	tegra_pmc = ioremap(TEGRA_PMC_BASE, 4096);
 	tegra_mc = ioremap(TEGRA_MC_BASE, 4096);
