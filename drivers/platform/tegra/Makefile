@@ -98,5 +98,5 @@ obj-$(CONFIG_TEGRA_FIRMWARES_INVENTORY)	+= firmwares-all.o
 obj-$(CONFIG_TEGRA_HSP)			+= tegra-hsp.o
 obj-$(CONFIG_TEGRA_HSP)			+= tegra186-hsp.o
 
-obj-$(CONFIG_TEGRA_SAFETY_SCE) 		+= tegra-safety-ivc.o
-obj-$(CONFIG_TEGRA_SAFETY_SCE) 		+= tegra-safety-dev.o
+obj-$(CONFIG_TEGRA_SAFETY_SCE) 		+= tegra-safety.o
+tegra-safety-objs			+= tegra-safety-ivc.o tegra-safety-dev.o
