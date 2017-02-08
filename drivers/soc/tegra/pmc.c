@@ -3141,7 +3141,7 @@ static int tegra_pmc_debug_scratch_reg_init(struct tegra_pmc *pmc)
 }
 
 #else
-static int tegra_pmc_debug_scratch_reg_init(struct device_node *np)
+static int tegra_pmc_debug_scratch_reg_init(struct tegra_pmc *pmc)
 {
 	return 0;
 }
