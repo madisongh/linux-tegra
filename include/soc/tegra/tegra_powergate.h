@@ -24,15 +24,8 @@
 
 struct platform_device;
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
-#define TEGRA_POWERGATE_DISA	TEGRA210_POWER_DOMAIN_DISA
-#define TEGRA_POWERGATE_SOR	TEGRA210_POWER_DOMAIN_SOR
-#endif
-
-#if defined(CONFIG_ARCH_TEGRA_18x_SOC)
-#define TEGRA_POWERGATE_DISA	TEGRA186_POWER_DOMAIN_DISP
-#define TEGRA_POWERGATE_SOR	TEGRA186_POWER_DOMAIN_DISP
-#endif
+extern int TEGRA_POWERGATE_DISA;
+extern int TEGRA_POWERGATE_SOR;
 
 #ifdef CONFIG_POWERGATE_TEGRA_BPMP
 int tegra_bpmp_init_powergate(struct platform_device *pdev);

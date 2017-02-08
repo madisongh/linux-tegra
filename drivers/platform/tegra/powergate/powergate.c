@@ -34,6 +34,12 @@
 #include <trace/events/power.h>
 #include <asm/atomic.h>
 
+int TEGRA_POWERGATE_DISA;
+EXPORT_SYMBOL(TEGRA_POWERGATE_DISA);
+
+int TEGRA_POWERGATE_SOR;
+EXPORT_SYMBOL(TEGRA_POWERGATE_SOR);
+
 static struct tegra_powergate_driver_ops *pg_ops;
 
 static inline bool tegra_powergate_check_skip_list(int id)
@@ -386,10 +392,14 @@ static int __init tegra_powergate_init(void)
 	switch (tegra_get_chip_id()) {
 	case TEGRA210:
 		pg_ops = tegra210_powergate_init_chip_support();
+		TEGRA_POWERGATE_DISA = TEGRA210_POWER_DOMAIN_DISA;
+		TEGRA_POWERGATE_SOR = TEGRA210_POWER_DOMAIN_SOR;
 		break;
 
 	case TEGRA186:
 		pg_ops = tegra186_powergate_init_chip_support();
+		TEGRA_POWERGATE_DISA = TEGRA186_POWER_DOMAIN_DISP;
+		TEGRA_POWERGATE_SOR = TEGRA186_POWER_DOMAIN_DISP;
 		break;
 
 	default:
