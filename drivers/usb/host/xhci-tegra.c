@@ -1367,6 +1367,43 @@ static const struct tegra_xhci_soc_config tegra186_soc_config = {
 };
 MODULE_FIRMWARE("tegra18x_xusb_firmware");
 
+static const struct tegra_xhci_soc_config tegra210b01_soc_config = {
+	.device_id = XHCI_DEVICE_ID_T210,
+	.firmware_file = "tegra21x_xusb_firmware",
+	.lpm_support = true,
+
+	.num_supplies = 4,
+	.supply_names[0] = "hvdd_usb",
+	.supply_names[1] = "avdd_pll_utmip",
+	.supply_names[2] = "avddio_usb",
+	.supply_names[3] = "avddio_pll_uerefe",
+
+	.num_phys[USB3_PHY] = 4,
+	.num_phys[UTMI_PHY] = 4,
+	.num_phys[HSIC_PHY] = 1,
+
+	.utmi_port_offset = 4,
+	.hsic_port_offset = 8,
+
+	.utmi_pad_power_on = tegra21x_phy_xusb_utmi_pad_power_on,
+	.utmi_pad_power_off = tegra21x_phy_xusb_utmi_pad_power_down,
+	.set_protection_level =
+		tegra21x_phy_xusb_utmi_pad_set_protection_level,
+	.utmi_vbus_power_on = tegra21x_phy_xusb_utmi_vbus_power_on,
+	.utmi_vbus_power_off = tegra21x_phy_xusb_utmi_vbus_power_off,
+	.overcurrent_detected = tegra21x_phy_xusb_overcurrent_detected,
+	.handle_overcurrent = tegra21x_phy_xusb_handle_overcurrent,
+	.set_id_override = tegra21x_phy_xusb_set_id_override,
+	.clear_id_override = tegra21x_phy_xusb_clear_id_override,
+	.has_otg_cap = tegra21x_phy_xusb_has_otg_cap,
+	.enable_sleepwalk = tegra21x_phy_xusb_enable_sleepwalk,
+	.disable_sleepwalk = tegra21x_phy_xusb_disable_sleepwalk,
+	.enable_wake = tegra21x_phy_xusb_enable_wake,
+	.disable_wake = tegra21x_phy_xusb_disable_wake,
+	.pretend_connected = tegra21x_phy_xusb_pretend_connected,
+	.remote_wake_detected = tegra21x_phy_xusb_remote_wake_detected,
+};
+
 static const struct tegra_xhci_soc_config tegra210_soc_config = {
 	.device_id = XHCI_DEVICE_ID_T210,
 	.firmware_file = "tegra21x_xusb_firmware",
@@ -1408,8 +1445,18 @@ static const struct tegra_xhci_soc_config tegra210_soc_config = {
 MODULE_FIRMWARE("tegra21x_xusb_firmware");
 
 static const struct of_device_id tegra_xhci_of_match[] = {
-	{ .compatible = "nvidia,tegra186-xhci", .data = &tegra186_soc_config },
-	{ .compatible = "nvidia,tegra210-xhci", .data = &tegra210_soc_config },
+	{
+		.compatible = "nvidia,tegra186-xhci",
+		.data = &tegra186_soc_config
+	},
+	{
+		.compatible = "nvidia,tegra210-xhci",
+		.data = &tegra210_soc_config
+	},
+	{
+		.compatible = "nvidia,tegra210b01-xhci",
+		.data = &tegra210b01_soc_config
+	},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, tegra_xhci_of_match);
