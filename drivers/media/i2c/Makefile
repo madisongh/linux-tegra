@@ -1,3 +1,4 @@
+subdir-ccflags-y += -Werror
 msp3400-objs	:=	msp3400-driver.o msp3400-kthreads.o
 ccflags-y += -I$(srctree)/drivers/media/platform/tegra
 ccflags-y += -I$(srctree)/drivers/video/tegra/camera
