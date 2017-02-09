@@ -567,6 +567,8 @@ struct tegra_pmc {
 	struct mutex powergates_lock;
 	struct pinctrl_dev *pctl;
 	struct pinctrl_desc pinctrl_desc;
+	bool *allow_dynamic_switch;
+	bool voltage_switch_restriction_enabled;
 };
 
 #ifdef CONFIG_PM_SLEEP
@@ -2449,12 +2451,16 @@ static int tegra_pmc_io_pads_pinctrl_get_group_pins(struct pinctrl_dev *pctldev,
 
 enum tegra_io_rail_pads_params {
 	TEGRA_IO_PAD_POWER_SOURCE_VOLTAGE = PIN_CONFIG_END + 1,
+	TEGRA_IO_PAD_DYNAMIC_VOLTAGE_SWITCH = PIN_CONFIG_END + 2,
 };
 
 static const struct pinconf_generic_params tegra_io_pads_cfg_params[] = {
 	{
 		.property = "nvidia,power-source-voltage",
 		.param = TEGRA_IO_PAD_POWER_SOURCE_VOLTAGE,
+	}, {
+		.property = "nvidia,enable-voltage-switching",
+		.param = TEGRA_IO_PAD_DYNAMIC_VOLTAGE_SWITCH,
 	},
 };
 
@@ -2493,6 +2499,17 @@ static int tegra_pmc_io_pads_pinconf_get(struct pinctrl_dev *pctldev,
 			return ret;
 		arg = ret;
 
+		break;
+
+	case TEGRA_IO_PAD_DYNAMIC_VOLTAGE_SWITCH:
+		if (pmc->soc->io_pads[pin].voltage == UINT_MAX)
+			return -EINVAL;
+
+		if (pmc->voltage_switch_restriction_enabled &&
+		    pmc->allow_dynamic_switch[pin])
+			arg = 1;
+		else
+			arg = 0;
 		break;
 
 	default:
@@ -2540,6 +2557,14 @@ static int tegra_pmc_io_pads_pinconf_set(struct pinctrl_dev *pctldev,
 			if (pmc->soc->io_pads[pin].voltage == UINT_MAX)
 				return -EINVAL;
 
+			if (pmc->voltage_switch_restriction_enabled &&
+			    !pmc->allow_dynamic_switch[pin]) {
+				dev_err(tpmc->dev,
+					"IO Pad %s: Dynamic voltage switching not allowed\n",
+					pad->name);
+				return -EINVAL;
+			}
+
 			ret = _tegra_pmc_io_pad_set_voltage(pad, param_val);
 			if (ret < 0) {
 				dev_err(tpmc->dev,
@@ -2548,6 +2573,13 @@ static int tegra_pmc_io_pads_pinconf_set(struct pinctrl_dev *pctldev,
 				return ret;
 			}
 
+			break;
+
+		case TEGRA_IO_PAD_DYNAMIC_VOLTAGE_SWITCH:
+			if (pmc->soc->io_pads[pin].voltage == UINT_MAX)
+				return -EINVAL;
+
+			pmc->allow_dynamic_switch[pin] = true;
 			break;
 
 		default:
@@ -2571,6 +2603,15 @@ static int tegra_pmc_io_pads_pinctrl_init(struct tegra_pmc *pmc)
 	if (!pmc->soc->num_descs)
 		return 0;
 
+	pmc->allow_dynamic_switch = devm_kzalloc(pmc->dev, pmc->soc->num_descs *
+					 sizeof(*pmc->allow_dynamic_switch),
+					 GFP_KERNEL);
+	if (!pmc->allow_dynamic_switch) {
+		dev_err(pmc->dev, "Failed to allocate allow_dynamic_switch\n");
+		return 0;
+	}
+
+	pmc->voltage_switch_restriction_enabled = false;
 	pmc->pinctrl_desc.name = "pinctr-pmc-io-pads";
 	pmc->pinctrl_desc.pctlops = &tegra_pmc_io_pads_pinctrl_ops;
 	pmc->pinctrl_desc.confops = &tegra_pmc_io_pads_pinconf_ops;
@@ -2588,6 +2629,10 @@ static int tegra_pmc_io_pads_pinctrl_init(struct tegra_pmc *pmc)
 			ret);
 		return ret;
 	}
+
+	pmc->voltage_switch_restriction_enabled =
+			of_property_read_bool(pmc->dev->of_node,
+			      "nvidia,restrict-voltage-switch");
 
 	return 0;
 }
