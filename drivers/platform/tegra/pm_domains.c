@@ -52,7 +52,6 @@
 	__ret;							\
 })
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 static int tegra_mc_clk_power_off(struct generic_pm_domain *genpd)
 {
 	int32_t val = cpu_to_le32(true);
@@ -78,7 +77,6 @@ static int tegra_mc_clk_power_on(struct generic_pm_domain *genpd)
 
 	return 0;
 }
-#endif
 
 #ifdef CONFIG_MMC_PM_DOMAIN
 static void suspend_devices_in_domain(struct generic_pm_domain *genpd)
@@ -319,12 +317,15 @@ static int tegra_ape_power_off(struct generic_pm_domain *genpd)
 
 typedef int (*of_tegra_pd_init_cb_t)(struct generic_pm_domain *);
 
-static int __init tegra_init_mc_clk(struct generic_pm_domain *pd)
+static int __init tegra210_init_mc_clk(struct generic_pm_domain *pd)
 {
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 	pd->power_off = tegra_mc_clk_power_off;
 	pd->power_on = tegra_mc_clk_power_on;
-#endif
+	return 0;
+}
+
+static int __init tegra_init_mc_clk(struct generic_pm_domain *pd)
+{
 	return 0;
 }
 
@@ -364,7 +365,7 @@ static const struct of_device_id tegra_pd_match[] __initconst = {
 	{.compatible = "nvidia,tegra132-mc-clk-pd", .data = tegra_init_mc_clk},
 	{.compatible = "nvidia,tegra132-nvavp-pd", .data = NULL},
 	{.compatible = "nvidia,tegra132-sdhci-pd", .data = tegra_init_sdhci},
-	{.compatible = "nvidia,tegra210-mc-clk-pd", .data = tegra_init_mc_clk},
+	{.compatible = "nvidia,tegra210-mc-clk-pd", .data = tegra210_init_mc_clk},
 	{.compatible = "nvidia,tegra210-ape-pd", .data = tegra_init_ape },
 	{.compatible = "nvidia,tegra210-adsp-pd", .data = NULL},
 	{.compatible = "nvidia,tegra210-sdhci3-pd", .data = tegra_init_sdhci},
@@ -405,7 +406,8 @@ static int __init tegra_init_pd(struct device_node *np)
 
 	pm_genpd_init(gpd, &simple_qos_governor, is_off);
 
-	if (tegra_init_mc_clk != match->data)
+	if ((tegra_init_mc_clk != match->data) &&
+	    (tegra210_init_mc_clk != match->data))
 		pm_genpd_set_poweroff_delay(gpd, 3000);
 
 	of_genpd_add_provider_simple(np, gpd);
