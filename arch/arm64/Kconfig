@@ -142,9 +142,6 @@ config ARCH_TEGRA_APE
 config ARCH_TEGRA_210_SOC
 	bool
 
-config ARCH_OR_PLATFORM_TEGRA
-	def_bool y if ARCH_TEGRA || PLATFORM_TEGRA
-
 config ARCH_TEGRA_VIC
         bool
 
