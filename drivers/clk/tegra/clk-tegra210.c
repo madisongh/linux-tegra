@@ -2656,7 +2656,6 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "nvdec", .dt_id = TEGRA210_CLK_NVDEC },
 	{ .con_id = "vi", .dt_id = TEGRA210_CLK_VI },
 	{ .con_id = "isp", .dt_id = TEGRA210_CLK_ISP },
-	{ .con_id = "ispb", .dt_id = TEGRA210_CLK_ISPB },
 	{ .con_id = "ape", .dt_id = TEGRA210_CLK_APE },
 	{ .con_id = "host1x", .dt_id = TEGRA210_CLK_HOST1X },
 	{ .con_id = "tsec", .dt_id = TEGRA210_CLK_TSEC },
