@@ -191,11 +191,8 @@ int tegra_kfuse_read(void *dest, size_t len)
 	if (err)
 		return err;
 
-	if (IS_ENABLED(CONFIG_ARCH_TEGRA_21x_SOC) ||
-	    IS_ENABLED(CONFIG_ARCH_TEGRA_18x_SOC)) {
-		tegra_kfuse_writel(kfuse, KFUSE_PD_PU, KFUSE_PD);
-		udelay(2);
-	}
+	tegra_kfuse_writel(kfuse, KFUSE_PD_PU, KFUSE_PD);
+	udelay(2);
 
 	tegra_kfuse_writel(kfuse, KFUSE_KEYADDR_AUTOINC, KFUSE_KEYADDR);
 
@@ -218,9 +215,7 @@ int tegra_kfuse_read(void *dest, size_t len)
 		memcpy(dest + cnt, &v, sizeof(v));
 	}
 
-	if (IS_ENABLED(CONFIG_ARCH_TEGRA_21x_SOC) ||
-	    IS_ENABLED(CONFIG_ARCH_TEGRA_18x_SOC))
-		tegra_kfuse_writel(kfuse, KFUSE_PD_PD, KFUSE_PD);
+	tegra_kfuse_writel(kfuse, KFUSE_PD_PD, KFUSE_PD);
 
 	clk_disable_unprepare(kfuse->clk);
 
