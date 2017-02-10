@@ -181,6 +181,9 @@ struct tegra_xotg {
 
 	/* USB-PET support */
 	bool test_device_enumerated;
+
+	/* A-device HNP state */
+	bool a_hnp_active;
 };
 
 /* timer callback to set timeout bit and kick FSM */
@@ -413,6 +416,8 @@ static void tegra_xotg_a_hnp_enter(struct usb_otg *otg)
 
 	if (otg->gadget)
 		otg->gadget->is_a_peripheral = 1;
+
+	xotg->a_hnp_active = true;
 }
 
 static void tegra_xotg_a_hnp_exit(struct usb_otg *otg)
@@ -437,6 +442,15 @@ static void tegra_xotg_a_hnp_exit(struct usb_otg *otg)
 		otg->gadget->is_a_peripheral = 0;
 	/* A-device now wants to use the bus so set this */
 	xotg->otg->fsm.a_bus_req = 1;
+
+	/*
+	 * Note that we must not set a_hnp_active = false here
+	 * because there are state transitions to run after this
+	 * callback (a_peripheral->a_wait_bcon or to a_wait_vfall)
+	 * before HNP is actually completed.
+	 * The actual end of HNP is when the state reaches a_host
+	 * again.
+	 */
 }
 
 static void tegra_xotg_b_hnp_enter(struct usb_otg *otg)
@@ -474,12 +488,28 @@ static void tegra_xotg_b_hnp_exit(struct usb_otg *otg)
 
 static void tegra_xotg_vbus_session(struct usb_otg *otg)
 {
+	struct device *dev = otg->dev;
+	struct tegra_xotg *xotg = dev_get_drvdata(dev);
+
 	/* do not turn on VBUS by not moving FSM to a_wait_vrise */
-	if (session_support) {
+	if (session_support && !xotg->a_hnp_active) {
 		dev_dbg(otg->dev,
 			"session supported, not moving to a_wait_vrise\n");
 		otg->fsm.a_bus_drop = 1;
 	}
+}
+
+static void tegra_xotg_mark_a_hnp_end(struct usb_otg *otg)
+{
+	struct device *dev = otg->dev;
+	struct tegra_xotg *xotg = dev_get_drvdata(dev);
+
+	/*
+	 * this boolean is used to denote if A-device HNP has ended
+	 * (state back to a_host). This is to determine if session
+	 * can be ended by A-device when session support is enabled
+	 */
+	xotg->a_hnp_active = false;
 }
 
 static void tegra_xotg_start_pulse(struct usb_otg *otg)
@@ -1420,6 +1450,9 @@ static int tegra_xotg_probe(struct platform_device *pdev)
 	otg_set_state_op(xotg->otg,
 			OTG_STATE_A_WAIT_VFALL, OTG_STATE_A_IDLE,
 			tegra_xotg_vbus_session);
+	otg_set_state_op(xotg->otg,
+			OTG_STATE_UNDEFINED, OTG_STATE_A_HOST,
+			tegra_xotg_mark_a_hnp_end);
 
 
 	/* enable OTG interrupts */
