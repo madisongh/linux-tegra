@@ -191,6 +191,7 @@ void __init tegra210_init_speedo_data(struct tegra_sku_info *sku_info)
 	 * revision. Note that GPU speedo value is fused in CPU_SPEEDO_2.
 	 */
 	speedo_revision = get_speedo_revision();
+	sku_info->speedo_rev = speedo_revision;
 
 	if (speedo_revision >= 3) {
 		sku_info->cpu_speedo_value = cpu_speedo[0];

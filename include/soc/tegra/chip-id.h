@@ -100,6 +100,7 @@ struct tegra_sku_info {
 	int gpu_speedo_value;
 	int gpu_iddq_value;
 	enum tegra_revision revision;
+	int speedo_rev;
 };
 
 u32 tegra_read_straps(void);
