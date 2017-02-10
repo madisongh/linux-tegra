@@ -41,6 +41,7 @@ struct chip_revision {
 	unsigned int		minor;
 	char			sub_type;
 	enum tegra_revision	revision;
+	enum tegra_revision	id_and_rev;
 };
 
 struct apbmisc_data {
@@ -96,7 +97,7 @@ enum tegra_revision tegra_chip_get_revision(void)
 	if (tegra_sku_info.revision == TEGRA_REVISION_UNKNOWN)
 		tegra_init_revision();
 
-	return tegra_sku_info.revision;
+	return tegra_sku_info.id_and_rev;
 }
 
 u32 tegra_read_straps(void)
@@ -140,25 +141,27 @@ static const struct of_device_id apbmisc_match[] = {
 };
 
 #define CHIP_REVISION(id, maj, min, sub, rev) {	\
-	.chipid = TEGRA_CHIPID_##id,		\
+	.chipid = id,				\
 	.major = maj,				\
 	.minor = min,				\
 	.sub_type = sub,			\
-	.revision = TEGRA_REVISION_##rev }
+	.revision = TEGRA_REVISION_##rev,	\
+	.id_and_rev = id##_REVISION_##rev }	\
 
 static struct chip_revision tegra_chip_revisions[] = {
-	CHIP_REVISION(TEGRA21, 1, 1, 0,   A01),
-	CHIP_REVISION(TEGRA21, 1, 1, 'q', A01q),
-	CHIP_REVISION(TEGRA21, 1, 2, 0,   A02),
-	CHIP_REVISION(TEGRA18, 1, 1, 0,   A01),
-	CHIP_REVISION(TEGRA18, 1, 2, 0,   A02),
-	CHIP_REVISION(TEGRA18, 1, 2, 'p', A02p),
+	CHIP_REVISION(TEGRA210, 1, 1, 0,   A01),
+	CHIP_REVISION(TEGRA210, 1, 1, 'q', A01q),
+	CHIP_REVISION(TEGRA210, 1, 2, 0,   A02),
+	CHIP_REVISION(TEGRA186, 1, 1, 0,   A01),
+	CHIP_REVISION(TEGRA186, 1, 2, 0,   A02),
+	CHIP_REVISION(TEGRA186, 1, 2, 'p', A02p),
 };
 
 void tegra_init_revision(void)
 {
 	u32 id, chipid, major, minor, subrev;
 	enum tegra_revision revision = TEGRA_REVISION_UNKNOWN;
+	enum tegra_revision id_and_rev = TEGRA_REVISION_UNKNOWN;
 	char sub_type = 0;
 	int i;
 
@@ -209,6 +212,7 @@ void tegra_init_revision(void)
 	}
 exit:
 	tegra_sku_info.revision = revision;
+	tegra_sku_info.id_and_rev = id_and_rev;
 	tegra_sku_info.sku_id = tegra_fuse_read_early(FUSE_SKU_INFO);
 }
 
