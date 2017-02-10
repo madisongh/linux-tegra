@@ -3,7 +3,7 @@
  *
  * GPU memory management driver for Tegra
  *
- * Copyright (c) 2009-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2009-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -467,10 +467,13 @@ static inline void nvmap_handle_mk(struct nvmap_handle *h,
 				   void (*fn)(struct page **))
 {
 	int i;
-	int start_page = PAGE_ALIGN(offset) >> PAGE_SHIFT;
-	int end_page = (offset + size) >> PAGE_SHIFT;
+	u32 start_page = offset >> PAGE_SHIFT;
+	u32 end_page = PAGE_ALIGN(offset + size) >> PAGE_SHIFT;
 
-	if (h->heap_pgalloc) {
+	if (h->heap_pgalloc &&
+		(offset < h->size) &&
+		(size <= h->size) &&
+		(offset <= (h->size - size))) {
 		for (i = start_page; i < end_page; i++)
 			fn(&h->pgalloc.pages[i]);
 	}

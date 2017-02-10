@@ -3,7 +3,7 @@
  *
  * Some MM related functionality specific to nvmap.
  *
- * Copyright (c) 2013-2014, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2013-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -192,6 +192,10 @@ void nvmap_zap_handle(struct nvmap_handle *handle, u32 offset, u32 size)
 	}
 
 	size = PAGE_ALIGN((offset & ~PAGE_MASK) + size);
+
+	if ((offset >= handle->size) || (offset > handle->size - size) ||
+	    (size > handle->size))
+		return;
 
 	mutex_lock(&handle->lock);
 	vmas = &handle->vmas;
