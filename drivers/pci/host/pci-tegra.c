@@ -4767,11 +4767,16 @@ static int tegra_pcie_probe(struct platform_device *pdev)
 	return ret;
 
 release_regulators:
+#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+	if (tegra_platform_is_silicon())
+		phy_exit(pcie->u_phy);
+#endif
 	devm_kfree(&pdev->dev, pcie->pcie_regulators);
 release_platdata:
 	devm_kfree(&pdev->dev, pcie->plat_data);
 release_drvdata:
 	devm_kfree(&pdev->dev, pcie);
+	platform_set_drvdata(pdev, NULL);
 	return ret;
 }
 
@@ -4781,6 +4786,9 @@ static int tegra_pcie_remove(struct platform_device *pdev)
 	struct tegra_pcie_bus *bus;
 
 	PR_FUNC_LINE;
+
+	if (!pcie)
+		return 0;
 
 	if (cancel_delayed_work_sync(&pcie->detect_delay))
 		return 0;
