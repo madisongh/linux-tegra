@@ -507,10 +507,7 @@ struct cvb_table tegra210_cpu_cvb_tables[] = {
 
 static struct thermal_tv tegra210_thermal_floor_table[] = {
 	{TEGRA210_DFLL_THERMAL_FLOOR_0 / 1000, 950},
-	{TEGRA210_DFLL_THERMAL_FLOOR_1 / 1000, 850},
-	{TEGRA210_DFLL_THERMAL_FLOOR_2 / 1000, 850},
-	{TEGRA210_DFLL_THERMAL_FLOOR_3 / 1000, 850},
-	{TEGRA210_DFLL_THERMAL_FLOOR_4 / 1000, 850},
+	{TEGRA210_DFLL_THERMAL_FLOOR_4 / 1000,   0},
 };
 
 static const struct thermal_tv tegra210_thermal_cap_table[] = {

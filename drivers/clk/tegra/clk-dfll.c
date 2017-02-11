@@ -3276,7 +3276,7 @@ static int profiles_show(struct seq_file *s, void *data)
 		r = td->dvco_rate_floors[i];
 		v = find_mv_out_cap(td, tv.millivolts);
 		seq_printf(s, " ..%3dC%5dmV%9lukHz%s\n",
-			   tv.temp, tv.millivolts,
+			   tv.temp, tegra_dfll_dev->lut_uv[v] / 1000,
 			   (r ? : get_dvco_rate_below(td, v)) / 1000,
 			   r ? " (calibrated)"  : "");
 	}
