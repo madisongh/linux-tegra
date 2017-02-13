@@ -28,6 +28,7 @@ enum dma_attr {
 };
 
 #define __DMA_ATTRS_LONGS BITS_TO_LONGS(DMA_ATTR_MAX)
+#define __DMA_ATTR(attrs) &attrs
 
 /**
  * struct dma_attrs - an opaque container for DMA attributes
@@ -36,6 +37,8 @@ enum dma_attr {
 struct dma_attrs {
 	unsigned long flags[__DMA_ATTRS_LONGS];
 };
+
+typedef struct dma_attrs * dma_attr;
 
 #define DEFINE_DMA_ATTRS(x) 					\
 	struct dma_attrs x = {					\
