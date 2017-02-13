@@ -802,7 +802,28 @@ struct MODS_SCREEN_INFO {
 	__u16 lfb_linelength;
 };
 
+enum MODS_DMA_TRANSACTION_TYPE {
+	MODS_DMA_MEMCPY,
+	MODS_DMA_XOR,
+	MODS_DMA_PQ,
+	MODS_DMA_XOR_VAL,
+	MODS_DMA_PQ_VAL,
+	MODS_DMA_MEMSET,
+	MODS_DMA_MEMSET_SG,
+	MODS_DMA_INTERRUPT,
+	MODS_DMA_SG,
+	MODS_DMA_PRIVATE,
+	MODS_DMA_ASYNC_TX,
+	MODS_DMA_SLAVE,
+	MODS_DMA_CYCLIC,
+	MODS_DMA_INTERLEAVE,
+/* last transaction type for creation of the capabilities mask */
+	MODS_DMA_TX_TYPE_END,
+};
+
 struct MODS_DMA_HANDLE {
+	/* IN */
+	__u32 dma_type; /* Indicate the DMA Type*/
 	/* OUT */
 	__u32	dma_id; /* Inditify for the DMA */
 };
@@ -839,7 +860,7 @@ struct MODS_DMA_CHANNEL_CONFIG {
 /* Node: Only support SINGLE MODS so far*/
 enum MODS_DMA_TX_MODE {
 	MODS_DMA_SINGLE = 0,
-	MODS_DMA_CYCLIC,
+	MODS_DMA_TX_CYCLIC,
 	MODS_DMA_INTERLEAVED, /* Common to Slave as well as M2M clients. */
 };
 

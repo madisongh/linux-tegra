@@ -1,7 +1,7 @@
 /*
  * mods_dma.c - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -233,8 +233,7 @@ int esc_mods_dma_request_channel(struct file *pfile,
 	read_unlock(&(p_mods_chan->lock));
 
 	dma_cap_zero(mask);
-	dma_cap_set(DMA_SLAVE, mask);
-	dma_cap_set(DMA_MEMCPY, mask);
+	dma_cap_set(p_handle->dma_type, mask);
 	chan = dma_request_channel(mask, NULL, NULL);
 	if (!chan) {
 		mods_error_printk("Dma channel is not available\n");
