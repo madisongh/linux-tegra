@@ -126,7 +126,7 @@ static unsigned int get_next_freq(struct cpufreq_policy *policy,
 				  unsigned long util, unsigned long max)
 {
 	unsigned int freq = arch_scale_freq_invariant() ?
-				policy->cpuinfo.max_freq : policy->cur;
+				policy->max : policy->cur;
 
 	return (freq + (freq >> 2)) * util / max;
 }
