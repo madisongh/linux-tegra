@@ -865,11 +865,10 @@ static void audio_dec(struct hid_device *hdev, const uint8_t *raw_input,
 						int type, size_t num_bytes)
 {
 	bool dropped_packet = false;
-	struct snd_pcm_substream *substream;
 	struct shdr_device *shdr_dev = hid_get_drvdata(hdev);
 	struct snd_card *shdr_card;
 	struct snd_atvr *atvr_snd;
-	int ret;
+	uint writable;
 
 	if (shdr_dev == NULL)
 		return;
@@ -890,7 +889,7 @@ static void audio_dec(struct hid_device *hdev, const uint8_t *raw_input,
 		}
 
 		/* Write data to a FIFO for decoding by the timer task. */
-		uint writable = atomic_fifo_available_to_write(
+		writable = atomic_fifo_available_to_write(
 			&atvr_snd->fifo_controller);
 		if (writable > 0) {
 			uint fifo_index = atomic_fifo_get_write_index(

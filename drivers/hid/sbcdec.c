@@ -353,6 +353,7 @@ uint32_t sbc_decode(uint8_t blocks_per_packet, uint8_t num_bits,
 #ifndef SPEED_OVER_ACCURACY
 	int32_t levels[8];
 #endif
+	const signed char* tbl;
 
 #if (DEBUG_DECODING == 1)
 	const uint8_t *start_buf = buf;
@@ -394,7 +395,7 @@ uint32_t sbc_decode(uint8_t blocks_per_packet, uint8_t num_bits,
 			bitpos = 0x80;
 		}
 	}
-        const signed char* tbl;
+
 	tbl = loudness_8[samplingRate];
 	for(i = 0; i < numSubbands; i++){
                 if(scaleFactors[i]){

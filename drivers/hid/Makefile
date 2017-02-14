@@ -1,6 +1,7 @@
 #
 # Makefile for the HID driver
 #
+subdir-ccflags-y	+= -Werror
 hid-y			:= hid-core.o hid-input.o
 hid-$(CONFIG_DEBUG_FS)		+= hid-debug.o
 
