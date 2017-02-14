@@ -620,7 +620,10 @@ static int tegra_xotg_event_handler(struct notifier_block *nb,
 
 	switch (event) {
 	case OTG_EVENT_HCD_PORT_SUSPEND:
-		otg->fsm.a_bus_req = 0;
+		/*
+		 * don't have to set a_bus_req=0 since this is done in
+		 * hnp polling function in usb-otg-fsm.c
+		 */
 		break;
 	case OTG_EVENT_HCD_PORT_RESUME:
 		otg->fsm.a_bus_req = 1;
