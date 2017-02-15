@@ -94,7 +94,7 @@ u32 tegra_read_emu_revid(void)
 
 enum tegra_revision tegra_chip_get_revision(void)
 {
-	if (tegra_sku_info.revision == TEGRA_REVISION_UNKNOWN)
+	if (tegra_sku_info.id_and_rev == TEGRA_REVISION_UNKNOWN)
 		tegra_init_revision();
 
 	return tegra_sku_info.id_and_rev;
@@ -208,6 +208,7 @@ void tegra_init_revision(void)
 			continue;
 
 		revision = tegra_chip_revisions[i].revision;
+		id_and_rev = tegra_chip_revisions[i].id_and_rev;
 		break;
 	}
 exit:
