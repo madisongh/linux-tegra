@@ -326,7 +326,7 @@ static int hda_tegra_runtime_suspend(struct device *dev)
 	struct azx *chip = card->private_data;
 	struct hda_tegra *hda = container_of(chip, struct hda_tegra, chip);
 
-	if (!(chip->driver_caps & AZX_DCAPS_PM_RUNTIME))
+	if (!azx_has_pm_runtime(chip))
 		return 0;
 
 	azx_stop_chip(chip);
@@ -341,7 +341,7 @@ static int hda_tegra_runtime_resume(struct device *dev)
 	struct azx *chip = card->private_data;
 	struct hda_tegra *hda = container_of(chip, struct hda_tegra, chip);
 
-	if (!(chip->driver_caps & AZX_DCAPS_PM_RUNTIME))
+	if (!azx_has_pm_runtime(chip))
 		return 0;
 
 	hda_tegra_enable_clocks(hda);
@@ -570,11 +570,15 @@ MODULE_DEVICE_TABLE(of, hda_tegra_match);
 
 static int hda_tegra_probe(struct platform_device *pdev)
 {
-	const unsigned int driver_flags = AZX_DCAPS_CORBRP_SELF_CLEAR | AZX_DCAPS_PM_RUNTIME;
+	unsigned int driver_flags = AZX_DCAPS_CORBRP_SELF_CLEAR;
 	struct snd_card *card;
 	struct azx *chip;
 	struct hda_tegra *hda;
 	int err;
+
+#if defined(CONFIG_ANDROID)
+	driver_flags |= AZX_DCAPS_PM_RUNTIME;
+#endif
 
 	hda = devm_kzalloc(&pdev->dev, sizeof(*hda), GFP_KERNEL);
 	if (!hda)
