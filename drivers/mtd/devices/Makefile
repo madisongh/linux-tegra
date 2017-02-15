@@ -1,6 +1,7 @@
 #
 # linux/drivers/mtd/devices/Makefile
 #
+subdir-ccflags-y += -Werror
 
 obj-$(CONFIG_MTD_DOCG3)		+= docg3.o
 obj-$(CONFIG_MTD_SLRAM)		+= slram.o

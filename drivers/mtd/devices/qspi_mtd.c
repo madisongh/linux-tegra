@@ -3,7 +3,7 @@
  *
  * Author: Mike Lavender, mike@steroidmicros.com
  * Copyright (c) 2005, Intec Automation Inc.
- * Copyright (c) 2013-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2013-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -171,7 +171,7 @@ static int read_sr1_reg(struct qspi *flash, uint8_t *regval)
  * Function to read mutiple bytes for eg
  * can be used for RDID command
  */
-static int read_multi(struct qspi *flash, uint8_t code,
+static __maybe_unused int read_multi(struct qspi *flash, uint8_t code,
 				uint8_t *buff, uint32_t len)
 {
 	int err = PASS;
