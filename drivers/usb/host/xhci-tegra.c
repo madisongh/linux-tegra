@@ -454,6 +454,7 @@ struct tegra_xhci_hcd {
 
 	bool host_mode;
 	bool otg_role_initialized;
+	struct delayed_work otg_retry_work;
 
 	bool pmc_usb_wakes_disabled;
 
@@ -1763,6 +1764,24 @@ struct otg_hcd_ops tegra_xhci_otg_hcd_ops = {
 	.stop = tegra_xhci_otg_hcd_stop,
 };
 
+static void tegra_xhci_otg_retry_work(struct work_struct *work)
+{
+	struct tegra_xhci_hcd *tegra;
+	int ret;
+
+	tegra = container_of(to_delayed_work(work),
+			struct tegra_xhci_hcd, otg_retry_work);
+
+	tegra->hcd->otg_dev = of_usb_get_otg(tegra->dev->of_node);
+	ret = usb_otg_register_hcd(tegra->hcd,
+				   &tegra_xhci_otg_hcd_ops);
+	if (ret)
+		dev_err(tegra->dev, "failed to register to OTG core (%d) after retry\n",
+			ret);
+	else
+		dev_dbg(tegra->dev, "successfully registered to OTG core\n");
+}
+
 static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 {
 	struct tegra_xhci_hcd *tegra = context;
@@ -1854,12 +1873,12 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 			ret = usb_otg_register_hcd(tegra->hcd,
 						   &tegra_xhci_otg_hcd_ops);
 			if (ret) {
-				dev_err(dev, "failed to register to OTG core: %d\n",
+				dev_err(dev, "failed to register to OTG core (%d)...retry after 1 second\n",
 					ret);
-				goto dealloc_usb3_hcd;
-			}
-
-			dev_dbg(dev, "registered to OTG core\n");
+				schedule_delayed_work(&tegra->otg_retry_work,
+						      msecs_to_jiffies(1000));
+			} else
+				dev_dbg(dev, "registered to OTG core\n");
 		}
 	} else {
 		tegra_xhci_update_otg_role(tegra);
@@ -2436,6 +2455,8 @@ skip_clocks:
 
 	if (XHCI_IS_T186(tegra)) {
 		INIT_WORK(&tegra->oc_work, tegra_xhci_oc_work);
+		INIT_DELAYED_WORK(&tegra->otg_retry_work,
+				  tegra_xhci_otg_retry_work);
 	} else {
 		INIT_WORK(&tegra->id_extcon_work, tegra_xhci_id_extcon_work);
 		tegra->id_extcon = extcon_get_extcon_dev_by_cable(&pdev->dev,
@@ -2489,6 +2510,7 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 	struct xhci_hcd *xhci;
 
 	if (XHCI_IS_T186(tegra)) {
+		cancel_delayed_work_sync(&tegra->otg_retry_work);
 		cancel_work_sync(&tegra->oc_work);
 		if (tegra->utmi_otg_port_base_1)
 			usb_otg_unregister_hcd(hcd);
