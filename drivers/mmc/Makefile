@@ -3,6 +3,7 @@
 #
 
 subdir-ccflags-$(CONFIG_MMC_DEBUG) := -DDEBUG
+subdir-ccflags-y += -Werror
 
 obj-$(CONFIG_MMC)		+= core/
 obj-$(CONFIG_MMC)		+= card/
