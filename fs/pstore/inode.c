@@ -2,7 +2,7 @@
  * Persistent Storage - ramfs parts.
  *
  * Copyright (C) 2010 Intel Corporation <tony.luck@intel.com>
- * Copyright (C) 2016 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2016-2017 NVIDIA Corporation. All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -174,7 +174,7 @@ static int pstore_rtrace_seq_show(struct seq_file *s, void *v)
 	struct pstore_rtrace_seq_data *data = v;
 	struct pstore_rtrace_record *rec = (void *)(ps->data + data->off);
 
-	seq_printf(s, "%d %c %p <- %p  %pF\n",
+	seq_printf(s, "%d %c %lu <- %lu  %pF\n",
 		rec->cpu, rec->event == RTRACE_READ ? 'R' : 'W',
 		rec->raddr, rec->caller, (void *)rec->caller);
 

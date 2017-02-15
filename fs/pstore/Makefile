@@ -2,6 +2,7 @@
 # Makefile for the linux pstorefs routines.
 #
 
+subdir-ccflags-y += -Werror
 obj-$(CONFIG_PSTORE) += pstore.o
 
 pstore-objs += inode.o platform.o

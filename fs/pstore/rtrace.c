@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2016-2017 NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -61,7 +61,7 @@ noinline void notrace pstore_rtrace_call(enum rtrace_event_type log_type,
 
 	local_irq_save(flags);
 
-	rec.raddr = data;
+	rec.raddr = (unsigned long) data;
 	if (rec.raddr >= rtrace.lower_limit &&
 				rec.raddr <= rtrace.upper_limit) {
 		rec.cpu = raw_smp_processor_id();
@@ -95,7 +95,6 @@ static ssize_t pstore_rtrace_knob_write(struct file *f, const char __user *buf,
 	rtrace.enabled = on;
 out:
 	ret = count;
-err:
 	mutex_unlock(&pstore_rtrace_lock);
 
 	return ret;
