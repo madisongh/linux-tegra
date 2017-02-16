@@ -660,6 +660,11 @@ static void ardbeg_usb_init(void)
 			tegra_ehci1_utmi_pdata.id_det_type = TEGRA_USB_PMU_ID;
 		}
 		tegra_ehci1_utmi_pdata.id_extcon_dev_name = "as3722-extcon";
+
+		/* Disable Charging detection on Jetson */
+		if (board_info.board_id == BOARD_PM375)
+			tegra_udc_pdata.u_data.dev.charging_supported = false;
+
 	} else {
 		/* Ardbeg and TN8 */
 
