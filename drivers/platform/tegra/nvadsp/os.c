@@ -1300,10 +1300,12 @@ static void __nvadsp_os_stop(bool reload)
 	}
 #endif
 
-	writel(ENABLE_MBOX2_FULL_INT, priv.hwmailbox_base + HWMBOX2_REG);
+	writel(ENABLE_MBOX2_FULL_INT,
+	       priv.hwmailbox_base + drv_data->chip_data->hwmb.hwmbox2_reg);
 	err = wait_for_completion_interruptible_timeout(&entered_wfi,
 		msecs_to_jiffies(ADSP_WFE_TIMEOUT));
-	writel(DISABLE_MBOX2_FULL_INT, priv.hwmailbox_base + HWMBOX2_REG);
+	writel(DISABLE_MBOX2_FULL_INT,
+	       priv.hwmailbox_base + drv_data->chip_data->hwmb.hwmbox2_reg);
 
 	/*
 	 * ADSP needs to be in WFI/WFE state to properly reset it.
@@ -1565,7 +1567,7 @@ int __init nvadsp_os_probe(struct platform_device *pdev)
 	int ret = 0;
 
 	priv.unit_fpga_reset_reg = drv_data->base_regs[UNIT_FPGA_RST];
-	priv.hwmailbox_base = drv_data->base_regs[HWMB_REG_IDX];
+	priv.hwmailbox_base = drv_data->base_regs[hwmb_reg_idx()];
 	priv.dram_region = drv_data->dram_region;
 
 	priv.adsp_os_addr = drv_data->adsp_mem[ADSP_OS_ADDR];
@@ -1587,7 +1589,8 @@ int __init nvadsp_os_probe(struct platform_device *pdev)
 		goto end;
 	}
 
-	writel(DISABLE_MBOX2_FULL_INT, priv.hwmailbox_base + HWMBOX2_REG);
+	writel(DISABLE_MBOX2_FULL_INT,
+	       priv.hwmailbox_base + drv_data->chip_data->hwmb.hwmbox2_reg);
 
 	if (of_device_is_compatible(dev->of_node, "nvidia,tegra210-adsp")) {
 		drv_data->assert_adsp = __assert_adsp;

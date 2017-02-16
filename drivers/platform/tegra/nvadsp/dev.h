@@ -81,6 +81,22 @@ struct nvadsp_pm_state {
 	void *evp_ptr;
 };
 
+struct nvadsp_hwmb {
+	u32 reg_idx;
+	u32 hwmbox0_reg;
+	u32 hwmbox1_reg;
+	u32 hwmbox2_reg;
+	u32 hwmbox3_reg;
+	u32 hwmbox4_reg;
+	u32 hwmbox5_reg;
+	u32 hwmbox6_reg;
+	u32 hwmbox7_reg;
+};
+
+struct nvadsp_chipdata {
+	struct nvadsp_hwmb hwmb;
+};
+
 struct nvadsp_drv_data {
 	void __iomem **base_regs;
 	void __iomem **base_regs_saved;
@@ -148,6 +164,8 @@ struct nvadsp_drv_data {
 
 	struct tegra_bwmgr_client *bwmgr;
 	u32 evp_base[ADSP_EVP_END];
+
+	const struct nvadsp_chipdata *chip_data;
 };
 
 #define ADSP_CONFIG	0x04
