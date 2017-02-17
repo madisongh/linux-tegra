@@ -2102,6 +2102,7 @@ int tegra_dfll_update_thermal_index(struct tegra_dfll *td,
 		if (new_index >= td->soc->thermal_floor_table_size)
 			return -ERANGE;
 
+		spin_lock_irqsave(&td->lock, flags);
 		mv = td->soc->thermal_floor_table[new_index].millivolts;
 		td->thermal_floor_output = find_mv_out_cap(td, mv);
 		td->thermal_floor_index = new_index;
@@ -2110,26 +2111,25 @@ int tegra_dfll_update_thermal_index(struct tegra_dfll *td,
 		set_force_out_min(td);
 
 		if (td->mode == DFLL_CLOSED_LOOP) {
-			spin_lock_irqsave(&td->lock, flags);
 			dfll_set_close_loop_config(td, &td->last_req);
 			dfll_set_frequency_request(td, &td->last_req);
-			spin_unlock_irqrestore(&td->lock, flags);
 		}
+		spin_unlock_irqrestore(&td->lock, flags);
 	} else if (type == TEGRA_DFLL_THERMAL_CAP &&
 		   td->soc->thermal_cap_table) {
 		if (new_index >= td->soc->thermal_cap_table_size)
 			return -ERANGE;
 
+		spin_lock_irqsave(&td->lock, flags);
 		mv = td->soc->thermal_cap_table[new_index].millivolts;
 		td->thermal_cap_output = find_mv_out_floor(td, mv);
 		td->thermal_cap_index = new_index;
 
 		if (td->mode == DFLL_CLOSED_LOOP) {
-			spin_lock_irqsave(&td->lock, flags);
 			dfll_set_close_loop_config(td, &td->last_req);
 			dfll_set_frequency_request(td, &td->last_req);
-			spin_unlock_irqrestore(&td->lock, flags);
 		}
+		spin_unlock_irqrestore(&td->lock, flags);
 	}
 
 	return 0;
@@ -3255,7 +3255,9 @@ static int profiles_show(struct seq_file *s, void *data)
 		tv = td->soc->thermal_cap_table[i];
 		if (tv.temp == TEGRA210_DFLL_THERMAL_CAP_NOCAP / 1000)
 			continue;
-		seq_printf(s, "%3dC.. %5dmV\n", tv.temp, tv.millivolts);
+		v = find_mv_out_floor(td, tv.millivolts);
+		seq_printf(s, "%3dC.. %5dmV\n",
+			   tv.temp, tegra_dfll_dev->lut_uv[v] / 1000);
 	}
 
 	if (td->tune_high_target_rate_min == ULONG_MAX) {
