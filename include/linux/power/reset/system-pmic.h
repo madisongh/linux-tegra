@@ -51,8 +51,21 @@ struct system_pmic_ops {
 	void (*override_poweroff_config) (void *pmic_data, bool enable);
 };
 
-extern void (*soc_specific_power_off)(void);
-extern void (*system_pmic_post_power_off_handler)(void);
+typedef void (*power_handler_t)(void);
+#if IS_ENABLED(CONFIG_SYSTEM_PMIC)
+void set_system_pmic_post_power_off_handler(power_handler_t);
+power_handler_t get_system_pmic_post_power_off_handler(void);
+void set_soc_specific_power_off(power_handler_t);
+power_handler_t get_soc_specific_power_off(void);
+#else
+static inline void set_system_pmic_post_power_off_handler(power_handler_t func)
+{ }
+static inline power_handler_t get_system_pmic_post_power_off_handler(void)
+{ return NULL; }
+static inline void set_soc_specific_power_off(power_handler_t func) { }
+static inline power_handler_t get_soc_specific_power_off(void)
+{ return NULL; }
+#endif
 
 extern struct system_pmic_dev *system_pmic_register(struct device *dev,
 	struct system_pmic_ops *ops, struct system_pmic_config *config,

@@ -333,7 +333,7 @@ static void __init psci_0_2_set_functions(void)
 
 	arm_pm_restart = psci_sys_reset;
 
-	system_pmic_post_power_off_handler = psci_sys_poweroff;
+	set_system_pmic_post_power_off_handler(psci_sys_poweroff);
 }
 
 /*
