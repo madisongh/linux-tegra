@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -54,7 +54,7 @@ struct tegra_usb_cd {
 	struct regulator *vbus_reg;
 	struct phy *phy;
 	int open_count;
-	enum tegra_usb_connect_type connect_type;
+	unsigned int connect_type;
 	u32 sdp_cdp_current_limit_ma;
 	u32 current_limit_ma;
 	u32 dcp_current_limit_ma;

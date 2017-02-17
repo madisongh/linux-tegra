@@ -63,16 +63,16 @@ static void vbus_drop_wl(struct vbus_lock *lock)
 }
 
 static const unsigned int tegra_usb_cd_extcon_cable[] = {
-	CONNECT_TYPE_SDP, /* USB */
-	CONNECT_TYPE_DCP, /* TA */
-	CONNECT_TYPE_DCP_QC2, /* QC2 */
-	CONNECT_TYPE_DCP_MAXIM, /* MAXIM */
-	CONNECT_TYPE_CDP, /* Charge-downstream */
-	CONNECT_TYPE_NON_STANDARD_CHARGER, /* Slow-charger */
-	CONNECT_TYPE_APPLE_500MA, /* Apple 500mA-charger */
-	CONNECT_TYPE_APPLE_1000MA, /* Apple 1A-charger */
-	CONNECT_TYPE_APPLE_2000MA, /* Apple 2A-charger */
-	CONNECT_TYPE_NONE,
+	EXTCON_USB, /* USB */
+	EXTCON_CHG_USB_DCP, /* TA */
+	EXTCON_USB_QC2, /* QC2 */
+	EXTCON_USB_MAXIM, /* MAXIM */
+	EXTCON_CHG_USB_CDP, /* Charge-downstream */
+	EXTCON_CHG_USB_SLOW, /* Slow-charger */
+	EXTCON_USB_APPLE_500mA, /* Apple 500mA-charger */
+	EXTCON_USB_APPLE_1A, /* Apple 1A-charger */
+	EXTCON_USB_APPLE_2A, /* Apple 2A-charger */
+	EXTCON_NONE,
 };
 
 static void tegra_usb_cd_update_wakelock(struct tegra_usb_cd *ucd)
@@ -85,11 +85,11 @@ static void tegra_usb_cd_update_wakelock(struct tegra_usb_cd *ucd)
 	spin_lock_irqsave(&wl_spinlock, flags);
 
 	switch (ucd->connect_type) {
-	case CONNECT_TYPE_SDP:
-	case CONNECT_TYPE_CDP:
+	case EXTCON_USB:
+	case EXTCON_CHG_USB_CDP:
 		vbus_hold_wl(&lock);
 		break;
-	case CONNECT_TYPE_NONE:
+	case EXTCON_NONE:
 		vbus_drop_wl(&lock);
 		break;
 	default:
@@ -137,50 +137,50 @@ static int tegra_usb_cd_update_charging_current(struct tegra_usb_cd *ucd)
 	int max_ua = 0, ret = 0;
 
 	switch (ucd->connect_type) {
-	case CONNECT_TYPE_NONE:
+	case EXTCON_NONE:
 		dev_info(ucd->dev, "disconnected USB cable/charger\n");
 		ucd->sdp_cdp_current_limit_ma = 0;
 		max_ua = 0;
 		break;
-	case CONNECT_TYPE_SDP:
+	case EXTCON_USB:
 		if (ucd->sdp_cdp_current_limit_ma > 2)
 			dev_info(ucd->dev, "connected to SDP\n");
 		max_ua = min(ucd->sdp_cdp_current_limit_ma * 1000,
 				USB_CHARGING_SDP_CURRENT_LIMIT_UA);
 		break;
-	case CONNECT_TYPE_DCP:
+	case EXTCON_CHG_USB_DCP:
 		dev_info(ucd->dev, "connected to DCP\n");
 		max_ua = max(ucd->dcp_current_limit_ma * 1000,
 				USB_CHARGING_DCP_CURRENT_LIMIT_UA);
 		break;
-	case CONNECT_TYPE_DCP_QC2:
+	case EXTCON_USB_QC2:
 		dev_info(ucd->dev, "connected to QuickCharge 2(wall charger)\n");
 		max_ua = ucd->qc2_current_limit_ma * 1000;
 		break;
-	case CONNECT_TYPE_DCP_MAXIM:
+	case EXTCON_USB_MAXIM:
 		dev_info(ucd->dev, "connected to Maxim(wall charger)\n");
 		max_ua = ucd->dcp_current_limit_ma * 1000;
 		break;
-	case CONNECT_TYPE_CDP:
+	case EXTCON_CHG_USB_CDP:
 		dev_info(ucd->dev, "connected to CDP\n");
 		if (ucd->sdp_cdp_current_limit_ma > 2)
 			max_ua = USB_CHARGING_CDP_CURRENT_LIMIT_UA;
 		else
 			max_ua = ucd->sdp_cdp_current_limit_ma * 1000;
 		break;
-	case CONNECT_TYPE_NON_STANDARD_CHARGER:
+	case EXTCON_CHG_USB_SLOW:
 		dev_info(ucd->dev, "connected to non-standard charger\n");
 		max_ua = USB_CHARGING_NON_STANDARD_CHARGER_CURRENT_LIMIT_UA;
 		break;
-	case CONNECT_TYPE_APPLE_500MA:
+	case EXTCON_USB_APPLE_500mA:
 		dev_info(ucd->dev, "connected to Apple/Other 0.5A custom charger\n");
 		max_ua = USB_CHARGING_APPLE_CHARGER_500mA_CURRENT_LIMIT_UA;
 		break;
-	case CONNECT_TYPE_APPLE_1000MA:
+	case EXTCON_USB_APPLE_1A:
 		dev_info(ucd->dev, "connected to Apple/Other 1A custom charger\n");
 		max_ua = USB_CHARGING_APPLE_CHARGER_1000mA_CURRENT_LIMIT_UA;
 		break;
-	case CONNECT_TYPE_APPLE_2000MA:
+	case EXTCON_USB_APPLE_2A:
 		dev_info(ucd->dev, "connected to Apple/Other/NV 2A custom charger\n");
 		max_ua = USB_CHARGING_APPLE_CHARGER_2000mA_CURRENT_LIMIT_UA;
 		break;
@@ -195,7 +195,7 @@ static int tegra_usb_cd_update_charging_current(struct tegra_usb_cd *ucd)
 	return ret;
 }
 
-static enum tegra_usb_connect_type
+static unsigned int
 	tegra_usb_cd_detect_cable_and_set_current(struct tegra_usb_cd *ucd)
 {
 	int ret;
@@ -209,15 +209,15 @@ static enum tegra_usb_connect_type
 		ret = ucd->hw_ops->apple_cd(ucd);
 		switch(ret) {
 		case APPLE_500MA:
-			ucd->connect_type = CONNECT_TYPE_APPLE_500MA;
+			ucd->connect_type = EXTCON_USB_APPLE_500mA;
 			goto power_off;
                         break;
 		case APPLE_1000MA:
-			ucd->connect_type = CONNECT_TYPE_APPLE_1000MA;
+			ucd->connect_type = EXTCON_USB_APPLE_1A;
 			goto power_off;
                         break;
 		case APPLE_2000MA:
-			ucd->connect_type = CONNECT_TYPE_APPLE_2000MA;
+			ucd->connect_type = EXTCON_USB_APPLE_2A;
 			goto power_off;
                         break;
 		default:
@@ -234,22 +234,22 @@ static enum tegra_usb_connect_type
 		 */
 		msleep(20);
 		if (ucd->hw_ops->cdp_cd && ucd->hw_ops->cdp_cd(ucd))
-			ucd->connect_type = CONNECT_TYPE_CDP;
+			ucd->connect_type = EXTCON_CHG_USB_CDP;
 		else if (ucd->hw_ops->maxim14675_cd &&
 				ucd->hw_ops->maxim14675_cd(ucd))
-			ucd->connect_type = CONNECT_TYPE_DCP_MAXIM;
+			ucd->connect_type = EXTCON_USB_MAXIM;
 		else if (ucd->qc2_voltage) {
-			ucd->connect_type = CONNECT_TYPE_NON_STANDARD_CHARGER;
+			ucd->connect_type = EXTCON_CHG_USB_SLOW;
 			tegra_usb_cd_update_charging_current(ucd);
 			if (ucd->hw_ops->qc2_cd &&
 				ucd->hw_ops->qc2_cd(ucd))
-				ucd->connect_type = CONNECT_TYPE_DCP_QC2;
+				ucd->connect_type = EXTCON_USB_QC2;
 			else
-				ucd->connect_type = CONNECT_TYPE_DCP;
+				ucd->connect_type = EXTCON_CHG_USB_DCP;
 		} else
-			ucd->connect_type = CONNECT_TYPE_DCP;
+			ucd->connect_type = EXTCON_CHG_USB_DCP;
 	} else
-		ucd->connect_type = CONNECT_TYPE_SDP;
+		ucd->connect_type = EXTCON_USB;
 
 power_off:
 	ucd->hw_ops->power_off(ucd);
@@ -265,7 +265,7 @@ power_off:
 /* API's for controller driver */
 
 void tegra_ucd_set_charger_type(struct tegra_usb_cd *ucd,
-				enum tegra_usb_connect_type connect_type)
+				unsigned int connect_type)
 {
 	if (ucd == NULL)
 		return;
@@ -277,7 +277,7 @@ void tegra_ucd_set_charger_type(struct tegra_usb_cd *ucd,
 }
 EXPORT_SYMBOL_GPL(tegra_ucd_set_charger_type);
 
-enum tegra_usb_connect_type
+unsigned int
 	tegra_ucd_detect_cable_and_set_current(struct tegra_usb_cd *ucd)
 {
 	if (IS_ERR(ucd)) {
@@ -331,8 +331,8 @@ void tegra_ucd_set_sdp_cdp_current(struct tegra_usb_cd *ucd, int current_ma)
 	if (ucd == NULL)
 		return;
 
-	if (ucd->connect_type != CONNECT_TYPE_SDP
-			&& ucd->connect_type != CONNECT_TYPE_CDP) {
+	if (ucd->connect_type != EXTCON_USB
+			&& ucd->connect_type != EXTCON_CHG_USB_CDP) {
 		dev_err(ucd->dev,
 			"%s: ignore the request to set %dmA for non SDP/CDP port",
 			__func__, current_ma);
@@ -406,7 +406,7 @@ static int tegra_usb_cd_probe(struct platform_device *pdev)
 	}
 
 	ucd->dev = &pdev->dev;
-	ucd->connect_type = CONNECT_TYPE_NONE;
+	ucd->connect_type = EXTCON_NONE;
 	ucd->current_limit_ma = 0;
 	ucd->sdp_cdp_current_limit_ma = 0;
 	ucd->open_count = 0;

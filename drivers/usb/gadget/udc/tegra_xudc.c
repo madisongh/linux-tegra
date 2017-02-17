@@ -544,7 +544,7 @@ struct tegra_xudc {
 
 	/* charger detection */
 	struct tegra_usb_cd *ucd;
-	enum tegra_usb_connect_type connect_type;
+	unsigned int connect_type;
 #define NON_STD_CHARGER_DET_TIME_MS 2000
 #define USB_ANDROID_SUSPEND_CURRENT_MA 2
 	struct work_struct set_sdp_dcp_charging_current_work;
@@ -656,7 +656,7 @@ static inline void dump_trb(struct tegra_xudc *xudc, const char *type,
 static void tegra_xudc_device_mode_on(struct tegra_xudc *xudc)
 {
 	unsigned long flags;
-	enum tegra_usb_connect_type type;
+	unsigned int type;
 
 	spin_lock_irqsave(&xudc->lock, flags);
 	if (xudc->device_mode) {
@@ -671,7 +671,7 @@ static void tegra_xudc_device_mode_on(struct tegra_xudc *xudc)
 
 		spin_lock_irqsave(&xudc->lock, flags);
 		xudc->connect_type = type;
-		if (xudc->connect_type == CONNECT_TYPE_SDP && xudc->pullup)
+		if (xudc->connect_type == EXTCON_USB && xudc->pullup)
 			schedule_delayed_work(&xudc->non_std_charger_work,
 				msecs_to_jiffies(NON_STD_CHARGER_DET_TIME_MS));
 		spin_unlock_irqrestore(&xudc->lock, flags);
@@ -746,9 +746,9 @@ static void tegra_xudc_device_mode_off(struct tegra_xudc *xudc)
 		cancel_delayed_work(&xudc->non_std_charger_work);
 		/* clear charger type */
 		spin_lock_irqsave(&xudc->lock, flags);
-		xudc->connect_type = CONNECT_TYPE_NONE;
+		xudc->connect_type = EXTCON_NONE;
 		spin_unlock_irqrestore(&xudc->lock, flags);
-		tegra_ucd_set_charger_type(xudc->ucd, CONNECT_TYPE_NONE);
+		tegra_ucd_set_charger_type(xudc->ucd, EXTCON_NONE);
 	}
 
 	pm_runtime_put(xudc->dev);
@@ -1919,7 +1919,7 @@ static int tegra_xudc_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	}
 	xudc->pullup = is_on;
 	if (xudc->ucd && xudc->device_mode &&
-	    xudc->connect_type == CONNECT_TYPE_SDP && is_on)
+	    xudc->connect_type == EXTCON_USB && is_on)
 		schedule_delayed_work(&xudc->non_std_charger_work,
 			msecs_to_jiffies(NON_STD_CHARGER_DET_TIME_MS));
 	spin_unlock_irqrestore(&xudc->lock, flags);
@@ -3433,10 +3433,10 @@ static void tegra_xudc_non_std_charger_work(struct work_struct *work)
 
 	if (xudc->ucd) {
 		spin_lock_irqsave(&xudc->lock, flags);
-		xudc->connect_type = CONNECT_TYPE_NON_STANDARD_CHARGER;
+		xudc->connect_type = EXTCON_CHG_USB_SLOW;
 		spin_unlock_irqrestore(&xudc->lock, flags);
 		tegra_ucd_set_charger_type(xudc->ucd,
-					   CONNECT_TYPE_NON_STANDARD_CHARGER);
+					EXTCON_CHG_USB_SLOW);
 	}
 }
 
@@ -3773,7 +3773,7 @@ static int tegra_xudc_probe(struct platform_device *pdev)
 				  tegra_xudc_set_sdp_dcp_charging_current_work);
 			INIT_DELAYED_WORK(&xudc->non_std_charger_work,
 					  tegra_xudc_non_std_charger_work);
-			xudc->connect_type = CONNECT_TYPE_NONE;
+			xudc->connect_type = EXTCON_NONE;
 		}
 	}
 

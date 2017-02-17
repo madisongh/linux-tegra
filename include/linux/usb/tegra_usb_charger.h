@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -22,22 +22,6 @@
  */
 struct tegra_usb_cd;
 
-/**
- * Tegra USB different connection types
- */
-enum tegra_usb_connect_type {
-	CONNECT_TYPE_NONE,
-	CONNECT_TYPE_SDP,
-	CONNECT_TYPE_DCP,
-	CONNECT_TYPE_DCP_MAXIM,
-	CONNECT_TYPE_DCP_QC2,
-	CONNECT_TYPE_CDP,
-	CONNECT_TYPE_NON_STANDARD_CHARGER,
-	CONNECT_TYPE_APPLE_500MA,
-	CONNECT_TYPE_APPLE_1000MA,
-	CONNECT_TYPE_APPLE_2000MA
-};
-
 #if IS_ENABLED(CONFIG_USB_TEGRA_CD)
 
 /**
@@ -53,7 +37,7 @@ extern void tegra_usb_release_ucd(struct tegra_usb_cd *ucd);
 /**
  * Detects the USB charger and returns the type.
  */
-extern enum tegra_usb_connect_type
+extern unsigned int
 	tegra_ucd_detect_cable_and_set_current(struct tegra_usb_cd *ucd);
 
 /**
@@ -72,7 +56,7 @@ extern void tegra_ucd_set_sdp_cdp_current(struct tegra_usb_cd *ucd,
  * charging current.
  */
 void tegra_ucd_set_charger_type(struct tegra_usb_cd *ucd,
-			enum tegra_usb_connect_type connect_type);
+				unsigned int connect_type);
 #else /* CONFIG_USB_TEGRA_CD */
 
 struct tegra_usb_cd *tegra_usb_get_ucd(struct platform_device *pdev)
@@ -84,7 +68,7 @@ void tegra_usb_release_ucd(struct tegra_usb_cd *ucd)
 {
 }
 
-enum tegra_usb_connect_type
+unsigned int
 	tegra_ucd_detect_cable_and_set_current(struct tegra_usb_cd *ucd)
 {
 	return -EINVAL;
@@ -99,7 +83,7 @@ void tegra_ucd_set_sdp_cdp_current(struct tegra_usb_cd *ucd, int current_ma)
 }
 
 void tegra_ucd_set_charger_type(struct tegra_usb_cd *ucd,
-			enum tegra_usb_connect_type connect_type)
+				unsigned int connect_type)
 {
 }
 #endif /* CONFIG_USB_TEGRA_CD */
