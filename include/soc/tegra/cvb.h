@@ -83,6 +83,8 @@ struct thermal_table {
 
 	const struct thermal_tv *thermal_cap_table;
 	unsigned int thermal_cap_table_size;
+	const struct thermal_tv *thermal_cap_ucm2_table;
+	unsigned int thermal_cap_ucm2_table_size;
 };
 
 #if defined(CONFIG_TEGRA_DVFS)
