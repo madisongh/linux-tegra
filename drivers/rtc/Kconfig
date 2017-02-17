@@ -1527,7 +1527,7 @@ config RTC_DRV_PM8XXX
 
 config RTC_DRV_TEGRA
 	tristate "Tegra RTC"
-	depends on ARCH_TEGRA_21x_SOC || ARCH_TEGRA_18x_SOC
+	depends on ARCH_TEGRA_210_SOC || ARCH_TEGRA_18x_SOC
 	default y
 	help
 	  Enable RTC driver on TEGRA T210 and later SOCs. Select required

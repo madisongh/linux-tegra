@@ -86,6 +86,6 @@ config MAILBOX_TEST
 	  implementations.
 
 config TEGRA_XUSB_MBOX
-	def_bool y if (ARCH_TEGRA_18x_SOC || ARCH_TEGRA_21x_SOC)
+	def_bool y if (ARCH_TEGRA_18x_SOC || ARCH_TEGRA_210_SOC)
 
 endif
