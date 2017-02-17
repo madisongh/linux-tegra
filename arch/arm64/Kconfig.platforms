@@ -83,6 +83,7 @@ config ARCH_TEGRA
 	select HAVE_CLK
 	select PINCTRL
 	select RESET_CONTROLLER
+	select GENERIC_PINCONF
 	help
 	  This enables support for the NVIDIA Tegra SoC family.
 
