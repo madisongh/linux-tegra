@@ -1,7 +1,7 @@
 /*
  * ADMA driver for Nvidia's Tegra ADMA controller.
  *
- * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -42,7 +42,7 @@
 
 #include "dmaengine.h"
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_210_SOC)
 #include  "tegra210-adma.h"
 #else
 #include <sound/tegra_adma.h>
