@@ -100,6 +100,11 @@ enum tegra_revision {
 	TEGRA_REVISION_MAX,
 };
 
+enum tegra_ucm {
+	TEGRA_UCM1 = 0,
+	TEGRA_UCM2,
+};
+
 /* wrappers for the old fuse.h names */
 #define soc_process_id core_process_id
 
@@ -120,6 +125,7 @@ struct tegra_sku_info {
 	enum tegra_revision revision;
 	int speedo_rev;
 	enum tegra_revision id_and_rev;
+	enum tegra_ucm ucm;
 };
 
 u32 tegra_read_straps(void);
