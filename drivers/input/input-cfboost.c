@@ -20,6 +20,7 @@
 #include <linux/pm_qos.h>
 #include <linux/pm_runtime.h>
 #include <linux/sched/rt.h>
+#include <soc/tegra/common.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/input_cfboost.h>
@@ -46,10 +47,9 @@ MODULE_DESCRIPTION("Input event CPU frequency booster");
 MODULE_LICENSE("GPL v2");
 
 
+static bool soc_is_t18x_compatible;
 static struct pm_qos_request freq_req, core_req, emc_req, gpu_req;
-#if IS_ENABLED(CONFIG_ARCH_TEGRA_18x_SOC)
 static struct pm_qos_request freq_req2;
-#endif
 static struct dev_pm_qos_request gpu_wakeup_req;
 static unsigned int boost_freq; /* kHz */
 static int boost_freq_set(const char *arg, const struct kernel_param *kp)
@@ -59,10 +59,9 @@ static int boost_freq_set(const char *arg, const struct kernel_param *kp)
 	if (ret == 0 && old_boost && !boost_freq) {
 		pm_qos_update_request(&freq_req,
 				      PM_QOS_DEFAULT_VALUE);
-#if IS_ENABLED(CONFIG_ARCH_TEGRA_18x_SOC)
-		pm_qos_update_request(&freq_req2,
-				      PM_QOS_DEFAULT_VALUE);
-#endif
+		if (soc_is_t18x_compatible)
+			pm_qos_update_request(&freq_req2,
+					      PM_QOS_DEFAULT_VALUE);
 	}
 	return ret;
 }
@@ -128,10 +127,9 @@ static void cfb_boost(struct kthread_work *w)
 	if (boost_freq > 0) {
 		pm_qos_update_request_timeout(&freq_req, boost_freq,
 				boost_time * 1000);
-#if IS_ENABLED(CONFIG_ARCH_TEGRA_18x_SOC)
-		pm_qos_update_request_timeout(&freq_req2, boost_freq,
+		if (soc_is_t18x_compatible)
+			pm_qos_update_request_timeout(&freq_req2, boost_freq,
 				boost_time * 1000);
-#endif
 	}
 
 	if (boost_emc > 0)
@@ -300,6 +298,8 @@ static int __init cfboost_init(void)
 	};
 	int ret;
 
+	soc_is_t18x_compatible = soc_is_tegra186_n_later();
+
 	/* create RT kthread */
 	boost_kthread = kthread_run(&kthread_worker_fn, &boost_worker,
 			"icfb-kthread");
@@ -319,15 +319,15 @@ static int __init cfboost_init(void)
 
 	pm_qos_add_request(&core_req, PM_QOS_MIN_ONLINE_CPUS,
 			   PM_QOS_DEFAULT_VALUE);
-#if IS_ENABLED(CONFIG_ARCH_TEGRA_18x_SOC)
-	pm_qos_add_request(&freq_req, PM_QOS_CLUSTER0_FREQ_MIN,
-			   PM_QOS_DEFAULT_VALUE);
-	pm_qos_add_request(&freq_req2, PM_QOS_CLUSTER1_FREQ_MIN,
-			   PM_QOS_DEFAULT_VALUE);
-#else
-	pm_qos_add_request(&freq_req, PM_QOS_CPU_FREQ_MIN,
-			   PM_QOS_DEFAULT_VALUE);
-#endif
+	if (soc_is_t18x_compatible) {
+		pm_qos_add_request(&freq_req, PM_QOS_CLUSTER0_FREQ_MIN,
+				   PM_QOS_DEFAULT_VALUE);
+		pm_qos_add_request(&freq_req2, PM_QOS_CLUSTER1_FREQ_MIN,
+				   PM_QOS_DEFAULT_VALUE);
+	} else {
+		pm_qos_add_request(&freq_req, PM_QOS_CPU_FREQ_MIN,
+				   PM_QOS_DEFAULT_VALUE);
+	}
 	pm_qos_add_request(&emc_req, PM_QOS_EMC_FREQ_MIN,
 			   PM_QOS_DEFAULT_VALUE);
 	pm_qos_add_request(&gpu_req, PM_QOS_GPU_FREQ_MIN,
@@ -344,9 +344,8 @@ static void __exit cfboost_exit(void)
 	pm_qos_remove_request(&gpu_req);
 	pm_qos_remove_request(&emc_req);
 	pm_qos_remove_request(&freq_req);
-#if IS_ENABLED(CONFIG_ARCH_TEGRA_18x_SOC)
-	pm_qos_remove_request(&freq_req2);
-#endif
+	if (soc_is_t18x_compatible)
+		pm_qos_remove_request(&freq_req2);
 	pm_qos_remove_request(&core_req);
 }
 
