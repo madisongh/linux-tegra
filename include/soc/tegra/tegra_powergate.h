@@ -30,7 +30,7 @@ extern int TEGRA_POWERGATE_SOR;
 #ifdef CONFIG_POWERGATE_TEGRA_BPMP
 int tegra_bpmp_init_powergate(struct platform_device *pdev);
 #else
-static inline int tegra_bpmp_init_powergate(struct tegra_bpmp *bpmp)
+static inline int tegra_bpmp_init_powergate(struct platform_device *pdev)
 {
 	return 0;
 }

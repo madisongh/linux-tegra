@@ -100,7 +100,7 @@ static inline bool tegra_powergate_check_clamping(int id)
 }
 static inline int tegra_powergate_remove_clamping(int id)
 {
-	return -ENOTSUP;
+	return -EOPNOTSUPP;
 }
 
 static inline int slcg_register_notifier(int id, struct notifier_block *nb)
