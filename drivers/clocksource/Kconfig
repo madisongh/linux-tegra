@@ -67,7 +67,7 @@ config TEGRA_TIMER
 	bool
 
 config TEGRA210_TIMER
-	def_bool ARCH_TEGRA_21x_SOC
+	def_bool ARCH_TEGRA_210_SOC
 
 config VT8500_TIMER
 	bool
