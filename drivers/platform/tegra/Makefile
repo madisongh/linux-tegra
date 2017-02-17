@@ -11,7 +11,7 @@ subdir-ccflags-y += -I$(srctree)/drivers/platform/tegra/include \
 		    -I$(srctree)/drivers/video/tegra/dc/panel/ \
 		    -I$(srctree)/arch/arm/mach-tegra
 
-ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
+ifeq ($(CONFIG_ARCH_TEGRA_210_SOC),y)
 obj-$(CONFIG_USB_SUPPORT)		+= tegra_usb_pmc.o
 endif
 
@@ -38,7 +38,7 @@ obj-y += powergate/
 
 ifeq ($(CONFIG_TEGRA_THERMAL_THROTTLE),y)
 ccflags-y += -I$(srctree)/arch/arm/mach-tegra
-obj-$(CONFIG_ARCH_TEGRA_21x_SOC)        += tegra_throttle.o
+obj-$(CONFIG_ARCH_TEGRA_210_SOC)        += tegra_throttle.o
 endif
 
 ifeq ($(CONFIG_CPU_FREQ),y)

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010-2012 Google, Inc.
- * Copyright (C) 2013-2016, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2013-2017, NVIDIA Corporation.  All rights reserved.
  *
  * Author:
  *	Erik Gilling <konkers@google.com>
@@ -21,7 +21,7 @@
 
 #include <linux/platform/tegra/tegra_mc.h>
 /* Pull in chip specific MC header - contains the regs for the platform. */
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_210_SOC)
 #include <linux/platform/tegra/mc-regs-t21x.h>
 #define MC_LATENCY_ALLOWANCE_BASE	MC_LATENCY_ALLOWANCE_AFI_0
 #elif defined(CONFIG_ARCH_TEGRA_18x_SOC)
@@ -150,7 +150,7 @@ int tegra_mc_get_tiled_memory_bandwidth_multiplier(void);
  */
 static inline int tegra_mc_get_effective_bytes_width(void)
 {
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_210_SOC)
 	return 8;
 #else
 	return 4;
@@ -159,7 +159,7 @@ static inline int tegra_mc_get_effective_bytes_width(void)
 
 unsigned long tegra_emc_bw_to_freq_req(unsigned long bw);
 unsigned long tegra_emc_freq_req_to_bw(unsigned long freq);
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_210_SOC)
 void         tegra21_mc_latency_allowance_save(u32 **pctx);
 void         tegra21_mc_latency_allowance_restore(u32 **pctx);
 #endif

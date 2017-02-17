@@ -3,7 +3,7 @@
  *
  * A header file containing data structures shared with ADSP OS
  *
- * Copyright (C) 2014-2016 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2014-2017 NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -21,11 +21,11 @@
 #include <linux/firmware.h>
 #include "adsp_shared_struct.h"
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_210_SOC)
 #include "os-t21x.h"
 #else
 #include "os-t18x.h"
-#endif /* CONFIG_ARCH_TEGRA_21x_SOC */
+#endif /* CONFIG_ARCH_TEGRA_210_SOC */
 
 #define CONFIG_ADSP_DRAM_LOG_WITH_TAG	1
 /* enable profiling of load init start */

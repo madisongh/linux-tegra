@@ -31,7 +31,7 @@ ifeq ($(CONFIG_TEGRA_ADSP_CPUSTAT),y)
 nvadsp-objs += adsp_cpustat.o
 endif
 
-ifeq ($(CONFIG_ARCH_TEGRA_21x_SOC),y)
+ifeq ($(CONFIG_ARCH_TEGRA_210_SOC),y)
 nvadsp-objs += dev-t21x.o
 nvadsp-objs += os-t21x.o
 endif

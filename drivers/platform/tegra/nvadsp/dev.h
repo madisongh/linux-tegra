@@ -26,11 +26,11 @@
 
 #include <linux/platform/tegra/emc_bwmgr.h>
 
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_210_SOC)
 #include "dev-t21x.h"
 #else
 #include "dev-t18x.h"
-#endif /* CONFIG_ARCH_TEGRA_21x_SOC */
+#endif /* CONFIG_ARCH_TEGRA_210_SOC */
 
 #include "hwmailbox.h"
 #include "amc.h"

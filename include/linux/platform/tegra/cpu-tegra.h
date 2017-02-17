@@ -1,7 +1,7 @@
 /*
  * linux/platform/tegra/cpu-tegra.h
  *
- * Copyright (c) 2011-2016, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2011-2017, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -65,7 +65,7 @@ struct tegra_cpufreq_table_data {
 struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void);
 unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate);
 int tegra_update_mselect_rate(unsigned long cpu_rate);
-#if defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_210_SOC)
 unsigned long tegra_emc_cpu_limit(unsigned long cpu_rate);
 #else
 static inline unsigned long tegra_emc_cpu_limit(unsigned long cpu_rate)

@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/tegra_emc.h
  *
- * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -83,7 +83,7 @@ int tegra_emc_set_over_temp_state(unsigned long state);
 void tegra_emc_mr4_set_freq_thresh(unsigned long thresh);
 void tegra_emc_mr4_freq_check(unsigned long freq);
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
+#ifdef CONFIG_ARCH_TEGRA_210_SOC
 int tegra_emc_set_rate_on_parent(unsigned long rate, struct clk *p);
 u32 emc_do_periodic_compensation(void);
 #else
