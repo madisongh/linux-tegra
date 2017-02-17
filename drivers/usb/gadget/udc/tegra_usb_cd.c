@@ -1,7 +1,7 @@
 /*
  * tegra_usb_cd.c -- Tegra USB charger detection driver.
  *
- * Copyright (c) 2012-2016, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -15,6 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/extcon.h>
 #include <linux/io.h>
@@ -225,6 +226,13 @@ static enum tegra_usb_connect_type
 	}
 
 	if (ucd->hw_ops->dcp_cd && ucd->hw_ops->dcp_cd(ucd)) {
+		/*
+		 * wait 20ms (max of TVDMSRC_DIS) for D- to be disabled
+		 * from host side, before we perform secondary detection.
+		 * Some hosts may not respond well if we do secondary
+		 * detection right after primary detection.
+		 */
+		msleep(20);
 		if (ucd->hw_ops->cdp_cd && ucd->hw_ops->cdp_cd(ucd))
 			ucd->connect_type = CONNECT_TYPE_CDP;
 		else if (ucd->hw_ops->maxim14675_cd &&
