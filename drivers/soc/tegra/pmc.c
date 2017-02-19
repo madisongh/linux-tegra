@@ -54,6 +54,7 @@
 #include <linux/notifier.h>
 #include <linux/regulator/consumer.h>
 #include <linux/uaccess.h>
+#include <linux/irqchip/tegra.h>
 
 #include <dt-bindings/soc/tegra-pmc.h>
 
@@ -634,13 +635,13 @@ static void tegra_pmc_register_update(enum pmc_regs reg,
 	tegra_pmc_writel(pmc_reg, reg);
 }
 
-#ifdef CONFIG_ARCH_TEGRA_210_SOC
 int tegra_read_wake_status(u32 *wake_status)
 {
-	// TODO: need to check if tegra-wakeups.c is still needed by t210
+	if (soc_is_tegra186_n_later())
+		return tegra18x_read_wake_status(wake_status);
+
 	return 0;
 }
-#endif
 
 #ifndef CONFIG_TEGRA_POWERGATE
 /**
