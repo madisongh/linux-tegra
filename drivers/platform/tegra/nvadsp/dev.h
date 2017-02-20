@@ -26,15 +26,43 @@
 
 #include <linux/platform/tegra/emc_bwmgr.h>
 
-#if defined(CONFIG_ARCH_TEGRA_210_SOC)
-#include "dev-t21x.h"
-#else
-#include "dev-t18x.h"
-#endif /* CONFIG_ARCH_TEGRA_210_SOC */
-
 #include "hwmailbox.h"
 #include "amc.h"
-#include "os.h"
+
+/*
+ * Note: These enums should be aligned to the regs mentioned in the
+ * device tree
+*/
+enum {
+	AMC,
+	AMISC,
+	ABRIDGE,
+	UNIT_FPGA_RST,
+	AHSP,
+	APE_MAX_REG
+};
+
+enum {
+	ADSP_DRAM1,
+	ADSP_DRAM2,
+	ADSP_MAX_DRAM_MAP
+};
+
+/*
+ * Note: These enums should be aligned to the adsp_mem node mentioned in the
+ * device tree
+*/
+enum adsp_mem_dt {
+	ADSP_OS_ADDR,
+	ADSP_OS_SIZE,
+	ADSP_APP_ADDR,
+	ADSP_APP_SIZE,
+	ARAM_ALIAS_0_ADDR,
+	ARAM_ALIAS_0_SIZE,
+	ACSR_ADDR, /* ACSR: ADSP CPU SHARED REGION */
+	ACSR_SIZE,
+	ADSP_MEM_END,
+};
 
 enum adsp_evp_dt {
 	ADSP_EVP_BASE,
@@ -93,8 +121,20 @@ struct nvadsp_hwmb {
 	u32 hwmbox7_reg;
 };
 
+
+typedef int (*reset_init) (struct platform_device *pdev);
+typedef int (*os_init) (struct platform_device *pdev);
+#ifdef CONFIG_PM
+typedef int (*pm_init) (struct platform_device *pdev);
+#endif
+
 struct nvadsp_chipdata {
-	struct nvadsp_hwmb hwmb;
+	struct nvadsp_hwmb	hwmb;
+	reset_init		reset_init;
+	os_init			os_init;
+#ifdef CONFIG_PM
+	pm_init			pm_init;
+#endif
 };
 
 struct nvadsp_drv_data {
@@ -202,8 +242,24 @@ void emc_dfs_exit(void);
 #endif
 
 #ifdef CONFIG_PM
-int __init nvadsp_pm_init(struct platform_device *pdev);
+static inline int __init nvadsp_pm_init(struct platform_device *pdev)
+{
+	struct nvadsp_drv_data *drv_data = platform_get_drvdata(pdev);
+
+	if (drv_data->chip_data->pm_init)
+		return drv_data->chip_data->pm_init(pdev);
+
+	return PTR_ERR(drv_data->chip_data->pm_init);
+}
 #endif
-int __init nvadsp_reset_init(struct platform_device *pdev);
+static inline int __init nvadsp_reset_init(struct platform_device *pdev)
+{
+	struct nvadsp_drv_data *drv_data = platform_get_drvdata(pdev);
+
+	if (drv_data->chip_data->reset_init)
+		return drv_data->chip_data->reset_init(pdev);
+
+	return PTR_ERR(drv_data->chip_data->reset_init);
+}
 
 #endif /* __TEGRA_NVADSP_DEV_H */

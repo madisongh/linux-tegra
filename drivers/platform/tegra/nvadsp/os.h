@@ -27,6 +27,8 @@
 #include "os-t18x.h"
 #endif /* CONFIG_ARCH_TEGRA_210_SOC */
 
+#include "dev.h"
+
 #define CONFIG_ADSP_DRAM_LOG_WITH_TAG	1
 /* enable profiling of load init start */
 #define RECORD_STATS			0
@@ -140,8 +142,17 @@ struct app_start_stats {
 	u64 adsp_receive_timestamp;
 };
 
+static inline int nvadsp_os_init(struct platform_device *pdev)
+{
+	struct nvadsp_drv_data *drv_data = platform_get_drvdata(pdev);
+
+	if (drv_data->chip_data->os_init)
+		return drv_data->chip_data->os_init(pdev);
+
+	return PTR_ERR(drv_data->chip_data->os_init);
+}
+
 int nvadsp_os_probe(struct platform_device *);
-int nvadsp_os_init(struct platform_device *pdev);
 int nvadsp_app_module_probe(struct platform_device *);
 int adsp_add_load_mappings(phys_addr_t, void *, int);
 struct elf32_shdr *nvadsp_get_section(const struct firmware *, char *);

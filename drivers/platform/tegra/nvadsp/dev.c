@@ -40,6 +40,9 @@
 #include "ape_actmon.h"
 #include "aram_manager.h"
 
+#include "dev-t21x.h"
+#include "dev-t18x.h"
+
 static struct nvadsp_drv_data *nvadsp_drv_data;
 
 #ifdef CONFIG_DEBUG_FS
@@ -399,6 +402,11 @@ static struct nvadsp_chipdata tegra210_adsp_chipdata = {
 		.hwmbox2_reg = 0x60,
 		.hwmbox3_reg = 0x64,
 	},
+	.reset_init = nvadsp_reset_t21x_init,
+	.os_init = nvadsp_os_t21x_init,
+#ifdef CONFIG_PM
+	.pm_init = nvadsp_pm_t21x_init,
+#endif
 };
 
 static struct nvadsp_chipdata tegrat18x_adsp_chipdata = {
@@ -413,6 +421,11 @@ static struct nvadsp_chipdata tegrat18x_adsp_chipdata = {
 		.hwmbox6_reg = 0X30000,
 		.hwmbox7_reg = 0X38000,
 	},
+	.reset_init = nvadsp_reset_t18x_init,
+	.os_init = nvadsp_os_t18x_init,
+#ifdef CONFIG_PM
+	.pm_init = nvadsp_pm_t18x_init,
+#endif
 };
 
 static const struct of_device_id nvadsp_of_match[] = {

@@ -281,7 +281,7 @@ static int __nvadsp_runtime_idle(struct device *dev)
 	return 0;
 }
 
-int __init nvadsp_pm_init(struct platform_device *pdev)
+int nvadsp_pm_t21x_init(struct platform_device *pdev)
 {
 	struct nvadsp_drv_data *drv_data = platform_get_drvdata(pdev);
 
@@ -293,7 +293,7 @@ int __init nvadsp_pm_init(struct platform_device *pdev)
 }
 #endif /* CONFIG_PM */
 
-int __init nvadsp_reset_init(struct platform_device *pdev)
+int nvadsp_reset_t21x_init(struct platform_device *pdev)
 {
 	struct nvadsp_drv_data *drv_data = platform_get_drvdata(pdev);
 	struct device *dev = &pdev->dev;
