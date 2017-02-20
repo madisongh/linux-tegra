@@ -1,7 +1,7 @@
 /*
  * drivers/gpio/gpio-tmpm32xi2c.c
  *
- * Copyright (c) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
+#include <linux/delay.h>
 #ifdef CONFIG_OF_GPIO
 #include <linux/of_platform.h>
 #endif
@@ -383,6 +384,12 @@ static int __tmpm32xi2c_power_get_value(struct tmpm32xi2c_chip *chip,
 			__func__, __LINE__, cmd, channel, ret);
 		return 0;
 	}
+
+	/*
+	 * Delay for allowing MCU to read the INA sensor and save the result
+	 * into I2C return value.
+	 */
+	usleep_range(10000, 10100);
 
 	/* set byte length for reading */
 	if (cmd == CMD_RD_VOLT)
