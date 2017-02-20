@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ *   Copyright (c) 2016-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -402,6 +402,9 @@ static void snd_complete_urb(struct urb *urb)
 		}
 
 		prepare_outbound_urb(ep, ctx);
+		/* can be stopped during prepare callback */
+		if (unlikely(!test_bit(EP_FLAG_RUNNING, &ep->flags)))
+			goto exit_clear;
 	} else {
 		retire_inbound_urb(ep, ctx);
 		/* can be stopped during retire callback */
