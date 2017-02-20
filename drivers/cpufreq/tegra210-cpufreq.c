@@ -199,13 +199,13 @@ static int cpufreq_table_make_from_dt(void)
 	/* Read frequency table */
 	if (!of_find_property(np, propname, &freqs_num)) {
 		dev_err(dev, "%s: %s is not found\n", __func__, propname);
-		return -EINVAL;
+		ret = -EINVAL;
 		goto err_out;
 	}
 
 	if (!freqs_num) {
 		dev_err(dev, "%s: invalid %s size 0\n", __func__, propname);
-		return -EINVAL;
+		ret = -EINVAL;
 		goto err_out;
 	}
 
