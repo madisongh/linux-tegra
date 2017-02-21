@@ -307,6 +307,8 @@ struct tegra_padctl_uphy_group {
 	unsigned int num_funcs;
 };
 
+struct tegra_padctl_uphy;
+
 struct tegra_padctl_uphy_soc {
 	const struct pinctrl_pin_desc *pins;
 	unsigned int num_pins;
@@ -321,6 +323,9 @@ struct tegra_padctl_uphy_soc {
 
 	const char * const *supply_names;
 	unsigned int num_supplies;
+
+	void (*usb3_phy_set_lfps_detector)(struct tegra_padctl_uphy *uphy,
+				    unsigned int port, bool enable);
 };
 
 struct tegra_padctl_uphy_lane {
@@ -3411,6 +3416,10 @@ static void tegra_xusb_phy_mbox_work(struct work_struct *work)
 		break;
 	case MBOX_CMD_DISABLE_SS_LFPS_DETECTION:
 	case MBOX_CMD_ENABLE_SS_LFPS_DETECTION:
+
+		if (!uphy->soc->usb3_phy_set_lfps_detector)
+			break;
+
 		ports = msg->data >> 1;
 		resp.data = msg->data;
 		resp.cmd = MBOX_CMD_ACK;
@@ -3418,10 +3427,10 @@ static void tegra_xusb_phy_mbox_work(struct work_struct *work)
 			if (!(ports & BIT(i)))
 				continue;
 			if (msg->cmd == MBOX_CMD_ENABLE_SS_LFPS_DETECTION)
-				tegra210_usb3_phy_set_lfps_detector(uphy, i,
+				uphy->soc->usb3_phy_set_lfps_detector(uphy, i,
 									true);
 			else {
-				tegra210_usb3_phy_set_lfps_detector(uphy, i,
+				uphy->soc->usb3_phy_set_lfps_detector(uphy, i,
 									false);
 				/*
 				 * Add this delay to increase stability of
@@ -3676,6 +3685,7 @@ static const struct tegra_padctl_uphy_soc tegra21x_soc = {
 	.hsic_port_offset = 8,
 	.supply_names = tegra21x_supply_names,
 	.num_supplies = ARRAY_SIZE(tegra21x_supply_names),
+	.usb3_phy_set_lfps_detector = tegra210_usb3_phy_set_lfps_detector,
 };
 
 static const struct tegra_padctl_uphy_soc tegra21xb01_soc = {
