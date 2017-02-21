@@ -1,7 +1,7 @@
 /*
  * QSPI driver for NVIDIA's Tegra210 QUAD SPI Controller.
  *
- * Copyright (c) 2013-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -349,7 +349,7 @@ static unsigned tegra_qspi_fill_tx_fifo_from_client_txbuf(
 		for (count = 0; count < max_n_32bit; count++) {
 			x = 0;
 			for (i = 0; (i < 4) && nbytes; i++, nbytes--)
-				x |= (*tx_buf++) << (i*8);
+				x |= (u32)(*tx_buf++) << (i*8);
 			tegra_qspi_writel(tqspi, x, QSPI_TX_FIFO);
 		}
 	} else {
@@ -360,7 +360,7 @@ static unsigned tegra_qspi_fill_tx_fifo_from_client_txbuf(
 			x = 0;
 			for (i = 0; nbytes && (i < tqspi->bytes_per_word);
 					i++, nbytes--)
-				x |= ((*tx_buf++) << i*8);
+				x |= (u32)((*tx_buf++) << i*8);
 			tegra_qspi_writel(tqspi, x, QSPI_TX_FIFO);
 		}
 	}
@@ -901,20 +901,6 @@ static int tegra_qspi_start_transfer_one(struct spi_device *spi,
 		tqspi->cur_direction |= DATA_DIR_TX;
 
 	tqspi->command1_reg = command1;
-
-	if (!cdata) {
-		u32 command2_reg;
-		int rx_tap_delay;
-		int tx_tap_delay;
-
-
-		rx_tap_delay = cdata->rx_clk_tap_delay;
-		tx_tap_delay = min(cdata->tx_clk_tap_delay, 63);
-
-		command2_reg = QSPI_TX_TAP_DELAY(tx_tap_delay) |
-			QSPI_RX_TAP_DELAY(rx_tap_delay);
-		tegra_qspi_writel(tqspi, command2_reg, QSPI_COMMAND2);
-	}
 
 	qspi_cs_timing2 &= QSPI_NUM_DUMMY_CYCLE_MASK;
 	qspi_cs_timing2 |= QSPI_NUM_DUMMY_CYCLE(num_dummy_cycles);
