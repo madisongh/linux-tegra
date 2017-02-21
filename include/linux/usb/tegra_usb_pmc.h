@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -136,14 +136,9 @@
 #define PMC_PAD_CFG		(0x1f4)
 
 #define PMC_UTMIP_TERM_PAD_CFG	0x1f8
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 #define PMC_RCTRL_VAL(x)	0
 #define PMC_TCTRL_VAL(x)	(((x) & 0x3f) << 7)
 #define PMC_PCTRL_VAL(x)	(((x) & 0x3f) << 1)
-#else
-#define PMC_TCTRL_VAL(x)	(((x) & 0x1f) << 5)
-#define PMC_RCTRL_VAL(x)	(((x) & 0x1f) << 0)
-#endif
 
 #define PMC_SLEEP_CFG(inst)		UTMIP_INST(inst, 0x1fc, 0x4d0)
 #define UTMIP_TCTRL_USE_PMC(inst) UTMIP_INST(inst, 1 << ((8*(inst))+3), 1 << 3)
@@ -151,7 +146,6 @@
 #define UTMIP_TCTRL_USE_PMC_P1		(1 << 11)
 #define UTMIP_TCTRL_USE_PMC_P0		(1 << 3)
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 #define UTMIP_PCTRL_USE_PMC(inst) UTMIP_INST(inst, 1 << ((8*(inst))+2), 1 << 2)
 #define UTMIP_PCTRL_USE_PMC_P2		(1 << 18)
 #define UTMIP_PCTRL_USE_PMC_P1		(1 << 10)
@@ -176,12 +170,6 @@
 #define UTMIP_RPU_SWITC_LOW_USE_PMC_P2		(1 << 10)
 #define UTMIP_RPU_SWITC_LOW_USE_PMC_P1		(1 << 9)
 #define UTMIP_RPU_SWITC_LOW_USE_PMC_P0		(1 << 8)
-#else
-#define UTMIP_RCTRL_USE_PMC(inst) UTMIP_INST(inst, 1 << ((8*(inst))+2), 1 << 2)
-#define UTMIP_RCTRL_USE_PMC_P2		(1 << 18)
-#define UTMIP_RCTRL_USE_PMC_P1		(1 << 10)
-#define UTMIP_RCTRL_USE_PMC_P0		(1 << 2)
-#endif
 
 #define UTMIP_FSLS_USE_PMC(inst) UTMIP_INST(inst, 1 << ((8*(inst))+1), 1 << 1)
 #define UTMIP_FSLS_USE_PMC_P2		(1 << 17)
@@ -245,10 +233,8 @@
 #define PMC_UTMIP_BIAS_MASTER_CNTRL 0x270
 #define BIAS_MASTER_PROG_VAL		(1 << 1)
 
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 #define PMC_UTMIP_PAD_CFG(inst)		(0x4c0 + (4*(inst)))
 #define UTMIP_RPD_CTRL(x)			(((x) & 0x1f) << 22)
-#endif
 
 #define UTMIP_BIAS_CFG1		0x83c
 #define   UTMIP_BIAS_PDTRK_COUNT(x) (((x) & 0x1f) << 3)

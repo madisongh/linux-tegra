@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -73,7 +73,6 @@ static inline enum padctl_lane usb3_laneowner_to_lane_enum(u8 laneowner)
 }
 
 /* PCIe/SATA pad phy */
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 #define SS_PAD_COUNT	4
 #define USB3_LANE_NOT_ENABLED	0xF
 #define SATA_LANE	(0x8 << 12)
@@ -205,46 +204,7 @@ static inline enum padctl_lane usb3_laneowner_to_lane_enum(u8 laneowner)
 #define RX_TERM_EN				(1 << 21)
 #define RX_TERM_OVRD				(1 << 23)
 
-#else
-#define SATA_LANE	(0x1)
-
-/* xusb padctl regs for pad programming of t124 usb3 */
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL1_0			0x138
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL1_0_PLL0_REFCLK_NDIV_MASK	(0x3 << 20)
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL1_0_PLL0_REFCLK_NDIV	(0x2 << 20)
-
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL2_0			0x13c
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL2_0_XDIGCLK_SEL_MASK	(0x7 << 0)
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL2_0_XDIGCLK_SEL		(0x7 << 0)
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL2_0_TXCLKREF_SEL		(1 << 4)
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL2_0_TCLKOUT_EN		(1 << 12)
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL2_0_PLL0_CP_CNTL_MASK	(0xF << 16)
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL2_0_PLL0_CP_CNTL		(0x8 << 16)
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL2_0_PLL1_CP_CNTL_MASK	(0xF << 20)
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL2_0_PLL1_CP_CNTL		(0x8 << 20)
-
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL3_0			0x140
-#define XUSB_PADCTL_IOPHY_PLL_S0_CTL3_0_RCAL_BYPASS		(1 << 7)
-
-/* xusb padctl regs for pad programming of pcie */
-#define XUSB_PADCTL_IOPHY_PLL_P0_CTL1_0	0x40
-#define XUSB_PADCTL_IOPHY_PLL_P0_CTL1_REFCLK_SEL_MASK	(0xF << 12)
-#define XUSB_PADCTL_IOPHY_PLL_P0_CTL1_REFCLK_SEL	(0x0 << 12)
-#define XUSB_PADCTL_IOPHY_PLL_P0_CTL1_PLL_RST_		(1 << 1)
-#define XUSB_PADCTL_IOPHY_PLL_P0_CTL1_PLL0_LOCKDET		(1 << 19)
-
-#define XUSB_PADCTL_IOPHY_PLL_P0_CTL2_0	0x44
-#define XUSB_PADCTL_IOPHY_PLL_P0_CTL2_TXCLKREF_SEL	(1 << 4)
-#define XUSB_PADCTL_IOPHY_PLL_P0_CTL2_TXCLKREF_EN	(1 << 5)
-#define XUSB_PADCTL_IOPHY_PLL_P0_CTL2_REFCLKBUF_EN	(1 << 6)
-#define XUSB_PADCTL_IOPHY_PLL_P0_CTL2_PLL0_CP_CNTL_MASK	(0xF << 16)
-#define XUSB_PADCTL_IOPHY_PLL_P0_CTL2_PLL0_CP_CNTL_VAL	(0x5 << 16)
-
-#endif
-
 /* PADCTL ELPG_PROGRAM */
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
-
 #define XUSB_PADCTL_ELPG_PROGRAM_0		0x20
 #define XUSB_PADCTL_ELPG_PROGRAM_1		0x24
 #define SSP0_ELPG_CLAMP_EN			(1 << 0)
@@ -291,53 +251,6 @@ static inline enum padctl_lane usb3_laneowner_to_lane_enum(u8 laneowner)
 		SS_PORT2_WAKEUP_EVENT | SS_PORT3_WAKEUP_EVENT |	\
 		USB2_HSIC_PORT0_WAKEUP_EVENT)
 
-#else
-#define XUSB_PADCTL_ELPG_PROGRAM_0		0x1c
-#define XUSB_PADCTL_ELPG_PROGRAM_AUX_MUX_LP0_CLAMP_EN	(1 << 24)
-#define XUSB_PADCTL_ELPG_PROGRAM_AUX_MUX_LP0_CLAMP_EN_EARLY	(1 << 25)
-#define XUSB_PADCTL_ELPG_PROGRAM_AUX_MUX_LP0_VCORE_DOWN	(1 << 26)
-
-#define SSP0_ELPG_CLAMP_EN		(1 << 16)
-#define SSP0_ELPG_CLAMP_EN_EARLY	(1 << 17)
-#define SSP0_ELPG_VCORE_DOWN		(1 << 18)
-#define SSP1_ELPG_CLAMP_EN		(1 << 20)
-#define SSP1_ELPG_CLAMP_EN_EARLY	(1 << 21)
-#define SSP1_ELPG_VCORE_DOWN		(1 << 22)
-#define SSP2_ELPG_CLAMP_EN			0x0
-#define SSP2_ELPG_CLAMP_EN_EARLY	0x0
-#define SSP2_ELPG_VCORE_DOWN		0x0
-#define SSP3_ELPG_CLAMP_EN			0x0
-#define SSP3_ELPG_CLAMP_EN_EARLY	0x0
-#define SSP3_ELPG_VCORE_DOWN		0x0
-
-#define USB2_PORT3_WAKE_INTERRUPT_ENABLE	0x0
-#define SS_PORT0_WAKE_INTERRUPT_ENABLE	(1 << 6)
-#define SS_PORT1_WAKE_INTERRUPT_ENABLE	(1 << 7)
-#define SS_PORT2_WAKE_INTERRUPT_ENABLE	0x0
-#define SS_PORT3_WAKE_INTERRUPT_ENABLE	0x0
-
-#define SS_PORT0_WAKEUP_EVENT		(1 << 14)
-#define SS_PORT1_WAKEUP_EVENT		(1 << 15)
-#define SS_PORT2_WAKEUP_EVENT		0x0
-#define SS_PORT3_WAKEUP_EVENT		0x0
-
-#define USB2_PORT0_WAKEUP_EVENT		(1 << 8)
-#define USB2_PORT1_WAKEUP_EVENT		(1 << 9)
-#define USB2_PORT2_WAKEUP_EVENT		(1 << 10)
-#define USB2_PORT3_WAKEUP_EVENT		0x0
-#define USB2_HSIC_PORT0_WAKEUP_EVENT	(1 << 11)
-#define USB2_HSIC_PORT1_WAKEUP_EVENT	(1 << 12)
-#define USB2_HSIC_PORT0_WAKE_INTERRUPT_ENABLE	(1 << 3)
-#define USB2_HSIC_PORT1_WAKE_INTERRUPT_ENABLE	(1 << 4)
-
-#define XUSB_ALL_WAKE_EVENT	\
-		(USB2_PORT0_WAKEUP_EVENT | USB2_PORT1_WAKEUP_EVENT |	\
-		USB2_PORT2_WAKEUP_EVENT |	\
-		SS_PORT0_WAKEUP_EVENT | SS_PORT1_WAKEUP_EVENT |	\
-		SS_PORT2_WAKEUP_EVENT |	\
-		USB2_HSIC_PORT0_WAKEUP_EVENT)
-#endif
-
 /* PADCTL register offset (Shared T124/T210/T114)*/
 #define USB2_PORT0_WAKE_INTERRUPT_ENABLE	(1 << 0)
 #define USB2_PORT1_WAKE_INTERRUPT_ENABLE	(1 << 1)
@@ -361,7 +274,6 @@ static inline enum padctl_lane usb3_laneowner_to_lane_enum(u8 laneowner)
 #define PLLU_SEQ_IN_SWCTL				(1 << 4)
 
 /* PAD MUX */
-#ifdef CONFIG_ARCH_TEGRA_21x_SOC
 /* XUSB_PADCTL_USB2_PAD_MUX_0 */
 #define BIAS_PAD_MASK	(0x3 << 18)
 #define BIAS_PAD_XUSB	(0x1 << 18)
@@ -533,93 +445,6 @@ static inline enum padctl_lane usb3_laneowner_to_lane_enum(u8 laneowner)
 			USB2_BATTERY_CHRG_OTGPAD_SRP_DETECTED | \
 			USB2_BATTERY_CHRG_OTGPAD_DCD_DETECTED)
 
-#else
-#define XUSB_PADCTL_USB3_PAD_MUX_0		0x134
-#define XUSB_PADCTL_USB3_PAD_MUX_FORCE_PCIE_PAD_IDDQ_DISABLE_MASK0	(1 << 1)
-#define XUSB_PADCTL_USB3_PAD_MUX_FORCE_PCIE_PAD_IDDQ_DISABLE_MASK1	(1 << 2)
-#define XUSB_PADCTL_USB3_PAD_MUX_FORCE_PCIE_PAD_IDDQ_DISABLE_MASK2	(1 << 3)
-#define XUSB_PADCTL_USB3_PAD_MUX_FORCE_PCIE_PAD_IDDQ_DISABLE_MASK3	(1 << 4)
-#define XUSB_PADCTL_USB3_PAD_MUX_FORCE_PCIE_PAD_IDDQ_DISABLE_MASK4	(1 << 5)
-#define XUSB_PADCTL_USB3_PAD_MUX_FORCE_SATA_PAD_IDDQ_DISABLE_MASK0	(1 << 6)
-#define XUSB_PADCTL_USB3_PAD_MUX_PCIE_PAD_LANE0	(0x3 << 16)
-#define XUSB_PADCTL_USB3_PAD_MUX_PCIE_PAD_LANE1	(0x3 << 18)
-#define XUSB_PADCTL_USB3_PAD_MUX_PCIE_PAD_LANE2	(0x3 << 20)
-#define XUSB_PADCTL_USB3_PAD_MUX_PCIE_PAD_LANE3	(0x3 << 22)
-#define XUSB_PADCTL_USB3_PAD_MUX_PCIE_PAD_LANE4	(0x3 << 24)
-#define XUSB_PADCTL_USB3_PAD_MUX_SATA_PAD_LANE0	(0x3 << 26)
-#define XUSB_PADCTL_USB3_PAD_MUX_SATA_PAD_LANE0_OWNER_USB3_SS	(0x1 << 26)
-#define XUSB_PADCTL_USB3_PAD_MUX_PCIE_PAD_LANE0_OWNER_USB3_SS	(0x1 << 16)
-#define XUSB_PADCTL_USB3_PAD_MUX_PCIE_PAD_LANE1_OWNER_USB3_SS	(0x1 << 18)
-
-#ifdef CONFIG_ARCH_TEGRA_11x_SOC
-#define XUSB_PADCTL_USB2_BIAS_PAD_CTL_0		0xa0
-#else
-#define XUSB_PADCTL_USB2_BIAS_PAD_CTL_0		0xb8
-#endif
-#define PD_MASK		(0x1 << 12)
-
-#define XUSB_PADCTL_VBUS_OC_MAP_0	0x0
-#define VBUS_OC_MAP(_p, val)	0x0
-#define VBUS_ENABLE(x)	  0x0
-#define OC_DISABLE		0x0
-
-#define XUSB_PADCTL_OC_DET_0	0x18
-#define VBUS_EN_OC_MAP(x, v) \
-	(((x) == 2) ? \
-	(((v) & 0x7) << 5) : (((v) & 0x7) << (10 + 3 * (x))))
-#define SET_OC_DETECTED(x)			(1 << (x))
-#define OC_DETECTED(x)				(1 << (16 + (x)))
-#define OC_DETECTED_VBUS_PAD(x)		(1 << (20 + (x)))
-#define OC_DETECTED_VBUS_PAD_MASK	(0x7 << 20)
-#define OC_DETECTED_INTR_ENABLE(x)	(1 << (24 + (x)))
-#define OC_DETECTED_INTR_ENABLE_VBUS_PAD(x)	(1 << (28 + (x)))
-
-#define XUSB_PADCTL_USB2_OTG_PAD_CTL_0(_p)	(0xa0 + _p * 0x4)
-#define USB2_OTG_HS_CURR_LVL	(0x3F << 0)
-#define USB2_OTG_PD				(0x1 << 19)
-#define USB2_OTG_PD2			(0x1 << 20)
-#define USB2_OTG_PD_ZI			(0x1 << 21)
-
-#define XUSB_PADCTL_USB2_OTG_PAD_CTL_1(_p)	(0xac + _p * 0x4)
-#define USB2_OTG_PD_DR					(0x1 << 2)
-#define USB2_OTG_TERM_RANGE_ADJ			(0xF << 3)
-#define USB2_OTG_HS_IREF_CAP			(0x3 << 9)
-#define USB2_OTG_PD_CHRP_FORCE_POWERUP	(0x1 << 0)
-#define USB2_OTG_PD_DISC_FORCE_POWERUP	(0x1 << 1)
-#define RPD_CTRL						0x0
-
-#define XUSB_PADCTL_USB2_OC_MAP_0	0x10
-#define PORT_OC_PIN(_p, val)	((val & 0xf) << (_p * 3))
-#define OC_VBUS_PAD(p)	(p + 4)
-#define OC_DISABLED	0xf
-
-#define XUSB_PADCTL_SS_PORT_MAP	0x14
-#define SS_PORT_MAP(_p, val) \
-	((val & 0x7) << (_p * 4))
-
-#define XUSB_PADCTL_USB2_BATTERY_CHRG_OTGPAD_CTL1(_p)	0x0
-#define VREG_FIX18	0x0
-#define VREG_LEV	0x0
-#define VREG_LEV_EN	0x0
-#define RPD_CTRL	0x0
-
-#define XUSB_PADCTL_USB2_VBUS_ID_0	0x0
-#define VBUS_SOURCE_SELECT(val)	0x0
-#define ID_SOURCE_SELECT(val)	0x0
-#define IDDIG_CHNG_INTR_EN		0x0
-
-#define HSIC_PAD_TRK	0x0
-#define TRK_START_TIMER_MASK		0x0
-#define TRK_DONE_RESET_TIMER_MASK	0x0
-
-#define XUSB_PADCTL_HSIC_PAD_TRK_CTL_0	0x0
-#define HSIC_TRK_START_TIMER_MASK		0x0
-#define HSIC_TRK_DONE_RESET_TIMER_MASK	0x0
-#define HSIC_PD_TRK_MASK	0x0
-
-#define XUSB_PADCTL_HSIC_PAD1_CTL_0_0	0x0
-#define PAD1_PD_TX_MASK	0x0
-#endif
 /* SATA PADPLL */
 #define CLK_RST_CONTROLLER_SATA_PLL_CFG0_0	0x490
 #define SATA_PADPLL_RESET_SWCTL			(1 << 0)
@@ -646,13 +471,8 @@ void tegra_xhci_hs_wake_on_interrupts(u32 portmap, bool enable);
 void tegra_xhci_ss_wake_signal(u32 portmap, bool enable);
 void tegra_xhci_ss_vcore(u32 portmap, bool enable);
 
-#ifndef CONFIG_ARCH_TEGRA_21x_SOC
-int utmi_phy_pad_disable(void);
-int utmi_phy_pad_enable(void);
-#else
 int utmi_phy_pad_disable(struct tegra_prod *prod_list);
 int utmi_phy_pad_enable(struct tegra_prod *prod_list);
-#endif
 int usb3_phy_pad_enable(u32 lane_owner);
 int pcie_phy_pad_enable(bool enable, int lane_owner);
 
