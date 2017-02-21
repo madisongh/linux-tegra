@@ -448,6 +448,7 @@ static int otg_set_state(struct otg_fsm *fsm, enum usb_otg_state new_state)
 		otg_add_timer(otg, A_AIDL_BDIS);
 		break;
 	case OTG_STATE_A_PERIPHERAL:
+		fsm->a_bidl_adis_tmout = 0;
 		otg_loc_sof(otg, 0);
 		otg_set_protocol(fsm, PROTO_GADGET);
 		otg_drv_vbus(otg, 1);

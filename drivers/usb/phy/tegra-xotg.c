@@ -642,9 +642,13 @@ static int tegra_xotg_event_handler(struct notifier_block *nb,
 		if (otg->fsm.id)
 			/* B-peripheral has detected A-host's disconnection */
 			otg->fsm.a_conn = 0;
-		else
+		else {
 			/* A-peripheral has detected B-host's disconnection */
 			otg->fsm.b_conn = 0;
+			/* force it out of a_peripheral if port disconnects */
+			if (otg->state == OTG_STATE_A_PERIPHERAL)
+				otg->fsm.a_bidl_adis_tmout = 1;
+		}
 		/* clear suspend state */
 		otg->fsm.a_bus_suspend = 0;
 		otg->fsm.b_bus_suspend = 0;
