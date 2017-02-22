@@ -30,7 +30,9 @@
 #include <linux/debugfs.h>
 #include <linux/pm_qos.h>
 #include <linux/thermal.h>
+#ifdef CONFIG_TEGRA_SYS_EDP
 #include <trace/events/sysedp.h>
+#endif
 #include <soc/tegra/fuse.h>
 #include <soc/tegra/tegra-dvfs.h>
 #include <soc/tegra/tegra-edp.h>
