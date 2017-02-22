@@ -64,6 +64,7 @@ Required properties:
 		"prod_c_hs" for 3.4MHz(High speed)
   - prod: This is set of tuples used to program the registers through prod setting API.
     The fields of each tuple are [offset, bitmask, value]
+- nvidia,timeout-addr: slave address for which timeout feature to be enabled.
 
 Example:
 
@@ -87,4 +88,5 @@ Example:
 					0x94 0x00003f00 0x00000200>;
 			};
 		};
+		nvidia,timeout-addr = <0x57>;
 	};
