@@ -202,9 +202,10 @@ static void otg_hnp_polling_work(struct work_struct *work)
 		return;
 
 	udev = usb_hub_find_child(otg->host->root_hub, otg->host->otg_port);
-	if (!udev) {
-		dev_err(otg->host->controller,
-			"no usb dev connected, can't start HNP polling\n");
+	/* only do HNP polling when the device is FS or HS */
+	if (!udev || (udev && udev->speed == USB_SPEED_LOW)) {
+		dev_dbg(otg->host->controller,
+			"no FS/HS dev connected, won't start HNP polling\n");
 		return;
 	}
 
@@ -252,7 +253,7 @@ static void otg_hnp_polling_work(struct work_struct *work)
 				USB_CTRL_GET_TIMEOUT);
 	if (retval != 1) {
 		/* rewording error message for USB-PET test requirement */
-		dev_err(&udev->dev, "device doesn't support HNP polling\n");
+		dev_dbg(&udev->dev, "device doesn't support HNP polling\n");
 		return;
 	}
 
