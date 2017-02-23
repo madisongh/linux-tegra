@@ -636,7 +636,7 @@ static inline void of_phandle_iter_start(struct of_phandle_iter *iter,
 					 const struct device_node *np,
 					 const char *list_name,
 					 const char *cells_name,
-					 int cell_count);
+					 int cell_count)
 {
 }
 
