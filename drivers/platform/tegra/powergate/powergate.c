@@ -387,6 +387,12 @@ static int tegra_powergate_init_refcount(void)
 	return pg_ops->powergate_init_refcount();
 }
 
+struct tegra_powergate_driver_ops
+__weak *tegra194_powergate_init_chip_support(void)
+{
+	return NULL;
+}
+
 static int __init tegra_powergate_init(void)
 {
 	switch (tegra_get_chip_id()) {
