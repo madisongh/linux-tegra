@@ -41,7 +41,9 @@ struct device_node;
 struct fwnode_handle;
 struct iommu_ops;
 struct iommu_group;
+#ifdef CONFIG_PLATFORM_ENABLE_IOMMU
 struct dma_iommu_mapping;
+#endif
 
 struct bus_attribute {
 	struct attribute	attr;
