@@ -3325,7 +3325,7 @@ static int handle_pte_fault(struct mm_struct *mm,
 		     struct vm_area_struct *vma, unsigned long address,
 		     pte_t *pte, pmd_t *pmd, unsigned int flags)
 {
-	pte_t entry;
+	pte_t entry, pte_t_m;
 	spinlock_t *ptl;
 	bool fix_prot = false;
 
@@ -3355,8 +3355,9 @@ static int handle_pte_fault(struct mm_struct *mm,
 	if (pte_protnone(entry))
 		return do_numa_page(mm, vma, address, entry, pte, pmd);
 
+	pte_t_m = pte_modify(entry, vm_get_page_prot(VM_NONE));
 	if (vma->vm_ops && vma->vm_ops->fixup_prot && vma->vm_ops->fault &&
-		(entry == pte_modify(entry, vm_get_page_prot(VM_NONE)))) {
+		memcmp(&entry, &pte_t_m, sizeof(entry)) == 0) {
 		pgoff_t pgoff = (((address & PAGE_MASK)
 				- vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;
 		if (!vma->vm_ops->fixup_prot(vma, address & PAGE_MASK, pgoff))
