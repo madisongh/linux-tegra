@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2010 Marco Stornelli <marco.stornelli@gmail.com>
  * Copyright (C) 2011 Kees Cook <keescook@chromium.org>
- * Copyright (C) 2016 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2016-2017 NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -367,6 +367,7 @@ static int ramoops_pstore_erase(enum pstore_type_id type, u64 id, int count,
 		break;
 	case PSTORE_TYPE_PMSG:
 		prz = cxt->mprz;
+		break;
 	case PSTORE_TYPE_RTRACE:
 		prz = cxt->rprz;
 		break;
