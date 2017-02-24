@@ -97,7 +97,7 @@ config ARM64
 	help
 	  ARM 64-bit (AArch64) Linux support.
 
-config ARCH_TEGRA_21x_SOC
+config ARCH_TEGRA_210_SOC
         bool "Tegra 21x family SOC"
         select CPU_V8
         select ARM_GIC
@@ -123,7 +123,6 @@ config ARCH_TEGRA_21x_SOC
         select CMA
         select NVMAP_CACHE_MAINT_BY_SET_WAYS if TEGRA_NVMAP
         select NVMAP_CACHE_MAINT_BY_SET_WAYS_ON_ONE_CPU if TEGRA_NVMAP
-	select ARCH_TEGRA_210_SOC
         select ARCH_HAS_PASR if STAGING
         select SKIP_LATE_PASR_SETUP if PASR
         help
@@ -138,9 +137,6 @@ config ARCH_TEGRA_APE
 	  the Tegra Audio Processing Engine (APE)
 	  which handles audio specific
 	  tasks.
-
-config ARCH_TEGRA_210_SOC
-	bool
 
 config ARCH_TEGRA_VIC
         bool
