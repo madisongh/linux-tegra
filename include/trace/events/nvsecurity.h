@@ -3,7 +3,7 @@
  *
  * Security event logging to ftrace.
  *
- * Copyright (c) 2012-2014, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include <linux/ktime.h>
 #include <linux/tracepoint.h>
 
-#if defined(CONFIG_CLK_SRC_TEGRA_TIMER) || defined(CONFIG_ARCH_TEGRA_21x_SOC)
+#if defined(CONFIG_CLK_SRC_TEGRA_TIMER) || defined(CONFIG_ARCH_TEGRA_210_SOC)
 extern u32 notrace tegra_read_usec_raw(void);
 #else
 #undef tegra_read_usec_raw
