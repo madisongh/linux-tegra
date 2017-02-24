@@ -5,7 +5,7 @@
  * Author: Mike Rapoport <mike@compulab.co.il>
  *
  * Based on NVIDIA PCIe driver
- * Copyright (c) 2008-2016, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2008-2017, NVIDIA Corporation. All rights reserved.
  *
  * Bits taken from arch/arm/mach-dove/pcie.c
  *
@@ -2791,7 +2791,7 @@ static int tegra_pcie_enable_msi(struct tegra_pcie *pcie, bool no_init)
 		}
 
 		/* setup AFI/FPCI range */
-		msi->pages = __get_free_pages(GFP_KERNEL, 0);
+		msi->pages = __get_free_pages(GFP_DMA32, 0);
 	}
 	base = virt_to_phys((void *)msi->pages);
 
