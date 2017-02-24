@@ -303,7 +303,7 @@ out:
 	return ret;
 }
 
-unsigned int get_cpu_freq(unsigned int cpu)
+static unsigned int get_cpu_freq(unsigned int cpu)
 {
 	unsigned long rate;
 
