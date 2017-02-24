@@ -42,7 +42,7 @@
 
 bool disable_ertm;
 
-static u32 l2cap_feat_mask = L2CAP_FEAT_FIXED_CHAN;
+static u32 l2cap_feat_mask = L2CAP_FEAT_FIXED_CHAN | L2CAP_FEAT_UCD;
 static u8 l2cap_fixed_chan[8] = { L2CAP_FC_L2CAP, };
 
 static LIST_HEAD(chan_list);
@@ -2099,9 +2099,10 @@ static void l2cap_ertm_resend(struct l2cap_chan *chan)
 		}
 
 		if (chan->fcs == L2CAP_FCS_CRC16) {
-			u16 fcs = crc16(0, (u8 *) tx_skb->data, tx_skb->len);
-			put_unaligned_le16(fcs, skb_put(tx_skb,
-							L2CAP_FCS_SIZE));
+			u16 fcs = crc16(0, (u8 *) tx_skb->data,
+					tx_skb->len - L2CAP_FCS_SIZE);
+			put_unaligned_le16(fcs, skb_tail_pointer(tx_skb) -
+							L2CAP_FCS_SIZE);
 		}
 
 		l2cap_do_send(chan, tx_skb);
