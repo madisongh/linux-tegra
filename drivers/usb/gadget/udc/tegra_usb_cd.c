@@ -370,6 +370,7 @@ static void tegra_usb_cd_parse_dt(struct platform_device *pdev,
 
 	of_property_read_u32(np, "nvidia,dcp-current-limit-ua", &current_ua);
 	ucd->dcp_current_limit_ma = current_ua / 1000;
+	current_ua = 0;
 	of_property_read_u32(np, "nvidia,qc2-current-limit-ua", &current_ua);
 	ucd->qc2_current_limit_ma = current_ua / 1000;
 	of_property_read_u32(np, "nvidia,qc2-input-voltage",
