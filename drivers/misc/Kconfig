@@ -426,12 +426,6 @@ config TEGRA_FUSE
 	This is Tegra downstream fuse driver, enable if you dont want to
 	use upstream fuse driver
 
-config TEGRA_CRYPTO_DEV
-        bool "Device node to access tegra aes hardware"
-        ---help---
-        Dev node /dev/tegra-crypto in order to get access to tegra aes
-        hardware from user space
-
 config VMWARE_BALLOON
 	tristate "VMware Balloon Driver"
 	depends on VMWARE_VMCI && X86 && HYPERVISOR_GUEST
