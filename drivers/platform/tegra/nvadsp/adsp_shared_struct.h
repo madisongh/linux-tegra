@@ -3,7 +3,7 @@
  *
  * A header file containing shared data structures shared with ADSP OS
  *
- * Copyright (C) 2015-2016 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2015-2017 NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -26,7 +26,7 @@
 
 #define ADSP_OS_LOAD_TIMEOUT		5000 /* 5000 ms */
 
-#define DRAM_DEBUG_LOG_SIZE		0x100000
+#define DRAM_DEBUG_LOG_SIZE		0x4000 /* 16 KB */
 
 #define NVADSP_NAME_SZ			128
 
