@@ -1300,8 +1300,11 @@ static inline bool lane_is_otg(unsigned int lane)
 	return lane >= PIN_OTG_0 && lane <= PIN_OTG_3;
 }
 
-static inline bool lane_is_hsic(unsigned int lane)
+static inline bool lane_is_hsic(struct tegra_padctl_uphy *uphy,
+				unsigned int lane)
 {
+	if (is_chip_t210b01(uphy))
+		return false;
 	return lane == PIN_HSIC_0;
 }
 
@@ -1598,7 +1601,7 @@ static int tegra21x_padctl_uphy_pinmux_set(struct pinctrl_dev *pinctrl,
 				USB2_BIAS_PAD_XUSB);
 		dev_info(uphy->dev, "UTMI-%d is used by XUSB\n", port);
 		padctl_writel(uphy, value, XUSB_PADCTL_USB2_PAD_MUX_0);
-	} else if (lane_is_hsic(group)) {
+	} else if (lane_is_hsic(uphy, group)) {
 		value = padctl_readl(uphy, XUSB_PADCTL_USB2_PAD_MUX_0);
 		value |= (USB2_HSIC_PAD_PORTx_XUSB(0) | HSIC_PAD_TRK_XUSB |
 				HSIC_PORTx_CONFIG_HSIC(0));
@@ -1794,7 +1797,7 @@ static int tegra_padctl_uphy_pinconf_group_set(struct pinctrl_dev *pinctrl,
 			break;
 
 		case TEGRA_PADCTL_UPHY_HSIC_PRETEND_CONNECTED:
-			if (lane_is_hsic(group)) {
+			if (lane_is_hsic(uphy, group)) {
 				int port = group - PIN_HSIC_0;
 
 				uphy->hsic_ports[port].pretend_connected =
