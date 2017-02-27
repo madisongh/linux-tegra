@@ -135,6 +135,7 @@ struct nvadsp_chipdata {
 #ifdef CONFIG_PM
 	pm_init			pm_init;
 #endif
+	int			wdt_irq;
 };
 
 struct nvadsp_drv_data {

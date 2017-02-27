@@ -21,12 +21,6 @@
 #include <linux/firmware.h>
 #include "adsp_shared_struct.h"
 
-#if defined(CONFIG_ARCH_TEGRA_210_SOC)
-#include "os-t21x.h"
-#else
-#include "os-t18x.h"
-#endif /* CONFIG_ARCH_TEGRA_210_SOC */
-
 #include "dev.h"
 
 #define CONFIG_ADSP_DRAM_LOG_WITH_TAG	1

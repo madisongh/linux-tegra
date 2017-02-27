@@ -1429,20 +1429,21 @@ static void nvadsp_os_restart(struct work_struct *work)
 		container_of(work, struct nvadsp_os_data, restart_os_work);
 	struct nvadsp_drv_data *drv_data = platform_get_drvdata(data->pdev);
 	int wdt_virq = drv_data->agic_irqs[WDT_VIRQ];
+	int wdt_irq = drv_data->chip_data->wdt_irq;
 	struct device *dev = &data->pdev->dev;
 
 	disable_irq(wdt_virq);
 	dump_adsp_sys();
 	nvadsp_os_stop();
 
-	if (tegra_agic_irq_is_active(ADSP_WDT_INT)) {
+	if (tegra_agic_irq_is_active(wdt_irq)) {
 		dev_info(dev, "wdt interrupt is active hence clearing\n");
-		tegra_agic_clear_active(ADSP_WDT_INT);
+		tegra_agic_clear_active(wdt_irq);
 	}
 
-	if (tegra_agic_irq_is_pending(ADSP_WDT_INT)) {
+	if (tegra_agic_irq_is_pending(wdt_irq)) {
 		dev_info(dev, "wdt interrupt is pending hence clearing\n");
-		tegra_agic_clear_pending(ADSP_WDT_INT);
+		tegra_agic_clear_pending(wdt_irq);
 	}
 
 	dev_info(dev, "wdt interrupt is not pending or active...enabling\n");

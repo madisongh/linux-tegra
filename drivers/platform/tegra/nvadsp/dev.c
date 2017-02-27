@@ -407,6 +407,7 @@ static struct nvadsp_chipdata tegra210_adsp_chipdata = {
 #ifdef CONFIG_PM
 	.pm_init = nvadsp_pm_t21x_init,
 #endif
+	.wdt_irq = INT_T210_ADSP_WDT,
 };
 
 static struct nvadsp_chipdata tegrat18x_adsp_chipdata = {
@@ -426,6 +427,7 @@ static struct nvadsp_chipdata tegrat18x_adsp_chipdata = {
 #ifdef CONFIG_PM
 	.pm_init = nvadsp_pm_t18x_init,
 #endif
+	.wdt_irq = INT_T18x_ATKE_WDT_IRQ,
 };
 
 static const struct of_device_id nvadsp_of_match[] = {
