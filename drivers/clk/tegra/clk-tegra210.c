@@ -1975,6 +1975,7 @@ static struct tegra_clk_pll_params pll_a1_params = {
 	.ext_misc_reg[3] = PLLA1_MISC3,
 	.freq_table = pll_cx_freq_table,
 	.flags = TEGRA_PLL_USE_LOCK,
+	.mdiv_default = 3,
 	.set_defaults = _plla1_set_defaults,
 	.calc_rate = tegra210_pll_fixed_mdiv_cfg,
 };
@@ -3402,8 +3403,9 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 	clks[TEGRA210_CLK_NVDEC_CBUS] = clk;
 
 	clk = tegra_clk_register_cbus("abus", "pll_a1",
-				      TEGRA_SHARED_BUS_RETENTION, "pll_p",
-				      38400000, 1000000000);
+		TEGRA_SHARED_BUS_RETENTION | TEGRA_SHARED_BUS_ROUND_PASS_THRU,
+		"pll_p", 38400000, 844800000);
+	clk_register_clkdev(clk, "abus", NULL);
 	clks[TEGRA210_CLK_ABUS] = clk;
 
 	clk = tegra_clk_register_shared("adsp.cpu.abus", &abus_parents[0] , 1,
