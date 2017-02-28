@@ -1181,32 +1181,38 @@ done:
 static int tegra_i2c_issue_bus_clear(struct tegra_i2c_dev *i2c_dev)
 {
 	int ret;
+	u32 reg;
 
 	if (i2c_dev->hw->has_hw_arb_support) {
 		reinit_completion(&i2c_dev->msg_complete);
-		i2c_writel(i2c_dev, I2C_BC_ENABLE
-				| I2C_BC_SCLK_THRESHOLD
-				| I2C_BC_STOP_COND
-				| I2C_BC_TERMINATE
-				, I2C_BUS_CLEAR_CNFG);
+		reg = I2C_BC_SCLK_THRESHOLD | I2C_BC_STOP_COND |
+			I2C_BC_TERMINATE;
+		i2c_writel(i2c_dev, reg, I2C_BUS_CLEAR_CNFG);
 		if (i2c_dev->hw->has_config_load_reg) {
 			ret = tegra_i2c_wait_for_config_load(i2c_dev,
 					I2C_MSTR_CONFIG_LOAD);
 			if (ret)
 				return ret;
 		}
+		reg |= I2C_BC_ENABLE;
+		i2c_writel(i2c_dev, reg, I2C_BUS_CLEAR_CNFG);
 		tegra_i2c_unmask_irq(i2c_dev, I2C_INT_BUS_CLEAR_DONE);
 
 		ret = wait_for_completion_timeout(&i2c_dev->msg_complete,
 						  TEGRA_I2C_TIMEOUT);
-		if (ret == 0)
+		if (ret == 0) {
 			dev_err(i2c_dev->dev, "timed out for bus clear\n");
+			return -ETIMEDOUT;
+		}
 
-		if (!(i2c_readl(i2c_dev, I2C_BUS_CLEAR_STATUS) & I2C_BC_STATUS))
+		reg = i2c_readl(i2c_dev, I2C_BUS_CLEAR_STATUS);
+		if (!(reg & I2C_BC_STATUS)) {
 			dev_warn(i2c_dev->dev, "Un-recovered Arb lost\n");
+			return -EIO;
+		}
 	}
 
-	return 0;
+	return -EAGAIN;
 }
 
 static void tegra_i2c_config_fifo_trig(struct tegra_i2c_dev *i2c_dev,
@@ -1455,11 +1461,8 @@ static int tegra_i2c_handle_xfer_error(struct tegra_i2c_dev *i2c_dev)
 
 	/* Arbitration Lost occurs, Start recovery */
 	if (i2c_dev->msg_err == I2C_ERR_ARBITRATION_LOST) {
-		if (!i2c_dev->is_multimaster_mode) {
-			ret = tegra_i2c_issue_bus_clear(i2c_dev);
-			if (ret)
-				return ret;
-		}
+		if (!i2c_dev->is_multimaster_mode)
+			return tegra_i2c_issue_bus_clear(i2c_dev);
 		return -EAGAIN;
 	}
 
