@@ -24,7 +24,7 @@
 
 /* Driver version */
 #define MODS_DRIVER_VERSION_MAJOR 3
-#define MODS_DRIVER_VERSION_MINOR 65
+#define MODS_DRIVER_VERSION_MINOR 69
 #define MODS_DRIVER_VERSION ((MODS_DRIVER_VERSION_MAJOR << 8) | \
 			     ((MODS_DRIVER_VERSION_MINOR/10) << 4) | \
 			     (MODS_DRIVER_VERSION_MINOR%10))
@@ -411,23 +411,23 @@ struct MODS_REGISTER_IRQ_2 {
 /* MODS_ESC_IRQ_HANDLED */
 struct MODS_REGISTER_IRQ {
 	/* IN */
-	struct mods_pci_dev dev;   /* device which generates
-				      the interrupt */
+	struct mods_pci_dev dev;   /* device which generates */
+				   /* the interrupt          */
 	__u8		    type;  /* MODS_IRQ_TYPE_* */
 };
 
 struct mods_irq_2 {
-	__u32			delay; /* delay in ns between the irq occuring
-					  and MODS querying for it */
+	__u32			delay; /* delay in ns between the irq        */
+				       /* occurring and MODS querying for it */
 	struct mods_pci_dev_2 dev;  /* device which generated the interrupt */
 };
 
 struct mods_irq {
-	__u32		    delay; /* delay in ns between the irq
-				      occuring and MODS querying
-				      for it */
-	struct mods_pci_dev dev;   /* device which generated
-				      the interrupt */
+	__u32		    delay; /* delay in ns between the irq */
+				   /* occurring and MODS querying */
+				   /* for it                      */
+	struct mods_pci_dev dev;   /* device which generated */
+				   /* the interrupt          */
 };
 
 #define MODS_MAX_IRQS 32
@@ -436,8 +436,8 @@ struct mods_irq {
 struct MODS_QUERY_IRQ_2 {
 	/* OUT */
 	struct mods_irq_2 irq_list[MODS_MAX_IRQS];
-	__u8		    more;	/* indicates that more interrupts
-					   are waiting */
+	__u8		    more;	/* indicates that more interrupts */
+					/* are waiting                    */
 };
 
 /* MODS_ESC_QUERY_IRQ */
@@ -476,15 +476,15 @@ struct MODS_SET_IRQ_MASK_2 {
 	/* IN */
 	__u64			aperture_addr;/* physical address of aperture */
 	__u32			aperture_size;/* size of the mapped region */
-	__u32			reg_offset;   /* offset of the irq mask register
-						 within the aperture */
-	__u64			and_mask;     /* and mask for clearing bits in
-						 the irq mask register */
-	__u64			or_mask;      /* or mask for setting bits in
-						 the irq mask register */
-	struct mods_pci_dev_2 dev;	      /* device identifying interrupt
-						 for which the mask will be
-						 applied */
+	__u32			reg_offset;   /* offset of the irq mask       */
+					      /* register within the aperture */
+	__u64			and_mask;     /* and mask for clearing bits */
+					      /* in the irq mask register   */
+	__u64			or_mask;      /* or mask for setting bits in */
+					      /* the irq mask register       */
+	struct mods_pci_dev_2 dev;	      /* device identifying interrupt */
+					      /* for which the mask will be   */
+					      /* applied                      */
 	__u8			irq_type;     /* irq type */
 	__u8			mask_type;    /* mask type */
 };
@@ -494,14 +494,15 @@ struct MODS_SET_IRQ_MASK {
 	/* IN */
 	__u64		    aperture_addr; /* physical address of aperture */
 	__u32		    aperture_size; /* size of the mapped region */
-	__u32		    reg_offset;	   /* offset of the irq mask register
-					      within the aperture */
-	__u32		    and_mask;	   /* and mask for clearing bits in
-					      the irq mask register */
-	__u32		    or_mask;	   /* or mask for setting bits in
-					      the irq mask register */
-	struct mods_pci_dev dev;	   /* device identifying interrupt for
-					      which the mask will be applied */
+	__u32		    reg_offset;	   /* offset of the irq mask register */
+					   /* within the aperture             */
+	__u32		    and_mask;	   /* and mask for clearing bits in */
+					   /* the irq mask register         */
+	__u32		    or_mask;	   /* or mask for setting bits in */
+					   /* the irq mask register       */
+	struct mods_pci_dev dev;	   /* device identifying interrupt */
+					   /* for which the mask will be   */
+					   /* applied                      */
 	__u8		    irq_type;	   /* irq type */
 	__u8		    mask_type;	   /* mask type */
 };
@@ -634,8 +635,8 @@ struct MODS_GET_CLOCK_HANDLE {
 	char  controller_name[MAX_CLOCK_HANDLE_NAME];
 };
 
-/* MODS_ESC_SET_CLOCK_RATE, MODS_ESC_GET_CLOCK_RATE,
- * MODS_ESC_GET_CLOCK_MAX_RATE, MODS_ESC_SET_CLOCK_MAX_RATE */
+/* MODS_ESC_SET_CLOCK_RATE, MODS_ESC_GET_CLOCK_RATE,        */
+/* MODS_ESC_GET_CLOCK_MAX_RATE, MODS_ESC_SET_CLOCK_MAX_RATE */
 struct MODS_CLOCK_RATE {
 	/* IN/OUT */
 	__u64 clock_rate_hz;
@@ -653,8 +654,8 @@ struct MODS_CLOCK_PARENT {
 	__u32 clock_parent_handle;
 };
 
-/* MODS_ESC_ENABLE_CLOCK, MODS_ESC_DISABLE_CLOCK, MODS_ESC_CLOCK_RESET_ASSERT,
- * MODS_ESC_CLOCK_RESET_DEASSERT */
+/* MODS_ESC_ENABLE_CLOCK, MODS_ESC_DISABLE_CLOCK,             */
+/* MODS_ESC_CLOCK_RESET_ASSERT, MODS_ESC_CLOCK_RESET_DEASSERT */
 struct MODS_CLOCK_HANDLE {
 	/* IN */
 	__u32 clock_handle;
@@ -818,7 +819,7 @@ enum MODS_DMA_TRANSACTION_TYPE {
 	MODS_DMA_CYCLIC,
 	MODS_DMA_INTERLEAVE,
 /* last transaction type for creation of the capabilities mask */
-	MODS_DMA_TX_TYPE_END,
+	MODS_DMA_TX_TYPE_END
 };
 
 struct MODS_DMA_HANDLE {
@@ -833,7 +834,7 @@ enum MODS_DMA_TRANSFER_DIRECTION {
 	MODS_DMA_MEM_TO_DEV,
 	MODS_DMA_DEV_TO_MEM,
 	MODS_DMA_DEV_TO_DEV,
-	MODS_DMA_TRANS_NONE,
+	MODS_DMA_TRANS_NONE
 };
 
 enum MODS_DMA_BUSWIDTH {
@@ -841,7 +842,7 @@ enum MODS_DMA_BUSWIDTH {
 	MODS_DMA_BUSWIDTH_1_BYTE = 1,
 	MODS_DMA_BUSWIDTH_2_BYTES = 2,
 	MODS_DMA_BUSWIDTH_4_BYTES = 4,
-	MODS_DMA_BUSWIDTH_8_BYTES = 8,
+	MODS_DMA_BUSWIDTH_8_BYTES = 8
 };
 
 struct MODS_DMA_CHANNEL_CONFIG {
@@ -861,7 +862,7 @@ struct MODS_DMA_CHANNEL_CONFIG {
 enum MODS_DMA_TX_MODE {
 	MODS_DMA_SINGLE = 0,
 	MODS_DMA_TX_CYCLIC,
-	MODS_DMA_INTERLEAVED, /* Common to Slave as well as M2M clients. */
+	MODS_DMA_INTERLEAVED /* Common to Slave as well as M2M clients. */
 };
 
 typedef __s32 mods_dma_cookie_t;
@@ -880,8 +881,8 @@ struct MODS_DMA_TX_DESC	{
 };
 
 enum MODS_DMA_WAIT_TYPE {
-	MODS_DMA_SYNC_WAIT,	/* wait until finished */
-	MODS_DMA_ASYNC_WAIT, /* just check tx status */
+	MODS_DMA_SYNC_WAIT,     /* wait until finished */
+	MODS_DMA_ASYNC_WAIT     /* just check tx status */
 };
 
 struct MODS_DMA_WAIT_DESC {
@@ -897,7 +898,6 @@ struct MODS_NET_DEVICE_NAME {
 	/* in */
 	char device_name[MAX_NET_DEVICE_NAME_LENGTH];
 };
-
 struct MODS_DMA_COHERENT_MEM_HANDLE {
 	__u32	num_bytes;
 	__u32	attrib;
@@ -912,7 +912,6 @@ struct MODS_DMA_COPY_TO_USER {
 	__u64	memory_handle_src;
 	__u64	memory_handle_dst;
 };
-
 #pragma pack(pop)
 
 /* ************************************************************************* */
@@ -952,7 +951,7 @@ struct MODS_DMA_COPY_TO_USER {
 #define MODS_ESC_IRQ_INQUIRY			\
 		   _IOWR(MODS_IOC_MAGIC, 13, struct MODS_IRQ)
 #define MODS_ESC_EVAL_ACPI_METHOD		\
-		   _IOWR(MODS_IOC_MAGIC, 16, struct MODS_EVAL_ACPI_METHOD)
+		   _IOWR_BAD(MODS_IOC_MAGIC, 16, struct MODS_EVAL_ACPI_METHOD)
 #define MODS_ESC_GET_API_VERSION		\
 		   _IOWR(MODS_IOC_MAGIC, 17, struct MODS_GET_VERSION)
 #define MODS_ESC_GET_KERNEL_VERSION		\
@@ -974,7 +973,7 @@ struct MODS_DMA_COPY_TO_USER {
 #define MODS_ESC_QUERY_IRQ			\
 		    _IOR(MODS_IOC_MAGIC, 26, struct MODS_QUERY_IRQ)
 #define MODS_ESC_EVAL_DEV_ACPI_METHOD		\
-		   _IOWR(MODS_IOC_MAGIC, 27, struct MODS_EVAL_DEV_ACPI_METHOD)
+		_IOWR_BAD(MODS_IOC_MAGIC, 27, struct MODS_EVAL_DEV_ACPI_METHOD)
 #define MODS_ESC_ACPI_GET_DDC			\
 		   _IOWR(MODS_IOC_MAGIC, 28, struct MODS_ACPI_GET_DDC)
 #define MODS_ESC_GET_CLOCK_HANDLE		\
@@ -1062,8 +1061,8 @@ struct MODS_DMA_COPY_TO_USER {
 #define MODS_ESC_SET_IRQ_MASK_2			\
 		    _IOW(MODS_IOC_MAGIC, 68, struct MODS_SET_IRQ_MASK_2)
 #define MODS_ESC_EVAL_DEV_ACPI_METHOD_2		\
-		   _IOWR(MODS_IOC_MAGIC, 69,	\
-			 struct MODS_EVAL_DEV_ACPI_METHOD_2)
+		   _IOWR_BAD(MODS_IOC_MAGIC, 69,\
+		   struct MODS_EVAL_DEV_ACPI_METHOD_2)
 #define MODS_ESC_DEVICE_NUMA_INFO_2		\
 		   _IOWR(MODS_IOC_MAGIC, 70, struct MODS_DEVICE_NUMA_INFO_2)
 #define MODS_ESC_ACPI_GET_DDC_2			\
@@ -1115,4 +1114,9 @@ struct MODS_DMA_COPY_TO_USER {
 #define MODS_ESC_MAP_INTERRUPT			\
 		   _IOWR(MODS_IOC_MAGIC, 92,		\
 		   struct MODS_DT_INFO)
+#define MODS_ESC_LOCK_CONSOLE			\
+		    _IO(MODS_IOC_MAGIC, 93)
+#define MODS_ESC_UNLOCK_CONSOLE		\
+		    _IO(MODS_IOC_MAGIC, 94)
+
 #endif /* _MODS_H_  */

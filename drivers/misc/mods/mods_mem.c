@@ -1,7 +1,7 @@
 /*
  * mods_mem.c - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -53,9 +53,7 @@ static void mods_dma_unmap_page(struct MODS_DMA_MAP *p_dma_map,
 		       DMA_BIDIRECTIONAL);
 
 	mods_debug_printk(DEBUG_MEM_DETAILED,
-		"%s : Unmapped map_addr=0x%llx, dma_addr=0x%llx on device "
-		"%x:%x:%x.%x\n",
-		__func__,
+		"Unmapped map_addr=0x%llx dma_addr=0x%llx on dev %x:%x:%x.%x\n",
 		(unsigned long long)pm->map_addr,
 		(unsigned long long)pm->pt->dma_addr,
 		pci_domain_nr(p_dma_map->dev->bus),
@@ -84,7 +82,8 @@ static int mods_dma_unmap_and_free(struct MODS_MEM_INFO *p_mem_info,
 			list_del(iter);
 
 			/* Safeguard check, all mappings should have a *
-			 * non-null device                             */
+			 * non-null device
+			 */
 			if (p_dma_map->dev != NULL) {
 				int i;
 
@@ -157,7 +156,7 @@ static void mods_dma_map_pages(struct MODS_MEM_INFO *p_mem_info,
 			DMA_BIDIRECTIONAL);
 
 		mods_debug_printk(DEBUG_MEM_DETAILED,
-			"%s : Mapped map_addr=0x%llx, dma_addr=0x%llx on device %x:%x:%x.%x\n",
+			"%s : Mapped map_addr=0x%llx, dma_addr=0x%llx on dev %x:%x:%x.%x\n",
 			__func__,
 			(unsigned long long)pm->map_addr,
 			(unsigned long long)pt->dma_addr,
@@ -169,7 +168,8 @@ static void mods_dma_map_pages(struct MODS_MEM_INFO *p_mem_info,
 }
 
 /* Create a DMA map on the specified allocation for the pci device.  Lazy *
- * initialize the map list structure if one does not yet exist            */
+ * initialize the map list structure if one does not yet exist.
+ */
 static int mods_create_dma_map(struct MODS_MEM_INFO *p_mem_info,
 			       struct pci_dev *p_pci_dev)
 {
@@ -210,7 +210,8 @@ static int mods_create_dma_map(struct MODS_MEM_INFO *p_mem_info,
 }
 
 /* Find the dma mapping chunk for the specified memory.  If p_phys_chunk is *
- * NULL then the first mapped chunk is returned                             */
+ * NULL then the first mapped chunk is returned.
+ */
 static struct MODS_MAP_CHUNK *mods_find_dma_map_chunk(
 					struct MODS_MEM_INFO *p_mem_info,
 					struct pci_dev  *p_pci_dev,
@@ -270,8 +271,10 @@ static int mods_restore_mem_type(u64 virt_addr,
 static void mods_restore_cache(struct MODS_MEM_INFO *p_mem_info)
 {
 	unsigned int i;
+
 	for (i = 0; i < p_mem_info->max_chunks; i++) {
 		struct MODS_PHYS_CHUNK *pt = &p_mem_info->pages[i];
+
 		if (!pt->allocated)
 			break;
 
@@ -282,6 +285,7 @@ static void mods_restore_cache(struct MODS_MEM_INFO *p_mem_info)
 static void mods_free_pages(struct MODS_MEM_INFO *p_mem_info)
 {
 	unsigned int i;
+
 	/* release in reverse order */
 	for (i = p_mem_info->max_chunks; i > 0; ) {
 		struct MODS_PHYS_CHUNK *pt;
@@ -303,6 +307,7 @@ static void mods_free_pages(struct MODS_MEM_INFO *p_mem_info)
 static gfp_t mods_alloc_flags(struct MODS_MEM_INFO *p_mem_info)
 {
 	gfp_t flags = GFP_KERNEL;
+
 	if (p_mem_info->alloc_type != MODS_ALLOC_TYPE_NON_CONTIG)
 		flags |= __GFP_COMP;
 	if ((p_mem_info->addr_bits & 0xFF) == 32)
@@ -397,6 +402,7 @@ static int mods_alloc_contig_sys_pages(struct MODS_MEM_INFO *p_mem_info)
 static int mods_get_max_order_needed(u32 num_pages)
 {
 	int order = 0;
+
 	while (order < 10 && (1U<<(order+1)) <= num_pages)
 		++order;
 	return order;
@@ -418,16 +424,15 @@ static int mods_alloc_noncontig_sys_pages(struct MODS_MEM_INFO *p_mem_info)
 		int order     = mods_get_max_order_needed(pages_left);
 		struct MODS_PHYS_CHUNK *pt = &p_mem_info->pages[num_chunks];
 
-		while (order >= 0) {
+		for ( ; order >= 0; --order) {
 			pt->p_page = alloc_pages_node(
 					p_mem_info->numa_node,
 					mods_alloc_flags(p_mem_info),
 					(unsigned int)order);
 			if (pt->p_page)
 				break;
-			else
-				--order;
 		}
+
 		if (!pt->p_page) {
 			mods_error_printk("out of memory\n");
 			goto failed;
@@ -468,7 +473,8 @@ failed:
 static int mods_register_alloc(struct file          *fp,
 			       struct MODS_MEM_INFO *p_mem_info)
 {
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV private_data = fp->private_data;
+
 	if (unlikely(mutex_lock_interruptible(&private_data->mtx)))
 		return -EINTR;
 	list_add(&p_mem_info->list, private_data->mods_alloc_list);
@@ -480,10 +486,9 @@ static int mods_unregister_and_free(struct file          *fp,
 				    struct MODS_MEM_INFO *p_del_mem)
 {
 	struct MODS_MEM_INFO *p_mem_info;
-
-	MODS_PRIVATE_DATA(private_data, fp);
-	struct list_head  *head;
-	struct list_head  *iter;
+	MODS_PRIV             private_data = fp->private_data;
+	struct list_head     *head;
+	struct list_head     *iter;
 
 	mods_debug_printk(DEBUG_MEM_DETAILED, "free %p\n", p_del_mem);
 
@@ -519,8 +524,8 @@ static int mods_unregister_and_free(struct file          *fp,
 
 int mods_unregister_all_alloc(struct file *fp)
 {
-	MODS_PRIVATE_DATA(private_data, fp);
-	struct list_head *head = private_data->mods_alloc_list;
+	MODS_PRIV         private_data = fp->private_data;
+	struct list_head *head         = private_data->mods_alloc_list;
 	struct list_head *iter;
 	struct list_head *tmp;
 
@@ -538,7 +543,8 @@ int mods_unregister_all_alloc(struct file *fp)
 }
 
 /* Returns an offset within an allocation deduced from physical address.
- * If dma address doesn't belong to the allocation, returns non-zero. */
+ * If dma address doesn't belong to the allocation, returns non-zero.
+ */
 int mods_get_alloc_offset(struct MODS_MEM_INFO *p_mem_info,
 			  u64			dma_addr,
 			  u32		       *ret_offs)
@@ -569,8 +575,8 @@ int mods_get_alloc_offset(struct MODS_MEM_INFO *p_mem_info,
 
 struct MODS_MEM_INFO *mods_find_alloc(struct file *fp, u64 phys_addr)
 {
-	MODS_PRIVATE_DATA(private_data, fp);
-	struct list_head     *plist_head = private_data->mods_alloc_list;
+	MODS_PRIV             private_data = fp->private_data;
+	struct list_head     *plist_head   = private_data->mods_alloc_list;
 	struct list_head     *plist_iter;
 	struct MODS_MEM_INFO *p_mem_info;
 	u32		      offset;
@@ -786,6 +792,7 @@ int esc_mods_device_alloc_pages(struct file                    *fp,
 {
 	int retval;
 	struct MODS_DEVICE_ALLOC_PAGES_2 dev_alloc_pages = {0};
+
 	LOG_ENT();
 
 	dev_alloc_pages.num_bytes		= p->num_bytes;
@@ -809,6 +816,7 @@ int esc_mods_alloc_pages(struct file *fp, struct MODS_ALLOC_PAGES *p)
 {
 	int retval;
 	struct MODS_DEVICE_ALLOC_PAGES_2 dev_alloc_pages;
+
 	LOG_ENT();
 
 	dev_alloc_pages.num_bytes	    = p->num_bytes;
@@ -845,7 +853,7 @@ int esc_mods_free_pages(struct file *fp, struct MODS_FREE_PAGES *p)
 int esc_mods_set_mem_type(struct file *fp, struct MODS_MEMORY_TYPE *p)
 {
 	struct MODS_MEM_INFO *p_mem_info;
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV             private_data = fp->private_data;
 
 	LOG_ENT();
 
@@ -997,7 +1005,7 @@ int esc_mods_virtual_to_phys(struct file *fp,
 			     struct MODS_VIRTUAL_TO_PHYSICAL *p)
 {
 	struct MODS_GET_PHYSICAL_ADDRESS get_phys_addr;
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV         private_data = fp->private_data;
 	struct list_head *head;
 	struct list_head *iter;
 
@@ -1076,11 +1084,11 @@ int esc_mods_phys_to_virtual(struct file *fp,
 			     struct MODS_PHYSICAL_TO_VIRTUAL *p)
 {
 	struct SYS_MAP_MEMORY *p_map_mem;
-	MODS_PRIVATE_DATA(private_data, fp);
-	struct list_head *head;
-	struct list_head *iter;
-	u32	offset;
-	u32	map_offset;
+	MODS_PRIV              private_data = fp->private_data;
+	struct list_head      *head;
+	struct list_head      *iter;
+	u32	               offset;
+	u32	               map_offset;
 
 	LOG_ENT();
 
@@ -1116,7 +1124,7 @@ int esc_mods_phys_to_virtual(struct file *fp,
 			return OK;
 		}
 
-		/* offset from the begining of the allocation */
+		/* offset from the beginning of the allocation */
 		if (mods_get_alloc_offset(p_map_mem->p_mem_info,
 					  p->physical_address,
 					  &offset))
@@ -1150,18 +1158,23 @@ int esc_mods_phys_to_virtual(struct file *fp,
 
 int esc_mods_memory_barrier(struct file *fp)
 {
+#if defined(CONFIG_ARM)
+	/* Full memory barrier on ARMv7 */
 	wmb();
 	return OK;
+#else
+	return -EINVAL;
+#endif
 }
 
 #if defined(MODS_HAS_SET_PPC_TCE_BYPASS)
 static struct PPC_TCE_BYPASS *mods_find_ppc_tce_bypass(struct file *fp,
 						       struct pci_dev *dev)
 {
-	MODS_PRIVATE_DATA(private_data, fp);
-	struct list_head     *plist_head;
-	struct list_head     *plist_iter;
-	struct PPC_TCE_BYPASS    *p_ppc_tce_bypass;
+	MODS_PRIV              private_data = fp->private_data;
+	struct list_head      *plist_head;
+	struct list_head      *plist_iter;
+	struct PPC_TCE_BYPASS *p_ppc_tce_bypass;
 
 	plist_head = private_data->mods_ppc_tce_bypass_list;
 
@@ -1181,14 +1194,15 @@ static int mods_register_ppc_tce_bypass(struct file    *fp,
 				    struct pci_dev *dev,
 				    u64 original_mask)
 {
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV              private_data = fp->private_data;
 	struct PPC_TCE_BYPASS *p_ppc_tce_bypass;
 
 	/* only register the first time in order to restore the true actual dma
-	   mask */
+	 * mask
+	 */
 	if (mods_find_ppc_tce_bypass(fp, dev) != NULL) {
 		mods_debug_printk(DEBUG_MEM,
-		    "PPC tce bypass already registered on device %x:%x:%x.%x\n",
+		    "TCE bypass already registered on dev %x:%x:%x.%x\n",
 		    pci_domain_nr(dev->bus),
 		    dev->bus->number,
 		    PCI_SLOT(dev->devfn),
@@ -1201,7 +1215,7 @@ static int mods_register_ppc_tce_bypass(struct file    *fp,
 
 	p_ppc_tce_bypass = kmalloc(sizeof(struct PPC_TCE_BYPASS), GFP_KERNEL);
 	if (unlikely(!p_ppc_tce_bypass)) {
-		mods_error_printk("failed to allocate ppc tce bypass struct\n");
+		mods_error_printk("failed to allocate TCE bypass struct\n");
 		LOG_EXT();
 		return -ENOMEM;
 	}
@@ -1213,7 +1227,7 @@ static int mods_register_ppc_tce_bypass(struct file    *fp,
 		 private_data->mods_ppc_tce_bypass_list);
 
 	mods_debug_printk(DEBUG_MEM,
-			"Registered ppc tce bypass on device %x:%x:%x.%x\n",
+			"Registered TCE bypass on dev %x:%x:%x.%x\n",
 			pci_domain_nr(dev->bus),
 			dev->bus->number,
 			PCI_SLOT(dev->devfn),
@@ -1225,10 +1239,9 @@ static int mods_register_ppc_tce_bypass(struct file    *fp,
 static int mods_unregister_ppc_tce_bypass(struct file *fp, struct pci_dev *dev)
 {
 	struct PPC_TCE_BYPASS *p_ppc_tce_bypass;
-	MODS_PRIVATE_DATA(private_data, fp);
-
-	struct list_head  *head = private_data->mods_ppc_tce_bypass_list;
-	struct list_head  *iter;
+	MODS_PRIV              private_data = fp->private_data;
+	struct list_head      *head = private_data->mods_ppc_tce_bypass_list;
+	struct list_head      *iter;
 
 	LOG_ENT();
 
@@ -1250,7 +1263,7 @@ static int mods_unregister_ppc_tce_bypass(struct file *fp, struct pci_dev *dev)
 					       p_ppc_tce_bypass->dma_mask);
 
 			mods_debug_printk(DEBUG_MEM,
-			    "Restored dma_mask on device %x:%x:%x.%x to %llx\n",
+			    "Restored dma_mask on dev %x:%x:%x.%x to %llx\n",
 			    pci_domain_nr(p_ppc_tce_bypass->dev->bus),
 			    p_ppc_tce_bypass->dev->bus->number,
 			    PCI_SLOT(p_ppc_tce_bypass->dev->devfn),
@@ -1267,7 +1280,7 @@ static int mods_unregister_ppc_tce_bypass(struct file *fp, struct pci_dev *dev)
 	mutex_unlock(&private_data->mtx);
 
 	mods_error_printk(
-		"Failed to unregister ppc tce bypass on device %x:%x:%x.%x\n",
+		"Failed to unregister TCE bypass on dev %x:%x:%x.%x\n",
 		pci_domain_nr(dev->bus),
 		dev->bus->number,
 		PCI_SLOT(dev->devfn),
@@ -1280,8 +1293,8 @@ static int mods_unregister_ppc_tce_bypass(struct file *fp, struct pci_dev *dev)
 
 int mods_unregister_all_ppc_tce_bypass(struct file *fp)
 {
-	MODS_PRIVATE_DATA(private_data, fp);
-	struct list_head *head = private_data->mods_ppc_tce_bypass_list;
+	MODS_PRIV         private_data = fp->private_data;
+	struct list_head *head         = private_data->mods_ppc_tce_bypass_list;
 	struct list_head *iter;
 	struct list_head *tmp;
 
@@ -1322,8 +1335,8 @@ int esc_mods_set_ppc_tce_bypass(struct file *fp,
 		 p->pci_device.bus,
 		 p->pci_device.device,
 		 p->pci_device.function);
-	    LOG_EXT();
-	    return -EINVAL;
+		LOG_EXT();
+		return -EINVAL;
 	}
 
 	original_dma_mask = dev->dma_mask;
@@ -1357,15 +1370,14 @@ int esc_mods_set_ppc_tce_bypass(struct file *fp,
 		if ((host == NULL) || (host->dn == NULL) ||
 		    !of_device_is_compatible(host->dn, "ibm,ioda2-phb")) {
 			mods_error_printk(
-				"Host device not found or PPC TCE bypass not "
-				"supported\n");
+			"Host device not found or TCE bypass not supported\n");
 			LOG_EXT();
 			return -EINVAL;
 		}
 
 		if (pci_set_dma_mask(dev, dma_mask) != 0) {
 			mods_error_printk(
-			  "pci_set_dma_mask failed on device %x:%x:%x.%x\n",
+			  "pci_set_dma_mask failed on dev %x:%x:%x.%x\n",
 			  p->pci_device.domain,
 			  p->pci_device.bus,
 			  p->pci_device.device,
@@ -1375,8 +1387,7 @@ int esc_mods_set_ppc_tce_bypass(struct file *fp,
 		}
 
 		mods_debug_printk(DEBUG_MEM,
-			"%s ppc tce bypass on device %x:%x:%x.%x with dma mask "
-			"0x%llx\n",
+			"%s TCE bypass on dev %x:%x:%x.%x, mask 0x%llx\n",
 			(dma_mask == DMA_BIT_MASK(64)) ? "Enabled" : "Disabled",
 			p->pci_device.domain,
 			p->pci_device.bus,
@@ -1389,7 +1400,7 @@ int esc_mods_set_ppc_tce_bypass(struct file *fp,
 	if (pci_dma_mapping_error(dev, dma_addr)) {
 		pci_set_dma_mask(dev, original_dma_mask);
 		mods_error_printk(
-			"pci_map_single failed on device %x:%x:%x.%x\n",
+			"pci_map_single failed on dev %x:%x:%x.%x\n",
 			p->pci_device.domain,
 			p->pci_device.bus,
 			p->pci_device.device,
@@ -1424,7 +1435,7 @@ int esc_mods_set_ppc_tce_bypass(struct file *fp,
 	p->dma_base_address = dma_addr & ~(p->device_dma_mask);
 
 	mods_debug_printk(DEBUG_MEM,
-		"dma base addres 0x%0llx on device %x:%x:%x.%x\n",
+		"dma base addr 0x%0llx on dev %x:%x:%x.%x\n",
 		p->dma_base_address,
 		p->pci_device.domain,
 			p->pci_device.bus,
@@ -1463,7 +1474,7 @@ int esc_mods_dma_map_memory(struct file *fp,
 	p_map_chunk = mods_find_dma_map_chunk(p_mem_info, p_pci_dev, NULL);
 	if (p_map_chunk) {
 		mods_debug_printk(DEBUG_MEM_DETAILED,
-			"memory %p already mapped to device %x:%x:%x.%x\n",
+			"memory %p already mapped to dev %x:%x:%x.%x\n",
 			p_mem_info,
 			p->pci_device.domain,
 				p->pci_device.bus,
@@ -1519,9 +1530,11 @@ static void clear_contiguous_cache
 )
 {
 	/* We are expecting virt_end and phys_end to point to the first address
-	 * of the next range */
+	 * of the next range
+	 */
 	u32 size = virt_end - virt_start;
-	BUG_ON(size != phys_end - phys_start);
+
+	WARN_ON(size != phys_end - phys_start);
 	size += (~virt_end + 1) & (~PAGE_MASK);  /* Align up to page boundary */
 
 	mods_debug_printk(DEBUG_MEM_DETAILED,
@@ -1601,13 +1614,13 @@ static void clear_entry_cache_mappings
 int esc_mods_flush_cpu_cache_range(struct file *fp,
 				   struct MODS_FLUSH_CPU_CACHE_RANGE *p)
 {
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV         private_data = fp->private_data;
 	struct list_head *head;
 	struct list_head *iter;
 
 	if (irqs_disabled() || in_interrupt() ||
 	    p->virt_addr_start > p->virt_addr_end ||
-	    MODS_INVALIDATE_CPU_CACHE == p->flags) {
+	    p->flags == MODS_INVALIDATE_CPU_CACHE) {
 
 		mods_debug_printk(DEBUG_MEM_DETAILED, "cannot clear cache\n");
 		return -EINVAL;
@@ -1638,7 +1651,8 @@ int esc_mods_flush_cpu_cache_range(struct file *fp,
 		u64 virt_start = p->virt_addr_start;
 
 		/* Kernel expects end to point to the first address of next
-		 * range */
+		 * range
+		 */
 		u64 virt_end = p->virt_addr_end + 1;
 
 		if ((start_on_page || start_before_page)

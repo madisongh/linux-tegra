@@ -37,7 +37,6 @@
 
 /* function return code */
 #define OK		 0
-#define ERROR		-1
 
 #define IRQ_FOUND	 1
 #define IRQ_NOT_FOUND	 0
@@ -73,6 +72,8 @@ struct mods_file_private_data {
 	struct mem_type      mem_type;
 	struct mutex         mtx;
 };
+
+typedef struct mods_file_private_data *MODS_PRIV;
 
 /* VM private data */
 struct mods_vm_private_data {
@@ -138,7 +139,8 @@ struct SYS_MAP_MEMORY {
 	struct MODS_MEM_INFO *p_mem_info;
 
 	u64 dma_addr;	    /* first physical address of given mapping,
-			       machine address on Xen */
+			     * machine address on Xen
+			     */
 	u64 virtual_addr;   /* virtual address of given mapping */
 	u32 mapping_length; /* tells how many bytes were mapped */
 
@@ -146,15 +148,11 @@ struct SYS_MAP_MEMORY {
 };
 
 /* functions used to avoid global debug variables */
-void mods_set_debug_level(int);
+void mods_set_debug_level(int mask);
 int mods_get_debug_level(void);
-int mods_check_debug_level(int);
-int mods_get_mem4g(void);
-int mods_get_highmem4g(void);
-void mods_set_highmem4g(int);
+int mods_check_debug_level(int mask);
 int mods_get_multi_instance(void);
-void mods_set_multi_instance(int);
-int mods_get_mem4goffset(void);
+void mods_set_multi_instance(int mi);
 
 #if defined(MODS_HAS_SET_PPC_TCE_BYPASS)
 void mods_set_ppc_tce_bypass(int bypass);
@@ -341,8 +339,6 @@ struct mods_priv {
 #endif
 
 /* FILE */
-#define MODS_PRIVATE_DATA(var, fp) \
-	struct mods_file_private_data *var = (fp)->private_data
 #define MODS_GET_FILE_PRIVATE_ID(fp) (((struct mods_file_private_data *)(fp) \
 				      ->private_data)->mods_id)
 
@@ -354,15 +350,15 @@ struct mods_priv {
 void mods_init_irq(void);
 void mods_cleanup_irq(void);
 unsigned char mods_alloc_channel(void);
-void mods_free_channel(unsigned char);
-void mods_irq_dev_clr_pri(unsigned char);
+void mods_free_channel(unsigned char channel);
+void mods_irq_dev_clr_pri(unsigned char id);
 void mods_irq_dev_set_pri(unsigned char id, void *pri);
-int mods_irq_event_check(unsigned char);
+int mods_irq_event_check(unsigned char channel);
 
 /* mem */
 const char *mods_get_prot_str(u32 mem_type);
 int mods_unregister_all_alloc(struct file *fp);
-struct MODS_MEM_INFO *mods_find_alloc(struct file *, u64);
+struct MODS_MEM_INFO *mods_find_alloc(struct file *fp, u64 phys_addr);
 
 #if defined(MODS_HAS_SET_PPC_TCE_BYPASS)
 int mods_unregister_all_ppc_tce_bypass(struct file *fp);
@@ -384,157 +380,160 @@ void mods_shutdown_clock_api(void);
 /* ioctl hanndlers */
 
 /* mem */
-int esc_mods_alloc_pages(struct file *, struct MODS_ALLOC_PAGES *);
-int esc_mods_device_alloc_pages(struct file *,
-				struct MODS_DEVICE_ALLOC_PAGES *);
-int esc_mods_device_alloc_pages_2(struct file *,
-				  struct MODS_DEVICE_ALLOC_PAGES_2 *);
-int esc_mods_free_pages(struct file *, struct MODS_FREE_PAGES *);
-int esc_mods_set_mem_type(struct file *, struct MODS_MEMORY_TYPE *);
-int esc_mods_get_phys_addr(struct file *,
-			   struct MODS_GET_PHYSICAL_ADDRESS *);
-int esc_mods_get_mapped_phys_addr(struct file *,
-			  struct MODS_GET_PHYSICAL_ADDRESS *);
+int esc_mods_alloc_pages(struct file *fp, struct MODS_ALLOC_PAGES *p);
+int esc_mods_device_alloc_pages(struct file *fp,
+				struct MODS_DEVICE_ALLOC_PAGES *p);
+int esc_mods_device_alloc_pages_2(struct file *fp,
+				  struct MODS_DEVICE_ALLOC_PAGES_2 *p);
+int esc_mods_free_pages(struct file *fp, struct MODS_FREE_PAGES *p);
+int esc_mods_set_mem_type(struct file *fp, struct MODS_MEMORY_TYPE *p);
+int esc_mods_get_phys_addr(struct file *fp,
+			   struct MODS_GET_PHYSICAL_ADDRESS *p);
+int esc_mods_get_mapped_phys_addr(struct file *fp,
+			  struct MODS_GET_PHYSICAL_ADDRESS *p);
 int esc_mods_get_mapped_phys_addr_2(struct file *fp,
 				    struct MODS_GET_PHYSICAL_ADDRESS_2 *p);
-int esc_mods_virtual_to_phys(struct file *,
-			     struct MODS_VIRTUAL_TO_PHYSICAL *);
-int esc_mods_phys_to_virtual(struct file *,
-			     struct MODS_PHYSICAL_TO_VIRTUAL *);
-int esc_mods_memory_barrier(struct file *);
+int esc_mods_virtual_to_phys(struct file *fp,
+			     struct MODS_VIRTUAL_TO_PHYSICAL *p);
+int esc_mods_phys_to_virtual(struct file *fp,
+			     struct MODS_PHYSICAL_TO_VIRTUAL *p);
+int esc_mods_memory_barrier(struct file *fp);
 #if defined(MODS_HAS_SET_PPC_TCE_BYPASS)
-int esc_mods_set_ppc_tce_bypass(struct file *,
-				struct MODS_SET_PPC_TCE_BYPASS *);
+int esc_mods_set_ppc_tce_bypass(struct file *fp,
+				struct MODS_SET_PPC_TCE_BYPASS *p);
 #endif
 
-int esc_mods_dma_map_memory(struct file *,
-			    struct MODS_DMA_MAP_MEMORY *);
-int esc_mods_dma_unmap_memory(struct file *,
-			      struct MODS_DMA_MAP_MEMORY *);
+int esc_mods_dma_map_memory(struct file *fp,
+			    struct MODS_DMA_MAP_MEMORY *p);
+int esc_mods_dma_unmap_memory(struct file *fp,
+			      struct MODS_DMA_MAP_MEMORY *p);
 
 /* acpi */
 #ifdef CONFIG_ACPI
-int esc_mods_eval_acpi_method(struct file *,
-			      struct MODS_EVAL_ACPI_METHOD *);
-int esc_mods_eval_dev_acpi_method(struct file *,
-				  struct MODS_EVAL_DEV_ACPI_METHOD *);
-int esc_mods_eval_dev_acpi_method_2(struct file *,
-				    struct MODS_EVAL_DEV_ACPI_METHOD_2 *);
-int esc_mods_acpi_get_ddc(struct file *, struct MODS_ACPI_GET_DDC *);
-int esc_mods_acpi_get_ddc_2(struct file *, struct MODS_ACPI_GET_DDC_2 *);
+int esc_mods_eval_acpi_method(struct file *fp,
+			      struct MODS_EVAL_ACPI_METHOD *p);
+int esc_mods_eval_dev_acpi_method(struct file *fp,
+				  struct MODS_EVAL_DEV_ACPI_METHOD *p);
+int esc_mods_eval_dev_acpi_method_2(struct file *fp,
+				    struct MODS_EVAL_DEV_ACPI_METHOD_2 *p);
+int esc_mods_acpi_get_ddc(struct file *fp, struct MODS_ACPI_GET_DDC *p);
+int esc_mods_acpi_get_ddc_2(struct file *fp, struct MODS_ACPI_GET_DDC_2 *p);
 #endif
 /* pci */
 #ifdef CONFIG_PCI
-int esc_mods_find_pci_dev(struct file *, struct MODS_FIND_PCI_DEVICE *);
-int esc_mods_find_pci_dev_2(struct file *,
-			    struct MODS_FIND_PCI_DEVICE_2 *);
-int esc_mods_find_pci_class_code(struct file *,
-				 struct MODS_FIND_PCI_CLASS_CODE *);
-int esc_mods_find_pci_class_code_2(struct file *,
-				   struct MODS_FIND_PCI_CLASS_CODE_2 *);
-int esc_mods_pci_get_bar_info(struct file *, struct MODS_PCI_GET_BAR_INFO *);
-int esc_mods_pci_get_bar_info_2(struct file *,
-				struct MODS_PCI_GET_BAR_INFO_2 *);
-int esc_mods_pci_get_irq(struct file *, struct MODS_PCI_GET_IRQ *);
-int esc_mods_pci_get_irq_2(struct file *,
-			   struct MODS_PCI_GET_IRQ_2 *);
-int esc_mods_pci_read(struct file *, struct MODS_PCI_READ *);
-int esc_mods_pci_read_2(struct file *, struct MODS_PCI_READ_2 *);
-int esc_mods_pci_write(struct file *, struct MODS_PCI_WRITE *);
-int esc_mods_pci_write_2(struct file *, struct MODS_PCI_WRITE_2 *);
-int esc_mods_pci_bus_add_dev(struct file *,
-			     struct MODS_PCI_BUS_ADD_DEVICES *);
-int esc_mods_pci_hot_reset(struct file *,
-			   struct MODS_PCI_HOT_RESET *);
-int esc_mods_pio_read(struct file *, struct MODS_PIO_READ *);
-int esc_mods_pio_write(struct file *, struct MODS_PIO_WRITE  *);
-int esc_mods_device_numa_info(struct file *,
-			      struct MODS_DEVICE_NUMA_INFO  *);
-int esc_mods_device_numa_info_2(struct file *,
-				struct MODS_DEVICE_NUMA_INFO_2  *);
-int esc_mods_pci_map_resource(struct file *,
-			      struct MODS_PCI_MAP_RESOURCE  *);
-int esc_mods_pci_unmap_resource(struct file *,
-				struct MODS_PCI_UNMAP_RESOURCE  *);
+int esc_mods_find_pci_dev(struct file *fp, struct MODS_FIND_PCI_DEVICE *p);
+int esc_mods_find_pci_dev_2(struct file *fp,
+			    struct MODS_FIND_PCI_DEVICE_2 *p);
+int esc_mods_find_pci_class_code(struct file *fp,
+				 struct MODS_FIND_PCI_CLASS_CODE *p);
+int esc_mods_find_pci_class_code_2(struct file *fp,
+				   struct MODS_FIND_PCI_CLASS_CODE_2 *p);
+int esc_mods_pci_get_bar_info(struct file *fp, struct MODS_PCI_GET_BAR_INFO *p);
+int esc_mods_pci_get_bar_info_2(struct file *fp,
+				struct MODS_PCI_GET_BAR_INFO_2 *p);
+int esc_mods_pci_get_irq(struct file *fp, struct MODS_PCI_GET_IRQ *p);
+int esc_mods_pci_get_irq_2(struct file *fp,
+			   struct MODS_PCI_GET_IRQ_2 *p);
+int esc_mods_pci_read(struct file *fp, struct MODS_PCI_READ *p);
+int esc_mods_pci_read_2(struct file *fp, struct MODS_PCI_READ_2 *p);
+int esc_mods_pci_write(struct file *fp, struct MODS_PCI_WRITE *p);
+int esc_mods_pci_write_2(struct file *fp, struct MODS_PCI_WRITE_2 *p);
+int esc_mods_pci_bus_add_dev(struct file *fp,
+			     struct MODS_PCI_BUS_ADD_DEVICES *p);
+int esc_mods_pci_hot_reset(struct file *fp,
+			   struct MODS_PCI_HOT_RESET *p);
+int esc_mods_pio_read(struct file *fp, struct MODS_PIO_READ *p);
+int esc_mods_pio_write(struct file *fp, struct MODS_PIO_WRITE *p);
+int esc_mods_device_numa_info(struct file *fp,
+			      struct MODS_DEVICE_NUMA_INFO *p);
+int esc_mods_device_numa_info_2(struct file *fp,
+				struct MODS_DEVICE_NUMA_INFO_2 *p);
+int esc_mods_pci_map_resource(struct file *fp,
+			      struct MODS_PCI_MAP_RESOURCE *p);
+int esc_mods_pci_unmap_resource(struct file *fp,
+				struct MODS_PCI_UNMAP_RESOURCE *p);
 #endif
 /* irq */
-int esc_mods_map_irq(struct file *pfile, struct MODS_DT_INFO *p);
-int esc_mods_register_irq(struct file *, struct MODS_REGISTER_IRQ *);
-int esc_mods_register_irq_2(struct file *,
-			    struct MODS_REGISTER_IRQ_2 *);
-int esc_mods_register_irq_3(struct file *,
-			    struct MODS_REGISTER_IRQ_3 *);
-int esc_mods_unregister_irq(struct file *, struct MODS_REGISTER_IRQ *);
-int esc_mods_unregister_irq_2(struct file *,
-			      struct MODS_REGISTER_IRQ_2 *);
-int esc_mods_query_irq(struct file *, struct MODS_QUERY_IRQ *);
-int esc_mods_query_irq_2(struct file *, struct MODS_QUERY_IRQ_2 *);
-int esc_mods_set_irq_mask(struct file *, struct MODS_SET_IRQ_MASK *);
-int esc_mods_set_irq_mask_2(struct file *,
-			    struct MODS_SET_IRQ_MASK_2 *);
-int esc_mods_set_irq_multimask(struct file *,
-			       struct MODS_SET_IRQ_MULTIMASK *);
-int esc_mods_irq_handled(struct file *, struct MODS_REGISTER_IRQ *);
-int esc_mods_irq_handled_2(struct file *,
-			   struct MODS_REGISTER_IRQ_2 *);
+#if defined(MODS_TEGRA) && defined(CONFIG_OF_IRQ) && defined(CONFIG_OF)
+int esc_mods_map_irq(struct file *fp, struct MODS_DT_INFO *p);
+#endif
+int esc_mods_register_irq(struct file *fp, struct MODS_REGISTER_IRQ *p);
+int esc_mods_register_irq_2(struct file *fp,
+			    struct MODS_REGISTER_IRQ_2 *p);
+int esc_mods_register_irq_3(struct file *fp,
+			    struct MODS_REGISTER_IRQ_3 *p);
+int esc_mods_unregister_irq(struct file *fp, struct MODS_REGISTER_IRQ *p);
+int esc_mods_unregister_irq_2(struct file *fp,
+			      struct MODS_REGISTER_IRQ_2 *p);
+int esc_mods_query_irq(struct file *fp, struct MODS_QUERY_IRQ *p);
+int esc_mods_query_irq_2(struct file *fp, struct MODS_QUERY_IRQ_2 *p);
+int esc_mods_set_irq_mask(struct file *fp, struct MODS_SET_IRQ_MASK *p);
+int esc_mods_set_irq_mask_2(struct file *fp,
+			    struct MODS_SET_IRQ_MASK_2 *p);
+int esc_mods_set_irq_multimask(struct file *fp,
+			       struct MODS_SET_IRQ_MULTIMASK *p);
+int esc_mods_irq_handled(struct file *fp, struct MODS_REGISTER_IRQ *p);
+int esc_mods_irq_handled_2(struct file *fp,
+			   struct MODS_REGISTER_IRQ_2 *p);
 /* clock */
 #ifdef MODS_TEGRA
-int esc_mods_get_clock_handle(struct file *,
-			      struct MODS_GET_CLOCK_HANDLE *);
-int esc_mods_set_clock_rate(struct file *, struct MODS_CLOCK_RATE *);
-int esc_mods_get_clock_rate(struct file *, struct MODS_CLOCK_RATE *);
-int esc_mods_get_clock_max_rate(struct file *, struct MODS_CLOCK_RATE *);
-int esc_mods_set_clock_max_rate(struct file *, struct MODS_CLOCK_RATE *);
-int esc_mods_set_clock_parent(struct file *, struct MODS_CLOCK_PARENT *);
-int esc_mods_get_clock_parent(struct file *, struct MODS_CLOCK_PARENT *);
-int esc_mods_enable_clock(struct file *, struct MODS_CLOCK_HANDLE *);
-int esc_mods_disable_clock(struct file *, struct MODS_CLOCK_HANDLE *);
-int esc_mods_is_clock_enabled(struct file *pfile,
+int esc_mods_get_clock_handle(struct file *fp,
+			      struct MODS_GET_CLOCK_HANDLE *p);
+int esc_mods_set_clock_rate(struct file *fp, struct MODS_CLOCK_RATE *p);
+int esc_mods_get_clock_rate(struct file *fp, struct MODS_CLOCK_RATE *p);
+int esc_mods_get_clock_max_rate(struct file *fp, struct MODS_CLOCK_RATE *p);
+int esc_mods_set_clock_max_rate(struct file *fp, struct MODS_CLOCK_RATE *p);
+int esc_mods_set_clock_parent(struct file *fp, struct MODS_CLOCK_PARENT *p);
+int esc_mods_get_clock_parent(struct file *fp, struct MODS_CLOCK_PARENT *p);
+int esc_mods_enable_clock(struct file *fp, struct MODS_CLOCK_HANDLE *p);
+int esc_mods_disable_clock(struct file *fp, struct MODS_CLOCK_HANDLE *p);
+int esc_mods_is_clock_enabled(struct file *fp,
 			      struct MODS_CLOCK_ENABLED *p);
-int esc_mods_clock_reset_assert(struct file *,
-				struct MODS_CLOCK_HANDLE *);
-int esc_mods_clock_reset_deassert(struct file *,
-				  struct MODS_CLOCK_HANDLE *);
-int esc_mods_flush_cpu_cache_range(struct file *,
-				   struct MODS_FLUSH_CPU_CACHE_RANGE *);
-int esc_mods_dma_alloc_coherent(struct file *,
-				struct MODS_DMA_COHERENT_MEM_HANDLE *);
-int esc_mods_dma_free_coherent(struct file *,
-				struct MODS_DMA_COHERENT_MEM_HANDLE *);
-int esc_mods_dma_copy_to_user(struct file *,
-				struct MODS_DMA_COPY_TO_USER *);
+int esc_mods_clock_reset_assert(struct file *fp,
+				struct MODS_CLOCK_HANDLE *p);
+int esc_mods_clock_reset_deassert(struct file *fp,
+				  struct MODS_CLOCK_HANDLE *p);
+int esc_mods_flush_cpu_cache_range(struct file *fp,
+				   struct MODS_FLUSH_CPU_CACHE_RANGE *p);
+int esc_mods_dma_alloc_coherent(struct file *fp,
+				struct MODS_DMA_COHERENT_MEM_HANDLE *p);
+int esc_mods_dma_free_coherent(struct file *fp,
+				struct MODS_DMA_COHERENT_MEM_HANDLE *p);
+int esc_mods_dma_copy_to_user(struct file *fp,
+				struct MODS_DMA_COPY_TO_USER *p);
 #ifdef CONFIG_DMA_ENGINE
-int esc_mods_dma_request_channel(struct file *, struct MODS_DMA_HANDLE *);
-int esc_mods_dma_release_channel(struct file *, struct MODS_DMA_HANDLE *);
-int esc_mods_dma_set_config(struct file *, struct MODS_DMA_CHANNEL_CONFIG *);
-int esc_mods_dma_wait(struct file *, struct MODS_DMA_WAIT_DESC *p_wait_desc);
-int esc_mods_dma_submit_request(struct file *,
-				struct MODS_DMA_TX_DESC *p_mods_desc);
-int esc_mods_dma_async_issue_pending(struct file *,
-				struct MODS_DMA_HANDLE *p_handle);
+int esc_mods_dma_request_channel(struct file *fp, struct MODS_DMA_HANDLE *p);
+int esc_mods_dma_release_channel(struct file *fp, struct MODS_DMA_HANDLE *p);
+int esc_mods_dma_set_config(struct file *fp, struct MODS_DMA_CHANNEL_CONFIG *p);
+int esc_mods_dma_wait(struct file *fp, struct MODS_DMA_WAIT_DESC *p);
+int esc_mods_dma_submit_request(struct file *fp,
+				struct MODS_DMA_TX_DESC *p);
+int esc_mods_dma_async_issue_pending(struct file *fp,
+				struct MODS_DMA_HANDLE *p);
 #endif
 #ifdef CONFIG_TEGRA_DC
-int esc_mods_tegra_dc_config_possible(struct file *,
-				struct MODS_TEGRA_DC_CONFIG_POSSIBLE *);
-int esc_mods_tegra_dc_setup_sd(struct file *, struct MODS_TEGRA_DC_SETUP_SD *);
+int esc_mods_tegra_dc_config_possible(struct file *fp,
+				struct MODS_TEGRA_DC_CONFIG_POSSIBLE *p);
+int esc_mods_tegra_dc_setup_sd(struct file *fp,
+			       struct MODS_TEGRA_DC_SETUP_SD *p);
 #endif
 #ifdef MODS_HAS_NET
-int esc_mods_net_force_link(struct file *pfile, struct MODS_NET_DEVICE_NAME *p);
+int esc_mods_net_force_link(struct file *fp, struct MODS_NET_DEVICE_NAME *p);
 #endif
 
 #ifdef MODS_HAS_DMABUF
-int esc_mods_dmabuf_get_phys_addr(struct file *,
-				  struct MODS_DMABUF_GET_PHYSICAL_ADDRESS *);
+int esc_mods_dmabuf_get_phys_addr(struct file *fp,
+				  struct MODS_DMABUF_GET_PHYSICAL_ADDRESS *p);
 #else
-static inline int esc_mods_dmabuf_get_phys_addr(struct file *f,
-				  struct MODS_DMABUF_GET_PHYSICAL_ADDRESS *a)
+static inline int esc_mods_dmabuf_get_phys_addr(struct file *fp,
+				  struct MODS_DMABUF_GET_PHYSICAL_ADDRESS *p)
 				  { return -EINVAL; }
 #endif
 #ifdef CONFIG_TEGRA_NVADSP
-int esc_mods_adsp_load(struct file *pfile);
-int esc_mods_adsp_start(struct file *pfile);
-int esc_mods_adsp_stop(struct file *pfile);
-int esc_mods_adsp_run_app(struct file *pfile, struct MODS_ADSP_RUN_APP_INFO *p);
+int esc_mods_adsp_load(struct file *fp);
+int esc_mods_adsp_start(struct file *fp);
+int esc_mods_adsp_stop(struct file *fp);
+int esc_mods_adsp_run_app(struct file *fp, struct MODS_ADSP_RUN_APP_INFO *p);
 #endif
 #endif
 

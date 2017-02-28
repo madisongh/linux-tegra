@@ -101,14 +101,12 @@ int esc_mods_tegra_dc_config_possible(struct file *fp,
 		}
 		dc_wins[i] = &dc->tmp_wins[idx];
 		mods_debug_printk(DEBUG_TEGRADC,
-			"esc_mods_tegra_dc_config_possible head %u, "
-			"using index %d for window %d\n",
+			"head %u, using index %d for win %d\n",
 			args->head, i, idx);
 	}
 
 	mods_debug_printk(DEBUG_TEGRADC,
-		"esc_mods_tegra_dc_config_possible head %u, "
-		"dc->mode.pclk %u\n",
+		"head %u, dc->mode.pclk %u\n",
 		args->head, dc->mode.pclk);
 
 #ifndef CONFIG_TEGRA_ISOMGR
@@ -117,7 +115,6 @@ int esc_mods_tegra_dc_config_possible(struct file *fp,
 	emc_clk = clk_get_sys("tegra_emc", "emc");
 	if (IS_ERR(emc_clk)) {
 		mods_debug_printk(DEBUG_TEGRADC,
-		"esc_mods_tegra_dc_config_possible "
 		"invalid clock specified when fetching EMC clock\n");
 	} else {
 		current_emc_freq = clk_get_rate(emc_clk);
@@ -128,8 +125,7 @@ int esc_mods_tegra_dc_config_possible(struct file *fp,
 	}
 
 	mods_debug_printk(DEBUG_TEGRADC,
-		"esc_mods_tegra_dc_config_possible bandwidth needed = %lu,"
-		" bandwidth available = %lu\n",
+		"b/w needed %lu, b/w available %lu\n",
 		max_bandwidth, max_available_bandwidth);
 
 	args->possible = (max_bandwidth <= max_available_bandwidth);
@@ -140,8 +136,7 @@ int esc_mods_tegra_dc_config_possible(struct file *fp,
 	for (i = 0; i < args->win_num; i++) {
 		args->windows[i].bandwidth = dc_wins[i]->new_bandwidth;
 		mods_debug_printk(DEBUG_TEGRADC,
-			"esc_mods_tegra_dc_config_possible head %u, "
-			"window %d bandwidth %d\n",
+			"head %u, win %d, b/w %d\n",
 			args->head, dc_wins[i]->idx, dc_wins[i]->new_bandwidth);
 	}
 
@@ -167,6 +162,7 @@ int esc_mods_tegra_dc_setup_sd(struct file *fp,
 	u32 val;
 #endif
 	u32 bw_idx;
+
 	LOG_ENT();
 
 	BUG_ON(args->head > tegra_dc_get_numof_dispheads());
@@ -331,9 +327,11 @@ void mods_exit_tegradc(void)
 {
 #if defined(CONFIG_TEGRA_NVSD)
 	int i;
+
 	LOG_ENT();
 	for (i = 0; i < tegra_dc_get_numof_dispheads(); i++) {
 		struct tegra_dc *dc = tegra_dc_get_dc(i);
+
 		if (!dc)
 			continue;
 		if (!tegra_dc_saved_sd_settings[i])

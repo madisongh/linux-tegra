@@ -1,7 +1,7 @@
 /*
  * mods_config.h - This file is part of NVIDIA MODS kernel driver.
  *
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA MODS kernel driver is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License,
@@ -53,6 +53,9 @@
 #endif
 #ifdef CONFIG_ZONE_DMA32
 #define MODS_HAS_DMA32	1
+#endif
+#ifdef CONFIG_PCI
+#define MODS_CAN_REGISTER_PCI_DEV 1
 #endif
 
 #endif /* _MODS_CONFIG_H_  */

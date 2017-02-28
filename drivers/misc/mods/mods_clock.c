@@ -208,8 +208,8 @@ int esc_mods_get_clock_handle(struct file *pfile,
 	}
 	pp = of_find_property(mods_np, "clock-names", NULL);
 	if (IS_ERR(pp)) {
-		mods_error_printk("'clock-names' prop not found in 'mods-clocks' node."
-				  " Can't get clock handle for %s\n",
+		mods_error_printk(
+		    "No 'clock-names' prop in 'mods-clocks' node for dev %s\n",
 				  p->controller_name);
 		goto err;
 	}
@@ -299,11 +299,13 @@ int esc_mods_get_clock_max_rate(struct file *pfile, struct MODS_CLOCK_RATE *p)
 			p->clock_handle);
 	} else {
 		long rate = pclk->ops->round_rate(pclk, pclk->max_rate);
+
 		p->clock_rate_hz = rate < 0 ? pclk->max_rate
 					    : (unsigned long)rate;
 #elif defined(MODS_COMMON_CLK)
 	} else {
 		long rate = clk_round_rate(pclk, ARBITRARY_MAX_CLK_FREQ);
+
 		p->clock_rate_hz = rate < 0 ? ARBITRARY_MAX_CLK_FREQ
 			: (unsigned long)rate;
 #endif
@@ -345,7 +347,7 @@ int esc_mods_set_clock_max_rate(struct file *pfile, struct MODS_CLOCK_RATE *p)
 		mods_error_printk("unable to override max clock rate\n");
 		mods_error_printk(
 		"reconfigure kernel with CONFIG_TEGRA_CLOCK_DEBUG_FUNC=y\n");
-		ret = -ENOSYS;
+		ret = -EINVAL;
 #endif
 	}
 
@@ -401,6 +403,7 @@ int esc_mods_get_clock_parent(struct file *pfile, struct MODS_CLOCK_PARENT *p)
 				  p->clock_handle);
 	} else {
 		struct clk *pparent = clk_get_parent(pclk);
+
 		p->clock_parent_handle = mods_get_clock_handle(pparent);
 		mods_debug_printk(DEBUG_CLOCK,
 				  "clock 0x%x is parent of clock 0x%x\n",
@@ -428,8 +431,9 @@ int esc_mods_enable_clock(struct file *pfile, struct MODS_CLOCK_HANDLE *p)
 #if defined(MODS_COMMON_CLK)
 		ret = clk_prepare(pclk);
 		if (ret) {
-			mods_error_printk("unable to prepare clock 0x%x before "
-					  "enabling\n", p->clock_handle);
+			mods_error_printk(
+			    "unable to prepare clock 0x%x before enabling\n",
+					  p->clock_handle);
 		}
 #endif
 		ret = clk_enable(pclk);
@@ -526,8 +530,8 @@ int esc_mods_clock_reset_assert(struct file *pfile,
 		}
 		pp = of_find_property(mods_np, "reset-names", NULL);
 		if (IS_ERR(pp)) {
-			mods_error_printk("'reset-names' prop not found in 'mods-clocks' node."
-					  " Can't get handle for reset dev %s\n",
+			mods_error_printk(
+		    "No 'reset-names' prop in 'mods-clocks' node for dev %s\n",
 					  __clk_get_name(pclk));
 			goto err;
 		}
@@ -536,8 +540,8 @@ int esc_mods_clock_reset_assert(struct file *pfile,
 
 		prst = of_reset_control_get(mods_np, clk_name);
 		if (IS_ERR(prst)) {
-			mods_error_printk("reset device %s not found. Failed "
-					  "to reset\n", clk_name);
+			mods_error_printk("reset device %s not found\n",
+					  clk_name);
 			goto err;
 		}
 		ret = reset_control_assert(prst);
@@ -584,8 +588,8 @@ int esc_mods_clock_reset_deassert(struct file *pfile,
 		}
 		pp = of_find_property(mods_np, "reset-names", NULL);
 		if (IS_ERR(pp)) {
-			mods_error_printk("'reset-names' prop not found in 'mods-clocks' node."
-					  " Can't get handle for reset dev %s\n",
+			mods_error_printk(
+		    "No 'reset-names' prop in 'mods-clocks' node for dev %s\n",
 					  __clk_get_name(pclk));
 			goto err;
 		}
@@ -594,8 +598,8 @@ int esc_mods_clock_reset_deassert(struct file *pfile,
 
 		prst = of_reset_control_get(mods_np, clk_name);
 		if (IS_ERR(prst)) {
-			mods_error_printk("reset device %s not found. Failed "
-					  "to reset\n", clk_name);
+			mods_error_printk(
+				"reset device %s not found\n", clk_name);
 			goto err;
 		}
 		ret = reset_control_deassert(prst);

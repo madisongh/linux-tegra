@@ -25,6 +25,9 @@
 #include <linux/miscdevice.h>
 #include <linux/screen_info.h>
 #include <linux/uaccess.h>
+#ifdef MODS_HAS_CONSOLE_LOCK
+#   include <linux/console.h>
+#endif
 
 /***********************************************************************
  * mods_krnl_* functions, driver interfaces called by the Linux kernel *
@@ -56,7 +59,7 @@ struct miscdevice mods_dev = {
 	.fops = &mods_fops
 };
 
-#if defined(CONFIG_PPC64)
+#if defined(MODS_CAN_REGISTER_PCI_DEV)
 static pci_ers_result_t mods_pci_error_detected(struct pci_dev *,
 						enum pci_channel_state);
 static pci_ers_result_t mods_pci_mmio_enabled(struct pci_dev *);
@@ -68,7 +71,7 @@ struct pci_error_handlers mods_pci_error_handlers = {
 	.resume		= mods_pci_resume,
 };
 
-DEFINE_PCI_DEVICE_TABLE(mods_pci_table) = {
+static const struct pci_device_id mods_pci_table[] = {
 	{
 		.vendor		= PCI_VENDOR_ID_NVIDIA,
 		.device		= PCI_ANY_ID,
@@ -109,7 +112,7 @@ static int debug = -0x80000000;
 static int multi_instance = MODS_MULTI_INSTANCE_DEFAULT_VALUE;
 
 #if defined(MODS_HAS_SET_PPC_TCE_BYPASS)
-static int ppc_tce_bypass;
+static int ppc_tce_bypass = MODS_PPC_TCE_BYPASS_DEFAULT;
 
 void mods_set_ppc_tce_bypass(int bypass)
 {
@@ -127,7 +130,7 @@ void mods_set_debug_level(int mask)
 	debug = mask;
 }
 
-int mods_get_debug_level()
+int mods_get_debug_level(void)
 {
 	return debug;
 }
@@ -160,7 +163,7 @@ static int __init mods_init_module(void)
 	if (rc < 0)
 		return -EBUSY;
 
-#if defined(CONFIG_PPC64)
+#if defined(MODS_CAN_REGISTER_PCI_DEV)
 	rc = pci_register_driver(&mods_pci_driver);
 	if (rc < 0)
 		return -EBUSY;
@@ -203,7 +206,7 @@ static void __exit mods_exit_module(void)
 
 	mods_cleanup_irq();
 
-#if defined(CONFIG_PPC64)
+#if defined(MODS_CAN_REGISTER_PCI_DEV)
 	pci_unregister_driver(&mods_pci_driver);
 #endif
 
@@ -225,16 +228,21 @@ module_exit(mods_exit_module);
 
 MODULE_LICENSE("GPL");
 
-module_param(debug, int, 0);
+#define STRING_VALUE(x) #x
+#define MAKE_MODULE_VERSION(x, y) STRING_VALUE(x) "." STRING_VALUE(y)
+MODULE_VERSION(MAKE_MODULE_VERSION(MODS_DRIVER_VERSION_MAJOR,
+				   MODS_DRIVER_VERSION_MINOR));
+
+module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug,
-		 "debug level (0=normal, 1=debug, 2=irq, 3=rich debug)");
-module_param(multi_instance, int, 0);
+"debug bitflags (2=ioctl 4=pci 8=acpi 16=irq 32=mem 64=fun +256=detailed)");
+
+module_param(multi_instance, int, 0644);
 MODULE_PARM_DESC(multi_instance,
-		 "allows more than one client to connect simultaneously to "
-		 "the driver");
+	"allows more than one client to simultaneously open the driver");
 
 #if defined(MODS_HAS_SET_PPC_TCE_BYPASS)
-module_param(ppc_tce_bypass, int, MODS_PPC_TCE_BYPASS_DEFAULT);
+module_param(ppc_tce_bypass, int, 0644);
 MODULE_PARM_DESC(ppc_tce_bypass,
 	"PPC TCE bypass (0=sys default, 1=force bypass, 2=force non bypass)");
 #endif
@@ -245,21 +253,24 @@ MODULE_PARM_DESC(ppc_tce_bypass,
 static int id_is_valid(unsigned char channel)
 {
 	if (channel <= 0 || channel > MODS_CHANNEL_MAX)
-		return ERROR;
+		return -EINVAL;
 
 	return OK;
 }
 
 static void mods_disable_all_devices(struct mods_file_private_data *priv)
 {
+#ifdef CONFIG_PCI
 	while (priv->enabled_devices != 0) {
 		struct en_dev_entry *old = priv->enabled_devices;
-#ifdef CONFIG_PCI
+
 		pci_disable_device(old->dev);
-#endif
 		priv->enabled_devices = old->next;
 		kfree(old);
 	}
+#else
+	WARN_ON(priv->enabled_devices != 0);
+#endif
 }
 
 /*********************
@@ -273,7 +284,7 @@ static int mods_register_mapping(
 	u32                   mapping_length)
 {
 	struct SYS_MAP_MEMORY *p_map_mem;
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV private_data = fp->private_data;
 
 	LOG_ENT();
 
@@ -302,7 +313,7 @@ static int mods_register_mapping(
 static void mods_unregister_mapping(struct file *fp, u64 virtual_address)
 {
 	struct SYS_MAP_MEMORY *p_map_mem;
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV private_data = fp->private_data;
 
 	struct list_head  *head = private_data->mods_mapping_list;
 	struct list_head  *iter;
@@ -328,7 +339,7 @@ static void mods_unregister_mapping(struct file *fp, u64 virtual_address)
 static void mods_unregister_all_mappings(struct file *fp)
 {
 	struct SYS_MAP_MEMORY *p_map_mem;
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV private_data = fp->private_data;
 
 	struct list_head  *head = private_data->mods_mapping_list;
 	struct list_head  *iter;
@@ -366,7 +377,8 @@ static pgprot_t mods_get_prot(u32 mem_type, pgprot_t prot)
 static pgprot_t mods_get_prot_for_range(struct file *fp, u64 dma_addr,
 					u64 size, pgprot_t prot)
 {
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV private_data = fp->private_data;
+
 	if ((dma_addr == private_data->mem_type.dma_addr) &&
 		(size == private_data->mem_type.size)) {
 
@@ -396,7 +408,8 @@ static const char *mods_get_prot_str_for_range(struct file *fp,
 					       u64          dma_addr,
 					       u64          size)
 {
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV private_data = fp->private_data;
+
 	if ((dma_addr == private_data->mem_type.dma_addr) &&
 		(size == private_data->mem_type.size)) {
 
@@ -407,7 +420,7 @@ static const char *mods_get_prot_str_for_range(struct file *fp,
 /********************
  * PCI ERROR FUNCTIONS *
  ********************/
-#if defined(CONFIG_PPC64)
+#if defined(MODS_CAN_REGISTER_PCI_DEV)
 static pci_ers_result_t mods_pci_error_detected(struct pci_dev *dev,
 						enum pci_channel_state state)
 {
@@ -472,7 +485,9 @@ static void mods_krnl_vma_close(struct vm_area_struct *vma)
 		struct mods_vm_private_data *vma_private_data
 			= MODS_VMA_PRIVATE(vma);
 		if (atomic_dec_and_test(&vma_private_data->usage_count)) {
-			MODS_PRIVATE_DATA(private_data, vma_private_data->fp);
+			MODS_PRIV private_data =
+				vma_private_data->fp->private_data;
+
 			if (unlikely(mutex_lock_interruptible(
 						&private_data->mtx))) {
 				LOG_EXT();
@@ -602,13 +617,18 @@ static int mods_krnl_open(struct inode *ip, struct file *fp)
 
 static int mods_krnl_close(struct inode *ip, struct file *fp)
 {
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV private_data = fp->private_data;
 	unsigned char id = MODS_GET_FILE_PRIVATE_ID(fp);
 	int ret = OK;
 
 	LOG_ENT();
 
-	BUG_ON(id_is_valid(id) != OK);
+	WARN_ON(id_is_valid(id) != OK);
+	if (id_is_valid(id) != OK) {
+		LOG_EXT();
+		return -EINVAL;
+	}
+
 	mods_free_channel(id);
 	mods_irq_dev_clr_pri(private_data->mods_id);
 
@@ -644,7 +664,7 @@ static int mods_krnl_close(struct inode *ip, struct file *fp)
 static unsigned int mods_krnl_poll(struct file *fp, poll_table *wait)
 {
 	unsigned int mask = 0;
-	MODS_PRIVATE_DATA(private_data, fp);
+	MODS_PRIV private_data = fp->private_data;
 	unsigned char id = MODS_GET_FILE_PRIVATE_ID(fp);
 
 	if (!(fp->f_flags & O_NONBLOCK)) {
@@ -683,7 +703,8 @@ static int mods_krnl_mmap(struct file *fp, struct vm_area_struct *vma)
 
 	{
 		int ret = OK;
-		MODS_PRIVATE_DATA(private_data, fp);
+		MODS_PRIV private_data = fp->private_data;
+
 		if (unlikely(mutex_lock_interruptible(&private_data->mtx)))
 			ret = -EINTR;
 		else {
@@ -719,6 +740,7 @@ static int mods_krnl_map_inner(struct file *fp, struct vm_area_struct *vma)
 		/* Find the beginning of the requested range */
 		for (first = 0; first < p_mem_info->max_chunks; first++) {
 			u64 dma_addr;
+
 			if (!pt[first].allocated)
 				continue;
 			dma_addr = pt[first].dma_addr;
@@ -740,7 +762,8 @@ static int mods_krnl_map_inner(struct file *fp, struct vm_area_struct *vma)
 			if (i == first) {
 				u64 aoffs      = req_pa - pt[i].dma_addr;
 				u32 skip_pages = aoffs >> PAGE_SHIFT;
-				have_pages     -= skip_pages;
+
+				have_pages -= skip_pages;
 			}
 			have_pages += 1U << pt[i].order;
 		}
@@ -763,6 +786,7 @@ static int mods_krnl_map_inner(struct file *fp, struct vm_area_struct *vma)
 
 			if (i == first) {
 				u64 aoffs = req_pa - pt[i].dma_addr;
+
 				map_pa    += aoffs;
 				map_size  -= aoffs;
 				map_pages -= aoffs >> PAGE_SHIFT;
@@ -792,7 +816,8 @@ static int mods_krnl_map_inner(struct file *fp, struct vm_area_struct *vma)
 		}
 
 		/* MODS_VMA_OFFSET(vma) can change so it can't be used
-		 * to register the mapping */
+		 * to register the mapping
+		 */
 		mods_register_mapping(fp,
 				      p_mem_info,
 				      pt[first].dma_addr,
@@ -858,7 +883,7 @@ int esc_mods_set_driver_para(struct file *pfile, struct MODS_SET_PARA *p)
 int esc_mods_get_screen_info(struct file *pfile, struct MODS_SCREEN_INFO *p)
 {
 #if defined(CONFIG_ARM) || defined(CONFIG_ARM64) || defined(CONFIG_PPC64)
-	return -ENOSYS;
+	return -EINVAL;
 #else
 	p->orig_video_mode = screen_info.orig_video_mode;
 	p->orig_video_is_vga = screen_info.orig_video_isVGA;
@@ -872,6 +897,26 @@ int esc_mods_get_screen_info(struct file *pfile, struct MODS_SCREEN_INFO *p)
 #endif
 }
 
+int esc_mods_lock_console(struct file *pfile)
+{
+#if defined(MODS_HAS_CONSOLE_LOCK)
+	console_lock();
+	return OK;
+#else
+	return -EINVAL;
+#endif
+}
+
+int esc_mods_unlock_console(struct file *pfile)
+{
+#if defined(MODS_HAS_CONSOLE_LOCK)
+	console_unlock();
+	return OK;
+#else
+	return -EINVAL;
+#endif
+}
+
 /**************
  * IO control *
  **************/
@@ -880,7 +925,7 @@ static long mods_krnl_ioctl(struct file  *fp,
 			    unsigned int  cmd,
 			    unsigned long i_arg)
 {
-	int ret;
+	int ret = 0;
 	void *arg_copy = 0;
 	void *arg = (void *) i_arg;
 	int arg_size;
@@ -903,8 +948,6 @@ static long mods_krnl_ioctl(struct file  *fp,
 			return -EFAULT;
 		}
 	}
-
-	switch (cmd) {
 
 #define MODS_IOCTL(code, function, argtype)\
 	({\
@@ -957,6 +1000,8 @@ static long mods_krnl_ioctl(struct file  *fp,
 		} \
 	} while (0);\
 	})
+
+	switch (cmd) {
 
 #ifdef CONFIG_PCI
 	case MODS_ESC_FIND_PCI_DEVICE:
@@ -1156,8 +1201,10 @@ static long mods_krnl_ioctl(struct file  *fp,
 		break;
 
 	case MODS_ESC_MAP_INTERRUPT:
+#if defined(MODS_TEGRA) && defined(CONFIG_OF_IRQ) && defined(CONFIG_OF)
 		MODS_IOCTL(MODS_ESC_MAP_INTERRUPT,
 				esc_mods_map_irq, MODS_DT_INFO);
+#endif
 		break;
 
 	case MODS_ESC_REGISTER_IRQ:
@@ -1252,7 +1299,7 @@ static long mods_krnl_ioctl(struct file  *fp,
 			   esc_mods_acpi_get_ddc_2, MODS_ACPI_GET_DDC_2);
 		break;
 
-#elif defined(MODS_TEGRA)
+#else
 	case MODS_ESC_EVAL_ACPI_METHOD:
 		/* fallthrough */
 	case MODS_ESC_EVAL_DEV_ACPI_METHOD:
@@ -1262,7 +1309,7 @@ static long mods_krnl_ioctl(struct file  *fp,
 	case MODS_ESC_ACPI_GET_DDC:
 		/* fallthrough */
 	case MODS_ESC_ACPI_GET_DDC_2:
-		/* Silent failure on Tegra to avoid clogging kernel log */
+		/* Silent failure to avoid clogging kernel log */
 		ret = -EINVAL;
 		break;
 #endif
@@ -1455,6 +1502,14 @@ static long mods_krnl_ioctl(struct file  *fp,
 	case MODS_ESC_GET_SCREEN_INFO:
 		MODS_IOCTL(MODS_ESC_GET_SCREEN_INFO,
 			   esc_mods_get_screen_info, MODS_SCREEN_INFO);
+		break;
+	case MODS_ESC_LOCK_CONSOLE:
+		MODS_IOCTL_VOID(MODS_ESC_LOCK_CONSOLE,
+			   esc_mods_lock_console);
+		break;
+	case MODS_ESC_UNLOCK_CONSOLE:
+		MODS_IOCTL_VOID(MODS_ESC_UNLOCK_CONSOLE,
+			   esc_mods_unlock_console);
 		break;
 
 	default:

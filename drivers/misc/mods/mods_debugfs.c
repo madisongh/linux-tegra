@@ -47,6 +47,7 @@ static int mods_dc_color_formats_show(struct seq_file *s, void *unused)
 	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *fmt_masks;
+
 		win = tegra_dc_get_window(dc, i);
 		if (!win)
 			continue;
@@ -81,6 +82,7 @@ static int mods_dc_blend_gen_show(struct seq_file *s, void *unused)
 	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *blend_gen;
+
 		win = tegra_dc_get_window(dc, i);
 		if (!win)
 			continue;
@@ -114,6 +116,7 @@ static int mods_dc_layout_show(struct seq_file *s, void *unused)
 	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *layouts;
+
 		win = tegra_dc_get_window(dc, i);
 		if (!win)
 			continue;
@@ -149,6 +152,7 @@ static int mods_dc_invert_show(struct seq_file *s, void *unused)
 	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *invert_data;
+
 		win = tegra_dc_get_window(dc, i);
 		if (!win)
 			continue;
@@ -189,6 +193,7 @@ static int mods_dc_interlaced_show(struct seq_file *s, void *unused)
 	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *interlaced;
+
 		win = tegra_dc_get_window(dc, i);
 		if (!win)
 			continue;
@@ -215,6 +220,7 @@ static const struct file_operations mods_dc_interlaced_fops = {
 static int mods_dc_window_mask_show(struct seq_file *s, void *unused)
 {
 	struct tegra_dc *dc = s->private;
+
 	seq_printf(s, "0x%02lx\n", dc->valid_windows);
 	return 0;
 }
@@ -240,6 +246,7 @@ static int mods_dc_scaling_show(struct seq_file *s, void *unused)
 	for (i = 0; i < tegra_dc_get_numof_dispwindows(); i++) {
 		struct tegra_dc_win *win;
 		u32 *scaling;
+
 		win = tegra_dc_get_window(dc, i);
 		if (!win)
 			continue;
@@ -322,6 +329,7 @@ DEFINE_SIMPLE_ATTRIBUTE(mods_dc_border_fops, mods_dc_border_get,
 static int mods_sd_brightness_get(void *data, u64 *val)
 {
 	struct tegra_dc *dc = data;
+
 	if (!dc->enabled)
 		*val = 0ULL;
 	else {
@@ -336,6 +344,7 @@ DEFINE_SIMPLE_ATTRIBUTE(mods_sd_brightness_fops, mods_sd_brightness_get,
 static int mods_sd_pixel_count_get(void *data, u64 *val)
 {
 	struct tegra_dc *dc = data;
+
 	if (!dc->enabled)
 		*val = 0ULL;
 	else
@@ -444,6 +453,7 @@ static int mods_dc_oc_show(struct seq_file *s, void *unused)
 	u32 val;
 #if defined(CONFIG_ARCH_TEGRA_12x_SOC)
 	struct tegra_dc *dc = s->private;
+
 	if (!dc->enabled)
 		val = 0U;
 	else
@@ -550,6 +560,7 @@ static int mods_dc_crc_latched_show(struct seq_file *s, void *unused)
 #ifdef CONFIG_TEGRA_DC_INTERLACE
 	{
 		u32 val;
+
 		val = tegra_dc_readl_exported(dc, DC_DISP_INTERLACE_CONTROL);
 		if (val & INTERLACE_MODE_ENABLE)
 			field = (val & INTERLACE_STATUS_FIELD_2) ? 1 : 0;
@@ -693,6 +704,7 @@ int mods_create_debugfs(struct miscdevice *modsdev)
 #endif
 		char devname[16];
 		struct tegra_dc *dc = tegra_dc_get_dc(dc_idx);
+
 		if (!dc)
 			continue;
 
@@ -805,6 +817,7 @@ int mods_create_debugfs(struct miscdevice *modsdev)
 
 		if (dc->out && dc->out->type == TEGRA_DC_OUT_DSI) {
 			struct dentry *dsi_debugfs_dir;
+
 			dsi_debugfs_dir = debugfs_create_dir("dsi",
 				dc_debugfs_dir);
 			if (IS_ERR(dsi_debugfs_dir)) {
