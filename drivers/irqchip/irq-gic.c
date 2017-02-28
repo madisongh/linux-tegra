@@ -135,6 +135,8 @@ struct gic_chip_data {
 #ifdef CONFIG_FIQ
 	bool fiq_enable;
 #endif
+	bool is_agic;
+	u32 num_interfaces;
 };
 
 static DEFINE_RAW_SPINLOCK(irq_controller_lock);
@@ -1407,6 +1409,8 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 				    unsigned long *hwirq,
 				    unsigned int *type)
 {
+	struct gic_chip_data *gic = (struct gic_chip_data *)d->host_data;
+
 	if (is_of_node(fwspec->fwnode)) {
 		if (fwspec->param_count < 3)
 			return -EINVAL;
@@ -1424,8 +1428,8 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
 
 #ifdef CONFIG_TEGRA_APE_AGIC
-	if (of_device_is_compatible(to_of_node(fwspec->fwnode), TEGRA_AGIC_COMPAT)
-		&& (fwspec->param_count == 4) && (fwspec->param[3] < MAX_AGIC_INTERFACES))
+	if ((gic->is_agic)
+		&& (fwspec->param_count == 4) && (fwspec->param[3] < gic->num_interfaces))
 		return tegra_agic_route_interrupt(*hwirq, fwspec->param[3]);
 	return 0;
 #else
@@ -1694,12 +1698,6 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 	cpu_base = of_iomap(node, 1);
 	WARN(!cpu_base, "unable to map gic cpu registers\n");
 
-#ifdef CONFIG_TEGRA_APE_AGIC
-	if ((of_property_read_bool(node, "enable-agic-clks")) &&
-	(!of_find_compatible_node(node, NULL, "nvidia,tegra210-agic")))
-		enable_t210_agic_clks(node);
-#endif
-
 	/*
 	 * Disable split EOI/Deactivate if either HYP is not available
 	 * or the CPU interface is too small.
@@ -1711,11 +1709,6 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 		percpu_offset = 0;
 
 	is_percpu = !of_property_read_bool(node, "not-per-cpu");
-
-#ifdef CONFIG_TEGRA_APE_AGIC
-	if (!of_find_compatible_node(node, NULL, TEGRA_AGIC_COMPAT))
-		tegra_agic = &gic_data[gic_cnt];
-#endif
 
 	__gic_init_bases(gic_cnt, -1, dist_base, cpu_base,
 			 percpu_offset, is_percpu,
@@ -1734,6 +1727,32 @@ gic_of_init(struct device_node *node, struct device_node *parent)
 	gic_cnt++;
 	return 0;
 }
+
+#ifdef CONFIG_TEGRA_APE_AGIC
+static int __init
+agic_t210_of_init(struct device_node *node, struct device_node *parent)
+{
+	if (of_property_read_bool(node, "enable-agic-clks"))
+		enable_t210_agic_clks(node);
+
+	tegra_agic = &gic_data[gic_cnt];
+	tegra_agic->is_agic = true;
+	tegra_agic->num_interfaces = MAX_AGIC_T210_INTERFACES;
+
+	return gic_of_init(node, parent);
+}
+
+static int __init
+agic_t18x_of_init(struct device_node *node, struct device_node *parent)
+{
+	tegra_agic = &gic_data[gic_cnt];
+	tegra_agic->is_agic = true;
+	tegra_agic->num_interfaces = MAX_AGIC_T18x_INTERFACES;
+
+	return gic_of_init(node, parent);
+}
+#endif
+
 IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
 IRQCHIP_DECLARE(arm11mp_gic, "arm,arm11mp-gic", gic_of_init);
 IRQCHIP_DECLARE(arm1176jzf_dc_gic, "arm,arm1176jzf-devchip-gic", gic_of_init);
@@ -1744,7 +1763,8 @@ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
 IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
 IRQCHIP_DECLARE(pl390, "arm,pl390", gic_of_init);
 #ifdef CONFIG_TEGRA_APE_AGIC
-IRQCHIP_DECLARE(tegra_agic, TEGRA_AGIC_COMPAT, gic_of_init);
+IRQCHIP_DECLARE(tegra_agic_t210, "nvidia,tegra210-agic", agic_t210_of_init);
+IRQCHIP_DECLARE(tegra_agic_t18x, "nvidia,tegra18x-agic", agic_t18x_of_init);
 #endif
 
 #endif
