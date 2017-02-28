@@ -2,7 +2,7 @@
  * drivers/cpufreq/cpufreq_interactive.c
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (c) 2012-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -57,7 +57,6 @@ struct cpufreq_interactive_cpuinfo {
 	u64 loc_hispeed_val_time; /* per-cpu hispeed_validate_time */
 	struct rw_semaphore enable_sem;
 	int governor_enabled;
-	u32 cycle_cnt;
 };
 
 static DEFINE_PER_CPU(struct cpufreq_interactive_cpuinfo, cpuinfo);
@@ -161,10 +160,7 @@ static void cpufreq_interactive_timer_resched(
 				  &pcpu->time_in_idle_timestamp,
 				  tunables->io_is_busy);
 	pcpu->time_in_iowait = get_cpu_iowait_time_us(smp_processor_id(), NULL);
-
 	pcpu->cputime_speedadj = 0;
-	active_cycle_cnt(smp_processor_id(), &pcpu->cycle_cnt);
-
 	pcpu->cputime_speedadj_timestamp = pcpu->time_in_idle_timestamp;
 	expires = jiffies + usecs_to_jiffies(tunables->timer_rate);
 	mod_timer_pinned(&pcpu->cpu_timer, expires);
@@ -205,10 +201,7 @@ static void cpufreq_interactive_timer_start(
 				  tunables->io_is_busy);
 	pcpu->time_in_iowait = get_cpu_iowait_time_us(cpu, NULL);
 	pcpu->io_consecutive = 0;
-
 	pcpu->cputime_speedadj = 0;
-	active_cycle_cnt(cpu, &pcpu->cycle_cnt);
-
 	pcpu->cputime_speedadj_timestamp = pcpu->time_in_idle_timestamp;
 	spin_unlock_irqrestore(&pcpu->load_lock, flags);
 }
@@ -353,8 +346,6 @@ static u64 update_load(int cpu)
 	unsigned int delta_time;
 	unsigned int io_consecutive;
 	u64 active_time;
-	u32 cur_ccnt;
-	u64 delta_ccnt = 0;
 
 	now_idle = get_cpu_idle_time(cpu, &now, tunables->io_is_busy);
 	now_iowait = get_cpu_iowait_time_us(cpu, NULL);
@@ -380,15 +371,8 @@ static u64 update_load(int cpu)
 		active_time = 0;
 	else
 		active_time = delta_time - delta_idle;
-	if (!active_cycle_cnt(cpu, &cur_ccnt)) {
-		delta_ccnt = cur_ccnt - pcpu->cycle_cnt;
-		/* cputime_speedadj is measured as time in us * Kcycles
-		 * delta_ccnt is cycles. Making it as par with cputime_speedadj
-		*/
-		pcpu->cputime_speedadj += delta_ccnt * 1000;
-		pcpu->cycle_cnt = cur_ccnt;
-	} else
-		pcpu->cputime_speedadj += active_time * pcpu->policy->cur;
+
+	pcpu->cputime_speedadj += active_time * pcpu->policy->cur;
 
 	pcpu->time_in_idle = now_idle;
 	pcpu->time_in_iowait = now_iowait;
@@ -1307,9 +1291,6 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 
 	case CPUFREQ_GOV_START:
 		mutex_lock(&gov_lock);
-
-		pcpu = &per_cpu(cpuinfo, policy->cpu);
-		active_cycle_cnt(policy->cpu, &pcpu->cycle_cnt);
 
 		freq_table = cpufreq_frequency_get_table(policy->cpu);
 		if (!tunables->hispeed_freq)

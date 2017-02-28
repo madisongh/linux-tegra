@@ -4,7 +4,7 @@
  *  Copyright (C) 2001 Russell King
  *            (C) 2002 - 2003 Dominik Brodowski <linux@brodo.de>
  *            (C) 2013 Viresh Kumar <viresh.kumar@linaro.org>
- *  Copyright (C) 2016, NVIDIA CORPORATION. All rights reserved.
+ *  Copyright (C) 2016-2017, NVIDIA CORPORATION. All rights reserved.
  *
  *  Oct 2005 - Ashok Raj <ashok.raj@intel.com>
  *	Added handling for CPU hotplug
@@ -1878,19 +1878,6 @@ EXPORT_SYMBOL(cpufreq_unregister_notifier);
 /*********************************************************************
  *                              GOVERNORS                            *
  *********************************************************************/
-/* return hw clk counter if cpufreq driver supports that */
-int active_cycle_cnt(u32 cpu, u32 *cnt)
-{
-	int ret = -EINVAL;
-
-	*cnt = 0;
-	if (cpufreq_driver->active_cycle_cnt) {
-		*cnt = cpufreq_driver->active_cycle_cnt(cpu);
-		ret = 0;
-	}
-	return ret;
-}
-EXPORT_SYMBOL(active_cycle_cnt);
 
 /**
  * cpufreq_driver_fast_switch - Carry out a fast CPU frequency switch.
