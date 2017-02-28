@@ -21,6 +21,7 @@
 #include <linux/delay.h>
 #include <linux/export.h>
 #include <linux/clk/tegra.h>
+#include <soc/tegra/chip-id.h>
 
 #include "clk.h"
 #include "clk-id.h"
@@ -47,7 +48,10 @@ int __init tegra_osc_clk_init(void __iomem *clk_base, struct tegra_clk *clks,
 	osc_ctrl_ctx = val & OSC_CTRL_MASK;
 	osc_idx = val >> OSC_CTRL_OSC_FREQ_SHIFT;
 
-	if (osc_idx < num)
+	if (tegra_platform_is_fpga() &&
+			of_machine_is_compatible("nvidia,tegra210"))
+		*osc_freq = input_freqs[5]; /* pretend FPGA is OSC38P4 */
+	else if (osc_idx < num)
 		*osc_freq = input_freqs[osc_idx];
 	else
 		*osc_freq = 0;
