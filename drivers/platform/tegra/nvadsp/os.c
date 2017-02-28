@@ -1138,10 +1138,13 @@ static void dump_adsp_logs(void)
 
 static void print_agic_irq_states(void)
 {
+	struct nvadsp_drv_data *drv_data = platform_get_drvdata(priv.pdev);
+	int start_irq = drv_data->chip_data->start_irq;
+	int end_irq = drv_data->chip_data->end_irq;
 	struct device *dev = &priv.pdev->dev;
 	int i;
 
-	for (i = INT_AGIC_START; i < INT_AGIC_END; i++) {
+	for (i = start_irq; i < end_irq; i++) {
 		dev_info(dev, "irq %d is %s and %s\n", i,
 		tegra_agic_irq_is_pending(i) ?
 			"pending" : "not pending",

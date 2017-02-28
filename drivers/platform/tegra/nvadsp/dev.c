@@ -33,6 +33,7 @@
 #include <linux/clk/tegra.h>
 #include <linux/delay.h>
 #include <asm/arch_timer.h>
+#include <linux/irqchip/tegra-agic.h>
 
 #include "dev.h"
 #include "os.h"
@@ -408,6 +409,8 @@ static struct nvadsp_chipdata tegra210_adsp_chipdata = {
 	.pm_init = nvadsp_pm_t21x_init,
 #endif
 	.wdt_irq = INT_T210_ADSP_WDT,
+	.start_irq = INT_T210_AGIC_START,
+	.end_irq = INT_T210_AGIC_END,
 };
 
 static struct nvadsp_chipdata tegrat18x_adsp_chipdata = {
@@ -428,6 +431,8 @@ static struct nvadsp_chipdata tegrat18x_adsp_chipdata = {
 	.pm_init = nvadsp_pm_t18x_init,
 #endif
 	.wdt_irq = INT_T18x_ATKE_WDT_IRQ,
+	.start_irq = INT_T18x_AGIC_START,
+	.end_irq = INT_T18x_AGIC_END,
 };
 
 static const struct of_device_id nvadsp_of_match[] = {

@@ -136,6 +136,8 @@ struct nvadsp_chipdata {
 	pm_init			pm_init;
 #endif
 	int			wdt_irq;
+	int			start_irq;
+	int			end_irq;
 };
 
 struct nvadsp_drv_data {
