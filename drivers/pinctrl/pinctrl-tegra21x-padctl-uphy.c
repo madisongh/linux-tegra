@@ -3721,6 +3721,12 @@ static const char * const tegra21x_usb3_groups[] = {
 	"uphy-lane-7",
 };
 
+static const char * const tegra21xb01_usb3_groups[] = {
+	"uphy-lane-1",
+	"uphy-lane-4",
+	"uphy-lane-5",
+};
+
 static const char * const tegra21x_sata_groups[] = {
 	"uphy-lane-7",
 };
@@ -3730,6 +3736,13 @@ static const char * const tegra21x_sata_groups[] = {
 		.name = #_name,						\
 		.num_groups = ARRAY_SIZE(tegra21x_##_name##_groups),	\
 		.groups = tegra21x_##_name##_groups,			\
+	}
+
+#define TEGRA21xB01_FUNCTION(_name)					\
+	{								\
+		.name = #_name,						\
+		.num_groups = ARRAY_SIZE(tegra21xb01_##_name##_groups),	\
+		.groups = tegra21xb01_##_name##_groups,			\
 	}
 
 static struct tegra_padctl_uphy_function tegra21x_functions[] = {
@@ -3743,7 +3756,7 @@ static struct tegra_padctl_uphy_function tegra21x_functions[] = {
 static struct tegra_padctl_uphy_function tegra21xb01_functions[] = {
 	TEGRA21x_FUNCTION(xusb),
 	TEGRA21x_FUNCTION(pcie),
-	TEGRA21x_FUNCTION(usb3),
+	TEGRA21xB01_FUNCTION(usb3),
 };
 
 static const unsigned int tegra21x_otg_functions[] = {
