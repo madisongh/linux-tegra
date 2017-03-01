@@ -2514,6 +2514,75 @@ int mmc_blk_cmdq_issue_discard_rq(struct mmc_queue *mq, struct request *req)
 EXPORT_SYMBOL(mmc_blk_cmdq_issue_discard_rq);
 
 /*
+ * Handle secure discard requests in cqe mode as DCMDs
+ */
+int mmc_blk_cmdq_issue_secdiscard_rq(struct mmc_queue *mq, struct request *req)
+{
+	struct mmc_card *card = mq->card;
+	struct mmc_host *host = card->host;
+	struct mmc_blk_data *md = mq->data;
+	struct mmc_cmdq_context_info *ctx_info;
+	struct mmc_queue_req *active_mqrq;
+	struct mmc_cmdq_req *cmdq_req;
+	int ret = 0, tag = req->tag;
+	unsigned int from, nr, arg, nbytes;
+	int type = MMC_BLK_DISCARD;
+
+	WARN_ON((tag < 0) || (tag > card->ext_csd.cmdq_depth));
+
+	if (!(mmc_can_secure_erase_trim(card))) {
+		ret = -EOPNOTSUPP;
+		blk_end_request_all(req, 0);
+		return ret;
+	}
+
+	ctx_info = &host->cmdq_ctx;
+
+	down(&ctx_info->thread_sem);
+	WARN_ON(test_and_set_bit(tag, &host->cmdq_ctx.active_reqs));
+	ctx_info->active_qbr = true;
+
+	active_mqrq = &mq->mqrq_cmdq[req->tag];
+	active_mqrq->req = req;
+
+	cmdq_req = mmc_cmdq_prep_dcmd(active_mqrq, mq);
+	cmdq_req->cmdq_req_flags |= QBR;
+	cmdq_req->mrq.cmd = &cmdq_req->cmd;
+	cmdq_req->tag = req->tag;
+	cmdq_req->mrq.host = host;
+
+	from = blk_rq_pos(req);
+	nr = blk_rq_sectors(req);
+	nbytes = blk_rq_bytes(req);
+
+	if (mmc_can_trim(card) && !mmc_erase_group_aligned(card, from, nr))
+		arg = MMC_SECURE_TRIM1_ARG;
+	else
+		arg = MMC_SECURE_ERASE_ARG;
+
+	ret = mmc_erase(card, from, nr, arg);
+	if (ret)
+		goto out;
+
+	if (arg == MMC_SECURE_TRIM1_ARG) {
+		ret = mmc_erase(card, from, nr, MMC_SECURE_TRIM2_ARG);
+		if (ret)
+			goto out;
+	}
+	mmc_blk_reset_success(md, type);
+
+out:
+	WARN_ON(!test_and_clear_bit(cmdq_req->tag, &ctx_info->active_reqs));
+	ctx_info->active_qbr = false;
+	blk_end_request(req, 0, nbytes);
+	up(&ctx_info->thread_sem);
+
+	return ret;
+
+}
+EXPORT_SYMBOL(mmc_blk_cmdq_issue_secdiscard_rq);
+
+/*
  * Issues a dcmd request
  * FIXME:
  *	Try to pull another request from queue and prepare it in the
@@ -2870,7 +2939,10 @@ static int mmc_blk_cmdq_issue_rq(struct mmc_queue *mq, struct request *req)
 
 	if (cmd_flags & REQ_DISCARD) {
 		mmc_get_card(card);
-		ret = mmc_blk_cmdq_issue_discard_rq(mq, req);
+		if (req->cmd_flags & REQ_SECURE)
+			ret = mmc_blk_cmdq_issue_secdiscard_rq(mq, req);
+		else
+			ret = mmc_blk_cmdq_issue_discard_rq(mq, req);
 		mmc_put_card(card);
 	} else if (cmd_flags & REQ_FLUSH) {
 		ret = mmc_blk_cmdq_issue_flush_rq(mq, req);
