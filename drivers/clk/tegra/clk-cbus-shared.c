@@ -255,11 +255,29 @@ static unsigned long clk_cbus_recalc_rate(struct clk_hw *hw,
 static unsigned long _clk_cap_shared_bus(struct clk *c, unsigned long rate,
 						unsigned long ceiling)
 {
-	ceiling = clk_round_rate(c, ceiling);
+	unsigned long rounded_ceiling = clk_round_rate(c, ceiling);
 
-	rate = min(rate, ceiling);
+	if (rounded_ceiling > ceiling) {
+		struct clk_hw *hw = __clk_get_hw(c);
+		unsigned long start, next, resolution = 2000; /* 2kHz */
 
-	return rate;
+		/* Div-by-2 search down for start */
+		start = clk_round_rate(c, to_clk_cbus_shared(hw)->min_rate);
+		do {
+			next = start;
+			start = max((start + ceiling) / 2, start + resolution);
+			start = clk_round_rate(c, start);
+		} while (start < ceiling);
+		pr_debug("%s: start %lu, next %lu\n", __func__, start, next);
+
+		/* Linear search rounding ladder up  */
+		do {
+			rounded_ceiling = next;
+			next = clk_round_rate(c, next + resolution);
+		} while (next <= ceiling);
+	}
+
+	return min(rate, rounded_ceiling);
 }
 
 static bool bus_user_is_slower(struct tegra_clk_cbus_shared *a,
