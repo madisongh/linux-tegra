@@ -1864,7 +1864,7 @@ static int tegra_i2c_change_clock_rate(struct tegra_i2c_dev *i2c_dev)
 	i2c_writel(i2c_dev, val, I2C_CNFG);
 
 	if (i2c_dev->hw->has_config_load_reg) {
-		ret = tegra_i2c_wait_for_config_load(i2c_dev);
+		ret = tegra_i2c_wait_for_config_load(i2c_dev, I2C_MSTR_CONFIG_LOAD);
 		if (ret)
 			return ret;
 	}
