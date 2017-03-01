@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -110,12 +110,12 @@ static void __init tegra_sclk_init(void __iomem *clk_base,
 {
 	struct clk *clk;
 	struct clk **dt_clk_mux, **dt_clk_skipper, **dt_clk;
-	char *hclk_parent;
+	char *hclk_parent = NULL;
 
 	/* SCLK_MUX */
 	dt_clk_mux = tegra_lookup_dt_id(tegra_clk_sclk_mux, tegra_clks);
 	dt_clk_skipper = tegra_lookup_dt_id(tegra_clk_sclk_skipper, tegra_clks);
-	if (dt_clk_skipper || dt_clk_mux) {
+	if (dt_clk_mux) {
 		clk = tegra_clk_register_super_mux("sclk_mux",
 						gen_info->sclk_parents,
 						gen_info->num_sclk_parents,
@@ -123,15 +123,17 @@ static void __init tegra_sclk_init(void __iomem *clk_base,
 						clk_base + SCLK_BURST_POLICY,
 						0, 4, 0, 0, NULL);
 		*dt_clk_mux = clk;
-		hclk_parent = "sclk";
+		hclk_parent = "sclk_mux";
 
 		/* SCLK */
 		dt_clk = tegra_lookup_dt_id(tegra_clk_sclk, tegra_clks);
 		if (dt_clk) {
 			clk = tegra_clk_register_divider("sclk", "sclk_mux",
-						clk_base + SCLK_DIVIDER, 0, 0,
+						clk_base + SCLK_DIVIDER, 0,
+						TEGRA_DIVIDER_ROUND_UP,
 						0, 8, 1, &sysrate_lock);
 			*dt_clk = clk;
+			hclk_parent = "sclk";
 		}
 
 		if (dt_clk_skipper) {
@@ -151,8 +153,12 @@ static void __init tegra_sclk_init(void __iomem *clk_base,
 						clk_base + SCLK_BURST_POLICY,
 						0, 4, 0, 0, NULL);
 			*dt_clk = clk;
+			hclk_parent = "sclk";
 		}
 	}
+
+	if (!hclk_parent)
+		return;		/* The entire sclk complex is not present */
 
 	/* HCLK */
 	dt_clk = tegra_lookup_dt_id(tegra_clk_hclk, tegra_clks);
