@@ -3545,8 +3545,8 @@ static void tegra_xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 	xhci_free_dev(hcd, udev);
 
 	/* make sure CDP is enabled for for USB2.0 root hub ports */
-	if (is_roothub_port && tegra->cdp_enabled &&
-			usb_hcd_is_primary_hcd(hcd)) {
+	if (is_roothub_port && tegra->connected_utmi_ports[port] &&
+			tegra->cdp_enabled && usb_hcd_is_primary_hcd(hcd)) {
 		/* we have to make sure CDP is turned on before VBUS on */
 		dev_dbg(dev, "%s: power on CDP phy %d\n", __func__, port);
 		ret = phy_power_on(tegra->cdp_phys[port]);
