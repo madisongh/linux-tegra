@@ -2151,7 +2151,7 @@ static int pg_iommu_map(struct dma_iommu_mapping *mapping, unsigned long iova,
 	bool need_prefetch_page = !!iommu_get_num_pf_pages(mapping, attrs);
 	unsigned long ioprot;
 
-#ifdef CONFIG_IOMMU_DMA
+#if ENABLE_IOMMU_DMA_OPS
 	ioprot = dma_direction_to_prot(dir, coherent);
 #else
 	ioprot = IOMMU_READ | IOMMU_WRITE;
@@ -2206,7 +2206,7 @@ static int pg_iommu_map_sg(struct dma_iommu_mapping *mapping, unsigned long iova
 	struct iommu_domain *domain = mapping->domain;
 	bool need_prefetch_page = !!iommu_get_num_pf_pages(mapping, attrs);
 
-#ifdef CONFIG_IOMMU_DMA
+#if ENABLE_IOMMU_DMA_OPS
 	ioprot = dma_direction_to_prot(dir, coherent);
 #else
 	ioprot = IOMMU_READ | IOMMU_WRITE;
@@ -2572,7 +2572,7 @@ static int _iommu_map(struct iommu_domain *domain, unsigned long iova,
 {
 	unsigned long ioprot;
 
-#ifdef CONFIG_IOMMU_DMA
+#if ENABLE_IOMMU_DMA_OPS
 	ioprot = dma_direction_to_prot(dir, coherent);
 #else
 	ioprot = IOMMU_READ | IOMMU_WRITE;
