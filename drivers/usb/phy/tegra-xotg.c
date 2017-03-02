@@ -300,13 +300,13 @@ static bool __tegra_xotg_update_inputs(struct tegra_xotg *xotg,
 
 	/* IDDIG */
 	changed = false;
-	if (info->iddig_chg) {
+	if (info->iddig_chg || !only_when_changed) {
 		id = tegra_xotg_get_id_from_rid(info->iddig);
-		dev_dbg(xotg->dev, "IDDIG changed: %u (ID:%d)\n",
-				info->iddig, id);
-		changed = ever_changed = true;
-	}
-	if (changed || !only_when_changed) {
+		if (info->iddig_chg) {
+			dev_dbg(xotg->dev, "IDDIG changed: %u (ID:%d)\n",
+					info->iddig, id);
+			changed = ever_changed = true;
+		}
 		if (id)	/* B-device */
 			dev_dbg(xotg->dev, "IDDIG -> B_IDLE\n");
 		else	/* A-device */
@@ -356,6 +356,9 @@ static bool tegra_xotg_update_inputs(struct tegra_xotg *xotg,
 
 	if (xotg->soc_config->get_otg_vbus_id)
 		xotg->soc_config->get_otg_vbus_id(xotg->usb2_phy, &info);
+	else
+		return false;
+
 	return __tegra_xotg_update_inputs(xotg, &info, only_when_changed);
 }
 
