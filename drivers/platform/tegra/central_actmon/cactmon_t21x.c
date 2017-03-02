@@ -224,7 +224,7 @@ static unsigned long actmon_dev_get_rate(struct actmon_dev *adev)
 	return clk_get_rate(aclk(adev->clnt));
 }
 
-int actmon_dev_platform_init_t21x(struct actmon_dev *adev,
+static int actmon_dev_platform_init_t21x(struct actmon_dev *adev,
 		struct platform_device *pdev)
 {
 	struct clk *prnt;
