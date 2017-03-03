@@ -370,7 +370,7 @@ struct tegra_dfll {
 	u32				force_mode;
 	u32				cf;
 	u32				ci;
-	u32				cg;
+	s32				cg;
 	bool				cg_scale;
 	u32				reg_init_uV;
 	u32				cfg_flags;
