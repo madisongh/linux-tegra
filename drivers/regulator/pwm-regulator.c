@@ -162,7 +162,8 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
 	 * to get output voltage nearer to requested value as there is no
 	 * calculation loss.
 	 */
-	req_period = req_diff * period;
+	req_period = req_diff;
+	req_period *= period;
 	div_u64_rem(req_period, diff, &rem);
 	if (!rem) {
 		do_div(req_period, diff);
