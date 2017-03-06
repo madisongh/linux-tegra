@@ -782,19 +782,16 @@ end:
 	return;
 }
 
-static int tegra_adma_terminate_all(struct dma_chan *dc)
+static int tegra_adma_terminate_chan(struct dma_chan *dc)
 {
 	struct tegra_adma_chan *tdc = to_tegra_adma_chan(dc);
 	struct tegra_adma_sg_req *sgreq;
 	struct tegra_adma_desc *dma_desc;
-	unsigned long flags;
 	unsigned long status;
 	unsigned long tc = 0;
 	bool was_busy;
 
-	spin_lock_irqsave(&tdc->lock, flags);
 	if (list_empty(&tdc->pending_sg_req)) {
-		spin_unlock_irqrestore(&tdc->lock, flags);
 		return 0;
 	}
 
@@ -833,9 +830,39 @@ skip_dma_stop:
 		list_del(&dma_desc->cb_node);
 		dma_desc->cb_count = 0;
 	}
-	spin_unlock_irqrestore(&tdc->lock, flags);
 
 	return 0;
+}
+
+static int tegra_adma_terminate_all(struct dma_chan *dc)
+{
+	struct tegra_adma_chan *tdc = to_tegra_adma_chan(dc);
+	unsigned long flags;
+	int ret;
+
+	spin_lock_irqsave(&tdc->lock, flags);
+	ret = tegra_adma_terminate_chan(dc);
+	spin_unlock_irqrestore(&tdc->lock, flags);
+
+	return ret;
+}
+
+static void tegra_adma_shutdown_all(struct dma_chan *dc)
+{
+	struct tegra_adma_chan *tdc = to_tegra_adma_chan(dc);
+	int ret;
+	unsigned long flags;
+
+	spin_lock_irqsave(&tdc->lock, flags);
+
+	ret = tegra_adma_terminate_chan(dc);
+
+	INIT_LIST_HEAD(&tdc->pending_sg_req);
+	INIT_LIST_HEAD(&tdc->free_sg_req);
+	INIT_LIST_HEAD(&tdc->free_dma_desc);
+	INIT_LIST_HEAD(&tdc->cb_desc);
+
+	spin_unlock_irqrestore(&tdc->lock, flags);
 }
 
 static enum dma_status tegra_adma_tx_status(struct dma_chan *dc,
@@ -1533,6 +1560,20 @@ err_pm_disable:
 	return ret;
 }
 
+static void tegra_adma_shutdown(struct platform_device *pdev)
+{
+	struct tegra_adma *tdma = platform_get_drvdata(pdev);
+	int i;
+
+	for (i = 0; i < tdma->nr_channels; ++i) {
+		struct tegra_adma_chan *tdc = &tdma->channels[i];
+		struct dma_chan *dc = &tdc->dma_chan;
+
+		tegra_adma_shutdown_all(dc);
+	}
+
+}
+
 static int tegra_adma_remove(struct platform_device *pdev)
 {
 	struct tegra_adma *tdma = platform_get_drvdata(pdev);
@@ -1673,6 +1714,7 @@ static struct platform_driver tegra_admac_driver = {
 		.of_match_table = of_match_ptr(tegra_adma_of_match),
 	},
 	.probe		= tegra_adma_probe,
+	.shutdown	= tegra_adma_shutdown,
 	.remove		= tegra_adma_remove,
 	.id_table	= tegra_adma_devtype,
 };
