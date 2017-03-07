@@ -40,6 +40,8 @@
 #define PWM_SCALE_WIDTH	13
 #define PWM_SCALE_SHIFT	0
 
+#define CLK_1MHz	1000000UL
+
 struct tegra_pwm_soc {
 	unsigned int num_channels;
 	unsigned long max_clk_limit;
@@ -264,6 +266,7 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 	struct tegra_pwm_chip *pwm;
 	struct resource *r;
 	bool no_clk_sleeping_in_ops;
+	struct clk *parent_clk;
 	int ret;
 
 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
@@ -298,6 +301,34 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 	if (IS_ERR(pwm->clk)) {
 		dev_err(&pdev->dev, "PWM clock get failed\n");
 		return PTR_ERR(pwm->clk);
+	}
+
+	parent_clk = devm_clk_get(&pdev->dev, "parent");
+	if (!IS_ERR(parent_clk)) {
+		struct device *dev = &pdev->dev;
+
+		/*
+		 * Set PWM frequency to lower so that it can switch
+		 * to parent with higher clock rate.
+		 */
+		ret = clk_set_rate(pwm->clk, CLK_1MHz);
+		if (ret < 0) {
+			dev_err(dev, "Failed to set 1M clock rate: %d\n", ret);
+			return ret;
+		}
+
+		ret = clk_set_parent(pwm->clk, parent_clk);
+		if (ret < 0) {
+			dev_err(dev, "Failed to set parent clk: %d\n", ret);
+			return ret;
+		}
+
+		/* Set clock to maximum clock limit */
+		ret = clk_set_rate(pwm->clk, pwm->soc->max_clk_limit);
+		if (ret < 0) {
+			dev_err(dev, "Failed to set max clk rate: %d\n", ret);
+			return ret;
+		}
 	}
 
 	/* Get clock rate */
