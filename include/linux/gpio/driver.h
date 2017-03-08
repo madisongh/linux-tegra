@@ -14,6 +14,7 @@ struct gpio_desc;
 struct of_phandle_args;
 struct device_node;
 struct seq_file;
+enum gpiod_flags;
 
 #ifdef CONFIG_GPIOLIB
 
@@ -116,6 +117,10 @@ struct gpio_chip {
 	int			(*set_debounce)(struct gpio_chip *chip,
 						unsigned offset,
 						unsigned debounce);
+
+	int			(*suspend_configure)(struct gpio_chip *chip,
+						     unsigned offset,
+						     enum gpiod_flags dflags);
 
 	int			(*is_enabled)(struct gpio_chip *chip,
 						unsigned offset);

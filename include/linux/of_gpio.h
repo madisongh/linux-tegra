@@ -60,6 +60,7 @@ extern void of_gpiochip_remove(struct gpio_chip *gc);
 extern int of_gpio_simple_xlate(struct gpio_chip *gc,
 				const struct of_phandle_args *gpiospec,
 				u32 *flags);
+extern int of_gpiochip_suspend(struct gpio_chip *gc);
 
 #else /* CONFIG_OF_GPIO */
 
@@ -79,7 +80,7 @@ static inline int of_gpio_simple_xlate(struct gpio_chip *gc,
 
 static inline int of_gpiochip_add(struct gpio_chip *gc) { return 0; }
 static inline void of_gpiochip_remove(struct gpio_chip *gc) { }
-
+static inline int of_gpiochip_suspend(struct gpio_chip *gc) { return 0; }
 #endif /* CONFIG_OF_GPIO */
 
 /**
