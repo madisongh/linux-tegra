@@ -16,6 +16,8 @@ For pwm-backlight bindings
   - default-brightness-level: the default brightness level (index into the
       array defined by the "brightness-levels" property)
   - power-supply: regulator for supply voltage
+  - label: name of the backlight device. If not specified, node name will be
+      be used as device name.
 
   The following "max-brightness" and "default-brightness" are mutually exclusive
   with "brightness-levels" and "default-brightness-level".
