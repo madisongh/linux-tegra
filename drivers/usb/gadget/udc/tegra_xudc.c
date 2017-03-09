@@ -683,8 +683,7 @@ static void tegra_xudc_device_mode_on(struct tegra_xudc *xudc)
 	dev_info(xudc->dev, "device mode on\n");
 	if (xudc->soc->utmi_pad_power_on)
 		xudc->soc->utmi_pad_power_on(xudc->utmi_phy);
-	if ((!xudc->gadget.is_otg || !XUDC_IS_T186(xudc)) &&
-			xudc->soc->set_vbus_override)
+	if (xudc->soc->set_vbus_override)
 		xudc->soc->set_vbus_override(xudc->utmi_phy);
 
 	xudc->device_mode = true;

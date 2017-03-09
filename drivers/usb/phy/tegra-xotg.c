@@ -812,8 +812,6 @@ static void update_vbus_state(struct tegra_xotg *xotg)
 	spin_lock_irqsave(&xotg->lock, flags);
 	if (extcon_get_cable_state_(xotg->vbus_extcon, EXTCON_USB)) {
 		dev_info(xotg->dev, "%s: VBUS detected\n", __func__);
-		if (xotg->soc_config->set_vbus_override)
-			xotg->soc_config->set_vbus_override(xotg->usb2_phy);
 		xotg->otg->fsm.b_sess_vld = 1;
 	} else {
 		dev_info(xotg->dev, "%s: VBUS not detected\n", __func__);
