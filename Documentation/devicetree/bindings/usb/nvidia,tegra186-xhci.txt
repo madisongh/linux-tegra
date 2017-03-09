@@ -38,6 +38,33 @@ Optional properties:
    USB ID pin. See ../extcon/extcon-gpio-states.txt for details.
    When the extcon cable state is 1, OTG port will transition to host mode.
  - extcon-cable-names: Must be "id".
+ - nvidia,boost_cpu_freq: Set the value to which CPU frequency will be boosted.
+   This is only the minimum frequency, DVFS can further scale up CPU frequency
+   based on the need and cpu load. CPU boost freq through PMQOS will be enabled
+   for xhci controller only when this field is a non-zero positive value. This
+   boost is applicable only for Bulk and Isoc transfers, other endpoints doesn't
+   need boost.
+   Example :
+   Before boosting on Quill-prod:
+     Output of "cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq"
+     345600
+     2419200
+     2419200
+     345600
+     345600
+     345600
+   After boosting on QUill-prod: (nvidia,boost_cpu_freq = <800>)
+     Output of "cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq"
+     806400
+     2419200
+     2419200
+     806400
+     806400
+     806400
+ - nvidia,boost_cpu_trigger: Minimum buffer length of the bulk or isoc transfers
+   beyond which we boost frequency. This field is applicable only if
+   "nvidia,boost_cpu_freq" > 0. This field should be > 16384(16KB), else driver
+   will use default 16384.
 
 Example:
 --------
@@ -58,4 +85,7 @@ Example:
 		extcon-cables = <&vbus_id_extcon 1>;
 		extcon-cable-names = "id";
 		#extcon-cells = <1>;
+
+		nvidia,boost_cpu_freq = <800>;
+		nvidia,boost_cpu_trigger = <18432>;
 	};
