@@ -66,7 +66,7 @@ static void edp_update_cap(struct gpu_edp *ctx, int temperature,
 {
 	unsigned clk_rate;
 
-	mutex_lock(&ctx->edp_lock);
+	BUG_ON(!mutex_is_locked(&ctx->edp_lock));
 
 	ctx->temperature_now = temperature;
 	ctx->imax = imax;
@@ -79,8 +79,6 @@ static void edp_update_cap(struct gpu_edp *ctx, int temperature,
 					  ctx->temperature_now, 1));
 
 	clk_set_rate(ctx->cap_clk, clk_rate * 1000);
-
-	mutex_unlock(&ctx->edp_lock);
 }
 
 #define C_TO_K(c) (c+273)
@@ -112,8 +110,11 @@ static int edp_set_cdev_state(struct thermal_cooling_device *cdev,
 
 	BUG_ON(cur_state >= MELT_SILICON_K);
 
+	mutex_lock(&ctx->edp_lock);
 	edp_update_cap(ctx, K_TO_C(cur_state),
 		       ctx->imax, ctx->pmax);
+	mutex_unlock(&ctx->edp_lock);
+
 	return 0;
 }
 
@@ -133,8 +134,10 @@ static int max_gpu_power_notify(struct notifier_block *b,
 	/* XXX there's no private data for a pm_qos notifier call */
 	struct gpu_edp *ctx = s_gpu;
 
+	mutex_lock(&ctx->edp_lock);
 	edp_update_cap(ctx, ctx->temperature_now,
 		       ctx->imax, max_gpu_pwr);
+	mutex_unlock(&ctx->edp_lock);
 
 	return NOTIFY_OK;
 }
@@ -154,10 +157,12 @@ static int store_edp_max(void *data, u64 val)
 	struct edp_attrs *attr = data;
 	struct gpu_edp *ctx = attr->ctx;
 
+	mutex_lock(&ctx->edp_lock);
 	*attr->var = val;
 
 	edp_update_cap(ctx, ctx->temperature_now,
 		       ctx->imax, ctx->pmax);
+	mutex_unlock(&ctx->edp_lock);
 
 	return 0;
 }
