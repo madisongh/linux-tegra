@@ -20,6 +20,7 @@
 #define __LINUX_VIRT_UTIL_H
 
 #include <sound/soc.h>
+#include "tegra_dtcp_sad.h"
 
 #define MIXER_CONFIG_SHIFT_VALUE 16
 #define TEGRA186_ASRC_STREAM_RATIO_INTEGER_PART_MASK		0x1F
@@ -267,5 +268,18 @@ int tegra_virt_i2s_set_loopback_enable(
 int tegra_virt_i2s_get_loopback_enable(
 	struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol);
-
+int tegra_sad_get_init(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol);
+int tegra_sad_set_init(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol);
+int tegra_sad_get_enable(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol);
+int tegra_sad_set_enable(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol);
+int tegra_setup_sad(struct platform_device *pdev, sad_context_t *psad,
+				struct snd_soc_card *card);
 #endif

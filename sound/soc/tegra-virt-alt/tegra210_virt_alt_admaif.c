@@ -28,7 +28,7 @@
 #include "tegra_asoc_xbar_virt_alt.h"
 #include "tegra_asoc_util_virt_alt.h"
 
-
+#define NUM_SAD_CONTROLS	2
 
 static struct tegra210_admaif *admaif;
 static int tegra210_admaif_hw_params(struct snd_pcm_substream *substream,
@@ -738,9 +738,15 @@ I2S_LOOPBACK_ENABLE_CTRL_DECL("I2S3 Loopback", 0x03),
 I2S_LOOPBACK_ENABLE_CTRL_DECL("I2S4 Loopback", 0x04),
 I2S_LOOPBACK_ENABLE_CTRL_DECL("I2S5 Loopback", 0x05),
 I2S_LOOPBACK_ENABLE_CTRL_DECL("I2S6 Loopback", 0x06),
+
+/* SAD controls should be always the last ones */
+SOC_SINGLE_BOOL_EXT("SAD Init", 0,
+		tegra_sad_get_init, tegra_sad_set_init),
+SOC_SINGLE_BOOL_EXT("SAD Enable", 0,
+		tegra_sad_get_enable, tegra_sad_set_enable),
 };
 
-static const struct snd_soc_component_driver tegra210_admaif_dai_driver = {
+static struct snd_soc_component_driver tegra210_admaif_dai_driver = {
 	.name		= DRV_NAME,
 	.controls = tegra_virt_t186ref_controls,
 	.num_controls = ARRAY_SIZE(tegra_virt_t186ref_controls),
@@ -755,6 +761,7 @@ int tegra210_virt_admaif_register_component(struct platform_device *pdev,
 	unsigned int admaif_ch_list[MAX_ADMAIF_IDS] = {0};
 	struct tegra_virt_admaif_soc_data *soc_data = data;
 	int adma_count = 0;
+	bool sad_enabled = false;
 
 	admaif = devm_kzalloc(&pdev->dev, sizeof(*admaif), GFP_KERNEL);
 	if (admaif == NULL) {
@@ -859,6 +866,15 @@ int tegra210_virt_admaif_register_component(struct platform_device *pdev,
 		}
 		adma_count++;
 	}
+
+	/* Remove exposing sad controls if not enabled in device node */
+	sad_enabled = of_property_read_bool(pdev->dev.of_node,
+		"sad_enabled");
+	if (!sad_enabled) {
+		tegra210_admaif_dai_driver.num_controls =
+		ARRAY_SIZE(tegra_virt_t186ref_controls) - NUM_SAD_CONTROLS;
+	}
+
 	ret = snd_soc_register_component(&pdev->dev,
 					&tegra210_admaif_dai_driver,
 					tegra210_admaif_dais,

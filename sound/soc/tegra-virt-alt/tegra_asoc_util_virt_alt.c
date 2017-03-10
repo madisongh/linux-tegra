@@ -21,7 +21,7 @@
 #include "tegra_virt_alt_ivc.h"
 #include "tegra_asoc_util_virt_alt.h"
 
-
+static sad_context_t *sad;
 const int tegra186_arad_mux_value[] = {
 	-1, /* None */
 	0, 1, 2, 3, 4, 5,	/* I2S1~6 */
@@ -1289,6 +1289,118 @@ int tegra_virt_i2s_set_loopback_enable(
 	return 0;
 }
 EXPORT_SYMBOL(tegra_virt_i2s_set_loopback_enable);
+
+
+int tegra_sad_get_init(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] =
+			sad->init_sad_flood;
+
+	return 0;
+}
+EXPORT_SYMBOL(tegra_sad_get_init);
+
+int tegra_sad_set_init(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+
+	if (sad->init_sad_flood == ucontrol->value.integer.value[0])
+		return 0;
+
+	if (ucontrol->value.integer.value[0]) {
+		if (sad_flood_init(sad, card->dev)) {
+			dev_err(card->dev, "failed to initialize sad\n");
+			return -1;
+		}
+	} else {
+		if (sad->enable_sad_flood) {
+			dev_err(card->dev, "SAD flood is enabled, disable first\n");
+			return -1;
+		}
+		sad_flood_deinit(sad, card->dev);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(tegra_sad_set_init);
+
+int tegra_sad_get_enable(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] =
+			sad->enable_sad_flood;
+
+	return 0;
+}
+EXPORT_SYMBOL(tegra_sad_get_enable);
+
+int tegra_sad_set_enable(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+
+	if (!sad->init_sad_flood) {
+		dev_err(card->dev, "SAD flood has not been initialized yet\n");
+		return -1;
+	}
+
+	sad_flood_enable(sad, ucontrol->value.integer.value[0], card->dev);
+
+	return 0;
+}
+EXPORT_SYMBOL(tegra_sad_set_enable);
+
+int tegra_setup_sad(struct platform_device *pdev, sad_context_t *psad,
+				struct snd_soc_card *card)
+{
+
+	sad = psad;
+	if (of_property_read_u32_index(pdev->dev.of_node, "nvidia,adma_ch_page",
+			0, &sad->dma_ch_page)) {
+		dev_info(&pdev->dev, "adma channel page address dt entry not found\n");
+		dev_info(&pdev->dev, "using adma channel page 0\n");
+		goto lb;
+	}
+	if (of_property_read_u32_index(pdev->dev.of_node,
+				"nvidia,sad_admaif_id", 0, &sad->admaif_id)) {
+		dev_info(&pdev->dev, "SAD admaif id dt entry not found\n");
+		dev_info(&pdev->dev, "using SAD admaif id: %d\n",
+				sad->admaif_id);
+		goto lb;
+	}
+	if (of_property_read_u32_index(pdev->dev.of_node, "nvidia,sad_dma_id",
+			0, &sad->dma_id)) {
+		dev_info(&pdev->dev, "SAD dma id dt entry not found\n");
+		dev_info(&pdev->dev, "using SAD dma id: %d\n", sad->dma_id);
+		goto lb;
+	}
+	if (of_property_read_u32_index(pdev->dev.of_node,
+			"nvidia,sad_header_mode", 0, &sad->sad_mode)) {
+		dev_info(&pdev->dev, "SAD header mode dt entry not found\n");
+		dev_info(&pdev->dev, "using SAD HEADER mode\n");
+		goto lb;
+	}
+
+	if (sad->sad_mode == SAD_SUBFRAME_MODE) {
+		if (sad_flood_init(sad, card->dev)) {
+			dev_err(&pdev->dev, "failed to initialize sad\n");
+			goto lb;
+		}
+		if (sad_flood_enable(sad, 1, card->dev)) {
+			dev_err(&pdev->dev, "failed to initialize sad\n");
+			goto lb;
+		}
+	}
+lb:
+	return 0;
+}
+EXPORT_SYMBOL(tegra_setup_sad);
 
 MODULE_AUTHOR("Dipesh Gandhi <dipeshg@nvidia.com>");
 MODULE_DESCRIPTION("Tegra Virt ASoC utility code");

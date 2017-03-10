@@ -1672,6 +1672,9 @@ static int tegra_adma_runtime_resume(struct device *dev)
 			struct tegra_adma_chan *tdc = &tdma->channels[i];
 			struct tegra_adma_chan_regs *ch_reg = &tdc->channel_reg;
 
+			if (channel_read(tdc, ADMA_CH_CMD))
+				continue;
+
 			channel_write(tdc, ADMA_CH_TC, ch_reg->tc);
 			channel_write(tdc, ADMA_CH_LOWER_SOURCE_ADDR,
 					ch_reg->src_ptr);

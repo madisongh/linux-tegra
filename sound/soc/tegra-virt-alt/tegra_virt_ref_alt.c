@@ -24,6 +24,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/tegra_pm_domains.h>
 
+#include "tegra_dtcp_sad.h"
 #include "tegra210_virt_alt_admaif.h"
 #include "tegra_asoc_machine_virt_alt.h"
 #include "tegra_asoc_util_virt_alt.h"
@@ -36,6 +37,18 @@ static const struct snd_soc_dapm_widget tegra_virt_dapm_widgets[] = {
 static const struct snd_soc_dapm_route tegra_virt_dapm_routes[] = {
 	{"Headphone", NULL, "OUT"},
 	{"IN", NULL, "LineIn"},
+};
+
+
+static sad_context_t sad = {
+	.sad_mode = SAD_HEADER_MODE,
+	.init_sad_flood = 0,
+	.enable_sad_flood = 0,
+
+	/* 0 indexed */
+	.admaif_id = 3,
+	.dma_id = 3,
+	.dma_ch_page = 0,
 };
 
 static struct snd_soc_card tegra_virt_t210ref_card = {
@@ -177,7 +190,7 @@ static int tegra_virt_machine_driver_probe(struct platform_device *pdev)
 			ret);
 		return -EINVAL;
 	}
-
+	tegra_setup_sad(pdev, &sad, card);
 	tegra_pd_add_device(&pdev->dev);
 	pm_runtime_forbid(&pdev->dev);
 
