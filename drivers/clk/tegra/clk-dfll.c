@@ -231,7 +231,7 @@
  * margin above the high voltage floor, in closed-loop mode in the
  * high-voltage range
  */
-#define DFLL_TUNE_HIGH_MARGIN_STEPS	2
+#define DFLL_TUNE_HIGH_MARGIN_STEPS	3
 
 /*
  * DFLL_CAP_GUARD_BAND_STEPS: the minimum volage is at least
@@ -393,6 +393,7 @@ struct tegra_dfll {
 	u8				tune_out_last;
 	unsigned long			tune_high_dvco_rate_min;
 	unsigned long 			tune_high_target_rate_min;
+	bool				tune_high_calibrated;
 
 	/* PWM interface */
 	enum tegra_dfll_pmu_if		pmu_if;
@@ -691,7 +692,7 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 
 	switch (td->tune_range) {
 	case DFLL_TUNE_LOW:
-		if (req->lut_index > td->tune_high_out_start) {
+		if (dfll_tune_target(td, req->rate) > DFLL_TUNE_LOW) {
 			td->tune_range = DFLL_TUNE_WAIT_DFLL;
 			mod_timer(&td->tune_timer, jiffies + td->tune_delay);
 			set_force_out_min(td);
@@ -702,7 +703,7 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 	case DFLL_TUNE_HIGH:
 	case DFLL_TUNE_WAIT_DFLL:
 	case DFLL_TUNE_WAIT_PMIC:
-		if (req->lut_index <= td->tune_high_out_start)
+		if (dfll_tune_target(td, req->rate) == DFLL_TUNE_LOW)
 			dfll_tune_low(td);
 		set_force_out_min(td);
 		break;
@@ -1352,6 +1353,7 @@ static void dfll_calibrate(struct tegra_dfll *td)
 		if ((td->tune_range == DFLL_TUNE_HIGH) &&
 		    (td->tune_high_out_min == out_min)) {
 			td->tune_high_dvco_rate_min = rate_min;
+			td->tune_high_calibrated = true;
 			return;
 		}
 
@@ -1591,8 +1593,6 @@ static int dfll_calculate_rate_request(struct tegra_dfll *td,
 	}
 	req->mult_bits = val;
 	req->dvco_target_rate = MULT_TO_DVCO_RATE(req->mult_bits, td->ref_rate);
-	req->rate = dfll_scale_dvco_rate(req->scale_bits,
-					 req->dvco_target_rate);
 	req->lut_index = find_lut_index_for_rate(td, req->dvco_target_rate);
 	if (req->lut_index < 0)
 		return req->lut_index;
@@ -2366,6 +2366,9 @@ static void dfll_init_tuning_thresholds(struct tegra_dfll *td)
 	 */
 	td->tune_high_out_min = max_voltage_index;
 	td->tune_high_out_start = max_voltage_index;
+	td->tune_high_dvco_rate_min = ULONG_MAX;
+	td->tune_high_target_rate_min = ULONG_MAX;
+
 	if (td->soc->tune_high_min_millivolts < td->soc->min_millivolts)
 		return;	/* no difference between low & high voltage range */
 
@@ -2379,7 +2382,7 @@ static void dfll_init_tuning_thresholds(struct tegra_dfll *td)
 
 	td->tune_high_out_min = out_min;
 	td->tune_high_out_start = out_start;
-	td->tune_high_dvco_rate_min = get_dvco_rate_above(td, out_start + 1);
+	td->tune_high_dvco_rate_min = get_dvco_rate_above(td, out_start);
 	td->tune_high_target_rate_min = get_dvco_rate_above(td, out_min);
 }
 
@@ -3311,9 +3314,10 @@ static int profiles_show(struct seq_file *s, void *data)
 		seq_puts(s, "TUNE HIGH: NONE\n");
 	} else {
 		seq_puts(s, "TUNE HIGH:\n");
-		seq_printf(s, "min    %5dmV%9lukHz\n",
+		seq_printf(s, "min    %5dmV%9lukHz%s\n",
 			   td->lut_uv[td->tune_high_out_min],
-			   td->tune_high_dvco_rate_min / 1000);
+			   td->tune_high_dvco_rate_min / 1000,
+			   td->tune_high_calibrated ? " (calibrated)"  : "");
 		seq_printf(s, "%-14s%9lukHz\n", "rate threshold",
 			   td->tune_high_target_rate_min / 1000);
 	}
