@@ -93,13 +93,13 @@ static int saf775x_hwdep_ioctl(struct file *file,
 			ret = saf775x_ops.codec_read(codec_priv,
 				buf, saf775x.val_len);
 			if (saf775x_curr_if == I2C) {
-				if (copy_to_user((unsigned char *)(_saf775x->val),
+				if (copy_to_user((void __user *)(saf775x.val),
 					buf, sizeof(*buf) * saf775x.val_len)) {
 					devm_kfree(dev, buf);
 					return -EFAULT;
 				}
 			} else {
-				if (copy_to_user((unsigned char *)(_saf775x->val),
+				if (copy_to_user((void __user *)(saf775x.val),
 					buf+1, sizeof(*buf) * (saf775x.val_len-1))) {
 					devm_kfree(dev, buf);
 					return -EFAULT;
@@ -160,7 +160,7 @@ static int saf775x_hwdep_ioctl(struct file *file,
 			dev_err(dev, "Failed to allocate memory for codec read buffer");
 			return -ENOMEM;
 		}
-		if (copy_from_user(buf, _saf775x->val,
+		if (copy_from_user(buf, saf775x.val,
 				sizeof(*buf) * saf775x.val_len)) {
 			devm_kfree(dev, buf);
 			return -EFAULT;
