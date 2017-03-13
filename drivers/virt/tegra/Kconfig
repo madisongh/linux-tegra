@@ -20,12 +20,3 @@ config TEGRA_HV_MANAGER
 	  configured by the hypervisor.
 
 	  Select Y to enable
-
-config TEGRA_VIRT_SUPPORT_BOOTDATA
-	bool "Expose Boot data passed by bootloader"
-	depends on TEGRA_VIRTUALIZATION
-	default n
-	help
-	  When enabled Boot data passed by bootloader is exposed via chosen node of device tree.
-
-	  Select Y to enable
