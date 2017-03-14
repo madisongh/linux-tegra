@@ -1015,11 +1015,12 @@ int eqos_probe(struct platform_device *pdev)
 	}
 #ifndef DISABLE_TRISTATE
 	if (pdata->prod_list) {
-		if (tegra_prod_set_by_name(&pdata->pads, "tx_tristate_enable",
-							pdata->prod_list)) {
-			dev_info(&pdata->pdev->dev,
-					"failed to enable pad prod settings\n");
-		}
+		ret = tegra_prod_set_by_name(&pdata->pads, "tx_tristate_enable",
+					     pdata->prod_list);
+		if (ret == -ENODEV)
+			dev_info(&pdev->dev, "tx_tristate_enable DT property missing\n");
+		if (ret == -EINVAL)
+			dev_err(&pdev->dev, "failed to enable pad prod settings\n");
 	}
 #endif
 	pdata->num_chans = num_chans;

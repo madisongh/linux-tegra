@@ -333,6 +333,7 @@ static void eqos_adjust_link(struct net_device *dev)
 	struct hw_if_struct *hw_if = &(pdata->hw_if);
 	struct phy_device *phydev = pdata->phydev;
 	int new_state = 0, speed_changed = 0, tx_tristate_disable = 0;
+	int ret;
 
 	if (phydev == NULL)
 		return;
@@ -387,13 +388,14 @@ static void eqos_adjust_link(struct net_device *dev)
 			pdata->xstats.link_connect_count++;
 #ifndef DISABLE_TRISTATE
 		if (pdata->prod_list) {
-			if (tegra_prod_set_by_name(
-						&pdata->pads,
-						"tx_tristate_disable",
-						pdata->prod_list)) {
-				dev_info(&pdata->pdev->dev,
-						"failed to disable pad prod settings\n");
-				}
+			ret = tegra_prod_set_by_name(&pdata->pads,
+						     "tx_tristate_disable",
+						     pdata->prod_list);
+			if (ret == -ENODEV)
+				dev_info(&pdata->pdev->dev, "tx_tristate_disable DT property missing\n");
+			if (ret == -EINVAL)
+				dev_err(&pdata->pdev->dev, "failed to disable pad prod settings\n");
+			if (!ret)
 				tx_tristate_disable = 1;
 			}
 #endif
@@ -407,13 +409,13 @@ static void eqos_adjust_link(struct net_device *dev)
 		pdata->xstats.link_disconnect_count++;
 #ifndef DISABLE_TRISTATE
 		if (pdata->prod_list) {
-			if (tegra_prod_set_by_name(
-						&pdata->pads,
-						"tx_tristate_enable",
-						pdata->prod_list)) {
-				dev_info(&pdata->pdev->dev,
-						"failed to enable pad prod settings\n");
-			}
+			ret = tegra_prod_set_by_name(&pdata->pads,
+						     "tx_tristate_enable",
+						     pdata->prod_list);
+			if (ret == -ENODEV)
+				dev_info(&pdata->pdev->dev, "tx_tristate_enable DT property missing\n");
+			if (ret == -EINVAL)
+				dev_err(&pdata->pdev->dev, "failed to enable pad prod settings\n");
 		}
 #endif
 		schedule_work(&pdata->iso_work);
