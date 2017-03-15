@@ -22,6 +22,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/clk-provider.h>
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/module.h>
@@ -54,6 +55,7 @@ struct tegra_pwm_chip {
 
 	const struct tegra_pwm_soc *soc;
 	bool			pretty_good_algo;
+	bool			no_clk_sleeping_in_ops;
 	int			num_user;
 	struct pinctrl		*pinctrl;
 	struct pinctrl_state	*suspend_state;
@@ -74,6 +76,22 @@ static inline void pwm_writel(struct tegra_pwm_chip *chip, unsigned int num,
 			     unsigned long val)
 {
 	writel(val, chip->regs + (num << 4));
+}
+
+static int tegra_pwm_clk_enable(struct tegra_pwm_chip *pc)
+{
+	if (pc->no_clk_sleeping_in_ops)
+		return clk_enable(pc->clk);
+	else
+		return clk_prepare_enable(pc->clk);
+}
+
+static void tegra_pwm_clk_disable(struct tegra_pwm_chip *pc)
+{
+	if (pc->no_clk_sleeping_in_ops)
+		clk_disable(pc->clk);
+	else
+		clk_disable_unprepare(pc->clk);
 }
 
 static long tegra_get_optimal_rate(struct tegra_pwm_chip *pc,
@@ -148,7 +166,7 @@ static int tegra_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	 * Compute the prescaler value for which (1 << PWM_DUTY_WIDTH)
 	 * cycles at the PWM clock rate will take period_ns nanoseconds.
 	 */
-	rate = clk_get_rate(pc->clk) >> PWM_DUTY_WIDTH;
+	rate = clk_hw_get_rate(__clk_get_hw(pc->clk)) >> PWM_DUTY_WIDTH;
 
 	/* Consider two digit precision in PWM_SCALE_WIDTH rate calculation */
 	ns100 *= precision;
@@ -178,7 +196,7 @@ timing_done:
 	 * before writing the register. Otherwise, keep it enabled.
 	 */
 	if (!pwm_is_enabled(pwm)) {
-		err = clk_prepare_enable(pc->clk);
+		err = tegra_pwm_clk_enable(pc);
 		if (err < 0)
 			return err;
 	} else
@@ -190,7 +208,7 @@ timing_done:
 	 * If the PWM is not enabled, turn the clock off again to save power.
 	 */
 	if (!pwm_is_enabled(pwm))
-		clk_disable_unprepare(pc->clk);
+		tegra_pwm_clk_disable(pc);
 
 	return 0;
 }
@@ -201,7 +219,7 @@ static int tegra_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 	int rc = 0;
 	u32 val;
 
-	rc = clk_prepare_enable(pc->clk);
+	rc = tegra_pwm_clk_enable(pc);
 	if (rc < 0)
 		return rc;
 
@@ -221,7 +239,7 @@ static void tegra_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 	val &= ~PWM_ENABLE;
 	pwm_writel(pc, pwm->hwpwm, val);
 
-	clk_disable_unprepare(pc->clk);
+	tegra_pwm_clk_disable(pc);
 }
 
 static const struct pwm_ops tegra_pwm_ops = {
@@ -251,14 +269,32 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, pwm);
 
-	if (pdev->dev.of_node)
+	if (pdev->dev.of_node) {
+		pwm->no_clk_sleeping_in_ops = of_property_read_bool(
+			pdev->dev.of_node, "nvidia,no-clk-sleeping-in-ops");
 		pwm->pretty_good_algo = of_property_read_bool(pdev->dev.of_node,
 						"pwm,use-pretty-good-alogorithm");
+		if (pwm->no_clk_sleeping_in_ops && pwm->pretty_good_algo) {
+			dev_warn(&pdev->dev,
+				"cannot use pretty good algo: sleeps in ops\n");
+			pwm->pretty_good_algo = false;
+		}
+		dev_info(&pdev->dev, "PWM clk can%s sleep in ops\n",
+			 pwm->no_clk_sleeping_in_ops ? "not" : "");
+	}
 
 	pwm->clk = devm_clk_get(&pdev->dev, "pwm");
 	if (IS_ERR(pwm->clk)) {
 		dev_err(&pdev->dev, "PWM clock get failed\n");
 		return PTR_ERR(pwm->clk);
+	}
+
+	if (pwm->no_clk_sleeping_in_ops) {
+		ret = clk_prepare(pwm->clk);
+		if (ret) {
+			dev_err(&pdev->dev, "PWM clock prepare failed\n");
+			return ret;
+		}
 	}
 
 	pwm->rst = devm_reset_control_get(&pdev->dev, "pwm");
@@ -314,7 +350,7 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 	if (WARN_ON(!pc))
 		return -ENODEV;
 
-	err = clk_prepare_enable(pc->clk);
+	err = tegra_pwm_clk_enable(pc);
 	if (err < 0)
 		return err;
 
@@ -322,12 +358,12 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 		struct pwm_device *pwm = &pc->chip.pwms[i];
 
 		if (!pwm_is_enabled(pwm))
-			if (clk_prepare_enable(pc->clk) < 0)
+			if (tegra_pwm_clk_enable(pc) < 0)
 				continue;
 
 		pwm_writel(pc, i, 0);
 
-		clk_disable_unprepare(pc->clk);
+		tegra_pwm_clk_disable(pc);
 	}
 
 	reset_control_assert(pc->rst);
