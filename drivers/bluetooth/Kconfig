@@ -18,6 +18,13 @@ config BT_QCA
 	tristate
 	select FW_LOADER
 
+config BT_RTKBTUSB
+	tristate "RTK HCI USB driver"
+	depends on USB
+	default y
+	help
+	  RTK Bluetooth HCI USB driver
+
 config BT_HCIBTUSB
 	tristate "HCI USB driver"
 	depends on USB
