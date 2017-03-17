@@ -1006,6 +1006,8 @@ int eqos_probe(struct platform_device *pdev)
 		ISO_BW_DEFAULT);
 	get_dt_u32(pdata, "nvidia,eth_iso_enable", &pdt_cfg->eth_iso_enable, 0,
 		1);
+	pdata->dt_cfg.phy_apd_mode = of_property_read_bool(node,
+							   "nvidia,brcm_phy_apd_mode");
 
 	pads = platform_get_resource_byname(pdev, IORESOURCE_MEM, "eqos_pads");
 	pdata->pads = devm_ioremap_nocache(&pdev->dev, pads->start,
