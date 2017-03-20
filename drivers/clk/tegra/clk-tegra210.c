@@ -3071,8 +3071,9 @@ static struct tegra_clk_periph tegra_sor1_mux =
 
 static const char *aclk_parents[] = { "pll_a1", "pll_c", "pll_p", "pll_a_out0", "pll_c2", "pll_c3", "clk_m" };
 
-static __init void tegra210_periph_clk_init(void __iomem *clk_base,
-					    void __iomem *pmc_base)
+static __init void tegra210_periph_clk_init(
+	void __iomem *clk_base, void __iomem *pmc_base,
+	struct tegra_clk_pll_params *pllp_params)
 {
 	struct clk *clk;
 	struct clk_hw *hw;
@@ -3143,7 +3144,7 @@ static __init void tegra210_periph_clk_init(void __iomem *clk_base,
 	clk_register_clkdev(clk, "cml1", NULL);
 	clks[TEGRA210_CLK_CML1] = clk;
 
-	tegra_periph_clk_init(clk_base, pmc_base, tegra210_clks, &pll_p_params);
+	tegra_periph_clk_init(clk_base, pmc_base, tegra210_clks, pllp_params);
 
 	hw = __clk_get_hw(clks[TEGRA210_CLK_VI]);
 	periph_clk = to_clk_periph(hw);
@@ -4204,6 +4205,9 @@ static void __init tegra210_clock_init(struct device_node *np)
 	struct device_node *node;
 	char *sclk_high_clk;
 	u32 value, clk_m_div;
+	bool t210b01 = of_device_is_compatible(np, "nvidia,tegra210b01-car");
+
+	pr_info("t210%s clock_and_reset probe\n", t210b01 ? "b01" : "");
 
 	clk_base = of_iomap(np, 0);
 	if (!clk_base) {
@@ -4242,12 +4246,21 @@ static void __init tegra210_clock_init(struct device_node *np)
 	sclk_high_clk = tegra210_determine_pllc4_rate();
 
 	tegra_fixed_clk_init(tegra210_clks);
-	tegra210_pll_init(clk_base, pmc_base);
-	tegra210_periph_clk_init(clk_base, pmc_base);
-	tegra210_ovr_clk_init(clk_base);
-	tegra_audio_clk_init(clk_base, pmc_base, tegra210_clks,
-			     tegra210_audio_plls,
-			     ARRAY_SIZE(tegra210_audio_plls));
+	if (t210b01) {
+		tegra210b01_pll_init(clk_base, pmc_base,
+				     osc_freq, pll_ref_freq, clks);
+		tegra210_periph_clk_init(clk_base, pmc_base,
+					 tegra210b01_get_pllp_params());
+		tegra210_ovr_clk_init(clk_base); /* FIXME to be removed */
+		tegra210b01_audio_clk_init(clk_base, pmc_base, tegra210_clks);
+	} else {
+		tegra210_pll_init(clk_base, pmc_base);
+		tegra210_periph_clk_init(clk_base, pmc_base, &pll_p_params);
+		tegra210_ovr_clk_init(clk_base);
+		tegra_audio_clk_init(clk_base, pmc_base, tegra210_clks,
+				     tegra210_audio_plls,
+				     ARRAY_SIZE(tegra210_audio_plls));
+	}
 	tegra_pmc_clk_init(pmc_base, tegra210_clks);
 
 	/* For Tegra210, PLLD is the only source for DSIA & DSIB */
@@ -4261,8 +4274,11 @@ static void __init tegra210_clock_init(struct device_node *np)
 
 	tegra_clk_apply_init_table = tegra210_clock_apply_init_table;
 
-	tegra_super_clk_gen5_init(clk_base, pmc_base, tegra210_clks,
-				  &pll_x_params);
+	if (t210b01)
+		tegra210b01_super_clk_init(clk_base, pmc_base, tegra210_clks);
+	else
+		tegra_super_clk_gen5_init(clk_base, pmc_base, tegra210_clks,
+					  &pll_x_params);
 	tegra_init_special_resets(2, tegra210_reset_assert,
 				tegra210_reset_deassert);
 
@@ -4278,3 +4294,4 @@ static void __init tegra210_clock_init(struct device_node *np)
 		register_syscore_ops(&tegra_clk_syscore_ops);
 }
 CLK_OF_DECLARE(tegra210, "nvidia,tegra210-car", tegra210_clock_init);
+CLK_OF_DECLARE(tegra210b01, "nvidia,tegra210b01-car", tegra210_clock_init);
