@@ -562,7 +562,12 @@ static unsigned long clk_shared_recalc_rate(struct clk_hw *hw,
 	    (~shared->flags & TEGRA_SHARED_BUS_RACE_TO_SLEEP)) {
 		/* FIXME: for clocks with clients that can be divided down */
 	}
-	return parent_rate;
+
+	/*
+	 * CCF wrongly assumes that the parent rate won't change during
+	 * set_rate, so get the parent rate explicitly.
+	 */
+        return clk_hw_get_rate(clk_hw_get_parent(hw));
 }
 
 static int clk_gbus_prepare(struct clk_hw *hw)
