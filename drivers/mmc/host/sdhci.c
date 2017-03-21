@@ -167,6 +167,8 @@ static void sdhci_dumpregs(struct sdhci_host *host)
 \*****************************************************************************/
 
 #ifdef CONFIG_MMC_CQ_HCI
+static void sdhci_clear_cqe_interrupt(struct mmc_host *mmc, u32 intmask);
+
 static void sdhci_clear_set_irqs(struct sdhci_host *host, u32 clear, u32 set)
 {
 	host->ier &= ~clear;
@@ -2873,11 +2875,22 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 		goto out;
 	}
 
-	if (host->mmc->card && (mmc_card_cmdq(host->mmc->card) &&
-			host->cq_host->enabled)) {
-		pr_debug("*** %s: cmdq intr: 0x%08x\n",
+	if (intmask & SDHCI_INT_CMDQ) {
+		if (host->mmc->card && (mmc_card_cmdq(host->mmc->card) &&
+				host->cq_host->enabled)) {
+			pr_debug("*** %s: cmdq intr: 0x%08x\n",
 				mmc_hostname(host->mmc), intmask);
-		result = sdhci_cmdq_irq(host->mmc, intmask);
+			result = sdhci_cmdq_irq(host->mmc, intmask);
+		} else {
+			pr_err("%s: cqe intr: 0x%08x, but cqe not enabled\n",
+				mmc_hostname(host->mmc), intmask);
+			pr_err("%s: cqe status card side(%d), host side(%d)\n",
+				mmc_hostname(host->mmc),
+				mmc_card_cmdq(host->mmc->card),
+				host->cq_host->enabled);
+			sdhci_clear_cqe_interrupt(host->mmc, intmask);
+			result = IRQ_NONE;
+		}
 		goto out;
 	}
 
