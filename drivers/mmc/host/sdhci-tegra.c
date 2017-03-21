@@ -115,6 +115,7 @@
 /* Do not enable auto calibration if the platform doesn't support */
 #define NVQUIRK_DISABLE_AUTO_CALIBRATION	BIT(6)
 #define NVQUIRK_UPDATE_PIN_CNTRL_REG		BIT(7)
+#define NVQUIRK_BROKEN_RTPM_FORBID		BIT(8)
 #define NVQUIRK2_SET_PLL_CLK_PARENT		BIT(0)
 /* Tegra register write WAR - needs follow on register read */
 #define NVQUIRK2_TEGRA_WRITE_REG		BIT(1)
@@ -1930,7 +1931,8 @@ static const struct sdhci_pltfm_data sdhci_tegra210_pdata = {
 
 static const struct sdhci_tegra_soc_data soc_data_tegra210 = {
 	.pdata = &sdhci_tegra210_pdata,
-	.nvquirks = NVQUIRK_UPDATE_PIN_CNTRL_REG,
+	.nvquirks = NVQUIRK_UPDATE_PIN_CNTRL_REG |
+		NVQUIRK_BROKEN_RTPM_FORBID,
 	.nvquirks2 = NVQUIRK2_TEGRA_WRITE_REG |
 		NVQUIRK2_DISABLE_CARD_CLK |
 		NVQUIRK2_SET_PLL_CLK_PARENT,
@@ -2304,10 +2306,14 @@ err_alloc_tegra_host:
 static void sdhci_tegra_shutdown(struct platform_device *pdev)
 {
 	struct sdhci_host *host = platform_get_drvdata(pdev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 
 	dev_dbg(&pdev->dev, " %s shutting down\n",
 		mmc_hostname(host->mmc));
-	pm_runtime_forbid(&pdev->dev);
+	if (!(soc_data->nvquirks & NVQUIRK_BROKEN_RTPM_FORBID))
+		pm_runtime_forbid(&pdev->dev);
 }
 
 static struct platform_driver sdhci_tegra_driver = {
