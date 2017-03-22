@@ -411,7 +411,7 @@ static ssize_t cec_logical_addr_store(struct device *dev,
 		return ret;
 
 
-	dev_info(dev, "tegra_cec: set logical address: %x\n", (u32)addr);
+	dev_dbg(dev, "tegra_cec: set logical address: %x\n", (u32)addr);
 	cec->logical_addr = addr;
 	state = readl(cec->cec_base + TEGRA_CEC_HW_CONTROL);
 	state &= ~TEGRA_CEC_HWCTRL_RX_LADDR_MASK;
