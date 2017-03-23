@@ -254,13 +254,14 @@ static DEFINE_SPINLOCK(pll_u_lock);
 
 #define PLL_ENABLE			(1 << 30)
 
+/* PLLC, PLLC2, PLLC3, PLLA1 */
 #define PLLCX_MISC1_IDDQ		(1 << 27)
 #define PLLCX_MISC0_RESET		(1 << 30)
 
 #define PLLCX_MISC0_DEFAULT_VALUE	0x40080000
 #define PLLCX_MISC0_WRITE_MASK		0x400ffffb
 #define PLLCX_MISC1_DEFAULT_VALUE	0x08000000
-#define PLLCX_MISC1_WRITE_MASK		0x08003cff
+#define PLLCX_MISC1_WRITE_MASK		0x38003cff
 #define PLLCX_MISC2_DEFAULT_VALUE	0x1f720f05
 #define PLLCX_MISC2_WRITE_MASK		0xffffff17
 #define PLLCX_MISC3_DEFAULT_VALUE	0x000000c4
@@ -1387,7 +1388,7 @@ static struct tegra_clk_pll_params pll_x_params = {
 	.calc_rate = tegra210b01_pll_fixed_mdiv_cfg,
 };
 
-static struct div_nmp pllc_nmp = {
+static struct div_nmp pllcx_nmp = {
 	.divm_shift = 0,
 	.divm_width = 8,
 	.divn_shift = 10,
@@ -1397,17 +1398,15 @@ static struct div_nmp pllc_nmp = {
 };
 
 static struct tegra_clk_pll_freq_table pll_cx_freq_table[] = {
-	{ 12000000, 510000000, 85, 1, 2, 0 },
-	{ 13000000, 510000000, 78, 1, 2, 0 }, /* actual: 507.0 MHz */
-	{ 38400000, 510000000, 79, 3, 2, 0 }, /* actual: 505.6 MHz */
+	{ 38400000, 510000000, 53, 2, 2, 0 }, /* actual: 508.8 MHz */
 	{        0,         0,  0, 0, 0, 0 },
 };
 
 static struct tegra_clk_pll_params pll_c_params = {
-	.input_min = 12000000,
+	.input_min = 19200000,
 	.input_max = 700000000,
-	.cf_min = 12000000,
-	.cf_max = 50000000,
+	.cf_min = 19200000,
+	.cf_max = 38400000,
 	.vco_min = 600000000,
 	.vco_max = 1200000000,
 	.base_reg = PLLC_BASE,
@@ -1425,28 +1424,19 @@ static struct tegra_clk_pll_params pll_c_params = {
 	.ext_misc_reg[3] = PLLC_MISC3,
 	.round_p_to_pdiv = pll_qlin_p_to_pdiv,
 	.pdiv_tohw = pll_qlin_pdiv_to_hw,
-	.mdiv_default = 3,
-	.div_nmp = &pllc_nmp,
+	.mdiv_default = 2,
+	.div_nmp = &pllcx_nmp,
 	.freq_table = pll_cx_freq_table,
 	.flags = TEGRA_PLL_USE_LOCK,
 	.set_defaults = _pllc_set_defaults,
 	.calc_rate = tegra210b01_pll_fixed_mdiv_cfg,
 };
 
-static struct div_nmp pllcx_nmp = {
-	.divm_shift = 0,
-	.divm_width = 8,
-	.divn_shift = 10,
-	.divn_width = 8,
-	.divp_shift = 20,
-	.divp_width = 5,
-};
-
 static struct tegra_clk_pll_params pll_c2_params = {
-	.input_min = 12000000,
+	.input_min = 19200000,
 	.input_max = 700000000,
-	.cf_min = 12000000,
-	.cf_max = 50000000,
+	.cf_min = 19200000,
+	.cf_max = 38400000,
 	.vco_min = 600000000,
 	.vco_max = 1200000000,
 	.base_reg = PLLC2_BASE,
@@ -1459,7 +1449,7 @@ static struct tegra_clk_pll_params pll_c2_params = {
 	.lock_delay = 300,
 	.round_p_to_pdiv = pll_qlin_p_to_pdiv,
 	.pdiv_tohw = pll_qlin_pdiv_to_hw,
-	.mdiv_default = 3,
+	.mdiv_default = 2,
 	.div_nmp = &pllcx_nmp,
 	.max_p = PLL_QLIN_PDIV_MAX,
 	.ext_misc_reg[0] = PLLC2_MISC0,
@@ -1473,10 +1463,10 @@ static struct tegra_clk_pll_params pll_c2_params = {
 };
 
 static struct tegra_clk_pll_params pll_c3_params = {
-	.input_min = 12000000,
+	.input_min = 19200000,
 	.input_max = 700000000,
-	.cf_min = 12000000,
-	.cf_max = 50000000,
+	.cf_min = 19200000,
+	.cf_max = 38400000,
 	.vco_min = 600000000,
 	.vco_max = 1200000000,
 	.base_reg = PLLC3_BASE,
@@ -1489,7 +1479,7 @@ static struct tegra_clk_pll_params pll_c3_params = {
 	.reset_bit_idx = PLLCX_RESET_BIT,
 	.round_p_to_pdiv = pll_qlin_p_to_pdiv,
 	.pdiv_tohw = pll_qlin_pdiv_to_hw,
-	.mdiv_default = 3,
+	.mdiv_default = 2,
 	.div_nmp = &pllcx_nmp,
 	.max_p = PLL_QLIN_PDIV_MAX,
 	.ext_misc_reg[0] = PLLC3_MISC0,
@@ -1766,10 +1756,10 @@ static struct tegra_clk_pll_params pll_p_params = {
 };
 
 static struct tegra_clk_pll_params pll_a1_params = {
-	.input_min = 12000000,
+	.input_min = 19200000,
 	.input_max = 700000000,
-	.cf_min = 12000000,
-	.cf_max = 50000000,
+	.cf_min = 19200000,
+	.cf_max = 38400000,
 	.vco_min = 600000000,
 	.vco_max = 1200000000,
 	.base_reg = PLLA1_BASE,
@@ -1782,14 +1772,14 @@ static struct tegra_clk_pll_params pll_a1_params = {
 	.reset_bit_idx = PLLCX_RESET_BIT,
 	.round_p_to_pdiv = pll_qlin_p_to_pdiv,
 	.pdiv_tohw = pll_qlin_pdiv_to_hw,
-	.div_nmp = &pllc_nmp,
+	.div_nmp = &pllcx_nmp,
 	.ext_misc_reg[0] = PLLA1_MISC0,
 	.ext_misc_reg[1] = PLLA1_MISC1,
 	.ext_misc_reg[2] = PLLA1_MISC2,
 	.ext_misc_reg[3] = PLLA1_MISC3,
 	.freq_table = pll_cx_freq_table,
 	.flags = TEGRA_PLL_USE_LOCK,
-	.mdiv_default = 3,
+	.mdiv_default = 2,
 	.set_defaults = _plla1_set_defaults,
 	.calc_rate = tegra210b01_pll_fixed_mdiv_cfg,
 };
@@ -2276,7 +2266,8 @@ static int tegra210b01_init_pllu(void)
 
 static struct tegra_audio_clk_info tegra210b01_audio_plls[] = {
 	{ "pll_a", &pll_a_params, tegra_clk_pll_a, "pll_ref" },
-	{ "pll_a1", &pll_a1_params, tegra_clk_pll_a1, "pll_ref" },
+	{ "pll_a1", &pll_a1_params, tegra_clk_pll_a1, "pll_ref",
+		tegra_clk_register_pllc_tegra210 },
 };
 
 void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
@@ -2290,7 +2281,7 @@ void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
 	pll_ref_freq = ref;
 
 	/* PLLC */
-	clk = tegra_clk_register_pllxc_tegra210("pll_c", "pll_ref", clk_base,
+	clk = tegra_clk_register_pllc_tegra210("pll_c", "pll_ref", clk_base,
 			pmc, 0, &pll_c_params, NULL);
 	if (!WARN_ON(IS_ERR(clk)))
 		clk_register_clkdev(clk, "pll_c", NULL);
