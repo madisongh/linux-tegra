@@ -257,7 +257,7 @@ static ssize_t consumer_register_store(const char *s, size_t count)
 	const char *s2;
 	int err;
 
-	name_len = strcspn(s, "\n");
+	name_len = strcspn(s, " \n");
 	if (name_len > SYSEDP_NAME_LEN-1)
 		return -EINVAL;
 
