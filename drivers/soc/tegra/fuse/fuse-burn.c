@@ -77,6 +77,7 @@ struct fuse_burn_data {
 struct tegra_fuse_hw_feature {
 	bool power_down_mode;
 	bool mirroring_support;
+	bool sticky_redirection_mode;
 	int pgm_time;
 	struct fuse_burn_data burn_data[TEGRA_FUSE_BURN_MAX_FUSES];
 };
@@ -221,6 +222,15 @@ static int tegra_fuse_pre_burn_process(struct tegra_fuse_burn_dev *fuse_dev)
 {
 	u32 off_0_val, off_1_val, reg;
 	int ret;
+
+	if (fuse_dev->hw->sticky_redirection_mode) {
+		ret = tegra_pmc_fuse_is_redirection_enabled();
+		if (ret) {
+			dev_err(fuse_dev->dev,
+				"sticky redirection set, burn not allowed\n");
+			return -EPERM;
+		}
+	}
 
 	if (fuse_dev->tz) {
 		ret = tegra_fuse_is_temp_under_range(fuse_dev);
@@ -531,6 +541,7 @@ static struct tegra_fuse_hw_feature tegra210_fuse_chip_data = {
 	.power_down_mode = true,
 	.mirroring_support = false,
 	.pgm_time = 5,
+	.sticky_redirection_mode = false,
 	.burn_data = {
 		FUSE_BURN_DATA(odm_reserved, 0x2e, 17, 256, 0xc8, true),
 		FUSE_BURN_DATA(odm_lock, 0, 6, 4, 0x8, true),
@@ -551,6 +562,7 @@ static struct tegra_fuse_hw_feature tegra210_fuse_chip_data = {
 static struct tegra_fuse_hw_feature tegra186_fuse_chip_data = {
 	.power_down_mode = true,
 	.mirroring_support = true,
+	.sticky_redirection_mode = false,
 	.pgm_time = 5,
 	.burn_data = {
 		FUSE_BURN_DATA(odm_reserved, 0x2, 2, 256, 0xc8, true),
@@ -574,6 +586,7 @@ static struct tegra_fuse_hw_feature tegra186_fuse_chip_data = {
 static struct tegra_fuse_hw_feature tegra210b01_fuse_chip_data = {
 	.power_down_mode = true,
 	.mirroring_support = true,
+	.sticky_redirection_mode = true,
 	.pgm_time = 5,
 	.burn_data = {
 		FUSE_BURN_DATA(odm_reserved, 0x62, 27, 256, 0xc8, true),
