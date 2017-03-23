@@ -635,6 +635,7 @@ static unsigned long clk_cascade_master_recalc_rate(struct clk_hw *hw,
 		cascade_div_hw = clk_hw_get_parent(bus->u.system.hclk);
 	}
 
+	parent_rate = clk_hw_get_rate(clk_hw_get_parent(hw));
 	return tegra_clk_frac_div_ops.recalc_rate(cascade_div_hw, parent_rate);
 }
 
@@ -912,7 +913,7 @@ static long clk_system_round_rate(struct clk_hw *hw, unsigned long rate,
 static unsigned long clk_system_recalc_rate(struct clk_hw *hw,
 					unsigned long parent_rate)
 {
-	return parent_rate;
+	return clk_hw_get_rate(clk_hw_get_parent(hw));
 }
 
 static int _sbus_update(struct tegra_clk_cbus_shared *cbus)
