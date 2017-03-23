@@ -2770,7 +2770,7 @@ static struct tegra_pto_table ptodefs[] = {
 	{ .clk_id = TEGRA210_CLK_PLL_C,  .divider = 2, .pto_id = 1,   .presel_reg = PLLC_MISC0, .presel_value = BIT(3),  .presel_mask = BIT(3) },
 	{ .clk_id = TEGRA210_CLK_PLL_A1, .divider = 2, .pto_id = 85,  .presel_reg = PLLA1_MISC0, .presel_value = BIT(3),  .presel_mask = BIT(3) },
 	{ .clk_id = TEGRA210_CLK_PLL_C2, .divider = 2, .pto_id = 88,  .presel_reg = PLLC2_MISC0, .presel_value = BIT(3),  .presel_mask = BIT(3) },
-	{ .clk_id = TEGRA210_CLK_PLL_C3, .divider = 2, .pto_id = 89,  .presel_reg = PLLC3_MISC0, .presel_value = BIT(3),  .presel_mask = BIT(3) },
+	{ .clk_id = TEGRA210_CLK_PLL_C3, .divider = 2, .pto_id = 90,  .presel_reg = PLLC3_MISC0, .presel_value = BIT(3),  .presel_mask = BIT(3) },
 
 	{ .clk_id = TEGRA210_CLK_PLL_A,  .divider = 2, .pto_id = 4,   .presel_reg = PLLA_MISC0, .presel_value = BIT(29), .presel_mask = BIT(29) },
 	{ .clk_id = TEGRA210_CLK_PLL_X,  .divider = 2, .pto_id = 5,   .presel_reg = PLLX_MISC0, .presel_value = BIT(22), .presel_mask = BIT(22) },
