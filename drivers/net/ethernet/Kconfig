@@ -190,6 +190,6 @@ source "drivers/net/ethernet/xilinx/Kconfig"
 source "drivers/net/ethernet/xircom/Kconfig"
 
 if ARCH_TEGRA_18x_SOC
-trysource "../t18x/drivers/net/ethernet/nvidia/eqos/Kconfig"
+trysource "nvidia/t18x/drivers/net/ethernet/nvidia/eqos/Kconfig"
 endif # ARCH_TEGRA_18x_SOC
 endif # ETHERNET

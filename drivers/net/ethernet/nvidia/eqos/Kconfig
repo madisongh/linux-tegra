@@ -9,4 +9,4 @@
 # FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
 # more details.
 
-trysource "../t18x/drivers/net/ethernet/nvidia/eqos/Kconfig"
+trysource "nvidia/t18x/drivers/net/ethernet/nvidia/eqos/Kconfig"

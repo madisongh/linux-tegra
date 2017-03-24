@@ -1,7 +1,7 @@
 GCOV_PROFILE := y
 ccflags-y += -Werror
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
-ccflags-y += -I$(srctree)/../t18x/drivers/platform/tegra/nvadsp
+ccflags-y += -I$(srctree)/nvidia/t18x/drivers/platform/tegra/nvadsp
 endif
 
 obj-y := nvadsp.o

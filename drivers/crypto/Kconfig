@@ -362,12 +362,12 @@ config CRYPTO_DEV_TEGRA_SE
         help
           This option allows you to have support of Security Engine for crypto acceleration.
 
-trysource "../t18x/drivers/crypto/Kconfig"
-trysource "../t18x/drivers/crypto/Kconfig.t18x"
+trysource "nvidia/t18x/drivers/crypto/Kconfig"
+trysource "nvidia/t18x/drivers/crypto/Kconfig.t18x"
 trysource "drivers/crypto/Kconfig.t18x"
 
-trysource "../t18x/drivers/crypto/elliptic/Kconfig"
-trysource "../t18x/drivers/crypto/elliptic/Kconfig.t18x"
+trysource "nvidia/t18x/drivers/crypto/elliptic/Kconfig"
+trysource "nvidia/t18x/drivers/crypto/elliptic/Kconfig.t18x"
 trysource "drivers/crypto/elliptic/Kconfig.t18x"
 
 

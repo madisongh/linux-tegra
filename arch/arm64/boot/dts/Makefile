@@ -39,22 +39,22 @@ DTCCPP_FLAGS += -I$(tegra-dtstree)/platform/t210/common/kernel-dts
 endif
 
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
-DTC_FLAGS += -i $(srctree)/../t18x/include
+DTC_FLAGS += -i $(srctree)/nvidia/t18x/include
 DTC_FLAGS += -i $(tegra-dtstree)/soc/t18x/kernel-include
 DTC_FLAGS += -i $(tegra-dtstree)/soc/t18x/kernel-dts
 DTC_FLAGS += -i $(tegra-dtstree)/platform/t18x/common/kernel-dts
-DTCCPP_FLAGS += -I$(srctree)/../t18x/include
+DTCCPP_FLAGS += -I$(srctree)/nvidia/t18x/include
 DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t18x/kernel-include
 DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t18x/kernel-dts
 DTCCPP_FLAGS += -I$(tegra-dtstree)/platform/t18x/common/kernel-dts
 endif
 
 ifeq ($(CONFIG_ARCH_TEGRA_19x_SOC),y)
-DTC_FLAGS += -i $(srctree)/../t19x/include
+DTC_FLAGS += -i $(srctree)/nvidia/t19x/include
 DTC_FLAGS += -i $(tegra-dtstree)/soc/t19x/kernel-include
 DTC_FLAGS += -i $(tegra-dtstree)/soc/t18x/kernel-include
 DTC_FLAGS += -i $(tegra-dtstree)/soc/t19x/kernel-dts
-DTCCPP_FLAGS += -I$(srctree)/../t19x/include
+DTCCPP_FLAGS += -I$(srctree)/nvidia/t19x/include
 DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t19x/kernel-include
 DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t18x/kernel-include
 DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t19x/kernel-dts
@@ -68,7 +68,7 @@ dts_mfiles = $(call dts_makefile, $(tegra-dtstree)/platform/, Makefile)
 ifneq ($(dts_mfiles),)
 dts-include :=
 include $(dts_mfiles)
-dtb-y := $(addprefix $(tegra-rel-dtstree)/hardware/nvidia/,$(dtb-y))
+dtb-y := $(addprefix $(tegra-rel-dtstree)/nvidia/,$(dtb-y))
 ifneq ($(dts-include),)
 DTC_FLAGS += $(addprefix -i $(tegra-dtstree)/,$(dts-include))
 DTCCPP_FLAGS += $(addprefix -I$(tegra-dtstree)/,$(dts-include))

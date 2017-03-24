@@ -16,7 +16,7 @@ config PADCTRL_TEGRA210_PMC
 	  Tegra210 PMC padctrl driver which controls the pad
 	  to supply either 1.8V or 3.3V.
 
-trysource "../t18x/drivers/padctrl/Kconfig"
-trysource "../t18x/drivers/padctrl/Kconfig.t18x"
+trysource "nvidia/t18x/drivers/padctrl/Kconfig"
+trysource "nvidia/t18x/drivers/padctrl/Kconfig.t18x"
 trysource "drivers/padctrl/Kconfig.t18x"
 endif
