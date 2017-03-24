@@ -338,6 +338,7 @@ struct tegra_xhci_soc_config {
 	void (*set_protection_level)(struct phy *utmi_phy,
 		int level, enum tegra_vbus_dir dir);
 	int (*utmi_vbus_power_on)(struct phy *phy);
+	int (*utmi_vbus_enable)(struct phy *phy);
 	int (*utmi_vbus_power_off)(struct phy *phy);
 	int (*overcurrent_detected)(struct phy *phy);
 	void (*handle_overcurrent)(struct phy *phy);
@@ -1353,6 +1354,7 @@ static const struct tegra_xhci_soc_config tegra186_soc_config = {
 		tegra18x_phy_xusb_utmi_pad_set_protection_level,
 	.utmi_vbus_power_on = tegra18x_phy_xusb_utmi_vbus_power_on,
 	.utmi_vbus_power_off = tegra18x_phy_xusb_utmi_vbus_power_off,
+	.utmi_vbus_enable = tegra18x_utmi_vbus_enable,
 	.overcurrent_detected = tegra18x_phy_xusb_overcurrent_detected,
 	.handle_overcurrent = tegra18x_phy_xusb_handle_overcurrent,
 	.set_id_override = tegra18x_phy_xusb_set_id_override,
@@ -1391,6 +1393,7 @@ static const struct tegra_xhci_soc_config tegra210b01_soc_config = {
 		tegra21x_phy_xusb_utmi_pad_set_protection_level,
 	.utmi_vbus_power_on = tegra21x_phy_xusb_utmi_vbus_power_on,
 	.utmi_vbus_power_off = tegra21x_phy_xusb_utmi_vbus_power_off,
+	.utmi_vbus_enable = tegra21x_utmi_vbus_enable,
 	.overcurrent_detected = tegra21x_phy_xusb_overcurrent_detected,
 	.handle_overcurrent = tegra21x_phy_xusb_handle_overcurrent,
 	.set_id_override = tegra21x_phy_xusb_set_id_override,
@@ -1430,6 +1433,7 @@ static const struct tegra_xhci_soc_config tegra210_soc_config = {
 		tegra21x_phy_xusb_utmi_pad_set_protection_level,
 	.utmi_vbus_power_on = tegra21x_phy_xusb_utmi_vbus_power_on,
 	.utmi_vbus_power_off = tegra21x_phy_xusb_utmi_vbus_power_off,
+	.utmi_vbus_enable = tegra21x_utmi_vbus_enable,
 	.overcurrent_detected = tegra21x_phy_xusb_overcurrent_detected,
 	.handle_overcurrent = tegra21x_phy_xusb_handle_overcurrent,
 	.set_id_override = tegra21x_phy_xusb_set_id_override,
@@ -1876,6 +1880,18 @@ static void tegra_xhci_probe_finish(const struct firmware *fw, void *context)
 	if (ret < 0)
 		goto put_usb2_hcd;
 	device_wakeup_enable(tegra->hcd->self.controller);
+
+	if (tegra->soc_config->utmi_vbus_enable) {
+		for (i = 0; i < tegra->soc_config->num_phys[UTMI_PHY]; i++) {
+			if (tegra->phys[UTMI_PHY][i]) {
+				ret = tegra->soc_config->utmi_vbus_enable(
+					tegra->phys[UTMI_PHY][i]);
+				if (ret)
+					dev_err(dev, "enable port vbus-%d failed %d\n",
+						i, ret);
+			}
+		}
+	}
 
 	xhci = hcd_to_xhci(tegra->hcd);
 	xhci->shared_hcd = usb_create_shared_hcd(&tegra_xhci_hc_driver,

@@ -107,6 +107,7 @@ void tegra21x_phy_xusb_utmi_pad_set_protection_level(struct phy *phy, int level,
 u32 tegra21x_phy_xusb_noncompliant_div_detect(struct phy *phy);
 int tegra21x_phy_xusb_utmi_vbus_power_on(struct phy *phy);
 int tegra21x_phy_xusb_utmi_vbus_power_off(struct phy *phy);
+int tegra21x_utmi_vbus_enable(struct phy *phy);
 int tegra21x_phy_xusb_overcurrent_detected(struct phy *phy);
 void tegra21x_phy_xusb_handle_overcurrent(struct phy *phy);
 int tegra21x_phy_xusb_set_id_override(struct phy *phy);
@@ -216,6 +217,11 @@ static inline int tegra21x_phy_xusb_utmi_vbus_power_on(struct phy *phy)
 }
 
 static inline int tegra21x_phy_xusb_utmi_vbus_power_off(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra21x_utmi_vbus_enable(struct phy *phy)
 {
 	return 0;
 }
@@ -351,6 +357,7 @@ bool tegra18x_phy_xusb_utmi_pad_primary_charger_detect(struct phy *phy);
 bool tegra18x_phy_xusb_utmi_pad_secondary_charger_detect(struct phy *phy);
 int tegra18x_phy_xusb_utmi_vbus_power_on(struct phy *phy);
 int tegra18x_phy_xusb_utmi_vbus_power_off(struct phy *phy);
+int tegra18x_utmi_vbus_enable(struct phy *phy);
 int tegra18x_phy_xusb_overcurrent_detected(struct phy *phy);
 void tegra18x_phy_xusb_handle_overcurrent(struct phy *phy);
 int tegra18x_phy_xusb_set_id_override(struct phy *phy);
@@ -460,6 +467,11 @@ static inline int tegra18x_phy_xusb_utmi_vbus_power_on(struct phy *phy)
 }
 
 static inline int tegra18x_phy_xusb_utmi_vbus_power_off(struct phy *phy)
+{
+	return 0;
+}
+
+static inline int tegra18x_utmi_vbus_enable(struct phy *phy)
 {
 	return 0;
 }

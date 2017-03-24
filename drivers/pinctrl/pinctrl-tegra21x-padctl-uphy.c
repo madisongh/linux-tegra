@@ -2865,7 +2865,7 @@ static inline void tegra21x_hsic_trk(struct tegra_padctl_uphy *uphy, bool on)
 #define tegra21x_hsic_trk_on(uphy) tegra21x_hsic_trk(uphy, true)
 #define tegra21x_hsic_trk_off(uphy) tegra21x_hsic_trk(uphy, false)
 
-static int tegra21x_utmi_phy_init(struct phy *phy)
+int tegra21x_utmi_vbus_enable(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
 	int port = utmi_phy_to_port(phy);
@@ -2874,7 +2874,7 @@ static int tegra21x_utmi_phy_init(struct phy *phy)
 	if (port < 0)
 		return port;
 
-	TRACE(uphy->dev, "phy init UTMI port %d\n",  port);
+	TRACE(uphy->dev, "enable vbus-%d\n", port);
 
 	mutex_lock(&uphy->lock);
 
@@ -2889,6 +2889,20 @@ static int tegra21x_utmi_phy_init(struct phy *phy)
 	}
 
 	mutex_unlock(&uphy->lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra21x_utmi_vbus_enable);
+
+static int tegra21x_utmi_phy_init(struct phy *phy)
+{
+	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
+	int port = utmi_phy_to_port(phy);
+
+	if (port < 0)
+		return port;
+
+	TRACE(uphy->dev, "phy init UTMI port %d\n", port);
 
 	return 0;
 }
