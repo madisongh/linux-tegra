@@ -1006,17 +1006,6 @@ static void clk_pll_unprepare(struct clk_hw *hw)
 	pll->prepared = false;
 }
 
-static int clk_pll_is_prepared(struct clk_hw *hw)
-{
-	struct tegra_clk_pll *pll = to_clk_pll(hw);
-
-	if (pll->prepared)
-		return true;
-
-	/* In case the clock is used to determine the required voltage */
-	return tegra_dvfs_get_rate(hw->clk) != 0;
-}
-
 const struct clk_ops tegra_clk_pll_ops = {
 	.is_enabled = clk_pll_is_enabled,
 	.enable = clk_pll_enable,
@@ -1745,6 +1734,18 @@ struct clk *tegra_clk_register_plle(const char *name, const char *parent_name,
 	defined(CONFIG_ARCH_TEGRA_124_SOC) || \
 	defined(CONFIG_ARCH_TEGRA_132_SOC) || \
 	defined(CONFIG_ARCH_TEGRA_210_SOC)
+
+static int clk_pll_is_prepared(struct clk_hw *hw)
+{
+	struct tegra_clk_pll *pll = to_clk_pll(hw);
+
+	if (pll->prepared)
+		return true;
+
+	/* In case the clock is used to determine the required voltage */
+	return tegra_dvfs_get_rate(hw->clk) != 0;
+}
+
 static const struct clk_ops tegra_clk_pllxc_ops = {
 	.is_enabled = clk_pll_is_enabled,
 	.is_prepared = clk_pll_is_prepared,
@@ -2469,6 +2470,8 @@ struct clk *tegra_clk_register_pllmb(const char *name, const char *parent_name,
 }
 #endif
 
+#if defined(CONFIG_PM_SLEEP) && defined(CONFIG_ARCH_TEGRA_210_SOC)
+
 static int clk_pll_iddq_enable(struct clk_hw *hw)
 {
 	struct tegra_clk_pll *pll = to_clk_pll(hw);
@@ -2515,7 +2518,6 @@ static void clk_pll_iddq_disable(struct clk_hw *hw)
 		spin_unlock_irqrestore(pll->lock, flags);
 }
 
-#if defined(CONFIG_PM_SLEEP) && defined(CONFIG_ARCH_TEGRA_210_SOC)
 void tegra_clk_pll_resume(struct clk *c, unsigned long rate)
 {
 	struct clk *parent = clk_get_parent(c);
