@@ -60,6 +60,7 @@
 #define PLLP_MISC0 0xac
 #define PLLP_MISC1 0x680
 #define PLLA_BASE 0xb0
+#define PLLA_OUT 0xb4
 #define PLLA_MISC0 0xbc
 #define PLLA_MISC1 0xb8
 #define PLLA_MISC2 0x5d8
@@ -281,6 +282,9 @@ static DEFINE_SPINLOCK(pll_u_lock);
 #define PLLA_MISC0_WRITE_MASK		0x7fffffff
 #define PLLA_MISC2_DEFAULT_VALUE	0x0
 #define PLLA_MISC2_WRITE_MASK		0x06ffffff
+
+#define PLLA_OUT_DEFAULT_VALUE		0x00000000
+#define PLLA_OUT_VREG_MASK		0xf0000000
 
 /* PLLD */
 #define PLLD_BASE_CSI_CLKSOURCE		(1 << 23)
@@ -598,6 +602,13 @@ static void tegra210b01_plla_set_defaults(struct tegra_clk_pll *plla)
 		_pll_misc_chk_default(clk_base, plla->params, 2, val,
 				PLLA_MISC2_EN_DYNRAMP);
 
+		val = readl_relaxed(clk_base + PLLA_OUT) & PLLA_OUT_VREG_MASK;
+		if (val != PLLA_OUT_DEFAULT_VALUE) {
+			pr_warn("boot plla vreg 0x%x: expected 0x%x\n",
+				val, PLLA_OUT_DEFAULT_VALUE);
+			plla->params->defaults_set = false;
+		}
+
 		/* Enable lock detect */
 		val = readl_relaxed(clk_base + plla->params->ext_misc_reg[0]);
 		val &= ~mask;
@@ -615,6 +626,8 @@ static void tegra210b01_plla_set_defaults(struct tegra_clk_pll *plla)
 			clk_base + plla->params->ext_misc_reg[0]);
 	writel_relaxed(PLLA_MISC2_DEFAULT_VALUE,
 			clk_base + plla->params->ext_misc_reg[2]);
+	val = readl_relaxed(clk_base + PLLA_OUT) & (~PLLA_OUT_VREG_MASK);
+	writel_relaxed(val | PLLA_OUT_DEFAULT_VALUE, clk_base + PLLA_OUT);
 	udelay(1);
 }
 
@@ -1794,14 +1807,8 @@ static struct div_nmp plla_nmp = {
 };
 
 static struct tegra_clk_pll_freq_table pll_a_freq_table[] = {
-	{ 12000000, 282240000, 47, 1, 2, 1, 0xf148 }, /* actual: 282240234 */
-	{ 12000000, 368640000, 61, 1, 2, 1, 0xfe15 }, /* actual: 368640381 */
-	{ 12000000, 240000000, 60, 1, 3, 1,      0 },
-	{ 13000000, 282240000, 43, 1, 2, 1, 0xfd7d }, /* actual: 282239807 */
-	{ 13000000, 368640000, 56, 1, 2, 1, 0x06d8 }, /* actual: 368640137 */
-	{ 13000000, 240000000, 55, 1, 3, 1,      0 }, /* actual: 238.3 MHz */
 	{ 38400000, 282240000, 44, 3, 2, 1, 0xf333 }, /* actual: 282239844 */
-	{ 38400000, 368640000, 57, 3, 1, 1, 0x0333 }, /* actual: 368639844 */
+	{ 38400000, 368640000, 57, 3, 2, 1, 0x0333 }, /* actual: 368639844 */
 	{ 38400000, 240000000, 75, 3, 4, 1,      0 },
 	{        0,         0,  0, 0, 0, 0,      0 },
 };
@@ -1810,7 +1817,7 @@ static struct tegra_clk_pll_params pll_a_params = {
 	.input_min = 12000000,
 	.input_max = 800000000,
 	.cf_min = 12000000,
-	.cf_max = 19200000,
+	.cf_max = 38400000,
 	.vco_min = 500000000,
 	.vco_max = 1000000000,
 	.base_reg = PLLA_BASE,
@@ -1831,6 +1838,7 @@ static struct tegra_clk_pll_params pll_a_params = {
 	.ext_misc_reg[2] = PLLA_MISC2,
 	.freq_table = pll_a_freq_table,
 	.flags = TEGRA_PLL_USE_LOCK | TEGRA_MDIV_NEW,
+	.mdiv_default = 3,
 	.set_defaults = tegra210b01_plla_set_defaults,
 	.calc_rate = tegra210b01_pll_fixed_mdiv_cfg,
 	.set_gain = tegra210b01_clk_pll_set_gain,
