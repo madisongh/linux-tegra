@@ -417,15 +417,17 @@ static DEFINE_SPINLOCK(pll_u_lock);
 					 PLLU_BASE_CLKENABLE_ICUSB |\
 					 PLLU_BASE_CLKENABLE_48M)
 
+#define PLLU_BASE_MNP_DEFAULT_VALUE	0x00011902
+
 #define PLLU_MISC0_IDDQ			(1 << 31)
 #define PLLU_MISC0_LOCK_ENABLE		(1 << 29)
 #define PLLU_MISC1_LOCK_OVERRIDE	(1 << 0)
 
 #define PLLU_MISC0_DEFAULT_VALUE	0xa0000000
-#define PLLU_MISC1_DEFAULT_VALUE	0x0
+#define PLLU_MISC1_DEFAULT_VALUE	0x00000000
 
 #define PLLU_MISC0_WRITE_MASK		0xbfffffff
-#define PLLU_MISC1_WRITE_MASK		0x00000007
+#define PLLU_MISC1_WRITE_MASK		0xf0000007
 
 #ifdef FIXME
 void tegra210b01_csi_source_from_brick(void)
@@ -452,8 +454,7 @@ EXPORT_SYMBOL_GPL(tegra210b01_csi_source_from_plld);
 #define mask(w) ((1 << (w)) - 1)
 #define divm_mask(p) mask(p->params->div_nmp->divm_width)
 #define divn_mask(p) mask(p->params->div_nmp->divn_width)
-#define divp_mask(p) (p->params->flags & TEGRA_PLLU ? PLLU_POST_DIVP_MASK :\
-		      mask(p->params->div_nmp->divp_width))
+#define divp_mask(p) mask(p->params->div_nmp->divp_width)
 
 #define divm_shift(p) ((p)->params->div_nmp->divm_shift)
 #define divn_shift(p) ((p)->params->div_nmp->divn_shift)
@@ -1989,10 +1990,7 @@ static struct div_nmp pllu_nmp = {
 };
 
 static struct tegra_clk_pll_freq_table pll_u_freq_table[] = {
-	{ 12000000, 480000000, 40, 1, 0, 0 },
-	{ 13000000, 480000000, 36, 1, 0, 0 }, /* actual: 468.0 MHz */
 	{ 38400000, 240000000, 25, 2, 1, 0 },
-	{ 38400000, 480000000, 25, 2, 0, 0 },
 	{        0,         0,  0, 0, 0, 0 },
 };
 
@@ -2014,6 +2012,7 @@ static struct tegra_clk_pll_params pll_u_vco_params = {
 	.round_p_to_pdiv = pll_qlin_p_to_pdiv,
 	.pdiv_tohw = pll_qlin_pdiv_to_hw,
 	.div_nmp = &pllu_nmp,
+	.mdiv_default = 2,
 	.freq_table = pll_u_freq_table,
 	.flags = TEGRA_PLLU | TEGRA_PLL_USE_LOCK | TEGRA_PLL_VCO_OUT,
 };
@@ -2200,6 +2199,7 @@ static int tegra210b01_enable_pllu(void)
 	reg = readl_relaxed(clk_base + pllu.params->ext_misc_reg[0]);
 	reg &= ~BIT(pllu.params->iddq_bit_idx);
 	writel_relaxed(reg, clk_base + pllu.params->ext_misc_reg[0]);
+	udelay(5);
 
 	reg = readl_relaxed(clk_base + PLLU_BASE);
 	reg &= ~GENMASK(20,0);
@@ -2207,6 +2207,7 @@ static int tegra210b01_enable_pllu(void)
 	reg |= fentry->n << 8;
 	reg |= fentry->p << 16;
 	writel(reg, clk_base + PLLU_BASE);
+	udelay(1);
 	reg |= PLL_ENABLE;
 	writel(reg, clk_base + PLLU_BASE);
 
@@ -2224,12 +2225,24 @@ static int tegra210b01_init_pllu(void)
 {
 	u32 reg;
 	int err;
+	struct tegra_clk_pll pllu;
+	struct tegra_clk_pll *p = &pllu;
 
 	tegra210b01_pllu_set_defaults(&pll_u_vco_params);
-	/* skip initialization when pllu is in hw controlled mode */
 	reg = readl_relaxed(clk_base + PLLU_BASE);
+
+	/* PLLU is modeled as fixed clock source - must have default MNP */
+	pllu.params = &pll_u_vco_params;
+	if ((reg & (divm_mask_shifted(p) | divn_mask_shifted(p) |
+		   divp_mask_shifted(p))) != PLLU_BASE_MNP_DEFAULT_VALUE) {
+		WARN_ON(1);
+		return -EINVAL;
+	}
+
+	/* skip initialization when pllu is in hw controlled mode */
 	if (reg & PLLU_BASE_OVERRIDE) {
 		if (!(reg & PLL_ENABLE)) {
+			WARN(1, "Disabled PLLU was put under h/w control\n");
 			err = tegra210b01_enable_pllu();
 			if (err < 0) {
 				WARN_ON(1);
@@ -2353,14 +2366,13 @@ void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
 					      480*1000*1000);
 		clk_register_clkdev(clk, "pll_u_vco", NULL);
 		clks[TEGRA210_CLK_PLL_U] = clk;
-	}
 
-	/* PLLU_OUT */
-	clk = clk_register_divider_table(NULL, "pll_u_out", "pll_u_vco", 0,
-					 clk_base + PLLU_BASE, 16, 4, 0,
-					 pll_vco_post_div_table, NULL);
-	clk_register_clkdev(clk, "pll_u_out", NULL);
-	clks[TEGRA210_CLK_PLL_U_OUT] = clk;
+		/* PLLU_OUT */
+		clk = clk_register_fixed_factor(NULL, "pll_u_out", "pll_u_vco",
+						CLK_SET_RATE_PARENT, 1, 2);
+		clk_register_clkdev(clk, "pll_u_out", NULL);
+		clks[TEGRA210_CLK_PLL_U_OUT] = clk;
+	}
 
 	/* PLLU_OUT1 */
 	clk = tegra_clk_register_divider("pll_u_out1_div", "pll_u_out",
@@ -2394,14 +2406,14 @@ void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
 	/* PLLU_60M */
 	clk = clk_register_gate(NULL, "pll_u_60M", "pll_u_out2",
 				CLK_SET_RATE_PARENT, clk_base + PLLU_BASE,
-				23, 0, NULL);
+				23, 0, &pll_u_lock);
 	clk_register_clkdev(clk, "pll_u_60M", NULL);
 	clks[TEGRA210_CLK_PLL_U_60M] = clk;
 
 	/* PLLU_48M */
 	clk = clk_register_gate(NULL, "pll_u_48M", "pll_u_out1",
 				CLK_SET_RATE_PARENT, clk_base + PLLU_BASE,
-				25, 0, NULL);
+				25, 0, &pll_u_lock);
 	clk_register_clkdev(clk, "pll_u_48M", NULL);
 	clks[TEGRA210_CLK_PLL_U_48M] = clk;
 
