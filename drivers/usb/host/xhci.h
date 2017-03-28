@@ -3,6 +3,7 @@
  * xHCI host controller driver
  *
  * Copyright (C) 2008 Intel Corp.
+ * Copyright (c) 2017, NVIDIA CORPORATION. All rights reserved.
  *
  * Author: Sarah Sharp
  * Some code borrowed from the Linux EHCI driver.
@@ -311,6 +312,7 @@ struct xhci_op_regs {
 #define XDEV_U0		(0x0 << 5)
 #define XDEV_U2		(0x2 << 5)
 #define XDEV_U3		(0x3 << 5)
+#define XDEV_RXDETECT	(0x5 << 5)
 #define XDEV_INACTIVE	(0x6 << 5)
 #define XDEV_RESUME	(0xf << 5)
 /* true: port has power (see HCC_PPC) */
@@ -1208,6 +1210,8 @@ enum xhci_setup_dev {
 
 /* Block Event Interrupt */
 #define	TRB_BEI			(1<<9)
+/* Transfer State Preserve */
+#define TRB_TSP			(1<<9)
 
 /* Control transfer TRB specific fields */
 #define TRB_DIR_IN		(1<<16)
@@ -1396,6 +1400,7 @@ struct xhci_ring {
 	enum xhci_ring_type	type;
 	bool			last_td_was_short;
 	struct radix_tree_root	*trb_address_map;
+	bool			soft_try;
 };
 
 struct xhci_erst_entry {
@@ -1898,6 +1903,8 @@ int xhci_queue_evaluate_context(struct xhci_hcd *xhci, struct xhci_command *cmd,
 		dma_addr_t in_ctx_ptr, u32 slot_id, bool command_must_succeed);
 int xhci_queue_reset_ep(struct xhci_hcd *xhci, struct xhci_command *cmd,
 		int slot_id, unsigned int ep_index);
+int xhci_queue_soft_retry(struct xhci_hcd *xhci, int slot_id,
+		unsigned int ep_index);
 int xhci_queue_reset_device(struct xhci_hcd *xhci, struct xhci_command *cmd,
 		u32 slot_id);
 void xhci_find_new_dequeue_state(struct xhci_hcd *xhci,
