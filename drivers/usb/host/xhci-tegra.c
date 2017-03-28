@@ -360,6 +360,10 @@ struct tegra_xhci_soc_config {
 	int (*pretend_connected)(struct phy *phy);
 	int (*remote_wake_detected)(struct phy *phy);
 
+	void (*receiver_detector)(struct phy *phy, bool on);
+	void (*clamp_en_early)(struct phy *phy, bool on);
+	bool disable_u0_ts1_detect;
+
 	int num_supplies;
 	const char *supply_names[];
 };
@@ -548,6 +552,34 @@ static void tegra_xusb_boost_cpu_deinit(struct tegra_xhci_hcd *tegra)
 	}
 
 	mutex_destroy(&tegra->boost_cpufreq_lock);
+}
+
+static void tegra_xhci_enable_receiver_detector(struct tegra_xhci_hcd *tegra,
+						struct phy *phy)
+{
+	if (tegra->soc_config->receiver_detector)
+		tegra->soc_config->receiver_detector(phy, true);
+}
+
+static void tegra_xhci_disable_receiver_detector(struct tegra_xhci_hcd *tegra,
+						struct phy *phy)
+{
+	if (tegra->soc_config->receiver_detector)
+		tegra->soc_config->receiver_detector(phy, false);
+}
+
+static void tegra_xhci_enable_clamp_en_early(struct tegra_xhci_hcd *tegra,
+						struct phy *phy)
+{
+	if (tegra->soc_config->clamp_en_early)
+		tegra->soc_config->clamp_en_early(phy, true);
+}
+
+static void tegra_xhci_disable_clamp_en_early(struct tegra_xhci_hcd *tegra,
+						struct phy *phy)
+{
+	if (tegra->soc_config->clamp_en_early)
+		tegra->soc_config->clamp_en_early(phy, false);
 }
 
 static inline struct tegra_xhci_hcd *hcd_to_tegra_xhci(struct usb_hcd *hcd)
@@ -1445,6 +1477,7 @@ static const struct tegra_xhci_soc_config tegra186_soc_config = {
 	.disable_wake = tegra18x_phy_xusb_disable_wake,
 	.pretend_connected = tegra18x_phy_xusb_pretend_connected,
 	.remote_wake_detected = tegra18x_phy_xusb_remote_wake_detected,
+	.disable_u0_ts1_detect = false,
 };
 MODULE_FIRMWARE("tegra18x_xusb_firmware");
 
@@ -1484,6 +1517,7 @@ static const struct tegra_xhci_soc_config tegra210b01_soc_config = {
 	.disable_wake = tegra21x_phy_xusb_disable_wake,
 	.pretend_connected = tegra21x_phy_xusb_pretend_connected,
 	.remote_wake_detected = tegra21x_phy_xusb_remote_wake_detected,
+	.disable_u0_ts1_detect = false,
 };
 
 static const struct tegra_xhci_soc_config tegra210_soc_config = {
@@ -1524,6 +1558,10 @@ static const struct tegra_xhci_soc_config tegra210_soc_config = {
 	.disable_wake = tegra21x_phy_xusb_disable_wake,
 	.pretend_connected = tegra21x_phy_xusb_pretend_connected,
 	.remote_wake_detected = tegra21x_phy_xusb_remote_wake_detected,
+
+	.receiver_detector = t210_receiver_detector,
+	.clamp_en_early = t210_clamp_en_early,
+	.disable_u0_ts1_detect = true,
 };
 MODULE_FIRMWARE("tegra21x_xusb_firmware");
 
@@ -3546,6 +3584,8 @@ static int tegra_xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 	struct tegra_xhci_hcd *tegra = hcd_to_tegra_xhci(hcd);
 	struct xhci_bus_state *bus_state = &xhci->bus_state[hcd_index(hcd)];
+	unsigned long flags;
+	int port;
 
 	if (bus_state->resuming_ports) {
 		__le32 __iomem **port_array;
@@ -3583,7 +3623,84 @@ static int tegra_xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 		}
 	}
 
+	if ((hcd->speed != HCD_USB3) ||
+			!tegra->soc_config->disable_u0_ts1_detect)
+		goto no_rx_control;
+
+	for (port = 0; port < tegra->soc_config->num_phys[USB3_PHY]; port++) {
+		u32 portsc = read_portsc(tegra, port);
+		struct phy *phy;
+
+		if (portsc == 0xffffffff)
+			break;
+
+		spin_lock_irqsave(&xhci->lock, flags);
+		phy = tegra->phys[USB3_PHY][port];
+		if ((portsc & PORT_PLS_MASK) == XDEV_U0)
+			tegra_xhci_disable_receiver_detector(tegra, phy);
+		else {
+			if ((portsc & PORT_PLS_MASK) == XDEV_RXDETECT)
+				tegra_xhci_disable_clamp_en_early(tegra, phy);
+
+			tegra_xhci_enable_receiver_detector(tegra, phy);
+		}
+		spin_unlock_irqrestore(&xhci->lock, flags);
+	}
+
+no_rx_control:
 	return xhci_hub_status_data(hcd, buf);
+}
+
+static bool tegra_xhci_is_u0_ts1_detect_disabled(struct usb_hcd *hcd)
+{
+	struct tegra_xhci_hcd *tegra = hcd_to_tegra_xhci(hcd);
+
+	return tegra->soc_config->disable_u0_ts1_detect;
+}
+
+static void tegra_xhci_endpoint_soft_retry(struct usb_hcd *hcd,
+		struct usb_host_endpoint *ep, bool on)
+{
+	struct usb_device *udev = (struct usb_device *) ep->hcpriv;
+	struct tegra_xhci_hcd *tegra = hcd_to_tegra_xhci(hcd);
+	struct phy *phy;
+	int port = -1;
+	int delay = 0;
+	u32 portsc;
+
+	if (!udev || udev->speed != USB_SPEED_SUPER ||
+			!tegra->soc_config->disable_u0_ts1_detect)
+		return;
+
+	/* trace back to roothub port */
+	while (udev->parent) {
+		if (udev->parent == udev->bus->root_hub) {
+			port = udev->portnum - 1;
+			break;
+		}
+		udev = udev->parent;
+	}
+
+	if (port < 0 || port >= tegra->soc_config->num_phys[USB3_PHY])
+		return;
+
+	portsc = read_portsc(tegra, port);
+	phy = tegra->phys[USB3_PHY][port];
+
+	if (on) {
+		while ((portsc & PORT_PLS_MASK) != XDEV_U0 && delay++ < 6) {
+			udelay(50);
+			portsc = read_portsc(tegra, port);
+		}
+
+		if ((portsc & PORT_PLS_MASK) != XDEV_U0) {
+			dev_info(tegra->dev, "%s port %d doesn't reach U0 in 300us, portsc 0x%x\n",
+				__func__, port, portsc);
+		}
+		tegra_xhci_disable_receiver_detector(tegra, phy);
+		tegra_xhci_enable_clamp_en_early(tegra, phy);
+	} else
+		tegra_xhci_disable_clamp_en_early(tegra, phy);
 }
 
 static int tegra_xhci_update_device(struct usb_hcd *hcd,
@@ -3632,6 +3749,11 @@ static bool device_has_isoch_ep_and_interval_one(struct usb_device *udev)
 static int tegra_xhci_enable_usb3_lpm_timeout(struct usb_hcd *hcd,
 			struct usb_device *udev, enum usb3_link_state state)
 {
+	struct tegra_xhci_hcd *tegra = hcd_to_tegra_xhci(hcd);
+
+	if (tegra->soc_config->disable_u0_ts1_detect)
+		return USB3_LPM_DISABLED;
+
 	if (state == USB3_LPM_U1 &&
 		device_has_isoch_ep_and_interval_one(udev))
 		return USB3_LPM_DISABLED;
@@ -3725,6 +3847,10 @@ static int __init tegra_xhci_init(void)
 	tegra_xhci_hc_driver.alloc_dev = tegra_xhci_alloc_dev;
 	tegra_xhci_hc_driver.free_dev = tegra_xhci_free_dev;
 	tegra_xhci_hc_driver.urb_enqueue = tegra_xhci_urb_enqueue;
+	tegra_xhci_hc_driver.endpoint_soft_retry =
+			tegra_xhci_endpoint_soft_retry;
+	tegra_xhci_hc_driver.is_u0_ts1_detect_disabled =
+			tegra_xhci_is_u0_ts1_detect_disabled;
 	return platform_driver_register(&tegra_xhci_driver);
 }
 fs_initcall(tegra_xhci_init);
