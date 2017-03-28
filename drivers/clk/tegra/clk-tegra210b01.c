@@ -188,6 +188,8 @@
 #define UTMIP_PLL_CFG1_FORCE_PLL_ENABLE_POWERDOWN BIT(14)
 #define UTMIP_PLL_CFG1_FORCE_PLL_ACTIVE_POWERDOWN BIT(12)
 
+#define UTMIP_PLL_CFG0 0x480
+
 #define SATA_PLL_CFG0				0x490
 #define SATA_PLL_CFG0_PADPLL_RESET_SWCTL	BIT(0)
 #define SATA_PLL_CFG0_PADPLL_USE_LOCKDET	BIT(2)
@@ -247,6 +249,7 @@ static void __iomem *pmc_base;
 
 static unsigned long osc_freq;
 static unsigned long pll_ref_freq;
+static bool pll_re_use_utmipll;
 
 static DEFINE_SPINLOCK(pll_d_lock);
 // FIXME static DEFINE_SPINLOCK(pll_e_lock);
@@ -428,6 +431,11 @@ static DEFINE_SPINLOCK(pll_u_lock);
 
 #define PLLU_MISC0_WRITE_MASK		0xbfffffff
 #define PLLU_MISC1_WRITE_MASK		0xf0000007
+
+/* UTMIPLL */
+#define UTMIP_PLL_CFG0_WRITE_MASK	0x1fffffff
+#define UTMIP_PLL_CFG0_DEFAULT_VALUE	0x00190101
+
 
 #ifdef FIXME
 void tegra210b01_csi_source_from_brick(void)
@@ -1182,6 +1190,27 @@ static void tegra210b01_pllu_set_defaults(struct tegra_clk_pll_params *pllu)
 	writel_relaxed(PLLU_MISC1_DEFAULT_VALUE,
 			clk_base + pllu->ext_misc_reg[1]);
 	udelay(1);
+}
+
+/*
+ * UTMIPLL
+ * Running at fixed 960MHz rate with fixed 1:2 factor 480MHz output supplied
+ * to USB link (not exposed to clock tree), and fixed 1:16 factor 60MHz supplied
+ * to PLL_RE (exposed to clock tree).
+ */
+static int utmipll_set_defaults(bool locked)
+{
+	u32 val = readl_relaxed(clk_base + UTMIP_PLL_CFG0);
+
+	if (locked)
+		return (val & UTMIP_PLL_CFG0_WRITE_MASK) ==
+			UTMIP_PLL_CFG0_DEFAULT_VALUE ? 0 : -EINVAL;
+
+	writel_relaxed(UTMIP_PLL_CFG0_DEFAULT_VALUE,
+		       clk_base + UTMIP_PLL_CFG0);
+	udelay(1);
+
+	return 0;
 }
 
 /*
@@ -2088,15 +2117,14 @@ static void tegra210b01_utmi_param_configure(void)
 	reg |= UTMIP_PLL_CFG2_STABLE_COUNT(utmi_parameters[i].stable_count);
 
 	reg &= ~UTMIP_PLL_CFG2_ACTIVE_DLY_COUNT(~0);
-
 	reg |= UTMIP_PLL_CFG2_ACTIVE_DLY_COUNT(utmi_parameters[i].
 					    active_delay_count);
 	writel_relaxed(reg, clk_base + UTMIP_PLL_CFG2);
 
 	/* Program UTMIP PLL delay and oscillator frequency counts */
 	reg = readl_relaxed(clk_base + UTMIP_PLL_CFG1);
-	reg &= ~UTMIP_PLL_CFG1_ENABLE_DLY_COUNT(~0);
 
+	reg &= ~UTMIP_PLL_CFG1_ENABLE_DLY_COUNT(~0);
 	reg |= UTMIP_PLL_CFG1_ENABLE_DLY_COUNT(utmi_parameters[i].
 					    enable_delay_count);
 
@@ -2112,7 +2140,7 @@ static void tegra210b01_utmi_param_configure(void)
 	reg &= ~UTMIP_PLL_CFG1_FORCE_PLL_ENABLE_POWERDOWN;
 	reg |= UTMIP_PLL_CFG1_FORCE_PLL_ENABLE_POWERUP;
 	writel_relaxed(reg, clk_base + UTMIP_PLL_CFG1);
-	udelay(1);
+	udelay(20);
 
 	/* Enable samplers for SNPS, XUSB_HOST, XUSB_DEV */
 	reg = readl_relaxed(clk_base + UTMIP_PLL_CFG2);
@@ -2123,6 +2151,10 @@ static void tegra210b01_utmi_param_configure(void)
 	reg &= ~UTMIP_PLL_CFG2_FORCE_PD_SAMP_B_POWERDOWN;
 	reg &= ~UTMIP_PLL_CFG2_FORCE_PD_SAMP_D_POWERDOWN;
 	writel_relaxed(reg, clk_base + UTMIP_PLL_CFG2);
+
+	/* Keep UTMIPLL under s/w control if it is used as PLL_RE reference */
+	if (pll_re_use_utmipll)
+		return;
 
 	/* Setup HW control of UTMIPLL */
 	reg = readl_relaxed(clk_base + UTMIP_PLL_CFG1);
@@ -2149,33 +2181,28 @@ static void tegra210b01_utmi_param_configure(void)
 	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
 }
 
-#ifdef FIXME
-void tegra210b01_put_utmipll_in_iddq(void)
+static int tegra210b01_enable_utmipll(void)
 {
-	u32 reg;
+	u32 reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
+	bool hw_on = reg & UTMIPLL_HW_PWRDN_CFG0_SEQ_ENABLE;
+	bool locked = reg & UTMIPLL_HW_PWRDN_CFG0_UTMIPLL_LOCK;
 
-	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
-
-	if (reg & UTMIPLL_HW_PWRDN_CFG0_UTMIPLL_LOCK) {
-		pr_err("trying to assert IDDQ while UTMIPLL is locked\n");
-		return;
+	if (hw_on && (pll_re_use_utmipll || !locked)) {
+		WARN(1, "Invalid UTMIP PLL: hw_on pll_re_usage_%s lock_%s\n",
+		     pll_re_use_utmipll ? "on" : "off", locked ? "on" : "off");
+		return -EINVAL;
 	}
 
-	reg |= UTMIPLL_HW_PWRDN_CFG0_IDDQ_OVERRIDE;
-	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
-}
-EXPORT_SYMBOL_GPL(tegra210b01_put_utmipll_in_iddq);
+	if (utmipll_set_defaults(locked)) {
+		WARN_ON(1);
+		return -EINVAL;
+	}
 
-void tegra210b01_put_utmipll_out_iddq(void)
-{
-	u32 reg;
+	if (!hw_on && (!pll_re_use_utmipll || !locked))
+		tegra210b01_utmi_param_configure();
 
-	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
-	reg &= ~UTMIPLL_HW_PWRDN_CFG0_IDDQ_OVERRIDE;
-	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
+	return 0;
 }
-EXPORT_SYMBOL_GPL(tegra210b01_put_utmipll_out_iddq);
-#endif
 
 static int tegra210b01_enable_pllu(void)
 {
@@ -2278,11 +2305,7 @@ static int tegra210b01_init_pllu(void)
 	}
 
 	/* enable UTMIPLL hw control if not yet done by the bootloader */
-	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
-	if (!(reg & UTMIPLL_HW_PWRDN_CFG0_SEQ_ENABLE))
-		tegra210b01_utmi_param_configure();
-
-	return 0;
+	return tegra210b01_enable_utmipll();
 }
 
 static struct tegra_audio_clk_info tegra210b01_audio_plls[] = {
@@ -2372,6 +2395,12 @@ void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
 						CLK_SET_RATE_PARENT, 1, 2);
 		clk_register_clkdev(clk, "pll_u_out", NULL);
 		clks[TEGRA210_CLK_PLL_U_OUT] = clk;
+
+		/* UTMIPLL_60M */
+		clk = clk_register_fixed_rate(NULL, "utmipll_60M", "pll_ref", 0,
+					      60*1000*1000);
+		clk_register_clkdev(clk, "utmipll_60M", NULL);
+		clks[TEGRA210_CLK_UTMIPLL_60M] = clk;
 	}
 
 	/* PLLU_OUT1 */
@@ -2540,4 +2569,7 @@ struct tegra_clk_pll_params __init *tegra210b01_get_pllp_params(void)
 
 void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks)
 {
+	/* Add 60MHz output of UTMIPLL */
+	tegra_clks[tegra_clk_utmipll_60m].dt_id = TEGRA210_CLK_UTMIPLL_60M;
+	tegra_clks[tegra_clk_utmipll_60m].present = true;
 }
