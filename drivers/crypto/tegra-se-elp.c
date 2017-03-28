@@ -253,7 +253,7 @@ static void tegra_se_ecc_free_point(struct tegra_se_elp_dev *se_dev,
 	devm_kfree(se_dev->dev, p);
 }
 
-const struct tegra_se_ecc_curve *tegra_se_ecc_get_curve(unsigned int curve_id)
+static const struct tegra_se_ecc_curve *tegra_se_ecc_get_curve(unsigned int curve_id)
 {
 	switch (curve_id) {
 	/* In FIPS mode only allow P256 and higher */
@@ -2517,8 +2517,8 @@ static int tegra_se_pka1_rsa_setkey(struct crypto_akcipher *tfm,
 		goto clk_dis;
 	}
 
-	modlen = (keylen >> 16);
-	explen = (keylen & (0xFFFF));
+	modlen = (keylen >> SE_PKA1_RSA_MOD_SHIFT);
+	explen = (keylen & SE_PKA1_RSA_EXP_BITS);
 
 	if ((modlen < 64) || (modlen > 512))
 		return -EINVAL;
