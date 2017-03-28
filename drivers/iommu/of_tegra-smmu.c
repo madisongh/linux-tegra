@@ -227,9 +227,13 @@ u64 tegra_smmu_of_get_swgids(struct device *dev,
 	struct device_node *np = dev->of_node;
 
 	if (dev_is_pci(dev)) {
-		struct pci_bus *bus = to_pci_dev(dev)->bus;
-		if (!pci_is_root_bus(bus))
+		for (;;) {
+			struct pci_bus *bus = to_pci_dev(dev)->bus;
+
+			if (pci_is_root_bus(bus))
+				break;
 			dev = bus->bridge;
+		}
 		np = of_get_parent(dev->of_node);
 	}
 
