@@ -139,6 +139,8 @@ int tegra21x_phy_xusb_disable_otg_int(struct phy *phy);
 int tegra21x_phy_xusb_ack_otg_int(struct phy *phy);
 int tegra21x_phy_xusb_get_otg_vbus_id(struct phy *phy,
 		struct tegra_xusb_otg_vbus_id *change);
+void t210_clamp_en_early(struct phy *phy, bool on);
+void t210_receiver_detector(struct phy *phy, bool on);
 #else
 static inline int tegra21x_phy_xusb_set_vbus_override(struct phy *phy)
 {
@@ -336,6 +338,14 @@ static inline int tegra21x_phy_xusb_get_otg_vbus_id(struct phy *phy,
 		struct tegra_xusb_otg_vbus_id *change)
 {
 	return 0;
+}
+
+static inline void t210_clamp_en_early(struct phy *phy, bool on)
+{
+}
+
+static inline void t210_receiver_detector(struct phy *phy, bool on)
+{
 }
 #endif
 

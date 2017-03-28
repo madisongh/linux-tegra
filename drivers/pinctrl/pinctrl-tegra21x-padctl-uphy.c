@@ -251,7 +251,12 @@
 #define UPHY_MISC_PAD_CTL_1			(0x0)
 #define   AUX_TX_IDDQ				BIT(0)
 #define   AUX_TX_IDDQ_OVRD			BIT(1)
+#define   AUX_TX_TERM_EN			BIT(2)
+#define   AUX_TX_RDET_EN			BIT(4)
+#define   AUX_TX_RDET_BYP			BIT(5)
+#define   AUX_TX_RDET_CLK_EN			BIT(6)
 #define   AUX_TX_RDET_STATUS			BIT(7)
+#define   AUX_TX_MODE_OVRD			BIT(12)
 #define   AUX_RX_MODE_OVRD			BIT(13)
 #define   AUX_RX_IDDQ				BIT(16)
 #define   AUX_RX_IDDQ_OVRD			BIT(17)
@@ -259,6 +264,12 @@
 #define   AUX_RX_IDLE_MODE(x)			(((x) & 0x3) << 20)
 #define   AUX_RX_IDLE_EN			BIT(22)
 #define   AUX_RX_IDLE_TH(x)			(((x) & 0x3) << 24)
+
+#define UPHY_MISC_PAD_CTL_2			(0x4)
+#define   RX_IDDQ_OVRD				BIT(9)
+#define   RX_IDDQ				BIT(8)
+#define   TX_IDDQ_OVRD				BIT(1)
+#define   TX_IDDQ				BIT(0)
 
 #define UPHY_MISC_PAD_CTL_4			(0xc)
 #define   RX_TERM_EN				BIT(21)
@@ -334,6 +345,8 @@ struct tegra_padctl_uphy_soc {
 
 	void (*usb3_phy_set_lfps_detector)(struct tegra_padctl_uphy *uphy,
 				    unsigned int port, bool enable);
+
+	bool disable_u0_ts1_detect;
 };
 
 struct tegra_padctl_uphy_lane {
@@ -367,6 +380,8 @@ struct tegra_xusb_usb3_port {
 	enum xusb_port_cap port_cap;
 	unsigned int uphy_lane;
 	unsigned int usb2_map;
+	bool clamp_en_early_enabled;
+	bool receiver_detector_disabled;
 };
 
 enum tegra_pcie_lane_select {
@@ -431,6 +446,7 @@ struct tegra_padctl_uphy {
 	struct clk *hsic_trk_clk; /* hsic tracking circuit clock */
 
 	struct mutex lock;
+	spinlock_t	spinlock;
 
 	const struct tegra_padctl_uphy_soc *soc;
 	struct tegra_xusb_fuse_calibration calib;
@@ -3604,6 +3620,7 @@ static void tegra_xusb_phy_mbox_work(struct work_struct *work)
 	struct tegra_xusb_mbox_msg resp;
 	u32 ports;
 	unsigned int i;
+	unsigned long flags;
 
 	TRACE(uphy->dev, "mailbox command %d\n", msg->cmd);
 	resp.cmd = 0;
@@ -3630,10 +3647,15 @@ static void tegra_xusb_phy_mbox_work(struct work_struct *work)
 		for (i = 0; i < TEGRA_USB3_PHYS; i++) {
 			if (!(ports & BIT(i)))
 				continue;
-			if (msg->cmd == MBOX_CMD_ENABLE_SS_LFPS_DETECTION)
+			if (msg->cmd == MBOX_CMD_ENABLE_SS_LFPS_DETECTION) {
+				spin_lock_irqsave(&uphy->spinlock, flags);
 				uphy->soc->usb3_phy_set_lfps_detector(uphy, i,
 									true);
-			else {
+				if (uphy->soc->disable_u0_ts1_detect)
+					t210_receiver_detector(
+						uphy->usb3_phys[i], true);
+				spin_unlock_irqrestore(&uphy->spinlock, flags);
+			} else {
 				uphy->soc->usb3_phy_set_lfps_detector(uphy, i,
 									false);
 				/*
@@ -3960,6 +3982,7 @@ static const struct tegra_padctl_uphy_soc tegra21x_soc = {
 	.supply_names = tegra21x_supply_names,
 	.num_supplies = ARRAY_SIZE(tegra21x_supply_names),
 	.usb3_phy_set_lfps_detector = tegra210_usb3_phy_set_lfps_detector,
+	.disable_u0_ts1_detect = true,
 };
 
 static const struct tegra_padctl_uphy_soc tegra21xb01_soc = {
@@ -3972,6 +3995,7 @@ static const struct tegra_padctl_uphy_soc tegra21xb01_soc = {
 	.hsic_port_offset = 8,
 	.supply_names = tegra21xb01_supply_names,
 	.num_supplies = ARRAY_SIZE(tegra21xb01_supply_names),
+	.disable_u0_ts1_detect = false,
 };
 
 static const struct of_device_id tegra_padctl_uphy_of_match[] = {
@@ -5355,6 +5379,102 @@ int tegra21x_phy_xusb_pretend_connected(struct phy *phy)
 	return -EINVAL;
 }
 EXPORT_SYMBOL_GPL(tegra21x_phy_xusb_pretend_connected);
+
+void t210_clamp_en_early(struct phy *phy, bool on)
+{
+	struct tegra_padctl_uphy *uphy;
+	u32 reg;
+	int port;
+
+	if (!phy)
+		return;
+
+	uphy = phy_get_drvdata(phy);
+	port = usb3_phy_to_port(phy);
+
+	if (port < 0) {
+		dev_err(uphy->dev, "Invalid port number\n");
+		return;
+	}
+
+	if ((on && uphy->usb3_ports[port].clamp_en_early_enabled) ||
+		(!on && !uphy->usb3_ports[port].clamp_en_early_enabled))
+		return;
+
+	uphy->usb3_ports[port].clamp_en_early_enabled = on;
+
+	if (on) {
+		reg = padctl_readl(uphy, XUSB_PADCTL_ELPG_PROGRAM_1);
+		reg |= SSPX_ELPG_CLAMP_EN_EARLY(port);
+		padctl_writel(uphy, reg, XUSB_PADCTL_ELPG_PROGRAM_1);
+	} else {
+		reg = padctl_readl(uphy, XUSB_PADCTL_ELPG_PROGRAM_1);
+		reg &= ~SSPX_ELPG_CLAMP_EN_EARLY(port);
+		padctl_writel(uphy, reg, XUSB_PADCTL_ELPG_PROGRAM_1);
+	}
+}
+EXPORT_SYMBOL_GPL(t210_clamp_en_early);
+
+void t210_receiver_detector(struct phy *phy, bool on)
+{
+	struct tegra_padctl_uphy *uphy;
+	u32 mask, reg;
+	unsigned int uphy_lane;
+	int port;
+
+	if (!phy)
+		return;
+
+	uphy = phy_get_drvdata(phy);
+	port = usb3_phy_to_port(phy);
+	if (port < 0) {
+		dev_err(uphy->dev, "Invalid port number\n");
+		return;
+	}
+
+	uphy_lane = uphy->usb3_ports[port].uphy_lane;
+
+	if ((on && !uphy->usb3_ports[port].receiver_detector_disabled) ||
+		(!on && uphy->usb3_ports[port].receiver_detector_disabled))
+		return;
+
+	uphy->usb3_ports[port].receiver_detector_disabled = !on;
+
+	if (!on) {
+		mask = TX_IDDQ | RX_IDDQ;
+		reg = uphy_lane_readl(uphy, uphy_lane, UPHY_MISC_PAD_CTL_2);
+		reg &= ~mask;
+		uphy_lane_writel(uphy, uphy_lane, reg, UPHY_MISC_PAD_CTL_2);
+
+		mask = TX_IDDQ_OVRD | RX_IDDQ_OVRD;
+		reg = uphy_lane_readl(uphy, uphy_lane, UPHY_MISC_PAD_CTL_2);
+		reg |= mask;
+		uphy_lane_writel(uphy, uphy_lane, reg, UPHY_MISC_PAD_CTL_2);
+
+		mask = (AUX_TX_RDET_CLK_EN | AUX_TX_RDET_BYP |
+			AUX_TX_RDET_EN | AUX_TX_TERM_EN);
+		reg = uphy_lane_readl(uphy, uphy_lane, UPHY_MISC_PAD_CTL_1);
+		reg &= ~mask;
+		uphy_lane_writel(uphy, uphy_lane, reg, UPHY_MISC_PAD_CTL_1);
+
+		mask = AUX_TX_MODE_OVRD;
+		reg = uphy_lane_readl(uphy, uphy_lane, UPHY_MISC_PAD_CTL_1);
+		reg |= mask;
+		uphy_lane_writel(uphy, uphy_lane, reg, UPHY_MISC_PAD_CTL_1);
+	} else {
+		mask = AUX_TX_MODE_OVRD;
+		reg = uphy_lane_readl(uphy, uphy_lane, UPHY_MISC_PAD_CTL_1);
+		reg &= ~mask;
+		uphy_lane_writel(uphy, uphy_lane, reg, UPHY_MISC_PAD_CTL_1);
+
+		mask = TX_IDDQ_OVRD | RX_IDDQ_OVRD;
+		reg = uphy_lane_readl(uphy, uphy_lane, UPHY_MISC_PAD_CTL_2);
+		reg &= ~mask;
+		uphy_lane_writel(uphy, uphy_lane, reg, UPHY_MISC_PAD_CTL_2);
+	}
+
+}
+EXPORT_SYMBOL_GPL(t210_receiver_detector);
 
 int tegra21x_phy_xusb_set_reverse_id(struct phy *phy)
 {
