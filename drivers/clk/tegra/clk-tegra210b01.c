@@ -2537,3 +2537,7 @@ struct tegra_clk_pll_params __init *tegra210b01_get_pllp_params(void)
 {
 	return &pll_p_params;
 }
+
+void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks)
+{
+}

@@ -4248,6 +4248,9 @@ static void __init tegra210_clock_init(struct device_node *np)
 	if (!clks)
 		return;
 
+	if (t210b01)
+		tegra210b01_adjust_clks(tegra210_clks);
+
 	value = clk_readl(clk_base + SPARE_REG0) >> CLK_M_DIVISOR_SHIFT;
 	clk_m_div = (value & CLK_M_DIVISOR_MASK) + 1;
 
