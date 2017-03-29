@@ -917,24 +917,6 @@ static void set_dvco_rate_min(struct tegra_dfll *td, struct dfll_rate_req *req)
 }
 
 /*
- * Output clock scaler helpers
- */
-
-/**
- * dfll_scale_dvco_rate - calculate scaled rate from the DVCO rate
- * @scale_bits: clock scaler value (bits in the DFLL_FREQ_REQ_SCALE field)
- * @dvco_rate: the DVCO rate
- *
- * Apply the same scaling formula that the DFLL hardware uses to scale
- * the DVCO rate.
- */
-static unsigned long dfll_scale_dvco_rate(int scale_bits,
-					  unsigned long dvco_rate)
-{
-	return (u64)dvco_rate * (scale_bits + 1) / DFLL_FREQ_REQ_SCALE_MAX;
-}
-
-/*
  * DFLL mode switching
  */
 
@@ -3063,6 +3045,25 @@ void tegra_dfll_resume(struct platform_device *pdev)
  */
 
 #ifdef CONFIG_DEBUG_FS
+/*
+ * Output clock scaler helpers
+ */
+
+/**
+ * dfll_scale_dvco_rate - calculate scaled rate from the DVCO rate
+ * @scale_bits: clock scaler value (bits in the DFLL_FREQ_REQ_SCALE field)
+ * @dvco_rate: the DVCO rate
+ *
+ * Apply the same scaling formula that the DFLL hardware uses to scale
+ * the DVCO rate.
+ */
+static unsigned long dfll_scale_dvco_rate(int scale_bits,
+					  unsigned long dvco_rate)
+{
+	return (u64)dvco_rate * (scale_bits + 1) / DFLL_FREQ_REQ_SCALE_MAX;
+}
+
+
 /*
  * Monitor control
  */
