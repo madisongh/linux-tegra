@@ -333,16 +333,21 @@ static DEFINE_SPINLOCK(pll_u_lock);
 #define PLLC4_MISC0_DEFAULT_VALUE	0x40000000
 
 /* PLLRE */
+#define PLLRE_BASE_CLKIN_SEL		(1 << 22)
+
 #define PLLRE_MISC0_LOCK_ENABLE		(1 << 30)
 #define PLLRE_MISC0_LOCK_OVERRIDE	(1 << 29)
 #define PLLRE_MISC0_LOCK		(1 << 27)
 #define PLLRE_MISC0_IDDQ		(1 << 24)
 
-#define PLLRE_BASE_DEFAULT_VALUE	0x0
+#define PLLRE_BASE_DEFAULT_VALUE	0x00000000
 #define PLLRE_MISC0_DEFAULT_VALUE	0x41000000
 
 #define PLLRE_BASE_DEFAULT_MASK		0x1c000000
 #define PLLRE_MISC0_WRITE_MASK		0x67ffffff
+
+#define PLLRE_OUT1_DEFAULT_VALUE	0x00000000
+#define PLLRE_OUT1_VREG_MASK		0xf0000000
 
 /* PLLX */
 #define PLLX_USE_DYN_RAMP		1
@@ -838,6 +843,14 @@ static void tegra210b01_pllre_set_defaults(struct tegra_clk_pll *pllre)
 			pllre->params->defaults_set = false;
 		}
 
+		val = readl_relaxed(clk_base + PLLRE_OUT1) &
+			PLLRE_OUT1_VREG_MASK;
+		if (val != PLLRE_OUT1_DEFAULT_VALUE) {
+			pr_warn("boot PLLRE vreg 0x%x: expected 0x%x\n",
+				val, PLLRE_OUT1_DEFAULT_VALUE);
+			pllre->params->defaults_set = false;
+		}
+
 		/* Ignore lock enable */
 		val = PLLRE_MISC0_DEFAULT_VALUE & (~PLLRE_MISC0_IDDQ);
 		mask = PLLRE_MISC0_LOCK_ENABLE | PLLRE_MISC0_LOCK_OVERRIDE;
@@ -849,6 +862,10 @@ static void tegra210b01_pllre_set_defaults(struct tegra_clk_pll *pllre)
 		val &= ~mask;
 		val |= PLLRE_MISC0_DEFAULT_VALUE & mask;
 		writel_relaxed(val, clk_base + pllre->params->ext_misc_reg[0]);
+		val = readl_relaxed(clk_base + PLLRE_OUT1) &
+			(~PLLRE_OUT1_VREG_MASK);
+		writel_relaxed(val | PLLRE_OUT1_DEFAULT_VALUE,
+			       clk_base + PLLRE_OUT1);
 		udelay(1);
 
 		return;
@@ -1720,10 +1737,10 @@ static struct tegra_clk_pll_params pll_e_params = {
 };
 
 static struct tegra_clk_pll_freq_table pll_re_vco_freq_table[] = {
-	{ 12000000, 672000000, 56, 1, 1, 0 },
-	{ 13000000, 672000000, 51, 1, 1, 0 }, /* actual: 663.0 MHz */
-	{ 38400000, 672000000, 70, 4, 1, 0 },
-	{        0,         0,  0, 0, 0, 0 },
+	{ 38400000, 672000000,  35,  2, 1, 0 },
+	{ 38400000, 624000000,  65,  4, 1, 0 },
+	{ 60000000, 625000000, 125, 12, 1, 0 },
+	{        0,         0,   0,  0, 0, 0 },
 };
 
 static struct div_nmp pllre_nmp = {
@@ -1753,6 +1770,7 @@ static struct tegra_clk_pll_params pll_re_vco_params = {
 	.round_p_to_pdiv = pll_qlin_p_to_pdiv,
 	.pdiv_tohw = pll_qlin_pdiv_to_hw,
 	.div_nmp = &pllre_nmp,
+	.mdiv_default = 4,
 	.freq_table = pll_re_vco_freq_table,
 	.flags = TEGRA_PLL_USE_LOCK | TEGRA_PLL_LOCK_MISC | TEGRA_PLL_VCO_OUT,
 	.set_defaults = tegra210b01_pllre_set_defaults,
@@ -2324,6 +2342,10 @@ void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
 	osc_freq = osc;
 	pll_ref_freq = ref;
 
+	/* PLL_RE reference clock must be selected by boot-loader */
+	pll_re_use_utmipll = readl_relaxed(clk_base + PLLRE_BASE) &
+		PLLRE_BASE_CLKIN_SEL;
+
 	/* PLLC */
 	clk = tegra_clk_register_pllc_tegra210("pll_c", "pll_ref", clk_base,
 			pmc, 0, &pll_c_params, NULL);
@@ -2459,10 +2481,15 @@ void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
 	clks[TEGRA210_CLK_PLL_D_OUT0] = clk;
 
 	/* PLLRE */
-	clk = tegra_clk_register_pllre_tegra210("pll_re_vco", "pll_ref",
-						clk_base, pmc, 0,
-						&pll_re_vco_params,
-						&pll_re_lock, pll_ref_freq);
+	if (pll_re_use_utmipll) {
+		clk = tegra_clk_register_pllre_tegra210(
+			"pll_re_vco", "utmipll_60M", clk_base, pmc, 0,
+			&pll_re_vco_params, &pll_re_lock, 60*1000*1000);
+	} else {
+		clk = tegra_clk_register_pllre_tegra210(
+			"pll_re_vco", "pll_ref", clk_base, pmc, 0,
+			&pll_re_vco_params, &pll_re_lock, pll_ref_freq);
+	}
 	clk_register_clkdev(clk, "pll_re_vco", NULL);
 	clks[TEGRA210_CLK_PLL_RE_VCO] = clk;
 
@@ -2576,7 +2603,7 @@ void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks)
 
 static struct tegra_clk_init_table t210b01_init_table[] __initdata = {
 	{ TEGRA210_CLK_PLL_A, TEGRA210_CLK_CLK_MAX, 564480000, 1 },
-	{ TEGRA210_CLK_PLL_RE_VCO, TEGRA210_CLK_CLK_MAX, 672000000, 1 },
+	{ TEGRA210_CLK_PLL_RE_VCO, TEGRA210_CLK_CLK_MAX, 0, 1 },
 	{ TEGRA210_CLK_PLL_DP, TEGRA210_CLK_CLK_MAX, 270000000, 0 },
 	{ TEGRA210_CLK_PLL_D2, TEGRA210_CLK_CLK_MAX, 594000000, 0 },
 	/* This MUST be the last entry. */
@@ -2585,5 +2612,16 @@ static struct tegra_clk_init_table t210b01_init_table[] __initdata = {
 
 void __init tegra210b01_clock_table_init(struct clk **clks)
 {
+	struct clk *clk;
+	unsigned long rate;
+
+	 /* Set PLL_RE at 625 MHz from UTMIPLL, or 672MHz, otherwise */
+	rate = (pll_re_use_utmipll ? 625 : 672) * 1000 * 1000;
+	clk = clks[TEGRA210_CLK_PLL_RE_VCO];
+	WARN_ON(IS_ERR_OR_NULL(clk));
+	if (clk_set_rate(clk, rate))
+		WARN(1, "%s: Failed to set rate %lu of %s\n",
+		     __func__, rate,   __clk_get_name(clk));
+
 	tegra_init_from_table(t210b01_init_table, clks, TEGRA210_CLK_CLK_MAX);
 }
