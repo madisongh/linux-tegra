@@ -1900,8 +1900,6 @@ unlock:
 	return ret;
 }
 
-struct otg_gadget_ops tegra_xudc_otg_gadget_ops;
-
 static int tegra_xudc_gadget_pullup(struct usb_gadget *gadget, int is_on)
 {
 	struct tegra_xudc *xudc = to_xudc(gadget);
@@ -1920,25 +1918,12 @@ static int tegra_xudc_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	}
 	xudc->pullup = is_on;
 	if (xudc->ucd && xudc->device_mode &&
-	    xudc->connect_type == EXTCON_USB && is_on &&
-	    !xudc->gadget.otg_dev)
+	    xudc->connect_type == EXTCON_USB && is_on)
 		schedule_delayed_work(&xudc->non_std_charger_work,
 			msecs_to_jiffies(NON_STD_CHARGER_DET_TIME_MS));
 	spin_unlock_irqrestore(&xudc->lock, flags);
-	pm_runtime_put_sync(xudc->dev);
 
-	if (xudc->gadget.otg_dev && !xudc->gadget.is_otg && is_on) {
-		int err = usb_otg_register_gadget(&xudc->gadget,
-				&tegra_xudc_otg_gadget_ops);
-		if (err) {
-			dev_err(xudc->dev,
-				"failed to register to OTG core: %d\n"
-				, err);
-			return err;
-		}
-		dev_dbg(xudc->dev, "registered to OTG core\n");
-		xudc->gadget.is_otg = 1;
-	}
+	pm_runtime_put(xudc->dev);
 
 	return 0;
 }
@@ -3795,8 +3780,17 @@ static int tegra_xudc_probe(struct platform_device *pdev)
 	/* for T186, register gadget to OTG core if the port is OTG port */
 	if (XUDC_IS_T186(xudc) && xudc->soc->has_otg_cap &&
 			xudc->soc->has_otg_cap(xudc->utmi_phy)) {
-		/* we defer otg resgister to gadget pullup */
 		xudc->gadget.otg_dev = of_usb_get_otg(pdev->dev.of_node);
+		err = usb_otg_register_gadget(&xudc->gadget,
+				&tegra_xudc_otg_gadget_ops);
+		if (err) {
+			dev_err(&pdev->dev,
+				"failed to register to OTG core: %d\n", err);
+			goto del_gadget;
+		}
+
+		dev_dbg(&pdev->dev, "registered to OTG core\n");
+		xudc->gadget.is_otg = 1;
 	} else {
 		/* for T186 device-only port or for non-T186 */
 		xudc->data_role_extcon = extcon_get_extcon_dev_by_cable(
