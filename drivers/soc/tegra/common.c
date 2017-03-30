@@ -73,6 +73,7 @@ bool soc_is_tegra210_n_before(void)
 
 	return of_match_node(tegra210_le_machine_match, root) != NULL;
 }
+EXPORT_SYMBOL(soc_is_tegra210_n_before);
 
 bool soc_is_tegra186_n_later(void)
 {
@@ -84,6 +85,7 @@ bool soc_is_tegra186_n_later(void)
 
 	return of_match_node(tegra186_ge_machine_match, root) != NULL;
 }
+EXPORT_SYMBOL(soc_is_tegra186_n_later);
 
 static int __init tegra_bootloader_fb_arg(char *options)
 {
