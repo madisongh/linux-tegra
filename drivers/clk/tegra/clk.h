@@ -797,6 +797,7 @@ void tegra210b01_super_clk_init(void __iomem *clk_base,
 				struct tegra_clk *tegra_clks);
 struct tegra_clk_pll_params *tegra210b01_get_pllp_params(void);
 void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks);
+void tegra210b01_clock_table_init(struct clk **clks);
 
 #ifdef CONFIG_TEGRA_CLK_EMC
 struct clk *tegra_clk_register_emc(void __iomem *base, struct device_node *np,

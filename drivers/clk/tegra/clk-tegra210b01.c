@@ -2573,3 +2573,17 @@ void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks)
 	tegra_clks[tegra_clk_utmipll_60m].dt_id = TEGRA210_CLK_UTMIPLL_60M;
 	tegra_clks[tegra_clk_utmipll_60m].present = true;
 }
+
+static struct tegra_clk_init_table t210b01_init_table[] __initdata = {
+	{ TEGRA210_CLK_PLL_A, TEGRA210_CLK_CLK_MAX, 564480000, 1 },
+	{ TEGRA210_CLK_PLL_RE_VCO, TEGRA210_CLK_CLK_MAX, 672000000, 1 },
+	{ TEGRA210_CLK_PLL_DP, TEGRA210_CLK_CLK_MAX, 270000000, 0 },
+	{ TEGRA210_CLK_PLL_D2, TEGRA210_CLK_CLK_MAX, 594000000, 0 },
+	/* This MUST be the last entry. */
+	{ TEGRA210_CLK_CLK_MAX, TEGRA210_CLK_CLK_MAX, 0, 0 },
+};
+
+void __init tegra210b01_clock_table_init(struct clk **clks)
+{
+	tegra_init_from_table(t210b01_init_table, clks, TEGRA210_CLK_CLK_MAX);
+}
