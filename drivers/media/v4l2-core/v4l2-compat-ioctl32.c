@@ -986,6 +986,10 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 		if (put_v4l2_ext_controls32(&karg.v2ecs, up))
 			err = -EFAULT;
 		break;
+	case VIDIOC_S_EDID:
+		if (put_v4l2_edid32(&karg.v2edid, up))
+			err = -EFAULT;
+		break;
 	}
 	if (err)
 		return err;
@@ -1007,7 +1011,6 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 		break;
 
 	case VIDIOC_G_EDID:
-	case VIDIOC_S_EDID:
 		err = put_v4l2_edid32(&karg.v2edid, up);
 		break;
 
