@@ -917,7 +917,7 @@ static void tegra_i2c_get_clk_parameters(struct tegra_i2c_dev *i2c_dev)
 			I2C_CLK_DIVISOR_STD_FAST_MODE_SHIFT);
 }
 
-static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
+static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev, bool is_init)
 {
 	u32 val;
 	int err = 0;
@@ -985,9 +985,11 @@ skip_periph_reset:
 
 	tegra_i2c_get_clk_parameters(i2c_dev);
 
-	err = tegra_i2c_set_clk_rate(i2c_dev);
-	if (err < 0)
-		return err;
+	if (is_init) {
+		err = tegra_i2c_set_clk_rate(i2c_dev);
+		if (err < 0)
+			goto err;
+	}
 
 	if (!i2c_dev->is_dvc) {
 		u32 sl_cfg = i2c_readl(i2c_dev, I2C_SL_CNFG);
@@ -1455,7 +1457,7 @@ static int tegra_i2c_handle_xfer_error(struct tegra_i2c_dev *i2c_dev)
 	if (i2c_dev->msg_err == I2C_ERR_NO_ACK)
 		udelay(DIV_ROUND_UP(2 * 1000000, i2c_dev->bus_clk_rate));
 
-	ret = tegra_i2c_init(i2c_dev);
+	ret = tegra_i2c_init(i2c_dev, false);
 	if (ret) {
 		WARN_ON(1);
 		return ret;
@@ -1579,7 +1581,7 @@ end_xfer:
 	if (time_left == 0) {
 		dev_err(i2c_dev->dev, "i2c transfer timed out addr: 0x%x\n",
 			i2c_dev->msg_add);
-		ret = tegra_i2c_init(i2c_dev);
+		ret = tegra_i2c_init(i2c_dev, false);
 		if (!ret)
 			ret = -ETIMEDOUT;
 		else
@@ -2297,10 +2299,6 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 		i2c_dev->clk_divisor_non_hs_mode =
 			i2c_dev->hw->clk_divisor_fast_plus_mode;
 
-	ret = tegra_i2c_set_clk_rate(i2c_dev);
-	if (ret < 0)
-		return ret;
-
 	ret = clk_prepare(i2c_dev->div_clk);
 	if (ret < 0) {
 		dev_err(i2c_dev->dev, "Clock prepare failed %d\n", ret);
@@ -2344,7 +2342,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	if (!(i2c_dev->rx_pio_buffer))
 		return -ENOMEM;
 
-	ret = tegra_i2c_init(i2c_dev);
+	ret = tegra_i2c_init(i2c_dev, true);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to initialize i2c controller");
 		goto disable_clk;
@@ -2462,7 +2460,7 @@ static int tegra_i2c_resume(struct device *dev)
 
 	i2c_lock_adapter(&i2c_dev->adapter);
 
-	ret = tegra_i2c_init(i2c_dev);
+	ret = tegra_i2c_init(i2c_dev, false);
 
 	if (ret) {
 		i2c_unlock_adapter(&i2c_dev->adapter);
