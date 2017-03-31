@@ -408,9 +408,9 @@ static DEFINE_SPINLOCK(pll_u_lock);
 #define PLLP_MISC1_XUSB_EN		(1 << PLLP_MISC1_XUSB_EN_SHIFT)
 
 #define PLLP_MISC0_DEFAULT_VALUE	0x00040008
-#define PLLP_MISC1_DEFAULT_VALUE	0x0
+#define PLLP_MISC1_DEFAULT_VALUE	0x00000000
 
-#define PLLP_MISC0_WRITE_MASK		0xdc6000f
+#define PLLP_MISC0_WRITE_MASK		0xfdc6000f
 #define PLLP_MISC1_WRITE_MASK		0x70ffffff
 
 /* PLLU */
@@ -1787,7 +1787,6 @@ static struct div_nmp pllp_nmp = {
 };
 
 static struct tegra_clk_pll_freq_table pll_p_freq_table[] = {
-	{ 12000000, 408000000, 34, 1, 1, 0 },
 	/* cf = 4.8MHz, allowed exception */
 	{ 38400000, 408000000, 85, 8, 1, 0 },
 	{        0,         0,  0, 0, 0, 0 },
@@ -1812,6 +1811,7 @@ static struct tegra_clk_pll_params pll_p_params = {
 	.freq_table = pll_p_freq_table,
 	.fixed_rate = 408000000,
 	.flags = TEGRA_PLL_FIXED | TEGRA_PLL_USE_LOCK | TEGRA_PLL_VCO_OUT,
+	.mdiv_default = 4,
 	.set_defaults = tegra210b01_pllp_set_defaults,
 	.calc_rate = tegra210b01_pll_fixed_mdiv_cfg,
 };
