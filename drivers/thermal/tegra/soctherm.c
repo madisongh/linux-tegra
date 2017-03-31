@@ -111,28 +111,6 @@
 #define TH_INTR_PU0_MASK			BIT(0)
 #define TH_INTR_IGNORE_MASK			0xFCFCFCFC
 
-#define OC_INTR_STATUS				0x39c
-#define OC_INTR_ENABLE				0x3a0
-#define OC_INTR_DISABLE				0x3a4
-
-#define OC_INTR_OC1_MASK			BIT(0)
-#define OC_INTR_OC2_MASK			BIT(1)
-#define OC_INTR_OC3_MASK			BIT(2)
-#define OC_INTR_OC4_MASK			BIT(3)
-#define OC_INTR_OC5_MASK			BIT(4)
-
-
-#define OC_INTR_POS_OC1_SHIFT			0
-#define OC_INTR_POS_OC1_MASK			0x1
-#define OC_INTR_POS_OC2_SHIFT			1
-#define OC_INTR_POS_OC2_MASK			0x1
-#define OC_INTR_POS_OC3_SHIFT			2
-#define OC_INTR_POS_OC3_MASK			0x1
-#define OC_INTR_POS_OC4_SHIFT			3
-#define OC_INTR_POS_OC4_MASK			0x1
-#define OC_INTR_POS_OC5_SHIFT			4
-#define OC_INTR_POS_OC5_MASK			0x1
-
 #define THROT_GLOBAL_CFG			0x400
 #define THROT_GLOBAL_ENB_MASK			BIT(0)
 
@@ -174,6 +152,34 @@
 #define THROT_DELAY_LITE			0x448
 #define THROT_DELAY_LITE_DELAY_MASK		0xff
 
+#define OC1_CFG					0x310
+#define OC1_CFG_LONG_LATENCY_MASK		BIT(6)
+#define OC1_CFG_HW_RESTORE_MASK			BIT(5)
+#define OC1_CFG_PWR_GOOD_MASK_MASK		BIT(4)
+#define OC1_CFG_THROTTLE_MODE_MASK		(0x3 << 2)
+#define OC1_CFG_ALARM_POLARITY_MASK		BIT(1)
+#define OC1_CFG_EN_THROTTLE_MASK		BIT(0)
+
+#define OC1_CNT_THRESHOLD			0x314
+#define OC1_THROTTLE_PERIOD			0x318
+#define OC1_ALARM_COUNT				0x31c
+#define OC1_FILTER				0x320
+#define OC1_STATS				0x3a8
+
+#define OC_INTR_STATUS				0x39c
+#define OC_INTR_ENABLE				0x3a0
+#define OC_INTR_DISABLE				0x3a4
+#define OC_STATS_CTL				0x3c4
+#define OC_STATS_CTL_CLR_ALL			0x2
+#define OC_STATS_CTL_EN_ALL			0x1
+
+#define OC_INTR_OC1_MASK			BIT(0)
+#define OC_INTR_OC2_MASK			BIT(1)
+#define OC_INTR_OC3_MASK			BIT(2)
+#define OC_INTR_OC4_MASK			BIT(3)
+#define OC_INTR_OC5_MASK			BIT(4)
+
+
 /* get val from register(r) mask bits(m) */
 #define REG_GET_MASK(r, m)	(((r) & (m)) >> (ffs(m) - 1))
 /* set val(v) to mask bits(m) of register(r) */
@@ -204,9 +210,30 @@
 #define THROT_DELAY_CTRL(throt)		(THROT_DELAY_LITE + \
 					(THROT_OFFSET * throt))
 
+#define ALARM_OFFSET			0x14
+#define ALARM_CFG(throt)		(OC1_CFG + \
+					(ALARM_OFFSET * (throt - THROTTLE_OC1)))
+
+#define ALARM_CNT_THRESHOLD(throt)	(OC1_CNT_THRESHOLD + \
+					(ALARM_OFFSET * (throt - THROTTLE_OC1)))
+
+#define ALARM_THROTTLE_PERIOD(throt)	(OC1_THROTTLE_PERIOD + \
+					(ALARM_OFFSET * (throt - THROTTLE_OC1)))
+
+#define ALARM_ALARM_COUNT(throt)	(OC1_ALARM_COUNT + \
+					(ALARM_OFFSET * (throt - THROTTLE_OC1)))
+
+#define ALARM_FILTER(throt)		(OC1_FILTER + \
+					(ALARM_OFFSET * (throt - THROTTLE_OC1)))
+
+#define ALARM_STATS(throt)		(OC1_STATS + \
+					(4 * (throt - THROTTLE_OC1)))
+
 /* get THERMCTL_LEVELx offset per CPU/GPU/MEM/TSENSE rg and LEVEL0~3 lv */
 #define THERMCTL_LVL_REGS_SIZE		0x20
 #define THERMCTL_LVL_REG(rg, lv)	((rg) + ((lv) * THERMCTL_LVL_REGS_SIZE))
+#define OC_THROTTLE_MODE_DISABLED 0
+#define OC_THROTTLE_MODE_BRIEF 2
 
 static const int min_low_temp = -127000;
 static const int max_high_temp = 127000;
@@ -256,32 +283,39 @@ struct tegra_thermctl_zone {
 	const struct tegra_tsensor_group *sg;
 };
 
+struct soctherm_oc_cfg {
+	u32 active_low;
+	u32 throt_period;
+	u32 alarm_cnt_thresh;
+	u32 alarm_filter;
+	u32 mode;
+	bool intr_en;
+};
+
 struct soctherm_throt_cfg {
+	struct soctherm_oc_cfg oc_cfg;
 	const char *name;
 	unsigned int id;
-	u8 priority;
 	u32 cpu_throt_depth;
 	u32 gpu_throt_level;
 	struct thermal_cooling_device *cdev;
 	bool init;
+	u8 priority;
 };
 
 struct tegra_soctherm {
+	struct soctherm_throt_cfg throt_cfgs[THROTTLE_SIZE];
+	struct mutex thermctl_lock;
 	struct reset_control *reset;
 	struct clk *clock_tsensor;
 	struct clk *clock_soctherm;
-	void __iomem *regs;
-
-	u32 *calib;
 	struct thermal_zone_device **thermctl_tzs;
 	struct tegra_soctherm_soc *soc;
-
-	struct soctherm_throt_cfg throt_cfgs[THROTTLE_SIZE];
-
 	struct dentry *debugfs_dir;
 	int thermal_irq;
 	int edp_irq;
-	struct mutex thermctl_lock;
+	void __iomem *regs;
+	u32 *calib;
 };
 
 struct soctherm_oc_irq_chip_data {
@@ -730,7 +764,7 @@ set_throttle:
 		return 0;
 	}
 
-	for (i = 0; i < THROTTLE_SIZE; i++) {
+	for (i = 0; i < THROTTLE_OC1; i++) {
 		struct thermal_cooling_device *cdev;
 
 		if (!ts->throt_cfgs[i].init)
@@ -886,6 +920,9 @@ static void soctherm_oc_intr_enable(struct tegra_soctherm *ts,
 	case THROTTLE_OC4:
 		r = REG_SET_MASK(r, OC_INTR_OC4_MASK, 1);
 		break;
+	case THROTTLE_OC5:
+		r = REG_SET_MASK(r, OC_INTR_OC5_MASK, 1);
+		break;
 	default:
 		r = 0;
 		break;
@@ -931,6 +968,12 @@ static int soctherm_handle_alarm(enum soctherm_throttle_id alarm)
 		rv = 0;
 		break;
 
+	case THROTTLE_OC5:
+		pr_debug("soctherm: Successfully handled OC5 alarm\n");
+		/* TODO: add OC5 alarm handling code here */
+		rv = 0;
+		break;
+
 	default:
 		break;
 	}
@@ -958,7 +1001,7 @@ static int soctherm_handle_alarm(enum soctherm_throttle_id alarm)
 static irqreturn_t soctherm_edp_isr_thread(int irq, void *arg)
 {
 	struct tegra_soctherm *ts = arg;
-	u32 st, ex, oc1, oc2, oc3, oc4;
+	u32 st, ex, oc1, oc2, oc3, oc4, oc5;
 
 	st = readl(ts->regs + OC_INTR_STATUS);
 
@@ -967,6 +1010,7 @@ static irqreturn_t soctherm_edp_isr_thread(int irq, void *arg)
 	oc2 = st & OC_INTR_OC2_MASK;
 	oc3 = st & OC_INTR_OC3_MASK;
 	oc4 = st & OC_INTR_OC4_MASK;
+	oc5 = st & OC_INTR_OC5_MASK;
 	ex = oc1 | oc2 | oc3 | oc4;
 
 	pr_err("soctherm: OC ALARM 0x%08x\n", ex);
@@ -985,6 +1029,9 @@ static irqreturn_t soctherm_edp_isr_thread(int irq, void *arg)
 
 		if (oc4 && !soctherm_handle_alarm(THROTTLE_OC4))
 			soctherm_oc_intr_enable(ts, THROTTLE_OC4, true);
+
+		if (oc5 && !soctherm_handle_alarm(THROTTLE_OC5))
+			soctherm_oc_intr_enable(ts, THROTTLE_OC5, true);
 
 		if (oc1 && soc_irq_cdata.irq_enable & BIT(0))
 			handle_nested_irq(
@@ -1628,6 +1675,31 @@ static int soctherm_hw_pllx_offsets_parse(struct platform_device *pdev)
 	return 0;
 }
 
+static void soctherm_oc_cfg_parse(struct device *dev,
+				struct device_node *np_oc,
+				struct soctherm_throt_cfg *stc)
+{
+	u32 val;
+
+	if (!of_property_read_u32(np_oc, "nvidia,polarity-active-low", &val))
+		stc->oc_cfg.active_low = val;
+
+	if (!of_property_read_u32(np_oc, "nvidia,count-threshold", &val)) {
+		stc->oc_cfg.intr_en = 1;
+		stc->oc_cfg.alarm_cnt_thresh = val;
+	}
+
+	if (!of_property_read_u32(np_oc, "nvidia,throttle-period", &val))
+		stc->oc_cfg.throt_period = val;
+
+	if (!of_property_read_u32(np_oc, "nvidia,alarm-filter", &val))
+		stc->oc_cfg.alarm_filter = val;
+
+	/* BRIEF throttling by default, do not support STICKY */
+	stc->oc_cfg.mode = OC_THROTTLE_MODE_BRIEF;
+	stc->init = true;
+}
+
 static int soctherm_throt_cfg_parse(struct device *dev,
 				struct device_node *np,
 				struct soctherm_throt_cfg *stc)
@@ -1693,21 +1765,31 @@ static void soctherm_init_hw_throt_cdev(struct platform_device *pdev)
 			continue;
 		}
 
+		if (stc->init) {
+			dev_err(dev, "throttle-cfg: %s: redefined!\n", name);
+			break;
+		}
+
 		err = soctherm_throt_cfg_parse(dev, c, stc);
 		if (err)
 			continue;
 
-		tcd = thermal_of_cooling_device_register(c, (char *)name, ts,
-							 &throt_cooling_ops);
-		of_node_put(c);
-		if (IS_ERR_OR_NULL(tcd)) {
-			dev_err(dev, "throttle-cfg: %s: cdev register failed\n",
-				name);
-			continue;
+		if (stc->id >= THROTTLE_OC1) {
+			soctherm_oc_cfg_parse(dev, c, stc);
+		} else {
+			tcd = thermal_of_cooling_device_register(c,
+							(char *)name, ts,
+							&throt_cooling_ops);
+			if (IS_ERR_OR_NULL(tcd)) {
+				dev_err(dev, "%s: cdev register failed\n",
+					name);
+			} else {
+				stc->cdev = tcd;
+				stc->init = true;
+			}
 		}
 
-		stc->cdev = tcd;
-		stc->init = true;
+		of_node_put(c);
 	}
 
 	of_node_put(np);
@@ -1768,6 +1850,28 @@ static void throttlectl_cpu_mn(struct tegra_soctherm *ts,
 	writel(r, ts->regs + THROT_PSKIP_RAMP(throt, THROTTLE_DEV_CPU));
 }
 
+static int soctherm_oc_cfg_program(struct tegra_soctherm *ts,
+				      enum soctherm_throttle_id throt)
+{
+	u32 r;
+	struct soctherm_oc_cfg *oc = &ts->throt_cfgs[throt].oc_cfg;
+
+	if (oc->mode == OC_THROTTLE_MODE_DISABLED)
+		return -EINVAL;
+
+	r = REG_SET_MASK(0, OC1_CFG_HW_RESTORE_MASK, 1);
+	r = REG_SET_MASK(r, OC1_CFG_THROTTLE_MODE_MASK, oc->mode);
+	r = REG_SET_MASK(r, OC1_CFG_ALARM_POLARITY_MASK, oc->active_low);
+	r = REG_SET_MASK(r, OC1_CFG_EN_THROTTLE_MASK, 1);
+	writel(r, ts->regs + ALARM_CFG(throt));
+	writel(oc->throt_period, ts->regs + ALARM_THROTTLE_PERIOD(throt));
+	writel(oc->alarm_cnt_thresh, ts->regs + ALARM_CNT_THRESHOLD(throt));
+	writel(oc->alarm_filter, ts->regs + ALARM_FILTER(throt));
+	soctherm_oc_intr_enable(ts, throt, oc->intr_en);
+
+	return 0;
+}
+
 /**
  * soctherm_throttle_program() - programs pulse skippers' configuration
  * @throt: the LIGHT/HEAVY of the throttle event id.
@@ -1779,9 +1883,16 @@ static void soctherm_throttle_program(struct tegra_soctherm *ts,
 				      enum soctherm_throttle_id throt)
 {
 	u32 r;
+	int err = 0;
 	struct soctherm_throt_cfg stc = ts->throt_cfgs[throt];
 
 	if (!stc.init)
+		return;
+
+	if (throt >= THROTTLE_OC1)
+		err = soctherm_oc_cfg_program(ts, throt);
+
+	if (err)
 		return;
 
 	/* Setup PSKIP parameters */
