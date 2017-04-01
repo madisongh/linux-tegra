@@ -55,11 +55,12 @@ struct tegra_pwm_chip {
 
 	const struct tegra_pwm_soc *soc;
 	bool			pretty_good_algo;
-	bool			no_clk_sleeping_in_ops;
 	int			num_user;
 	struct pinctrl		*pinctrl;
 	struct pinctrl_state	*suspend_state;
 	struct pinctrl_state	*resume_state;
+	int (*clk_enable)(struct clk *clk);
+	void (*clk_disable)(struct clk *clk);
 };
 
 static inline struct tegra_pwm_chip *to_tegra_pwm_chip(struct pwm_chip *chip)
@@ -76,22 +77,6 @@ static inline void pwm_writel(struct tegra_pwm_chip *chip, unsigned int num,
 			     unsigned long val)
 {
 	writel(val, chip->regs + (num << 4));
-}
-
-static int tegra_pwm_clk_enable(struct tegra_pwm_chip *pc)
-{
-	if (pc->no_clk_sleeping_in_ops)
-		return clk_enable(pc->clk);
-	else
-		return clk_prepare_enable(pc->clk);
-}
-
-static void tegra_pwm_clk_disable(struct tegra_pwm_chip *pc)
-{
-	if (pc->no_clk_sleeping_in_ops)
-		clk_disable(pc->clk);
-	else
-		clk_disable_unprepare(pc->clk);
 }
 
 static long tegra_get_optimal_rate(struct tegra_pwm_chip *pc,
@@ -196,7 +181,7 @@ timing_done:
 	 * before writing the register. Otherwise, keep it enabled.
 	 */
 	if (!pwm_is_enabled(pwm)) {
-		err = tegra_pwm_clk_enable(pc);
+		err = pc->clk_enable(pc->clk);
 		if (err < 0)
 			return err;
 	} else
@@ -208,7 +193,7 @@ timing_done:
 	 * If the PWM is not enabled, turn the clock off again to save power.
 	 */
 	if (!pwm_is_enabled(pwm))
-		tegra_pwm_clk_disable(pc);
+		pc->clk_disable(pc->clk);
 
 	return 0;
 }
@@ -219,7 +204,7 @@ static int tegra_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 	int rc = 0;
 	u32 val;
 
-	rc = tegra_pwm_clk_enable(pc);
+	rc = pc->clk_enable(pc->clk);
 	if (rc < 0)
 		return rc;
 
@@ -239,7 +224,7 @@ static void tegra_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 	val &= ~PWM_ENABLE;
 	pwm_writel(pc, pwm->hwpwm, val);
 
-	tegra_pwm_clk_disable(pc);
+	pc->clk_disable(pc->clk);
 }
 
 static const struct pwm_ops tegra_pwm_ops = {
@@ -253,6 +238,7 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 {
 	struct tegra_pwm_chip *pwm;
 	struct resource *r;
+	bool no_clk_sleeping_in_ops;
 	int ret;
 
 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
@@ -269,19 +255,19 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, pwm);
 
-	if (pdev->dev.of_node) {
-		pwm->no_clk_sleeping_in_ops = of_property_read_bool(
-			pdev->dev.of_node, "nvidia,no-clk-sleeping-in-ops");
-		pwm->pretty_good_algo = of_property_read_bool(pdev->dev.of_node,
-						"pwm,use-pretty-good-alogorithm");
-		if (pwm->no_clk_sleeping_in_ops && pwm->pretty_good_algo) {
-			dev_warn(&pdev->dev,
-				"cannot use pretty good algo: sleeps in ops\n");
-			pwm->pretty_good_algo = false;
-		}
-		dev_info(&pdev->dev, "PWM clk can%s sleep in ops\n",
-			 pwm->no_clk_sleeping_in_ops ? "not" : "");
+	no_clk_sleeping_in_ops = of_property_read_bool(pdev->dev.of_node,
+					"nvidia,no-clk-sleeping-in-ops");
+	pwm->pretty_good_algo = of_property_read_bool(pdev->dev.of_node,
+					"pwm,use-pretty-good-alogorithm");
+
+	if (no_clk_sleeping_in_ops && pwm->pretty_good_algo) {
+		dev_warn(&pdev->dev,
+			 "cannot use pretty good algo: sleeps in ops\n");
+		pwm->pretty_good_algo = false;
 	}
+	dev_info(&pdev->dev, "PWM clk can%s sleep in ops\n",
+		 no_clk_sleeping_in_ops ? "not" : "");
+
 
 	pwm->clk = devm_clk_get(&pdev->dev, "pwm");
 	if (IS_ERR(pwm->clk)) {
@@ -289,12 +275,17 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 		return PTR_ERR(pwm->clk);
 	}
 
-	if (pwm->no_clk_sleeping_in_ops) {
+	if (no_clk_sleeping_in_ops) {
 		ret = clk_prepare(pwm->clk);
 		if (ret) {
 			dev_err(&pdev->dev, "PWM clock prepare failed\n");
 			return ret;
 		}
+		pwm->clk_enable = clk_enable;
+		pwm->clk_disable = clk_disable;
+	} else {
+		pwm->clk_enable = clk_prepare_enable;
+		pwm->clk_disable = clk_disable_unprepare;
 	}
 
 	pwm->rst = devm_reset_control_get(&pdev->dev, "pwm");
@@ -350,7 +341,7 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 	if (WARN_ON(!pc))
 		return -ENODEV;
 
-	err = tegra_pwm_clk_enable(pc);
+	err = pc->clk_enable(pc->clk);
 	if (err < 0)
 		return err;
 
@@ -358,12 +349,12 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 		struct pwm_device *pwm = &pc->chip.pwms[i];
 
 		if (!pwm_is_enabled(pwm))
-			if (tegra_pwm_clk_enable(pc) < 0)
+			if (pc->clk_enable(pc->clk) < 0)
 				continue;
 
 		pwm_writel(pc, i, 0);
 
-		tegra_pwm_clk_disable(pc);
+		pc->clk_disable(pc->clk);
 	}
 
 	reset_control_assert(pc->rst);
