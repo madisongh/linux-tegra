@@ -1730,7 +1730,8 @@ static struct div_nmp pllss_nmp = {
 static struct tegra_clk_pll_freq_table pll_c4_vco_freq_table[] = {
 	{ 12000000, 600000000, 50, 1, 1, 0 },
 	{ 13000000, 600000000, 46, 1, 1, 0 }, /* actual: 598.0 MHz */
-	{ 38400000, 600000000, 62, 4, 1, 0 }, /* actual: 595.2 MHz */
+	{ 38400000, 998400000, 78, 3, 1, 0 },
+	{ 38400000, 793600000, 62, 3, 1, 0 },
 	{        0,         0,  0, 0, 0, 0 },
 };
 
@@ -3340,8 +3341,8 @@ skip_pllms:
 	clks[TEGRA210_CLK_PLL_E] = clk;
 
 	/* PLLC4 */
-	clk = tegra_clk_register_pllre("pll_c4_vco", "pll_ref", clk_base, pmc,
-			     0, &pll_c4_vco_params, NULL, pll_ref_freq);
+	clk = tegra_clk_register_pllre_tegra210("pll_c4_vco", "pll_ref",
+		clk_base, pmc, 0, &pll_c4_vco_params, NULL, pll_ref_freq);
 	clk_register_clkdev(clk, "pll_c4_vco", NULL);
 	clks[TEGRA210_CLK_PLL_C4] = clk;
 
@@ -3405,9 +3406,12 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 {
 	struct clk *clk;
 	struct tegra_clk_cbus_shared *sbus_cbus;
+	struct tegra_clk_pll_params *pllc4_params =
+		to_clk_pll(__clk_get_hw(clks[TEGRA210_CLK_PLL_C4]))->params;
 
-	clk_set_rate(clks[TEGRA210_CLK_PLL_C4], pll_c4_vco_params.fixed_rate);
-	clk_set_rate(clks[TEGRA210_CLK_PLL_C4_OUT3], pll_c4_vco_params.fixed_rate);
+	clk_set_rate(clks[TEGRA210_CLK_PLL_C4], pllc4_params->fixed_rate);
+	clk_set_rate(clks[TEGRA210_CLK_PLL_C4_OUT3], pllc4_params->fixed_rate);
+	pllc4_params->flags |= TEGRA_PLL_FIXED;
 
 	clk = tegra_clk_register_cbus("c2bus", "pll_c2", 0, "pll_p", 0,
 					1000000000);
@@ -3534,7 +3538,9 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 	tegra_shared_clk_init(tegra210_clks);
 }
 
-static char *tegra210_determine_pllc4_rate(void)
+static char *tegra210_determine_pllc4_rate(
+	struct tegra_clk_pll_params *pllc4_params,
+	const struct clk_div_table *pllc4_post_div_table)
 {
 	struct device_node *node;
 	u32 val;
@@ -3555,30 +3561,29 @@ static char *tegra210_determine_pllc4_rate(void)
 	switch (sdmmc_max_rate) {
 		case 266000000:
 			sclk_high_clk = "pll_c4_out1";
-			pll_c4_vco_params.fixed_rate = 798000000;
+			pllc4_params->fixed_rate = 798000000;
 			out0_ratio = 4;
 			break;
 		default:
 			sclk_high_clk = "pll_c4_out3";
-			pll_c4_vco_params.fixed_rate = 1000000000;
+			pllc4_params->fixed_rate = 1000000000;
 			out0_ratio = 1;
 			break;
 	}
 
-	pll_c4_vco_params.fixed_rate /= pll_ref_freq;
-	pll_c4_vco_params.fixed_rate *= pll_ref_freq;
-	pll_c4_vco_params.flags |= TEGRA_PLL_FIXED;
+	pllc4_params->fixed_rate /= pll_ref_freq/pllc4_params->mdiv_default;
+	pllc4_params->fixed_rate *= pll_ref_freq/pllc4_params->mdiv_default;
 
 	val = readl(clk_base + PLLC4_BASE);
-	for (i = 0; i < ARRAY_SIZE(pll_vco_post_div_table); i++)
-		if (pll_vco_post_div_table[i].div >= out0_ratio)
+	for (i = 0; pllc4_post_div_table[i].div; i++)
+		if (pllc4_post_div_table[i].div >= out0_ratio)
 			break;
 	val &= ~GENMASK(23, 19);
-	val |= pll_vco_post_div_table[i].val << 19;
+	val |= pllc4_post_div_table[i].val << pllc4_params->div_nmp->divp_shift;
 	writel(val, clk_base + PLLC4_BASE);
 
 	clk = clk_register_fixed_factor(NULL, "pll_c4_out0", "pll_c4_vco", 0,
-					1, pll_vco_post_div_table[i].div);
+					1, pllc4_post_div_table[i].div);
 	clks[TEGRA210_CLK_PLL_C4_OUT0] = clk;
 
 	return sclk_high_clk;
@@ -4272,9 +4277,11 @@ static void __init tegra210_clock_init(struct device_node *np)
 			       &osc_freq, &pll_ref_freq) < 0)
 		return;
 
-	sclk_high_clk = tegra210_determine_pllc4_rate();
-
 	tegra_fixed_clk_init(tegra210_clks);
+
+	sclk_high_clk = tegra210_determine_pllc4_rate(
+		&pll_c4_vco_params,  pll_vco_post_div_table);
+
 	if (t210b01) {
 		tegra210b01_pll_init(clk_base, pmc_base,
 				     osc_freq, pll_ref_freq, clks);
