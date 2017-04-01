@@ -796,6 +796,8 @@ void tegra210b01_super_clk_init(void __iomem *clk_base,
 				void __iomem *pmc_base,
 				struct tegra_clk *tegra_clks);
 struct tegra_clk_pll_params *tegra210b01_get_pllp_params(void);
+struct tegra_clk_pll_params *tegra210b01_get_pllc4_params(void);
+const struct clk_div_table *tegra210b01_get_pll_vco_post_div_table(void);
 void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks);
 void tegra210b01_clock_table_init(struct clk **clks);
 

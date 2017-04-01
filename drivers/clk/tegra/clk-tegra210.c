@@ -4279,10 +4279,11 @@ static void __init tegra210_clock_init(struct device_node *np)
 
 	tegra_fixed_clk_init(tegra210_clks);
 
-	sclk_high_clk = tegra210_determine_pllc4_rate(
-		&pll_c4_vco_params,  pll_vco_post_div_table);
-
 	if (t210b01) {
+		sclk_high_clk = tegra210_determine_pllc4_rate(
+			tegra210b01_get_pllc4_params(),
+			tegra210b01_get_pll_vco_post_div_table());
+
 		tegra210b01_pll_init(clk_base, pmc_base,
 				     osc_freq, pll_ref_freq, clks);
 		tegra210_periph_clk_init(clk_base, pmc_base,
@@ -4290,6 +4291,9 @@ static void __init tegra210_clock_init(struct device_node *np)
 		tegra210_ovr_clk_init(clk_base); /* FIXME to be removed */
 		tegra210b01_audio_clk_init(clk_base, pmc_base, tegra210_clks);
 	} else {
+		sclk_high_clk = tegra210_determine_pllc4_rate(
+			&pll_c4_vco_params,  pll_vco_post_div_table);
+
 		tegra210_pll_init(clk_base, pmc_base);
 		tegra210_periph_clk_init(clk_base, pmc_base, &pll_p_params);
 		tegra210_ovr_clk_init(clk_base);

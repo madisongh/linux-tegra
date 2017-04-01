@@ -331,6 +331,8 @@ static DEFINE_SPINLOCK(pll_u_lock);
 #define PLLDSS_MISC3_CTRL2_WRITE_MASK	0xffffffff
 
 #define PLLC4_MISC0_DEFAULT_VALUE	0x40000000
+#define PLLC4_OUT_DEFAULT_VALUE		0x00000000
+#define PLLC4_OUT_VREG_MASK		0xf0000000
 
 /* PLLRE */
 #define PLLRE_BASE_CLKIN_SEL		(1 << 22)
@@ -618,7 +620,7 @@ static void tegra210b01_plla_set_defaults(struct tegra_clk_pll *plla)
 
 		val = readl_relaxed(clk_base + PLLA_OUT) & PLLA_OUT_VREG_MASK;
 		if (val != PLLA_OUT_DEFAULT_VALUE) {
-			pr_warn("boot plla vreg 0x%x: expected 0x%x\n",
+			pr_warn("boot PLL_A vreg 0x%x: expected 0x%x\n",
 				val, PLLA_OUT_DEFAULT_VALUE);
 			plla->params->defaults_set = false;
 		}
@@ -813,7 +815,61 @@ static void tegra210b01_plldp_set_defaults(struct tegra_clk_pll *plldp)
  */
 static void tegra210b01_pllc4_set_defaults(struct tegra_clk_pll *pllc4)
 {
-	plldss_defaults("PLL_C4", pllc4, PLLC4_MISC0_DEFAULT_VALUE, 0, 0, 0);
+	u32 default_val;
+	u32 val = readl_relaxed(clk_base + pllc4->params->base_reg);
+
+	pllc4->params->defaults_set = true;
+
+	if (val & PLL_ENABLE) {
+		pr_warn("PLL_C4 already enabled. Postponing set full defaults\n");
+
+		/*
+		 * PLL is ON: check if defaults already set, then set those
+		 * that can be updated in flight.
+		 */
+		if (val & PLLDSS_BASE_IDDQ) {
+			pr_warn("PLL_C4 boot enabled with IDDQ set\n");
+			pllc4->params->defaults_set = false;
+		}
+
+		/* ignore lock enable */
+		default_val = PLLC4_MISC0_DEFAULT_VALUE;
+		_pll_misc_chk_default(clk_base, pllc4->params, 0, default_val,
+				     PLLDSS_MISC0_WRITE_MASK &
+				     (~PLLDSS_MISC0_LOCK_ENABLE));
+
+		val = readl_relaxed(clk_base + PLLC4_OUT) & PLLC4_OUT_VREG_MASK;
+		if (val != PLLC4_OUT_DEFAULT_VALUE) {
+			pr_warn("boot PLL_C4 vreg 0x%x: expected 0x%x\n",
+				val, PLLC4_OUT_DEFAULT_VALUE);
+			pllc4->params->defaults_set = false;
+		}
+
+		/* Enable lock detect */
+		if (val & PLLDSS_BASE_LOCK_OVERRIDE) {
+			val &= ~PLLDSS_BASE_LOCK_OVERRIDE;
+			writel_relaxed(val, clk_base + pllc4->params->base_reg);
+		}
+
+		val = readl_relaxed(clk_base + pllc4->params->ext_misc_reg[0]);
+		val &= ~PLLDSS_MISC0_LOCK_ENABLE;
+		val |= PLLC4_MISC0_DEFAULT_VALUE & PLLDSS_MISC0_LOCK_ENABLE;
+		writel_relaxed(val, clk_base + pllc4->params->ext_misc_reg[0]);
+		udelay(1);
+
+		return;
+	}
+
+	/* set IDDQ, enable lock detect  */
+	val |= PLLDSS_BASE_IDDQ;
+	val &= ~PLLDSS_BASE_LOCK_OVERRIDE;
+	writel_relaxed(val, clk_base + pllc4->params->base_reg);
+	writel_relaxed(PLLC4_MISC0_DEFAULT_VALUE,
+		       clk_base + pllc4->params->ext_misc_reg[0]);
+	val = readl_relaxed(clk_base + PLLC4_OUT) & (~PLLC4_OUT_VREG_MASK);
+	writel_relaxed(val | PLLC4_OUT_DEFAULT_VALUE, clk_base + PLLC4_OUT);
+	udelay(1);
+	return;
 }
 
 /*
@@ -1562,9 +1618,8 @@ static struct div_nmp pllss_nmp = {
 };
 
 static struct tegra_clk_pll_freq_table pll_c4_vco_freq_table[] = {
-	{ 12000000, 600000000, 50, 1, 1, 0 },
-	{ 13000000, 600000000, 46, 1, 1, 0 }, /* actual: 598.0 MHz */
-	{ 38400000, 600000000, 62, 4, 1, 0 }, /* actual: 595.2 MHz */
+	{ 38400000, 998400000, 26, 1, 1, 0 },
+	{ 38400000, 793600000, 62, 3, 1, 0 },
 	{        0,         0,  0, 0, 0, 0 },
 };
 
@@ -1592,8 +1647,8 @@ static const struct clk_div_table pll_vco_post_div_table[] = {
 static struct tegra_clk_pll_params pll_c4_vco_params = {
 	.input_min = 9600000,
 	.input_max = 800000000,
-	.cf_min = 9600000,
-	.cf_max = 19200000,
+	.cf_min = 12000000,
+	.cf_max = 38400000,
 	.vco_min = 500000000,
 	.vco_max = 1080000000,
 	.base_reg = PLLC4_BASE,
@@ -2515,8 +2570,8 @@ void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
 	clks[TEGRA210_CLK_PLL_E] = clk;
 
 	/* PLLC4 */
-	clk = tegra_clk_register_pllre("pll_c4_vco", "pll_ref", clk_base, pmc,
-			     0, &pll_c4_vco_params, NULL, pll_ref_freq);
+	clk = tegra_clk_register_pllre_tegra210("pll_c4_vco", "pll_ref",
+		clk_base, pmc, 0, &pll_c4_vco_params, NULL, pll_ref_freq);
 	clk_register_clkdev(clk, "pll_c4_vco", NULL);
 	clks[TEGRA210_CLK_PLL_C4] = clk;
 
@@ -2592,6 +2647,16 @@ void __init tegra210b01_super_clk_init(void __iomem *clk_base,
 struct tegra_clk_pll_params __init *tegra210b01_get_pllp_params(void)
 {
 	return &pll_p_params;
+}
+
+struct tegra_clk_pll_params *tegra210b01_get_pllc4_params(void)
+{
+	return &pll_c4_vco_params;
+}
+
+const struct clk_div_table *tegra210b01_get_pll_vco_post_div_table(void)
+{
+	return pll_vco_post_div_table;
 }
 
 void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks)
