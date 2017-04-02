@@ -86,9 +86,13 @@ static void sdhci_runtime_pm_bus_off(struct sdhci_host *host)
 static void sdhci_enable_host_interrupts(struct mmc_host *mmc, bool enable)
 {
 	struct sdhci_host *host;
+	u32 status;
 
 	host = mmc_priv(mmc);
 
+	sdhci_runtime_pm_get(host);
+	status = sdhci_readl(host, SDHCI_INT_STATUS);
+	sdhci_writel(host, status, SDHCI_INT_STATUS);
 	if (enable) {
 		host->ier = host->ier & ~SDHCI_INT_CMDQ_EN;
 		host->ier |= SDHCI_INT_RESPONSE | SDHCI_INT_DATA_END;
@@ -98,7 +102,6 @@ static void sdhci_enable_host_interrupts(struct mmc_host *mmc, bool enable)
 		host->ier |= SDHCI_INT_CMDQ_EN | SDHCI_INT_ERROR_MASK;
 		host->flags &= ~SDHCI_FORCE_PIO_MODE;
 	}
-	sdhci_runtime_pm_get(host);
 	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
 	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
 	sdhci_runtime_pm_put(host);
@@ -1512,7 +1515,7 @@ static void sdhci_clear_cqe_interrupt(struct mmc_host *mmc, u32 intmask)
 			SDHCI_INT_CMDQ);
 	sdhci_writel(host, mask, SDHCI_INT_STATUS);
 
-	if (!cq_host->data) {
+	if ((mask & SDHCI_INT_DATA_MASK) && !cq_host->data) {
 		pr_err("%s: Got data interrupt 0x%08x even "
 			"though no data operation was in progress.\n",
 			mmc_hostname(host->mmc), (unsigned)intmask);
@@ -3252,7 +3255,10 @@ EXPORT_SYMBOL_GPL(sdhci_alloc_host);
 static void sdhci_cmdq_clear_set_irqs(struct mmc_host *mmc, u32 clear, u32 set)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
+	u32 status;
 
+	status = sdhci_readl(host, SDHCI_INT_STATUS);
+	sdhci_writel(host, status, SDHCI_INT_STATUS);
 	sdhci_clear_set_irqs(host, SDHCI_INT_ALL_MASK,
 			SDHCI_INT_CMDQ_EN | SDHCI_INT_ERROR_MASK);
 }

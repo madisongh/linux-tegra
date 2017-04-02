@@ -894,12 +894,12 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 
 cmd_done:
 	mmc_blk_put(md);
-cmd_err:
 	if (mmc_card_cmdq_pause(card)) {
 		mmc_cmdq_pause(card, false);
 		mmc_release_host(card->host);
 	}
 
+cmd_err:
 	kfree(idata->buf);
 	kfree(idata);
 	return ioc_err ? ioc_err : err;
@@ -971,16 +971,16 @@ static int mmc_blk_ioctl_multi_cmd(struct block_device *bdev,
 
 cmd_done:
 	mmc_blk_put(md);
+	if (mmc_card_cmdq_pause(card)) {
+		mmc_cmdq_pause(card, false);
+		mmc_release_host(card->host);
+	}
 cmd_err:
 	for (i = 0; i < num_of_cmds; i++) {
 		kfree(idata[i]->buf);
 		kfree(idata[i]);
 	}
 	kfree(idata);
-	if (mmc_card_cmdq_pause(card)) {
-		mmc_cmdq_pause(card, false);
-		mmc_release_host(card->host);
-	}
 	return ioc_err ? ioc_err : err;
 }
 
@@ -1025,7 +1025,7 @@ static int mmc_blk_hw_cmdq_switch(struct mmc_card *card,
 	bool cmdq_mode = !!mmc_card_cmdq(card);
 	struct mmc_host *host = card->host;
 
-	if (!(card->host->caps2 & MMC_CAP2_HW_CQ) ||
+	if (!(host->caps2 & MMC_CAP2_HW_CQ) ||
 		!card->ext_csd.cmdq_support ||
 		(enable && !(md->flags & MMC_BLK_CMD_QUEUE)) ||
 		(cmdq_mode == enable)) {
@@ -1038,8 +1038,14 @@ static int mmc_blk_hw_cmdq_switch(struct mmc_card *card,
 			if (ret) {
 				pr_err("%s: failed to set block-size to 512\n",
 					       __func__);
-				BUG();
+				goto out;
 			}
+		} else {
+			/* Wait till all issued cq requests are processed,
+			 * to make sure that no pending requests are exist
+			 * in device queue before disabling CQ mode.
+			 */
+			mmc_wait_hw_cmdq_empty(host);
 		}
 
 		ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
@@ -1055,31 +1061,27 @@ static int mmc_blk_hw_cmdq_switch(struct mmc_card *card,
 		}
 
 		/* enable host controller command queue engine */
-		if (enable)
-			ret = host->cmdq_ops->enable(card->host);
-		else
-			host->cmdq_ops->disable(card->host, true);
-		if (ret) {
-			pr_err("%s: failed to enable host controller cqe %d\n",
-					md->disk->disk_name,
-					ret);
-			/* disable CQ mode in card */
-			ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+		if (enable) {
+			mmc_card_set_cmdq(card);
+			ret = host->cmdq_ops->enable(host);
+			if (ret) {
+				pr_err("%s: enable host cntr cqe failed:%d\n",
+						md->disk->disk_name, ret);
+				/* disable CQ mode in card */
+				ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 					EXT_CSD_CMDQ_MODE_EN, 0,
 					card->ext_csd.generic_cmd6_time);
+			}
 			goto out;
+		} else {
+			/* disable host controller command queue engine */
+			host->cmdq_ops->disable(host, true);
+			if (host->ops && host->ops->enable_host_int)
+				host->ops->enable_host_int(host, true);
 		}
 	} else {
 		pr_err("%s: No cmdq ops defined !!!\n", __func__);
-		BUG();
-	}
-
-	if (enable)
-		mmc_card_set_cmdq(card);
-	else {
-		if (card->host->ops && card->host->ops->enable_host_int)
-			card->host->ops->enable_host_int(card->host, true);
-		mmc_card_clr_cmdq(card);
+		ret = -ENOTSUPP;
 	}
 out:
 	return ret;
@@ -1098,7 +1100,7 @@ static inline int mmc_blk_part_switch(struct mmc_card *card,
 		u8 part_config = card->ext_csd.part_config;
 
 		if (md->part_type) {
-			/* disable CQ mode for non-user data partitions */
+			/* disable CQ mode for non-user data partitions.*/
 			ret = mmc_blk_hw_cmdq_switch(card, md, false);
 			if (ret)
 				return ret;
