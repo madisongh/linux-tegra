@@ -290,8 +290,6 @@ static DEFINE_SPINLOCK(pll_u_lock);
 #define PLLA_OUT_VREG_MASK		0xf0000000
 
 /* PLLD */
-#define PLLD_BASE_CSI_CLKSOURCE		(1 << 23)
-
 #define PLLD_MISC0_EN_SDM		(1 << 16)
 #define PLLD_MISC0_LOCK_OVERRIDE	(1 << 17)
 #define PLLD_MISC0_LOCK_ENABLE		(1 << 18)
@@ -300,8 +298,8 @@ static DEFINE_SPINLOCK(pll_u_lock);
 
 #define PLLD_MISC0_DEFAULT_VALUE	0x00140000
 #define PLLD_MISC0_WRITE_MASK		0x3ff7ffff
-#define PLLD_MISC1_DEFAULT_VALUE	0x20
-#define PLLD_MISC1_WRITE_MASK		0x00ffffff
+#define PLLD_MISC1_DEFAULT_VALUE	0x00000020
+#define PLLD_MISC1_WRITE_MASK		0xf0ffffff
 
 /* PLLD2 and PLLDP  and PLLC4 */
 #define PLLDSS_BASE_LOCK		(1 << 27)
@@ -442,29 +440,6 @@ static DEFINE_SPINLOCK(pll_u_lock);
 /* UTMIPLL */
 #define UTMIP_PLL_CFG0_WRITE_MASK	0x1fffffff
 #define UTMIP_PLL_CFG0_DEFAULT_VALUE	0x00190101
-
-
-#ifdef FIXME
-void tegra210b01_csi_source_from_brick(void)
-{
-	u32 val;
-
-	val = readl_relaxed(clk_base + PLLD_BASE);
-	val &= ~PLLD_BASE_CSI_CLKSOURCE;
-	writel_relaxed(val, clk_base + PLLD_BASE);
-}
-EXPORT_SYMBOL_GPL(tegra210b01_csi_source_from_brick);
-
-void tegra210b01_csi_source_from_plld(void)
-{
-	u32 val;
-
-	val = readl_relaxed(clk_base + PLLD_BASE);
-	val |= PLLD_BASE_CSI_CLKSOURCE;
-	writel_relaxed(val, clk_base + PLLD_BASE);
-}
-EXPORT_SYMBOL_GPL(tegra210b01_csi_source_from_plld);
-#endif
 
 #define mask(w) ((1 << (w)) - 1)
 #define divm_mask(p) mask(p->params->div_nmp->divm_width)
@@ -1958,19 +1933,17 @@ static struct div_nmp plld_nmp = {
 };
 
 static struct tegra_clk_pll_freq_table pll_d_freq_table[] = {
-	{ 12000000, 594000000, 99, 1, 2, 0,      0 },
-	{ 13000000, 594000000, 91, 1, 2, 0, 0xfc4f }, /* actual: 594000183 */
 	{ 38400000, 594000000, 30, 1, 2, 0, 0x0e00 },
 	{        0,         0,  0, 0, 0, 0,      0 },
 };
 
 static struct tegra_clk_pll_params pll_d_params = {
-	.input_min = 12000000,
+	.input_min = 13500000,
 	.input_max = 800000000,
-	.cf_min = 12000000,
+	.cf_min = 13500000,
 	.cf_max = 38400000,
-	.vco_min = 750000000,
-	.vco_max = 1500000000,
+	.vco_min = 800000000,
+	.vco_max = 1620000000,
 	.base_reg = PLLD_BASE,
 	.misc_reg = PLLD_MISC0,
 	.lock_mask = PLL_BASE_LOCK,
@@ -2534,6 +2507,11 @@ void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
 					CLK_SET_RATE_PARENT, 1, 2);
 	clk_register_clkdev(clk, "pll_d_out0", NULL);
 	clks[TEGRA210_CLK_PLL_D_OUT0] = clk;
+
+	/* PLL_D_DSI_OUT */
+	clk = clk_register_fixed_factor(NULL, "pll_d_dsi_out", "pll_d_out0",
+					0, 1, 1);
+	clks[TEGRA210_CLK_PLL_D_DSI_OUT] = clk;
 
 	/* PLLRE */
 	if (pll_re_use_utmipll) {
