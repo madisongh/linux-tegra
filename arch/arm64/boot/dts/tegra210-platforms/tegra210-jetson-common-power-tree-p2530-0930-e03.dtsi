@@ -189,18 +189,6 @@
 			gpio-open-drain;
 			vin-supply = <&vdd_3v3>;
 		};
-
-		usb_vbus3: regulator@15 {
-			compatible = "regulator-fixed-sync";
-			reg = <15>;
-			regulator-name = "usb-vbus3";
-			regulator-min-microvolt = <5000000>;
-			regulator-max-microvolt = <5000000>;
-			gpio = <&gpio TEGRA_GPIO(D, 4) 0>;
-			enable-active-high;
-			gpio-open-drain;
-			vin-supply = <&vdd_3v3>;
-		};
 	};
 
 	efuse@7000f800 {
@@ -256,7 +244,7 @@
 
 	xusb@70090000 {
 		usb_vbus0-supply = <&battery_reg>;
-		usb_vbus1-supply = <&usb_vbus3>;
+		usb_vbus1-supply = <&battery_reg>;
 		usb_vbus2-supply = <&usb_vbus1>;
 		usb_vbus3-supply = <&vdd_3v3>;
 		hvdd_usb-supply = <&vdd_3v3>;
