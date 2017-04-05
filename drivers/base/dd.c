@@ -361,6 +361,12 @@ done:
 	return ret;
 }
 
+void device_resource_registered(void)
+{
+	driver_deferred_probe_trigger();
+}
+EXPORT_SYMBOL_GPL(device_resource_registered);
+
 /**
  * driver_probe_done
  * Determine if the probe sequence is finished or not.
