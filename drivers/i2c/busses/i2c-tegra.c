@@ -789,7 +789,7 @@ static inline int tegra_i2c_clock_enable(struct tegra_i2c_dev *i2c_dev)
 		goto err;
 	}
 
-	if (i2c_dev->slow_clk) {
+	if (i2c_dev->slow_clk && i2c_dev->timeout_addr) {
 		ret = clk_enable(i2c_dev->slow_clk);
 		if (ret < 0) {
 			dev_err(i2c_dev->dev,
@@ -806,7 +806,7 @@ static inline void tegra_i2c_clock_disable(struct tegra_i2c_dev *i2c_dev)
 	clk_disable(i2c_dev->div_clk);
 	if (!i2c_dev->hw->has_single_clk_source)
 		clk_disable(i2c_dev->fast_clk);
-	if (i2c_dev->slow_clk)
+	if (i2c_dev->slow_clk && i2c_dev->timeout_addr)
 		clk_disable(i2c_dev->slow_clk);
 }
 
@@ -2198,7 +2198,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 
 	slow_clk = devm_clk_get(&pdev->dev, "slow-clk");
 	if (IS_ERR(slow_clk)) {
-		dev_err(&pdev->dev, "missing slow clock\n");
+		dev_dbg(&pdev->dev, "missing slow clock\n");
 		slow_clk = NULL;
 	}
 
@@ -2296,7 +2296,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 		dev_err(i2c_dev->dev, "Clock prepare failed %d\n", ret);
 		goto unprepare_fast_clk;
 	}
-	if (i2c_dev->slow_clk) {
+	if (i2c_dev->slow_clk && i2c_dev->timeout_addr) {
 		ret = clk_prepare(i2c_dev->slow_clk);
 		if (ret < 0) {
 			dev_err(i2c_dev->dev, "slow clk prep failed %d\n", ret);
@@ -2375,7 +2375,7 @@ disable_clk:
 	tegra_i2c_clock_disable(i2c_dev);
 
 unprepare_slow_clk:
-	if (i2c_dev->slow_clk)
+	if (i2c_dev->slow_clk && i2c_dev->timeout_addr)
 		clk_unprepare(i2c_dev->slow_clk);
 
 unprepare_div_clk:
