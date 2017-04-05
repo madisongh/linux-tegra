@@ -1585,6 +1585,7 @@ DEFINE_SIMPLE_ATTRIBUTE(sdhci_tegra_card_insert_fops, get_card_insert,
 
 static void sdhci_tegra_misc_debugfs(struct sdhci_host *host)
 {
+#ifdef CONFIG_DEBUG_FS
 	struct dentry *root = host->debugfs_root;
 	unsigned saved_line;
 
@@ -1617,6 +1618,7 @@ err_node:
 err_root:
 	pr_err("%s %s: Failed to initialize debugfs functionality at line=%d\n"
 		, __func__,	mmc_hostname(host->mmc), saved_line);
+#endif
 }
 
 static void tegra_sdhci_config_tap(struct sdhci_host *sdhci, u8 option)
