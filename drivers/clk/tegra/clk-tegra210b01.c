@@ -85,6 +85,7 @@
 #define PLLD2_MISC1 0x570
 #define PLLD2_MISC2 0x574
 #define PLLD2_MISC3 0x578
+#define PLLD2_MISC4 0x76c
 #define PLLE_AUX 0x48c
 #define PLLRE_BASE 0x4c4
 #define PLLRE_MISC0 0x4c8
@@ -158,6 +159,7 @@
 #define PLLDP_SSC_EN_MASK BIT(30)
 #define PLLDP_SS_CTRL1	0x59c
 #define PLLDP_SS_CTRL2	0x5a0
+#define PLLDP_MISC4	0x770
 
 #define LVL2_CLK_GATE_OVRA 0xf8
 #define LVL2_CLK_GATE_OVRC 0x3a0
@@ -315,18 +317,21 @@ static DEFINE_SPINLOCK(pll_u_lock);
 
 #define PLLD2_MISC0_DEFAULT_VALUE	0x40000020
 #define PLLD2_MISC1_CFG_DEFAULT_VALUE	0x10000000
-#define PLLD2_MISC2_CTRL1_DEFAULT_VALUE	0x0
-#define PLLD2_MISC3_CTRL2_DEFAULT_VALUE	0x0
+#define PLLD2_MISC2_CTRL1_DEFAULT_VALUE	0x00000000
+#define PLLD2_MISC3_CTRL2_DEFAULT_VALUE	0x00000000
+#define PLLD2_MISC4_VREG_DEFAULT_VALUE	0x00000000
 
 #define PLLDP_MISC0_DEFAULT_VALUE	0x40000020
 #define PLLDP_MISC1_CFG_DEFAULT_VALUE	0xc0000000
 #define PLLDP_MISC2_CTRL1_DEFAULT_VALUE	0xf400f0da
 #define PLLDP_MISC3_CTRL2_DEFAULT_VALUE	0x2004f400
+#define PLLDP_MISC4_VREG_DEFAULT_VALUE	0x00000000
 
 #define PLLDSS_MISC0_WRITE_MASK		0x47ffffff
 #define PLLDSS_MISC1_CFG_WRITE_MASK	0xf8000000
 #define PLLDSS_MISC2_CTRL1_WRITE_MASK	0xffffffff
 #define PLLDSS_MISC3_CTRL2_WRITE_MASK	0xffffffff
+#define PLLDSS_MISC4_VREG_WRITE_MASK	0xf0000000
 
 #define PLLC4_MISC0_DEFAULT_VALUE	0x40000000
 #define PLLC4_OUT_DEFAULT_VALUE		0x00000000
@@ -680,7 +685,8 @@ static void tegra210b01_plld_set_defaults(struct tegra_clk_pll *plld)
  * PLL with fractional SDM and Spread Spectrum (SDM is a must if SSC is used).
  */
 static void plldss_defaults(const char *pll_name, struct tegra_clk_pll *plldss,
-		u32 misc0_val, u32 misc1_val, u32 misc2_val, u32 misc3_val)
+		u32 misc0_val, u32 misc1_val, u32 misc2_val, u32 misc3_val,
+		u32 misc4_val)
 {
 	u32 default_val;
 	u32 val = readl_relaxed(clk_base + plldss->params->base_reg);
@@ -688,9 +694,6 @@ static void plldss_defaults(const char *pll_name, struct tegra_clk_pll *plldss,
 	plldss->params->defaults_set = true;
 
 	if (val & PLL_ENABLE) {
-		pr_warn("%s already enabled. Postponing set full defaults\n",
-			 pll_name);
-
 		/*
 		 * PLL is ON: check if defaults already set, then set those
 		 * that can be updated in flight.
@@ -728,6 +731,14 @@ static void plldss_defaults(const char *pll_name, struct tegra_clk_pll *plldss,
 				(~PLLDSS_MISC1_CFG_EN_SDM));
 		}
 
+		default_val = misc4_val;
+		_pll_misc_chk_default(clk_base, plldss->params, 4,
+			default_val, PLLDSS_MISC4_VREG_WRITE_MASK);
+
+		if (!plldss->params->defaults_set)
+			pr_warn("%s already enabled. Postponing set full defaults\n",
+				pll_name);
+
 		/* Enable lock detect */
 		if (val & PLLDSS_BASE_LOCK_OVERRIDE) {
 			val &= ~PLLDSS_BASE_LOCK_OVERRIDE;
@@ -749,14 +760,6 @@ static void plldss_defaults(const char *pll_name, struct tegra_clk_pll *plldss,
 	val &= ~PLLDSS_BASE_LOCK_OVERRIDE;
 	writel_relaxed(val, clk_base + plldss->params->base_reg);
 
-	/* When using this function for PLLC4 exit here */
-	if (!plldss->params->ext_misc_reg[1]) {
-		writel_relaxed(misc0_val, clk_base +
-				plldss->params->ext_misc_reg[0]);
-		udelay(1);
-		return;
-	}
-
 	writel_relaxed(misc0_val, clk_base +
 			plldss->params->ext_misc_reg[0]);
 	/* if SSC used set by 1st enable */
@@ -764,6 +767,7 @@ static void plldss_defaults(const char *pll_name, struct tegra_clk_pll *plldss,
 			clk_base + plldss->params->ext_misc_reg[1]);
 	writel_relaxed(misc2_val, clk_base + plldss->params->ext_misc_reg[2]);
 	writel_relaxed(misc3_val, clk_base + plldss->params->ext_misc_reg[3]);
+	writel_relaxed(misc4_val, clk_base + plldss->params->ext_misc_reg[4]);
 	udelay(1);
 }
 
@@ -772,7 +776,8 @@ static void tegra210b01_plld2_set_defaults(struct tegra_clk_pll *plld2)
 	plldss_defaults("PLL_D2", plld2, PLLD2_MISC0_DEFAULT_VALUE,
 			PLLD2_MISC1_CFG_DEFAULT_VALUE,
 			PLLD2_MISC2_CTRL1_DEFAULT_VALUE,
-			PLLD2_MISC3_CTRL2_DEFAULT_VALUE);
+			PLLD2_MISC3_CTRL2_DEFAULT_VALUE,
+			PLLD2_MISC4_VREG_DEFAULT_VALUE);
 }
 
 static void tegra210b01_plldp_set_defaults(struct tegra_clk_pll *plldp)
@@ -780,7 +785,8 @@ static void tegra210b01_plldp_set_defaults(struct tegra_clk_pll *plldp)
 	plldss_defaults("PLL_DP", plldp, PLLDP_MISC0_DEFAULT_VALUE,
 			PLLDP_MISC1_CFG_DEFAULT_VALUE,
 			PLLDP_MISC2_CTRL1_DEFAULT_VALUE,
-			PLLDP_MISC3_CTRL2_DEFAULT_VALUE);
+			PLLDP_MISC3_CTRL2_DEFAULT_VALUE,
+			PLLDP_MISC4_VREG_DEFAULT_VALUE);
 }
 
 /*
@@ -1969,20 +1975,18 @@ static struct tegra_clk_pll_params pll_d_params = {
 };
 
 static struct tegra_clk_pll_freq_table tegra210b01_pll_d2_freq_table[] = {
-	{ 12000000, 594000000, 99, 1, 2, 0, 0xf000 },
-	{ 13000000, 594000000, 91, 1, 2, 0, 0xfc4f }, /* actual: 594000183 */
 	{ 38400000, 594000000, 30, 1, 2, 0, 0x0e00 },
 	{        0,         0,  0, 0, 0, 0,      0 },
 };
 
 /* s/w policy, always tegra_pll_ref */
 static struct tegra_clk_pll_params pll_d2_params = {
-	.input_min = 12000000,
+	.input_min = 13500000,
 	.input_max = 800000000,
-	.cf_min = 12000000,
+	.cf_min = 13500000,
 	.cf_max = 38400000,
-	.vco_min = 750000000,
-	.vco_max = 1500000000,
+	.vco_min = 780000000,
+	.vco_max = 1620000000,
 	.base_reg = PLLD2_BASE,
 	.misc_reg = PLLD2_MISC0,
 	.lock_mask = PLL_BASE_LOCK,
@@ -2002,6 +2006,7 @@ static struct tegra_clk_pll_params pll_d2_params = {
 	.ext_misc_reg[1] = PLLD2_MISC1,
 	.ext_misc_reg[2] = PLLD2_MISC2,
 	.ext_misc_reg[3] = PLLD2_MISC3,
+	.ext_misc_reg[4] = PLLD2_MISC4,
 	.max_p = PLL_QLIN_PDIV_MAX,
 	.mdiv_default = 1,
 	.freq_table = tegra210b01_pll_d2_freq_table,
@@ -2013,19 +2018,17 @@ static struct tegra_clk_pll_params pll_d2_params = {
 };
 
 static struct tegra_clk_pll_freq_table pll_dp_freq_table[] = {
-	{ 12000000, 270000000, 90, 1, 4, 0, 0xf000 },
-	{ 13000000, 270000000, 83, 1, 4, 0, 0xf000 }, /* actual: 269.8 MHz */
 	{ 38400000, 270000000, 28, 1, 4, 0, 0xf400 },
 	{        0,         0,  0, 0, 0, 0,      0 },
 };
 
 static struct tegra_clk_pll_params pll_dp_params = {
-	.input_min = 12000000,
+	.input_min = 13500000,
 	.input_max = 800000000,
-	.cf_min = 12000000,
+	.cf_min = 13500000,
 	.cf_max = 38400000,
-	.vco_min = 750000000,
-	.vco_max = 1500000000,
+	.vco_min = 780000000,
+	.vco_max = 1620000000,
 	.base_reg = PLLDP_BASE,
 	.misc_reg = PLLDP_MISC,
 	.lock_mask = PLL_BASE_LOCK,
@@ -2045,6 +2048,7 @@ static struct tegra_clk_pll_params pll_dp_params = {
 	.ext_misc_reg[1] = PLLDP_SS_CFG,
 	.ext_misc_reg[2] = PLLDP_SS_CTRL1,
 	.ext_misc_reg[3] = PLLDP_SS_CTRL2,
+	.ext_misc_reg[4] = PLLDP_MISC4,
 	.max_p = PLL_QLIN_PDIV_MAX,
 	.mdiv_default = 1,
 	.freq_table = pll_dp_freq_table,
