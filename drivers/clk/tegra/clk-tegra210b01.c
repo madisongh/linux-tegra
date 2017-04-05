@@ -1645,7 +1645,7 @@ static const struct clk_div_table pll_vco_post_div_table[] = {
 };
 
 static struct tegra_clk_pll_params pll_c4_vco_params = {
-	.input_min = 9600000,
+	.input_min = 12000000,
 	.input_max = 800000000,
 	.cf_min = 12000000,
 	.cf_max = 38400000,
