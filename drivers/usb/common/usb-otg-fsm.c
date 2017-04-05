@@ -649,7 +649,7 @@ int otg_statemachine(struct usb_otg *otg)
 			otg_set_state(fsm, OTG_STATE_A_HOST);
 		else if (fsm->id || fsm->a_bus_drop || fsm->a_wait_bcon_tmout) {
 			if (fsm->a_wait_bcon_tmout)
-				dev_info(otg->dev, "No response from device\n");
+				dev_dbg(otg->dev, "No response from device\n");
 			otg_set_state(fsm, OTG_STATE_A_WAIT_VFALL);
 		} else if (fsm->otg_vbus_off && !fsm->tst_maint_tmout) {
 			otg_set_state(fsm, OTG_STATE_A_WAIT_VFALL);
