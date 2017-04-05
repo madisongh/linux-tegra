@@ -309,6 +309,8 @@ static const char *mux_pllmcp_clkm[] = {
 };
 #define mux_pllmcp_clkm_idx NULL
 
+static struct clk **clks;
+
 #define PLL_ENABLE			(1 << 30)
 
 #define PLLCX_MISC1_IDDQ		(1 << 27)
@@ -618,20 +620,38 @@ EXPORT_SYMBOL_GPL(tegra210_set_sata_pll_seq_sw);
 void tegra210_csi_source_from_brick(void)
 {
 	u32 val;
+	unsigned long flags = 0;
+	struct clk *plld = clks[TEGRA210_CLK_PLL_D];
+
+	if (!IS_ERR_OR_NULL(plld))
+		spin_lock_irqsave(to_clk_pll(__clk_get_hw(plld))->lock, flags);
 
 	val = readl_relaxed(clk_base + PLLD_BASE);
 	val &= ~PLLD_BASE_CSI_CLKSOURCE;
 	writel_relaxed(val, clk_base + PLLD_BASE);
+
+	if (!IS_ERR_OR_NULL(plld))
+		spin_unlock_irqrestore(to_clk_pll(__clk_get_hw(plld))->lock,
+				       flags);
 }
 EXPORT_SYMBOL_GPL(tegra210_csi_source_from_brick);
 
 void tegra210_csi_source_from_plld(void)
 {
 	u32 val;
+	unsigned long flags = 0;
+	struct clk *plld = clks[TEGRA210_CLK_PLL_D];
+
+	if (!IS_ERR_OR_NULL(plld))
+		spin_lock_irqsave(to_clk_pll(__clk_get_hw(plld))->lock, flags);
 
 	val = readl_relaxed(clk_base + PLLD_BASE);
 	val |= PLLD_BASE_CSI_CLKSOURCE;
 	writel_relaxed(val, clk_base + PLLD_BASE);
+
+	if (!IS_ERR_OR_NULL(plld))
+		spin_unlock_irqrestore(to_clk_pll(__clk_get_hw(plld))->lock,
+				       flags);
 }
 EXPORT_SYMBOL_GPL(tegra210_csi_source_from_plld);
 
@@ -2794,8 +2814,6 @@ static struct tegra_pto_table ptodefs[] = {
 	{ .clk_id = TEGRA210_CLK_CCLK_G, .divider = 1,  .pto_id = 18, },
 };
 
-static struct clk **clks;
-
 static void tegra210_utmi_param_configure(void)
 {
 	u32 reg;
@@ -3095,11 +3113,6 @@ static __init void tegra210_periph_clk_init(void __iomem *clk_base,
 				mux_vi_visensor_pd2vi_idx, &vi_lock);
 	clks[TEGRA210_CLK_VI_OUTPUT] = clk;
 
-	/* pll_d_dsi_out */
-	clk = clk_register_gate(NULL, "pll_d_dsi_out", "pll_d_out0", 0,
-				clk_base + PLLD_MISC0, 21, 0, &pll_d_lock);
-	clks[TEGRA210_CLK_PLL_D_DSI_OUT] = clk;
-
 	/* dsia */
 	clk = tegra_clk_register_periph_gate("dsi", "pll_d_dsi_out", 0,
 					     clk_base, 0, 48,
@@ -3275,6 +3288,11 @@ static void __init tegra210_pll_init(void __iomem *clk_base,
 					CLK_SET_RATE_PARENT, 1, 2);
 	clk_register_clkdev(clk, "pll_d_out0", NULL);
 	clks[TEGRA210_CLK_PLL_D_OUT0] = clk;
+
+	/* PLL_D_DSI_OUT */
+	clk = clk_register_gate(NULL, "pll_d_dsi_out", "pll_d_out0", 0,
+				clk_base + PLLD_MISC0, 21, 0, &pll_d_lock);
+	clks[TEGRA210_CLK_PLL_D_DSI_OUT] = clk;
 
 	/* PLLRE */
 	clk = tegra_clk_register_pllre_tegra210("pll_re_vco", "pll_ref",
