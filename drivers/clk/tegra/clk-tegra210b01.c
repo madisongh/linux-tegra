@@ -2365,7 +2365,8 @@ static struct tegra_audio_clk_info tegra210b01_audio_plls[] = {
 };
 
 void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
-	unsigned long osc, unsigned long ref, struct clk **clks)
+	unsigned long osc, unsigned long ref, bool emc_is_native,
+	struct clk **clks)
 {
 	struct clk *clk;
 
@@ -2413,6 +2414,9 @@ void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
 	clk_register_clkdev(clk, "pll_c3", NULL);
 	clks[TEGRA210_CLK_PLL_C3] = clk;
 
+	if (!emc_is_native)
+		goto skip_pllms;
+
 	/* PLLM */
 	clk = tegra_clk_register_pllm("pll_m", "osc", clk_base, pmc,
 			     CLK_SET_RATE_GATE, &pll_m_params, NULL);
@@ -2437,6 +2441,7 @@ void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
 	clk_register_clkdev(clk, "pll_m_ud", NULL);
 	clks[TEGRA210_CLK_PLL_MB_UD] = clk;
 
+skip_pllms:
 	/* PLLU_VCO */
 	if (!tegra210b01_init_pllu()) {
 		clk = clk_register_fixed_rate(NULL, "pll_u_vco", "pll_ref", 0,

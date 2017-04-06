@@ -787,8 +787,8 @@ void tegra_super_clk_gen5_init(void __iomem *clk_base,
 			void __iomem *pmc_base, struct tegra_clk *tegra_clks,
 			struct tegra_clk_pll_params *pll_params);
 void tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
-			  unsigned long osc, unsigned long ref,
-			  struct clk **clks);
+		unsigned long osc, unsigned long ref, bool emc_is_native,
+		struct clk **clks);
 void tegra210b01_audio_clk_init(void __iomem *clk_base,
 				void __iomem *pmc_base,
 				struct tegra_clk *tegra_clks);

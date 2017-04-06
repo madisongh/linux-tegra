@@ -4285,7 +4285,7 @@ static void __init tegra210_clock_init(struct device_node *np)
 			tegra210b01_get_pll_vco_post_div_table());
 
 		tegra210b01_pll_init(clk_base, pmc_base,
-				     osc_freq, pll_ref_freq, clks);
+			osc_freq, pll_ref_freq, emc_is_native, clks);
 		tegra210_periph_clk_init(clk_base, pmc_base,
 					 tegra210b01_get_pllp_params());
 		tegra210_ovr_clk_init(clk_base); /* FIXME to be removed */
