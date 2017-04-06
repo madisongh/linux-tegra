@@ -1639,10 +1639,12 @@ static int akm_probe(struct i2c_client *client,
 
 	akm_pm_init(st);
 	ret = akm_id_i2c(st, id);
-	if (ret == -EAGAIN)
+	if (ret == -EAGAIN ) {
+		ret = -EPROBE_DEFER;
 		goto akm_probe_again;
-	else if (ret)
+	} else if (ret) {
 		goto akm_probe_err;
+	}
 
 	akm_pm(st, false);
 	akm_fn_dev.errs = &st->errs;
@@ -1744,7 +1746,7 @@ static void __exit akm_exit(void)
 late_initcall(akm_init);
 module_exit(akm_exit);
 
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("AKM driver");
 MODULE_AUTHOR("NVIDIA Corporation");
 
