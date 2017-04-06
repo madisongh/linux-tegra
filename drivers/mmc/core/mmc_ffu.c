@@ -260,6 +260,7 @@ static int mmc_ffu_restart(struct mmc_card *card)
 	struct mmc_host *host = card->host;
 	int err = 0;
 
+	mmc_flush_cache(card);
 	err = mmc_power_save_host(host);
 	if (err) {
 		pr_warn("%s: going to sleep failed (%d)!!!\n",
@@ -268,7 +269,6 @@ static int mmc_ffu_restart(struct mmc_card *card)
 	}
 
 	err = mmc_power_restore_host(host);
-
 exit:
 
 	return err;
