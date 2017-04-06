@@ -305,8 +305,7 @@ static int clock_print_freq_stats_table(struct seq_file *m, void *unused)
 {
 	struct clk_core *core = m->private;
 
-	if (!(core->flags & CLK_GET_RATE_NOCACHE))
-		generic_print_freq_stats_table(m, core, false, 0);
+	generic_print_freq_stats_table(m, core, false, 0);
 
 	return 0;
 }
@@ -2361,8 +2360,7 @@ static void clk_summary_show_one(struct seq_file *s, struct clk_core *c,
 		   clk_core_get_accuracy(c), clk_core_get_phase(c));
 
 #ifdef CONFIG_COMMON_CLK_FREQ_STATS_ACCOUNTING
-	if (!(c->flags & CLK_GET_RATE_NOCACHE))
-		generic_print_freq_stats_table(s, c, true, level);
+	generic_print_freq_stats_table(s, c, true, level);
 #endif /*CONFIG_COMMON_CLK_FREQ_STATS_ACCOUNTING*/
 }
 
