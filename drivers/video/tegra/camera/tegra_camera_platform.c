@@ -543,6 +543,7 @@ static int tegra_camera_probe(struct platform_device *pdev)
 	info->en_max_bw = of_property_read_bool(pdev->dev.of_node,
 		"default-max-bw");
 	if (info->en_max_bw == true) {
+#if defined(CONFIG_TEGRA_ISOMGR)
 		ret = tegra_camera_isomgr_request(info, info->max_bw, 4);
 		if (ret) {
 			dev_err(info->dev,
@@ -550,6 +551,7 @@ static int tegra_camera_probe(struct platform_device *pdev)
 			tegra_camera_isomgr_unregister(info);
 			return -EFAULT;
 		}
+#endif
 	}
 
 	tegra_camera_dev_mfi_init();

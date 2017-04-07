@@ -136,6 +136,7 @@ static inline struct tegra_csi_device *to_csi(struct v4l2_subdev *subdev)
 	return chan->csi;
 }
 
+struct tegra_csi_device *tegra_get_mc_csi(void);
 void set_csi_portinfo(struct tegra_csi_device *csi,
 	unsigned int port, unsigned int numlanes);
 void tegra_csi_status(struct tegra_csi_channel *chan,

@@ -44,6 +44,8 @@
 #define TEGRA_MEM_FORMAT 0
 #define TEGRA_ISP_FORMAT 1
 
+struct tegra_mipi_context;
+
 enum channel_capture_state {
 	CAPTURE_IDLE = 0,
 	CAPTURE_GOOD,
@@ -260,6 +262,7 @@ struct tegra_mc_vi {
 
 	bool has_sensors;
 	atomic_t power_on_refcnt;
+	atomic_t vb2_dma_alloc_refcnt;
 	struct mutex bw_update_lock;
 	unsigned long aggregated_kbyteps;
 	unsigned long max_requested_hz;

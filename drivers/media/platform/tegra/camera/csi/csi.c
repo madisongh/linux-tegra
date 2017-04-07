@@ -31,6 +31,14 @@
 #include "mipical/mipi_cal.h"
 #include "linux/nvhost.h"
 
+static struct tegra_csi_device *mc_csi;
+
+struct tegra_csi_device *tegra_get_mc_csi(void)
+{
+	return mc_csi;
+}
+EXPORT_SYMBOL(tegra_get_mc_csi);
+
 static int set_csi_properties(struct tegra_csi_device *csi,
 			struct platform_device *pdev)
 {
@@ -786,6 +794,10 @@ int tegra_csi_media_controller_init(struct tegra_csi_device *csi,
 				    struct platform_device *pdev)
 {
 	int ret;
+
+	if (!csi)
+		return -EINVAL;
+	mc_csi = csi;
 
 	csi->dev = &pdev->dev;
 	csi->pdev = pdev;

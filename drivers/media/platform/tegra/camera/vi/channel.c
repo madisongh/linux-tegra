@@ -952,15 +952,16 @@ static int tegra_channel_setup_controls(struct tegra_channel *chan)
 	struct v4l2_subdev *sd = NULL;
 	struct tegra_mc_vi *vi = chan->vi;
 	int i;
+	int ret = 0;
 
 	/* Initialize the subdev and controls here at first open */
 	sd = chan->subdev[num_sd];
 	while ((sd = chan->subdev[num_sd++]) &&
 		(num_sd <= chan->num_subdevs)) {
 		/* Add control handler for the subdevice */
-		v4l2_ctrl_add_handler(&chan->ctrl_handler,
+		ret = v4l2_ctrl_add_handler(&chan->ctrl_handler,
 					sd->ctrl_handler, NULL);
-		if (chan->ctrl_handler.error)
+		if (ret || chan->ctrl_handler.error)
 			dev_err(chan->vi->dev,
 				"Failed to add sub-device controls\n");
 	}
@@ -984,9 +985,9 @@ static int tegra_channel_setup_controls(struct tegra_channel *chan)
 	vi->fops->vi_add_ctrls(chan);
 
 	if (chan->pg_mode) {
-		v4l2_ctrl_add_handler(&chan->ctrl_handler,
+		ret = v4l2_ctrl_add_handler(&chan->ctrl_handler,
 					&chan->vi->ctrl_handler, NULL);
-		if (chan->ctrl_handler.error)
+		if (ret || chan->ctrl_handler.error)
 			dev_err(chan->vi->dev,
 				"Failed to add VI controls\n");
 	}
@@ -1273,9 +1274,6 @@ static int tegra_channel_open(struct file *fp)
 	int ret;
 	struct video_device *vdev = video_devdata(fp);
 	struct tegra_channel *chan = video_get_drvdata(vdev);
-#ifdef T210
-	struct vi *tegra_vi;
-#endif
 	struct tegra_mc_vi *vi;
 	struct tegra_csi_device *csi;
 
@@ -1292,9 +1290,6 @@ static int tegra_channel_open(struct file *fp)
 	}
 
 	vi = chan->vi;
-#ifdef T210
-	tegra_vi = vi->vi;
-#endif
 	csi = vi->csi;
 
 	/* The first open then turn on power */
@@ -1352,7 +1347,6 @@ static const struct v4l2_file_operations tegra_channel_fops = {
 
 static int tegra_channel_csi_init(struct tegra_channel *chan)
 {
-	int numlanes = 0;
 	int idx = 0;
 	struct tegra_mc_vi *vi = chan->vi;
 	int ret = 0;
@@ -1381,15 +1375,9 @@ static int tegra_channel_csi_init(struct tegra_channel *chan)
 
 	for (idx = 0; csi_port_is_valid(chan->port[idx]); idx++) {
 		chan->total_ports++;
-		numlanes = chan->numlanes - (idx * MAX_CSI_BLOCK_LANES);
-		numlanes = numlanes > MAX_CSI_BLOCK_LANES ?
-			MAX_CSI_BLOCK_LANES : numlanes;
 		/* maximum of 4 lanes are present per CSI block */
 		chan->csibase[idx] = vi->iomem +
 					TEGRA_VI_CSI_BASE(chan->port[idx]);
-#ifdef T210
-		set_csi_portinfo(vi->csi, chan->port[idx], numlanes);
-#endif
 	}
 	/* based on gang mode valid ports will be updated - set default to 1 */
 	chan->valid_ports = chan->total_ports ? 1 : 0;
@@ -1401,9 +1389,6 @@ int tegra_channel_init(struct tegra_channel *chan)
 	int ret;
 	struct tegra_mc_vi *vi = chan->vi;
 
-#ifdef T210
-	chan->fops = vi->vi->data->channel_fops;
-#endif
 	ret = tegra_channel_csi_init(chan);
 	if (ret)
 		return ret;
