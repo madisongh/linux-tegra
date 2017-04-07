@@ -2649,6 +2649,10 @@ void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks)
 	/* Add 60MHz output of UTMIPLL */
 	tegra_clks[tegra_clk_utmipll_60m].dt_id = TEGRA210_CLK_UTMIPLL_60M;
 	tegra_clks[tegra_clk_utmipll_60m].present = true;
+
+	/* Remove CPU_LP claster clocks */
+	tegra_clks[tegra_clk_cclk_lp].present = false;
+	tegra_clks[tegra_clk_pll_x_out0].present = false;
 }
 
 static struct tegra_clk_init_table t210b01_init_table[] __initdata = {
