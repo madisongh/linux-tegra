@@ -375,15 +375,15 @@ static DEFINE_SPINLOCK(pll_u_lock);
 
 #define PLLX_MISC0_DEFAULT_VALUE	PLLX_MISC0_LOCK_ENABLE
 #define PLLX_MISC0_WRITE_MASK		0x10c40000
-#define PLLX_MISC1_DEFAULT_VALUE	0x20
-#define PLLX_MISC1_WRITE_MASK		0x00ffffff
-#define PLLX_MISC2_DEFAULT_VALUE	0x0
+#define PLLX_MISC1_DEFAULT_VALUE	0x00000020
+#define PLLX_MISC1_WRITE_MASK		0xf0ffffff
+#define PLLX_MISC2_DEFAULT_VALUE	0x00000000
 #define PLLX_MISC2_WRITE_MASK		0xffffff11
 #define PLLX_MISC3_DEFAULT_VALUE	PLLX_MISC3_IDDQ
 #define PLLX_MISC3_WRITE_MASK		0x01ff0f0f
-#define PLLX_MISC4_DEFAULT_VALUE	0x0
+#define PLLX_MISC4_DEFAULT_VALUE	0x00000000
 #define PLLX_MISC4_WRITE_MASK		0x8000ffff
-#define PLLX_MISC5_DEFAULT_VALUE	0x0
+#define PLLX_MISC5_DEFAULT_VALUE	0x00000000
 #define PLLX_MISC5_WRITE_MASK		0x0000ffff
 
 #define PLLX_HW_CTRL_CFG		0x548
@@ -1444,18 +1444,16 @@ static struct div_nmp pllx_nmp = {
 
 static struct tegra_clk_pll_freq_table pll_x_freq_table[] = {
 	/* 1 GHz */
-	{ 12000000, 1000000000, 166, 1, 2, 0 }, /* actual: 996.0 MHz */
-	{ 13000000, 1000000000, 153, 1, 2, 0 }, /* actual: 994.0 MHz */
-	{ 38400000, 1000000000, 156, 3, 2, 0 }, /* actual: 998.4 MHz */
+	{ 38400000, 1000000000, 104, 2, 2, 0 }, /* actual: 998.4 MHz */
 	{        0,          0,   0, 0, 0, 0 },
 };
 
 static struct tegra_clk_pll_params pll_x_params = {
-	.input_min = 12000000,
+	.input_min = 13500000,
 	.input_max = 800000000,
-	.cf_min = 12000000,
+	.cf_min = 13500000,
 	.cf_max = 38400000,
-	.vco_min = 1350000000,
+	.vco_min = 1300000000,
 	.vco_max = 3000000000UL,
 	.base_reg = PLLX_BASE,
 	.misc_reg = PLLX_MISC0,
