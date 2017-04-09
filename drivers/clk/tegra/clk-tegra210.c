@@ -502,9 +502,14 @@ EXPORT_SYMBOL_GPL(tegra210_plle_hw_sequence_is_enabled);
 void tegra210_plle_hw_sequence_start(void)
 {
 	u32 val;
+	unsigned long flags = 0;
+	struct clk *plle = clks[TEGRA210_CLK_PLL_E];
+
+	if (!IS_ERR_OR_NULL(plle))
+		spin_lock_irqsave(to_clk_pll(__clk_get_hw(plle))->lock, flags);
 
 	if (tegra210_plle_hw_sequence_is_enabled())
-		return;
+		goto _out;
 
 	val = readl_relaxed(clk_base + PLLE_MISC0);
 	val &= ~PLLE_MISC_IDDQ_SW_CTRL;
@@ -519,6 +524,10 @@ void tegra210_plle_hw_sequence_start(void)
 
 	val |= PLLE_AUX_SEQ_ENABLE;
 	writel_relaxed(val, clk_base + PLLE_AUX);
+_out:
+	if (!IS_ERR_OR_NULL(plle))
+		spin_unlock_irqrestore(to_clk_pll(__clk_get_hw(plle))->lock,
+				       flags);
 }
 EXPORT_SYMBOL_GPL(tegra210_plle_hw_sequence_start);
 
@@ -3140,18 +3149,6 @@ static __init void tegra210_periph_clk_init(
 
 	tegra210_emc_clk_init(clk_base);
 
-	/* cml0 */
-	clk = clk_register_gate(NULL, "cml0", "pll_e", 0, clk_base + PLLE_AUX,
-				0, 0, &pll_e_lock);
-	clk_register_clkdev(clk, "cml0", NULL);
-	clks[TEGRA210_CLK_CML0] = clk;
-
-	/* cml1 */
-	clk = clk_register_gate(NULL, "cml1", "pll_e", 0, clk_base + PLLE_AUX,
-				1, 0, &pll_e_lock);
-	clk_register_clkdev(clk, "cml1", NULL);
-	clks[TEGRA210_CLK_CML1] = clk;
-
 	tegra_periph_clk_init(clk_base, pmc_base, tegra210_clks, pllp_params);
 
 	hw = __clk_get_hw(clks[TEGRA210_CLK_VI]);
@@ -3336,9 +3333,21 @@ skip_pllms:
 
 	/* PLLE */
 	clk = tegra_clk_register_plle_tegra210("pll_e", "pll_ref",
-				      clk_base, 0, &pll_e_params, NULL);
+				      clk_base, 0, &pll_e_params, &pll_e_lock);
 	clk_register_clkdev(clk, "pll_e", NULL);
 	clks[TEGRA210_CLK_PLL_E] = clk;
+
+	/* CML0 */
+	clk = clk_register_gate(NULL, "cml0", "pll_e", 0, clk_base + PLLE_AUX,
+				0, 0, &pll_e_lock);
+	clk_register_clkdev(clk, "cml0", NULL);
+	clks[TEGRA210_CLK_CML0] = clk;
+
+	/* CML1 */
+	clk = clk_register_gate(NULL, "cml1", "pll_e", 0, clk_base + PLLE_AUX,
+				1, 0, &pll_e_lock);
+	clk_register_clkdev(clk, "cml1", NULL);
+	clks[TEGRA210_CLK_CML1] = clk;
 
 	/* PLLC4 */
 	clk = tegra_clk_register_pllre_tegra210("pll_c4_vco", "pll_ref",
