@@ -33,6 +33,8 @@
 #include "clk-dfll.h"
 #include "clk-id.h"
 
+#define PLLE_SS_CTRL 0x68
+
 #define PLLC_BASE 0x80
 #define PLLC_OUT 0x84
 #define PLLC_MISC0 0x88
@@ -254,7 +256,7 @@ static unsigned long pll_ref_freq;
 static bool pll_re_use_utmipll;
 
 static DEFINE_SPINLOCK(pll_d_lock);
-// FIXME static DEFINE_SPINLOCK(pll_e_lock);
+static DEFINE_SPINLOCK(pll_e_lock);
 static DEFINE_SPINLOCK(pll_re_lock);
 static DEFINE_SPINLOCK(pll_u_lock);
 
@@ -445,6 +447,14 @@ static DEFINE_SPINLOCK(pll_u_lock);
 /* UTMIPLL */
 #define UTMIP_PLL_CFG0_WRITE_MASK	0x1fffffff
 #define UTMIP_PLL_CFG0_DEFAULT_VALUE	0x00190101
+
+/* PLLE */
+#define PLLE_SS_ENABLE	1
+#define PLLE_SS_MAX_VAL 0x21
+#define PLLE_SS_INC_VAL (0x1 << 16)
+#define PLLE_SS_INCINTRV_VAL (0x23 << 24)
+#define PLLE_SS_COEFFICIENTS_VAL \
+	(PLLE_SS_MAX_VAL | PLLE_SS_INC_VAL | PLLE_SS_INCINTRV_VAL)
 
 #define mask(w) ((1 << (w)) - 1)
 #define divm_mask(p) mask(p->params->div_nmp->divm_width)
@@ -1731,12 +1741,7 @@ static struct tegra_clk_pll_params pll_mb_params = {
 
 static struct tegra_clk_pll_freq_table pll_e_freq_table[] = {
 	/* PLLE special case: use cpcon field to store cml divider value */
-	{ 672000000, 100000000, 125, 42, 1, 13 },
-	{ 624000000, 100000000, 125, 39, 1, 13 },
-	{ 336000000, 100000000, 125, 21, 1, 13 },
-	{ 312000000, 100000000, 200, 26, 1, 14 },
 	{  38400000, 100000000, 125,  2, 1, 14 },
-	{  12000000, 100000000, 200,  1, 1, 14 },
 	{         0,         0,   0,  0, 0,  0 },
 };
 
@@ -1750,11 +1755,11 @@ static struct div_nmp plle_nmp = {
 };
 
 static struct tegra_clk_pll_params pll_e_params = {
-	.input_min = 12000000,
+	.input_min = 19200000,
 	.input_max = 800000000,
-	.cf_min = 12000000,
+	.cf_min = 19200000,
 	.cf_max = 38400000,
-	.vco_min = 1600000000,
+	.vco_min = 1250000000,
 	.vco_max = 2500000000U,
 	.base_reg = PLLE_BASE,
 	.misc_reg = PLLE_MISC0,
@@ -1763,6 +1768,10 @@ static struct tegra_clk_pll_params pll_e_params = {
 	.lock_enable_bit_idx = PLLE_MISC_LOCK_ENABLE,
 	.lock_delay = 300,
 	.div_nmp = &plle_nmp,
+	.ssc_ctrl_en_mask = PLLE_SS_COEFFICIENTS_VAL,
+#if PLLE_SS_ENABLE
+	.ssc_ctrl_reg = PLLE_SS_CTRL,
+#endif
 	.freq_table = pll_e_freq_table,
 	.flags = TEGRA_PLL_FIXED | TEGRA_PLL_LOCK_MISC | TEGRA_PLL_USE_LOCK |
 		 TEGRA_PLL_HAS_LOCK_ENABLE,
@@ -2550,9 +2559,21 @@ skip_pllms:
 
 	/* PLLE */
 	clk = tegra_clk_register_plle_tegra210("pll_e", "pll_ref",
-				      clk_base, 0, &pll_e_params, NULL);
+				      clk_base, 0, &pll_e_params, &pll_e_lock);
 	clk_register_clkdev(clk, "pll_e", NULL);
 	clks[TEGRA210_CLK_PLL_E] = clk;
+
+	/* CML0 */
+	clk = clk_register_gate(NULL, "cml0", "pll_e", 0, clk_base + PLLE_AUX,
+				0, 0, &pll_e_lock);
+	clk_register_clkdev(clk, "cml0", NULL);
+	clks[TEGRA210_CLK_CML0] = clk;
+
+	/* CML1 */
+	clk = clk_register_gate(NULL, "cml1", "pll_e", 0, clk_base + PLLE_AUX,
+				1, 0, &pll_e_lock);
+	clk_register_clkdev(clk, "cml1", NULL);
+	clks[TEGRA210_CLK_CML1] = clk;
 
 	/* PLLC4 */
 	clk = tegra_clk_register_pllre_tegra210("pll_c4_vco", "pll_ref",
