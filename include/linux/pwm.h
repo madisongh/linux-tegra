@@ -33,6 +33,16 @@ int pwm_enable(struct pwm_device *pwm);
  * pwm_disable - stop a PWM output toggling
  */
 void pwm_disable(struct pwm_device *pwm);
+
+/*
+ * Set PWM signal ramp up and down time.
+ */
+int pwm_set_ramp_time(struct pwm_device *pwm, int ramp_time);
+
+/*
+ * Set double pulse period.
+ */
+int pwm_set_double_pulse_period(struct pwm_device *pwm, int period);
 #else
 static inline struct pwm_device *pwm_request(int pwm_id, const char *label)
 {
@@ -55,6 +65,16 @@ static inline int pwm_enable(struct pwm_device *pwm)
 
 static inline void pwm_disable(struct pwm_device *pwm)
 {
+}
+
+int pwm_set_ramp_time(struct pwm_device *pwm, int ramp_time)
+{
+	return -EINVAL;
+}
+
+int pwm_set_double_pulse_period(struct pwm_device *pwm, int period)
+{
+	return -EINVAL;
 }
 #endif
 
@@ -105,6 +125,8 @@ struct pwm_device {
 	unsigned int period;
 	unsigned int duty_cycle;
 	enum pwm_polarity polarity;
+	unsigned int double_period;
+	unsigned int ramp_time;
 };
 
 static inline bool pwm_is_enabled(const struct pwm_device *pwm)
@@ -132,6 +154,16 @@ static inline void pwm_set_duty_cycle(struct pwm_device *pwm, unsigned int duty)
 static inline unsigned int pwm_get_duty_cycle(const struct pwm_device *pwm)
 {
 	return pwm ? pwm->duty_cycle : 0;
+}
+
+static inline unsigned int pwm_get_double_period(const struct pwm_device *pwm)
+{
+	return pwm ? pwm->double_period : 0;
+}
+
+static inline unsigned int pwm_get_ramp_time(const struct pwm_device *pwm)
+{
+	return pwm ? pwm->ramp_time : 0;
 }
 
 /*
@@ -164,6 +196,11 @@ struct pwm_ops {
 			    enum pwm_polarity polarity);
 	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
 	void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
+	int (*set_ramp_time)(struct pwm_chip *chip, struct pwm_device *pwm,
+			     int ramp_time);
+	int (*set_double_pulse_period)(struct pwm_chip *chip,
+				       struct pwm_device *pwm,
+				       int period);
 #ifdef CONFIG_DEBUG_FS
 	void (*dbg_show)(struct pwm_chip *chip, struct seq_file *s);
 #endif

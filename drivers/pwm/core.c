@@ -533,6 +533,66 @@ void pwm_disable(struct pwm_device *pwm)
 }
 EXPORT_SYMBOL_GPL(pwm_disable);
 
+/**
+ * pwm_set_ramp_time(): Set PWM ramp up/down time.
+ * @pwm: PWM device
+ * @ramp_time: Ram up/down time.
+ *
+ * Return success else negative error number in falure.
+ */
+int pwm_set_ramp_time(struct pwm_device *pwm, int ramp_time)
+{
+	int err;
+
+	if (!pwm || ramp_time < 0)
+		return -EINVAL;
+
+	if (pwm->duty_cycle  && (pwm->duty_cycle  <= ramp_time))
+		return -EINVAL;
+
+	if (!pwm->chip->ops->set_ramp_time)
+		return -ENOTSUPP;
+
+	err = pwm->chip->ops->set_ramp_time(pwm->chip, pwm, ramp_time);
+	if (err)
+		return err;
+
+	pwm->ramp_time = ramp_time;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pwm_set_ramp_time);
+
+/**
+ * pwm_set_double_pulse_period(): Set PWM double pulse period
+ * @pwm: PWM device
+ * @period_ns: Double pulse period.
+ *
+ * Double pulse is feautue in which the pwm signal appear two times and their
+ * periods is different then normal period.
+ *
+ * Return success else negative error number in falure.
+ */
+int pwm_set_double_pulse_period(struct pwm_device *pwm, int period)
+{
+	int err;
+
+	if (!pwm || period < 0 || period > pwm->period)
+		return -EINVAL;
+
+	if (!pwm->chip->ops->set_double_pulse_period)
+		return -ENOTSUPP;
+
+	err = pwm->chip->ops->set_double_pulse_period(pwm->chip, pwm, period);
+	if (err)
+		return err;
+
+	pwm->double_period = period;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pwm_set_double_pulse_period);
+
 static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
 {
 	struct pwm_chip *chip;
