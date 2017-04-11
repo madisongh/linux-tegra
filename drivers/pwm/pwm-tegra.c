@@ -56,6 +56,8 @@ struct tegra_pwm_chip {
 	const struct tegra_pwm_soc *soc;
 	bool			pretty_good_algo;
 	int			num_user;
+	unsigned long		src_rate;
+	unsigned long		parent_rate;
 	struct pinctrl		*pinctrl;
 	struct pinctrl_state	*suspend_state;
 	struct pinctrl_state	*resume_state;
@@ -86,7 +88,7 @@ static long tegra_get_optimal_rate(struct tegra_pwm_chip *pc,
 	unsigned long p_rate, in_rate, rate, hz;
 	int ret;
 
-	p_rate = clk_get_rate(clk_get_parent(pc->clk));
+	p_rate = pc->parent_rate;
 
 	/* Round rate/128 to nearest integer */
 	rate = DIV_ROUND_CLOSEST(p_rate, 128);
@@ -116,6 +118,13 @@ static long tegra_get_optimal_rate(struct tegra_pwm_chip *pc,
 		dev_err(pc->dev, "Not able to set proper rate: %d\n", ret);
 		return ret;
 	}
+
+	/*
+	 * Get exact configured clk rate as there is loss/gain due to clock
+	 * resolution.
+	 */
+	pc->src_rate = clk_get_rate(pc->clk);
+
 	return dn - 1;
 }
 
@@ -151,7 +160,7 @@ static int tegra_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	 * Compute the prescaler value for which (1 << PWM_DUTY_WIDTH)
 	 * cycles at the PWM clock rate will take period_ns nanoseconds.
 	 */
-	rate = clk_hw_get_rate(__clk_get_hw(pc->clk)) >> PWM_DUTY_WIDTH;
+	rate = pc->src_rate >> PWM_DUTY_WIDTH;
 
 	/* Consider two digit precision in PWM_SCALE_WIDTH rate calculation */
 	ns100 *= precision;
@@ -274,6 +283,10 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "PWM clock get failed\n");
 		return PTR_ERR(pwm->clk);
 	}
+
+	/* Get clock rate */
+	pwm->src_rate = clk_get_rate(pwm->clk);
+	pwm->parent_rate = clk_get_rate(clk_get_parent(pwm->clk));
 
 	if (no_clk_sleeping_in_ops) {
 		ret = clk_prepare(pwm->clk);
