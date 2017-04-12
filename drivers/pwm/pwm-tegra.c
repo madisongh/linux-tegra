@@ -3,7 +3,7 @@
  *
  * Tegra pulse-width-modulation controller driver
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2017, NVIDIA CORPORATION. All rights reserved.
  * Based on arch/arm/plat-mxc/pwm.c by Sascha Hauer <s.hauer@pengutronix.de>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -42,6 +42,7 @@
 
 struct tegra_pwm_soc {
 	unsigned int num_channels;
+	unsigned long max_clk_limit;
 };
 
 struct tegra_pwm_chip {
@@ -113,6 +114,21 @@ static long tegra_get_optimal_rate(struct tegra_pwm_chip *pc,
 		return -EINVAL;
 
 	in_rate = (2 * p_rate) / (due_dm - 1);
+
+	/*
+	 * Make sure that derived frequency should not exceed max clock
+	 * frequency limit.
+	 */
+	if (pc->soc->max_clk_limit && (in_rate > pc->soc->max_clk_limit)) {
+		ret = clk_set_rate(pc->clk, pc->soc->max_clk_limit);
+		if (ret < 0)
+			dev_warn(pc->dev, "Failed to set clock rate %lu: %d\n",
+				 pc->soc->max_clk_limit, ret);
+
+		pc->src_rate = clk_get_rate(pc->clk);
+		return -EAGAIN;
+	}
+
 	ret = clk_set_rate(pc->clk, in_rate);
 	if (ret < 0) {
 		dev_err(pc->dev, "Not able to set proper rate: %d\n", ret);
@@ -288,6 +304,18 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 	pwm->src_rate = clk_get_rate(pwm->clk);
 	pwm->parent_rate = clk_get_rate(clk_get_parent(pwm->clk));
 
+	/* Limit the maximum clock rate */
+	if (pwm->soc->max_clk_limit &&
+	    (pwm->src_rate > pwm->soc->max_clk_limit)) {
+		ret = clk_set_rate(pwm->clk, pwm->soc->max_clk_limit);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "Failed to set max clk rate: %d\n",
+				ret);
+			return ret;
+		}
+		pwm->src_rate = clk_get_rate(pwm->clk);
+	}
+
 	if (no_clk_sleeping_in_ops) {
 		ret = clk_prepare(pwm->clk);
 		if (ret) {
@@ -378,10 +406,12 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 
 static const struct tegra_pwm_soc tegra20_pwm_soc = {
 	.num_channels = 4,
+	.max_clk_limit = 38400000UL, /* 38.4MHz */
 };
 
 static const struct tegra_pwm_soc tegra186_pwm_soc = {
 	.num_channels = 1,
+	.max_clk_limit = 102000000UL, /*102 MHz */
 };
 
 #ifdef CONFIG_PM_SLEEP
