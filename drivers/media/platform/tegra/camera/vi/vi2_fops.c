@@ -95,6 +95,24 @@ void vi2_init_video_formats(struct tegra_channel *chan)
 		chan->video_formats[i] = &vi2_video_formats[i];
 }
 
+int tegra_vi2_s_ctrl(struct v4l2_ctrl *ctrl)
+{
+	struct tegra_channel *chan = container_of(ctrl->handler,
+				struct tegra_channel, ctrl_handler);
+	int err = 0;
+
+	switch (ctrl->id) {
+	case TEGRA_CAMERA_CID_WRITE_ISPFORMAT:
+		chan->write_ispformat = ctrl->val;
+		break;
+	default:
+		dev_err(&chan->video.dev, "%s:Not valid ctrl\n", __func__);
+		return -EINVAL;
+	}
+
+	return err;
+}
+
 static const struct v4l2_ctrl_ops vi2_ctrl_ops = {
 	.s_ctrl	= tegra_channel_s_ctrl,
 };
@@ -102,7 +120,7 @@ static const struct v4l2_ctrl_ops vi2_ctrl_ops = {
 static const struct v4l2_ctrl_config vi2_custom_ctrls[] = {
 	{
 		.ops = &vi2_ctrl_ops,
-		.id = V4L2_CID_WRITE_ISPFORMAT,
+		.id = TEGRA_CAMERA_CID_WRITE_ISPFORMAT,
 		.name = "Write ISP format",
 		.type = V4L2_CTRL_TYPE_BOOLEAN,
 		.def = 0,
@@ -689,7 +707,7 @@ int vi2_channel_start_streaming(struct vb2_queue *vq, u32 count)
 
 	/* disable override for vi mode */
 	override_ctrl = v4l2_ctrl_find(
-		&chan->ctrl_handler, V4L2_CID_OVERRIDE_ENABLE);
+		&chan->ctrl_handler, TEGRA_CAMERA_CID_OVERRIDE_ENABLE);
 	if (!chan->pg_mode) {
 		if (override_ctrl) {
 			ret = v4l2_ctrl_s_ctrl(override_ctrl, false);

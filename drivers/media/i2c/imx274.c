@@ -26,6 +26,7 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 
+#include <media/tegra-v4l2-camera.h>
 #include <media/camera_common.h>
 #include <media/imx274.h>
 
@@ -87,7 +88,7 @@ static struct v4l2_ctrl_config ctrl_config_list[] = {
 /* Do not change the name field for the controls! */
 	{
 		.ops = &imx274_ctrl_ops,
-		.id = V4L2_CID_GAIN,
+		.id = TEGRA_CAMERA_CID_GAIN,
 		.name = "Gain",
 		.type = V4L2_CTRL_TYPE_INTEGER,
 		.flags = V4L2_CTRL_FLAG_SLIDER,
@@ -98,7 +99,7 @@ static struct v4l2_ctrl_config ctrl_config_list[] = {
 	},
 	{
 		.ops = &imx274_ctrl_ops,
-		.id = V4L2_CID_FRAME_LENGTH,
+		.id = TEGRA_CAMERA_CID_FRAME_LENGTH,
 		.name = "Frame Length",
 		.type = V4L2_CTRL_TYPE_INTEGER,
 		.flags = V4L2_CTRL_FLAG_SLIDER,
@@ -109,7 +110,7 @@ static struct v4l2_ctrl_config ctrl_config_list[] = {
 	},
 	{
 		.ops = &imx274_ctrl_ops,
-		.id = V4L2_CID_COARSE_TIME,
+		.id = TEGRA_CAMERA_CID_COARSE_TIME,
 		.name = "Coarse Time",
 		.type = V4L2_CTRL_TYPE_INTEGER,
 		.flags = V4L2_CTRL_FLAG_SLIDER,
@@ -120,7 +121,7 @@ static struct v4l2_ctrl_config ctrl_config_list[] = {
 	},
 	{
 		.ops = &imx274_ctrl_ops,
-		.id = V4L2_CID_COARSE_TIME_SHORT,
+		.id = TEGRA_CAMERA_CID_COARSE_TIME_SHORT,
 		.name = "Coarse Time Short",
 		.type = V4L2_CTRL_TYPE_INTEGER,
 		.flags = V4L2_CTRL_FLAG_SLIDER,
@@ -131,7 +132,7 @@ static struct v4l2_ctrl_config ctrl_config_list[] = {
 	},
 	{
 		.ops = &imx274_ctrl_ops,
-		.id = V4L2_CID_GROUP_HOLD,
+		.id = TEGRA_CAMERA_CID_GROUP_HOLD,
 		.name = "Group Hold",
 		.type = V4L2_CTRL_TYPE_INTEGER_MENU,
 		.min = 0,
@@ -142,7 +143,7 @@ static struct v4l2_ctrl_config ctrl_config_list[] = {
 	},
 	{
 		.ops = &imx274_ctrl_ops,
-		.id = V4L2_CID_HDR_EN,
+		.id = TEGRA_CAMERA_CID_HDR_EN,
 		.name = "HDR enable",
 		.type = V4L2_CTRL_TYPE_INTEGER_MENU,
 		.min = 0,
@@ -426,21 +427,21 @@ static int imx274_s_stream(struct v4l2_subdev *sd, int enable)
 	if (s_data->override_enable) {
 		/* write list of override regs for the asking frame length, */
 		/* coarse integration time, and gain.                       */
-		control.id = V4L2_CID_GAIN;
+		control.id = TEGRA_CAMERA_CID_GAIN;
 		err = v4l2_g_ctrl(&priv->ctrl_handler, &control);
 		err |= imx274_set_gain(priv, control.value);
 		if (err)
 			dev_dbg(&client->dev,
 				"%s: error gain override\n", __func__);
 
-		control.id = V4L2_CID_FRAME_LENGTH;
+		control.id = TEGRA_CAMERA_CID_FRAME_LENGTH;
 		err = v4l2_g_ctrl(&priv->ctrl_handler, &control);
 		err |= imx274_set_frame_length(priv, control.value);
 		if (err)
 			dev_dbg(&client->dev,
 				"%s: error frame length override\n", __func__);
 
-		control.id = V4L2_CID_COARSE_TIME;
+		control.id = TEGRA_CAMERA_CID_COARSE_TIME;
 		err = v4l2_g_ctrl(&priv->ctrl_handler, &control);
 		err |= imx274_set_coarse_time(priv, control.value);
 		if (err)
@@ -750,19 +751,19 @@ static int imx274_s_ctrl(struct v4l2_ctrl *ctrl)
 		return 0;
 
 	switch (ctrl->id) {
-	case V4L2_CID_GAIN:
+	case TEGRA_CAMERA_CID_GAIN:
 		err = imx274_set_gain(priv, ctrl->val);
 		break;
-	case V4L2_CID_FRAME_LENGTH:
+	case TEGRA_CAMERA_CID_FRAME_LENGTH:
 		err = imx274_set_frame_length(priv, ctrl->val);
 		break;
-	case V4L2_CID_COARSE_TIME:
+	case TEGRA_CAMERA_CID_COARSE_TIME:
 		err = imx274_set_coarse_time(priv, ctrl->val);
 		break;
-	case V4L2_CID_COARSE_TIME_SHORT:
+	case TEGRA_CAMERA_CID_COARSE_TIME_SHORT:
 		err = imx274_set_coarse_time(priv, ctrl->val);
 		break;
-	case V4L2_CID_GROUP_HOLD:
+	case TEGRA_CAMERA_CID_GROUP_HOLD:
 		if (switch_ctrl_qmenu[ctrl->val] == SWITCH_ON) {
 			priv->group_hold_en = true;
 		} else {
@@ -770,7 +771,7 @@ static int imx274_s_ctrl(struct v4l2_ctrl *ctrl)
 			err = imx274_set_group_hold(priv);
 		}
 		break;
-	case V4L2_CID_HDR_EN:
+	case TEGRA_CAMERA_CID_HDR_EN:
 		break;
 	default:
 		pr_err("%s: unknown ctrl id.\n", __func__);
