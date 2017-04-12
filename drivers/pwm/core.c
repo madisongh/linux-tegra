@@ -205,6 +205,10 @@ static void init_pwm_of_config(struct pwm_chip *chip, struct pwm_device *pwm)
 	if (!np)
 		return;
 
+	ret = of_property_read_u32(np, "capture-window-length", &pval);
+	if (!ret)
+		pwm->capture_win_len = pval;
+
 	ret = of_property_read_u32(np, "pwm-ramp-time", &pval);
 	if (!ret)
 		pwm->ramp_time = pval;
@@ -639,6 +643,57 @@ int pwm_set_double_pulse_period(struct pwm_device *pwm, int period)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(pwm_set_double_pulse_period);
+
+/**
+ * pwm_set_capture_window_length(): Set PWM capture window length.
+ * @pwm: PWM device
+ * @window_length: Window length.
+ *
+ * Window lenght to capture the PWM signal.
+ *
+ * Returns 0 in success else negative error number in failure.
+ */
+int pwm_set_capture_window_length(struct pwm_device *pwm, int window_length)
+{
+	int err;
+
+	if (!pwm || window_length <= 0)
+		return -EINVAL;
+
+	if (!pwm->chip->ops->set_capture_window_length)
+		return -ENOTSUPP;
+
+	err = pwm->chip->ops->set_capture_window_length(pwm->chip, pwm,
+							window_length);
+	if (err)
+		return err;
+
+	pwm->capture_win_len = window_length;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pwm_set_capture_window_length);
+
+/**
+ * pwm_get_rpm(): Get PWM RPM.
+ * @pwm: PWM device
+ *
+ * Read PWM signal and return RPM value.
+ *
+ * Returns positive integer for valid RPM else negative error.
+ */
+int pwm_get_rpm(struct pwm_device *pwm)
+{
+	struct pwm_capture result;
+	int err;
+
+	err = pwm_capture(pwm, &result, 0);
+	if (err < 0)
+		return err;
+
+	return result.rpm;
+}
+EXPORT_SYMBOL_GPL(pwm_get_rpm);
 
 static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
 {
