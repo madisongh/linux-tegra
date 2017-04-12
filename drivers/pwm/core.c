@@ -196,6 +196,24 @@ static void of_pwmchip_remove(struct pwm_chip *chip)
 		of_node_put(chip->dev->of_node);
 }
 
+static void init_pwm_of_config(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+	struct device_node *np = chip->dev->of_node;
+	u32 pval;
+	int ret;
+
+	if (!np)
+		return;
+
+	ret = of_property_read_u32(np, "pwm-ramp-time", &pval);
+	if (!ret)
+		pwm->ramp_time = pval;
+
+	ret = of_property_read_u32(np, "pwm-double-pulse-period", &pval);
+	if (!ret)
+		pwm->double_period = pval;
+}
+
 /**
  * pwm_set_chip_data() - set private chip data for a PWM
  * @pwm: PWM device
@@ -270,6 +288,8 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
 		pwm->hwpwm = i;
 		pwm->polarity = polarity;
 		mutex_init(&pwm->lock);
+
+		init_pwm_of_config(chip, pwm);
 
 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
 	}

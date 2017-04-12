@@ -68,12 +68,13 @@ static inline void pwm_disable(struct pwm_device *pwm)
 {
 }
 
-int pwm_set_ramp_time(struct pwm_device *pwm, int ramp_time)
+static inline int pwm_set_ramp_time(struct pwm_device *pwm, int ramp_time)
 {
 	return -EINVAL;
 }
 
-int pwm_set_double_pulse_period(struct pwm_device *pwm, int period)
+static inline int pwm_set_double_pulse_period(struct pwm_device *pwm,
+					      int period)
 {
 	return -EINVAL;
 }
@@ -112,6 +113,8 @@ enum {
  * @lock: used to serialize accesses to the PWM device where necessary
  * @period: period of the PWM signal (in nanoseconds)
  * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
+ * @double_period: Doble pulse period.
+ * @ramp_time: Ramp up/down time.
  * @polarity: polarity of the PWM signal
  */
 struct pwm_device {
@@ -186,6 +189,8 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
  * @capture: capture and report PWM signal
  * @enable: enable PWM output toggling
  * @disable: disable PWM output toggling
+ * @set_ramp_time: Set PWM ramp up/down time.
+ * @set_double_pulse_period: Set double pulse period time.
  * @dbg_show: optional routine to show contents in debugfs
  * @owner: helps prevent removal of modules exporting active PWMs
  */
