@@ -1922,9 +1922,11 @@ static int _dfll_lock(struct tegra_dfll *td)
 			return -EINVAL;
 		}
 
+#ifdef CONFIG_PWM_TEGRA_DFLL
 		if (td->pmu_if == TEGRA_DFLL_PMU_PWM)
 			tegra_dfll_pwm_output_enable();
-		else
+#endif
+		if (td->pmu_if == TEGRA_DFLL_PMU_I2C)
 			dfll_i2c_set_output_enabled(td, true);
 
 		dfll_set_mode(td, DFLL_CLOSED_LOOP);
@@ -1977,9 +1979,11 @@ static int _dfll_unlock(struct tegra_dfll *td)
 		dfll_set_open_loop_config(td);
 		dfll_set_mode(td, DFLL_OPEN_LOOP);
 
+#ifdef CONFIG_PWM_TEGRA_DFLL
 		if (td->pmu_if == TEGRA_DFLL_PMU_PWM)
 			tegra_dfll_pwm_output_disable();
-		else
+#endif
+		if (td->pmu_if == TEGRA_DFLL_PMU_I2C)
 			dfll_i2c_set_output_enabled(td, false);
 
 		return 0;
