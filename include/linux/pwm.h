@@ -50,11 +50,6 @@ int pwm_set_double_pulse_period(struct pwm_device *pwm, int period);
  */
 int pwm_set_capture_window_length(struct pwm_device *pwm, int window_length);
 
-/*
- * Get PWM RPM.
- */
-int pwm_get_rpm(struct pwm_device *pwm);
-
 #else
 static inline struct pwm_device *pwm_request(int pwm_id, const char *label)
 {
@@ -92,11 +87,6 @@ static inline int pwm_set_double_pulse_period(struct pwm_device *pwm,
 
 static inline int pwm_set_capture_window_length(struct pwm_device *pwm,
 					       int window_length)
-{
-	return -EINVAL;
-}
-
-static inline int pwm_get_rpm(struct pwm_device *pwm)
 {
 	return -EINVAL;
 }
@@ -395,6 +385,26 @@ static inline bool pwm_can_sleep(struct pwm_device *pwm)
 	return false;
 }
 #endif
+
+/**
+ * pwm_get_rpm(): Get PWM RPM.
+ * @pwm: PWM device
+ *
+ * Read PWM signal and return RPM value.
+ *
+ * Returns positive integer for valid RPM else negative error.
+ */
+static inline int pwm_get_rpm(struct pwm_device *pwm)
+{
+	struct pwm_capture result;
+	int err;
+
+	err = pwm_capture(pwm, &result, 0);
+	if (err < 0)
+		return err;
+
+	return result.rpm;
+}
 
 struct pwm_lookup {
 	struct list_head list;

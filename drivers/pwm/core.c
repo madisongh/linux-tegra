@@ -674,27 +674,6 @@ int pwm_set_capture_window_length(struct pwm_device *pwm, int window_length)
 }
 EXPORT_SYMBOL_GPL(pwm_set_capture_window_length);
 
-/**
- * pwm_get_rpm(): Get PWM RPM.
- * @pwm: PWM device
- *
- * Read PWM signal and return RPM value.
- *
- * Returns positive integer for valid RPM else negative error.
- */
-int pwm_get_rpm(struct pwm_device *pwm)
-{
-	struct pwm_capture result;
-	int err;
-
-	err = pwm_capture(pwm, &result, 0);
-	if (err < 0)
-		return err;
-
-	return result.rpm;
-}
-EXPORT_SYMBOL_GPL(pwm_get_rpm);
-
 static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
 {
 	struct pwm_chip *chip;
