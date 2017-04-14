@@ -3958,8 +3958,7 @@ static void tegra210_clk_resume(void)
 	car_writel(val, PLLD_MISC0, 0);
 
 	/* reprogram PLLRE VCO */
-	tegra_clk_pllre_vco_resume(clks[TEGRA210_CLK_PLL_RE_VCO],
-					pll_re_vco_rate);
+	tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_RE_VCO], pll_re_vco_rate);
 
 	/* reprogram PLLRE post dividers  */
 	val = car_readl(PLLRE_BASE, 0);
@@ -4025,14 +4024,14 @@ static void tegra210_clk_resume(void)
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_U_OUT1]);
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_U_OUT2]);
 
-	tegra_clk_sync_state_pllcx(clks[TEGRA210_CLK_PLL_C2]);
-	tegra_clk_sync_state_pllcx(clks[TEGRA210_CLK_PLL_C3]);
-	tegra_clk_sync_state_iddq(clks[TEGRA210_CLK_PLL_C]);
+	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_C2]);
+	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_C3]);
+	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_C]);
 
-	tegra_clk_sync_state_iddq(clks[TEGRA210_CLK_PLL_RE_VCO]);
-	tegra_clk_sync_state_iddq(clks[TEGRA210_CLK_PLL_C4]);
-	tegra_clk_sync_state_iddq(clks[TEGRA210_CLK_PLL_D2]);
-	tegra_clk_sync_state_iddq(clks[TEGRA210_CLK_PLL_DP]);
+	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_RE_VCO]);
+	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_C4]);
+	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_D2]);
+	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_DP]);
 	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_A]);
 	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_D]);
 
@@ -4042,7 +4041,7 @@ static void tegra210_clk_resume(void)
 	/* restore CPUG clocks */
 	parent = clk_get_parent(clks[TEGRA210_CLK_CCLK_G]);
 	if (parent != clks[TEGRA210_CLK_PLL_X])
-		tegra_clk_sync_state_iddq(clks[TEGRA210_CLK_PLL_X]);
+		tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_X]);
 
 	if (dfll_pdev)
 		tegra_dfll_resume(dfll_pdev);
@@ -4058,8 +4057,8 @@ static void tegra210_clk_resume(void)
 
 	car_writel(pll_m_v, PLLM_BASE, 0);
 	tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_MB], pll_mb_rate);
-	tegra_clk_sync_state_iddq(clks[TEGRA210_CLK_PLL_M]);
-	tegra_clk_sync_state_iddq(clks[TEGRA210_CLK_PLL_MB]);
+	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_M]);
+	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_MB]);
 
 	tegra210_emc_timing_invalidate();
 
