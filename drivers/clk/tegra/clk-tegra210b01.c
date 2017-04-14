@@ -194,17 +194,6 @@
 
 #define UTMIP_PLL_CFG0 0x480
 
-#define SATA_PLL_CFG0				0x490
-#define SATA_PLL_CFG0_PADPLL_RESET_SWCTL	BIT(0)
-#define SATA_PLL_CFG0_PADPLL_USE_LOCKDET	BIT(2)
-#define SATA_PLL_CFG0_SATA_SEQ_IN_SWCTL		BIT(4)
-#define SATA_PLL_CFG0_SATA_SEQ_RESET_INPUT_VALUE	BIT(5)
-#define SATA_PLL_CFG0_SATA_SEQ_LANE_PD_INPUT_VALUE	BIT(6)
-#define SATA_PLL_CFG0_SATA_SEQ_PADPLL_PD_INPUT_VALUE	BIT(7)
-
-#define SATA_PLL_CFG0_PADPLL_SLEEP_IDDQ		BIT(13)
-#define SATA_PLL_CFG0_SEQ_ENABLE		BIT(24)
-
 #define XUSBIO_PLL_CFG0				0x51c
 #define XUSBIO_PLL_CFG0_PADPLL_RESET_SWCTL	BIT(0)
 #define XUSBIO_PLL_CFG0_CLK_ENABLE_SWCTL	BIT(2)
@@ -236,6 +225,9 @@
 #define XUSB_PLL_CFG0_UTMIPLL_LOCK_DLY		0x3ff
 #define XUSB_PLL_CFG0_PLLU_LOCK_DLY_MASK	(0x3ff << 14)
 
+/* This register is re-purposed on T210b01 as UPHY management clock divider */
+#define PEX_SATA_USB_RX_BYP			0x6d0
+
 /*
  * SDM fractional divisor is 16-bit 2's complement signed number within
  * (-2^12 ... 2^12-1) range. Represented in PLL data structure as unsigned
@@ -259,6 +251,7 @@ static DEFINE_SPINLOCK(pll_d_lock);
 static DEFINE_SPINLOCK(pll_e_lock);
 static DEFINE_SPINLOCK(pll_re_lock);
 static DEFINE_SPINLOCK(pll_u_lock);
+static DEFINE_SPINLOCK(pll_p_uphy_lock);
 
 #define PLL_ENABLE			(1 << 30)
 
@@ -2632,6 +2625,16 @@ skip_pllms:
 					CLK_SET_RATE_PARENT, 1, 1);
 	clk_register_clkdev(clk, "pll_pud", NULL);
 	clks[TEGRA210_CLK_PLL_P_UD] = clk;
+
+	/* PLLP_UPHY_OUT */
+	clk = tegra_clk_register_divider("pll_p_uphy_div", "pll_p_out_xusb",
+		clk_base + PEX_SATA_USB_RX_BYP, 0,
+		TEGRA_DIVIDER_ROUND_UP, 0, 8, 1, &pll_p_uphy_lock);
+	clk = clk_register_gate(NULL, "pll_p_uphy_out", "pll_p_uphy_div",
+		CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
+		clk_base + PEX_SATA_USB_RX_BYP, 8, 0, &pll_p_uphy_lock);
+	clk_register_clkdev(clk, "pll_p_uphy_out", NULL);
+	clks[TEGRA210_CLK_PLL_P_UPHY_OUT] = clk;
 }
 
 void __init tegra210b01_audio_clk_init(void __iomem *clk_base,
@@ -2681,6 +2684,7 @@ static struct tegra_clk_init_table t210b01_init_table[] __initdata = {
 	{ TEGRA210_CLK_PLL_RE_VCO, TEGRA210_CLK_CLK_MAX, 0, 1 },
 	{ TEGRA210_CLK_PLL_DP, TEGRA210_CLK_CLK_MAX, 270000000, 0 },
 	{ TEGRA210_CLK_PLL_D2, TEGRA210_CLK_CLK_MAX, 594000000, 0 },
+	{ TEGRA210_CLK_PLL_P_UPHY_OUT, TEGRA210_CLK_CLK_MAX, 102000000, 0 },
 	/* This MUST be the last entry. */
 	{ TEGRA210_CLK_CLK_MAX, TEGRA210_CLK_CLK_MAX, 0, 0 },
 };
