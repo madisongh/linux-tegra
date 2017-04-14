@@ -821,7 +821,8 @@ error:
 
 MODULE_DEVICE_TABLE(of, imx274_of_match);
 
-static struct camera_common_pdata *imx274_parse_dt(struct i2c_client *client)
+static struct camera_common_pdata *imx274_parse_dt(struct i2c_client *client,
+				const struct camera_common_data *s_data)
 {
 	struct device_node *node = client->dev.of_node;
 	struct camera_common_pdata *board_priv_pdata;
@@ -929,7 +930,7 @@ static int imx274_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 
-	priv->pdata = imx274_parse_dt(client);
+	priv->pdata = imx274_parse_dt(client, common_data);
 	if (!priv->pdata) {
 		dev_err(&client->dev, " unable to get platform data\n");
 		return -EFAULT;

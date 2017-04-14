@@ -23,11 +23,13 @@
 
 #include <media/media-device.h>
 #include <media/media-entity.h>
+#include <media/sensor_common.h>
 #include <media/v4l2-async.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-dev.h>
 #include <media/videobuf2-core.h>
+
 #include <linux/workqueue.h>
 
 #include "core.h"
