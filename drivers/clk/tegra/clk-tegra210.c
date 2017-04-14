@@ -3738,7 +3738,6 @@ static unsigned long pll_re_vco_rate, pll_d_rate, pll_a_rate;
 static unsigned long pll_c_out1_rate;
 static unsigned long pll_a_out0_rate, pll_c4_out3_rate;
 static unsigned long pll_p_out_rate[5];
-static unsigned long pll_p_rate;
 static unsigned long pll_u_out1_rate, pll_u_out2_rate;
 static unsigned long pll_mb_rate;
 static u32 pll_m_v;
@@ -3934,14 +3933,13 @@ static void tegra210_clk_resume(void)
 	 * Since we are going to reset devices and switch clock sources in this
 	 * function, plls and secondary dividers is required to be enabled. The
 	 * actual value will be restored back later. Note that boot plls: pllm,
-	 * pllp, and pllu are already configured and enabled
+	 * pllp are already configured and enabled (pllm is enabled only if it
+	 * is used as EMC clock source, pllp is enabled always).
 	 */
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_P_OUT1], pll_p_out_rate[0]);
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_P_OUT3], pll_p_out_rate[2]);
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_P_OUT4], pll_p_out_rate[3]);
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_P_OUT5], pll_p_out_rate[4]);
-
-	tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_P], pll_p_rate);
 
 	tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_C2], pll_c2_rate);
 	tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_C3], pll_c3_rate);
@@ -3963,6 +3961,11 @@ static void tegra210_clk_resume(void)
 	tegra_clk_pllre_vco_resume(clks[TEGRA210_CLK_PLL_RE_VCO],
 					pll_re_vco_rate);
 
+	/* reprogram PLLRE post dividers  */
+	val = car_readl(PLLRE_BASE, 0);
+	val &= ~(0xf << 16);
+	car_writel(val | pll_re_out_div, PLLRE_BASE, 0);
+
 	car_writel(pll_re_out_1, PLLRE_OUT1, 0);
 
 	/* resume PLLU */
@@ -3972,24 +3975,31 @@ static void tegra210_clk_resume(void)
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_U_OUT2],
 				pll_u_out2_rate);
 
-	/* reprogram PLLE post divider */
-	val = car_readl(PLLRE_BASE, 0);
-	val &= ~(0xf << 16);
-	car_writel(val | pll_re_out_div, PLLRE_BASE, 0);
-
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_C_OUT1],
 					pll_c_out1_rate);
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_A_OUT0],
 					pll_a_out0_rate);
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_C4_OUT3],
 					pll_c4_out3_rate);
+
+	/*
+	 * resume SCLK and CPULP clocks
+	 * for SCLk 1st set safe dividers values, then restore sorce,
+	 * then restore dividers
+	 */
+	car_writel(0x1, SYSTEM_CLK_RATE, 0);
+	val = car_readl(SYS_CLK_DIV, 0);
+	i = BURST_POLICY_REG_SIZE;
+	if (val < sclk_burst_policy_ctx[i])
+		car_writel(sclk_burst_policy_ctx[i], SYS_CLK_DIV, 0);
+	udelay(2);
 	for (i = 0; i < BURST_POLICY_REG_SIZE; i++) {
 		car_writel(cclklp_burst_policy_ctx[i], CCLKLP_BURST_POLICY, i);
 		car_writel(sclk_burst_policy_ctx[i], SCLK_BURST_POLICY, i);
 	}
 	car_writel(sclk_burst_policy_ctx[i], SYS_CLK_DIV, 0);
-
 	car_writel(sclk_ctx, SYSTEM_CLK_RATE, 0);
+
 	car_writel(spare_ctx, SPARE_REG0, 0);
 	car_writel(misc_clk_enb_ctx, MISC_CLK_ENB, 0);
 	car_writel(clk_arm_ctx, CLK_MASK_ARM, 0);
@@ -3997,13 +4007,20 @@ static void tegra210_clk_resume(void)
 	/* enable all clocks before configuring clock sources */
 	tegra_clk_periph_force_on(periph_clks_on, ARRAY_SIZE(periph_clks_on),
 				clk_base);
-
 	wmb();
+	udelay(2);
 
 	for (i = 0; i < ARRAY_SIZE(periph_srcs); i++)
 		for (off = periph_srcs[i].start; off <= periph_srcs[i].end;
 			off += 4)
 			car_writel(*clk_rst_ctx++, off, 0);
+
+	/* propagate and restore resets, restore clock state */
+	udelay(5);
+	tegra_clk_periph_resume(clk_base);
+
+	/* restore (sync) the actual PLL and secondary divider values */
+	car_writel(pll_p_outb, PLLP_OUTB, 0);
 
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_U_OUT1]);
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_U_OUT2]);
@@ -4019,12 +4036,10 @@ static void tegra210_clk_resume(void)
 	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_A]);
 	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_D]);
 
-	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_P]);
-
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_C_OUT1]);
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_A_OUT0]);
 
-	tegra_clk_periph_resume(clk_base);
+	/* restore CPUG clocks */
 	parent = clk_get_parent(clks[TEGRA210_CLK_CCLK_G]);
 	if (parent != clks[TEGRA210_CLK_PLL_X])
 		tegra_clk_sync_state_iddq(clks[TEGRA210_CLK_PLL_X]);
@@ -4047,9 +4062,6 @@ static void tegra210_clk_resume(void)
 	tegra_clk_sync_state_iddq(clks[TEGRA210_CLK_PLL_MB]);
 
 	tegra210_emc_timing_invalidate();
-
-	/* restore the actual PLL and secondary divider values */
-	car_writel(pll_p_outb, PLLP_OUTB, 0);
 
 	tegra_clk_plle_tegra210_resume(clks[TEGRA210_CLK_PLL_E]);
 }
