@@ -3957,13 +3957,13 @@ static void tegra210_clk_resume(void)
 	val |= PLLD_MISC0_DSI_CLKENABLE;
 	car_writel(val, PLLD_MISC0, 0);
 
-	/* reprogram PLLRE VCO */
+	/* reprogram PLLRE post divider, VCO, 2ndary divider (in this order) */
+	if (!__clk_is_enabled(clks[TEGRA210_CLK_PLL_RE_VCO])) {
+		val = car_readl(PLLRE_BASE, 0);
+		val &= ~(0xf << 16);
+		car_writel(val | pll_re_out_div, PLLRE_BASE, 0);
+	}
 	tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_RE_VCO], pll_re_vco_rate);
-
-	/* reprogram PLLRE post dividers  */
-	val = car_readl(PLLRE_BASE, 0);
-	val &= ~(0xf << 16);
-	car_writel(val | pll_re_out_div, PLLRE_BASE, 0);
 
 	car_writel(pll_re_out_1, PLLRE_OUT1, 0);
 
