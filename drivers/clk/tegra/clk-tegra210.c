@@ -3928,7 +3928,7 @@ static void tegra210_clk_resume(void)
 	unsigned long off;
 	u32 val;
 	u32 *clk_rst_ctx = periph_clk_src_ctx;
-	struct clk *parent;
+	struct clk_hw *parent;
 
 	tegra_clk_osc_resume(clk_base);
 
@@ -4050,17 +4050,26 @@ static void tegra210_clk_resume(void)
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_C_OUT1]);
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_A_OUT0]);
 
-	/* restore CPUG clocks */
-	parent = clk_get_parent(clks[TEGRA210_CLK_CCLK_G]);
-	if (parent != clks[TEGRA210_CLK_PLL_X])
-		tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_X]);
-
+	/*
+	 * restore CPUG clocks:
+	 * - enable DFLL in open loop mode
+	 * - switch CPUG to DFLL clock source
+	 * - close DFLL loop
+	 * - sync PLLX state
+	 */
 	if (dfll_pdev)
-		tegra_dfll_resume(dfll_pdev);
+		tegra_dfll_resume(dfll_pdev, false);
 
-	/* CPU G clock restored after DFLL and PLLs */
 	for (i = 0; i < BURST_POLICY_REG_SIZE; i++)
 		car_writel(cclkg_burst_policy_ctx[i], CCLKG_BURST_POLICY, i);
+	udelay(2);
+
+	if (dfll_pdev)
+		tegra_dfll_resume(dfll_pdev, true);
+
+	parent = clk_hw_get_parent(__clk_get_hw(clks[TEGRA210_CLK_CCLK_G]));
+	if (parent != __clk_get_hw(clks[TEGRA210_CLK_PLL_X]))
+		tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_X]);
 
 	/* Disable PLL_OUT_CPU after DFLL resume */
 	val = car_readl(CLK_OUT_ENB_Y,0);

@@ -945,6 +945,7 @@ static void dfll_set_mode(struct tegra_dfll *td,
 		dfll_writel(td, val, DFLL_CC4_HVC);
 	}
 	dfll_wmb(td);
+	udelay(1);
 }
 
 /*
@@ -3008,11 +3009,19 @@ void tegra_dfll_suspend(struct platform_device *pdev)
  *
  * Re-initialize and enable target device clock in open loop mode. Called
  * directly from SoC clock resume syscore operation. Closed loop will be
- * re-entered in platform syscore ops as well.
+ * re-entered in platform syscore ops as well after CPU clock source is
+ * switched to DFLL in open loop.
  */
-void tegra_dfll_resume(struct platform_device *pdev)
+void tegra_dfll_resume(struct platform_device *pdev, bool on_dfll)
 {
 	struct tegra_dfll *td = dev_get_drvdata(&pdev->dev);
+
+	if (on_dfll) {
+		if (td->resume_mode == DFLL_CLOSED_LOOP)
+			_dfll_lock(td);
+		td->resume_mode = DFLL_DISABLED;
+		return;
+	}
 
 	reset_control_deassert(td->dvco_rst);
 
@@ -3026,22 +3035,17 @@ void tegra_dfll_resume(struct platform_device *pdev)
 
 	pm_runtime_put(td->dev);
 
-	if (td->mode <= DFLL_DISABLED)
-		return;
-
-	/* Restore last request and mode */
+	/* Restore last request and mode up to open loop */
 	switch (td->resume_mode) {
+	case DFLL_CLOSED_LOOP:
 	case DFLL_OPEN_LOOP:
 		dfll_set_mode(td, DFLL_OPEN_LOOP);
-		dfll_i2c_set_output_enabled(td, false);
-		break;
-	case DFLL_CLOSED_LOOP:
-		_dfll_lock(td);
+		if (td->pmu_if == TEGRA_DFLL_PMU_I2C)
+			dfll_i2c_set_output_enabled(td, false);
 		break;
 	default:
 		break;
 	}
-	td->resume_mode = DFLL_DISABLED;
 }
 
 /*
