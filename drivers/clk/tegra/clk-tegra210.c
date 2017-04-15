@@ -3806,6 +3806,11 @@ static u32 periph_clks_on[] = {
 	0xfc1fc7ff,
 };
 
+static inline unsigned long clk_get_rate_nolock(struct clk *clk)
+{
+	return clk_hw_get_rate(__clk_get_hw(clk));
+}
+
 static inline struct clk *pll_p_clk(unsigned int x)
 {
 	if (x < 4)
@@ -3847,25 +3852,25 @@ static int tegra210_clk_suspend(void)
 	u32 *clk_rst_ctx = periph_clk_src_ctx;
 	u32 val;
 
-	pll_a_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_A]);
-	pll_a_out0_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_A_OUT0]);
-	pll_a1_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_A1]);
-	pll_c2_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C2]);
-	pll_c3_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C3]);
-	pll_c_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C]);
-	pll_c_out1_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C_OUT1]);
-	pll_x_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_X]);
-	pll_c4_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C4]);
-	pll_c4_out3_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C4_OUT3]);
-	pll_dp_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_DP]);
-	pll_d_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_D]);
-	pll_d2_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_D2]);
-	pll_re_vco_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_RE_VCO]);
+	pll_a_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_A]);
+	pll_a_out0_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_A_OUT0]);
+	pll_a1_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_A1]);
+	pll_c2_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_C2]);
+	pll_c3_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_C3]);
+	pll_c_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_C]);
+	pll_c_out1_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_C_OUT1]);
+	pll_x_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_X]);
+	pll_c4_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_C4]);
+	pll_c4_out3_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_C4_OUT3]);
+	pll_dp_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_DP]);
+	pll_d_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_D]);
+	pll_d2_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_D2]);
+	pll_re_vco_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_RE_VCO]);
 	pll_re_out_div = car_readl(PLLRE_BASE, 0) & (0xf << 16);
 	pll_re_out_1 = car_readl(PLLRE_OUT1, 0);
-	pll_u_out1_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_U_OUT1]);
-	pll_u_out2_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_U_OUT2]);
-	pll_mb_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_MB]);
+	pll_u_out1_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_U_OUT1]);
+	pll_u_out2_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_U_OUT2]);
+	pll_mb_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_MB]);
 	pll_m_v = car_readl(PLLM_BASE, 0);
 	pll_p_outb = car_readl(PLLP_OUTB, 0);
 
@@ -3873,7 +3878,7 @@ static int tegra210_clk_suspend(void)
 		cpu_softrst_ctx[i] = car_readl(CPU_SOFTRST_CTRL, i);
 
 	for (i = 0; i < ARRAY_SIZE(pll_p_out_rate); i++)
-		pll_p_out_rate[i] = clk_get_rate(pll_p_clk(i));
+		pll_p_out_rate[i] = clk_get_rate_nolock(pll_p_clk(i));
 
 	for (i = 0; i < BURST_POLICY_REG_SIZE; i++) {
 		cclkg_burst_policy_ctx[i] = car_readl(CCLKG_BURST_POLICY, i);
@@ -3905,7 +3910,7 @@ static int tegra210_clk_suspend(void)
 	if (dfll_pdev)
 		tegra_dfll_suspend(dfll_pdev);
 
-	emc_rate = clk_get_rate(clks[TEGRA210_CLK_EMC]);
+	emc_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_EMC]);
 	tegra210_emc_clk_suspend(clks[TEGRA210_CLK_EMC], emc_rate);
 
 	/* Enable PLLP_OUT_CPU after dfll suspend */
