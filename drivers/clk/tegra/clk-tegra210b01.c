@@ -2298,7 +2298,7 @@ static int tegra210b01_enable_pllu(void)
 	return 0;
 }
 
-static int tegra210b01_init_pllu(void)
+int tegra210b01_init_pllu(void)
 {
 	u32 reg;
 	int err;

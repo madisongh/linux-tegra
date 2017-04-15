@@ -3975,7 +3975,11 @@ static void tegra210_clk_resume(void)
 	car_writel(pll_re_out_1, PLLRE_OUT1, 0);
 
 	/* resume PLLU */
-	tegra210_init_pllu();
+	if (t210b01)
+		tegra210b01_init_pllu();
+	else
+		tegra210_init_pllu();
+
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_U_OUT1],
 				pll_u_out1_rate);
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_U_OUT2],
