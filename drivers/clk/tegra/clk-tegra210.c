@@ -3734,7 +3734,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
 #ifdef CONFIG_PM_SLEEP
 static unsigned long pll_c_rate, pll_c2_rate, pll_c3_rate, pll_x_rate;
 static unsigned long pll_c4_rate, pll_d2_rate, pll_dp_rate;
-static unsigned long pll_re_vco_rate, pll_d_rate, pll_a_rate;
+static unsigned long pll_re_vco_rate, pll_d_rate, pll_a_rate, pll_a1_rate;
 static unsigned long pll_c_out1_rate;
 static unsigned long pll_a_out0_rate, pll_c4_out3_rate;
 static unsigned long pll_p_out_rate[5];
@@ -3849,6 +3849,7 @@ static int tegra210_clk_suspend(void)
 
 	pll_a_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_A]);
 	pll_a_out0_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_A_OUT0]);
+	pll_a1_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_A1]);
 	pll_c2_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C2]);
 	pll_c3_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C3]);
 	pll_c_rate = clk_get_rate(clks[TEGRA210_CLK_PLL_C]);
@@ -3941,6 +3942,7 @@ static void tegra210_clk_resume(void)
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_P_OUT4], pll_p_out_rate[3]);
 	tegra_clk_pll_out_resume(clks[TEGRA210_CLK_PLL_P_OUT5], pll_p_out_rate[4]);
 
+	tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_A1], pll_a1_rate);
 	tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_C2], pll_c2_rate);
 	tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_C3], pll_c3_rate);
 	tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_C], pll_c_rate);
@@ -4024,6 +4026,7 @@ static void tegra210_clk_resume(void)
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_U_OUT1]);
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_U_OUT2]);
 
+	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_A1]);
 	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_C2]);
 	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_C3]);
 	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_C]);
