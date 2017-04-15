@@ -44,6 +44,8 @@
 #define TEGRA_MEM_FORMAT 0
 #define TEGRA_ISP_FORMAT 1
 
+struct tegra_mipi_context;
+
 enum channel_capture_state {
 	CAPTURE_IDLE = 0,
 	CAPTURE_GOOD,
@@ -204,6 +206,7 @@ struct tegra_channel {
 	struct vi_notify_channel *vnc[TEGRA_CSI_BLOCKS];
 	int vnc_id[TEGRA_CSI_BLOCKS];
 	int grp_id;
+	struct tegra_mipi_context *mipical_ctx;
 };
 
 #define to_tegra_channel(vdev) \
@@ -262,7 +265,6 @@ struct tegra_mc_vi {
 	struct mutex bw_update_lock;
 	unsigned long aggregated_kbyteps;
 	unsigned long max_requested_hz;
-	struct mutex mipical_lock;
 
 	bool bypass;
 
@@ -332,7 +334,8 @@ struct tegra_csi_fops {
 		enum tegra_csi_port_num port_num);
 	void (*csi_override_format)(struct tegra_csi_channel *chan,
 		enum tegra_csi_port_num port_num);
-	int (*mipical)(struct tegra_csi_channel *chan);
+	int (*mipical)(struct tegra_csi_channel *chan,
+			struct tegra_mipi_context **ctx);
 	int (*hw_init)(struct tegra_csi_device *csi);
 };
 
