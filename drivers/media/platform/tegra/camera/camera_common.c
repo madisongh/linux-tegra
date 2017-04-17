@@ -108,6 +108,8 @@ int camera_common_g_ctrl(struct camera_common_data *s_data,
 	return -EFAULT;
 }
 
+EXPORT_SYMBOL_GPL(camera_common_g_ctrl);
+
 int camera_common_regulator_get(struct i2c_client *client,
 		       struct regulator **vreg, const char *vreg_name)
 {
@@ -127,6 +129,8 @@ int camera_common_regulator_get(struct i2c_client *client,
 	*vreg = reg;
 	return err;
 }
+
+EXPORT_SYMBOL_GPL(camera_common_regulator_get);
 
 int camera_common_parse_clocks(struct i2c_client *client,
 			struct camera_common_pdata *pdata)
@@ -188,6 +192,8 @@ int camera_common_parse_clocks(struct i2c_client *client,
 	return 0;
 }
 
+EXPORT_SYMBOL_GPL(camera_common_parse_clocks);
+
 int camera_common_parse_ports(struct i2c_client *client,
 			      struct camera_common_data *s_data)
 {
@@ -227,6 +233,8 @@ int camera_common_parse_ports(struct i2c_client *client,
 
 	return 0;
 }
+
+EXPORT_SYMBOL_GPL(camera_common_parse_ports);
 
 int camera_common_debugfs_show(struct seq_file *s, void *unused)
 {
@@ -324,6 +332,8 @@ void camera_common_remove_debugfs(
 	s_data->debugdir = NULL;
 }
 
+EXPORT_SYMBOL_GPL(camera_common_remove_debugfs);
+
 void camera_common_create_debugfs(
 		struct camera_common_data *s_data,
 		const char *name)
@@ -351,6 +361,8 @@ remove_debugfs:
 	camera_common_remove_debugfs(s_data);
 }
 
+EXPORT_SYMBOL_GPL(camera_common_create_debugfs);
+
 /* Find a data format by a pixel code in an array */
 const struct camera_common_colorfmt *camera_common_find_datafmt(
 		unsigned int code)
@@ -363,7 +375,7 @@ const struct camera_common_colorfmt *camera_common_find_datafmt(
 
 	return NULL;
 }
-EXPORT_SYMBOL(camera_common_find_datafmt);
+EXPORT_SYMBOL_GPL(camera_common_find_datafmt);
 
 int camera_common_enum_mbus_code(struct v4l2_subdev *sd,
 				struct v4l2_subdev_pad_config *cfg,
@@ -389,7 +401,7 @@ int camera_common_enum_mbus_code(struct v4l2_subdev *sd,
 	code->code = mbus_code;
 	return 0;
 }
-EXPORT_SYMBOL(camera_common_enum_mbus_code);
+EXPORT_SYMBOL_GPL(camera_common_enum_mbus_code);
 
 int camera_common_enum_fmt(struct v4l2_subdev *sd, unsigned int index,
 			unsigned int *code)
@@ -508,6 +520,8 @@ verify_code:
 	return err;
 }
 
+EXPORT_SYMBOL_GPL(camera_common_try_fmt);
+
 int camera_common_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -528,6 +542,8 @@ int camera_common_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 	return ret;
 }
 
+EXPORT_SYMBOL_GPL(camera_common_s_fmt);
+
 int camera_common_g_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -547,6 +563,8 @@ int camera_common_g_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 
 	return 0;
 }
+
+EXPORT_SYMBOL_GPL(camera_common_g_fmt);
 
 static int camera_common_evaluate_color_format(struct v4l2_subdev *sd,
 					       int pixelformat)
@@ -598,7 +616,7 @@ int camera_common_enum_framesizes(struct v4l2_subdev *sd,
 		s_data->frmfmt[fse->index].size.height;
 	return 0;
 }
-EXPORT_SYMBOL(camera_common_enum_framesizes);
+EXPORT_SYMBOL_GPL(camera_common_enum_framesizes);
 
 int camera_common_enum_frameintervals(struct v4l2_subdev *sd,
 		struct v4l2_subdev_pad_config *cfg,
@@ -635,7 +653,7 @@ int camera_common_enum_frameintervals(struct v4l2_subdev *sd,
 
 	return 0;
 }
-EXPORT_SYMBOL(camera_common_enum_frameintervals);
+EXPORT_SYMBOL_GPL(camera_common_enum_frameintervals);
 
 static void camera_common_mclk_disable(struct camera_common_data *s_data)
 {
@@ -736,6 +754,8 @@ int camera_common_s_power(struct v4l2_subdev *sd, int on)
 	return err;
 }
 
+EXPORT_SYMBOL_GPL(camera_common_s_power);
+
 int camera_common_g_mbus_config(struct v4l2_subdev *sd,
 				struct v4l2_mbus_config *cfg)
 {
@@ -746,6 +766,8 @@ int camera_common_g_mbus_config(struct v4l2_subdev *sd,
 
 	return 0;
 }
+
+EXPORT_SYMBOL_GPL(camera_common_g_mbus_config);
 
 int camera_common_focuser_s_power(struct v4l2_subdev *sd, int on)
 {
@@ -764,6 +786,8 @@ int camera_common_focuser_s_power(struct v4l2_subdev *sd, int on)
 
 	return err;
 }
+
+EXPORT_SYMBOL_GPL(camera_common_focuser_s_power);
 
 int camera_common_focuser_init(struct camera_common_focuser_data *s_data)
 {
