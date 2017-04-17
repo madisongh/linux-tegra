@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -65,8 +65,8 @@ static u8 __init get_speedo_revision(void)
 	       tegra_fuse_read_spare(2) << 0;
 }
 
-static void __init rev_sku_to_speedo_ids(struct tegra_sku_info *sku_info,
-					 u8 speedo_rev, int *threshold)
+static void __init rev_t210sku_to_speedo_ids(struct tegra_sku_info *sku_info,
+					     u8 speedo_rev, int *threshold)
 {
 	int sku = sku_info->sku_id;
 	int rev = sku_info->revision;
@@ -160,6 +160,50 @@ static void __init rev_sku_to_speedo_ids(struct tegra_sku_info *sku_info,
 	}
 }
 
+static void __init rev_t210b01sku_to_speedo_ids(struct tegra_sku_info *sku_info,
+						u8 speedo_rev, int *threshold)
+{
+	int sku = sku_info->sku_id;
+	int rev = sku_info->revision;
+
+	/* Assign to default */
+	sku_info->cpu_speedo_id = 0;
+	sku_info->soc_speedo_id = 0;
+	sku_info->gpu_speedo_id = 1;	/* T210b01 GPC PLL default NA mode */
+	sku_info->ucm = TEGRA_UCM1;
+	*threshold = THRESHOLD_INDEX_0;
+
+	switch (sku) {
+	case 0x00: /* Engineering SKU */
+		break;
+	default:
+		pr_err("Tegra210b01: invalid combination of SKU/revision/mode:\n");
+		pr_err("Tegra210: SKU %#04x, rev %d\n", sku, rev);
+		/* Using the default for the error case */
+		break;
+	}
+}
+
+static bool __init is_t210b01_sku(struct tegra_sku_info *sku_info)
+{
+	switch (sku_info->id_and_rev) {
+	case TEGRA210B01_REVISION_A01:
+		return true;
+	default:
+		break;
+	}
+	return false;
+}
+
+static void __init rev_sku_to_speedo_ids(struct tegra_sku_info *sku_info,
+					 u8 speedo_rev, int *threshold)
+{
+	if (is_t210b01_sku(sku_info))
+		rev_t210b01sku_to_speedo_ids(sku_info, speedo_rev, threshold);
+
+	rev_t210sku_to_speedo_ids(sku_info, speedo_rev, threshold);
+}
+
 static int get_process_id(int value, const u32 *speedos, unsigned int num)
 {
 	unsigned int i;
@@ -175,7 +219,7 @@ void __init tegra210_init_speedo_data(struct tegra_sku_info *sku_info)
 {
 	int cpu_speedo[3], soc_speedo[3];
 	unsigned int index;
-	u8 speedo_revision;
+	u8 speedo_revision = 0;
 
 	BUILD_BUG_ON(ARRAY_SIZE(cpu_process_speedos) !=
 			THRESHOLD_INDEX_COUNT);
@@ -201,21 +245,35 @@ void __init tegra210_init_speedo_data(struct tegra_sku_info *sku_info)
 	 * Determine CPU, GPU and SoC speedo values depending on speedo fusing
 	 * revision. Note that GPU speedo value is fused in CPU_SPEEDO_2.
 	 */
-	speedo_revision = get_speedo_revision();
-	sku_info->speedo_rev = speedo_revision;
-
-	if (speedo_revision >= 3) {
+	if (is_t210b01_sku(sku_info)) {
 		sku_info->cpu_speedo_value = cpu_speedo[0];
 		sku_info->gpu_speedo_value = cpu_speedo[2];
 		sku_info->soc_speedo_value = soc_speedo[0];
-	} else if (speedo_revision == 2) {
-		sku_info->cpu_speedo_value = (-1938 + (1095 * cpu_speedo[0] / 100)) / 10;
-		sku_info->gpu_speedo_value = (-1662 + (1082 * cpu_speedo[2] / 100)) / 10;
-		sku_info->soc_speedo_value = ( -705 + (1037 * soc_speedo[0] / 100)) / 10;
+
+		/* FIXME Remove hack to set fixed speedo value */
+		sku_info->cpu_speedo_value = 1452;
+		sku_info->gpu_speedo_value = 1452;
+
 	} else {
-		sku_info->cpu_speedo_value = 2100;
-		sku_info->gpu_speedo_value = cpu_speedo[2] - 75;
-		sku_info->soc_speedo_value = 1900;
+		speedo_revision = get_speedo_revision();
+		sku_info->speedo_rev = speedo_revision;
+
+		if (speedo_revision >= 3) {
+			sku_info->cpu_speedo_value = cpu_speedo[0];
+			sku_info->gpu_speedo_value = cpu_speedo[2];
+			sku_info->soc_speedo_value = soc_speedo[0];
+		} else if (speedo_revision == 2) {
+			sku_info->cpu_speedo_value =
+				(-1938 + (1095 * cpu_speedo[0] / 100)) / 10;
+			sku_info->gpu_speedo_value =
+				(-1662 + (1082 * cpu_speedo[2] / 100)) / 10;
+			sku_info->soc_speedo_value =
+				(-705 + (1037 * soc_speedo[0] / 100)) / 10;
+		} else {
+			sku_info->cpu_speedo_value = 2100;
+			sku_info->gpu_speedo_value = cpu_speedo[2] - 75;
+			sku_info->soc_speedo_value = 1900;
+		}
 	}
 
 	if ((sku_info->cpu_speedo_value <= 0) ||
