@@ -71,6 +71,7 @@ struct cvb_table {
 	int voltage_scale;
 	struct cvb_table_freq_entry cvb_table[MAX_DVFS_FREQS];
 	struct cvb_cpu_dfll_data cpu_dfll_data;
+	struct cvb_coefficients vmin_coefficients;
 };
 
 struct thermal_table {
@@ -96,7 +97,8 @@ const struct cvb_table *tegra_cvb_build_opp_table(
 		int speedo_id,
 		int speedo_value,
 		unsigned long max_rate,
-		struct device *opp_dev);
+		struct device *opp_dev,
+		int *vmin);
 int tegra_round_voltage(int mv, const struct rail_alignment *align, int up);
 #else
 static inline const struct cvb_table *tegra_cvb_build_opp_table(
@@ -107,7 +109,8 @@ static inline const struct cvb_table *tegra_cvb_build_opp_table(
 		int speedo_id,
 		int speedo_value,
 		unsigned long max_rate,
-		struct device *opp_dev)
+		struct device *opp_dev,
+		int *vmin)
 {
 	return ERR_PTR(-ENODEV);
 }

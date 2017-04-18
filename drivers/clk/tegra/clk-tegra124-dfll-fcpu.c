@@ -624,14 +624,14 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 				&align,
 				process_id, speedo_id, speedo_value,
 				max_freq,
-				soc->dev);
+				soc->dev,
+				&soc->min_millivolts);
 	if (IS_ERR(cvb)) {
 		dev_err(&pdev->dev, "couldn't build OPP table: %ld\n",
 			PTR_ERR(cvb));
 		return PTR_ERR(cvb);
 	}
 
-	soc->min_millivolts = cvb->min_millivolts;
 	soc->alignment.step_uv = align.step_uv;
 	soc->alignment.offset_uv = align.offset_uv;
 	soc->tune0_low = cvb->cpu_dfll_data.tune0_low;
