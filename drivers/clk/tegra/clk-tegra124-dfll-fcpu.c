@@ -573,6 +573,8 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 	const struct dfll_fcpu_data *fcpu_data;
 	const struct thermal_table *thermal;
 	bool ucm2;
+	unsigned long max_freq;
+	u32 f;
 
 	of_id = of_match_device(tegra124_dfll_fcpu_of_match, &pdev->dev);
 	fcpu_data = of_id->data;
@@ -587,6 +589,10 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 			speedo_id);
 		return -ENODEV;
 	}
+	max_freq = fcpu_data->cpu_max_freq_table[speedo_id];
+	if (!of_property_read_u32(pdev->dev.of_node, "nvidia,dfll-max-freq-khz",
+				  &f))
+		max_freq = min(max_freq, f * 1000UL);
 
 	soc = devm_kzalloc(&pdev->dev, sizeof(*soc), GFP_KERNEL);
 	if (!soc)
@@ -617,7 +623,7 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 				fcpu_data->cpu_cvb_tables_size,
 				&align,
 				process_id, speedo_id, speedo_value,
-				fcpu_data->cpu_max_freq_table[speedo_id],
+				max_freq,
 				soc->dev);
 	if (IS_ERR(cvb)) {
 		dev_err(&pdev->dev, "couldn't build OPP table: %ld\n",
