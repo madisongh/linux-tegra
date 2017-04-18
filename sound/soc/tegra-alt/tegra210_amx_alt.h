@@ -183,8 +183,10 @@ struct tegra210_amx {
 	struct regmap *regmap;
 	unsigned int map[TEGRA210_AMX_RAM_DEPTH];
 	unsigned int byte_mask[2];
-	int input_channels[TEGRA210_AMX_NUM_INPUTS];
 	int output_channels;
+	int output_bits_format;
+	int input_channels[TEGRA210_AMX_NUM_INPUTS];
+	int input_bits_format[TEGRA210_AMX_NUM_INPUTS];
 	const struct tegra210_amx_soc_data *soc_data;
 	bool is_shutdown;
 };
