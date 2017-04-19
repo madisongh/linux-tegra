@@ -3,7 +3,7 @@
  *
  * Author: Dara Ramesh <dramesh@nvidia.com>
  *
- * Copyright (C) 2014-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2014-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -205,5 +205,7 @@ static inline int tegra_adma_init(struct platform_device *pdev,
 {
 	return 0;
 }
+
+void tegra_adma_dump_ch_reg(void);
 
 #endif

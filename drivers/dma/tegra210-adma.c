@@ -1689,6 +1689,46 @@ static int tegra_adma_runtime_resume(struct device *dev)
 	return 0;
 }
 
+/* Add function to dump the register status during hung trigger */
+void tegra_adma_dump_ch_reg(void)
+{
+	struct platform_device *pdev = to_platform_device(dma_device);
+	struct tegra_adma *tdma = platform_get_drvdata(pdev);
+	int i, chan_base_offset;
+#if defined(CONFIG_TEGRA186_ADMA)
+	int max_ch = 32;
+#else
+	int max_ch = 22;
+#endif
+
+	/* Enable clock before accessing registers */
+	pm_runtime_get_sync(tdma->dev);
+	dev_err(tdma->dev, "======= ADMA Register Dump ========\n");
+	for (i = 0; i < max_ch; i++) {
+		chan_base_offset = tdma->chip_data->channel_reg_size * i;
+		dev_err(tdma->dev, "ADMA_PAGE1_CH%d_CMD_0 = %x\n",
+			i, readl(tdma->base_addr + chan_base_offset + 0x0));
+		dev_err(tdma->dev, "ADMA_PAGE1_CH%d_STATUS_0 = %x\n",
+			i, readl(tdma->base_addr + chan_base_offset + 0xc));
+		dev_err(tdma->dev, "ADMA_PAGE1_CH%d_CTRL_0 = %x\n",
+			i, readl(tdma->base_addr + chan_base_offset + 0x24));
+		dev_err(tdma->dev, "ADMA_PAGE1_CH%d_CONFIG_0 = %x\n",
+			i, readl(tdma->base_addr + chan_base_offset + 0x28));
+		dev_err(tdma->dev, "ADMA_PAGE1_CH%d_AHUB_FIFO_CTRL_0 = %x\n",
+			i, readl(tdma->base_addr + chan_base_offset + 0x2c));
+		dev_err(tdma->dev, "ADMA_PAGE1_CH%d_TC_STATUS_0 = %x\n",
+			i, readl(tdma->base_addr + chan_base_offset + 0x30));
+		dev_err(tdma->dev, "ADMA_PAGE1_CH%d_LOWER_SOURCE_ADDR_0 = %x\n",
+			i, readl(tdma->base_addr + chan_base_offset + 0x34));
+		dev_err(tdma->dev, "ADMA_PAGE1_CH%d_LOWER_TARGET_ADDR_0 = %x\n",
+			i, readl(tdma->base_addr + chan_base_offset + 0x3c));
+		dev_err(tdma->dev, "ADMA_PAGE1_CH%d_TRANSFER_STATUS_0 = %x\n",
+			i, readl(tdma->base_addr + chan_base_offset + 0x54));
+	}
+	pm_runtime_put_sync(tdma->dev);
+}
+EXPORT_SYMBOL_GPL(tegra_adma_dump_ch_reg);
+
 #ifdef CONFIG_PM_SLEEP
 static int tegra_adma_pm_suspend(struct device *dev)
 {
