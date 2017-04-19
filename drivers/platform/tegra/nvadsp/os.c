@@ -49,6 +49,8 @@
 #include "hwmailbox.h"
 #include "log_state.h"
 
+extern void tegra_adma_dump_ch_reg(void);
+
 #define NVADSP_ELF "adsp.elf"
 #define NVADSP_FIRMWARE NVADSP_ELF
 
@@ -1284,6 +1286,7 @@ void dump_adsp_sys(void)
 	dump_adsp_logs();
 	dump_mailbox_regs();
 	get_adsp_state();
+	tegra_adma_dump_ch_reg();
 	print_agic_irq_states();
 }
 EXPORT_SYMBOL(dump_adsp_sys);
