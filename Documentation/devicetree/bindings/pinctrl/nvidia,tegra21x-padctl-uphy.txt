@@ -60,6 +60,11 @@ Optional properties:
 - nvidia,usb2-map: USB2 port (0/1/2/3) to which the USB3 port is mapped.
 - nvidia,port-cap: USB port capability.
 - nvidia,pcie-controller: pcie controller number which the lane is assigned.
+- nvidia,usb3-port-fake: Faked USB3 port (0/1/2/3) to which USB2 port is mapped.
+  This property is required to support T210 device mode on "USB2.0 only" port.
+  Driver configures only XUSB_PADCTL_SS_PORT_MAP_0 & XUSB_PADCTL_ELPG_PROGRAM_1
+  for specified USB3 port without assign corresponding UPHY lane to USB3.
+  This property is only valid for function "xusb".
 
 Note that not all of these properties are valid for all lanes. Lanes can be
 divided into four groups:

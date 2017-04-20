@@ -381,6 +381,7 @@ struct tegra_pcie_controller {
 
 struct tegra_xusb_utmi_port {
 	enum xusb_port_cap port_cap;
+	int usb3_port_fake;
 };
 
 struct tegra_xusb_hsic_port {
@@ -1396,6 +1397,7 @@ enum tegra_xusb_padctl_param {
 	TEGRA_PADCTL_UPHY_HSIC_PRETEND_CONNECTED,
 	TEGRA_PADCTL_UPHY_USB2_MAP,
 	TEGRA_PADCTL_UPHY_PCIE_LANE_SELECT,
+	TEGRA_PADCTL_UPHY_USB3_PORT_FAKE,
 };
 
 static const struct tegra_padctl_uphy_property {
@@ -1408,6 +1410,7 @@ static const struct tegra_padctl_uphy_property {
 	{"nvidia,pretend-connected", TEGRA_PADCTL_UPHY_HSIC_PRETEND_CONNECTED},
 	{"nvidia,usb2-map", TEGRA_PADCTL_UPHY_USB2_MAP},
 	{"nvidia,pcie-lane-select", TEGRA_PADCTL_UPHY_PCIE_LANE_SELECT},
+	{"nvidia,usb3-port-fake", TEGRA_PADCTL_UPHY_USB3_PORT_FAKE},
 };
 
 #define TEGRA_XUSB_PADCTL_PACK(param, value) ((param) << 16 | (value))
@@ -1858,6 +1861,26 @@ static int tegra_padctl_uphy_pinconf_group_set(struct pinctrl_dev *pinctrl,
 				dev_err(dev,
 			"PCIE lane select is not applicable for pin %d\n",
 					group);
+				return -EINVAL;
+			}
+
+			break;
+
+		case TEGRA_PADCTL_UPHY_USB3_PORT_FAKE:
+			if (value >= TEGRA_USB3_PHYS) {
+				dev_err(dev, "Invalid USB3 port: %lu\n", value);
+				return -EINVAL;
+			}
+
+			if (lane_is_otg(group)) {
+				int port = group - PIN_OTG_0;
+
+				uphy->utmi_ports[port].usb3_port_fake = value;
+				TRACE(dev,
+			"UTMI port %d faked maping to USB3 port %lu\n",
+					port, value);
+			} else {
+				dev_err(dev, "nvidia,usb3-port-fake is only valid in OTG ports\n");
 				return -EINVAL;
 			}
 
@@ -2943,11 +2966,39 @@ static int tegra21x_utmi_phy_power_on(struct phy *phy)
 	char prod_name[] = "prod_c_utmiX";
 	int err;
 	u32 reg;
+	int usb3_port_fake;
 
 	if (port < 0)
 		return port;
 
 	TRACE(uphy->dev, "power on UTMI port %d\n",  port);
+
+	usb3_port_fake = uphy->utmi_ports[port].usb3_port_fake;
+
+	if (usb3_port_fake != -1) {
+		TRACE(uphy->dev, "Faked map SSP%d to HSP%d for device mode\n",
+			usb3_port_fake, port);
+		reg = padctl_readl(uphy, XUSB_PADCTL_SS_PORT_MAP_0);
+		reg &= ~SS_PORT_MAP(usb3_port_fake, SS_PORT_MAP_PORT_DISABLED);
+		reg |= SS_PORT_MAP(usb3_port_fake, port);
+		padctl_writel(uphy, reg, XUSB_PADCTL_SS_PORT_MAP_0);
+
+		reg = padctl_readl(uphy, XUSB_PADCTL_ELPG_PROGRAM_1);
+		reg &= ~SSPX_ELPG_VCORE_DOWN(usb3_port_fake);
+		padctl_writel(uphy, reg, XUSB_PADCTL_ELPG_PROGRAM_1);
+
+		usleep_range(100, 200);
+
+		reg = padctl_readl(uphy, XUSB_PADCTL_ELPG_PROGRAM_1);
+		reg &= ~SSPX_ELPG_CLAMP_EN_EARLY(usb3_port_fake);
+		padctl_writel(uphy, reg, XUSB_PADCTL_ELPG_PROGRAM_1);
+
+		usleep_range(100, 200);
+
+		reg = padctl_readl(uphy, XUSB_PADCTL_ELPG_PROGRAM_1);
+		reg &= ~SSPX_ELPG_CLAMP_EN(usb3_port_fake);
+		padctl_writel(uphy, reg, XUSB_PADCTL_ELPG_PROGRAM_1);
+	}
 
 	sprintf(prod_name, "prod_c_utmi%d", port);
 	err = tegra_prod_set_by_name(&uphy->padctl_regs, prod_name,
@@ -3034,11 +3085,38 @@ static int tegra21x_utmi_phy_power_off(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
 	int port = utmi_phy_to_port(phy);
+	u32 reg;
+	int usb3_port_fake;
 
 	if (port < 0)
 		return port;
 
 	TRACE(uphy->dev, "power off UTMI port %d\n", port);
+
+	usb3_port_fake = uphy->utmi_ports[port].usb3_port_fake;
+
+	if (usb3_port_fake != -1) {
+		reg = padctl_readl(uphy, XUSB_PADCTL_ELPG_PROGRAM_1);
+		reg |= SSPX_ELPG_CLAMP_EN_EARLY(usb3_port_fake);
+		padctl_writel(uphy, reg, XUSB_PADCTL_ELPG_PROGRAM_1);
+
+		usleep_range(100, 200);
+
+		reg = padctl_readl(uphy, XUSB_PADCTL_ELPG_PROGRAM_1);
+		reg |= SSPX_ELPG_CLAMP_EN(usb3_port_fake);
+		padctl_writel(uphy, reg, XUSB_PADCTL_ELPG_PROGRAM_1);
+
+		usleep_range(100, 200);
+
+		reg = padctl_readl(uphy, XUSB_PADCTL_ELPG_PROGRAM_1);
+		reg |= SSPX_ELPG_VCORE_DOWN(usb3_port_fake);
+		padctl_writel(uphy, reg, XUSB_PADCTL_ELPG_PROGRAM_1);
+
+		reg = padctl_readl(uphy, XUSB_PADCTL_SS_PORT_MAP_0);
+		reg |= SS_PORT_MAP(usb3_port_fake,
+					SS_PORT_MAP_PORT_DISABLED);
+		padctl_writel(uphy, reg, XUSB_PADCTL_SS_PORT_MAP_0);
+	}
 
 	mutex_lock(&uphy->lock);
 
@@ -4282,6 +4360,9 @@ static int tegra21x_padctl_uphy_probe(struct platform_device *pdev)
 	 */
 	for (i = 0; i < TEGRA_USB3_PHYS; i++)
 		uphy->usb3_ports[i].uphy_lane = T21x_UPHY_LANES;
+
+	for (i = 0; i < TEGRA_UTMI_PHYS; i++)
+		uphy->utmi_ports[i].usb3_port_fake = -1;
 
 	uphy->pinctrl = pinctrl_register(&uphy->desc, &pdev->dev, uphy);
 	if (!uphy->pinctrl) {
