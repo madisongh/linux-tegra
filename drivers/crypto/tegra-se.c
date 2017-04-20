@@ -3421,7 +3421,7 @@ struct device *get_se_device(void)
 }
 EXPORT_SYMBOL(get_se_device);
 
-static int __maybe_unused tegra_se_suspend(struct device *dev)
+static int tegra_se_suspend(struct device *dev)
 {
 	int ret = 0;
 	ret = se_suspend(dev, false);
@@ -3429,7 +3429,7 @@ static int __maybe_unused tegra_se_suspend(struct device *dev)
 	return ret;
 }
 
-static int __maybe_unused tegra_se_resume(struct device *dev)
+static int tegra_se_resume(struct device *dev)
 {
 	struct tegra_se_dev *se_dev = sg_tegra_se_dev;
 
