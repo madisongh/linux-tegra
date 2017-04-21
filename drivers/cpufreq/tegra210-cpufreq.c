@@ -183,7 +183,7 @@ static int cpufreq_table_make_from_dt(void)
 	const char *propname = "freq-table";
 	struct device_node *np = NULL;
 	u32 *freqs = NULL;
-	int i, freqs_num;
+	int i, j, freqs_num;
 	int ret = 0;
 
 	ftbl = devm_kzalloc(dev,
@@ -228,9 +228,12 @@ static int cpufreq_table_make_from_dt(void)
 	}
 
 	/* Fill in scaling table data */
-	for (i = 0; i < freqs_num; i++) {
-		ftbl[i].driver_data = 0;
-		ftbl[i].frequency = freqs[i];
+	for (i = 0, j = 0; j < freqs_num; j++) {
+		if (clk_round_rate(tfreq_priv->cpu_clk, freqs[j] * 1000) > 0) {
+			ftbl[i].driver_data = 0;
+			ftbl[i].frequency = freqs[j];
+			i++;
+		}
 	}
 	ftbl[i].driver_data = 0;
 	ftbl[i].frequency = CPUFREQ_TABLE_END;
@@ -246,7 +249,7 @@ static int cpufreq_table_make_from_dt(void)
 	 */
 	tftbl->suspend_index = 0;
 	tftbl->throttle_lowest_index = 0;
-	tftbl->throttle_highest_index = freqs_num - 1;
+	tftbl->throttle_highest_index = i - 1;
 
 err_out:
 	kfree(freqs);
@@ -381,11 +384,12 @@ static int tegra_cpufreq_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, tfreq_priv);
 	tfreq_priv->pdev = pdev;
-	ret = cpufreq_table_make_from_dt();
+
+	ret = enable_cpu_clk();
 	if (ret)
 		goto err_out;
 
-	ret = enable_cpu_clk();
+	ret = cpufreq_table_make_from_dt();
 	if (ret)
 		goto err_out;
 
