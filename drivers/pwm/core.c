@@ -598,9 +598,6 @@ int pwm_set_ramp_time(struct pwm_device *pwm, int ramp_time)
 	if (!pwm || ramp_time < 0)
 		return -EINVAL;
 
-	if (pwm->duty_cycle  && (pwm->duty_cycle  <= ramp_time))
-		return -EINVAL;
-
 	if (!pwm->chip->ops->set_ramp_time)
 		return -ENOTSUPP;
 
