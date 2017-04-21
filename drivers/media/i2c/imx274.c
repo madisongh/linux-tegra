@@ -74,6 +74,7 @@ static const struct regmap_config sensor_regmap_config = {
 	.reg_bits = 16,
 	.val_bits = 8,
 	.cache_type = REGCACHE_RBTREE,
+	.use_single_rw = true,
 };
 
 static int imx274_s_ctrl(struct v4l2_ctrl *ctrl);
