@@ -437,7 +437,7 @@ static int tegra_pwm_remove(struct platform_device *pdev)
 
 static const struct tegra_pwm_soc tegra20_pwm_soc = {
 	.num_channels = 4,
-	.max_clk_limit = 38400000UL, /* 38.4MHz */
+	.max_clk_limit = 48000000UL, /* 48MHz */
 };
 
 static const struct tegra_pwm_soc tegra186_pwm_soc = {
