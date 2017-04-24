@@ -2424,9 +2424,18 @@ static void tegra_i2c_shutdown(struct platform_device *pdev)
 static int tegra_i2c_suspend(struct device *dev)
 {
 	struct tegra_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+	int ret;
 
 	i2c_lock_adapter(&i2c_dev->adapter);
 	i2c_dev->is_suspended = true;
+
+	ret = tegra_i2c_clock_enable(i2c_dev);
+	if (ret < 0) {
+		dev_err(i2c_dev->dev, "suspend: clock enable failed %d\n", ret);
+		return ret;
+	}
+	reset_control_reset(i2c_dev->rst);
+	tegra_i2c_clock_disable(i2c_dev);
 
 	if (i2c_dev->is_clkon_always)
 		tegra_i2c_clock_disable(i2c_dev);
