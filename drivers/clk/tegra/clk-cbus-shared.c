@@ -422,20 +422,6 @@ static int _simple_shared_update(struct tegra_clk_cbus_shared *bus)
 	return err;
 }
 
-static int _connect_shared_update(struct tegra_clk_cbus_shared *bus)
-{
-	unsigned long rate;
-	int err;
-
-	rate = _clk_shared_bus_update(bus, NULL, NULL, NULL);
-
-	bus->u.shared_bus_user.rate = rate;
-
-	err = clk_set_rate(bus->hw.clk, rate);
-
-	return err;
-}
-
 static int clk_shared_bus_update(struct clk *bus)
 {
 	struct tegra_clk_cbus_shared *cbus =
@@ -478,6 +464,22 @@ static void clk_shared_unprepare(struct clk_hw *hw)
 	clk_shared_bus_update(clk_get_parent(hw->clk));
 }
 
+static int _connect_shared_update(struct tegra_clk_cbus_shared *bus)
+{
+	unsigned long rate;
+	int err;
+
+	rate = _clk_shared_bus_update(bus, NULL, NULL, NULL);
+
+	bus->u.shared_bus_user.rate = rate;
+	pr_debug("%s: %s: user.rate is set to %lu\n",
+		 __func__, clk_hw_get_name(&bus->hw), rate);
+
+	err = clk_shared_bus_update(clk_get_parent(bus->hw.clk));
+
+	return err;
+}
+
 static int clk_shared_connect_master_prepare(struct clk_hw *hw)
 {
 	struct tegra_clk_cbus_shared *shared = to_clk_cbus_shared(hw);
@@ -510,6 +512,8 @@ static int clk_shared_set_rate(struct clk_hw *hw, unsigned long rate,
 		return 0;
 
 	shared->u.shared_bus_user.rate = rate;
+	pr_debug("%s: %s: user.rate is set to %lu\n",
+		 __func__, clk_hw_get_name(hw), rate);
 
 	return clk_shared_bus_update(clk_get_parent(hw->clk));
 }
