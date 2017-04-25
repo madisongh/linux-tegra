@@ -654,14 +654,15 @@ tegra_channel_enum_framesizes(struct file *file, void *fh,
 {
 	struct v4l2_fh *vfh = file->private_data;
 	struct tegra_channel *chan = to_tegra_channel(vfh->vdev);
+	struct v4l2_subdev *sd = chan->subdev_on_csi;
 	struct v4l2_subdev_frame_size_enum fse = {
 		.index = sizes->index,
 		.code = sizes->pixel_format,
 	};
 	int ret = 0;
 
-	ret = v4l2_device_call_until_err(chan->video.v4l2_dev,
-			chan->grp_id, pad, enum_frame_size, NULL, &fse);
+	ret = v4l2_subdev_call(sd, pad, enum_frame_size, NULL, &fse);
+
 	if (!ret) {
 		sizes->type = V4L2_FRMSIZE_TYPE_DISCRETE;
 		sizes->discrete.width = fse.max_width;
@@ -677,6 +678,7 @@ tegra_channel_enum_frameintervals(struct file *file, void *fh,
 {
 	struct v4l2_fh *vfh = file->private_data;
 	struct tegra_channel *chan = to_tegra_channel(vfh->vdev);
+	struct v4l2_subdev *sd = chan->subdev_on_csi;
 	struct v4l2_subdev_frame_interval_enum fie = {
 		.index = intervals->index,
 		.code = intervals->pixel_format,
@@ -685,8 +687,7 @@ tegra_channel_enum_frameintervals(struct file *file, void *fh,
 	};
 	int ret = 0;
 
-	ret = v4l2_device_call_until_err(chan->video.v4l2_dev,
-			chan->grp_id, pad, enum_frame_interval, NULL, &fie);
+	ret = v4l2_subdev_call(sd, pad, enum_frame_interval, NULL, &fie);
 
 	if (!ret) {
 		intervals->type = V4L2_FRMIVAL_TYPE_DISCRETE;
