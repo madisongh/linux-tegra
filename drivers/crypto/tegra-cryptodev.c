@@ -811,7 +811,6 @@ static long tegra_crypto_dev_ioctl(struct file *filp,
 	struct crypto_rng *tfm = NULL;
 	struct tegra_pka1_rsa_request pka1_rsa_req;
 	struct tegra_se_pka1_ecc_request pka1_ecc_req;
-	struct tegra_se_rng1_request rng1_req;
 	struct tegra_crypt_req crypt_req;
 	struct tegra_rng_req rng_req;
 	struct tegra_sha_req sha_req;
@@ -1113,29 +1112,49 @@ rng_out:
 		break;
 
 	case TEGRA_CRYPTO_IOCTL_RNG1_REQ:
-		if (copy_from_user(&rng1_req, (void __user *)arg,
-				   sizeof(rng1_req))) {
-			ret = -EFAULT;
-			pr_err("%s: copy_from_user fail(%d) for rng1_req\n",
-				__func__, ret);
-			return ret;
+		if (copy_from_user(&rng_req, (void __user *)arg,
+			sizeof(rng_req))) {
+			pr_err("%s: copy_from_user fail(%d)\n",
+					__func__, ret);
+			return -EFAULT;
 		}
 
-		ret = tegra_se_rng1_op(&rng1_req);
-		if (ret) {
-			pr_debug("\ntegra_se_rng1_op failed(%d) for RNG1\n",
-				  ret);
-			return ret;
+		rng = kzalloc(rng_req.nbytes, GFP_KERNEL);
+		if (!rng)
+			return -ENODATA;
+
+		ctx->rng = crypto_alloc_rng("rng1-elp-tegra",
+			CRYPTO_ALG_TYPE_RNG, 0);
+		if (IS_ERR(ctx->rng)) {
+			pr_err("Failed to alloc rng1: %ld\n",
+						PTR_ERR(ctx->rng));
+			ret = PTR_ERR(ctx->rng);
+			goto rng1_out;
 		}
 
-		ret = copy_to_user((void __user *)arg, &rng1_req,
-				   sizeof(rng1_req));
+		tfm = ctx->rng;
+		filp->private_data = ctx;
+		ret = crypto_rng_get_bytes(ctx->rng, rng,
+				rng_req.nbytes);
+
+		if (ret != rng_req.nbytes) {
+			pr_err("rng failed");
+			ret = -ENODATA;
+			goto free_rng1_tfm;
+		}
+
+
+		ret = copy_to_user((void __user *)rng_req.rdata,
+			(const void *)rng, rng_req.nbytes);
 		if (ret) {
 			ret = -EFAULT;
-			pr_debug("%s: copy_to_user failed (%d) for rng1_req\n",
-				 __func__, ret);
-			return ret;
+			pr_err("%s: copy_to_user fail(%d)\n", __func__, ret);
+			goto free_rng1_tfm;
 		}
+free_rng1_tfm:
+		crypto_free_rng(tfm);
+rng1_out:
+		kfree(rng);
 		break;
 	default:
 		pr_debug("invalid ioctl code(%d)", ioctl_num);
