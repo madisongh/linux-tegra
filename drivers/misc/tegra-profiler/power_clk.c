@@ -1,7 +1,7 @@
 /*
  * drivers/misc/tegra-profiler/power_clk.c
  *
- * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -480,47 +480,16 @@ int quadd_power_clk_start(void)
 	pr_info("power_clk: start, freq: %d\n",
 		param->power_rate_freq);
 
-	/* setup gpu frequency */
+	/*
+	 * As a quick workaround, do not use gpu and emc clocks
+	 * since it leads to crash on some devices.
+	 * It will be fixed properly later.
+	 */
 	s = &power_ctx.gpu;
-	s->clkp = clk_get_sys("3d", NULL);
-	if (!IS_ERR_OR_NULL(s->clkp)) {
-#ifdef CONFIG_COMMON_CLK
-		int status = clk_notifier_register(s->clkp, s->nb);
+	atomic_set(&s->active, 0);
 
-		if (status < 0) {
-			pr_err("error: could not setup gpu freq\n");
-			clk_put(s->clkp);
-			return status;
-		}
-#endif
-		clk_put(s->clkp);
-		reset_data(s);
-		atomic_set(&s->active, 1);
-	} else {
-		pr_warn("warning: could not setup gpu freq\n");
-		atomic_set(&s->active, 0);
-	}
-
-	/* setup emc frequency */
 	s = &power_ctx.emc;
-	s->clkp = clk_get_sys("cpu", "emc");
-	if (!IS_ERR_OR_NULL(s->clkp)) {
-#ifdef CONFIG_COMMON_CLK
-		int status = clk_notifier_register(s->clkp, s->nb);
-
-		if (status < 0) {
-			pr_err("error: could not setup emc freq\n");
-			clk_put(s->clkp);
-			return status;
-		}
-#endif
-		clk_put(s->clkp);
-		reset_data(s);
-		atomic_set(&s->active, 1);
-	} else {
-		pr_warn("warning: could not setup emc freq\n");
-		atomic_set(&s->active, 0);
-	}
+	atomic_set(&s->active, 0);
 
 	/* setup cpu frequency notifier */
 	s = &power_ctx.cpu;
