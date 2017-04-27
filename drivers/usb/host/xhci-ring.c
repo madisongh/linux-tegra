@@ -2332,7 +2332,7 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 	int ret = 0;
 	int td_num = 0;
 	bool handling_skipped_tds = false;
-	bool disable_u0_ts1_detect;
+	bool disable_u0_ts1_detect = false;
 
 	slot_id = TRB_TO_SLOT_ID(le32_to_cpu(event->flags));
 	xdev = xhci->devs[slot_id];
@@ -2351,7 +2351,8 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 		return -ENODEV;
 	}
 
-	disable_u0_ts1_detect =
+	if (xhci->shared_hcd->driver->is_u0_ts1_detect_disabled)
+		disable_u0_ts1_detect =
 			xhci->shared_hcd->driver->is_u0_ts1_detect_disabled(
 					xhci->shared_hcd);
 
