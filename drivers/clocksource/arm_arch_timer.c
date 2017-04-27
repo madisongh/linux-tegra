@@ -68,6 +68,8 @@ static int arch_timer_ppi[MAX_TIMER_PPI];
 static struct clock_event_device __percpu *arch_timer_evt;
 
 static bool arch_timer_use_virtual = true;
+static bool arch_timer_secure = true;
+static enum ppi_nr arch_timer_select = PHYS_SECURE_PPI;
 static bool arch_timer_c3stop;
 static bool arch_timer_mem_use_virtual;
 
@@ -268,7 +270,7 @@ static void __arch_timer_setup(unsigned type,
 			clk->set_state_shutdown = arch_timer_shutdown_virt;
 			clk->set_next_event = arch_timer_set_next_event_virt;
 		} else {
-			clk->irq = arch_timer_ppi[PHYS_SECURE_PPI];
+			clk->irq = arch_timer_ppi[arch_timer_select];
 			clk->set_state_shutdown = arch_timer_shutdown_phys;
 			clk->set_next_event = arch_timer_set_next_event_phys;
 		}
@@ -345,8 +347,8 @@ static int arch_timer_setup(struct clock_event_device *clk)
 	if (arch_timer_use_virtual)
 		enable_percpu_irq(arch_timer_ppi[VIRT_PPI], 0);
 	else {
-		enable_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI], 0);
-		if (arch_timer_ppi[PHYS_NONSECURE_PPI])
+		enable_percpu_irq(arch_timer_ppi[arch_timer_select], 0);
+		if (arch_timer_ppi[PHYS_NONSECURE_PPI] && arch_timer_secure)
 			enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
 	}
 
@@ -493,8 +495,8 @@ static void arch_timer_stop(struct clock_event_device *clk)
 	if (arch_timer_use_virtual)
 		disable_percpu_irq(arch_timer_ppi[VIRT_PPI]);
 	else {
-		disable_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI]);
-		if (arch_timer_ppi[PHYS_NONSECURE_PPI])
+		disable_percpu_irq(arch_timer_ppi[arch_timer_select]);
+		if (arch_timer_ppi[PHYS_NONSECURE_PPI] && arch_timer_secure)
 			disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
 	}
 
@@ -567,10 +569,11 @@ static int __init arch_timer_register(void)
 		err = request_percpu_irq(ppi, arch_timer_handler_virt,
 					 "arch_timer", arch_timer_evt);
 	} else {
-		ppi = arch_timer_ppi[PHYS_SECURE_PPI];
+		ppi = arch_timer_ppi[arch_timer_select];
 		err = request_percpu_irq(ppi, arch_timer_handler_phys,
 					 "arch_timer", arch_timer_evt);
-		if (!err && arch_timer_ppi[PHYS_NONSECURE_PPI]) {
+		if (!err && arch_timer_ppi[PHYS_NONSECURE_PPI] &&
+				arch_timer_secure) {
 			ppi = arch_timer_ppi[PHYS_NONSECURE_PPI];
 			err = request_percpu_irq(ppi, arch_timer_handler_phys,
 						 "arch_timer", arch_timer_evt);
@@ -605,9 +608,9 @@ out_free_irq:
 	if (arch_timer_use_virtual)
 		free_percpu_irq(arch_timer_ppi[VIRT_PPI], arch_timer_evt);
 	else {
-		free_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI],
+		free_percpu_irq(arch_timer_ppi[arch_timer_select],
 				arch_timer_evt);
-		if (arch_timer_ppi[PHYS_NONSECURE_PPI])
+		if (arch_timer_ppi[PHYS_NONSECURE_PPI] && arch_timer_secure)
 			free_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI],
 					arch_timer_evt);
 	}
@@ -737,6 +740,10 @@ static void __init arch_timer_of_init(struct device_node *np)
 	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
 			arch_timer_use_virtual = false;
 
+	if (IS_ENABLED(CONFIG_ARM64)) {
+		arch_timer_select = PHYS_NONSECURE_PPI;
+		arch_timer_secure = false;
+	}
 	arch_timer_init();
 }
 CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_of_init);
