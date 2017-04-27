@@ -185,8 +185,8 @@ int tegra_alt_asoc_utils_set_rate(struct tegra_asoc_audio_clock_info *data,
 				mclk = mclk >> 1;
 				ahub_rate = ahub_rate >> 1;
 			}
-			/* aud_mclk should be 256*Fs */
-			clk_out_rate = srate << 8;
+
+			clk_out_rate = srate * data->mclk_scale;
 			data->clk_out_rate = clk_out_rate;
 		}
 		break;
@@ -216,8 +216,8 @@ int tegra_alt_asoc_utils_set_rate(struct tegra_asoc_audio_clock_info *data,
 				mclk = mclk >> 1;
 				ahub_rate = ahub_rate >> 1;
 			}
-			/* aud_mclk should be 256*Fs */
-			clk_out_rate = srate << 8;
+
+			clk_out_rate = srate * data->mclk_scale;
 			data->clk_out_rate = clk_out_rate;
 		}
 		break;
@@ -319,6 +319,7 @@ int tegra_alt_asoc_utils_init(struct tegra_asoc_audio_clock_info *data,
 
 	data->dev = dev;
 	data->card = card;
+	data->mclk_scale = 256;
 
 	if (of_machine_is_compatible("nvidia,tegra20"))
 		data->soc = TEGRA_ASOC_UTILS_SOC_TEGRA20;
