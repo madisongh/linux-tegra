@@ -23,6 +23,7 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
 #include <soc/tegra/cvb.h>
 #include <soc/tegra/fuse.h>
 
@@ -563,10 +564,48 @@ static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, tegra124_dfll_fcpu_of_match);
 
+static void get_alignment_from_dt(struct device *dev,
+				  struct rail_alignment *align)
+{
+	if (!of_property_read_u32(dev->of_node, "nvidia,align-step-uv",
+				  &align->step_uv)) {
+		if (of_property_read_u32(dev->of_node,
+				"nvidia,align-offset-uv", &align->offset_uv)) {
+			dev_dbg(dev,
+				"offset uv not found, by default set to 0\n");
+			align->offset_uv = 0;
+		}
+	}
+}
+
+static int get_alignment_from_regulator(struct device *dev,
+					 struct rail_alignment *align)
+{
+	int min_uV, max_uV, n_voltages, ret;
+	struct regulator *reg = devm_regulator_get(dev, "vdd-cpu");
+
+	if (IS_ERR(reg))
+		return PTR_ERR(reg);
+
+	ret = regulator_get_constraint_voltages(reg, &min_uV, &max_uV);
+	if (!ret)
+		align->offset_uv = min_uV;
+
+	align->step_uv = regulator_get_linear_step(reg);
+	if (!align->step_uv && !ret) {
+		n_voltages = regulator_count_voltages(reg);
+		if (n_voltages > 1)
+			align->step_uv = (max_uV - min_uV) / (n_voltages - 1);
+	}
+	devm_regulator_put(reg);
+
+	return 0;
+}
+
 static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 {
 	int process_id, speedo_id, speedo_value, ret;
-	struct rail_alignment align;
+	struct rail_alignment align = { };
 	struct tegra_dfll_soc_data *soc;
 	const struct cvb_table *cvb;
 	const struct of_device_id *of_id;
@@ -604,17 +643,17 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	ret = of_property_read_u32(pdev->dev.of_node, "nvidia,align-offset-uv",
-					&align.offset_uv);
-	if (ret < 0) {
-		dev_dbg(&pdev->dev,
-			"offset uv not found, the default value will be 0\n");
-		align.offset_uv = 0;
+	get_alignment_from_dt(&pdev->dev, &align);
+	if (!align.step_uv) {
+		dev_info(&pdev->dev, "no align data in DT, try from vdd-cpu\n");
+		ret = get_alignment_from_regulator(&pdev->dev, &align);
+		if (ret == -EPROBE_DEFER) {
+			dev_info(&pdev->dev, "defer probe to get vdd-cpu\n");
+			return -EPROBE_DEFER;
+		}
 	}
 
-	ret = of_property_read_u32(pdev->dev.of_node, "nvidia,align-step-uv",
-					&align.step_uv);
-	if (ret < 0) {
+	if (!align.step_uv) {
 		dev_err(&pdev->dev, "missing step uv\n");
 		return -EINVAL;
 	}
