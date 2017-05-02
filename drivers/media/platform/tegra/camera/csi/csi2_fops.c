@@ -18,8 +18,6 @@
 #include "nvhost_acm.h"
 #include <linux/clk/tegra.h>
 
-#define DEFAULT_MIPICAL_TIMEOUTMS 500
-
 static void csi_write(struct tegra_csi_channel *chan, unsigned int addr,
 			u32 val, u8 port)
 {
@@ -403,8 +401,7 @@ int csi2_hw_init(struct tegra_csi_device *csi)
 	return 0;
 }
 
-int csi2_mipi_cal(struct tegra_csi_channel *chan,
-		  struct tegra_mipi_context **ctx)
+int csi2_mipi_cal(struct tegra_csi_channel *chan)
 {
 	unsigned int lanes, num_ports, val, csi_port;
 	struct tegra_csi_port *port;
@@ -413,6 +410,7 @@ int csi2_mipi_cal(struct tegra_csi_channel *chan,
 	lanes = 0;
 	num_ports = 0;
 
+	nvhost_module_enable_clk(csi->dev);
 	while (num_ports < chan->numports) {
 		port = &chan->ports[num_ports];
 		csi_port = port->num;
@@ -425,7 +423,7 @@ int csi2_mipi_cal(struct tegra_csi_channel *chan,
 			csi_write(chan,
 				TEGRA_CSI_CIL_OFFSET +
 				TEGRA_CSI_CIL_PAD_CONFIG0, 0x0, csi_port >> 1);
-			val = ((csi_port & 0x1) == PORT_A) ?
+			val |= ((csi_port & 0x1) == PORT_A) ?
 				CSI_A_PHY_CIL_ENABLE : CSI_B_PHY_CIL_ENABLE;
 			csi_write(chan, TEGRA_CSI_PHY_CIL_COMMAND, val,
 				csi_port >> 1);
@@ -442,7 +440,8 @@ int csi2_mipi_cal(struct tegra_csi_channel *chan,
 			"Selected no CSI lane, cannot do calibration");
 		return -EINVAL;
 	}
-	return tegra_mipical_nonblock(ctx, lanes, DEFAULT_MIPICAL_TIMEOUTMS);
+	nvhost_module_disable_clk(csi->dev);
+	return tegra_mipi_calibration(lanes);
 }
 
 int csi2_power_on(struct tegra_csi_device *csi)
