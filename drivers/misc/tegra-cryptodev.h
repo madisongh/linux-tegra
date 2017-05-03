@@ -146,7 +146,7 @@ struct tegra_sha_req {
 	unsigned char *algo;
 	unsigned char *plaintext;
 	unsigned char *result;
-	int plaintext_sz;
+	unsigned int plaintext_sz;
 };
 #define TEGRA_CRYPTO_IOCTL_GET_SHA	\
 		_IOWR(0x98, 104, struct tegra_sha_req)
@@ -154,11 +154,11 @@ struct tegra_sha_req {
 #ifdef CONFIG_COMPAT
 struct tegra_sha_req_32 {
 	char key[TEGRA_CRYPTO_MAX_KEY_SIZE];
-	unsigned int keylen;
+	__u32 keylen;
 	__u32 algo;
 	__u32 plaintext;
 	__u32 result;
-	int plaintext_sz;
+	__u32 plaintext_sz;
 };
 #define TEGRA_CRYPTO_IOCTL_GET_SHA_32	\
 		_IOWR(0x98, 104, struct tegra_sha_req_32)
