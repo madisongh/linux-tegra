@@ -461,7 +461,6 @@ static const char * const mode_name[] = {
 
 static void dfll_set_output_limits(struct tegra_dfll *td,
 			u32 out_min, u32 out_max);
-static void dfll_load_i2c_lut(struct tegra_dfll *td);
 static u8 find_mv_out_cap(struct tegra_dfll *td, int mv);
 static u8 find_mv_out_floor(struct tegra_dfll *td, int mv);
 
@@ -739,7 +738,6 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 
 	if ((td->lut_min != out_min) || (td->lut_max != out_max)) {
 		dfll_set_output_limits(td, out_min, out_max);
-		dfll_load_i2c_lut(td);
 	}
 }
 
@@ -1028,7 +1026,7 @@ static void dfll_set_output_limits(struct tegra_dfll *td,
  * @td: struct tegra_dfll *
  *
  * Load the voltage-to-PMIC register value lookup table into the DFLL
- * IP block memory. Look-up tables can be loaded at any time.
+ * IP block memory. Look-up tables can be loaded only when DFLL is disabled.
  */
 static void dfll_load_i2c_lut(struct tegra_dfll *td)
 {
@@ -1039,10 +1037,10 @@ static void dfll_load_i2c_lut(struct tegra_dfll *td)
 		return;
 
 	for (i = 0; i < MAX_DFLL_VOLTAGES; i++) {
-		if (i < td->lut_min)
-			lut_index = td->lut_min;
-		else if (i > td->lut_max)
-			lut_index = td->lut_max;
+		if (i < td->lut_bottom)
+			lut_index = td->lut_bottom;
+		else if (i > td->lut_size - 1)
+			lut_index = td->lut_size - 1;
 		else
 			lut_index = i;
 
