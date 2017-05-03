@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2015, NVIDIA Corporation. All Rights Reserved.
+ * Copyright (c) 2010-2017, NVIDIA Corporation. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@ struct tegra_crypt_req {
 	int op; /* e.g. TEGRA_CRYPTO_ECB */
 	bool encrypt;
 	char key[TEGRA_CRYPTO_MAX_KEY_SIZE];
-	int keylen;
+	unsigned int keylen;
 	char iv[TEGRA_CRYPTO_IV_SIZE];
 	int ivlen;
 	u8 *plaintext;
@@ -64,7 +64,7 @@ struct tegra_crypt_req_32 {
 	int op; /* e.g. TEGRA_CRYPTO_ECB */
 	bool encrypt;
 	char key[TEGRA_CRYPTO_MAX_KEY_SIZE];
-	int keylen;
+	unsigned int keylen;
 	char iv[TEGRA_CRYPTO_IV_SIZE];
 	int ivlen;
 	__u32 plaintext;
@@ -109,12 +109,12 @@ struct tegra_rsa_req {
 	char *key;
 	char *message;
 	char *result;
-	int algo;
-	int keylen;
-	int msg_len;
-	int modlen;
-	int pub_explen;
-	int prv_explen;
+	unsigned int algo;
+	unsigned int keylen;
+	unsigned int msg_len;
+	unsigned int modlen;
+	unsigned int pub_explen;
+	unsigned int prv_explen;
 	int skip_key;
 };
 #define TEGRA_CRYPTO_IOCTL_RSA_REQ	\
@@ -125,12 +125,12 @@ struct tegra_rsa_req_32 {
 	__u32 key;
 	__u32 message;
 	__u32 result;
-	int algo;
-	int keylen;
-	int msg_len;
-	int modlen;
-	int pub_explen;
-	int prv_explen;
+	__u32 algo;
+	__u32 keylen;
+	__u32 msg_len;
+	__u32 modlen;
+	__u32 pub_explen;
+	__u32 prv_explen;
 	int skip_key;
 };
 #define TEGRA_CRYPTO_IOCTL_RSA_REQ_32	\
@@ -139,7 +139,7 @@ struct tegra_rsa_req_32 {
 
 struct tegra_sha_req {
 	char key[TEGRA_CRYPTO_MAX_KEY_SIZE];
-	int keylen;
+	unsigned int keylen;
 	unsigned char *algo;
 	unsigned char *plaintext;
 	unsigned char *result;
@@ -151,7 +151,7 @@ struct tegra_sha_req {
 #ifdef CONFIG_COMPAT
 struct tegra_sha_req_32 {
 	char key[TEGRA_CRYPTO_MAX_KEY_SIZE];
-	int keylen;
+	unsigned int keylen;
 	__u32 algo;
 	__u32 plaintext;
 	__u32 result;

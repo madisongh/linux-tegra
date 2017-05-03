@@ -3,7 +3,7 @@
  *
  * crypto dev node for NVIDIA tegra aes hardware
  *
- * Copyright (c) 2010-2015, NVIDIA Corporation. All Rights Reserved.
+ * Copyright (c) 2010-2017, NVIDIA Corporation. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,6 +41,10 @@
 #define XBUFSIZE 8
 #define RNG_DRBG 1
 #define RNG 0
+#define NUM_RSA_ALGO 4
+#define ECC_MODE_MIN_INDEX 7
+#define ECC_MODE_MAX_INDEX 13
+#define MAX_RSA_MSG_LEN 256
 
 struct tegra_crypto_ctx {
 	struct crypto_ablkcipher *aes_tfm[4]; /*ecb, cbc, ofb, ctr */
@@ -521,6 +525,11 @@ static long tegra_crypto_dev_ioctl(struct file *filp,
 			pr_err("%s: copy_from_user fail(%d)\n", __func__, ret);
 			return -EFAULT;
 		}
+		if (crypt_req_32.keylen > TEGRA_CRYPTO_MAX_KEY_SIZE) {
+			pr_err("key length %d exceeds max value %d\n",
+				crypt_req_32.keylen, TEGRA_CRYPTO_MAX_KEY_SIZE);
+			return -EINVAL;
+		}
 		crypt_req.op = crypt_req_32.op;
 		crypt_req.encrypt = crypt_req_32.encrypt;
 		crypt_req.skip_key = crypt_req_32.skip_key;
@@ -713,6 +722,11 @@ rng_out:
 			pr_err("%s: copy_from_user fail(%d)\n", __func__, ret);
 			return -EFAULT;
 		}
+		if (sha_req_32.keylen > TEGRA_CRYPTO_MAX_KEY_SIZE) {
+			pr_err("key length %d not within the range [0,%d]\n",
+				sha_req_32.keylen, TEGRA_CRYPTO_MAX_KEY_SIZE);
+			return -EINVAL;
+		}
 		for (i = 0; i < sha_req_32.keylen; i++)
 			sha_req.key[i] = sha_req_32.key[i];
 		sha_req.keylen = sha_req_32.keylen;
@@ -735,6 +749,11 @@ rng_out:
 				sizeof(sha_req))) {
 			pr_err("%s: copy_from_user fail(%d)\n", __func__, ret);
 			return -EFAULT;
+		}
+		if (sha_req.keylen > TEGRA_CRYPTO_MAX_KEY_SIZE) {
+			pr_err("key length %d not within the range [0,%d]\n",
+				sha_req.keylen, TEGRA_CRYPTO_MAX_KEY_SIZE);
+			return -EINVAL;
 		}
 		ret = tegra_crypto_sha(filp, ctx, &sha_req);
 		break;
@@ -769,6 +788,16 @@ rng_out:
 			sizeof(rsa_req))) {
 			pr_err("%s: copy_from_user fail(%d)\n", __func__, ret);
 			return -EFAULT;
+		}
+		if (rsa_req.msg_len > MAX_RSA_MSG_LEN) {
+			pr_err("Illegal message from user of length = %d\n",
+				rsa_req.msg_len);
+			return -EINVAL;
+		}
+		if (rsa_req.algo >= NUM_RSA_ALGO) {
+			pr_err("Invalid value of algo index %d\n",
+				rsa_req.algo);
+			return -EINVAL;
 		}
 
 		ret = tegra_crypt_rsa(filp, ctx, &rsa_req);
