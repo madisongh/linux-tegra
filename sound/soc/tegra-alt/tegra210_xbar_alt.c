@@ -1,7 +1,7 @@
 /*
  * tegra210_xbar_alt.c - Tegra210 XBAR driver
  *
- * Copyright (c) 2014-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -94,7 +94,9 @@ static int tegra210_xbar_runtime_resume(struct device *dev)
 	}
 
 	regcache_cache_only(xbar->regmap, false);
-	regcache_sync(xbar->regmap);
+
+	if (!xbar->is_shutdown)
+		regcache_sync(xbar->regmap);
 
 	return 0;
 }
@@ -881,6 +883,7 @@ static int tegra210_xbar_probe(struct platform_device *pdev)
 	}
 
 	xbar->soc_data = soc_data;
+	xbar->is_shutdown = false;
 
 	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
 		xbar->clk = devm_clk_get(&pdev->dev, "ahub");
@@ -990,6 +993,11 @@ err:
 	return ret;
 }
 
+static void tegra210_xbar_shutdown(struct platform_device *pdev)
+{
+	xbar->is_shutdown = true;
+}
+
 static int tegra210_xbar_remove(struct platform_device *pdev)
 {
 	snd_soc_unregister_codec(&pdev->dev);
@@ -1017,6 +1025,7 @@ static const struct dev_pm_ops tegra210_xbar_pm_ops = {
 static struct platform_driver tegra210_xbar_driver = {
 	.probe = tegra210_xbar_probe,
 	.remove = tegra210_xbar_remove,
+	.shutdown = tegra210_xbar_shutdown,
 	.driver = {
 		.name = DRV_NAME,
 		.owner = THIS_MODULE,

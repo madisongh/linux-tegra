@@ -1,7 +1,7 @@
 /*
  * tegra210_i2s.c - Tegra210 I2S driver
  *
- * Copyright (c) 2014-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -292,7 +292,9 @@ static int tegra210_i2s_runtime_resume(struct device *dev)
 	}
 
 	regcache_cache_only(i2s->regmap, false);
-	regcache_sync(i2s->regmap);
+
+	if (!i2s->is_shutdown)
+		regcache_sync(i2s->regmap);
 
 	return 0;
 }
@@ -1009,6 +1011,7 @@ static int tegra210_i2s_platform_probe(struct platform_device *pdev)
 	i2s->bclk_ratio = 2;
 	i2s->enable_cya = false;
 	i2s->loopback = 0;
+	i2s->is_shutdown = false;
 
 	if (!(tegra_platform_is_unit_fpga() || tegra_platform_is_fpga())) {
 		i2s->clk_i2s = devm_clk_get(&pdev->dev, NULL);
@@ -1202,6 +1205,13 @@ err:
 	return ret;
 }
 
+static void tegra210_i2s_platform_shutdown(struct platform_device *pdev)
+{
+	struct tegra210_i2s *i2s = dev_get_drvdata(&pdev->dev);
+
+	i2s->is_shutdown = true;
+}
+
 static int tegra210_i2s_platform_remove(struct platform_device *pdev)
 {
 	struct tegra210_i2s *i2s = dev_get_drvdata(&pdev->dev);
@@ -1237,6 +1247,7 @@ static struct platform_driver tegra210_i2s_driver = {
 	},
 	.probe = tegra210_i2s_platform_probe,
 	.remove = tegra210_i2s_platform_remove,
+	.shutdown = tegra210_i2s_platform_shutdown,
 };
 module_platform_driver(tegra210_i2s_driver)
 

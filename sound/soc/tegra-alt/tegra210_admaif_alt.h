@@ -1,7 +1,7 @@
 /*
  * tegra210_admaif_alt.h - Tegra210 ADMAIF registers
  *
- * Copyright (c) 2014-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -159,6 +159,7 @@ struct tegra210_admaif {
 	int override_channels[TEGRA210_ADMAIF_CHANNEL_COUNT];
 	int tx_mono_to_stereo[TEGRA210_ADMAIF_CHANNEL_COUNT];
 	int rx_stereo_to_mono[TEGRA210_ADMAIF_CHANNEL_COUNT];
+	bool is_shutdown;
 };
 
 #endif
