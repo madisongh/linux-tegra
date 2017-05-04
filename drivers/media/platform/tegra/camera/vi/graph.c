@@ -31,7 +31,6 @@
 
 #include "camera/vi/mc_common.h"
 #include "camera/csi/csi.h"
-#include "vi/vi4.h"
 #include "nvcsi/nvcsi.h"
 
 /* -----------------------------------------------------------------------------

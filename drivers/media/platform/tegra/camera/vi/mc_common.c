@@ -25,7 +25,6 @@
 #include "dev.h"
 #include "camera/vi/mc_common.h"
 #include "vi/vi.h"
-#include "vi/vi4.h"
 #include "host1x/host1x.h"
 #include "camera/vi/registers.h"
 
