@@ -533,6 +533,8 @@ void tegra210_plle_hw_sequence_start(void)
 
 	val |= PLLE_AUX_SEQ_ENABLE;
 	writel_relaxed(val, clk_base + PLLE_AUX);
+
+	fence_udelay(1, clk_base);
 _out:
 	if (!IS_ERR_OR_NULL(plle))
 		spin_unlock_irqrestore(to_clk_pll(__clk_get_hw(plle))->lock,
@@ -565,6 +567,7 @@ void tegra210_xusb_pll_hw_control_enable(void)
 	val |= XUSBIO_PLL_CFG0_PADPLL_USE_LOCKDET |
 	       XUSBIO_PLL_CFG0_PADPLL_SLEEP_IDDQ;
 	writel_relaxed(val, clk_base + XUSBIO_PLL_CFG0);
+	fence_udelay(1, clk_base);
 }
 EXPORT_SYMBOL_GPL(tegra210_xusb_pll_hw_control_enable);
 
@@ -578,6 +581,7 @@ void tegra210_xusb_pll_hw_sequence_start(void)
 	val = readl_relaxed(clk_base + XUSBIO_PLL_CFG0);
 	val |= XUSBIO_PLL_CFG0_SEQ_ENABLE;
 	writel_relaxed(val, clk_base + XUSBIO_PLL_CFG0);
+	fence_udelay(1, clk_base);
 }
 EXPORT_SYMBOL_GPL(tegra210_xusb_pll_hw_sequence_start);
 
@@ -605,6 +609,7 @@ void tegra210_sata_pll_hw_control_enable(void)
 	val |= SATA_PLL_CFG0_PADPLL_USE_LOCKDET |
 	       SATA_PLL_CFG0_PADPLL_SLEEP_IDDQ;
 	writel_relaxed(val, clk_base + SATA_PLL_CFG0);
+	fence_udelay(1, clk_base);
 }
 EXPORT_SYMBOL_GPL(tegra210_sata_pll_hw_control_enable);
 
@@ -618,6 +623,7 @@ void tegra210_sata_pll_hw_sequence_start(void)
 	val = readl_relaxed(clk_base + SATA_PLL_CFG0);
 	val |= SATA_PLL_CFG0_SEQ_ENABLE;
 	writel_relaxed(val, clk_base + SATA_PLL_CFG0);
+	fence_udelay(1, clk_base);
 }
 EXPORT_SYMBOL_GPL(tegra210_sata_pll_hw_sequence_start);
 
@@ -638,6 +644,7 @@ void tegra210_set_sata_pll_seq_sw(bool state)
 		val &= ~SATA_PLL_CFG0_SATA_SEQ_PADPLL_PD_INPUT_VALUE;
 	}
 	writel_relaxed(val, clk_base + SATA_PLL_CFG0);
+	fence_udelay(1, clk_base);
 }
 EXPORT_SYMBOL_GPL(tegra210_set_sata_pll_seq_sw);
 
@@ -653,6 +660,7 @@ void tegra210_csi_source_from_brick(void)
 	val = readl_relaxed(clk_base + PLLD_BASE);
 	val &= ~PLLD_BASE_CSI_CLKSOURCE;
 	writel_relaxed(val, clk_base + PLLD_BASE);
+	fence_udelay(1, clk_base);
 
 	if (!IS_ERR_OR_NULL(plld))
 		spin_unlock_irqrestore(to_clk_pll(__clk_get_hw(plld))->lock,
@@ -672,6 +680,7 @@ void tegra210_csi_source_from_plld(void)
 	val = readl_relaxed(clk_base + PLLD_BASE);
 	val |= PLLD_BASE_CSI_CLKSOURCE;
 	writel_relaxed(val, clk_base + PLLD_BASE);
+	fence_udelay(1, clk_base);
 
 	if (!IS_ERR_OR_NULL(plld))
 		spin_unlock_irqrestore(to_clk_pll(__clk_get_hw(plld))->lock,
@@ -2934,6 +2943,8 @@ static void tegra210_utmi_param_configure(void)
 	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
 	reg |= UTMIPLL_HW_PWRDN_CFG0_SEQ_ENABLE;
 	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
+
+	fence_udelay(1, clk_base);
 }
 
 void tegra210_put_utmipll_in_iddq(void)
@@ -2949,6 +2960,7 @@ void tegra210_put_utmipll_in_iddq(void)
 
 	reg |= UTMIPLL_HW_PWRDN_CFG0_IDDQ_OVERRIDE;
 	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
+	fence_udelay(1, clk_base);
 }
 EXPORT_SYMBOL_GPL(tegra210_put_utmipll_in_iddq);
 
@@ -2959,6 +2971,7 @@ void tegra210_put_utmipll_out_iddq(void)
 	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
 	reg &= ~UTMIPLL_HW_PWRDN_CFG0_IDDQ_OVERRIDE;
 	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
+	fence_udelay(5, clk_base);
 }
 EXPORT_SYMBOL_GPL(tegra210_put_utmipll_out_iddq);
 
@@ -2995,6 +3008,7 @@ static int tegra210_enable_pllu(void)
 	fence_udelay(1, clk_base);
 	reg |= PLL_ENABLE;
 	writel(reg, clk_base + PLLU_BASE);
+	fence_udelay(1, clk_base);
 
 	ret = tegra210_wait_for_mask(&pllu, PLLU_BASE, PLL_BASE_LOCK);
 
@@ -4131,6 +4145,7 @@ static void __init tegra210_clock_apply_init_table(void)
 static void tegra210_car_barrier(void)
 {
 	readl_relaxed(clk_base + RST_DFLL_DVCO);
+	udelay(2);
 }
 
 /**
@@ -4168,10 +4183,11 @@ static int tegra210_reset_assert(unsigned long id)
 {
 	if (id == TEGRA210_RST_DFLL_DVCO)
 		tegra210_clock_assert_dfll_dvco_reset();
-	else if (id == TEGRA210_RST_ADSP)
+	else if (id == TEGRA210_RST_ADSP) {
 		writel(GENMASK(26, 21) | BIT(7),
 			clk_base + CLK_RST_CONTROLLER_RST_DEV_Y_SET);
-	else
+		fence_udelay(2, clk_base);
+	} else
 		return -EINVAL;
 
 	return 0;
@@ -4191,6 +4207,7 @@ static int tegra210_reset_deassert(unsigned long id)
 		fence_udelay(5, clk_base);
 		writel(GENMASK(26, 22) | BIT(7),
 			clk_base + CLK_RST_CONTROLLER_RST_DEV_Y_CLR);
+		fence_udelay(2, clk_base);
 	}
 	else
 		return -EINVAL;

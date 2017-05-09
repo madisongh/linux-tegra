@@ -2229,6 +2229,8 @@ static void tegra210b01_utmi_param_configure(void)
 	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
 	reg |= UTMIPLL_HW_PWRDN_CFG0_SEQ_ENABLE;
 	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
+
+	fence_udelay(1, clk_base);
 }
 
 static int tegra210b01_enable_utmipll(void)
@@ -2287,6 +2289,7 @@ static int tegra210b01_enable_pllu(void)
 	fence_udelay(1, clk_base);
 	reg |= PLL_ENABLE;
 	writel(reg, clk_base + PLLU_BASE);
+	fence_udelay(1, clk_base);
 
 	ret = tegra210b01_wait_for_mask(&pllu, PLLU_BASE, PLL_BASE_LOCK);
 
