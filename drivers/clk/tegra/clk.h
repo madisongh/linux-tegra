@@ -1000,4 +1000,11 @@ void tegra_register_pto(struct clk *clk, struct tegra_pto_table *ptodef);
 /* add some extra nodes to debugfs */
 void tegra_clk_debugfs_add(struct clk *clk);
 
+/* Combined read fence with delay */
+#define fence_udelay(delay, reg)	\
+	do {				\
+		readl_relaxed(reg);	\
+		udelay(delay);		\
+	} while (0)
+
 #endif /* TEGRA_CLK_H */
