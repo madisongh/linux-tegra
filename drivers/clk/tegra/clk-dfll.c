@@ -2129,6 +2129,7 @@ static int cclk_g_parent_event(struct notifier_block *nb,
 			/* Unlock DFLL before switching to PLL parent */
 			if(dfll_unlock(td))
 				return NOTIFY_BAD;
+			dev_info(td->dev, "exited closed loop mode\n");
 		} else if (!td->last_req.rate) {
 			dev_err(td->dev, "%s: Don't switch to DFLL at rate 0\n",
 				__func__);
@@ -2148,6 +2149,7 @@ static int cclk_g_parent_event(struct notifier_block *nb,
 			 */
 			if(dfll_lock(td))
 				return NOTIFY_BAD;
+			dev_info(td->dev, "entered closed loop mode\n");
 		}
 		break;
 	}
