@@ -153,6 +153,7 @@ struct tegra210_admaif_soc_data {
 struct tegra210_admaif {
 	/* regmap for admaif */
 	struct regmap *regmap;
+	struct device *dev;
 	int refcnt;
 	struct tegra_alt_pcm_dma_params *capture_dma_data;
 	struct tegra_alt_pcm_dma_params *playback_dma_data;
@@ -161,6 +162,10 @@ struct tegra210_admaif {
 	int tx_mono_to_stereo[TEGRA210_ADMAIF_CHANNEL_COUNT];
 	int rx_stereo_to_mono[TEGRA210_ADMAIF_CHANNEL_COUNT];
 	bool is_shutdown;
+	int reg_dump_flag;
+	void __iomem *base_addr;
 };
+
+extern void tegra_adma_dump_ch_reg(void);
 
 #endif

@@ -575,6 +575,75 @@ static int tegra210_admaif_put_format(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static void tegra_admaif_reg_dump(struct tegra210_admaif *admaif)
+{
+	int i, stride;
+	int ret;
+
+	ret = pm_runtime_get_sync(admaif->dev->parent);
+	if (ret < 0) {
+		dev_err(admaif->dev, "parent get_sync failed: %d\n", ret);
+		return;
+	}
+
+	pr_info("=========ADMAIF reg dump=========\n");
+
+	for (i = 0; i < admaif->soc_data->num_ch; i++) {
+		stride = (i * TEGRA210_ADMAIF_CHANNEL_REG_STRIDE);
+		pr_info("RX%d_Enable	= %#x\n", i+1,
+			readl(admaif->base_addr +
+				TEGRA210_ADMAIF_XBAR_RX_ENABLE + stride));
+		pr_info("RX%d_STATUS	= %#x\n", i+1,
+			readl(admaif->base_addr +
+				TEGRA210_ADMAIF_XBAR_RX_STATUS + stride));
+		pr_info("RX%d_CIF_CTRL	= %#x\n", i+1,
+			readl(admaif->base_addr +
+				TEGRA210_ADMAIF_CHAN_ACIF_RX_CTRL + stride));
+		pr_info("RX%d_FIFO_CTRL	= %#x\n", i+1,
+			readl(admaif->base_addr +
+				TEGRA210_ADMAIF_XBAR_RX_FIFO_CTRL + stride));
+		pr_info("TX%d_Enable	= %#x\n", i+1,
+			readl(admaif->base_addr +
+				TEGRA210_ADMAIF_XBAR_TX_ENABLE + stride));
+		pr_info("TX%d_STATUS	= %#x\n", i+1,
+			readl(admaif->base_addr +
+				TEGRA210_ADMAIF_XBAR_TX_STATUS + stride));
+		pr_info("TX%d_CIF_CTRL	= %#x\n", i+1,
+			readl(admaif->base_addr +
+				TEGRA210_ADMAIF_CHAN_ACIF_TX_CTRL + stride));
+		pr_info("TX%d_FIFO_CTRL	= %#x\n", i+1,
+			readl(admaif->base_addr +
+				TEGRA210_ADMAIF_XBAR_TX_FIFO_CTRL + stride));
+	}
+	pm_runtime_put_sync(admaif->dev->parent);
+}
+static int tegra210_ape_dump_reg_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tegra210_admaif *admaif = snd_soc_codec_get_drvdata(codec);
+
+	ucontrol->value.integer.value[0] = admaif->reg_dump_flag;
+
+	return 0;
+}
+
+static int tegra210_ape_dump_reg_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tegra210_admaif *admaif = snd_soc_codec_get_drvdata(codec);
+
+	admaif->reg_dump_flag = ucontrol->value.integer.value[0];
+
+	if (admaif->reg_dump_flag) {
+		tegra_adma_dump_ch_reg();
+		tegra_admaif_reg_dump(admaif);
+	}
+
+	return 0;
+}
+
 static int tegra210_admaif_dai_probe(struct snd_soc_dai *dai)
 {
 	struct tegra210_admaif *admaif = snd_soc_dai_get_drvdata(dai);
@@ -896,6 +965,8 @@ static struct snd_kcontrol_new tegra210_admaif_controls[] = {
 	TEGRA210_ADMAIF_TX_CIF_CTRL(19),
 	TEGRA210_ADMAIF_TX_CIF_CTRL(20),
 #endif
+	SOC_SINGLE_EXT("APE Reg Dump", SND_SOC_NOPM, 0, 1, 0,
+		tegra210_ape_dump_reg_get, tegra210_ape_dump_reg_put),
 };
 
 static int tegra210_admaif_codec_probe(struct snd_soc_codec *codec)
@@ -962,6 +1033,7 @@ static int tegra210_admaif_probe(struct platform_device *pdev)
 
 	admaif->soc_data = soc_data;
 	admaif->is_shutdown = false;
+	admaif->dev = &pdev->dev;
 
 	admaif->capture_dma_data = devm_kzalloc(&pdev->dev,
 			sizeof(struct tegra_alt_pcm_dma_params) *
@@ -997,6 +1069,7 @@ static int tegra210_admaif_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	admaif->base_addr = regs;
 	admaif->regmap = devm_regmap_init_mmio(&pdev->dev, regs,
 					&tegra210_admaif_regmap_config);
 	if (IS_ERR(admaif->regmap)) {
