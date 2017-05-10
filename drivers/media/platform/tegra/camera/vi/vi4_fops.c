@@ -769,20 +769,23 @@ int vi4_channel_start_streaming(struct vb2_queue *vq, u32 count)
 		if (ret < 0)
 			goto error_capture_setup;
 
-		if (s_data != NULL)
-			sensor_mode = &sensor_props.sensor_modes[s_data->mode];
-		else
-			sensor_mode = &sensor_props.sensor_modes[0];
+		if (sensor_props.num_modes) {
+			if (s_data != NULL)
+				sensor_mode = &sensor_props.sensor_modes[s_data->mode];
+			else
+				sensor_mode = &sensor_props.sensor_modes[0];
 
-		chan->embedded_data_width =
-			sensor_mode->image_properties.width;
-		chan->embedded_data_height =
-			sensor_mode->image_properties.embedded_metadata_height;
-		/* rounding up to page size */
-		emb_buf_size =
-			round_up(
-				chan->embedded_data_width * chan->embedded_data_height * BPP_MEM,
-				PAGE_SIZE);
+			chan->embedded_data_width =
+				sensor_mode->image_properties.width;
+			chan->embedded_data_height =
+				sensor_mode->image_properties.embedded_metadata_height;
+
+			/* rounding up to page size */
+			emb_buf_size =
+				round_up(
+					chan->embedded_data_width * chan->embedded_data_height * BPP_MEM,
+					PAGE_SIZE);
+		}
 	}
 
 	/* Allocate buffer for Embedded Data if need to*/
