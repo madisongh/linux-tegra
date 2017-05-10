@@ -2070,7 +2070,14 @@ static bool fb_var_is_equal(const struct fb_var_screeninfo *var1,
 	    var1->vsync_len != var2->vsync_len)
 		return false;
 
-	if (var1->vmode == var2->vmode)
+	/*
+	 * Userspace might modify LIMITED_RANGE flag to select full range
+	 * quantization. This shouldn't lead to mode mismatch as the modes
+	 * are still the same even if LIMITED_RANGE flag doesn't match.
+	 * Ignore LIMITED_RANGE bit during vmode comparision.
+	 */
+	if ((var1->vmode & ~FB_VMODE_LIMITED_RANGE) ==
+			(var2->vmode & ~FB_VMODE_LIMITED_RANGE))
 		return true;
 
 	/*
