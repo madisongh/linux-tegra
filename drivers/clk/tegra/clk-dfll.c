@@ -1528,7 +1528,7 @@ static void dfll_init_out_if(struct tegra_dfll *td)
 
 	td->lut_min = td->thermal_floor_output;
 	td->lut_max = td->thermal_cap_output;
-	td->lut_safe = td->lut_min + 1;
+	td->lut_safe = td->lut_min + (td->lut_min < td->lut_max ? 1 : 0);
 
 	if (td->pmu_if == TEGRA_DFLL_PMU_PWM) {
 		int vinit = td->reg_init_uV;
@@ -1560,6 +1560,7 @@ static void dfll_init_out_if(struct tegra_dfll *td)
 		}
 	} else {
 		dfll_i2c_writel(td, 0, DFLL_OUTPUT_CFG);
+		val = dfll_readl(td, DFLL_OUTPUT_CFG);
 		val |= (td->lut_safe << DFLL_OUTPUT_CFG_SAFE_SHIFT) |
 		       (td->lut_max << DFLL_OUTPUT_CFG_MAX_SHIFT) |
 		       (td->lut_min << DFLL_OUTPUT_CFG_MIN_SHIFT);
