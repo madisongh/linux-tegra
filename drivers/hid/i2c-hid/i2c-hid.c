@@ -261,18 +261,23 @@ static int i2c_hid_set_report(struct i2c_client *client, u8 reportType,
 	struct i2c_hid *ihid = i2c_get_clientdata(client);
 	u8 *args = ihid->argsbuf;
 	int ret;
+	u16 size;
+	int args_len;
+	int index = 0;
 	u16 dataRegister = le16_to_cpu(ihid->hdesc.wDataRegister);
 
+	i2c_hid_dbg(ihid, "%s\n", __func__);
+
+	if (data_len > ihid->bufsize)
+		return -EINVAL;
+
 	/* hidraw already checked that data_len < HID_MAX_BUFFER_SIZE */
-	u16 size =	2			/* size */ +
+	size =		2			/* size */ +
 			(reportID ? 1 : 0)	/* reportID */ +
 			data_len		/* buf */;
-	int args_len =	(reportID >= 0x0F ? 1 : 0) /* optional third byte */ +
+	args_len =	(reportID >= 0x0F ? 1 : 0) /* optional third byte */ +
 			2			/* dataRegister */ +
 			size			/* args */;
-	int index = 0;
-
-	i2c_hid_dbg(ihid, "%s\n", __func__);
 
 	if (reportID >= 0x0F) {
 		args[index++] = reportID;
