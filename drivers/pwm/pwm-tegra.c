@@ -61,6 +61,7 @@ struct tegra_pwm_chip {
 	int			num_user;
 	unsigned long		src_rate;
 	unsigned long		parent_rate;
+	unsigned long		max_clk_limit;
 	struct pinctrl		*pinctrl;
 	struct pinctrl_state	*suspend_state;
 	struct pinctrl_state	*resume_state;
@@ -121,11 +122,11 @@ static long tegra_get_optimal_rate(struct tegra_pwm_chip *pc,
 	 * Make sure that derived frequency should not exceed max clock
 	 * frequency limit.
 	 */
-	if (pc->soc->max_clk_limit && (in_rate > pc->soc->max_clk_limit)) {
-		ret = clk_set_rate(pc->clk, pc->soc->max_clk_limit);
+	if (pc->max_clk_limit && (in_rate > pc->max_clk_limit)) {
+		ret = clk_set_rate(pc->clk, pc->max_clk_limit);
 		if (ret < 0)
 			dev_warn(pc->dev, "Failed to set clock rate %lu: %d\n",
-				 pc->soc->max_clk_limit, ret);
+				 pc->max_clk_limit, ret);
 
 		pc->src_rate = clk_get_rate(pc->clk);
 		return -EAGAIN;
@@ -267,6 +268,7 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 	struct resource *r;
 	bool no_clk_sleeping_in_ops;
 	struct clk *parent_clk;
+	u32 pval;
 	int ret;
 
 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
@@ -296,6 +298,12 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "PWM clk can%s sleep in ops\n",
 		 no_clk_sleeping_in_ops ? "not" : "");
 
+	ret = of_property_read_u32(pdev->dev.of_node,
+				   "pwm-minimum-frequency-hz", &pval);
+	if (!ret)
+		pwm->max_clk_limit = pval * 256 * (1 << PWM_SCALE_WIDTH);
+	else
+		pwm->max_clk_limit = pwm->soc->max_clk_limit;
 
 	pwm->clk = devm_clk_get(&pdev->dev, "pwm");
 	if (IS_ERR(pwm->clk)) {
@@ -324,7 +332,7 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 		}
 
 		/* Set clock to maximum clock limit */
-		ret = clk_set_rate(pwm->clk, pwm->soc->max_clk_limit);
+		ret = clk_set_rate(pwm->clk, pwm->max_clk_limit);
 		if (ret < 0) {
 			dev_err(dev, "Failed to set max clk rate: %d\n", ret);
 			return ret;
@@ -337,8 +345,8 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 
 	/* Limit the maximum clock rate */
 	if (pwm->soc->max_clk_limit &&
-	    (pwm->src_rate > pwm->soc->max_clk_limit)) {
-		ret = clk_set_rate(pwm->clk, pwm->soc->max_clk_limit);
+	    (pwm->src_rate > pwm->max_clk_limit)) {
+		ret = clk_set_rate(pwm->clk, pwm->max_clk_limit);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "Failed to set max clk rate: %d\n",
 				ret);
