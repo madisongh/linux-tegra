@@ -575,18 +575,25 @@ static inline uint64_t tegra_adma_get_position(struct tegra_adma_chan *tdc)
 {
 	unsigned long tc_remain = 0, tc_transferred = 0;
 	uint64_t tx_done_max = ADMA_CH_TRANSFER_DONE_COUNT_MASK + 1;
-	uint64_t tx_done;
+	uint64_t tx_done,tx_done_l;
+	unsigned long tc_remain_l;
 
 	tx_done = channel_read(tdc, ADMA_CH_TRANSFER_STATUS) &
-		ADMA_CH_TRANSFER_DONE_COUNT_MASK;
+				ADMA_CH_TRANSFER_DONE_COUNT_MASK;
 
 	/* read TC_STATUS register to get current transfer status. */
 	tc_remain = channel_read(tdc, ADMA_CH_TC_STATUS);
 
-	/* read TRANSFER_DONE_COUNT again in case TC_STATUS is just reset */
-	if (tc_remain == tdc->channel_reg.tc)
-		tx_done = channel_read(tdc, ADMA_CH_TRANSFER_STATUS) &
-			ADMA_CH_TRANSFER_DONE_COUNT_MASK;
+	tx_done_l = channel_read(tdc, ADMA_CH_TRANSFER_STATUS) &
+				ADMA_CH_TRANSFER_DONE_COUNT_MASK;
+
+	tc_remain_l = channel_read(tdc, ADMA_CH_TC_STATUS);
+
+	/* Transfer count status got reset between ADMA_CH_TRANSFER_STATUS reads */
+	if (tx_done != tx_done_l) {
+		tx_done = tx_done_l;
+		tc_remain = tc_remain_l;
+	}
 
 	/* Handle wrap around case */
 	if (tx_done < tdc->channel_reg.tx_done)
