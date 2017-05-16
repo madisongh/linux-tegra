@@ -480,16 +480,47 @@ int quadd_power_clk_start(void)
 	pr_info("power_clk: start, freq: %d\n",
 		param->power_rate_freq);
 
-	/*
-	 * As a quick workaround, do not use gpu and emc clocks
-	 * since it leads to crash on some devices.
-	 * It will be fixed properly later.
-	 */
+	/* setup gpu frequency */
 	s = &power_ctx.gpu;
-	atomic_set(&s->active, 0);
+	s->clkp = clk_get_sys("3d", NULL);
+	if (!IS_ERR_OR_NULL(s->clkp)) {
+#ifdef CONFIG_COMMON_CLK
+		int status = clk_notifier_register(s->clkp, s->nb);
 
+		if (status < 0) {
+			pr_err("error: could not setup gpu freq\n");
+			clk_put(s->clkp);
+			return status;
+		}
+#endif
+		clk_put(s->clkp);
+		reset_data(s);
+		atomic_set(&s->active, 1);
+	} else {
+		pr_warn("warning: could not setup gpu freq\n");
+		atomic_set(&s->active, 0);
+	}
+
+	/* setup emc frequency */
 	s = &power_ctx.emc;
-	atomic_set(&s->active, 0);
+	s->clkp = clk_get_sys("cpu", "emc");
+	if (!IS_ERR_OR_NULL(s->clkp)) {
+#ifdef CONFIG_COMMON_CLK
+		int status = clk_notifier_register(s->clkp, s->nb);
+
+		if (status < 0) {
+			pr_err("error: could not setup emc freq\n");
+			clk_put(s->clkp);
+			return status;
+		}
+#endif
+		clk_put(s->clkp);
+		reset_data(s);
+		atomic_set(&s->active, 1);
+	} else {
+		pr_warn("warning: could not setup emc freq\n");
+		atomic_set(&s->active, 0);
+	}
 
 	/* setup cpu frequency notifier */
 	s = &power_ctx.cpu;
