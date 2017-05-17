@@ -15,10 +15,6 @@
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
 #include <linux/clk.h>
@@ -34,13 +30,13 @@
 #include <linux/slab.h>
 #include <linux/reset.h>
 
-#define PWM_ENABLE	(1 << 31)
+#define PWM_ENABLE	BIT(31)
 #define PWM_DUTY_WIDTH	8
 #define PWM_DUTY_SHIFT	16
 #define PWM_SCALE_WIDTH	13
 #define PWM_SCALE_SHIFT	0
 
-#define CLK_1MHz	1000000UL
+#define CLK_1MHZ	1000000UL
 
 struct tegra_pwm_soc {
 	unsigned int num_channels;
@@ -52,7 +48,7 @@ struct tegra_pwm_chip {
 	struct device *dev;
 
 	struct clk *clk;
-	struct reset_control*rst;
+	struct reset_control *rst;
 
 	void __iomem *regs;
 
@@ -80,13 +76,13 @@ static inline u32 pwm_readl(struct tegra_pwm_chip *chip, unsigned int num)
 }
 
 static inline void pwm_writel(struct tegra_pwm_chip *chip, unsigned int num,
-			     unsigned long val)
+			      unsigned long val)
 {
 	writel(val, chip->regs + (num << 4));
 }
 
 static long tegra_get_optimal_rate(struct tegra_pwm_chip *pc,
-				int duty_ns, int period_ns)
+				   int duty_ns, int period_ns)
 {
 	unsigned long due_dp, dn, due_dm;
 	unsigned long p_rate, in_rate, rate, hz;
@@ -212,8 +208,9 @@ timing_done:
 		err = pc->clk_enable(pc->clk);
 		if (err < 0)
 			return err;
-	} else
+	} else {
 		val |= PWM_ENABLE;
+	}
 
 	pwm_writel(pc, pwm->hwpwm, val);
 
@@ -287,7 +284,7 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, pwm);
 
 	no_clk_sleeping_in_ops = of_property_read_bool(pdev->dev.of_node,
-					"nvidia,no-clk-sleeping-in-ops");
+						       "nvidia,no-clk-sleeping-in-ops");
 	pwm->pretty_good_algo = of_property_read_bool(pdev->dev.of_node,
 					"pwm,use-pretty-good-alogorithm");
 
@@ -320,7 +317,7 @@ static int tegra_pwm_probe(struct platform_device *pdev)
 		 * Set PWM frequency to lower so that it can switch
 		 * to parent with higher clock rate.
 		 */
-		ret = clk_set_rate(pwm->clk, CLK_1MHz);
+		ret = clk_set_rate(pwm->clk, CLK_1MHZ);
 		if (ret < 0) {
 			dev_err(dev, "Failed to set 1M clock rate: %d\n", ret);
 			return ret;
@@ -436,7 +433,7 @@ parent_done:
 
 		if (pwm->suspend_state && pwm->resume_state)
 			dev_info(&pdev->dev,
-				"Pinconfig found for suspend/resume\n");
+				 "Pinconfig found for suspend/resume\n");
 	}
 
 	return 0;
