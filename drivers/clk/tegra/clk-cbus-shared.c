@@ -374,7 +374,8 @@ static unsigned long _clk_shared_bus_update(struct tegra_clk_cbus_shared *cbus,
 		}
 	}
 
-	if (!strcmp(__clk_get_name(cbus->hw.clk), "emc_master")) {
+	if (!strcmp(__clk_get_name(cbus->hw.clk), "emc_master") &&
+	    (cbus->flags & TEGRA_SHARED_BUS_EMC_NATIVE)) {
 		unsigned long iso_bw_min = 0;
 		struct tegra_clk_emc *emc;
 		struct clk_hw *hw_emc;
@@ -556,6 +557,9 @@ static unsigned long clk_shared_recalc_rate(struct clk_hw *hw,
 	struct tegra_clk_cbus_shared *shared = to_clk_cbus_shared(hw);
 
 	if (shared->u.shared_bus_user.mode == SHARED_CEILING)
+		return shared->u.shared_bus_user.rate;
+
+	if (!clk_hw_get_parent(clk_hw_get_parent(hw)))
 		return shared->u.shared_bus_user.rate;
 
 	if (shared->u.shared_bus_user.client &&
@@ -1294,8 +1298,13 @@ static struct tegra_clk_cbus_shared *tegra_clk_init_shared(const char *name,
 	shared->u.shared_bus_user.mode = mode;
 	if (mode == SHARED_CEILING)
 		shared->u.shared_bus_user.rate = parent_cbus->max_rate;
-	else
+	else {
 		shared->u.shared_bus_user.rate = clk_get_rate(parent_clk);
+		/* If bus parent is not registered yet set default rate */
+		if (!clk_get_parent(parent_clk))
+			shared->u.shared_bus_user.rate =
+				parent_cbus->users_default_rate;
+	}
 
 	shared->flags = flags;
 	shared->iso_usages = usages;
