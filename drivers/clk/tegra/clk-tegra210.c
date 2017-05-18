@@ -3854,20 +3854,10 @@ static u32 * __init tegra210_init_suspend_ctx(void)
 	return periph_clk_src_ctx;
 }
 
-static void tegra210_emc_clk_suspend(struct clk *emc, unsigned long rate)
-{
-	/*
-	 * Scale EMC rate at/below boot rate - required for entering SC7(LP0)
-	 * on LPDDR4.
-	 */
-	clk_set_rate(emc, rate);
-}
-
 static int tegra210_clk_suspend(void)
 {
 	int i;
 	unsigned long off;
-	unsigned long emc_rate;
 	struct device_node *node;
 	u32 *clk_rst_ctx = periph_clk_src_ctx;
 	u32 val;
@@ -3929,9 +3919,6 @@ static int tegra210_clk_suspend(void)
 
 	if (dfll_pdev)
 		tegra_dfll_suspend(dfll_pdev);
-
-	emc_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_EMC]);
-	tegra210_emc_clk_suspend(clks[TEGRA210_CLK_EMC], emc_rate);
 
 	/* Enable PLLP_OUT_CPU after dfll suspend */
 	val = car_readl(CLK_OUT_ENB_Y,0);
@@ -4096,10 +4083,12 @@ static void tegra210_clk_resume(void)
 	val &= ~CLK_ENB_PLLP_OUT_CPU;
 	car_writel(val, CLK_OUT_ENB_Y, 0);
 
-	car_writel(pll_m_v, PLLM_BASE, 0);
-	tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_MB], pll_mb_rate);
-	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_M]);
-	tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_MB]);
+	if (emc_is_native) {
+		car_writel(pll_m_v, PLLM_BASE, 0);
+		tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_MB], pll_mb_rate);
+		tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_M]);
+		tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_MB]);
+	}
 
 	tegra210_emc_timing_invalidate();
 
