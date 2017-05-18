@@ -1,6 +1,9 @@
 #
 # Makefile for misc devices that really don't fit anywhere else.
 #
+ifeq ($(NV_BUILD_CONFIGURATION_IS_COVERAGE),1)
+GCOV_PROFILE_bluedroid_pm.o :=y
+endif
 
 obj-$(CONFIG_IBM_ASM)		+= ibmasm/
 obj-$(CONFIG_AD525X_DPOT)	+= ad525x_dpot.o

@@ -9,6 +9,10 @@
 # FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
 # more details.
 
+ifeq ($(NV_BUILD_CONFIGURATION_IS_COVERAGE),1)
+GCOV_PROFILE :=y
+endif
+
 ccflags-y += -DHWA_NV_1640420
 ccflags-y += -DHWA_NV_1637630
 ccflags-y += -DHWA_NV_1650337
