@@ -40,15 +40,18 @@
 enum {
 	THRESHOLD_INDEX_0,
 	THRESHOLD_INDEX_1,
+	THRESHOLD_INDEX_2,
 	THRESHOLD_INDEX_COUNT,
 };
 
 static const u32 __initconst cpu_process_speedos[][CPU_PROCESS_CORNERS] = {
 	{ 2119, UINT_MAX },
 	{ 2119, UINT_MAX },
+	{ 1550, UINT_MAX },
 };
 
 static const u32 __initconst gpu_process_speedos[][GPU_PROCESS_CORNERS] = {
+	{ UINT_MAX, UINT_MAX },
 	{ UINT_MAX, UINT_MAX },
 	{ UINT_MAX, UINT_MAX },
 };
@@ -56,6 +59,7 @@ static const u32 __initconst gpu_process_speedos[][GPU_PROCESS_CORNERS] = {
 static const u32 __initconst soc_process_speedos[][SOC_PROCESS_CORNERS] = {
 	{ 1950,     2073,     UINT_MAX },
 	{ UINT_MAX, UINT_MAX, UINT_MAX },
+	{ 1562,     1673,     UINT_MAX },
 };
 
 static u8 __init get_speedo_revision(void)
@@ -80,7 +84,7 @@ static void __init rev_t210sku_to_speedo_ids(struct tegra_sku_info *sku_info,
 	sku_info->soc_speedo_id = 0;
 	sku_info->gpu_speedo_id = 0;
 	sku_info->ucm = TEGRA_UCM1;
-	*threshold = THRESHOLD_INDEX_0;
+	*threshold = THRESHOLD_INDEX_2;
 #ifdef CONFIG_OF
 	vcm31_sku = of_property_read_bool(of_chosen, "nvidia,t210-vcm31-sku");
 	always_on = of_property_read_bool(of_chosen,
@@ -175,10 +179,11 @@ static void __init rev_t210b01sku_to_speedo_ids(struct tegra_sku_info *sku_info,
 
 	switch (sku) {
 	case 0x00: /* Engineering SKU */
+	case 0x01: /* Engineering SKU */
 		break;
 	default:
 		pr_err("Tegra210b01: invalid combination of SKU/revision/mode:\n");
-		pr_err("Tegra210: SKU %#04x, rev %d\n", sku, rev);
+		pr_err("Tegra210b01: SKU %#04x, rev %d\n", sku, rev);
 		/* Using the default for the error case */
 		break;
 	}
@@ -245,6 +250,9 @@ void __init tegra210_init_speedo_data(struct tegra_sku_info *sku_info)
 	 * Determine CPU, GPU and SoC speedo values depending on speedo fusing
 	 * revision. Note that GPU speedo value is fused in CPU_SPEEDO_2.
 	 */
+	speedo_revision = get_speedo_revision();
+	sku_info->speedo_rev = speedo_revision;
+
 	if (is_t210b01_sku(sku_info)) {
 		sku_info->cpu_speedo_value = cpu_speedo[0];
 		sku_info->gpu_speedo_value = cpu_speedo[2];
@@ -253,11 +261,9 @@ void __init tegra210_init_speedo_data(struct tegra_sku_info *sku_info)
 		/* FIXME Remove hack to set fixed speedo value */
 		sku_info->cpu_speedo_value = 1452;
 		sku_info->gpu_speedo_value = 1452;
+		sku_info->soc_speedo_value = 1452;
 
 	} else {
-		speedo_revision = get_speedo_revision();
-		sku_info->speedo_rev = speedo_revision;
-
 		if (speedo_revision >= 3) {
 			sku_info->cpu_speedo_value = cpu_speedo[0];
 			sku_info->gpu_speedo_value = cpu_speedo[2];
