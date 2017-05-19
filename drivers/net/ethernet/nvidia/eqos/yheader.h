@@ -1454,7 +1454,7 @@ struct eqos_prv_data {
 	unsigned char hwts_rx_en;
 	struct ptp_clock *ptp_clock;
 	struct ptp_clock_info ptp_clock_ops;
-	spinlock_t ptp_lock; /* protects registers */
+	raw_spinlock_t ptp_lock; /* protects registers */
 	unsigned int default_addend;
 	bool one_nsec_accuracy; /* set to 1 if one nano second accuracy
 				   is enabled else set to zero */
