@@ -131,6 +131,6 @@ int tegra_round_cvb_voltage(int mv, int v_scale,
 int tegra_get_cvb_t_voltage(int speedo, int s_scale, int t, int t_scale,
 			    struct cvb_coefficients *cvb);
 int tegra_cvb_build_thermal_table(const struct thermal_table *table,
-		int speedo_value);
+		int speedo_value, unsigned int soc_min_mv);
 
 #endif

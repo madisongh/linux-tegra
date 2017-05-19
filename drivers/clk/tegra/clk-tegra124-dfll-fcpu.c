@@ -680,7 +680,8 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 		cvb->cpu_dfll_data.tune_high_min_millivolts;
 
 	thermal = fcpu_data->cpu_thermal_table;
-	ret = tegra_cvb_build_thermal_table(thermal, speedo_value);
+	ret = tegra_cvb_build_thermal_table(thermal, speedo_value,
+					    soc->min_millivolts);
 	if (ret < 0) {
 		pr_warn("couldn't build thermal floor table\n");
 	} else {

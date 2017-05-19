@@ -182,6 +182,7 @@ const struct cvb_table *tegra_cvb_build_opp_table(
  * tegra_cvb_build_thermal_table - build thermal table from Tegra CVB tables
  * @table: the hardware characterization thermal table
  * @speedo_value: speedo value of the HW module
+ * @soc_min_mv: minimum voltage applied across all temperature ranges
  *
  * The minimum voltage for the IP blocks inside Tegra SoCs might depend on
  * the current temperature. This function calculates the voltage-thermal
@@ -190,7 +191,7 @@ const struct cvb_table *tegra_cvb_build_opp_table(
  * be used.  Returns 0 on success or a negative error code on failure.
  */
 int tegra_cvb_build_thermal_table(const struct thermal_table *table,
-		int speedo_value)
+		int speedo_value, unsigned int soc_min_mv)
 {
 	int i;
 
@@ -207,6 +208,7 @@ int tegra_cvb_build_thermal_table(const struct thermal_table *table,
 				table->temp_scale,
 				&table->coefficients);
 		mv = DIV_ROUND_UP(mv, table->voltage_scale);
+		mv = max(mv, soc_min_mv);
 		table->thermal_floor_table[i].millivolts = max(mv,
 				table->thermal_floor_table[i].millivolts);
 	}
