@@ -192,6 +192,7 @@ static struct dvfs_rail tegra210b01_dvfs_rail_vdd_cpu = {
 	.stats = {
 		.bin_uv = 5000, /* 5.0mV */
 	},
+	.nvver = "p4v1",
 };
 
 static struct dvfs_rail tegra210b01_dvfs_rail_vdd_gpu = {
