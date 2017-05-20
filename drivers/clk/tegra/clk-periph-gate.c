@@ -173,7 +173,7 @@ const struct clk_ops tegra_clk_periph_gate_ops = {
 	.is_prepared = clk_periph_is_prepared,
 	.enable = clk_periph_enable,
 	.disable = clk_periph_disable,
-	.disable = clk_periph_disable_unused,
+	.disable_unused = clk_periph_disable_unused,
 	.prepare = clk_periph_prepare,
 	.unprepare = clk_periph_unprepare,
 };
