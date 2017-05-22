@@ -228,7 +228,6 @@ static int tegra210_admaif_runtime_suspend(struct device *dev)
 
 	regcache_cache_only(admaif->regmap, true);
 	regcache_mark_dirty(admaif->regmap);
-	pm_runtime_put_sync(dev->parent);
 
 	return 0;
 }
@@ -236,13 +235,6 @@ static int tegra210_admaif_runtime_suspend(struct device *dev)
 static int tegra210_admaif_runtime_resume(struct device *dev)
 {
 	struct tegra210_admaif *admaif = dev_get_drvdata(dev);
-	int ret;
-
-	ret = pm_runtime_get_sync(dev->parent);
-	if (ret < 0) {
-		dev_err(dev, "parent get_sync failed: %d\n", ret);
-		return ret;
-	}
 
 	regcache_cache_only(admaif->regmap, false);
 	if (!admaif->is_shutdown)
