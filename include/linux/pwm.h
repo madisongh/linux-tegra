@@ -272,12 +272,10 @@ struct pwm_chip {
  * struct pwm_capture - PWM capture data
  * @period: period of the PWM signal (in nanoseconds)
  * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
- * @rpm: Revolution per minute.
  */
 struct pwm_capture {
 	unsigned int period;
 	unsigned int duty_cycle;
-	unsigned int rpm;
 };
 
 #if IS_ENABLED(CONFIG_PWM)
@@ -385,26 +383,6 @@ static inline bool pwm_can_sleep(struct pwm_device *pwm)
 	return false;
 }
 #endif
-
-/**
- * pwm_get_rpm(): Get PWM RPM.
- * @pwm: PWM device
- *
- * Read PWM signal and return RPM value.
- *
- * Returns positive integer for valid RPM else negative error.
- */
-static inline int pwm_get_rpm(struct pwm_device *pwm)
-{
-	struct pwm_capture result;
-	int err;
-
-	err = pwm_capture(pwm, &result, 0);
-	if (err < 0)
-		return err;
-
-	return result.rpm;
-}
 
 struct pwm_lookup {
 	struct list_head list;
