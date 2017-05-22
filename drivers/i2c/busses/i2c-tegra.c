@@ -1906,7 +1906,6 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	i2c_dev->msg_add = msgs[0].addr;
 	i2c_dev->msgs = msgs;
 	i2c_dev->msg_num = num;
-	tegra_i2c_flush_fifos(i2c_dev);
 
 	if (i2c_dev->is_suspended)
 		return -EBUSY;
@@ -1921,6 +1920,7 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 		pm_runtime_put(&adap->dev);
 		return ret;
 	}
+	tegra_i2c_flush_fifos(i2c_dev);
 
 	if (adap->bus_clk_rate != i2c_dev->bus_clk_rate) {
 		i2c_dev->bus_clk_rate = adap->bus_clk_rate;
