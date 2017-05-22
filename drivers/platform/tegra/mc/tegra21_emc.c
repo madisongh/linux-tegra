@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/tegra21_emc.c
  *
- * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1439,18 +1439,20 @@ static int emc_read_mrr(int dev, int addr)
 
 int tegra_emc_get_dram_temperature(void)
 {
-	int mr4 = 0;
+	int mr4, mr4_0, mr4_1;
 	unsigned long flags;
 
+	mr4 = mr4_0 = mr4_1 = 0;
+
 	spin_lock_irqsave(&emc_access_lock, flags);
-
-	mr4 = emc_read_mrr(0, 4);
-	if (IS_ERR_VALUE(mr4)) {
-		spin_unlock_irqrestore(&emc_access_lock, flags);
-		return mr4;
-	}
-
+	mr4_0 = emc_read_mrr(0, 4);
+	mr4_1 = emc_read_mrr(1, 4);
 	spin_unlock_irqrestore(&emc_access_lock, flags);
+
+	/* Consider higher temperature of the tw DDR Dies */
+	mr4 = (mr4_0 > mr4_1) ? mr4_0 : mr4_1;
+	if (IS_ERR_VALUE(mr4))
+		return mr4;
 
 	mr4 = (mr4 & LPDDR2_MR4_TEMP_MASK) >> LPDDR2_MR4_TEMP_SHIFT;
 	return mr4;
