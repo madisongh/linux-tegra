@@ -18,6 +18,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		nvidia,use-ram-code;
+		nvidia,poll_thresh_freq = <408000>;
 		emc-table@0 {
 			reg = <0x00000000>;
 			#address-cells = <0x00000001>;
