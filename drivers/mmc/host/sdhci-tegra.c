@@ -2022,7 +2022,8 @@ static int sdhci_tegra_parse_dt(struct device *dev)
 	plat->update_pinctrl_settings = of_property_read_bool(np,
 		"nvidia,update-pinctrl-settings");
 	plat->cd_cap_invert = of_property_read_bool(np, "cd-inverted");
-
+	plat->force_non_rem_rescan = of_property_read_bool(np,
+		"force-non-removable-rescan");
 	tegra_host->plat = plat;
 	return mmc_of_parse(host->mmc);
 }
@@ -2265,6 +2266,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
 
 	if (plat->en_periodic_cflush)
 		host->mmc->caps2 |= MMC_CAP2_PERIODIC_CACHE_FLUSH;
+
+	if (plat->force_non_rem_rescan)
+		host->mmc->caps2 |= MMC_CAP2_FORCE_RESCAN;
 
 #ifdef CONFIG_MMC_CQ_HCI
 	if (plat->enable_hw_cq) {
