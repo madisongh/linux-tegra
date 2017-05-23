@@ -102,26 +102,20 @@ static int tegra210_xbar_runtime_resume(struct device *dev)
 }
 
 #ifdef CONFIG_PM_SLEEP
-static int tegra210_xbar_child_suspend(struct device *dev, void *data)
-{
-	struct device_driver *drv = dev->driver;
-	int ret = 0;
-
-	if (!drv)
-		return 0;
-
-	if (drv->pm)
-		if (drv->pm->suspend)
-			ret = drv->pm->suspend(dev);
-
-	return ret;
-}
-
 static int tegra210_xbar_suspend(struct device *dev)
 {
-	device_for_each_child(dev, NULL, tegra210_xbar_child_suspend);
+	if (pm_runtime_status_suspended(dev))
+		return 0;
 
-	return 0;
+	return tegra210_xbar_runtime_suspend(dev);
+}
+
+static int tegra210_xbar_resume(struct device *dev)
+{
+	if (pm_runtime_status_suspended(dev))
+		return 0;
+
+	return tegra210_xbar_runtime_resume(dev);
 }
 #endif
 
@@ -1019,7 +1013,8 @@ static int tegra210_xbar_remove(struct platform_device *pdev)
 static const struct dev_pm_ops tegra210_xbar_pm_ops = {
 	SET_RUNTIME_PM_OPS(tegra210_xbar_runtime_suspend,
 			   tegra210_xbar_runtime_resume, NULL)
-	SET_SYSTEM_SLEEP_PM_OPS(tegra210_xbar_suspend, NULL)
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(tegra210_xbar_suspend,
+				     tegra210_xbar_resume)
 };
 
 static struct platform_driver tegra210_xbar_driver = {

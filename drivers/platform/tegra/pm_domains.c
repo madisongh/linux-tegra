@@ -225,7 +225,6 @@ static int tegra_ape_pd_disable_clks(struct tegra_pm_domain *ape_pd)
 static int tegra_ape_power_on(struct generic_pm_domain *genpd)
 {
 	struct tegra_pm_domain *ape_pd;
-	struct pm_domain_data *pdd;
 	int ret = 0;
 	int partition_id;
 	struct device_node *dn;
@@ -266,8 +265,6 @@ static int tegra_ape_power_on(struct generic_pm_domain *genpd)
 #ifdef CONFIG_TEGRA_APE_AGIC
 		tegra_agic_restore_registers();
 #endif
-		list_for_each_entry(pdd, &genpd->dev_list, list_node)
-			TEGRA_PD_DEV_CALLBACK(resume, pdd->dev);
 	} else {
 		/*
 		 * The adsp clock shall be enabled only when ADSP cpu is
@@ -283,7 +280,6 @@ static int tegra_ape_power_on(struct generic_pm_domain *genpd)
 static int tegra_ape_power_off(struct generic_pm_domain *genpd)
 {
 	struct tegra_pm_domain *ape_pd;
-	struct pm_domain_data *pdd;
 	int ret = 0;
 	int partition_id;
 	struct device_node *dn;
@@ -292,9 +288,6 @@ static int tegra_ape_power_off(struct generic_pm_domain *genpd)
 	ret = of_property_read_u32(dn, "partition-id", &partition_id);
 	if (ret)
 		return -EINVAL;
-
-	list_for_each_entry(pdd, &genpd->dev_list, list_node)
-		TEGRA_PD_DEV_CALLBACK(suspend, pdd->dev);
 
 #ifdef CONFIG_TEGRA_APE_AGIC
 	tegra_agic_save_registers();
