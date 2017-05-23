@@ -1757,6 +1757,14 @@ config SENSORS_ULTRA45
 	  This driver provides support for the Ultra45 workstation environmental
 	  sensors.
 
+
+config GPIO_TACHOMETER
+	tristate "GPIO tachometer"
+	depends on GPIO_DEVRES
+	depends on GPIOLIB
+	help
+	  Enables a driver to use gpio IRQ to measure motor speed.
+
 if ACPI
 
 comment "ACPI drivers"
