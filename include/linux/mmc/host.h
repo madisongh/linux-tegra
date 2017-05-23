@@ -380,6 +380,7 @@ struct mmc_host {
 #define MMC_CAP2_CMDQ_QBR	(1 << 24)	/* CMDQ Queue barrier supported */
 #define MMC_CAP2_PERIODIC_CACHE_FLUSH	(1 << 26)
 #define MMC_CAP2_NO_EXTENDED_GP		(1 << 27) /* EXT GP support broken */
+#define MMC_CAP2_FORCE_RESCAN	(1 << 28) /* Force rescan requests for the device if this cap is set */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 

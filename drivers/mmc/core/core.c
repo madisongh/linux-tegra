@@ -2887,7 +2887,8 @@ int _mmc_detect_card_removed(struct mmc_host *host)
 {
 	int ret;
 
-	if (host->caps & MMC_CAP_NONREMOVABLE)
+	if ((host->caps & MMC_CAP_NONREMOVABLE) &&
+		!(host->caps2 & MMC_CAP2_FORCE_RESCAN))
 		return 0;
 
 	if (!host->card || mmc_card_removed(host->card))
@@ -2976,8 +2977,10 @@ void mmc_rescan(struct work_struct *work)
 	 * still present
 	 */
 	if (host->bus_ops && !host->bus_dead
-	    && !(host->caps & MMC_CAP_NONREMOVABLE))
+	    && (!(host->caps & MMC_CAP_NONREMOVABLE) ||
+			(host->caps2 & MMC_CAP2_FORCE_RESCAN))) {
 		host->bus_ops->detect(host);
+	}
 
 	host->detect_change = 0;
 
