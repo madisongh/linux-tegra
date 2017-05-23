@@ -1739,12 +1739,18 @@ EXPORT_SYMBOL_GPL(tegra_adma_dump_ch_reg);
 #ifdef CONFIG_PM_SLEEP
 static int tegra_adma_pm_suspend(struct device *dev)
 {
-	return 0;
+	if (pm_runtime_status_suspended(dev))
+		return 0;
+
+	return tegra_adma_runtime_suspend(dev);
 }
 
 static int tegra_adma_pm_resume(struct device *dev)
 {
-	return 0;
+	if (pm_runtime_status_suspended(dev))
+		return 0;
+
+	return tegra_adma_runtime_resume(dev);
 }
 #endif
 
@@ -1753,7 +1759,8 @@ static const struct dev_pm_ops tegra_adma_dev_pm_ops = {
 	.runtime_suspend = tegra_adma_runtime_suspend,
 	.runtime_resume = tegra_adma_runtime_resume,
 #endif
-	SET_SYSTEM_SLEEP_PM_OPS(tegra_adma_pm_suspend, tegra_adma_pm_resume)
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(tegra_adma_pm_suspend,
+				     tegra_adma_pm_resume)
 };
 
 static struct platform_driver tegra_admac_driver = {
