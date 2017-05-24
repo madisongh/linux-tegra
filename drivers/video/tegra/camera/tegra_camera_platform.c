@@ -430,6 +430,16 @@ static long tegra_camera_ioctl(struct file *file,
 				__func__);
 			return -EFAULT;
 		}
+
+#if defined(CONFIG_TEGRA_ISOMGR)
+		if (kcopy.bw > info->max_bw && kcopy.is_iso) {
+			dev_info(info->dev,
+				"ISO BW req %llu > %lld (max) capping to max",
+				kcopy.bw,
+				info->max_bw);
+			kcopy.bw = info->max_bw;
+		}
+#endif
 		/* Use Khz to prevent overflow */
 		mc_khz = tegra_emc_bw_to_freq_req(kcopy.bw);
 		mc_khz = min(ULONG_MAX / 1000, mc_khz);
@@ -447,6 +457,11 @@ static long tegra_camera_ioctl(struct file *file,
 			ret = clk_set_rate(info->emc, mc_khz * 1000);
 #endif
 		}
+
+		if (copy_to_user((void __user *)arg, &kcopy,
+			sizeof(struct bw_info)))
+			dev_err(info->dev, "%s:Failed to copy data to user\n",
+				 __func__);
 		break;
 	}
 	default:
