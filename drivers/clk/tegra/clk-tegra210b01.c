@@ -1600,8 +1600,8 @@ static struct div_nmp pllss_nmp = {
 };
 
 static struct tegra_clk_pll_freq_table pll_c4_vco_freq_table[] = {
-	{ 38400000, 998400000, 26, 1, 1, 0 },
-	{ 38400000, 793600000, 62, 3, 1, 0 },
+	{ 38400000, 998400000, 52, 2, 1, 0 },
+	{ 38400000, 787200000, 41, 2, 1, 0 },
 	{        0,         0,  0, 0, 0, 0 },
 };
 
@@ -1643,7 +1643,7 @@ static struct tegra_clk_pll_params pll_c4_vco_params = {
 	.iddq_bit_idx = PLLSS_IDDQ_BIT,
 	.round_p_to_pdiv = pll_qlin_p_to_pdiv,
 	.pdiv_tohw = pll_qlin_pdiv_to_hw,
-	.mdiv_default = 3,
+	.mdiv_default = 2,
 	.div_nmp = &pllss_nmp,
 	.freq_table = pll_c4_vco_freq_table,
 	.set_defaults = tegra210b01_pllc4_set_defaults,
