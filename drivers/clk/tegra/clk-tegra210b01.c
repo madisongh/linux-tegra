@@ -1891,9 +1891,8 @@ static struct div_nmp plla_nmp = {
 };
 
 static struct tegra_clk_pll_freq_table pll_a_freq_table[] = {
-	{ 38400000, 282240000, 44, 3, 2, 1, 0xf333 }, /* actual: 282239844 */
-	{ 38400000, 368640000, 57, 3, 2, 1, 0x0333 }, /* actual: 368639844 */
-	{ 38400000, 240000000, 75, 3, 4, 1,      0 },
+	{ 38400000, 282240000, 29, 2, 2, 1, 0xfccc }, /* actual: 282239063 */
+	{ 38400000, 368640000, 38, 2, 2, 1, 0xfccc }, /* actual: 368639063 */
 	{        0,         0,  0, 0, 0, 0,      0 },
 };
 
@@ -1922,7 +1921,7 @@ static struct tegra_clk_pll_params pll_a_params = {
 	.ext_misc_reg[2] = PLLA_MISC2,
 	.freq_table = pll_a_freq_table,
 	.flags = TEGRA_PLL_USE_LOCK | TEGRA_MDIV_NEW,
-	.mdiv_default = 3,
+	.mdiv_default = 2,
 	.set_defaults = tegra210b01_plla_set_defaults,
 	.calc_rate = tegra210b01_pll_fixed_mdiv_cfg,
 	.set_gain = tegra210b01_clk_pll_set_gain,
