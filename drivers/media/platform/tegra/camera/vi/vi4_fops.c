@@ -757,7 +757,6 @@ int vi4_channel_start_streaming(struct vb2_queue *vq, u32 count)
 	unsigned long flags;
 	struct v4l2_ctrl *override_ctrl;
 	struct v4l2_subdev *sd;
-	struct i2c_client *client;
 	struct device_node *node;
 	struct sensor_mode_properties *sensor_mode;
 	struct camera_common_data *s_data;
@@ -782,9 +781,9 @@ int vi4_channel_start_streaming(struct vb2_queue *vq, u32 count)
 
 	if (!chan->pg_mode) {
 		sd = chan->subdev_on_csi;
-		client = v4l2_get_subdevdata(sd);
-		node = client->dev.of_node;
-		s_data = to_camera_common_data(client);
+		node = sd->dev->of_node;
+		s_data = to_camera_common_data(sd->dev);
+
 		if (s_data == NULL) {
 			dev_err(&chan->video.dev,
 				"Camera common data missing!\n");
@@ -793,14 +792,12 @@ int vi4_channel_start_streaming(struct vb2_queue *vq, u32 count)
 
 		/* get sensor properties from DT */
 		if (node != NULL) {
-			sensor_mode = &s_data->sensor_props
-					.sensor_modes[s_data->mode];
+			sensor_mode = &s_data->sensor_props.sensor_modes[s_data->mode];
 
 			chan->embedded_data_width =
 				sensor_mode->image_properties.width;
 			chan->embedded_data_height =
-				sensor_mode->image_properties
-					.embedded_metadata_height;
+				sensor_mode->image_properties.embedded_metadata_height;
 			/* rounding up to page size */
 			emb_buf_size =
 				round_up(
@@ -832,7 +829,7 @@ int vi4_channel_start_streaming(struct vb2_queue *vq, u32 count)
 					&chan->vi->emb_buf, GFP_KERNEL);
 			if (!chan->vi->emb_buf_addr) {
 				dev_err(&chan->video.dev,
-				  "Can't allocate memory for embedded data\n");
+						"Can't allocate memory for embedded data\n");
 				goto error_capture_setup;
 			}
 			chan->vi->emb_buf_size = emb_buf_size;

@@ -98,7 +98,7 @@ int camera_common_g_ctrl(struct camera_common_data *s_data,
 	for (i = 0; i < s_data->numctrls; i++) {
 		if (s_data->ctrls[i]->id == control->id) {
 			control->value = s_data->ctrls[i]->val;
-			dev_dbg(&s_data->i2c_client->dev,
+			dev_dbg(s_data->dev,
 				 "%s: found control %s\n", __func__,
 				 s_data->ctrls[i]->name);
 			return 0;
@@ -110,20 +110,20 @@ int camera_common_g_ctrl(struct camera_common_data *s_data,
 
 EXPORT_SYMBOL_GPL(camera_common_g_ctrl);
 
-int camera_common_regulator_get(struct i2c_client *client,
+int camera_common_regulator_get(struct device *dev,
 		       struct regulator **vreg, const char *vreg_name)
 {
 	struct regulator *reg = NULL;
 	int err = 0;
 
-	reg = devm_regulator_get(&client->dev, vreg_name);
+	reg = devm_regulator_get(dev, vreg_name);
 	if (unlikely(IS_ERR(reg))) {
-		dev_err(&client->dev, "%s %s ERR: %p\n",
+		dev_err(dev, "%s %s ERR: %p\n",
 			__func__, vreg_name, reg);
 		err = PTR_ERR(reg);
 		reg = NULL;
 	} else
-		dev_dbg(&client->dev, "%s: %s\n",
+		dev_dbg(dev, "%s: %s\n",
 			__func__, vreg_name);
 
 	*vreg = reg;
@@ -132,10 +132,10 @@ int camera_common_regulator_get(struct i2c_client *client,
 
 EXPORT_SYMBOL_GPL(camera_common_regulator_get);
 
-int camera_common_parse_clocks(struct i2c_client *client,
+int camera_common_parse_clocks(struct device *dev,
 			struct camera_common_pdata *pdata)
 {
-	struct device_node *np = client->dev.of_node;
+	struct device_node *np = dev->of_node;
 	const char *prop;
 	int proplen = 0;
 	int i = 0;
@@ -149,7 +149,7 @@ int camera_common_parse_clocks(struct i2c_client *client,
 	pdata->parentclk_name = NULL;
 	err = of_property_read_string(np, "mclk", &pdata->mclk_name);
 	if (!err) {
-		dev_dbg(&client->dev, "mclk in DT %s\n", pdata->mclk_name);
+		dev_dbg(dev, "mclk in DT %s\n", pdata->mclk_name);
 		of_property_read_string(np, "parent-clk",
 					      &pdata->parentclk_name);
 		return 0;
@@ -168,7 +168,7 @@ int camera_common_parse_clocks(struct i2c_client *client,
 	if (numclocks > 1) {
 		err = of_property_read_u32(np, "mclk-index", &mclk_index);
 		if (err) {
-			dev_err(&client->dev, "Failed to find mclk index\n");
+			dev_err(dev, "Failed to find mclk index\n");
 			return err;
 		}
 		err = of_property_read_u32(np, "parent-clk-index",
@@ -178,14 +178,14 @@ int camera_common_parse_clocks(struct i2c_client *client,
 	for (i = 0; i < numclocks; i++) {
 		if (i == mclk_index) {
 			pdata->mclk_name = prop;
-			dev_dbg(&client->dev, "%s: mclk_name is %s\n",
+			dev_dbg(dev, "%s: mclk_name is %s\n",
 				 __func__, pdata->mclk_name);
 		} else if (i == parentclk_index) {
 			pdata->parentclk_name = prop;
-			dev_dbg(&client->dev, "%s: parentclk_name is %s\n",
+			dev_dbg(dev, "%s: parentclk_name is %s\n",
 				 __func__, pdata->parentclk_name);
 		} else
-			dev_dbg(&client->dev, "%s: %s\n", __func__, prop);
+			dev_dbg(dev, "%s: %s\n", __func__, prop);
 		prop += strlen(prop) + 1;
 	}
 
@@ -194,10 +194,10 @@ int camera_common_parse_clocks(struct i2c_client *client,
 
 EXPORT_SYMBOL_GPL(camera_common_parse_clocks);
 
-int camera_common_parse_ports(struct i2c_client *client,
+int camera_common_parse_ports(struct device *dev,
 			      struct camera_common_data *s_data)
 {
-	struct device_node *node = client->dev.of_node;
+	struct device_node *node = dev->of_node;
 	struct device_node *ep = NULL;
 	struct device_node *next;
 	int bus_width = 0;
@@ -214,7 +214,7 @@ int camera_common_parse_ports(struct i2c_client *client,
 
 	err = of_property_read_u32(ep, "bus-width", &bus_width);
 	if (err) {
-		dev_err(&client->dev,
+		dev_err(dev,
 			"Failed to find num of lanes\n");
 		return err;
 	}
@@ -222,13 +222,13 @@ int camera_common_parse_ports(struct i2c_client *client,
 
 	err = of_property_read_u32(ep, "csi-port", &port);
 	if (err) {
-		dev_err(&client->dev,
+		dev_err(dev,
 			"Failed to find CSI port\n");
 		return err;
 	}
 	s_data->csi_port = port;
 
-	dev_dbg(&client->dev, "%s: csi port %d num of lanes %d\n",
+	dev_dbg(dev, "%s: csi port %d num of lanes %d\n",
 		__func__, s_data->csi_port, s_data->numlanes);
 
 	return 0;
@@ -240,7 +240,7 @@ int camera_common_debugfs_show(struct seq_file *s, void *unused)
 {
 	struct camera_common_data *s_data = s->private;
 
-	dev_dbg(&s_data->i2c_client->dev, "%s: ++\n", __func__);
+	dev_dbg(s_data->dev, "%s: ++\n", __func__);
 
 	return 0;
 }
@@ -253,14 +253,14 @@ ssize_t camera_common_debugfs_write(
 {
 	struct camera_common_data *s_data =
 		((struct seq_file *)file->private_data)->private;
-	struct i2c_client *client = s_data->i2c_client;
+	struct device *dev = s_data->dev;
 	int err = 0;
 	char buffer[MAX_BUFFER_SIZE];
 	u32 address;
 	u32 data;
 	u8 readback = 0;
 
-	dev_dbg(&client->dev, "%s: ++\n", __func__);
+	dev_dbg(dev, "%s: ++\n", __func__);
 
 	if (copy_from_user(&buffer, buf, sizeof(buffer)))
 		goto debugfs_write_fail;
@@ -279,16 +279,16 @@ ssize_t camera_common_debugfs_write(
 	if (sscanf(buf, "%d %d", &address, &data) == 1)
 		goto read;
 
-	dev_err(&client->dev, "SYNTAX ERROR: %s\n", buf);
+	dev_err(dev, "SYNTAX ERROR: %s\n", buf);
 	return -EFAULT;
 
 set_attr:
-	dev_dbg(&client->dev,
+	dev_dbg(dev,
 			"new address = %x, data = %x\n", address, data);
 	err |= call_s_ops(s_data, write_reg, address, data);
 read:
 	err |= call_s_ops(s_data, read_reg, address, &readback);
-	dev_dbg(&client->dev,
+	dev_dbg(dev,
 			"wrote to address 0x%x with value 0x%x\n",
 			address, readback);
 
@@ -298,7 +298,7 @@ read:
 	return count;
 
 debugfs_write_fail:
-	dev_err(&client->dev,
+	dev_err(dev,
 			"%s: test pattern write failed\n", __func__);
 	return -EFAULT;
 }
@@ -306,9 +306,9 @@ debugfs_write_fail:
 int camera_common_debugfs_open(struct inode *inode, struct file *file)
 {
 	struct camera_common_data *s_data = inode->i_private;
-	struct i2c_client *client = s_data->i2c_client;
+	struct device *dev = s_data->dev;
 
-	dev_dbg(&client->dev, "%s: ++\n", __func__);
+	dev_dbg(dev, "%s: ++\n", __func__);
 
 	return single_open(file, camera_common_debugfs_show, inode->i_private);
 }
@@ -324,9 +324,9 @@ static const struct file_operations camera_common_debugfs_fops = {
 void camera_common_remove_debugfs(
 		struct camera_common_data *s_data)
 {
-	struct i2c_client *client = s_data->i2c_client;
+	struct device *dev = s_data->dev;
 
-	dev_dbg(&client->dev, "%s: ++\n", __func__);
+	dev_dbg(dev, "%s: ++\n", __func__);
 
 	debugfs_remove_recursive(s_data->debugdir);
 	s_data->debugdir = NULL;
@@ -339,9 +339,9 @@ void camera_common_create_debugfs(
 		const char *name)
 {
 	struct dentry *err;
-	struct i2c_client *client = s_data->i2c_client;
+	struct device *dev = s_data->dev;
 
-	dev_dbg(&client->dev, "%s %s\n", __func__, name);
+	dev_dbg(dev, "%s %s\n", __func__, name);
 
 	s_data->debugdir =
 		debugfs_create_dir(name, NULL);
@@ -357,7 +357,7 @@ void camera_common_create_debugfs(
 
 	return;
 remove_debugfs:
-	dev_err(&client->dev, "couldn't create debugfs\n");
+	dev_err(dev, "couldn't create debugfs\n");
 	camera_common_remove_debugfs(s_data);
 }
 
@@ -381,8 +381,7 @@ int camera_common_enum_mbus_code(struct v4l2_subdev *sd,
 				struct v4l2_subdev_pad_config *cfg,
 				struct v4l2_subdev_mbus_code_enum *code)
 {
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
 	struct tegra_channel *chan = v4l2_get_subdev_hostdata(sd);
 	unsigned int mbus_code;
 
@@ -406,8 +405,7 @@ EXPORT_SYMBOL_GPL(camera_common_enum_mbus_code);
 int camera_common_enum_fmt(struct v4l2_subdev *sd, unsigned int index,
 			unsigned int *code)
 {
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
 
 	if (s_data->num_color_fmts < 1 || !s_data->color_fmts) {
 		s_data->color_fmts = camera_common_color_fmts;
@@ -446,8 +444,7 @@ static void select_mode(struct camera_common_data *s_data,
 
 int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 {
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
 	struct tegra_channel *chan = v4l2_get_subdev_hostdata(sd);
 	struct v4l2_control hdr_control;
 	const struct camera_common_frmfmt *frmfmt = s_data->frmfmt;
@@ -455,7 +452,7 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 	int err = 0;
 	int i;
 
-	dev_dbg(&client->dev, "%s: size %i x %i\n", __func__,
+	dev_dbg(sd->dev, "%s: size %i x %i\n", __func__,
 		 mf->width, mf->height);
 
 	/* check hdr enable ctrl */
@@ -463,7 +460,7 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 
 	err = v4l2_g_ctrl(s_data->ctrl_handler, &hdr_control);
 	if (err < 0) {
-		dev_err(&client->dev, "could not find device ctrl.\n");
+		dev_err(sd->dev, "could not find device ctrl.\n");
 		return err;
 	}
 
@@ -477,7 +474,7 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 	if (s_data->use_sensor_mode_id &&
 		s_data->sensor_mode_id >= 0 &&
 		s_data->sensor_mode_id < s_data->numfmts) {
-		dev_dbg(&client->dev, "%s: use_sensor_mode_id %d\n",
+		dev_dbg(sd->dev, "%s: use_sensor_mode_id %d\n",
 				__func__, s_data->sensor_mode_id);
 		s_data->mode = frmfmt[s_data->sensor_mode_id].mode;
 		s_data->fmt_width = mf->width;
@@ -497,7 +494,7 @@ int camera_common_try_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 		if (i == s_data->numfmts) {
 			mf->width = s_data->fmt_width;
 			mf->height = s_data->fmt_height;
-			dev_dbg(&client->dev,
+			dev_dbg(sd->dev,
 				"%s: invalid resolution supplied to set mode %d %d\n",
 				__func__, mf->width, mf->height);
 			goto verify_code;
@@ -524,11 +521,10 @@ EXPORT_SYMBOL_GPL(camera_common_try_fmt);
 
 int camera_common_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 {
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
 	int ret;
 
-	dev_dbg(&client->dev, "%s(%u) size %i x %i\n", __func__,
+	dev_dbg(sd->dev, "%s(%u) size %i x %i\n", __func__,
 			mf->code, mf->width, mf->height);
 
 	/* MIPI CSI could have changed the format, double-check */
@@ -546,11 +542,10 @@ EXPORT_SYMBOL_GPL(camera_common_s_fmt);
 
 int camera_common_g_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 {
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
 	const struct camera_common_colorfmt *fmt = s_data->colorfmt;
 
-	dev_dbg(&client->dev, "%s++\n", __func__);
+	dev_dbg(sd->dev, "%s++\n", __func__);
 
 	mf->code	= fmt->code;
 	mf->colorspace	= fmt->colorspace;
@@ -569,8 +564,7 @@ EXPORT_SYMBOL_GPL(camera_common_g_fmt);
 static int camera_common_evaluate_color_format(struct v4l2_subdev *sd,
 					       int pixelformat)
 {
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
 	int i;
 
 	if (!s_data)
@@ -596,8 +590,7 @@ int camera_common_enum_framesizes(struct v4l2_subdev *sd,
 		struct v4l2_subdev_pad_config *cfg,
 		struct v4l2_subdev_frame_size_enum *fse)
 {
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
 	int ret;
 
 	if (!s_data || !s_data->frmfmt)
@@ -622,8 +615,7 @@ int camera_common_enum_frameintervals(struct v4l2_subdev *sd,
 		struct v4l2_subdev_pad_config *cfg,
 		struct v4l2_subdev_frame_interval_enum *fie)
 {
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
 	int i, ret;
 
 	if (!s_data || !s_data->frmfmt)
@@ -660,12 +652,12 @@ static void camera_common_mclk_disable(struct camera_common_data *s_data)
 	struct camera_common_power_rail *pw = s_data->power;
 
 	if (!pw) {
-		dev_err(&s_data->i2c_client->dev, "%s: no device power rail\n",
+		dev_err(s_data->dev, "%s: no device power rail\n",
 			__func__);
 		return;
 	}
 
-	dev_dbg(&s_data->i2c_client->dev, "%s: disable MCLK\n", __func__);
+	dev_dbg(s_data->dev, "%s: disable MCLK\n", __func__);
 	clk_disable_unprepare(pw->mclk);
 }
 
@@ -728,8 +720,7 @@ void camera_common_dpd_enable(struct camera_common_data *s_data)
 int camera_common_s_power(struct v4l2_subdev *sd, int on)
 {
 	int err = 0;
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
 
 	if (on) {
 		err = camera_common_mclk_enable(s_data);
@@ -772,14 +763,13 @@ EXPORT_SYMBOL_GPL(camera_common_g_mbus_config);
 int camera_common_focuser_s_power(struct v4l2_subdev *sd, int on)
 {
 	int err = 0;
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	struct camera_common_focuser_data *s_data =
-			to_camera_common_focuser_data(client);
+			to_camera_common_focuser_data(sd->dev);
 
 	if (on) {
 		err = call_s_op(s_data, power_on);
 		if (err)
-			dev_err(&s_data->i2c_client->dev,
+			dev_err(s_data->dev,
 				"%s: error power on\n", __func__);
 	} else
 		err = call_s_op(s_data, power_off);
@@ -796,7 +786,7 @@ int camera_common_focuser_init(struct camera_common_focuser_data *s_data)
 	/* power on */
 	err = call_s_op(s_data, power_on);
 	if (err) {
-		dev_err(&s_data->i2c_client->dev,
+		dev_err(s_data->dev,
 			"%s: error power on\n", __func__);
 		return err;
 	}
@@ -804,7 +794,7 @@ int camera_common_focuser_init(struct camera_common_focuser_data *s_data)
 	/* load default configuration */
 	err = call_s_op(s_data, load_config);
 	if (err) {
-		dev_err(&s_data->i2c_client->dev,
+		dev_err(s_data->dev,
 			"%s: error loading config\n", __func__);
 		goto fail;
 	}
@@ -812,7 +802,7 @@ int camera_common_focuser_init(struct camera_common_focuser_data *s_data)
 	/* set controls */
 	err = call_s_op(s_data, ctrls_init);
 	if (err)
-		dev_err(&s_data->i2c_client->dev,
+		dev_err(s_data->dev,
 			"%s: error initializing controls\n", __func__);
 
 fail:
