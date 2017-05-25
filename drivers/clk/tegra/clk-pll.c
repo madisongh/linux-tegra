@@ -840,7 +840,7 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
 					 unsigned long parent_rate)
 {
 	struct tegra_clk_pll *pll = to_clk_pll(hw);
-	struct tegra_clk_pll_freq_table cfg;
+	struct tegra_clk_pll_freq_table cfg = { };
 	u32 val;
 	u64 rate = parent_rate;
 	int pdiv;
