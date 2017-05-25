@@ -376,13 +376,13 @@ static int imx274_power_get(struct imx274 *priv)
 	}
 
 	/* ananlog 2.7v */
-	err |= camera_common_regulator_get(priv->i2c_client,
+	err |= camera_common_regulator_get(&priv->i2c_client->dev,
 			&pw->avdd, pdata->regulators.avdd);
 	/* digital 1.2v */
-	err |= camera_common_regulator_get(priv->i2c_client,
+	err |= camera_common_regulator_get(&priv->i2c_client->dev,
 			&pw->dvdd, pdata->regulators.dvdd);
 	/* IO 1.8v */
-	err |= camera_common_regulator_get(priv->i2c_client,
+	err |= camera_common_regulator_get(&priv->i2c_client->dev,
 			&pw->iovdd, pdata->regulators.iovdd);
 
 	if (!err) {
@@ -402,7 +402,7 @@ static int imx274_set_coarse_time(struct imx274 *priv, s32 val);
 static int imx274_s_stream(struct v4l2_subdev *sd, int enable)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(&client->dev);
 	struct imx274 *priv = (struct imx274 *)s_data->priv;
 	struct v4l2_control control;
 	int err;
@@ -488,7 +488,7 @@ static int imx274_set_fmt(struct v4l2_subdev *sd,
 static int imx274_g_input_status(struct v4l2_subdev *sd, u32 *status)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(&client->dev);
 	struct imx274 *priv = (struct imx274 *)s_data->priv;
 	struct camera_common_power_rail *pw = &priv->power;
 
@@ -846,7 +846,7 @@ static struct camera_common_pdata *imx274_parse_dt(struct i2c_client *client,
 	}
 
 
-	err = camera_common_parse_clocks(client, board_priv_pdata);
+	err = camera_common_parse_clocks(&client->dev, board_priv_pdata);
 	if (err) {
 		dev_err(&client->dev, "Failed to find clocks\n");
 		goto error;
@@ -938,7 +938,7 @@ static int imx274_probe(struct i2c_client *client,
 
 	common_data->ops		= &imx274_common_ops;
 	common_data->ctrl_handler	= &priv->ctrl_handler;
-	common_data->i2c_client		= client;
+	common_data->dev		= &client->dev;
 	common_data->frmfmt		= &imx274_frmfmt[0];
 	common_data->colorfmt		= camera_common_find_datafmt(
 					  IMX274_DEFAULT_DATAFMT);
@@ -963,7 +963,7 @@ static int imx274_probe(struct i2c_client *client,
 	if (err)
 		return err;
 
-	err = camera_common_parse_ports(client, common_data);
+	err = camera_common_parse_ports(&client->dev, common_data);
 	if (err) {
 		dev_err(&client->dev, "Failed to find port info\n");
 		return err;
@@ -1010,7 +1010,7 @@ static int imx274_probe(struct i2c_client *client,
 static int
 imx274_remove(struct i2c_client *client)
 {
-	struct camera_common_data *s_data = to_camera_common_data(client);
+	struct camera_common_data *s_data = to_camera_common_data(&client->dev);
 	struct imx274 *priv = (struct imx274 *)s_data->priv;
 
 	v4l2_async_unregister_subdev(priv->subdev);
