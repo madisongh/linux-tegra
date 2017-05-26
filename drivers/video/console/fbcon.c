@@ -3205,11 +3205,13 @@ static void fbcon_new_modelist(struct fb_info *info)
 		if (!fb_display[i].mode)
 			continue;
 		vc = vc_cons[i].d;
-		display_to_var(&var, &fb_display[i]);
-		mode = fb_find_nearest_mode(fb_display[i].mode,
+		if (vc->vc_mode == KD_TEXT) {
+			display_to_var(&var, &fb_display[i]);
+			mode = fb_find_nearest_mode(fb_display[i].mode,
 					    &info->modelist);
-		fb_videomode_to_var(&var, mode);
-		fbcon_set_disp(info, &var, vc->vc_num);
+			fb_videomode_to_var(&var, mode);
+			fbcon_set_disp(info, &var, vc->vc_num);
+		}
 	}
 }
 
