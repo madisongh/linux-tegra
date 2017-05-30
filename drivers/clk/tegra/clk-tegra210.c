@@ -3524,11 +3524,11 @@ static __init void tegra210_shared_clk_init(char *sclk_high_clk)
 	clks[TEGRA210_CLK_GBUS] = clk;
 
 	clk = tegra_clk_register_shared_master("host1x_master", "host1x", 0,
-						12000000, 408000000);
+				12000000, t210b01 ? 204000000 : 408000000);
 	clks[TEGRA210_CLK_HOST1X_MASTER] = clk;
 
 	clk = tegra_clk_register_shared_master("mselect_master", "mselect", 0,
-						12000000, 408000000);
+				12000000, t210b01 ? 204000000 : 408000000);
 	clks[TEGRA210_CLK_MSELECT_MASTER] = clk;
 
 	clk = tegra_clk_register_shared_master("ape_master", "ape",
