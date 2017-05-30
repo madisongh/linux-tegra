@@ -1035,6 +1035,7 @@ static struct nvs_fn_dev akm_fn_dev = {
 	.nvs_read			= akm_nvs_read,
 };
 
+#ifdef CONFIG_PM_SLEEP
 static int akm_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -1062,7 +1063,7 @@ static int akm_resume(struct device *dev)
 		dev_info(&client->dev, "%s\n", __func__);
 	return ret;
 }
-
+#endif /* CONFIG_PM_SLEEP */
 static SIMPLE_DEV_PM_OPS(akm_pm_ops, akm_suspend, akm_resume);
 
 static void akm_shutdown(struct i2c_client *client)
