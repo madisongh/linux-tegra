@@ -2673,6 +2673,9 @@ const struct clk_div_table *tegra210b01_get_pll_vco_post_div_table(void)
 
 void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks)
 {
+	/* Prevent 1:1.5 fractional divider setting */
+	div1_5_not_allowed = true;
+
 	/* Add 60MHz output of UTMIPLL */
 	tegra_clks[tegra_clk_utmipll_60m].dt_id = TEGRA210_CLK_UTMIPLL_60M;
 	tegra_clks[tegra_clk_utmipll_60m].present = true;
