@@ -588,8 +588,8 @@ struct cvb_table tegra210b01_cpu_cvb_tables[] = {
 		.max_millivolts = 1120,
 		CPUB01_CVB_TABLE,
 		.cpu_dfll_data = {
-			.tune0_low = 0xffead0ff,
-			.tune1 = 0x20091d9,
+			.tune0_low = 0x00009F87,
+			.tune1 = 0x010001C0,
 		}
 	},
 	{
@@ -598,8 +598,8 @@ struct cvb_table tegra210b01_cpu_cvb_tables[] = {
 		.max_millivolts = 1120,
 		CPUB01_CVB_TABLE,
 		.cpu_dfll_data = {
-			.tune0_low = 0xffead0ff,
-			.tune1 = 0x25501d0,
+			.tune0_low = 0x00009F87,
+			.tune1 = 0x010001C0,
 		}
 	},
 };
