@@ -87,6 +87,12 @@
 
 #define ENTRY_OVERHEAD strlen("bssid=\nssid=\nfreq=\nlevel=\nage=\ndist=\ndistSd=\n====")
 #define TIME_MIN_DIFF 5
+
+#define EVENT_DATABUF_MAXLEN   (512 - sizeof(bcm_event_t))
+#define EVENT_MAX_NETCNT \
+       ((EVENT_DATABUF_MAXLEN - sizeof(wl_pfn_scanresults_t)) \
+              / sizeof(wl_pfn_net_info_t) + 1)
+
 static inline bool
 is_dfs(uint16 channel)
 {
