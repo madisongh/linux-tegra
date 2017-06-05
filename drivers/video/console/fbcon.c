@@ -2341,6 +2341,10 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 	}
 
  	if (!fbcon_is_inactive(vc, info)) {
+		/* Update mode before unblanking and enabling controller */
+		if (!blank)
+			update_screen(vc);
+
 		if (ops->blank_state != blank || mode_switch) {
 			ops->blank_state = blank;
 			fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
@@ -2350,9 +2354,6 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 				if (fb_blank(info, blank))
 					fbcon_generic_blank(vc, info, blank);
 		}
-
-		if (!blank)
-			update_screen(vc);
 	}
 
 	if (mode_switch || fbcon_is_inactive(vc, info) ||
