@@ -217,6 +217,17 @@ static int tegra_clk_rst_reset(struct reset_controller_dev *rcdev,
 	return tegra_clk_rst_deassert(rcdev, id);
 }
 
+void __init tegra_register_debug_devclks(void)
+{
+	int i;
+
+	for (i = 0; i < clk_num; i++) {
+		if (!IS_ERR_OR_NULL(clks[i]))
+			clk_register_clkdev(clks[i], __clk_get_name(clks[i]),
+				"tegra-clk-debug");
+	}
+}
+
 #ifdef CONFIG_PM_SLEEP
 void tegra_clk_periph_suspend(void __iomem *clk_base)
 {
@@ -659,6 +670,8 @@ void __init tegra_add_of_provider(struct device_node *np)
 	rst_ctlr.of_node = np;
 	rst_ctlr.nr_resets = periph_banks * 32 + num_special_reset;
 	reset_controller_register(&rst_ctlr);
+
+	tegra_register_debug_devclks();
 }
 
 static int pto_get(void *data, u64 *output)
@@ -793,11 +806,6 @@ void __init tegra_register_devclks(struct tegra_devclk *dev_clks, int num)
 		clk_register_clkdev(clks[dev_clks->dt_id], dev_clks->con_id,
 				dev_clks->dev_id);
 
-	for (i = 0; i < clk_num; i++) {
-		if (!IS_ERR_OR_NULL(clks[i]))
-			clk_register_clkdev(clks[i], __clk_get_name(clks[i]),
-				"tegra-clk-debug");
-	}
 }
 
 struct clk ** __init tegra_lookup_dt_id(int clk_id,
