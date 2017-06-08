@@ -283,9 +283,11 @@ static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll)
 	}
 
 	pr_err("%s: Timed out waiting for pll %s lock\n", __func__,
-	       clk_hw_get_name(&pll->hw));
+		clk_hw_get_name(&pll->hw));
+	pr_debug("%s: mask %08x, address: %p, val: %08x\n", __func__,
+		lock_mask, lock_addr, val);
 
-	return -1;
+	return 0;
 }
 
 int tegra_pll_wait_for_lock(struct tegra_clk_pll *pll)
