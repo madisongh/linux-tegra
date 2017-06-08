@@ -2987,6 +2987,9 @@ void tegra_dfll_suspend(struct platform_device *pdev)
 {
 	struct tegra_dfll *td = dev_get_drvdata(&pdev->dev);
 
+	if (!td)
+		return;
+
 	if (td->mode <= DFLL_DISABLED)
 		return;
 
@@ -3021,6 +3024,9 @@ void tegra_dfll_suspend(struct platform_device *pdev)
 void tegra_dfll_resume(struct platform_device *pdev, bool on_dfll)
 {
 	struct tegra_dfll *td = dev_get_drvdata(&pdev->dev);
+
+	if (!td)
+		return;
 
 	if (on_dfll) {
 		if (td->resume_mode == DFLL_CLOSED_LOOP)
