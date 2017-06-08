@@ -307,12 +307,14 @@ enum tegra21x_function {
 	TEGRA21x_FUNC_PCIE,
 	TEGRA21x_FUNC_USB3,
 	TEGRA21x_FUNC_SATA,
+	TEGRA21x_FUNC_INVALID,
 };
 
 enum tegra21xb01_function {
 	TEGRA21xB01_FUNC_XUSB,
 	TEGRA21xB01_FUNC_PCIE,
 	TEGRA21xB01_FUNC_USB3,
+	TEGRA21xB01_FUNC_INVALID,
 };
 
 struct tegra_padctl_uphy_function {
@@ -491,11 +493,9 @@ struct tegra_padctl_uphy {
 	struct regulator *vbus[TEGRA_UTMI_PHYS];
 	struct regulator *vddio_hsic;
 
-	unsigned long uphy_pll_users[T21x_UPHY_PLLS];
 	enum uphy_pll_state uphy_pll_state[T21x_UPHY_PLLS];
 	enum source_pll_state plle_state;
 
-	int uphy_pll_clients[T21x_UPHY_PLLS];
 	struct reset_control *uphy_pll_rst[T21x_UPHY_PLLS];
 
 	/* vbus/id based OTG */
@@ -616,7 +616,7 @@ static inline int is_chip_t210b01(struct tegra_padctl_uphy *uphy)
 
 	if (!compatible) {
 		dev_err(uphy->dev, "Unable to find compatible property\n");
-		return -ENODEV;
+		return 0;
 	}
 
 	if (strstr(compatible, "tegra21xb01") != NULL)
@@ -646,24 +646,22 @@ static int get_function(struct tegra_padctl_uphy *uphy, char *func)
 	int ret;
 
 	ret = is_chip_t210b01(uphy);
-	if (ret < 0)
-		return ret;
 
 	switch (str_to_func(func)) {
 	case TEGRA21x_FUNC_HSIC:
-		return ret ? -1 : TEGRA21x_FUNC_HSIC;
+		return ret ? TEGRA21xB01_FUNC_INVALID : TEGRA21x_FUNC_HSIC;
 	case TEGRA21x_FUNC_XUSB:
 		return ret ? TEGRA21xB01_FUNC_XUSB : TEGRA21x_FUNC_XUSB;
 	case TEGRA21x_FUNC_PCIE:
 		return ret ? TEGRA21xB01_FUNC_PCIE : TEGRA21x_FUNC_PCIE;
 	case TEGRA21x_FUNC_SATA:
-		return ret ? -1 : TEGRA21x_FUNC_SATA;
+		return ret ? TEGRA21xB01_FUNC_INVALID : TEGRA21x_FUNC_SATA;
 	case TEGRA21x_FUNC_USB3:
 		return ret ? TEGRA21xB01_FUNC_USB3 : TEGRA21x_FUNC_USB3;
 	default:
 		dev_err(uphy->dev, "Invalid function\n");
 	}
-	return -1;
+	return ret ? TEGRA21xB01_FUNC_INVALID : TEGRA21x_FUNC_INVALID;
 }
 
 static int tegra21x_padctl_uphy_regulators_init(struct tegra_padctl_uphy *uphy)
@@ -782,33 +780,6 @@ static int uphy_pll_source_clk_enable(struct tegra_padctl_uphy *uphy)
 }
 
 /* caller must hold uphy->lock */
-static int uphy_pll_source_clk_disable(struct tegra_padctl_uphy *uphy, int pll,
-				       enum tegra21x_function func)
-{
-	struct device *dev = uphy->dev;
-	int rc = 0;
-
-	rc = uphy_pll_source_clk_state_check(uphy);
-	if (rc)
-		return rc;
-
-	/* Both UPHY PLLs are powered down, power down PLLE.
-	 * Note that clk_disable_unprepare(PLLE) is still
-	 * invoked even PLLE is in HW in order to sync
-	 * enable_cnt/prepare_cnt of PLLE.
-	 * clk_plle_tegra210_disable doesn't really disable
-	 * PLLE if it's in HW.
-	 */
-	if (uphy->plle_state >= PLL_POWER_UP_SW_CTL) {
-		clk_disable_unprepare(uphy->plle);
-		uphy->plle_state = PLL_POWER_DOWN;
-		TRACE(dev, "done disable PLLE\n");
-	}
-
-	return rc;
-}
-
-/* caller must hold uphy->lock */
 static int uphy_pll_resistor_calibration(struct tegra_padctl_uphy *uphy,
 					 int pll)
 {
@@ -829,10 +800,8 @@ static int uphy_pll_resistor_calibration(struct tegra_padctl_uphy *uphy,
 	usleep_range(5, 10);
 
 	value = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_8);
-	if (!(value & RCAL_DONE)) {
+	if (!(value & RCAL_DONE))
 		dev_err(dev, "PLL%d start resistor calibration timeout\n", pll);
-		return -ETIMEDOUT;
-	}
 
 	/* stop resistor calibration */
 	value = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_8);
@@ -842,10 +811,8 @@ static int uphy_pll_resistor_calibration(struct tegra_padctl_uphy *uphy,
 	usleep_range(5, 10);
 
 	value = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_8);
-	if (value & RCAL_DONE) {
+	if (value & RCAL_DONE)
 		dev_err(dev, "PLL%d stop resistor calibration timeout\n", pll);
-		return -ETIMEDOUT;
-	}
 
 	value = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_8);
 	value &= ~RCAL_CLK_EN;
@@ -862,8 +829,8 @@ static int uphy_pll_hw_sequencer_enable(struct tegra_padctl_uphy *uphy, int pll,
 	u32 value;
 	unsigned int uphy_lane;
 
-	TRACE(dev, "enable PLL%d HW power sequencer by function %d\n",
-						pll, func);
+	TRACE(dev, "enable PLL%d HW power sequencer by function %s\n",
+					pll, uphy->soc->functions[func].name);
 
 	if (func == get_function(uphy, "sata")) {
 		for_each_set_bit(uphy_lane, &uphy->sata_lanes,
@@ -902,8 +869,8 @@ static int uphy_pll_hw_sequencer_enable(struct tegra_padctl_uphy *uphy, int pll,
 		tegra210_xusb_pll_hw_sequence_start();
 
 	uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_UP_HW_SEQ;
-	TRACE(dev, "done enable PLL%d in HW by function %d\n",
-				pll, func);
+	TRACE(dev, "done enable PLL%d in HW by function %s\n",
+				pll, uphy->soc->functions[func].name);
 
 	/* enable PLLE Power sequencer */
 	if ((uphy->uphy_pll_state[0] == UPHY_PLL_POWER_UP_HW_SEQ) &&
@@ -912,53 +879,6 @@ static int uphy_pll_hw_sequencer_enable(struct tegra_padctl_uphy *uphy, int pll,
 		uphy->plle_state = PLL_POWER_UP_HW_SEQ;
 		TRACE(dev, "done enable PLLE in HW");
 	}
-
-	return 0;
-}
-
-/* caller must hold uphy->lock */
-static int uphy_pll_power_down(struct tegra_padctl_uphy *uphy, int pll
-					, enum tegra21x_function func)
-{
-	struct device *dev = uphy->dev;
-	u32 value;
-
-	if ((pll == 0 && tegra210_xusb_pll_hw_sequence_is_enabled()) ||
-		(pll == 1 && tegra210_sata_pll_hw_sequence_is_enabled())) {
-		TRACE(dev, "PLL%d is in HW, skip powering down\n", pll);
-		uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_DOWN;
-		return 0;
-	}
-
-	if (uphy->uphy_pll_state[pll] == UPHY_PLL_POWER_DOWN) {
-		TRACE(dev, "PLL%d was already powered down", pll);
-		return 0;
-	}
-
-	value = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_1);
-	value &= ~PLL_ENABLE;
-	uphy_pll_writel(uphy, pll, value, UPHY_PLL_CTL_1);
-
-	usleep_range(20, 25);
-
-	value = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_1);
-	if (value & LOCKDET_STATUS) {
-		dev_err(dev, "disable PLL%d timeout\n", pll);
-		return -ETIMEDOUT;
-	}
-
-	/* enter sleep state = 3 */
-	value = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_1);
-	value &= ~PLL_SLEEP(~0);
-	value |= PLL_SLEEP(3);
-	uphy_pll_writel(uphy, pll, value, UPHY_PLL_CTL_1);
-
-	/* apply IDDQ */
-	value = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_1);
-	value |= PLL_IDDQ;
-	uphy_pll_writel(uphy, pll, value, UPHY_PLL_CTL_1);
-	uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_DOWN;
-	TRACE(dev, "done powering down PLL%d\n", pll);
 
 	return 0;
 }
@@ -983,10 +903,8 @@ static int uphy_pll_calibration(struct tegra_padctl_uphy *uphy, int pll)
 			break;
 		usleep_range(10, 15);
 	}
-	if (!(value & CAL_DONE)) {
+	if (!(value & CAL_DONE))
 		dev_err(dev, "start PLL%d calibration timeout\n", pll);
-		return -EPROBE_DEFER;
-	}
 
 	/* stop PLL calibration */
 	value = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_2);
@@ -999,10 +917,8 @@ static int uphy_pll_calibration(struct tegra_padctl_uphy *uphy, int pll)
 			break;
 		usleep_range(10, 15);
 	}
-	if (value & CAL_DONE) {
+	if (value & CAL_DONE)
 		dev_err(dev, "stop PLL%d calibration timeout\n", pll);
-		return -EPROBE_DEFER;
-	}
 
 	return 0;
 }
@@ -1012,7 +928,6 @@ static int uphy_pll_init_full(struct tegra_padctl_uphy *uphy, int pll,
 			      enum tegra21x_function func)
 {
 	struct device *dev = uphy->dev;
-	int rc = 0;
 	u32 reg;
 
 	if (pll < 0 || pll >= T21x_UPHY_PLLS)
@@ -1034,12 +949,13 @@ static int uphy_pll_init_full(struct tegra_padctl_uphy *uphy, int pll,
 
 	if (uphy->uphy_pll_state[pll] >= UPHY_PLL_POWER_UP_SW_CTL) {
 		TRACE(dev,
-		"PLL%d was already enabled in SW/HW, current function is %d",
-		pll, func);
+		"PLL%d was already enabled in SW/HW, current function is %s",
+		pll, uphy->soc->functions[func].name);
 		return 0; /* already done */
 	}
 
-	TRACE(dev, "PLL%d full init by function %d\n", pll, func);
+	TRACE(dev, "PLL%d full init by function %s\n",
+			pll, uphy->soc->functions[func].name);
 
 	reg = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_2);
 	reg &= ~CAL_CTRL(~0);
@@ -1084,9 +1000,7 @@ static int uphy_pll_init_full(struct tegra_padctl_uphy *uphy, int pll,
 
 	ndelay(100);
 
-	rc = uphy_pll_calibration(uphy, pll);
-	if (rc)
-		return rc;
+	uphy_pll_calibration(uphy, pll);
 
 	/* enable PLL and wait for lock */
 	reg = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_1);
@@ -1096,19 +1010,15 @@ static int uphy_pll_init_full(struct tegra_padctl_uphy *uphy, int pll,
 	usleep_range(65, 70);
 
 	reg = uphy_pll_readl(uphy, pll, UPHY_PLL_CTL_1);
-	if (!(reg & LOCKDET_STATUS)) {
+	if (!(reg & LOCKDET_STATUS))
 		dev_err(dev, "enable PLL%d timeout\n", pll);
-		return -EPROBE_DEFER;
-	}
 
-	if (uphy->uphy_pll_state[pll] == UPHY_PLL_POWER_DOWN) {
-		rc = uphy_pll_resistor_calibration(uphy, pll);
-		if (rc)
-			return -EPROBE_DEFER;
-	}
+	if (uphy->uphy_pll_state[pll] == UPHY_PLL_POWER_DOWN)
+		uphy_pll_resistor_calibration(uphy, pll);
 
 	uphy->uphy_pll_state[pll] = UPHY_PLL_POWER_UP_SW_CTL;
-	TRACE(dev, "done enable PLL%d in SW by function %d\n", pll, func);
+	TRACE(dev, "done enable PLL%d in SW by function %s\n",
+			pll, uphy->soc->functions[func].name);
 
 	return uphy_pll_hw_sequencer_enable(uphy, pll, func);
 }
@@ -1119,9 +1029,9 @@ static int uphy_pll_init(struct tegra_padctl_uphy *uphy,
 {
 	struct device *dev = uphy->dev;
 	int rc = 0;
-	int i;
 
-	TRACE(dev, "PLL init by function %d\n", func);
+	TRACE(dev, "PLL init by function %s\n",
+		uphy->soc->functions[func].name);
 
 	rc = uphy_pll_source_clk_enable(uphy);
 	if (rc)
@@ -1162,61 +1072,7 @@ static int uphy_pll_init(struct tegra_padctl_uphy *uphy,
 		}
 	}
 
-	if (rc == 0) {
-		if (func == get_function(uphy, "pcie")) {
-			uphy->uphy_pll_users[0] |= BIT(func);
-		} else if (func == get_function(uphy, "sata")) {
-			uphy->uphy_pll_users[1] |= BIT(func);
-		} else if (func == get_function(uphy, "usb3")) {
-			uphy->uphy_pll_users[0] |= BIT(func);
-			if (uphy->usb3_lanes & SATA_LANE_MASK)
-				uphy->uphy_pll_users[1] |= BIT(func);
-		}
-		for (i = 0; i < T21x_UPHY_PLLS; i++) {
-			TRACE(dev, "PLL%d users 0x%lx\n", i,
-				uphy->uphy_pll_users[i]);
-		}
-	}
-
 	return rc;
-}
-
-/* caller must hold uphy->lock */
-int uphy_pll_deinit(struct tegra_padctl_uphy *uphy,
-			   enum tegra21x_function func)
-{
-	struct device *dev = uphy->dev;
-	int rc;
-	int i;
-
-	if (func == get_function(uphy, "pcie")) {
-		uphy->uphy_pll_users[0] &= ~BIT(func);
-	} else if (func == get_function(uphy, "sata")) {
-		uphy->uphy_pll_users[1] &= ~BIT(func);
-	} else if (func == get_function(uphy, "usb3")) {
-		uphy->uphy_pll_users[0] &= ~BIT(func);
-		uphy->uphy_pll_users[1] &= ~BIT(func);
-	} else
-		return -EINVAL;
-
-	for (i = T21x_UPHY_PLLS - 1; i >= 0; i--) {
-		TRACE(dev, "PLL%d users 0x%lx\n", i, uphy->uphy_pll_users[i]);
-		if (uphy->uphy_pll_users[i] == 0) {
-			/* TODO error handling */
-			rc = uphy_pll_power_down(uphy, i, func);
-			if (rc)
-				return rc;
-		}
-	}
-
-	if ((uphy->uphy_pll_state[0] == UPHY_PLL_POWER_DOWN) &&
-		(uphy->uphy_pll_state[1] == UPHY_PLL_POWER_DOWN)) {
-		rc = uphy_pll_source_clk_disable(uphy, i, func);
-		if (rc)
-			return rc;
-	}
-
-	return 0;
 }
 
 /* caller must hold uphy->lock */
@@ -1228,22 +1084,12 @@ static int uphy_pll_reset_deassert(struct tegra_padctl_uphy *uphy, int pll)
 	if (pll < 0 || pll >= T21x_UPHY_PLLS)
 		return -EINVAL;
 
-	TRACE(dev, "PLL%d clients %d\n", pll, uphy->uphy_pll_clients[pll]);
-
-	if (WARN_ON(uphy->uphy_pll_clients[pll] < 0))
-		return -EINVAL;
-
-	if (uphy->uphy_pll_clients[pll]++ > 0)
-		goto out;
-
 	TRACE(dev, "deassert reset to PLL%d\n", pll);
 	rc = reset_control_deassert(uphy->uphy_pll_rst[pll]);
 	if (rc) {
-		uphy->uphy_pll_clients[pll]--;
 		dev_err(dev, "failed to deassert reset PLL%d %d\n", pll, rc);
 	}
 
-out:
 	return rc;
 }
 
@@ -1256,21 +1102,12 @@ static int uphy_pll_reset_assert(struct tegra_padctl_uphy *uphy, int pll)
 	if (pll < 0 || pll >= T21x_UPHY_PLLS)
 		return -EINVAL;
 
-	TRACE(dev, "PLL%d clients %d\n", pll, uphy->uphy_pll_clients[pll]);
-
-	if (WARN_ON(uphy->uphy_pll_clients[pll] == 0))
-		return -EINVAL;
-
-	if (--uphy->uphy_pll_clients[pll] > 0)
-		goto out;
-
 	TRACE(dev, "assert reset to PLL%d\n", pll);
 	rc = reset_control_assert(uphy->uphy_pll_rst[pll]);
 	if (rc) {
-		uphy->uphy_pll_clients[pll]++;
 		dev_err(dev, "failed to assert reset for PLL%d %d\n", pll, rc);
 	}
-out:
+
 	return rc;
 }
 
@@ -2111,35 +1948,6 @@ unlock_out:
 	return rc;
 }
 
-static int tegra21x_pcie_uphy_pll_deinit(struct tegra_padctl_uphy *uphy)
-{
-	int rc;
-
-	TRACE(uphy->dev, "%s PCIE controller uphy-lanes 0x%lx\n",
-		__func__, uphy->pcie_lanes);
-
-	mutex_lock(&uphy->lock);
-
-	rc = uphy_pll_reset_assert(uphy, 0);
-	if (rc)
-		goto unlock_out;
-
-	rc = uphy_pll_deinit(uphy, get_function(uphy, "pcie"));
-	if (rc)
-		goto deassert_pll0_reset;
-
-	mutex_unlock(&uphy->lock);
-
-	return 0;
-
-deassert_pll0_reset:
-	uphy_pll_reset_deassert(uphy, 0);
-unlock_out:
-	mutex_unlock(&uphy->lock);
-
-	return rc;
-}
-
 static int tegra21x_pcie_phy_init(struct phy *phy)
 {
 	struct tegra_padctl_uphy *uphy = phy_get_drvdata(phy);
@@ -2300,35 +2108,6 @@ static int tegra21x_sata_uphy_pll_init(struct tegra_padctl_uphy *uphy)
 
 assert_pll1_reset:
 	uphy_pll_reset_assert(uphy, 1);
-unlock_out:
-	mutex_unlock(&uphy->lock);
-
-	return rc;
-}
-
-static int tegra21x_sata_uphy_pll_deinit(struct tegra_padctl_uphy *uphy)
-{
-	struct device *dev = uphy->dev;
-	int rc;
-
-	TRACE(dev, "SATA uphy-lanes 0x%lx\n", uphy->sata_lanes);
-
-	mutex_lock(&uphy->lock);
-
-	rc = uphy_pll_reset_assert(uphy, 1);
-	if (rc)
-		goto unlock_out;
-
-	rc = uphy_pll_deinit(uphy, get_function(uphy, "sata"));
-	if (rc)
-		goto deassert_pll1_reset;
-
-	mutex_unlock(&uphy->lock);
-
-	return 0;
-
-deassert_pll1_reset:
-	uphy_pll_reset_deassert(uphy, 1);
 unlock_out:
 	mutex_unlock(&uphy->lock);
 
@@ -2522,43 +2301,6 @@ assert_pll0_reset:
 	uphy_pll_reset_assert(uphy, 0);
 unlock_out:
 	mutex_unlock(&uphy->lock);
-	return rc;
-}
-
-static int tegra21x_usb3_uphy_pll_deinit(struct tegra_padctl_uphy *uphy)
-{
-	unsigned long uphy_lane_bitmap;
-	int rc;
-
-	uphy_lane_bitmap = uphy->usb3_lanes;
-	TRACE(uphy->dev, "XUSB controller uphy-lanes 0x%lx\n",
-			uphy_lane_bitmap);
-
-	mutex_lock(&uphy->lock);
-
-	rc = uphy_pll_reset_assert(uphy, 0);
-	if (rc)
-		goto unlock_out;
-
-	rc = uphy_pll_reset_assert(uphy, 1);
-	if (rc)
-		goto deassert_pll0_reset;
-
-	rc = uphy_pll_deinit(uphy, get_function(uphy, "usb3"));
-	if (rc)
-		goto deassert_pll1_reset;
-
-	mutex_unlock(&uphy->lock);
-
-	return 0;
-
-deassert_pll1_reset:
-	uphy_pll_reset_deassert(uphy, 1);
-deassert_pll0_reset:
-	uphy_pll_reset_deassert(uphy, 0);
-unlock_out:
-	mutex_unlock(&uphy->lock);
-
 	return rc;
 }
 
@@ -4179,33 +3921,11 @@ static int tegra21x_uphy_pll_init(struct tegra_padctl_uphy *uphy)
 			return rc;
 	}
 
-	if (uphy->sata_lanes) {
+	/* always enable SATA PLL HW sequencer to ensure PLLE could
+	 * enable HW sequencer, set SATA PLL to SATA as default
+	 */
+	if (!(uphy->usb3_lanes & SATA_LANE_MASK)) {
 		rc = tegra21x_sata_uphy_pll_init(uphy);
-		if (rc)
-			return rc;
-	}
-
-	return 0;
-}
-
-static int tegra21x_uphy_pll_deinit(struct tegra_padctl_uphy *uphy)
-{
-	int rc;
-
-	if (uphy->pcie_lanes) {
-		rc = tegra21x_pcie_uphy_pll_deinit(uphy);
-		if (rc)
-			return rc;
-	}
-
-	if (uphy->usb3_lanes) {
-		rc = tegra21x_usb3_uphy_pll_deinit(uphy);
-		if (rc)
-			return rc;
-	}
-
-	if (uphy->sata_lanes) {
-		rc = tegra21x_sata_uphy_pll_deinit(uphy);
 		if (rc)
 			return rc;
 	}
@@ -4241,7 +3961,12 @@ static int tegra21x_padctl_uphy_suspend(struct device *dev)
 
 	tegra21x_padctl_save(uphy);
 
-	return tegra21x_uphy_pll_deinit(uphy);
+	clk_disable_unprepare(uphy->plle);
+	uphy->plle_state = PLL_POWER_DOWN;
+	uphy->uphy_pll_state[0] = UPHY_PLL_POWER_DOWN;
+	uphy->uphy_pll_state[1] = UPHY_PLL_POWER_DOWN;
+
+	return 0;
 }
 
 static int tegra21x_padctl_uphy_resume(struct device *dev)
@@ -4252,7 +3977,20 @@ static int tegra21x_padctl_uphy_resume(struct device *dev)
 
 	tegra21x_padctl_restore(uphy);
 
-	return tegra21x_uphy_pll_init(uphy);
+	if (tegra210_plle_hw_sequence_is_enabled()) {
+		/* PLLE in HW when .resume_noirq being called indicated system
+		 * didn't reach SC7. Hence skip PLL init and invoke
+		 * clk_prepare_enable(uphy->plle) to update PLLE enable_count.
+		 * Please note that clk_plle_tegra210_enable won't update PLLE
+		 * regs if PLLE is in HW.
+		 */
+		TRACE(dev, "skip PLL init as PLLE in HW");
+		uphy->uphy_pll_state[0] = UPHY_PLL_POWER_UP_HW_SEQ;
+		uphy->uphy_pll_state[1] = UPHY_PLL_POWER_UP_HW_SEQ;
+		uphy->plle_state = PLL_POWER_UP_HW_SEQ;
+		return clk_prepare_enable(uphy->plle);
+	} else
+		return tegra21x_uphy_pll_init(uphy);
 }
 
 static const struct dev_pm_ops tegra21x_padctl_uphy_pm_ops = {
@@ -4497,7 +4235,6 @@ static int tegra21x_padctl_uphy_remove(struct platform_device *pdev)
 		mbox_free_channel(uphy->mbox_chan);
 	}
 
-	tegra21x_uphy_pll_deinit(uphy);
 	pinctrl_unregister(uphy->pinctrl);
 	reset_control_assert(uphy->padctl_rst);
 	regulator_bulk_disable(uphy->soc->num_supplies, uphy->supplies);
