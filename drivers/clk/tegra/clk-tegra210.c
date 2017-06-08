@@ -4373,7 +4373,6 @@ static void __init tegra210_clock_init(struct device_node *np)
 			osc_freq, pll_ref_freq, emc_is_native, clks);
 		tegra210_periph_clk_init(clk_base, pmc_base,
 					 tegra210b01_get_pllp_params());
-		tegra210_ovr_clk_init(clk_base); /* FIXME to be removed */
 		tegra210b01_audio_clk_init(clk_base, pmc_base, tegra210_clks);
 	} else {
 		sclk_high_clk = tegra210_determine_pllc4_rate(
