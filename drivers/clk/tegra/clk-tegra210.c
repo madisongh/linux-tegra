@@ -2791,31 +2791,14 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "xusb_ss", .dt_id = TEGRA210_CLK_XUSB_SS, },
 	{ .con_id = "xusb_dev", .dt_id = TEGRA210_CLK_XUSB_DEV, },
 	{ .con_id = "xusb_host", .dt_id = TEGRA210_CLK_XUSB_HOST, },
-	{ .con_id = "vic03_slcg_ovr", .dt_id = TEGRA210_CLK_VIC03_SLCG_OVR, },
 	{ .con_id = "vic03.cbus", .dt_id = TEGRA210_CLK_VIC03_CBUS, },
 	{ .con_id = "nvenc.cbus", .dt_id = TEGRA210_CLK_NVENC_CBUS, },
-	{ .con_id = "disp1_slcg_ovr", .dt_id = TEGRA210_CLK_DISP1_SLCG_OVR },
-	{ .con_id = "disp2_slcg_ovr", .dt_id = TEGRA210_CLK_DISP2_SLCG_OVR },
-	{ .con_id = "vi_slcg_ovr", .dt_id = TEGRA210_CLK_VI_SLCG_OVR },
-	{ .con_id = "ispa_slcg_ovr", .dt_id = TEGRA210_CLK_ISPA_SLCG_OVR },
-	{ .con_id = "ispb_slcg_ovr", .dt_id = TEGRA210_CLK_ISPB_SLCG_OVR },
-	{ .con_id = "nvdec_slcg_ovr", .dt_id = TEGRA210_CLK_NVDEC_SLCG_OVR },
-	{ .con_id = "nvenc_slcg_ovr", .dt_id = TEGRA210_CLK_NVENC_SLCG_OVR },
-	{ .con_id = "nvjpg_slcg_ovr", .dt_id = TEGRA210_CLK_NVJPG_SLCG_OVR },
-	{ .con_id = "xusb_dev_slcg", .dt_id = TEGRA210_CLK_XUSB_DEV_SLCG_OVR },
-	{ .con_id = "xusb_host_slcg", .dt_id = TEGRA210_CLK_XUSB_HOST_SLCG_OVR },
-	{ .con_id = "daudio_slcg_ovr", .dt_id = TEGRA210_CLK_D_AUDIO_SLCG_OVR },
-	{ .con_id = "ape_slcg_ovr", .dt_id = TEGRA210_CLK_APE_SLCG_OVR },
-	{ .con_id = "sata_slcg_ovr", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR },
-	{ .con_id = "sata_slcg_ipfs", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR_IPFS },
-	{ .con_id = "sata_slcg_fpci", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR_FPCI },
 	{ .con_id = "xusb_ssp_src", .dt_id = TEGRA210_CLK_XUSB_SSP_SRC },
 	{ .con_id = "gpu_gate", .dt_id = TEGRA210_CLK_GPU },
 	{ .con_id = "gpu_ref", .dt_id = TEGRA210_CLK_PLL_G_REF },
 	{ .con_id = "gpu", .dt_id = TEGRA210_CLK_GM20B_GBUS },
 	{ .con_id = "gbus", .dt_id = TEGRA210_CLK_GBUS },
 	{ .con_id = "pll_p_out5", .dt_id = TEGRA210_CLK_PLL_P_OUT5 },
-	{ .con_id = "aclk_slcg_ovr", .dt_id = TEGRA210_CLK_ACLK_SLCG_OVR },
 	{ .con_id = "aclk", .dt_id = TEGRA210_CLK_ACLK },
 	{ .con_id = "la", .dt_id = TEGRA210_CLK_LA },
 	{ .con_id = "se", .dt_id = TEGRA210_CLK_SE },
@@ -4229,6 +4212,26 @@ static int tegra210_reset_deassert(unsigned long id)
 	return 0;
 }
 
+static struct tegra_devclk slcg_devclks[] __initdata = {
+	{ .con_id = "disp1_slcg_ovr", .dt_id = TEGRA210_CLK_DISP1_SLCG_OVR },
+	{ .con_id = "disp2_slcg_ovr", .dt_id = TEGRA210_CLK_DISP2_SLCG_OVR },
+	{ .con_id = "vi_slcg_ovr", .dt_id = TEGRA210_CLK_VI_SLCG_OVR },
+	{ .con_id = "ispa_slcg_ovr", .dt_id = TEGRA210_CLK_ISPA_SLCG_OVR },
+	{ .con_id = "ispb_slcg_ovr", .dt_id = TEGRA210_CLK_ISPB_SLCG_OVR },
+	{ .con_id = "nvdec_slcg_ovr", .dt_id = TEGRA210_CLK_NVDEC_SLCG_OVR },
+	{ .con_id = "nvenc_slcg_ovr", .dt_id = TEGRA210_CLK_NVENC_SLCG_OVR },
+	{ .con_id = "nvjpg_slcg_ovr", .dt_id = TEGRA210_CLK_NVJPG_SLCG_OVR },
+	{ .con_id = "xusb_dev_slcg", .dt_id = TEGRA210_CLK_XUSB_DEV_SLCG_OVR },
+	{ .con_id = "xusb_host_slcg", .dt_id = TEGRA210_CLK_XUSB_HOST_SLCG_OVR },
+	{ .con_id = "daudio_slcg_ovr", .dt_id = TEGRA210_CLK_D_AUDIO_SLCG_OVR },
+	{ .con_id = "ape_slcg_ovr", .dt_id = TEGRA210_CLK_APE_SLCG_OVR },
+	{ .con_id = "sata_slcg_ovr", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR },
+	{ .con_id = "aclk_slcg_ovr", .dt_id = TEGRA210_CLK_ACLK_SLCG_OVR },
+	{ .con_id = "sata_slcg_ipfs", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR_IPFS },
+	{ .con_id = "sata_slcg_fpci", .dt_id = TEGRA210_CLK_SATA_SLCG_OVR_FPCI },
+	{ .con_id = "vic03_slcg_ovr", .dt_id = TEGRA210_CLK_VIC03_SLCG_OVR, },
+};
+
 static void __init tegra210_ovr_clk_init(void __iomem *clk_base)
 {
 	struct clk *clk;
@@ -4301,6 +4304,7 @@ static void __init tegra210_ovr_clk_init(void __iomem *clk_base)
 			clk_base + LVL2_CLK_GATE_OVRE, 11, 0, NULL);
 	clks[TEGRA210_CLK_ACLK_SLCG_OVR] = clk;
 
+	tegra_register_devclks(slcg_devclks, ARRAY_SIZE(slcg_devclks));
 }
 
 /**
