@@ -534,7 +534,8 @@ static void tegra210b01_pllcx_set_defaults(const char *name,
 			PLL_ENABLE && !pllcx->params->defaults_set) {
 		/* PLL is ON: only check if defaults already set */
 		pllcx_check_defaults(pllcx->params);
-		pr_warn("%s already enabled. Postponing set full defaults\n",
+		if (!pllcx->params->defaults_set)
+			pr_warn("%s already enabled. Postponing set defaults\n",
 			name);
 		return;
 	}
@@ -593,8 +594,6 @@ static void tegra210b01_plla_set_defaults(struct tegra_clk_pll *plla)
 			plla->params->defaults_set = false;
 		}
 
-		pr_warn("PLL_A already enabled. Postponing set full defaults\n");
-
 		val = PLLA_MISC0_DEFAULT_VALUE;	/* ignore lock enable */
 		mask = PLLA_MISC0_LOCK_ENABLE | PLLA_MISC0_LOCK_OVERRIDE;
 		_pll_misc_chk_default(clk_base, plla->params, 0, val,
@@ -617,6 +616,9 @@ static void tegra210b01_plla_set_defaults(struct tegra_clk_pll *plla)
 		val |= PLLA_MISC0_DEFAULT_VALUE & mask;
 		writel_relaxed(val, clk_base + plla->params->ext_misc_reg[0]);
 		fence_udelay(1, clk_base);
+
+		if (!plla->params->defaults_set)
+			pr_warn("PLL_A already enabled. Postponing set full defaults\n");
 
 		return;
 	}
@@ -808,8 +810,6 @@ static void tegra210b01_pllc4_set_defaults(struct tegra_clk_pll *pllc4)
 	pllc4->params->defaults_set = true;
 
 	if (val & PLL_ENABLE) {
-		pr_warn("PLL_C4 already enabled. Postponing set full defaults\n");
-
 		/*
 		 * PLL is ON: check if defaults already set, then set those
 		 * that can be updated in flight.
@@ -844,6 +844,9 @@ static void tegra210b01_pllc4_set_defaults(struct tegra_clk_pll *pllc4)
 		writel_relaxed(val, clk_base + pllc4->params->ext_misc_reg[0]);
 		fence_udelay(1, clk_base);
 
+		if (!pllc4->params->defaults_set)
+			pr_warn("PLL_C4 already enabled. Postponing set full defaults\n");
+
 		return;
 	}
 
@@ -871,8 +874,6 @@ static void tegra210b01_pllre_set_defaults(struct tegra_clk_pll *pllre)
 	pllre->params->defaults_set = true;
 
 	if (val & PLL_ENABLE) {
-		pr_warn("PLL_RE already enabled. Postponing set full defaults\n");
-
 		/*
 		 * PLL is ON: check if defaults already set, then set those
 		 * that can be updated in flight.
@@ -910,6 +911,9 @@ static void tegra210b01_pllre_set_defaults(struct tegra_clk_pll *pllre)
 		writel_relaxed(val | PLLRE_OUT1_DEFAULT_VALUE,
 			       clk_base + PLLRE_OUT1);
 		fence_udelay(1, clk_base);
+
+		if (!pllre->params->defaults_set)
+			pr_warn("PLL_RE already enabled. Postponing set full defaults\n");
 
 		return;
 	}
@@ -2322,7 +2326,6 @@ int tegra210b01_init_pllu(void)
 	/* skip initialization when pllu is in hw controlled mode */
 	if (reg & PLLU_BASE_OVERRIDE) {
 		if (!(reg & PLL_ENABLE)) {
-			WARN(1, "Disabled PLLU was put under h/w control\n");
 			err = tegra210b01_enable_pllu();
 			if (err < 0) {
 				WARN_ON(1);
