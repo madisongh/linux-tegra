@@ -2338,10 +2338,10 @@ int tegra210b01_init_pllu(void)
 		writel(reg, clk_base + PLLU_BASE);
 
 		reg = readl_relaxed(clk_base + PLLU_HW_PWRDN_CFG0);
-		reg |= PLLU_HW_PWRDN_CFG0_IDDQ_PD_INCLUDE |
-		       PLLU_HW_PWRDN_CFG0_USE_SWITCH_DETECT |
+		reg |= PLLU_HW_PWRDN_CFG0_USE_SWITCH_DETECT |
 		       PLLU_HW_PWRDN_CFG0_USE_LOCKDET;
 		reg &= ~(PLLU_HW_PWRDN_CFG0_CLK_ENABLE_SWCTL |
+			PLLU_HW_PWRDN_CFG0_IDDQ_PD_INCLUDE |
 			PLLU_HW_PWRDN_CFG0_CLK_SWITCH_SWCTL);
 		writel_relaxed(reg, clk_base + PLLU_HW_PWRDN_CFG0);
 
