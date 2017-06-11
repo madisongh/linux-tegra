@@ -2420,8 +2420,11 @@ void __init tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
 	clk_register_clkdev(clk, "pll_c3", NULL);
 	clks[TEGRA210_CLK_PLL_C3] = clk;
 
-	if (!emc_is_native)
-		goto skip_pllms;
+	if (emc_is_native) {
+		pr_warn("%s: native EMC support from PLLP only\n", __func__);
+		pr_warn("%s: PLLM and PLLMB are not registred\n", __func__);
+	}
+	goto skip_pllms;
 
 	/* PLLM */
 	clk = tegra_clk_register_pllm("pll_m", "osc", clk_base, pmc,
