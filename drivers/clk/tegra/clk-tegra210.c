@@ -3882,8 +3882,10 @@ static int tegra210_clk_suspend(void)
 	pll_re_out_1 = car_readl(PLLRE_OUT1, 0);
 	pll_u_out1_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_U_OUT1]);
 	pll_u_out2_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_U_OUT2]);
-	pll_mb_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_MB]);
-	pll_m_v = car_readl(PLLM_BASE, 0);
+	if (!t210b01) {
+		pll_mb_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_MB]);
+		pll_m_v = car_readl(PLLM_BASE, 0);
+	}
 	pll_p_outb = car_readl(PLLP_OUTB, 0);
 
 	for (i = 0; i < ARRAY_SIZE(cpu_softrst_ctx); i++)
@@ -4085,7 +4087,7 @@ static void tegra210_clk_resume(void)
 	val &= ~CLK_ENB_PLLP_OUT_CPU;
 	car_writel(val, CLK_OUT_ENB_Y, 0);
 
-	if (emc_is_native) {
+	if (!t210b01) {
 		car_writel(pll_m_v, PLLM_BASE, 0);
 		tegra_clk_pll_resume(clks[TEGRA210_CLK_PLL_MB], pll_mb_rate);
 		tegra_clk_sync_state_pll(clks[TEGRA210_CLK_PLL_M]);
