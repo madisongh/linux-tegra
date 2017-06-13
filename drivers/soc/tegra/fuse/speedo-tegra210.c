@@ -257,12 +257,6 @@ void __init tegra210_init_speedo_data(struct tegra_sku_info *sku_info)
 		sku_info->cpu_speedo_value = cpu_speedo[0];
 		sku_info->gpu_speedo_value = cpu_speedo[2];
 		sku_info->soc_speedo_value = soc_speedo[0];
-
-		/* FIXME Remove hack to set fixed speedo value */
-		sku_info->cpu_speedo_value = 1452;
-		sku_info->gpu_speedo_value = 1452;
-		sku_info->soc_speedo_value = 1452;
-
 	} else {
 		if (speedo_revision >= 3) {
 			sku_info->cpu_speedo_value = cpu_speedo[0];
