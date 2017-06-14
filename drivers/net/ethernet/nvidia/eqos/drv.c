@@ -5793,8 +5793,6 @@ void eqos_start_dev(struct eqos_prv_data *pdata)
 		usleep_range(10, 11);
 		gpio_set_value(pdata->phy_reset_gpio, 1);
 		pdata->phydev->drv->low_power_mode(pdata->phydev, false);
-		if (pdata->suspended == 0 && netif_running(pdata->dev))
-			phy_start_interrupts(pdata->phydev);
 	} else if (!gpio_get_value(pdata->phy_reset_gpio))
 	{
 		/* deassert phy reset */
@@ -5804,6 +5802,11 @@ void eqos_start_dev(struct eqos_prv_data *pdata)
 	/* issue CAR reset to device */
 	hw_if->car_reset(pdata);
 	hw_if->pad_calibrate(pdata);
+
+	if (pdata->phydev->drv->low_power_mode) {
+		if (pdata->suspended == 0 && netif_running(pdata->dev))
+			phy_start_interrupts(pdata->phydev);
+	}
 
 	/* default configuration */
 	eqos_default_common_confs(pdata);
