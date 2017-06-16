@@ -789,8 +789,7 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 			if (ret) {
 				dev_err(mmc_dev(sdhci->mmc),
 				"clock enable is failed, ret: %d\n", ret);
-				mutex_unlock(&tegra_host->set_clock_mutex);
-				return;
+				goto unlock_mutex;
 			}
 			tegra_host->clk_enabled = true;
 			vendor_ctrl = sdhci_readb(sdhci, SDHCI_VNDR_CLK_CTRL);
@@ -820,6 +819,9 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 		}
 		sdhci_set_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
+		sdhci_set_clock(sdhci, clock);
+		if (sdhci->mmc->skip_host_clkgate)
+			goto unlock_mutex;
 		/* power down / idle state */
 		vendor_trim_clear_sel_vreg(sdhci, false);
 		vendor_ctrl = sdhci_readb(sdhci, SDHCI_VNDR_CLK_CTRL);
@@ -835,6 +837,7 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 				"disabling eMC clock failed, ret: %d\n", ret);
 		}
 	}
+unlock_mutex:
 	mutex_unlock(&tegra_host->set_clock_mutex);
 }
 
