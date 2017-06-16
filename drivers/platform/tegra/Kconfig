@@ -170,7 +170,7 @@ config TEGRA_ISOMGR_SYSFS
 config TEGRA_ISOMGR_MAX_ISO_BW_QUIRK
 	bool "Relax Max ISO Bw limit"
 	depends on TEGRA_ISOMGR
-	default y
+	default n
 	help
 	  When enabled, allows system with less ISO bw continue to
 	  work. This is necessary for systems running at lower
