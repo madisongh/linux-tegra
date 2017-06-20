@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2012-2016, Raydium Semiconductor Corporation.
  * All Rights Reserved.
- * Copyright (C) 2012-2016, NVIDIA Corporation.  All Rights Reserved.
+ * Copyright (C) 2012-2017, NVIDIA Corporation.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -87,7 +87,7 @@
 #define RM_NEED_TO_READ_RAW_DATA	0x02
 #define RM_NEED_TO_SEND_SIGNAL		0x04
 
-#define TCH_WAKE_LOCK_TIMEOUT		(HZ/2)
+#define TCH_WAKE_LOCK_TIMEOUT		(1*HZ)
 
 #if ENABLE_FREQ_HOPPING  /*ENABLE_SCAN_DATA_HEADER*/
 #define QUEUE_HEADER_NUM			(8)
@@ -3267,7 +3267,16 @@ static void rm_ctrl_suspend(struct rm_tch_ts *ts)
 static int rm_tch_suspend(struct rm_tch_ts *ts)
 {
 	if (g_st_ts.b_init_service) {
+		int timeout = 1000; /* timeout 1000ms */
 		dev_info(ts->dev, "Raydium - Disable input device\n");
+		while (g_st_ts.u8_resume_cnt != 0 &&
+				g_st_ts.b_init_finish != 1 &&
+				timeout > 0) {
+			usleep_range(5000, 6000); /* msleep(5) */
+			timeout -= 5;
+		}
+		if (timeout <= 0)
+			dev_warn(ts->dev, "Raydium - resume timeout, try to suspend directly\n");
 		rm_ctrl_suspend(ts);
 		dev_info(ts->dev, "Raydium - Disable input device done\n");
 	}
