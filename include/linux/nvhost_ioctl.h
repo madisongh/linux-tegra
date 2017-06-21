@@ -3,7 +3,7 @@
  *
  * Tegra graphics host driver
  *
- * Copyright (c) 2009-2014, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2009-2017, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -116,10 +116,6 @@ struct nvhost_alloc_obj_ctx_args {
 	__u32 class_num; /* kepler3d, 2d, compute, etc       */
 	__u32 padding;
 	__u64 obj_id;    /* output, used to free later       */
-};
-
-struct nvhost_free_obj_ctx_args {
-	__u64 obj_id; /* obj ctx to free */
 };
 
 struct nvhost_alloc_gpfifo_args {
@@ -390,8 +386,6 @@ struct nvhost_set_ctxswitch_args {
 	_IOWR(NVHOST_IOCTL_MAGIC, 107, struct nvhost_submit_gpfifo_args)
 #define NVHOST_IOCTL_CHANNEL_ALLOC_OBJ_CTX	\
 	_IOWR(NVHOST_IOCTL_MAGIC, 108, struct nvhost_alloc_obj_ctx_args)
-#define NVHOST_IOCTL_CHANNEL_FREE_OBJ_CTX	\
-	_IOR(NVHOST_IOCTL_MAGIC,  109, struct nvhost_free_obj_ctx_args)
 #define NVHOST_IOCTL_CHANNEL_ZCULL_BIND		\
 	_IOWR(NVHOST_IOCTL_MAGIC, 110, struct nvhost_zcull_bind_args)
 #define NVHOST_IOCTL_CHANNEL_SET_ERROR_NOTIFIER  \
