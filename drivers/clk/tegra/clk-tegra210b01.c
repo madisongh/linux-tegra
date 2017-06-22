@@ -321,8 +321,8 @@ static DEFINE_SPINLOCK(pll_p_uphy_lock);
 
 #define PLLDP_MISC0_DEFAULT_VALUE	0x40000000
 #define PLLDP_MISC1_CFG_DEFAULT_VALUE	0xc0000000
-#define PLLDP_MISC2_CTRL1_DEFAULT_VALUE	0xf400f0da
-#define PLLDP_MISC3_CTRL2_DEFAULT_VALUE	0x2004f400
+#define PLLDP_MISC2_CTRL1_DEFAULT_VALUE	0xf600f200
+#define PLLDP_MISC3_CTRL2_DEFAULT_VALUE	0x2005f600
 #define PLLDP_MISC4_VREG_DEFAULT_VALUE	0x00000000
 
 #define PLLDSS_MISC0_WRITE_MASK		0x47ffffff
@@ -2022,7 +2022,7 @@ static struct tegra_clk_pll_params pll_d2_params = {
 };
 
 static struct tegra_clk_pll_freq_table pll_dp_freq_table[] = {
-	{ 38400000, 270000000, 28, 1, 4, 0, 0xf400 },
+	{ 38400000, 270000000, 42, 1, 6, 0, 0xf600 },
 	{        0,         0,  0, 0, 0, 0,      0 },
 };
 
