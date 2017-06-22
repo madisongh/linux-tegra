@@ -317,11 +317,6 @@ typedef struct dhd_epno_results {
 	struct ether_addr bssid;
 } dhd_epno_results_t;
 
-struct dhd_pno_swc_evt_param {
-	uint16 results_rxed_so_far;
-	wl_pfn_significant_net_t *change_array;
-};
-
 typedef struct wifi_gscan_result {
     uint64 ts;                           /* Time of discovery           */
     char ssid[DOT11_MAX_SSID_LEN+1];     /* null terminated             */
@@ -356,10 +351,8 @@ typedef struct dhd_pno_gscan_capabilities {
     int max_scan_cache_size;
     int max_scan_buckets;
     int max_ap_cache_per_scan;
-    int max_rssi_sample_size;
     int max_scan_reporting_threshold;
     int max_hotlist_aps;
-    int max_significant_wifi_change_aps;
     int max_epno_ssid_crc32;
     int max_epno_hidden_ssid;
     int max_white_list_ssid;
@@ -370,8 +363,6 @@ struct dhd_pno_gscan_params {
 	uint8 bestn;
 	uint8 mscan;
 	uint8 buffer_threshold;
-	uint8 swc_nbssid_threshold;
-	uint8 swc_rssi_window_size;
 	uint8 lost_ap_window;
 	uint8 nchannel_buckets;
 	uint8 reason;
@@ -381,7 +372,6 @@ struct dhd_pno_gscan_params {
 	gscan_results_cache_t *gscan_batch_cache;
 	gscan_results_cache_t *gscan_hotlist_found;
 	gscan_results_cache_t *gscan_hotlist_lost;
-	uint16 nbssid_significant_change;
 	uint16 nbssid_hotlist;
 	uint16 num_epno_ssid;
 	uint8 num_visible_epno_ssid;
@@ -390,10 +380,8 @@ struct dhd_pno_gscan_params {
 	 * w/o clear in between
 	 */
 	uint8 ssid_ext_last_used_index;
-	struct dhd_pno_swc_evt_param param_significant;
 	struct dhd_pno_gscan_channel_bucket channel_bucket[GSCAN_MAX_CH_BUCKETS];
 	struct list_head hotlist_bssid_list;
-	struct list_head significant_bssid_list;
 	struct list_head epno_ssid_list;
 	uint32 scan_id;
 };
@@ -421,26 +409,6 @@ typedef struct gscan_hotlist_scan_params {
 	struct bssid_t bssid[1];  /* n bssids to follow */
 } gscan_hotlist_scan_params_t;
 
-/* SWC (Significant WiFi Change) params */
-typedef struct gscan_swc_params {
-	/* Rssi averaging window size */
-	uint8 rssi_window;
-	/* Number of scans that the AP has to be absent before
-	 * being declared LOST
-	 */
-	uint8 lost_ap_window;
-	/* if x  Aps have a significant change generate an event. */
-	uint8 swc_threshold;
-	uint8 nbssid;
-	wl_pfn_significant_bssid_t bssid_elem_list[1];
-} gscan_swc_params_t;
-
-typedef struct dhd_pno_significant_bssid {
-	struct ether_addr BSSID;
-	int8 rssi_low_threshold;
-	int8 rssi_high_threshold;
-	struct list_head list;
-} dhd_pno_significant_bssid_t;
 #endif /* GSCAN_SUPPORT */
 typedef union dhd_pno_params {
 	struct dhd_pno_legacy_params params_legacy;

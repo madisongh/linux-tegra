@@ -1217,10 +1217,8 @@ void * dhd_pno_get_gscan(dhd_pub_t *dhd, dhd_pno_gscan_cmd_cfg_t type,
 			ptr->max_scan_cache_size = GSCAN_MAX_AP_CACHE;
 			ptr->max_scan_buckets = GSCAN_MAX_CH_BUCKETS;
 			ptr->max_ap_cache_per_scan = GSCAN_MAX_AP_CACHE_PER_SCAN;
-			ptr->max_rssi_sample_size = PFN_SWC_RSSI_WINDOW_MAX;
 			ptr->max_scan_reporting_threshold = 100;
 			ptr->max_hotlist_aps = PFN_HOTLIST_MAX_NUM_APS;
-			ptr->max_significant_wifi_change_aps = PFN_SWC_MAX_NUM_APS;
 			ptr->max_epno_ssid_crc32 = MAX_EPNO_SSID_NUM;
 			ptr->max_epno_hidden_ssid = MAX_EPNO_HIDDEN_SSID;
 			ptr->max_white_list_ssid = MAX_WHITELIST_SSID;

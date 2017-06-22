@@ -226,7 +226,6 @@ typedef BWL_PRE_PACKED_STRUCT struct bcm_event {
 #define WLC_E_FBT_AUTH_REQ_IND		132	/* FBT Authentication Request Indication */
 #define WLC_E_RSSI_LQM			133	/* Enhancement addition for WLC_E_RSSI */
 #define WLC_E_PFN_GSCAN_FULL_RESULT		134 /* Full probe/beacon (IEs etc) results */
-#define WLC_E_PFN_SWC		135 /* Significant change in rssi of bssids being tracked */
 #define WLC_E_RMC_EVENT			139	/* RMC event */
 #define WLC_E_LAST			140	/* highest val + 1 for range checking */
 
