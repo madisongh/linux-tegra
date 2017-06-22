@@ -446,9 +446,9 @@ static DEFINE_SPINLOCK(pll_p_uphy_lock);
 
 /* PLLE */
 #define PLLE_SS_ENABLE	1
-#define PLLE_SS_MAX_VAL 0x21
+#define PLLE_SS_MAX_VAL 0x25
 #define PLLE_SS_INC_VAL (0x1 << 16)
-#define PLLE_SS_INCINTRV_VAL (0x23 << 24)
+#define PLLE_SS_INCINTRV_VAL (0x20 << 24)
 #define PLLE_SS_COEFFICIENTS_VAL \
 	(PLLE_SS_MAX_VAL | PLLE_SS_INC_VAL | PLLE_SS_INCINTRV_VAL)
 
