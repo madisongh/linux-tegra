@@ -1778,7 +1778,7 @@ static struct tegra_clk_pll_params pll_e_params = {
 };
 
 static struct tegra_clk_pll_freq_table pll_re_vco_freq_table[] = {
-	{ 38400000, 672000000,  35,  2, 1, 0 },
+	{ 38400000, 672000000,  70,  4, 1, 0 },
 	{ 38400000, 624000000,  65,  4, 1, 0 },
 	{ 60000000, 625000000, 125, 12, 1, 0 },
 	{        0,         0,   0,  0, 0, 0 },
