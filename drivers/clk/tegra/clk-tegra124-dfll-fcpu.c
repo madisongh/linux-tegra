@@ -28,6 +28,7 @@
 #include <soc/tegra/fuse.h>
 
 #include <dt-bindings/thermal/tegra210-dfll-trips.h>
+#include <dt-bindings/thermal/tegra210b01-trips.h>
 
 #include "clk.h"
 #include "clk-dfll.h"
@@ -592,8 +593,8 @@ static const struct thermal_table tegra210_cpu_thermal_table = {
 };
 
 static struct thermal_tv tegra210b01_thermal_floor_table[] = {
-	{TEGRA210_DFLL_THERMAL_FLOOR_0 / 1000, 800},
-	{TEGRA210_DFLL_THERMAL_FLOOR_4 / 1000,   0},
+	{TEGRA210B01_DFLL_THERMAL_FLOOR_0 / 1000, 800},
+	{TEGRA210B01_DFLL_THERMAL_FLOOR_NOFLOOR / 1000,   0},
 };
 
 static const struct thermal_table tegra210b01_cpu_thermal_table = {
