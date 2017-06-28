@@ -1,5 +1,5 @@
 /*
- * Copyright © 1999-2010 David Woodhouse <dwmw2@infradead.org> et al.
+ * Copyright © 1999-2017 David Woodhouse <dwmw2@infradead.org> et al.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -98,6 +98,7 @@ struct mtd_write_req {
 #define MTD_DATAFLASH		6
 #define MTD_UBIVOLUME		7
 #define MTD_MLCNANDFLASH	8	/* MLC NAND (including TLC) */
+#define MTD_FRAM		9	/* Ferroelectric RAM */
 
 #define MTD_WRITEABLE		0x400	/* Device is writeable */
 #define MTD_BIT_WRITEABLE	0x800	/* Single bits can be flipped */

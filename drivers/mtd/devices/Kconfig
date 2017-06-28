@@ -124,6 +124,17 @@ config MTD_QSPI_FLASH
           Quad Output/Dual IO/Quad IO/DDR Fast/DDR Dual IO/DDR Quad IO read,
           Page Program/Quad Page program write, sector and bulk erase modes.
 
+config MTD_QSPI_FRAM
+	tristate "Support Quad SPI Fram chips (MB85RQ4ML)"
+	depends on SPI_MASTER && QSPI_TEGRA
+	help
+	  This enables access to Quad SPI fram chipss, used for
+	  program and data storage.
+
+          It includes support for Fujitsu's MB85RQ4ML
+          QSPI fram. It provides support for Normal/Fast/Quad Output/Quad IO
+          read.
+
 config MTD_BCM47XXSFLASH
 	tristate "R/O support for serial flash on BCMA bus"
 	depends on BCMA_SFLASH

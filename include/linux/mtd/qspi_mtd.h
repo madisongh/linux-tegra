@@ -3,7 +3,7 @@
  *
  * Author: Mike Lavender, mike@steroidmicros.com
  * Copyright (c) 2005, Intec Automation Inc.
- * Copyright (C) 2013-2015 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2013-2017 NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -69,6 +69,10 @@ enum qspi_operation_mode {
 	STATUS_READ,
 	READ_ANY_REG,
 	WRITE_ANY_REG,
+	QPI_FRQAD,
+	QPI_WQAD,
+	CMD_EQPI,
+	CMD_RDSR,
 	OPERATION_MAX_LIMIT,
 };
 
@@ -88,7 +92,7 @@ enum boot {
 	TRUE,
 };
 
-struct qcmdset cmd_info_table[OPERATION_MAX_LIMIT] = {
+static struct qcmdset cmd_info_table[OPERATION_MAX_LIMIT] = {
 	/*  NORMAL_READ */
 	{ {.op_code = 0x13, .is_ddr = FALSE, .bus_width = X1, .post_txn = 2},
 		{.address = 0, .is_ddr = FALSE, .len = 4,
@@ -197,6 +201,18 @@ struct qcmdset cmd_info_table[OPERATION_MAX_LIMIT] = {
 			.bus_width = X1, .dummy_cycles = 0},
 		{.is_ddr = FALSE, .bus_width = X1}
 	},
+	/*  QPI_FRQAD, need dummy byte 16 instead of 24 byte Bug 200284769 */
+	{ {.op_code = 0xeb, .is_ddr = FALSE, .bus_width = X1, .post_txn = 2},
+		{.address = 0, .is_ddr = FALSE, .len = 4, .bus_width = X4,
+			.dummy_cycles = 16},
+		{.is_ddr = FALSE, .bus_width = X4}
+	},
+	/*  QPI_WQAD */
+	{ {.op_code = 0x32, .is_ddr = FALSE, .bus_width = X1, .post_txn = 2},
+		{.address = 0, .is_ddr = FALSE, .len = 3, .bus_width = X4,
+			.dummy_cycles = 0},
+		{.is_ddr = FALSE, .bus_width = X4}
+	},
 };
 
 /* Flash opcodes. */
@@ -211,6 +227,14 @@ struct qcmdset cmd_info_table[OPERATION_MAX_LIMIT] = {
 #define WEL_ENABLE		0x02    /* Enable WEL bit */
 #define WEL_DISABLE		0x00    /* Disable WEL bit */
 #define WIP_ENABLE		0x01    /* Enable WIP bit */
+
+#define FRAM_CMD_RDID		0x9f
+#define FRAM_CMD_RDSR		0x05
+#define FRAM_CMD_EQPI		0x38
+#define FRAM_CMD_DQPI		0xff
+#define FRAM_CMD_WREN		0x06
+#define FRAM_CMD_WQAD		0x12
+#define FRAM_CMD_FRQAD		0xeb
 
 #define JEDEC_MFR(_jedec_id)	((_jedec_id) >> 16)
 
@@ -290,6 +314,17 @@ static const struct spi_device_id qspi_ids[] = {
 	},
 	{	"MT25QL512AB",
 		INFO(0x20BA20, 0, 256 * 1024, 256, 0, 0, 0, 0, 256, 0)
+	},
+	{ },
+};
+
+static const struct spi_device_id qspi_ids_fram[] = {
+
+	/* Fujitsu -- single (large) sector size only, at least
+	 * for the chips listed here (without boot sectors).
+	 */
+	{	"MB85RQ4ML",
+		INFO(0x047f29, 0, 512 * 1024, 8, 0, 0, 0, 0, 1024 * 20, 0)
 	},
 	{ },
 };

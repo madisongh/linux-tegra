@@ -19,6 +19,7 @@ obj-$(CONFIG_MTD_BCM47XXSFLASH)	+= bcm47xxsflash.o
 obj-$(CONFIG_MTD_ST_SPI_FSM)    += st_spi_fsm.o
 obj-$(CONFIG_MTD_POWERNV_FLASH)	+= powernv_flash.o
 obj-$(CONFIG_MTD_QSPI_FLASH)	+= qspi_mtd.o
+obj-$(CONFIG_MTD_QSPI_FRAM)	+= fujitsu_fram.o
 
 
 CFLAGS_docg3.o			+= -I$(src)
