@@ -204,6 +204,9 @@ struct tegra_channel {
 	struct vi_notify_channel *vnc[TEGRA_CSI_BLOCKS];
 	int vnc_id[TEGRA_CSI_BLOCKS];
 	int grp_id;
+
+	/* check if the sensor is imx185, needed as WAR for Bug 200301178 */
+	bool sensor_is_imx185;
 };
 
 #define to_tegra_channel(vdev) \

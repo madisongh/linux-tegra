@@ -542,7 +542,11 @@ int tegra_channel_set_stream(struct tegra_channel *chan, bool on)
 	if (atomic_read(&chan->is_streaming) == on)
 		return 0;
 
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+	if (on && !chan->sensor_is_imx185) {
+#else
 	if (on) {
+#endif
 		/* Enable CSI before sensor. Reason is as follows:
 		 * CSI is able to catch the very first clk transition.
 		 * Ensure mipi calibration is done before transmission/first frame data.
@@ -576,7 +580,11 @@ int tegra_channel_set_power(struct tegra_channel *chan, bool on)
 	int err = 0;
 	struct v4l2_subdev *sd;
 
+#ifdef CONFIG_ARCH_TEGRA_18x_SOC
+	if (on && !chan->sensor_is_imx185) {
+#else
 	if (on) {
+#endif
 		for (num_sd = 0; num_sd < chan->num_subdevs; num_sd++) {
 			sd = chan->subdev[num_sd];
 
@@ -1287,6 +1295,7 @@ static int tegra_channel_open(struct file *fp)
 #endif
 	struct tegra_mc_vi *vi;
 	struct tegra_csi_device *csi;
+	int num_sd = 0;
 
 	mutex_lock(&chan->video_lock);
 	ret = v4l2_fh_open(fp);
@@ -1314,8 +1323,17 @@ static int tegra_channel_open(struct file *fp)
 	}
 
 	chan->fh = (struct v4l2_fh *)fp->private_data;
-
+	chan->sensor_is_imx185 = false;
+#ifndef BUG_200301178_WAR
+	for (num_sd = 0; num_sd < chan->num_subdevs; num_sd++) {
+		if (strstr(chan->subdev[num_sd]->name, "imx185")) {
+			chan->sensor_is_imx185 = true;
+			break;
+		}
+	}
+#endif
 	mutex_unlock(&chan->video_lock);
+
 	return 0;
 
 fail:
