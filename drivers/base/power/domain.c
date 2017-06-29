@@ -2,7 +2,7 @@
  * drivers/base/power/domain.c - Common code related to device power domains.
  *
  * Copyright (C) 2011 Rafael J. Wysocki <rjw@sisk.pl>, Renesas Electronics Corp.
- * Copyright (c) 2014-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2014-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This file is released under the GPLv2.
  */
@@ -1013,6 +1013,7 @@ static int pm_genpd_suspend_noirq(struct device *dev)
 static int pm_genpd_resume_noirq(struct device *dev)
 {
 	struct generic_pm_domain *genpd;
+	int ret = 0;
 
 	dev_dbg(dev, "%s()\n", __func__);
 
@@ -1032,10 +1033,22 @@ static int pm_genpd_resume_noirq(struct device *dev)
 	pm_genpd_sync_poweron(genpd, true);
 	genpd->suspended_count--;
 
-	if (genpd->flags & GENPD_FLAG_PM_UPSTREAM)
-		return genpd_restore_dev(genpd, dev);
-	else
-		return genpd_start_dev(genpd, dev);
+	ret = genpd_start_dev(genpd, dev);
+	if (ret)
+		return ret;
+
+	if (genpd->flags & GENPD_FLAG_PM_UPSTREAM) {
+		ret = genpd_restore_dev(genpd, dev);
+		if (ret)
+			goto err_stop;
+	}
+
+	return 0;
+
+err_stop:
+	genpd_stop_dev(genpd, dev);
+
+	return ret;
 }
 
 /**
