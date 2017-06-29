@@ -311,8 +311,9 @@ int csi2_start_streaming(struct tegra_csi_channel *chan,
 		csi_write(chan,
 			TEGRA_CSI_CIL_OFFSET + TEGRA_CSI_CIL_PAD_CONFIG0, 0x0,
 			csi_port >> 1);
-		val |= ((csi_port & 0x1) == PORT_A) ? CSI_A_PHY_CIL_ENABLE :
-			CSI_B_PHY_CIL_ENABLE;
+		val = ((csi_port & 0x1) == PORT_A) ?
+			CSI_A_PHY_CIL_ENABLE | CSI_B_PHY_CIL_NOP
+			: CSI_B_PHY_CIL_ENABLE | CSI_A_PHY_CIL_NOP;
 		csi_write(chan, TEGRA_CSI_PHY_CIL_COMMAND, val,
 				csi_port >> 1);
 	}
@@ -418,13 +419,12 @@ int csi2_mipi_cal(struct tegra_csi_channel *chan)
 
 		if (chan->numlanes == 2) {
 			lanes |= CSIA << csi_port;
-			val = csi_read(chan, TEGRA_CSI_PHY_CIL_COMMAND,
-					csi_port >> 1);
 			csi_write(chan,
 				TEGRA_CSI_CIL_OFFSET +
 				TEGRA_CSI_CIL_PAD_CONFIG0, 0x0, csi_port >> 1);
-			val |= ((csi_port & 0x1) == PORT_A) ?
-				CSI_A_PHY_CIL_ENABLE : CSI_B_PHY_CIL_ENABLE;
+			val = ((csi_port & 0x1) == PORT_A) ?
+				CSI_A_PHY_CIL_ENABLE | CSI_B_PHY_CIL_NOP
+				: CSI_B_PHY_CIL_ENABLE | CSI_A_PHY_CIL_NOP;
 			csi_write(chan, TEGRA_CSI_PHY_CIL_COMMAND, val,
 				csi_port >> 1);
 		} else {
