@@ -84,7 +84,7 @@ static void __init rev_t210sku_to_speedo_ids(struct tegra_sku_info *sku_info,
 	sku_info->soc_speedo_id = 0;
 	sku_info->gpu_speedo_id = 0;
 	sku_info->ucm = TEGRA_UCM1;
-	*threshold = THRESHOLD_INDEX_2;
+	*threshold = THRESHOLD_INDEX_0;
 #ifdef CONFIG_OF
 	vcm31_sku = of_property_read_bool(of_chosen, "nvidia,t210-vcm31-sku");
 	always_on = of_property_read_bool(of_chosen,
@@ -175,7 +175,7 @@ static void __init rev_t210b01sku_to_speedo_ids(struct tegra_sku_info *sku_info,
 	sku_info->soc_speedo_id = 0;
 	sku_info->gpu_speedo_id = 1;	/* T210b01 GPC PLL default NA mode */
 	sku_info->ucm = TEGRA_UCM1;
-	*threshold = THRESHOLD_INDEX_0;
+	*threshold = THRESHOLD_INDEX_2;
 
 	switch (sku) {
 	case 0x00: /* Engineering SKU */
@@ -203,8 +203,10 @@ static bool __init is_t210b01_sku(struct tegra_sku_info *sku_info)
 static void __init rev_sku_to_speedo_ids(struct tegra_sku_info *sku_info,
 					 u8 speedo_rev, int *threshold)
 {
-	if (is_t210b01_sku(sku_info))
+	if (is_t210b01_sku(sku_info)) {
 		rev_t210b01sku_to_speedo_ids(sku_info, speedo_rev, threshold);
+		return;
+	}
 
 	rev_t210sku_to_speedo_ids(sku_info, speedo_rev, threshold);
 }
