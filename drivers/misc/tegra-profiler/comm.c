@@ -278,7 +278,7 @@ init_mmap_hdr(struct quadd_mmap_rb_info *mmap_rb,
 
 	cpu_id = mmap_rb->cpu_id;
 
-	if (cpu_id >= nr_cpu_ids)
+	if (!cpu_possible(cpu_id))
 		return -EINVAL;
 
 	cc = &per_cpu(cpu_ctx, cpu_id);
@@ -463,7 +463,7 @@ device_ioctl(struct file *file,
 
 		cpuid = cpu_pmu_params->cpuid;
 
-		if (cpuid >= nr_cpu_ids) {
+		if (!cpu_possible(cpuid)) {
 			vfree(cpu_pmu_params);
 			err = -EINVAL;
 			goto error_out;
@@ -560,7 +560,7 @@ device_ioctl(struct file *file,
 
 		cpuid = per_cpu_cap->cpuid;
 
-		if (cpuid >= nr_cpu_ids) {
+		if (!cpu_possible(cpuid)) {
 			vfree(per_cpu_cap);
 			err = -EINVAL;
 			goto error_out;
