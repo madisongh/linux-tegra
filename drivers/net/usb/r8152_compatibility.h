@@ -9,16 +9,34 @@
 #include <linux/version.h>
 #include <linux/in.h>
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,30)
-#include <linux/mdio.h>
-#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,31)
+	#include <linux/mdio.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)
+	#include <uapi/linux/mdio.h>
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0) */
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,31) */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,5,0)
+	#define NETIF_F_CSUM_MASK			NETIF_F_ALL_CSUM
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,0,0)
+	#define skb_vlan_tag_present(__skb)		vlan_tx_tag_present(__skb)
+	#define skb_vlan_tag_get(__skb)			vlan_tx_tag_get(__skb)
+	#define skb_vlan_tag_get_id(__skb)		vlan_tx_tag_get_id(__skb)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
+	#define napi_alloc_skb(napi, length)		netdev_alloc_skb_ip_align(netdev,length)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
 	#define ether_addr_copy(dst, src)		memcpy(dst, src, ETH_ALEN)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
+	#define BIT(nr)					(1UL << (nr))
+	#define BIT_ULL(nr)				(1ULL << (nr))
+	#define BITS_PER_BYTE				8
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
 	#define NETIF_F_HW_VLAN_CTAG_RX			NETIF_F_HW_VLAN_RX
 	#define NETIF_F_HW_VLAN_CTAG_TX			NETIF_F_HW_VLAN_TX
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0)
+	#define USB_DEVICE_INTERFACE_CLASS(vend, prod, iclass) \
+		USB_DEVICE_AND_INTERFACE_INFO(vend, prod, iclass, 0xff, 0)
+
 	static inline __sum16 tcp_v6_check(int len,
 					   const struct in6_addr *saddr,
 					   const struct in6_addr *daddr,
@@ -26,11 +44,10 @@
 	{
 		return csum_ipv6_magic(saddr, daddr, len, IPPROTO_TCP, base);
 	}
-
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,6,0)
 	#define eth_random_addr(addr)			random_ether_addr(addr)
-	#define MDIO_EEE_100TX				0x0002	/* 100TX EEE cap */
-	#define MDIO_EEE_1000T				0x0004	/* 1000T EEE cap */
+	#define MDIO_EEE_100TX				MDIO_AN_EEE_ADV_100TX	/* 100TX EEE cap */
+	#define MDIO_EEE_1000T				MDIO_AN_EEE_ADV_1000T	/* 1000T EEE cap */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)
 	#define ETH_MDIO_SUPPORTS_C22			MDIO_SUPPORTS_C22
 
@@ -73,9 +90,36 @@
 	#define ndo_set_rx_mode				ndo_set_multicast_list
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)
 	#define NETIF_F_RXCSUM				(1 << 29) /* Receive checksumming offload */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38)
+	#define MDIO_AN_EEE_ADV				60	/* EEE advertisement */
+	#define MDIO_AN_EEE_ADV_100TX			0x0002	/* Advertise 100TX EEE cap */
+	#define MDIO_AN_EEE_ADV_1000T			0x0004	/* Advertise 1000T EEE cap */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
 	#define skb_checksum_none_assert(skb_ptr)	(skb_ptr)->ip_summed = CHECKSUM_NONE
+
+	static inline __be16 vlan_get_protocol(const struct sk_buff *skb)
+	{
+	       __be16 protocol = 0;
+
+	       if (vlan_tx_tag_present(skb) ||
+	            skb->protocol != cpu_to_be16(ETH_P_8021Q))
+	               protocol = skb->protocol;
+	       else {
+	               __be16 proto, *protop;
+	               protop = skb_header_pointer(skb, offsetof(struct vlan_ethhdr,
+	                                               h_vlan_encapsulated_proto),
+	                                               sizeof(proto), &proto);
+	               if (likely(protop))
+	                       protocol = *protop;
+	       }
+
+	       return protocol;
+	}
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
+	#define skb_tx_timestamp(skb)
+
+	#define queue_delayed_work(long_wq, work, delay)	schedule_delayed_work(work, delay)
+
 	static inline void usleep_range(unsigned long min, unsigned long max)
 	{
 		unsigned long ms = min / 1000;
@@ -121,6 +165,17 @@
 	{ return 0; }
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
 	#define get_sset_count				get_stats_count
+
+	static inline
+	struct sk_buff *netdev_alloc_skb_ip_align(struct net_device *dev,
+						  unsigned int length)
+	{
+		struct sk_buff *skb = netdev_alloc_skb(dev, length + NET_IP_ALIGN);
+
+		if (NET_IP_ALIGN && skb)
+			skb_reserve(skb, NET_IP_ALIGN);
+		return skb;
+	}
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,32)
 	#define pm_request_resume(para)
 	#define pm_runtime_set_suspended(para)
@@ -134,8 +189,13 @@
 	#define pm_runtime_disable(para)
 	typedef int netdev_tx_t;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
-	#define USB_SPEED_SUPER		(USB_SPEED_VARIABLE + 1)
+	#define USB_SPEED_SUPER				(USB_SPEED_VARIABLE + 1)
+	#define MDIO_MMD_AN				7	/* Auto-Negotiation */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29)
+	#define napi_gro_receive(napi, skb)		netif_receive_skb(skb)
+	#define vlan_gro_receive(napi, grp, vlan_tci, skb) \
+		vlan_hwaccel_receive_skb(skb, grp, vlan_tci)
+
 	static inline void usb_autopm_put_interface_async(struct usb_interface *intf)
 	{
 		struct usb_device *udev = interface_to_usbdev(intf);
@@ -213,12 +273,45 @@
 	}
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27)
 	#define PM_EVENT_AUTO		0x0400
+
+	static inline void __list_splice2(const struct list_head *list,
+					  struct list_head *prev,
+					  struct list_head *next)
+	{
+		struct list_head *first = list->next;
+		struct list_head *last = list->prev;
+
+		first->prev = prev;
+		prev->next = first;
+
+		last->next = next;
+		next->prev = last;
+	}
+
+	static inline void list_splice_tail(struct list_head *list,
+					    struct list_head *head)
+	{
+		if (!list_empty(list))
+			__list_splice2(list, head->prev, head);
+	}
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	#define napi_enable(napi_ptr)			netif_poll_enable(tp->netdev)
-	#define napi_disable(napi_ptr)			netif_poll_disable(tp->netdev)
-	#define napi_schedule(napi_ptr)			netif_rx_schedule(tp->netdev)
-	#define napi_complete(napi_ptr)			netif_rx_complete(tp->netdev)
-	#define netif_napi_del(napi_ptr)
+	struct napi_struct {
+		struct list_head	poll_list;
+		unsigned long		state;
+		int			weight;
+		int			(*poll)(struct napi_struct *, int);
+	#ifdef CONFIG_NETPOLL
+		spinlock_t		poll_lock;
+		int			poll_owner;
+		struct net_device	*dev;
+		struct list_head	dev_list;
+	#endif
+	};
+
+	#define napi_enable(napi_ptr)			netif_poll_enable(container_of(napi_ptr, struct r8152, napi)->netdev)
+	#define napi_disable(napi_ptr)			netif_poll_disable(container_of(napi_ptr, struct r8152, napi)->netdev)
+	#define napi_schedule(napi_ptr)			netif_rx_schedule(container_of(napi_ptr, struct r8152, napi)->netdev)
+	#define napi_complete(napi_ptr)			netif_rx_complete(container_of(napi_ptr, struct r8152, napi)->netdev)
 	#define netif_napi_add(ndev, napi_ptr, function, weight_t) \
 		ndev->poll = function; \
 		ndev->weight = weight_t;
@@ -237,13 +330,20 @@
 			delta = headroom - skb_headroom(skb);
 
 		if (delta || skb_header_cloned(skb))
-			return pskb_expand_head(skb, ALIGN(delta, NET_SKB_PAD), 0,
-						GFP_ATOMIC);
+			return pskb_expand_head(skb, ALIGN(delta, NET_SKB_PAD),
+						0, GFP_ATOMIC);
 		return 0;
 	}
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22)
 	#define ip_hdr(skb_ptr)				(skb_ptr)->nh.iph
 	#define ipv6hdr(skb_ptr)			(skb_ptr)->nh.ipv6h
+
+	static inline void skb_copy_from_linear_data(const struct sk_buff *skb,
+						     void *to,
+						     const unsigned int len)
+	{
+		memcpy(to, skb->data, len);
+	}
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,21)
 	#define vlan_group_set_device(vlgrp, vid, value) \
 		if (vlgrp) \
@@ -273,14 +373,14 @@
 		return NULL;
 	}
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
-#ifndef __LINUX_MUTEX_H
+	#ifndef __LINUX_MUTEX_H
 	#define mutex					semaphore
 	#define mutex_lock				down
 	#define mutex_unlock				up
 	#define mutex_trylock				down_trylock
 	#define mutex_lock_interruptible		down_interruptible
 	#define mutex_init				init_MUTEX
-#endif
+	#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
 	#define ADVERTISED_Pause			(1 << 13)
 	#define ADVERTISED_Asym_Pause			(1 << 14)
@@ -296,6 +396,12 @@
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) */
+	static inline void netif_napi_del(struct napi_struct *napi)
+	{
+	#ifdef CONFIG_NETPOLL
+	        list_del(&napi->dev_list);
+	#endif
+	}
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29) */
@@ -306,6 +412,7 @@
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37) */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,2,0) */
@@ -314,57 +421,16 @@
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,6,0) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0) */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0) */
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0) */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0) */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4,0,0) */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4,5,0) */
 
 #ifndef FALSE
 	#define TRUE	1
 	#define FALSE	0
 #endif
-
-/*
- * inline function
- */
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
-static inline struct sk_buff *netdev_alloc_skb_ip_align(struct net_device *dev,
-							unsigned int length)
-{
-	struct sk_buff *skb = netdev_alloc_skb(dev, length + NET_IP_ALIGN);
-
-	if (NET_IP_ALIGN && skb)
-		skb_reserve(skb, NET_IP_ALIGN);
-	return skb;
-}
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22)
-static inline void skb_copy_from_linear_data(const struct sk_buff *skb,
-					     void *to,
-					     const unsigned int len)
-{
-	memcpy(to, skb->data, len);
-}
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22) */
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33) */
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27) && LINUX_VERSION_CODE > KERNEL_VERSION(2,6,23)
-/**
- *  netif_napi_del - remove a napi context
- *  @napi: napi context
- *
- *  netif_napi_del() removes a napi context from the network device napi list
- */
-static inline void netif_napi_del(struct napi_struct *napi)
-{
-#ifdef CONFIG_NETPOLL
-        list_del(&napi->dev_list);
-#endif
-}
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
-	#define skb_tx_timestamp(skb)	(tp->netdev->trans_start = jiffies)
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
-	#define skb_tx_timestamp(skb)
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31) */
 
 enum rtl_cmd {
 	RTLTOOL_PLA_OCP_READ_DWORD = 0,
