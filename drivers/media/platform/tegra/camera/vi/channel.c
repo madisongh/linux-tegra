@@ -576,22 +576,13 @@ int tegra_channel_set_power(struct tegra_channel *chan, bool on)
 	int err = 0;
 	struct v4l2_subdev *sd;
 
-	if (on) {
-		for (num_sd = 0; num_sd < chan->num_subdevs; num_sd++) {
-			sd = chan->subdev[num_sd];
+	/* Power on CSI at the last to complete calibration of mipi lanes */
+	for (num_sd = chan->num_subdevs - 1; num_sd >= 0; num_sd--) {
+		sd = chan->subdev[num_sd];
 
-			err = v4l2_subdev_call(sd, core, s_power, on);
-			if (!ret && err < 0 && err != -ENOIOCTLCMD)
-				ret = err;
-		}
-	} else {
-		for (num_sd = chan->num_subdevs - 1; num_sd >= 0; num_sd--) {
-			sd = chan->subdev[num_sd];
-
-			err = v4l2_subdev_call(sd, core, s_power, on);
-			if (!ret && err < 0 && err != -ENOIOCTLCMD)
-				ret = err;
-		}
+		err = v4l2_subdev_call(sd, core, s_power, on);
+		if (!ret && err < 0 && err != -ENOIOCTLCMD)
+			ret = err;
 	}
 
 	return ret;

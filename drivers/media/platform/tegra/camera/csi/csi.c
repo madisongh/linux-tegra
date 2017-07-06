@@ -71,7 +71,8 @@ void set_csi_portinfo(struct tegra_csi_device *csi,
 }
 EXPORT_SYMBOL(set_csi_portinfo);
 
-int tegra_csi_power(struct tegra_csi_device *csi, int enable)
+static int tegra_csi_power(struct tegra_csi_device *csi,
+			struct tegra_csi_channel *chan, int enable)
 {
 	int err = 0;
 
@@ -80,6 +81,8 @@ int tegra_csi_power(struct tegra_csi_device *csi, int enable)
 		err = csi->fops->csi_power_on(csi);
 		if (!err)
 			atomic_inc(&csi->power_ref);
+		if (!chan->pg_mode)
+			csi->fops->mipical(chan);
 	} else {
 		err = csi->fops->csi_power_off(csi);
 		tegra_mipi_bias_pad_disable();
@@ -94,8 +97,9 @@ int tegra_csi_s_power(struct v4l2_subdev *subdev, int enable)
 {
 	int err = 0;
 	struct tegra_csi_device *csi = to_csi(subdev);
+	struct tegra_csi_channel *chan = to_csi_chan(subdev);
 
-	err = tegra_csi_power(csi, enable);
+	err = tegra_csi_power(csi, chan, enable);
 
 	return err;
 }
@@ -168,9 +172,6 @@ static int tegra_csi_s_stream(struct v4l2_subdev *subdev, int enable)
 	ret = update_video_source(csi, enable, chan->pg_mode);
 	if (ret)
 		return ret;
-	if (!chan->pg_mode)
-		if (enable)
-			csi->fops->mipical(chan);
 
 	if (tegra_chan->bypass) {
 		atomic_set(&chan->is_streaming, enable);
