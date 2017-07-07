@@ -28,7 +28,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/tegra-common.h>
-#include "../../../../display/drivers/video/tegra/dc/panel/board-panel.h"
+#include "../../../nvidia/display/drivers/video/tegra/dc/panel/board-panel.h"
 
 static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
 {
