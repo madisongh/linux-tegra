@@ -1,0 +1,78 @@
+/*
+ * Copyright (c) 2014-2015 NVIDIA CORPORATION. All rights reserved.
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
+
+#include <dt-bindings/gpio/tegra-gpio.h>
+
+/ {
+	dfll-max77621@70110000 {
+		i2c_dfll: dfll-max77621-integration {
+			pmic-i2c-address = <0x36>;
+			pmic-i2c-voltage-register = <0x01>;
+			i2c-fs-rate = <400000>;
+			sel-conversion-slope = <1>;
+		};
+
+		dfll_max77621_parms: dfll-max77621-board-params {
+			sample-rate = <12500>;
+			fixed-output-forcing;
+			cf = <10>;
+			ci = <0>;
+			cg = <2>;
+			droop-cut-value = <0xf>;
+			droop-restore-ramp = <0x0>;
+			scale-out-ramp = <0x0>;
+		};
+	};
+
+	cpu_edp {
+		status = "okay";
+		nvidia,edp_limit = <25000>;
+	};
+
+	gpu_edp {
+		status = "okay";
+		nvidia,edp_limit = <20000>;
+	};
+
+};
+
+#include <tegra210-soc/tegra210-power-dvfs.dtsi>
+
+/ {
+	dvfs_rails {
+		vdd-cpu-vmin-cdev@5 {
+			status = "okay";
+		};
+
+		vdd-core-vmin-cdev@6 {
+			status = "okay";
+		};
+
+		vdd-gpu-scaling-cdev@7 {
+			status = "okay";
+		};
+
+		vdd-cpu-vmax-cdev@8 {
+			status = "okay";
+		};
+
+		vdd-gpu-vmax-cdev@9 {
+			status = "okay";
+		};
+
+		vdd-core-vmax-cdev@10 {
+			status = "okay";
+		};
+	};
+};
