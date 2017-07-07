@@ -1,7 +1,7 @@
 GCOV_PROFILE := y
 
 subdir-ccflags-y := -Werror
-ccflags-y += -I$(srctree)/../t18x
+ccflags-y += -I$(srctree)/nvidia/t18x
 ccflags-y += -I$(src)/../tegra-alt
 ccflags-y += -I$(src)/../codecs
 

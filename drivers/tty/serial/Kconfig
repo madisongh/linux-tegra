@@ -1652,8 +1652,8 @@ endmenu
 config SERIAL_MCTRL_GPIO
 	tristate
 
-trysource "../t18x/drivers/tty/serial/Kconfig"
-trysource "../t18x/drivers/tty/serial/Kconfig.t18x"
+trysource "nvidia/t18x/drivers/tty/serial/Kconfig"
+trysource "nvidia/t18x/drivers/tty/serial/Kconfig.t18x"
 trysource "drivers/tty/serial/Kconfig.t18x"
 
 endif # TTY
