@@ -237,8 +237,8 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
 	if (!mem)
 		return;
 
-		if (!(mem->flags & DMA_MEMORY_NOMAP))
-			iounmap(mem->virt_base);
+	if (!(mem->flags & DMA_MEMORY_NOMAP))
+		iounmap(mem->virt_base);
 
 	kfree(mem->bitmap);
 	kfree(mem);
