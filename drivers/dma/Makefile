@@ -1,7 +1,7 @@
 #dmaengine debug flags
 subdir-ccflags-$(CONFIG_DMADEVICES_DEBUG)  := -DDEBUG
 subdir-ccflags-$(CONFIG_DMADEVICES_VDEBUG) += -DVERBOSE_DEBUG
-subdir-ccflags-y += -I$(srctree)/../t18x
+subdir-ccflags-y += -I$(srctree)/nvidia/t18x
 subdir-ccflags-y += -I$(srctree)
 subdir-ccflags-y += -Werror
 
