@@ -237,8 +237,8 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
 	if (!mem)
 		return;
 
-		if (!(mem->flags & DMA_MEMORY_NOMAP))
-			iounmap(mem->virt_base);
+	if (!(mem->flags & DMA_MEMORY_NOMAP))
+		iounmap(mem->virt_base);
 
 	kfree(mem->bitmap);
 	kfree(mem);
@@ -748,7 +748,7 @@ static bool shrink_chunk_locked(struct heap_info *h, int idx)
 	int resize_err;
 	void *ret = NULL;
 	dma_addr_t dev_base;
-	struct dma_attrs attrs;
+	DEFINE_DMA_ATTRS(attrs);
 
 	dma_set_attr(DMA_ATTR_ALLOC_EXACT_SIZE, &attrs);
 	/* check if entire chunk is free */
