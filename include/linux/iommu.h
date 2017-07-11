@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007-2008 Advanced Micro Devices, Inc.
- * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Joerg Roedel <joerg.roedel@amd.com>
  *
@@ -51,6 +51,7 @@ typedef int (*iommu_fault_handler_t)(struct iommu_domain *,
 struct iommu_linear_map {
 	dma_addr_t start;
 	size_t size;
+	bool is_mapped;
 };
 
 extern int iommu_get_linear_map(struct device *dev,

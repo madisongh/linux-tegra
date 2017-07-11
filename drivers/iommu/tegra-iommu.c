@@ -32,6 +32,7 @@ static struct iommu_linear_map tegra_fb_linear_map[16]; /* Terminated with 0 */
 #define LINEAR_MAP_ADD(n) \
 do { \
 	if (n##_start && n##_size) { \
+		map[i].is_mapped = false; \
 		map[i].start = n##_start; \
 		map[i++].size = n##_size; \
 	} \
