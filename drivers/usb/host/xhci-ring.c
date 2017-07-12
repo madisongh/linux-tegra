@@ -2405,6 +2405,12 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 			xhci_warn_ratelimited(xhci,
 					"WARN Successful completion on short TX: needs XHCI_TRUST_TX_LENGTH quirk?\n");
 	case COMP_SHORT_TX:
+		goto check_soft_try;
+	case COMP_STOP:
+		xhci_dbg(xhci, "Stopped on Transfer TRB\n");
+		goto check_soft_try;
+	case COMP_STOP_INVAL:
+		xhci_dbg(xhci, "Stopped on No-op or Link TRB\n");
 check_soft_try:
 		if (disable_u0_ts1_detect && ep_ring->soft_try) {
 			xhci_dbg(xhci, "soft retry completed successfully\n");
@@ -2412,12 +2418,6 @@ check_soft_try:
 			xhci_endpoint_soft_retry(xhci,
 						slot_id, ep_index + 1, false);
 		}
-		break;
-	case COMP_STOP:
-		xhci_dbg(xhci, "Stopped on Transfer TRB\n");
-		break;
-	case COMP_STOP_INVAL:
-		xhci_dbg(xhci, "Stopped on No-op or Link TRB\n");
 		break;
 	case COMP_STOP_SHORT:
 		xhci_dbg(xhci, "Stopped with short packet transfer detected\n");
