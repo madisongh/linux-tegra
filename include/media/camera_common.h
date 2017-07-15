@@ -125,6 +125,8 @@ struct camera_common_pdata {
 	bool use_cam_gpio;
 	bool has_eeprom;
 	struct camera_common_mode_info *mode_info;
+	bool v_flip;
+	bool h_mirror;
 };
 
 struct camera_common_eeprom_data {

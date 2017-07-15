@@ -80,6 +80,10 @@
 #define OV5693_GAIN_ADDR_MSB			0x350A
 #define OV5693_GAIN_ADDR_LSB			0x350B
 #define OV5693_GROUP_HOLD_ADDR			0x3208
+#define OV5693_TIMING_REG20			0x3820
+#define VERTICAL_FLIP				((0x1 << 1) | (0x1 << 6))
+#define OV5693_TIMING_REG21			0x3821
+#define HORIZONTAL_MIRROR_MASK			(0x3 << 1)
 
 struct ov5693_mode {
 	int res_x;
