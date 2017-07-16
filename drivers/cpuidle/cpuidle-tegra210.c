@@ -555,21 +555,21 @@ static int tegra210_cpuidle_register(int cpu)
 
 	state = &drv->states[6];
 	snprintf(state->name, CPUIDLE_NAME_LEN, "SC2");
-	snprintf(state->desc, CPUIDLE_DESC_LEN, "DRAM SR + MC CG");
+	snprintf(state->desc, CPUIDLE_DESC_LEN, "DRAM SR/MC CG");
 	state->enter = tegra210_enter_state;
 	state->power_usage = 300;
 	state->flags = CPUIDLE_FLAG_TIME_VALID;
 
 	state = &drv->states[7];
 	snprintf(state->name, CPUIDLE_NAME_LEN, "SC3");
-	snprintf(state->desc, CPUIDLE_DESC_LEN, "DRAM SR + MC CG + Memory PLL disabled");
+	snprintf(state->desc, CPUIDLE_DESC_LEN, "DRAM SR/MC CG/Mem PLL disabled");
 	state->enter = tegra210_enter_state;
 	state->power_usage = 300;
 	state->flags = CPUIDLE_FLAG_TIME_VALID;
 
 	state = &drv->states[8];
 	snprintf(state->name, CPUIDLE_NAME_LEN, "SC4");
-	snprintf(state->desc, CPUIDLE_DESC_LEN, "DRAM SR + MC CG + Memory PLL & PLLP disabled");
+	snprintf(state->desc, CPUIDLE_DESC_LEN, "DRAM SR/MC CG/Mem PLL/P dsbld");
 	state->enter = tegra210_enter_state;
 	state->power_usage = 300;
 	state->flags = CPUIDLE_FLAG_TIME_VALID;
