@@ -791,6 +791,8 @@ ifeq ($(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-goto.sh $(CC)), y)
 	KBUILD_AFLAGS += -DCC_HAVE_ASM_GOTO
 endif
 
+KBUILD_CFLAGS += $(call cc-ifversion, -ge, 0700, -Wno-error=format-truncation -Wno-error=format-overflow)
+
 include scripts/Makefile.kasan
 include scripts/Makefile.extrawarn
 
