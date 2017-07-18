@@ -2217,7 +2217,9 @@ static void tegra210b01_utmi_param_configure(void)
 	writel_relaxed(reg, clk_base + UTMIP_PLL_CFG1);
 
 	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
+	reg |= UTMIPLL_HW_PWRDN_CFG0_IDDQ_PD_INCLUDE;
 	reg |= UTMIPLL_HW_PWRDN_CFG0_USE_LOCKDET;
+	reg &= ~UTMIPLL_HW_PWRDN_CFG0_IDDQ_SWCTL;
 	reg &= ~UTMIPLL_HW_PWRDN_CFG0_CLK_ENABLE_SWCTL;
 	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
 

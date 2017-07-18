@@ -227,7 +227,6 @@
 #define XUSBIO_PLL_CFG0_SEQ_ENABLE		BIT(24)
 
 #define UTMIPLL_HW_PWRDN_CFG0			0x52c
-#define UTMIPLL_HW_PWRDN_CFG0_UTMIPLL_LOCK	BIT(31)
 #define UTMIPLL_HW_PWRDN_CFG0_SEQ_START_STATE	BIT(25)
 #define UTMIPLL_HW_PWRDN_CFG0_SEQ_ENABLE	BIT(24)
 #define UTMIPLL_HW_PWRDN_CFG0_IDDQ_PD_INCLUDE	BIT(7)
@@ -2928,6 +2927,8 @@ static void tegra210_utmi_param_configure(void)
 	writel_relaxed(reg, clk_base + UTMIP_PLL_CFG1);
 
 	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
+	reg &= ~UTMIPLL_HW_PWRDN_CFG0_IDDQ_SWCTL;
+	reg |= UTMIPLL_HW_PWRDN_CFG0_IDDQ_PD_INCLUDE;
 	reg |= UTMIPLL_HW_PWRDN_CFG0_USE_LOCKDET;
 	reg &= ~UTMIPLL_HW_PWRDN_CFG0_CLK_ENABLE_SWCTL;
 	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
@@ -2947,34 +2948,6 @@ static void tegra210_utmi_param_configure(void)
 
 	fence_udelay(1, clk_base);
 }
-
-void tegra210_put_utmipll_in_iddq(void)
-{
-	u32 reg;
-
-	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
-
-	if (reg & UTMIPLL_HW_PWRDN_CFG0_UTMIPLL_LOCK) {
-		pr_err("trying to assert IDDQ while UTMIPLL is locked\n");
-		return;
-	}
-
-	reg |= UTMIPLL_HW_PWRDN_CFG0_IDDQ_OVERRIDE;
-	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
-	fence_udelay(1, clk_base);
-}
-EXPORT_SYMBOL_GPL(tegra210_put_utmipll_in_iddq);
-
-void tegra210_put_utmipll_out_iddq(void)
-{
-	u32 reg;
-
-	reg = readl_relaxed(clk_base + UTMIPLL_HW_PWRDN_CFG0);
-	reg &= ~UTMIPLL_HW_PWRDN_CFG0_IDDQ_OVERRIDE;
-	writel_relaxed(reg, clk_base + UTMIPLL_HW_PWRDN_CFG0);
-	fence_udelay(5, clk_base);
-}
-EXPORT_SYMBOL_GPL(tegra210_put_utmipll_out_iddq);
 
 static int tegra210_enable_pllu(void)
 {
