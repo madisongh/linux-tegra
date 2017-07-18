@@ -97,9 +97,12 @@ static u64 vhost_virt_connect(int moduleid)
 	if (p->module == -1)
 		return 0;
 
+	msg.ret = -ENOSYS;
 	err = vhost_sendrecv(&msg);
+	if (err)
+		return 0;
 
-	return (err || msg.ret) ? 0 : p->handle;
+	return msg.ret ? 0 : p->handle;
 }
 
 int vhost_sendrecv(struct tegra_vhost_cmd_msg *msg)
