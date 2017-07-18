@@ -481,7 +481,7 @@ static u32 devinit_get_pwr_policy_table(struct gk20a *g,
 
 	memcpy(&pwr_policy_table_header.d2_limit,
 		(pwr_policy_table_ptr + 14),
-		(VBIOS_POWER_POLICY_3X_ENTRY_SIZE_2E - 14));
+		(VBIOS_POWER_POLICY_3X_HEADER_SIZE_25 - 14));
 
 	if (pwr_policy_table_header.version !=
 			VBIOS_POWER_POLICY_VERSION_3X) {
