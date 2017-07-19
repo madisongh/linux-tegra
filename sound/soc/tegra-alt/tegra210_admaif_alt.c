@@ -642,6 +642,7 @@ static int tegra210_ape_dump_reg_put(struct snd_kcontrol *kcontrol,
 	if (admaif->reg_dump_flag) {
 		tegra_adma_dump_ch_reg();
 		tegra_admaif_reg_dump(admaif);
+		tegra_mixer_reg_dump();
 	}
 
 	return 0;

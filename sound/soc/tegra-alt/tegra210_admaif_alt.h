@@ -167,5 +167,6 @@ struct tegra210_admaif {
 };
 
 extern void tegra_adma_dump_ch_reg(void);
+extern void tegra_mixer_reg_dump(void);
 
 #endif

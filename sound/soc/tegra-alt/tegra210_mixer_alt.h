@@ -133,6 +133,9 @@ struct tegra210_mixer {
 	const struct tegra210_mixer_soc_data *soc_data;
 	unsigned int channels_via_control[TEGRA210_MIXER_TOTAL_PATH];
 	bool is_shutdown;
+	struct device	*dev;
+	void __iomem *base_addr;
 };
+void tegra_mixer_reg_dump(void);
 
 #endif

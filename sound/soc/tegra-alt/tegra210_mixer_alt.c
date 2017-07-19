@@ -115,6 +115,55 @@ static int tegra210_mixer_resume(struct device *dev)
 }
 #endif
 
+static struct tegra210_mixer *mixer_dev;
+void tegra_mixer_reg_dump(void)
+{
+	int i;
+
+	pr_info("MIXER Reg Dump\n");
+	pm_runtime_get_sync(mixer_dev->dev);
+
+	for(i = 0; i < TEGRA210_MIXER_AXBAR_RX_MAX; i++) {
+		pr_info("RX%d Status %x\n", i,
+			readl(mixer_dev->base_addr +
+				i*TEGRA210_MIXER_AXBAR_RX_STRIDE +
+				TEGRA210_MIXER_AXBAR_RX1_STATUS));
+		pr_info("RX%d Cif ctrl %x\n", i,
+			readl(mixer_dev->base_addr +
+				i*TEGRA210_MIXER_AXBAR_RX_STRIDE +
+				TEGRA210_MIXER_AXBAR_RX1_CIF_CTRL));
+		pr_info("RX%d CTRL %x\n", i,
+			readl(mixer_dev->base_addr +
+				i*TEGRA210_MIXER_AXBAR_RX_STRIDE +
+				TEGRA210_MIXER_AXBAR_RX1_CTRL));
+		pr_info("RX%d DBG0 %x\n", i,
+			readl(mixer_dev->base_addr +
+				i*TEGRA210_MIXER_AXBAR_RX_STRIDE +
+				TEGRA210_MIXER_AXBAR_RX1_DBG0));
+	}
+
+	for(i = 0; i < TEGRA210_MIXER_AXBAR_TX_MAX; i++) {
+		pr_info("TX%d Enable %x\n", i,
+			readl(mixer_dev->base_addr +
+				i*TEGRA210_MIXER_AXBAR_TX_STRIDE +
+				TEGRA210_MIXER_AXBAR_TX1_ENABLE));
+		pr_info("TX%d Status %x\n", i,
+			readl(mixer_dev->base_addr +
+				i*TEGRA210_MIXER_AXBAR_TX_STRIDE +
+				TEGRA210_MIXER_AXBAR_TX1_STATUS));
+		pr_info("TX%d Adder config %x\n", i,
+			readl(mixer_dev->base_addr +
+				i*TEGRA210_MIXER_AXBAR_TX_STRIDE +
+				TEGRA210_MIXER_AXBAR_TX1_ADDER_CONFIG));
+		pr_info("TX%d DBG0 %x\n", i,
+			readl(mixer_dev->base_addr +
+				i*TEGRA210_MIXER_AXBAR_TX_STRIDE +
+				TEGRA210_MIXER_AXBAR_TX1_DBG0));
+	}
+	pm_runtime_put_sync(mixer_dev->dev);
+}
+EXPORT_SYMBOL_GPL(tegra_mixer_reg_dump);
+
 static int tegra210_mixer_write_ram(struct tegra210_mixer *mixer,
 				unsigned int addr,
 				unsigned int val)
@@ -721,6 +770,8 @@ static int tegra210_mixer_platform_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	mixer_dev = mixer;
+	mixer->dev = &pdev->dev;
 	mixer->soc_data = soc_data;
 	mixer->is_shutdown = false;
 	mixer->gain_coeff[0] = 0;
@@ -763,6 +814,7 @@ static int tegra210_mixer_platform_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	mixer->base_addr = regs;
 	mixer->regmap = devm_regmap_init_mmio(&pdev->dev, regs,
 					    &tegra210_mixer_regmap_config);
 	if (IS_ERR(mixer->regmap)) {
