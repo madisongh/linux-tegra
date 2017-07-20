@@ -373,6 +373,13 @@ int vi_v4l2_update_isobw(u32 vi_kbyteps, u32 is_ioctl)
 		info->vi_mode_isobw = vi_kbyteps;
 	bw = info->bypass_mode_isobw + info->vi_mode_isobw;
 
+	/* Bug 200323801 consider iso bw of both vi mode and vi-bypass mode */
+	if (bw >= info->max_bw) {
+		dev_info(info->dev, "%s: requested iso bw is larger than max\n",
+		 __func__);
+		bw = info->max_bw;
+	}
+
 	/* Use Khz to prevent overflow */
 	total_khz = tegra_emc_bw_to_freq_req(bw);
 	total_khz = min(ULONG_MAX / 1000, total_khz);
