@@ -40,6 +40,7 @@ struct thermal_tv;
  * @thermal_cap_table: table mapping a given temperature to a maximum voltage
  * @thermal_floor_table_size: size of thermal_floor_table
  * @thermal_cap_table_size: size of thermal_cap_table
+ * @cvb_version: version of CVB table used to configure DFLL parameters
  */
 struct tegra_dfll_soc_data {
 	struct device *dev;
@@ -56,6 +57,7 @@ struct tegra_dfll_soc_data {
 	const struct thermal_tv *thermal_cap_table;
 	unsigned int thermal_floor_table_size;
 	unsigned int thermal_cap_table_size;
+	const char *cvb_version;
 };
 
 int tegra_dfll_register(struct platform_device *pdev,

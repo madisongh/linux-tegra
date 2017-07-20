@@ -537,7 +537,8 @@ struct cvb_table tegra210_cpu_cvb_tables[] = {
 		{ 2091000000UL, {  2680658,  -119443,     1590 } }, \
 		{ 0,	        { } }, \
 	}, \
-	.vmin_coefficients =	{   700000,        0,        0 }
+	.vmin_coefficients =	{   700000,        0,        0 }, \
+	.cvb_version = "FCPU Table - p4v1"
 
 struct cvb_table tegra210b01_cpu_cvb_tables[] = {
 	{
@@ -759,6 +760,7 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 	soc->tune1 = cvb->cpu_dfll_data.tune1;
 	soc->tune_high_min_millivolts =
 		cvb->cpu_dfll_data.tune_high_min_millivolts;
+	soc->cvb_version = cvb->cvb_version;
 
 	thermal = fcpu_data->cpu_thermal_table;
 	ret = tegra_cvb_build_thermal_table(thermal, speedo_value,
