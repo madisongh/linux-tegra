@@ -65,6 +65,8 @@ static const unsigned long tegra210_cpu_max_freq_table[] = {
 
 static const unsigned long tegra210b01_cpu_max_freq_table[] = {
 	[0] = 1785000000UL,
+	[1] = 1785000000UL,
+	[2] = 1785000000UL,
 };
 
 static const struct cvb_table tegra124_cpu_cvb_tables[] = {
@@ -511,6 +513,35 @@ struct cvb_table tegra210_cpu_cvb_tables[] = {
 	},
 };
 
+#define CPUB01_CVB_TABLE_SLT	\
+	.speedo_scale = 100,	\
+	.voltage_scale = 1000,	\
+	.cvb_table = {		\
+		/* f	                c0,       c1,       c2 */   \
+		{  204000000UL, {  2656707,  -241190,     6093 } }, \
+		{  306000000UL, {  2703335,  -241190,     6093 } }, \
+		{  408000000UL, {  2749962,  -241190,     6093 } }, \
+		{  510000000UL, {  1410412,   -55343,       86 } }, \
+		{  612000000UL, {   821517,    15479,    -1856 } }, \
+		{  714000000UL, {  2392263,  -186652,     4774 } }, \
+		{  816000000UL, {  2469886,  -192473,     4949 } }, \
+		{  918000000UL, {  2434720,  -182172,     4561 } }, \
+		{ 1020000000UL, {  2951051,  -239926,     6276 } }, \
+		{ 1122000000UL, {  3194378,  -261627,     6821 } }, \
+		{ 1224000000UL, {  3508827,  -292553,     7686 } }, \
+		{ 1326000000UL, {  3769236,  -315698,     8291 } }, \
+		{ 1428000000UL, {  4155857,  -353465,     9336 } }, \
+		{ 1581000000UL, {  4297102,  -353015,     9115 } }, \
+		{ 1683000000UL, {  4564079,  -365796,     9190 } }, \
+		{ 1785000000UL, {  2680658,  -119443,     1590 } }, \
+		{ 1887000000UL, {  2680658,  -119443,     1590 } }, \
+		{ 1989000000UL, {  2680658,  -119443,     1590 } }, \
+		{ 2091000000UL, {  2680658,  -119443,     1590 } }, \
+		{ 0,	        { } }, \
+	}, \
+	.vmin_coefficients =	{   700000,        0,        0 }, \
+	.cvb_version = "SLT FCPU Table - p4v1"
+
 #define CPUB01_CVB_TABLE	\
 	.speedo_scale = 100,	\
 	.voltage_scale = 1000,	\
@@ -541,6 +572,16 @@ struct cvb_table tegra210_cpu_cvb_tables[] = {
 	.cvb_version = "FCPU Table - p4v1"
 
 struct cvb_table tegra210b01_cpu_cvb_tables[] = {
+	{
+		.speedo_id = 2,
+		.process_id = -1,
+		.max_millivolts = 1120,
+		CPUB01_CVB_TABLE_SLT,
+		.cpu_dfll_data = {
+			.tune0_low = 0x00009F87,
+			.tune1 = 0x010001C0,
+		}
+	},
 	{
 		.speedo_id = -1,
 		.process_id = 0,
