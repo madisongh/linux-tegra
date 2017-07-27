@@ -47,11 +47,7 @@
 	#endif /* CONFIG_PREALLOC_RX_SKB_BUFFER */
 
 	#ifdef CONFIG_RTW_NAPI
-		#ifdef RTK_129X_PLATFORM
-		#define RTL_NAPI_WEIGHT (10)
-		#else
 		#define RTL_NAPI_WEIGHT (32)
-		#endif
 	#endif
 #endif
 

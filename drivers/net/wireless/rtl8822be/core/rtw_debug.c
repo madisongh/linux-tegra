@@ -60,6 +60,9 @@ void dump_drv_cfg(void *sel)
 #ifdef RTW_USE_CFG80211_STA_EVENT
 	RTW_PRINT_SEL(sel, "RTW_USE_CFG80211_STA_EVENT\n");
 #endif
+	#ifdef CONFIG_RADIO_WORK
+	RTW_PRINT_SEL(sel, "CONFIG_RADIO_WORK\n");
+	#endif
 #else
 	RTW_PRINT_SEL(sel, "WEXT\n");
 #endif

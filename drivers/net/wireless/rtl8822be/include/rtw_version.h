@@ -13,5 +13,5 @@
  *
  *****************************************************************************/
 
-#define DRIVERVERSION	"v5.2.4.nv_r22065.20170414_beta"
-#define BTCOEXVERSION	"COEX20170113-4141"
+#define DRIVERVERSION	"v5.2.4_22177.20170503"
+#define BTCOEXVERSION	"COEX20170313-4343"
