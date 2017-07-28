@@ -30,4 +30,6 @@ void te_restore_keyslots(void);
 int  te_vrr_set_buf(phys_addr_t addr);
 void te_vrr_sec(void);
 
+int te_is_secos_dev_enabled(void);
+
 #endif

@@ -565,6 +565,12 @@ static struct device_node *get_tlk_device_node(void)
 	return node;
 }
 
+int te_is_secos_dev_enabled(void)
+{
+	struct device_node *node = get_tlk_device_node();
+	return node != NULL;
+}
+
 static int __init tlk_init(void)
 {
 	int ret;

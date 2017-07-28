@@ -36,8 +36,8 @@ static DECLARE_COMPLETION(req_complete);
 static void tlk_ss_reset(void)
 {
 	/* reset completion vars to default state */
-	INIT_COMPLETION(req_ready);
-	INIT_COMPLETION(req_complete);
+	init_completion(&req_ready);
+	init_completion(&req_complete);
 }
 
 int te_handle_ss_ioctl(struct file *file, unsigned int ioctl_num,
