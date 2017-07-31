@@ -204,6 +204,11 @@ struct tegra_channel {
 	struct vi_notify_channel *vnc[TEGRA_CSI_BLOCKS];
 	int vnc_id[TEGRA_CSI_BLOCKS];
 	int grp_id;
+	struct v4l2_async_notifier notifier;
+	struct list_head entities;
+	struct device_node *endpoint_node; /* endpoint of_node in vi */
+	unsigned int subdevs_bound;
+	unsigned int link_status;
 };
 
 #define to_tegra_channel(vdev) \
@@ -241,8 +246,6 @@ struct tegra_mc_vi {
 	struct clk *clk;
 	struct clk *parent_clk;
 
-	struct v4l2_async_notifier notifier;
-	struct list_head entities;
 	unsigned int num_channels;
 	unsigned int num_subdevs;
 
@@ -257,8 +260,6 @@ struct tegra_mc_vi {
 
 	bool has_sensors;
 	atomic_t power_on_refcnt;
-	unsigned int link_status;
-	unsigned int subdevs_bound;
 	struct mutex bw_update_lock;
 	unsigned long aggregated_kbyteps;
 	unsigned long max_requested_hz;
