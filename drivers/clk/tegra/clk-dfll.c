@@ -2974,6 +2974,12 @@ static int dfll_dt_parse(struct tegra_dfll *td)
 		return ret;
 	}
 
+	ret = find_lut_index_for_rate(td, td->out_rate_max);
+	if (ret < 0) {
+		dev_err(td->dev, "built invalid LUT\n");
+		return ret;
+	}
+
 	return 0;
 }
 
