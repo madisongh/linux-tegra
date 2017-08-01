@@ -253,8 +253,7 @@ int sysedp_dynamic_cap_ready(void)
 
 static void capping_worker(struct work_struct *work)
 {
-	if (!gpu_busy)
-		do_cap_control();
+	do_cap_control();
 }
 
 /*
@@ -293,7 +292,7 @@ void tegra_edp_notify_gpu_load(unsigned int load, unsigned int freq_in_hz)
 	cancel_delayed_work(&capping_work);
 
 	if (gpu_busy)
-		do_cap_control();
+		schedule_delayed_work(&capping_work, 0);
 	else
 		schedule_delayed_work(&capping_work,
 				msecs_to_jiffies(gpu_window));
