@@ -659,7 +659,7 @@ static void dfll_tune_low(struct tegra_dfll *td)
 	td->tune_range = DFLL_TUNE_LOW;
 
 	dfll_writel(td, td->soc->tune0_low, DFLL_TUNE0);
-	dfll_writel(td, td->soc->tune1, DFLL_TUNE1);
+	dfll_writel(td, td->soc->tune1_low, DFLL_TUNE1);
 	dfll_wmb(td);
 
 	if (td->soc->set_clock_trimmers_low)
@@ -680,7 +680,7 @@ static void dfll_tune_high(struct tegra_dfll *td)
 	td->tune_range = DFLL_TUNE_HIGH;
 
 	dfll_writel(td, td->soc->tune0_high, DFLL_TUNE0);
-	dfll_writel(td, td->soc->tune1, DFLL_TUNE1);
+	dfll_writel(td, td->soc->tune1_low, DFLL_TUNE1);
 	dfll_wmb(td);
 
 	if (td->soc->set_clock_trimmers_high)
