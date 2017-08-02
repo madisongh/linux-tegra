@@ -719,8 +719,8 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 			td->tune_range = DFLL_TUNE_WAIT_DFLL;
 			mod_timer(&td->tune_timer, jiffies + td->tune_delay);
 			set_force_out_min(td);
+			sample_tune_out_last = true;
 		}
-		sample_tune_out_last = true;
 		break;
 
 	case DFLL_TUNE_HIGH:
@@ -745,6 +745,10 @@ static void dfll_set_close_loop_config(struct tegra_dfll *td,
 	if ((td->lut_min != out_min) || (td->lut_max != out_max)) {
 		dfll_set_output_limits(td, out_min, out_max);
 	}
+
+	/* Must be sampled after new out_min is set */
+	if (sample_tune_out_last && (td->pmu_if == TEGRA_DFLL_PMU_I2C))
+		td->tune_out_last = READ_LAST_I2C_VAL(td);
 }
 
 /**
@@ -792,21 +796,22 @@ static void dfll_set_open_loop_config(struct tegra_dfll *td)
 static void dfll_tune_timer_cb(unsigned long data)
 {
 	struct tegra_dfll *td = (struct tegra_dfll *)data;
-	u32 val, out_min, out_last;
+	u32 out_min, out_last;
 	bool use_ramp_delay;
+	unsigned long flags;
+
+	spin_lock_irqsave(&td->lock, flags);
 
 	if (td->tune_range == DFLL_TUNE_WAIT_DFLL) {
 		out_min = td->lut_min;
 
+		use_ramp_delay = !is_output_i2c_req_pending(td);
+
 		if (td->pmu_if == TEGRA_DFLL_PMU_I2C) {
-			val = dfll_i2c_readl(td, DFLL_I2C_STS);
-			out_last = val >> DFLL_I2C_STS_I2C_LAST_SHIFT;
-			out_last &= OUT_MASK;
+			out_last = READ_LAST_I2C_VAL(td);
 		} else {
 			out_last = out_min;
 		}
-
-		use_ramp_delay = !is_output_i2c_req_pending(td);
 		use_ramp_delay |= td->tune_out_last != out_last;
 
 		if (use_ramp_delay &&
@@ -821,6 +826,11 @@ static void dfll_tune_timer_cb(unsigned long data)
 	} else if (td->tune_range == DFLL_TUNE_WAIT_PMIC) {
 		dfll_tune_high(td);
 	}
+
+	pr_debug("%s: dvco tuning state %d last uv %u\n", __func__,
+		 td->tune_range, td->lut_uv[READ_LAST_I2C_VAL(td)]);
+
+	spin_unlock_irqrestore(&td->lock, flags);
 }
 
 /*
@@ -2581,7 +2591,7 @@ static void dfll_init_tuning_thresholds(struct tegra_dfll *td)
 		return;	/* no difference between low & high voltage range */
 
 	out_min = find_mv_out_cap(td, td->soc->tune_high_min_millivolts);
-	if ((out_min + 2) > max_voltage_index)
+	if ((out_min + DFLL_CAP_GUARD_BAND_STEPS) > max_voltage_index)
 		return;
 
 	out_start = out_min + DFLL_TUNE_HIGH_MARGIN_STEPS;
