@@ -2659,7 +2659,15 @@ static void dfll_init_tuning_thresholds(struct tegra_dfll *td)
 	if ((out_min + DFLL_CAP_GUARD_BAND_STEPS) > max_voltage_index)
 		return;
 
-	out_start = out_min + DFLL_TUNE_HIGH_MARGIN_STEPS;
+	if (td->soc->tune_high_margin_millivolts) {
+		unsigned int mv = td->soc->tune_high_min_millivolts +
+			td->soc->tune_high_margin_millivolts;
+		if (mv * 1000 > td->lut_uv[max_voltage_index])
+			return;
+		out_start = max((u8)(out_min + 1), find_mv_out_cap(td, mv));
+	} else {
+		out_start = out_min + DFLL_TUNE_HIGH_MARGIN_STEPS;
+	}
 	if (out_start > max_voltage_index)
 		return;
 

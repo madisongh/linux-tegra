@@ -48,6 +48,7 @@ struct cvb_cpu_dfll_data {
 	u32 tune1_low;
 	u32 tune1_high;
 	unsigned int tune_high_min_millivolts;
+	unsigned int tune_high_margin_millivolts;
 };
 
 struct thermal_coefficients {

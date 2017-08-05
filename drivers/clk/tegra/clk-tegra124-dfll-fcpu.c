@@ -802,6 +802,8 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 	soc->tune1_high = cvb->cpu_dfll_data.tune1_high;
 	soc->tune_high_min_millivolts =
 		cvb->cpu_dfll_data.tune_high_min_millivolts;
+	soc->tune_high_margin_millivolts =
+		cvb->cpu_dfll_data.tune_high_margin_millivolts;
 	soc->cvb_version = cvb->cvb_version;
 
 	thermal = fcpu_data->cpu_thermal_table;
