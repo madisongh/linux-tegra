@@ -1,7 +1,7 @@
 /*
  * GK20A Graphics Engine
  *
- * Copyright (c) 2011-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -324,9 +324,12 @@ int gk20a_init_gr_channel(struct channel_gk20a *ch_gk20a);
 int gr_gk20a_init_ctx_vars(struct gk20a *g, struct gr_gk20a *gr);
 
 struct nvhost_alloc_obj_ctx_args;
+struct nvhost_free_obj_ctx_args;
 
 int gk20a_alloc_obj_ctx(struct channel_gk20a *c,
 			struct nvhost_alloc_obj_ctx_args *args);
+int gk20a_free_obj_ctx(struct channel_gk20a *c,
+			struct nvhost_free_obj_ctx_args *args);
 void gk20a_free_channel_ctx(struct channel_gk20a *c);
 
 int gk20a_gr_isr(struct gk20a *g);

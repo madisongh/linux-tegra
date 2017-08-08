@@ -3,7 +3,7 @@
  *
  * GK20A graphics channel
  *
- * Copyright (c) 2011-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -98,6 +98,7 @@ struct channel_gk20a {
 	u64 userd_iova;
 	u64 userd_gpu_va;
 
+	s32 num_objects;
 	u32 obj_class;	/* we support only one obj per channel */
 
 	struct priv_cmd_queue priv_cmd_q;
