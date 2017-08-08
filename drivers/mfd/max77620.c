@@ -84,6 +84,7 @@ static struct mfd_cell max20024_children[] = {
 	MAX77620_MFD_CELL_RES("max20024-power", power_resources),
 	MAX77620_MFD_CELL_NAME("max20024-watchdog"),
 	MAX77620_MFD_CELL_NAME("max20024-clock"),
+	MAX77620_MFD_CELL_RES("max77620-thermal", thermal_resources),
 };
 
 static int max77620_top_irq_chip_pre_irq(void *data)
