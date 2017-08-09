@@ -180,6 +180,7 @@ static void __init rev_t210b01sku_to_speedo_ids(struct tegra_sku_info *sku_info,
 	switch (sku) {
 	case 0x00: /* Engineering SKU */
 	case 0x01: /* Engineering SKU */
+	case 0x83:
 		break;
 	default:
 		pr_err("Tegra210b01: invalid combination of SKU/revision/mode:\n");
