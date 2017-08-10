@@ -72,14 +72,14 @@ static void rtw_hal_mcc_build_p2p_noa_attr(PADAPTER padapter, u8 *ie, u32 *ie_le
 	u8 noa_desc_num = 1;
 	u8 opp_ps = 0; /* Disable OppPS */
 	u8 noa_count = 255;
-	u32 noa_duration = 0x20;
-	u32 noa_interval = 0x64;
+	u32 noa_duration;
+	u32 noa_interval;
 	u8 noa_index = 0;
 	u8 mcc_policy_idx = 0;
 
 	mcc_policy_idx = pmccobjpriv->policy_index;
-	noa_duration = mcc_switch_channel_policy_table[mcc_policy_idx][MCC_DURATION_IDX];
-	noa_interval = mcc_switch_channel_policy_table[mcc_policy_idx][MCC_INTERVAL_IDX];
+	noa_duration = mcc_switch_channel_policy_table[mcc_policy_idx][MCC_DURATION_IDX] * TU;
+	noa_interval = mcc_switch_channel_policy_table[mcc_policy_idx][MCC_INTERVAL_IDX] * TU;
 
 	/* P2P OUI(4 bytes) */
 	_rtw_memcpy(p2p_noa_attr_ie, P2P_OUI, 4);
@@ -106,11 +106,11 @@ static void rtw_hal_mcc_build_p2p_noa_attr(PADAPTER padapter, u8 *ie, u32 *ie_le
 	p2p_noa_attr_len = p2p_noa_attr_len + 1;
 
 	/* NoA Duration (4 bytes) unit: microseconds */
-	RTW_PUT_LE32(p2p_noa_attr_ie + p2p_noa_attr_len, (noa_duration * TU));
+	RTW_PUT_LE32(p2p_noa_attr_ie + p2p_noa_attr_len, noa_duration);
 	p2p_noa_attr_len = p2p_noa_attr_len + 4;
 
 	/* NoA Interval (4 bytes) unit: microseconds */
-	RTW_PUT_LE32(p2p_noa_attr_ie + p2p_noa_attr_len, (noa_interval * TU));
+	RTW_PUT_LE32(p2p_noa_attr_ie + p2p_noa_attr_len, noa_interval);
 	p2p_noa_attr_len = p2p_noa_attr_len + 4;
 
 	/* NoA Start Time (4 bytes) unit: microseconds */
@@ -1479,13 +1479,14 @@ inline void rtw_hal_mcc_calc_tx_bytes_to_port(PADAPTER padapter, u32 len)
 		struct mcc_obj_priv *pmccobjpriv = &(adapter_to_dvobj(padapter)->mcc_objpriv);
 		struct mcc_adapter_priv *pmccadapriv = &padapter->mcc_adapterpriv;
 
-		if (rtw_hal_check_mcc_status(padapter, MCC_STATUS_DOING_MCC))
+		if (rtw_hal_check_mcc_status(padapter, MCC_STATUS_DOING_MCC)) {
 			pmccadapriv->mcc_tx_bytes_to_port += len;
 			if (0)
 				RTW_INFO("%s(order:%d): mcc tx bytes to port:%d, mcc target tx bytes to port:%d\n"
 					, __func__, pmccadapriv->order, pmccadapriv->mcc_tx_bytes_to_port
 					, pmccadapriv->mcc_target_tx_bytes_to_port);
 		}
+	}
 }
 
 /**

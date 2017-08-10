@@ -3126,6 +3126,30 @@ unsigned char check_assoc_AP(u8 *pframe, uint len)
 	return HT_IOT_PEER_UNKNOWN;
 }
 
+#ifdef CONFIG_80211AC_VHT
+unsigned char get_vht_mu_bfer_cap(u8 *pframe, uint len)
+{
+	unsigned int i;
+	unsigned int mu_bfer=0;
+	PNDIS_802_11_VARIABLE_IEs pIE;
+
+	for (i = sizeof(NDIS_802_11_FIXED_IEs); i < len;) {
+		pIE = (PNDIS_802_11_VARIABLE_IEs)(pframe + i);
+
+		switch (pIE->ElementID) {
+
+		case EID_VHTCapability:
+			mu_bfer = GET_VHT_CAPABILITY_ELE_MU_BFER(pIE->data);
+			break;
+		default:
+			break;
+		}
+		i += (pIE->Length + 2);
+	}
+	return mu_bfer;
+}
+#endif
+
 void update_capinfo(PADAPTER Adapter, u16 updateCap)
 {
 	struct mlme_ext_priv	*pmlmeext = &Adapter->mlmeextpriv;
@@ -3632,6 +3656,7 @@ void rtw_alloc_macid(_adapter *padapter, struct sta_info *psta)
 	/* static u8 last_id = 0;  for testing */
 	u8 last_id = 0;
 	u8 is_bc_sta = _FALSE;
+	u8 rsvd_maicd[MACID_NUM_SW_LIMIT] = {0};
 
 	if (_rtw_memcmp(psta->hwaddr, adapter_mac_addr(padapter), ETH_ALEN)) {
 		psta->mac_id = macid_ctl->num;
@@ -3670,23 +3695,22 @@ void rtw_alloc_macid(_adapter *padapter, struct sta_info *psta)
 	}
 #endif /* CONFIG_MCC_MODE */
 
-	_enter_critical_bh(&macid_ctl->lock, &irqL);
-
-	for (i = last_id; i < macid_ctl->num; i++) {
 #ifdef CONFIG_SHARED_BMC_MACID
-		if (i == 1)
-			continue;
+	rsvd_maicd[1] = _TRUE;
 #endif
 
 #ifdef CONFIG_MCC_MODE
-		/* macid 0/1 reserve for mcc for mgnt queue macid */
-		if (MCC_EN(padapter)) {
-			if (i == MCC_ROLE_STA_GC_MGMT_QUEUE_MACID)
-				continue;
-			if (i == MCC_ROLE_SOFTAP_GO_MGMT_QUEUE_MACID)
-				continue;
-		}
+        /* macid 0/1 reserve for mcc for mgnt queue macid */
+        rsvd_maicd[MCC_ROLE_STA_GC_MGMT_QUEUE_MACID] = _TRUE;
+        rsvd_maicd[MCC_ROLE_SOFTAP_GO_MGMT_QUEUE_MACID] = _TRUE;
 #endif /* CONFIG_MCC_MODE */
+
+	_enter_critical_bh(&macid_ctl->lock, &irqL);
+
+	for (i = last_id; i < macid_ctl->num; i++) {
+
+		if (rsvd_maicd[i] == _TRUE)
+			continue;
 
 		if (is_bc_sta) {/*for SoftAP's Broadcast sta-info*/
 			/*TODO:non-security AP may allociated macid = 1*/
@@ -4055,7 +4079,7 @@ bool rtw_wowlan_parser_pattern_cmd(u8 *input, char *pattern,
 	char *cp = NULL, *end = NULL;
 	size_t len = 0;
 	int pos = 0, mask_pos = 0, res = 0;
-	u8 member[2] = {0};
+	u8 member[3] = {0};
 
 	cp = strchr(input, '=');
 	if (cp) {
@@ -4082,6 +4106,7 @@ bool rtw_wowlan_parser_pattern_cmd(u8 *input, char *pattern,
 			u8 hex;
 
 			strncpy(member, input, len);
+			member[2] = '\0';
 			if (!rtw_check_pattern_valid(member, sizeof(member))) {
 				RTW_INFO("%s:[ERROR] pattern is invalid!!\n",
 					 __func__);
@@ -4241,6 +4266,7 @@ u8 rtw_set_default_pattern(_adapter *adapter)
 					IPv6_OFFSET + RTW_IPv6_ADDR_LEN;
 			}
 			break;
+#ifdef CONFIG_PLATFORM_ANDROID_INTEL_X86
 		case 3:
 			target = pwrpriv->patterns[index].content;
 			_rtw_memcpy(target, &multicast_addr,
@@ -4263,6 +4289,7 @@ u8 rtw_set_default_pattern(_adapter *adapter)
 			pwrpriv->patterns[index].len =
 				IP_OFFSET + sizeof(multicast_ip);
 			break;
+#endif			
 		default:
 			break;
 		}

@@ -108,6 +108,7 @@ struct vht_priv {
 	u8	ldpc_cap;
 	u8	stbc_cap;
 	u16	beamform_cap;
+	u8	ap_is_mu_bfer;
 
 	u8	sgi_80m;/* short GI */
 	u8	ampdu_len;

@@ -328,8 +328,10 @@ void rtw_tdls_process_ht_cap(_adapter *padapter, struct sta_info *ptdls_sta, u8 
 		ptdls_sta->flags |= WLAN_STA_WME;
 
 		_rtw_memcpy(&ptdls_sta->htpriv.ht_cap, data, sizeof(struct rtw_ieee80211_ht_cap));
-	} else
+	} else {
 		ptdls_sta->flags &= ~WLAN_STA_HT;
+		return;
+	}
 
 	if (ptdls_sta->flags & WLAN_STA_HT) {
 		if (padapter->registrypriv.ht_enable == _TRUE) {
@@ -439,8 +441,10 @@ void rtw_tdls_process_vht_cap(_adapter *padapter, struct sta_info *ptdls_sta, u8
 #else
 		ptdls_sta->vhtpriv.vht_op_mode_notify = CHANNEL_WIDTH_80;
 #endif
-	} else
+	} else {
 		ptdls_sta->flags &= ~WLAN_STA_VHT;
+		return;
+	}
 
 	if (ptdls_sta->flags & WLAN_STA_VHT) {
 		if (REGSTY_IS_11AC_ENABLE(&padapter->registrypriv)
@@ -593,7 +597,11 @@ u8 *rtw_tdls_set_ftie(struct tdls_txmgmt *ptxmgmt, u8 *pframe, struct pkt_attrib
 			_rtw_memcpy(FTIE.Anonce, ANonce, WPA_NONCE_LEN);
 		if (SNonce != NULL)
 			_rtw_memcpy(FTIE.Snonce, SNonce, WPA_NONCE_LEN);
-		return rtw_set_ie(pframe, _FTIE_ , 82, (u8 *)FTIE.mic_ctrl, &(pattrib->pktlen));
+
+		rtw_set_ie(pframe, _FTIE_, 2, (u8 *)FTIE.mic_ctrl, &(pattrib->pktlen));
+		rtw_set_ie(pframe, _FTIE_, TDLS_MIC_LEN, (u8 *)FTIE.mic, &(pattrib->pktlen));
+		rtw_set_ie(pframe, _FTIE_, WPA_NONCE_LEN, (u8 *)FTIE.Anonce, &(pattrib->pktlen));
+		return rtw_set_ie(pframe, _FTIE_, WPA_NONCE_LEN, (u8 *)FTIE.Snonce, &(pattrib->pktlen));
 	}
 }
 
@@ -1693,7 +1701,7 @@ sint On_TDLS_Setup_Req(_adapter *padapter, union recv_frame *precv_frame)
 			case _COUNTRY_IE_:
 				break;
 			case _EXT_SUPPORTEDRATES_IE_:
-				if (supportRateNum <= sizeof(supportRate)) {
+				if (supportRateNum < sizeof(supportRate)) {
 					_rtw_memcpy(supportRate + supportRateNum, pIE->data, pIE->Length);
 					supportRateNum += pIE->Length;
 				}
@@ -1883,7 +1891,7 @@ int On_TDLS_Setup_Rsp(_adapter *padapter, union recv_frame *precv_frame)
 		case _COUNTRY_IE_:
 			break;
 		case _EXT_SUPPORTEDRATES_IE_:
-			if (supportRateNum <= sizeof(supportRate)) {
+			if (supportRateNum < sizeof(supportRate)) {
 				_rtw_memcpy(supportRate + supportRateNum, pIE->data, pIE->Length);
 				supportRateNum += pIE->Length;
 			}
@@ -1955,28 +1963,21 @@ int On_TDLS_Setup_Rsp(_adapter *padapter, union recv_frame *precv_frame)
 	rtw_tdls_process_wfd_ie(ptdlsinfo, ptr + FIXED_IE, parsing_length);
 #endif
 
-	if (status_code != _STATS_SUCCESSFUL_)
-		txmgmt.status_code = status_code;
-	else {
-		if (prx_pkt_attrib->encrypt) {
-			if (verify_ccmp == 1) {
-				txmgmt.status_code = _STATS_SUCCESSFUL_;
-				if (rtw_tdls_is_driver_setup(padapter) == _TRUE) {
-					wpa_tdls_generate_tpk(padapter, ptdls_sta);
-					if (tdls_verify_mic(ptdls_sta->tpk.kck, 2, plinkid_ie, prsnie, ptimeout_ie, pftie) == _FAIL) {
-						RTW_INFO("[TDLS] %s tdls_verify_mic fail, free_tdls_sta\n", __FUNCTION__);
-						free_tdls_sta(padapter, ptdls_sta);
-						ret = _FAIL;
-						goto exit;
-					}
-					ptdls_sta->TDLS_PeerKey_Lifetime = timeout_interval;
-				}
-			} else
-				txmgmt.status_code = _STATS_INVALID_RSNIE_;
-
-		} else
+	if (prx_pkt_attrib->encrypt) {
+		if (verify_ccmp == 1) {
 			txmgmt.status_code = _STATS_SUCCESSFUL_;
-	}
+			if (rtw_tdls_is_driver_setup(padapter) == _TRUE) {
+				wpa_tdls_generate_tpk(padapter, ptdls_sta);
+				if (tdls_verify_mic(ptdls_sta->tpk.kck, 2, plinkid_ie, prsnie, ptimeout_ie, pftie) == _FAIL) {
+					RTW_INFO("[TDLS] %s tdls_verify_mic fail, free_tdls_sta\n", __FUNCTION__);
+					free_tdls_sta(padapter, ptdls_sta);
+					ret = _FAIL;
+					goto exit;
+				}
+				ptdls_sta->TDLS_PeerKey_Lifetime = timeout_interval;
+			}
+		} else txmgmt.status_code = _STATS_INVALID_RSNIE_;
+	} else txmgmt.status_code = _STATS_SUCCESSFUL_;
 
 	if (rtw_tdls_is_driver_setup(padapter) == _TRUE) {
 		_rtw_memcpy(txmgmt.peer, prx_pkt_attrib->src, ETH_ALEN);
@@ -2263,6 +2264,11 @@ int On_TDLS_Peer_Traffic_Rsp(_adapter *padapter, union recv_frame *precv_frame)
 	u8 wmmps_ac = 0;
 	/* u8 state=TDLS_check_ch_state(ptdls_sta->tdls_sta_state); */
 	int i;
+
+	if (ptdls_sta == NULL) {
+		rtw_warn_on(1);
+		return;
+	}
 
 	ptdls_sta->sta_stats.rx_data_pkts++;
 
@@ -2638,6 +2644,11 @@ void rtw_build_tdls_setup_req_ies(_adapter *padapter, struct xmit_frame *pxmitfr
 	u32 time;
 	u8 *pframe_head;
 
+	if (ptdls_sta == NULL) {
+		rtw_warn_on(1);
+		return;
+	}
+
 	/* SNonce */
 	if (pattrib->encrypt) {
 		for (i = 0; i < 8; i++) {
@@ -2717,8 +2728,10 @@ void rtw_build_tdls_setup_rsp_ies(_adapter *padapter, struct xmit_frame *pxmitfr
 
 	ptdls_sta = rtw_get_stainfo(&(padapter->stapriv) , pattrib->dst);
 
-	if (ptdls_sta == NULL)
+	if (ptdls_sta == NULL) {
 		RTW_INFO("[%s] %d ptdls_sta is NULL\n", __FUNCTION__, __LINE__);
+		return;
+	}
 
 	if (pattrib->encrypt && ptdls_sta != NULL) {
 		for (k = 0; k < 8; k++) {
@@ -2827,6 +2840,11 @@ void rtw_build_tdls_setup_cfm_ies(_adapter *padapter, struct xmit_frame *pxmitfr
 	if (ptxmgmt->status_code != 0)
 		return;
 
+	if (ptdls_sta == NULL) {
+		rtw_warn_on(1);
+		return;
+	}
+
 	if (pattrib->encrypt) {
 		prsnie = pframe;
 		pframe = rtw_tdls_set_rsnie(ptxmgmt, pframe, pattrib, _TRUE, ptdls_sta);
@@ -2880,6 +2898,11 @@ void rtw_build_tdls_teardown_ies(_adapter *padapter, struct xmit_frame *pxmitfra
 	struct pkt_attrib	*pattrib = &pxmitframe->attrib;
 	struct sta_info *ptdls_sta = rtw_get_stainfo(&(padapter->stapriv) , pattrib->dst);
 	u8  *pftie = NULL, *pftie_mic = NULL, *plinkid_ie = NULL;
+
+	if (ptdls_sta == NULL) {
+		rtw_warn_on(1);
+		return;
+	}
 
 	pframe = rtw_tdls_set_payload_type(pframe, pattrib);
 	pframe = rtw_tdls_set_category(pframe, pattrib, RTW_WLAN_CATEGORY_TDLS);
@@ -2965,6 +2988,11 @@ void rtw_build_tdls_peer_traffic_indication_ies(_adapter *padapter, struct xmit_
 	u8 AC_queue = 0;
 	struct sta_info *ptdls_sta = rtw_get_stainfo(&padapter->stapriv, pattrib->dst);
 
+	if (ptdls_sta == NULL) {
+		rtw_warn_on(1);
+		return;
+	}
+
 	pframe = rtw_tdls_set_payload_type(pframe, pattrib);
 	pframe = rtw_tdls_set_category(pframe, pattrib, RTW_WLAN_CATEGORY_TDLS);
 	pframe = rtw_tdls_set_action(pframe, pattrib, ptxmgmt);
@@ -2995,6 +3023,11 @@ void rtw_build_tdls_peer_traffic_rsp_ies(_adapter *padapter, struct xmit_frame *
 	struct pkt_attrib	*pattrib = &pxmitframe->attrib;
 	struct sta_info *ptdls_sta = rtw_get_stainfo(&padapter->stapriv, pattrib->dst);
 
+	if (ptdls_sta == NULL) {
+		rtw_warn_on(1);
+		return;
+	}
+
 	pframe = rtw_tdls_set_payload_type(pframe, pattrib);
 	pframe = rtw_tdls_set_category(pframe, pattrib, RTW_WLAN_CATEGORY_TDLS);
 	pframe = rtw_tdls_set_action(pframe, pattrib, ptxmgmt);
@@ -3014,6 +3047,11 @@ void rtw_build_tdls_ch_switch_req_ies(_adapter *padapter, struct xmit_frame *pxm
 	struct sta_priv	*pstapriv = &padapter->stapriv;
 	struct sta_info *ptdls_sta = rtw_get_stainfo(pstapriv, pattrib->dst);
 	u16 switch_time = TDLS_CH_SWITCH_TIME * 1000, switch_timeout = TDLS_CH_SWITCH_TIMEOUT * 1000;
+
+	if (ptdls_sta == NULL) {
+		rtw_warn_on(1);
+		return;
+	}
 
 	ptdls_sta->ch_switch_time = switch_time;
 	ptdls_sta->ch_switch_timeout = switch_timeout;
@@ -3050,6 +3088,11 @@ void rtw_build_tdls_ch_switch_rsp_ies(_adapter *padapter, struct xmit_frame *pxm
 	struct pkt_attrib	*pattrib = &pxmitframe->attrib;
 	struct sta_priv	*pstapriv = &padapter->stapriv;
 	struct sta_info *ptdls_sta = rtw_get_stainfo(pstapriv, pattrib->dst);
+
+	if (ptdls_sta == NULL) {
+		rtw_warn_on(1);
+		return;
+	}
 
 	pframe = rtw_tdls_set_payload_type(pframe, pattrib);
 	pframe = rtw_tdls_set_category(pframe, pattrib, RTW_WLAN_CATEGORY_TDLS);
@@ -3195,7 +3238,6 @@ void _tdls_ch_switch_monitor_timer_hdl(void *FunctionContext)
 void _tdls_handshake_timer_hdl(void *FunctionContext)
 {
 	struct sta_info *ptdls_sta = (struct sta_info *)FunctionContext;
-	_adapter *padapter = ptdls_sta->padapter;
 	struct tdls_txmgmt txmgmt;
 
 	_rtw_memset(&txmgmt, 0x00, sizeof(struct tdls_txmgmt));
@@ -3203,6 +3245,8 @@ void _tdls_handshake_timer_hdl(void *FunctionContext)
 	txmgmt.status_code = _RSON_TDLS_TEAR_UN_RSN_;
 
 	if (ptdls_sta != NULL) {
+		_adapter *padapter = ptdls_sta->padapter;
+
 		RTW_INFO("[TDLS] Handshake time out\n");
 		if (ptdls_sta->tdls_sta_state & TDLS_LINKED_STATE)
 			rtw_tdls_cmd(padapter, ptdls_sta->hwaddr, TDLS_TEARDOWN_STA);
@@ -3214,7 +3258,6 @@ void _tdls_handshake_timer_hdl(void *FunctionContext)
 void _tdls_pti_timer_hdl(void *FunctionContext)
 {
 	struct sta_info *ptdls_sta = (struct sta_info *)FunctionContext;
-	_adapter *padapter = ptdls_sta->padapter;
 	struct tdls_txmgmt txmgmt;
 
 	_rtw_memset(&txmgmt, 0x00, sizeof(struct tdls_txmgmt));
@@ -3222,6 +3265,8 @@ void _tdls_pti_timer_hdl(void *FunctionContext)
 	txmgmt.status_code = _RSON_TDLS_TEAR_TOOFAR_;
 
 	if (ptdls_sta != NULL) {
+		_adapter *padapter = ptdls_sta->padapter;
+
 		if (ptdls_sta->tdls_sta_state & TDLS_WAIT_PTR_STATE) {
 			RTW_INFO("[TDLS] Doesn't receive PTR from peer dev:"MAC_FMT"; "
 				"Send TDLS Tear Down\n", MAC_ARG(ptdls_sta->hwaddr));

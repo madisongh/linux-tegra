@@ -4214,24 +4214,25 @@ exit:
 #ifdef CONFIG_WOWLAN
 int rtw_resume_process_wow(_adapter *padapter)
 {
-	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
-	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
-	struct net_device *pnetdev = padapter->pnetdev;
-	struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(padapter);
-	struct dvobj_priv *psdpriv = padapter->dvobj;
-	struct debug_priv *pdbgpriv = &psdpriv->drv_dbg;
+	struct mlme_priv *pmlmepriv;
+	struct mlme_ext_priv	*pmlmeext;
+	struct mlme_ext_info	*pmlmeinfo;
+	struct net_device *pnetdev;
+	struct pwrctrl_priv *pwrpriv;
 	struct wowlan_ioctl_param poidparam;
 	struct sta_info	*psta = NULL;
 	int ret = _SUCCESS;
 
-	RTW_INFO("==> "FUNC_ADPT_FMT" entry....\n", FUNC_ADPT_ARG(padapter));
-
 	if (padapter) {
+		RTW_INFO("==> "FUNC_ADPT_FMT" entry....\n",
+			 FUNC_ADPT_ARG(padapter));
+ 
+		pmlmepriv = &padapter->mlmepriv;
+		pmlmeext = &padapter->mlmeextpriv;
+		pmlmeinfo = &pmlmeext->mlmext_info;
 		pnetdev = padapter->pnetdev;
 		pwrpriv = adapter_to_pwrctl(padapter);
 	} else {
-		pdbgpriv->dbg_resume_error_cnt++;
 		ret = -1;
 		goto exit;
 	}
@@ -4377,8 +4378,8 @@ int rtw_resume_process_wow(_adapter *padapter)
 	rtw_btcoex_SuspendNotify(padapter, BTCOEX_SUSPEND_STATE_RESUME);
 #endif /* CONFIG_BT_COEXIST */
 
-exit:
 	RTW_INFO("<== "FUNC_ADPT_FMT" exit....\n", FUNC_ADPT_ARG(padapter));
+exit:
 	return ret;
 }
 #endif /* #ifdef CONFIG_WOWLAN */
@@ -4611,6 +4612,8 @@ int rtw_resume_common(_adapter *padapter)
 	struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(padapter);
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 
+	if (pwrpriv == NULL)
+		return 0;
 
 	if (pwrpriv->bInSuspend == _FALSE)
 		return 0;

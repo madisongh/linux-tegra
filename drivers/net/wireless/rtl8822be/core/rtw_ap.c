@@ -1496,7 +1496,7 @@ int rtw_check_beacon_data(_adapter *padapter, u8 *pbuf,  int len)
 		return _FAIL;
 
 
-	if (len > MAX_IE_SZ)
+	if (len >= MAX_IE_SZ)
 		return _FAIL;
 
 	pbss_network->IELength = len;

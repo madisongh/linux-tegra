@@ -221,14 +221,15 @@ struct ieee80211_supported_band *rtw_spt_band_alloc(
 
 	spt_band->channels = (struct ieee80211_channel *)(((u8 *)spt_band) + sizeof(struct ieee80211_supported_band));
 	spt_band->bitrates = (struct ieee80211_rate *)(((u8 *)spt_band->channels) + sizeof(struct ieee80211_channel) * n_channels);
-	spt_band->band = band;
 	spt_band->n_channels = n_channels;
 	spt_band->n_bitrates = n_bitrates;
 
 	if (band == NL80211_BAND_2GHZ) {
+		spt_band->band = NL80211_BAND_2GHZ;
 		rtw_2g_channels_init(spt_band->channels);
 		rtw_2g_rates_init(spt_band->bitrates);
 	} else if (band == NL80211_BAND_5GHZ) {
+		spt_band->band = NL80211_BAND_5GHZ;
 		rtw_5g_channels_init(spt_band->channels);
 		rtw_5g_rates_init(spt_band->bitrates);
 	}
@@ -1154,7 +1155,7 @@ static int rtw_cfg80211_set_encryption(struct net_device *dev, struct ieee_param
 		wep_key_idx = param->u.crypt.idx;
 		wep_key_len = param->u.crypt.key_len;
 
-		if ((wep_key_idx > WEP_KEYS) || (wep_key_len <= 0)) {
+		if ((wep_key_idx >= WEP_KEYS) || (wep_key_len <= 0)) {
 			ret = -EINVAL;
 			goto exit;
 		}
@@ -3158,7 +3159,7 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev,
 		wep_key_idx = sme->key_idx;
 		wep_key_len = sme->key_len;
 
-		if (sme->key_idx > WEP_KEYS) {
+		if (sme->key_idx >= WEP_KEYS) {
 			ret = -EINVAL;
 			goto cancel_ps_deny;
 		}
@@ -5712,7 +5713,7 @@ static int cfg80211_rtw_mgmt_tx(struct wiphy *wiphy,
 	u32 dump_cnt = 0;
 	bool ack = _TRUE;
 	u8 tx_ch;
-	u8 category, action;
+	u8 category, action = ACT_PUBLIC_MAX;
 	u8 frame_styp;
 	int type = (-1);
 	u32 start = rtw_get_current_time();
@@ -6044,13 +6045,17 @@ static int cfg80211_rtw_tdls_oper(struct wiphy *wiphy,
 		return 0;
 	}
 
+	if (peer == NULL) {
+		RTW_WARN("%s: peer is NULL\n", __func__);
+		return 0;
+	}
+
 #ifdef CONFIG_LPS
 	rtw_lps_ctrl_wk_cmd(padapter, LPS_CTRL_LEAVE, 1);
 #endif /* CONFIG_LPS */
 
 	_rtw_memset(&txmgmt, 0x00, sizeof(struct tdls_txmgmt));
-	if (peer)
-		_rtw_memcpy(txmgmt.peer, peer, ETH_ALEN);
+	_rtw_memcpy(txmgmt.peer, peer, ETH_ALEN);
 
 	if (rtw_tdls_is_driver_setup(padapter)) {
 		/* these two cases are done by driver itself */

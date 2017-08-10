@@ -2226,7 +2226,7 @@ phydm_cmd_parser(
 	u32 used = 0;
 	u8 id = 0;
 	int var1[10] = {0};
-	int i, input_idx = 0, phydm_ary_size;
+	int i, input_idx = 0, phydm_ary_size = sizeof(phy_dm_ary) / sizeof(struct _PHYDM_COMMAND);
 	char help[] = "-h";
 
 	if (flag == 0) {
@@ -2239,7 +2239,6 @@ phydm_cmd_parser(
 	/* Parsing Cmd ID */
 	if (input_num) {
 
-		phydm_ary_size = sizeof(phy_dm_ary) / sizeof(struct _PHYDM_COMMAND);
 		for (i = 0; i < phydm_ary_size; i++) {
 			if (strcmp(phy_dm_ary[i].name, input[0]) == 0) {
 				id = phy_dm_ary[i].id;

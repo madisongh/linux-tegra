@@ -583,8 +583,8 @@ union recv_frame *decryptor(_adapter *padapter, union recv_frame *precv_frame)
 		u8 *iv = precv_frame->u.hdr.rx_data + prxattrib->hdrlen;
 		prxattrib->key_index = (((iv[3]) >> 6) & 0x3) ;
 
-		if (prxattrib->key_index > WEP_KEYS) {
-			RTW_INFO("prxattrib->key_index(%d) > WEP_KEYS\n", prxattrib->key_index);
+		if (prxattrib->key_index >= WEP_KEYS) {
+			RTW_INFO("prxattrib->key_index(%d) >= WEP_KEYS\n", prxattrib->key_index);
 
 			switch (prxattrib->encrypt) {
 			case _WEP40_:

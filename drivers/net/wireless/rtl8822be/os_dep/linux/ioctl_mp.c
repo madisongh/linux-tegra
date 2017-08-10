@@ -43,10 +43,14 @@ int rtw_mp_write_reg(struct net_device *dev,
 	u32 addr, data;
 	int ret;
 	PADAPTER padapter = rtw_netdev_priv(dev);
-	char input[wrqu->length];
+	char input[wrqu->length + 1];
+
+	_rtw_memset(input, 0, sizeof(input));
 
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
+
+	input[wrqu->length] = '\0';
 
 	_rtw_memset(extra, 0, wrqu->length);
 
@@ -523,15 +527,19 @@ int rtw_mp_txpower_index(struct net_device *dev,
 			 struct iw_point *wrqu, char *extra)
 {
 	PADAPTER padapter = rtw_netdev_priv(dev);
-	char input[wrqu->length];
+	char input[wrqu->length + 1];
 	u32 rfpath;
 	u32 txpower_inx;
 
 	if (wrqu->length > 128)
 		return -EFAULT;
 
+	_rtw_memset(input, 0, sizeof(input));
+
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
 		return -EFAULT;
+
+	input[wrqu->length] = '\0';
 
 	rfpath = rtw_atoi(input);
 	txpower_inx = mpt_ProQueryCalTxPower(padapter, rfpath);
@@ -814,11 +822,15 @@ int rtw_mp_disable_bt_coexist(struct net_device *dev,
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 	struct hal_ops *pHalFunc = &padapter->hal_func;
 
-	u8 input[wrqu->data.length];
+	u8 input[wrqu->data.length + 1];
 	u32 bt_coexist;
 
+	_rtw_memset(input, 0, sizeof(input));
+	
 	if (copy_from_user(input, wrqu->data.pointer, wrqu->data.length))
 		return -EFAULT;
+
+	input[wrqu->data.length] = '\0';
 
 	bt_coexist = rtw_atoi(input);
 
@@ -2113,6 +2125,9 @@ int rtw_mp_SetBT(struct net_device *dev,
 
 	if (copy_from_user(extra, wrqu->data.pointer, wrqu->data.length))
 		return -EFAULT;
+
+	*(extra + wrqu->data.lenght) = '\0';
+	
 	if (strlen(extra) < 1)
 		return -EFAULT;
 

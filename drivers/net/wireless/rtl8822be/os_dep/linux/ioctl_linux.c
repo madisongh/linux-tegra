@@ -1297,7 +1297,7 @@ static int wpa_set_encryption(struct net_device *dev, struct ieee_param *param, 
 		wep_key_idx = param->u.crypt.idx;
 		wep_key_len = param->u.crypt.key_len;
 
-		if ((wep_key_idx > WEP_KEYS) || (wep_key_len <= 0)) {
+		if ((wep_key_idx >= WEP_KEYS) || (wep_key_len <= 0)) {
 			ret = -EINVAL;
 			goto exit;
 		}
@@ -8732,7 +8732,7 @@ static int rtw_wowlan_set_pattern(struct net_device *dev,
 	struct wowlan_ioctl_param poidparam;
 	int ret = 0, len = 0, i = 0;
 	u32 start_time = rtw_get_current_time();
-	u8 input[wrqu->data.length];
+	u8 input[wrqu->data.length + 1];
 	u8 index = 0;
 
 	poidparam.subcode = 0;
@@ -8753,6 +8753,8 @@ static int rtw_wowlan_set_pattern(struct net_device *dev,
 		if (copy_from_user(input,
 				   wrqu->data.pointer, wrqu->data.length))
 			return -EFAULT;
+
+		input[wrqu->data.length] = '\0';
 		/* leave PS first */
 		rtw_ps_deny(padapter, PS_DENY_IOCTL);
 		LeaveAllPowerSaveModeDirect(padapter);
@@ -9101,6 +9103,9 @@ static int rtw_mp_efuse_get(struct net_device *dev,
 		err = -EFAULT;
 		goto exit;
 	}
+
+	*(extra + wrqu->length) = '\0';
+
 #ifdef CONFIG_LPS
 	lps_mode = pwrctrlpriv->power_mgnt;/* keep org value */
 	rtw_pm_set_lps(padapter, PS_MODE_ACTIVE);
@@ -9768,6 +9773,8 @@ static int rtw_mp_efuse_set(struct net_device *dev,
 	if (copy_from_user(extra, wrqu->pointer, wrqu->length))
 		return -EFAULT;
 
+	*(extra + wrqu->length) = '\0';
+
 	EFUSE_GetEfuseDefinition(padapter, EFUSE_WIFI, TYPE_EFUSE_MAP_LEN , (void *)&wifimaplen, _FALSE);
 
 	setdata = rtw_zmalloc(1024);
@@ -10384,7 +10391,8 @@ static int rtw_mp_efuse_set(struct net_device *dev,
 		RTW_INFO("%s: MAC address=%s\n", __FUNCTION__, tmp[1]);
 
 		for (jj = 0, kk = 0; jj < cnts; jj++, kk += 2)
-			pEfuseHal->fakeEfuseModifiedMap[addr + jj] = key_2char2num(tmp[1][kk], tmp[1][kk + 1]);
+			if ((addr + jj) < EFUSE_MAX_MAP_LEN)
+				pEfuseHal->fakeEfuseModifiedMap[addr + jj] = key_2char2num(tmp[1][kk], tmp[1][kk + 1]);
 
 		_rtw_memset(extra, '\0', strlen(extra));
 		sprintf(extra, "write mac addr to fake map OK\n");
@@ -10979,6 +10987,9 @@ static int rtw_priv_get(struct net_device *dev,
 	}
 
 	switch (subcmd) {
+	case MP_NULL:
+		/* passthrough */
+		break;
 #if defined(CONFIG_RTL8723B)
 	case MP_SetBT:
 		RTW_INFO("set MP_SetBT\n");
@@ -12511,17 +12522,20 @@ static int rtw_test(
 	RTW_INFO("+%s\n", __func__);
 	len = wrqu->data.length;
 
-	pbuf = (u8 *)rtw_zmalloc(len);
+	pbuf = (u8 *)rtw_zmalloc(len + 1);
 	if (pbuf == NULL) {
 		RTW_INFO("%s: no memory!\n", __func__);
 		return -ENOMEM;
 	}
 
 	if (copy_from_user(pbuf, wrqu->data.pointer, len)) {
-		rtw_mfree(pbuf, len);
+		rtw_mfree(pbuf, len + 1);
 		RTW_INFO("%s: copy from user fail!\n", __func__);
 		return -EFAULT;
 	}
+
+	pbuf[len] = '\0';
+	
 	RTW_INFO("%s: string=\"%s\"\n", __func__, pbuf);
 
 	ptmp = (char *)pbuf;
@@ -13079,11 +13093,6 @@ static int _rtw_ioctl_wext_private(struct net_device *dev, union iwreq_data *wrq
 	ptr = input;
 	len = input_len;
 
-	if (ptr == NULL) {
-		err = -EOPNOTSUPP;
-		goto exit;
-	}
-
 	sscanf(ptr, "%16s", cmdname);
 	cmdlen = strlen(cmdname);
 	RTW_INFO("%s: cmd=%s\n", __func__, cmdname);
@@ -13157,6 +13166,11 @@ static int _rtw_ioctl_wext_private(struct net_device *dev, union iwreq_data *wrq
 	buffer = rtw_zmalloc(4096);
 	if (NULL == buffer) {
 		err = -ENOMEM;
+		goto exit;
+	}
+
+	if (k >= num_priv_args) {
+		err = -EINVAL;
 		goto exit;
 	}
 

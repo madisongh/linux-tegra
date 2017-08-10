@@ -657,7 +657,7 @@ static s32 rtw_pci_parse_configuration(struct pci_dev *pdev, struct dvobj_priv *
 	/* PPCI_COMMON_CONFIG pPciConfig = (PPCI_COMMON_CONFIG) pucBuffer; */
 	/* u16	usPciCommand = pPciConfig->Command; */
 	u16	usPciCommand = 0;
-	int	Result, ret;
+	int	Result, ret = _FAIL;
 	u8	CapabilityOffset;
 	RT_PCI_CAPABILITIES_HEADER CapabilityHdr;
 	u8	PCIeCap;

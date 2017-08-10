@@ -3601,7 +3601,7 @@ phydm_calculate_fc(
 )
 {
 	struct PHY_DM_STRUCT	*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
-	u32		fc = *fc_in;
+	u32		fc;
 	u32		start_ch_per_40m[NUM_START_CH_40M] = {36, 44, 52, 60, 100, 108, 116, 124, 132, 140, 149, 157, 165, 173};
 	u32		start_ch_per_80m[NUM_START_CH_80M] = {36, 52, 100, 116, 132, 149, 165};
 	u32		*p_start_ch = &(start_ch_per_40m[0]);
@@ -3648,7 +3648,7 @@ phydm_calculate_fc(
 				channel_offset = CH_OFFSET_80M;
 			}
 
-			for (i = 0; i < num_start_channel; i++) {
+			for (i = 0; i < (num_start_channel - 1); i++) {
 
 				if (channel < p_start_ch[i + 1]) {
 					channel = p_start_ch[i] + channel_offset;

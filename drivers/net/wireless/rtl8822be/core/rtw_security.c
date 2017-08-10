@@ -2086,7 +2086,9 @@ u32	rtw_BIP_verify(_adapter *padapter, u8 *precvframe)
 		ClearPwrMgt(BIP_AAD);
 		ClearMData(BIP_AAD);
 		/* conscruct AAD, copy address 1 to address 3 */
-		_rtw_memcpy(BIP_AAD + 2, pwlanhdr->addr1, 18);
+		_rtw_memcpy(BIP_AAD + 2, pwlanhdr->addr1, 6);
+		_rtw_memcpy(BIP_AAD + 8, pwlanhdr->addr2, 6);
+		_rtw_memcpy(BIP_AAD + 14, pwlanhdr->addr3, 6);
 
 		if (omac1_aes_128(padapter->securitypriv.dot11wBIPKey[padapter->securitypriv.dot11wBIPKeyid].skey
 				  , BIP_AAD, ori_len, mic))

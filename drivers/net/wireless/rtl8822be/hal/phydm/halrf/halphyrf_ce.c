@@ -200,7 +200,9 @@ odm_txpowertracking_callback_thermal_meter(
 	u8			xtal_offset_eanble = 0;
 	s8			thermal_value_temp = 0;
 
-	struct _TXPWRTRACK_CFG	c;
+	struct _TXPWRTRACK_CFG	c = {
+		.threshold_dpk = DPK_THRESHOLD,
+	};
 
 	/* 4 1. The following TWO tables decide the final index of OFDM/CCK swing table. */
 	u8			*delta_swing_table_idx_tup_a = NULL;
@@ -220,15 +222,25 @@ odm_txpowertracking_callback_thermal_meter(
 
 	configure_txpower_track(p_dm_odm, &c);
 
-	(*c.get_delta_swing_table)(p_dm_odm, (u8 **)&delta_swing_table_idx_tup_a, (u8 **)&delta_swing_table_idx_tdown_a,
-		(u8 **)&delta_swing_table_idx_tup_b, (u8 **)&delta_swing_table_idx_tdown_b);
+	if (c.get_delta_swing_table)
+		(*c.get_delta_swing_table)(p_dm_odm, (u8 **)&delta_swing_table_idx_tup_a, (u8 **)&delta_swing_table_idx_tdown_a, (u8 **)&delta_swing_table_idx_tup_b, (u8 **)&delta_swing_table_idx_tdown_b);
+	else
+		ODM_RT_TRACE(p_dm_odm, ODM_COMP_TX_PWR_TRACK, ODM_DBG_SERIOUS, ("get_delta_swing_table not exist"));
 
-	if (p_dm_odm->support_ic_type & ODM_RTL8814A)	/*for 8814 path C & D*/
-		(*c.get_delta_swing_table8814only)(p_dm_odm, (u8 **)&delta_swing_table_idx_tup_c, (u8 **)&delta_swing_table_idx_tdown_c,
-			(u8 **)&delta_swing_table_idx_tup_d, (u8 **)&delta_swing_table_idx_tdown_d);
+	if (p_dm_odm->support_ic_type & ODM_RTL8814A) { /*for 8814 path C & D*/
+		if (c.get_delta_swing_table8814only)
+			(*c.get_delta_swing_table8814only)(p_dm_odm, (u8 **)&delta_swing_table_idx_tup_c, (u8 **)&delta_swing_table_idx_tdown_c, (u8 **)&delta_swing_table_idx_tup_d, (u8 **)&delta_swing_table_idx_tdown_d);
+		else
+			ODM_RT_TRACE(p_dm_odm, ODM_COMP_TX_PWR_TRACK, ODM_DBG_SERIOUS, ("get_delta_swing_table8814only not exist"));
+	}
+
 	/* JJ ADD 20161014 */
-	if (p_dm_odm->support_ic_type & (ODM_RTL8703B | ODM_RTL8723D | ODM_RTL8710B))	/*for Xtal Offset*/
-		(*c.get_delta_swing_xtal_table)(p_dm_odm, (s8 **)&delta_swing_table_xtal_up, (s8 **)&delta_swing_table_xtal_down);
+	if (p_dm_odm->support_ic_type & (ODM_RTL8703B | ODM_RTL8723D | ODM_RTL8710B)) { /*for Xtal Offset*/
+		if (c.get_delta_swing_xtal_table)
+			(*c.get_delta_swing_xtal_table)(p_dm_odm, (s8 **)&delta_swing_table_xtal_up, (s8 **)&delta_swing_table_xtal_down);
+		else
+			ODM_RT_TRACE(p_dm_odm, ODM_COMP_TX_PWR_TRACK, ODM_DBG_SERIOUS, ("get_delta_swing_xtal_table not exist"));
+	}
 
 	p_rf_calibrate_info->txpowertracking_callback_cnt++;	/*cosa add for debug*/
 	p_rf_calibrate_info->is_txpowertracking_init = true;

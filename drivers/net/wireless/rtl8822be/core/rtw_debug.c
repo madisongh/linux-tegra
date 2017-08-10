@@ -3912,7 +3912,7 @@ ssize_t proc_set_pattern_info(struct file *file, const char __user *buffer,
 	if (count < 1)
 		return -EFAULT;
 
-	if (count > sizeof(tmp)) {
+	if (count > sizeof(tmp) - 1) {
 		rtw_warn_on(1);
 		return -EFAULT;
 	}
@@ -3925,6 +3925,7 @@ ssize_t proc_set_pattern_info(struct file *file, const char __user *buffer,
 	}
 
 	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		tmp[count] = '\0';
 		if (strncmp(tmp, "clean", 5) == 0) {
 			poidparam.subcode = WOWLAN_PATTERN_CLEAN;
 			rtw_hal_set_hwreg(padapter,
@@ -4752,7 +4753,7 @@ ssize_t proc_set_tx_sa_query(struct file *file, const char __user *buffer, size_
 	_irqL	 irqL;
 	char tmp[16];
 	u8	mac_addr[NUM_STA][ETH_ALEN];
-	u32 key_type;
+	u32 key_type = 0;
 	u8 index;
 
 	if (count > 2) {
@@ -4832,7 +4833,7 @@ ssize_t proc_set_tx_deauth(struct file *file, const char __user *buffer, size_t 
 	char tmp[16];
 	u8	mac_addr[NUM_STA][ETH_ALEN];
 	u8 bc_addr[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-	u32 key_type;
+	u32 key_type = 0;
 	u8 index;
 
 
@@ -4851,7 +4852,7 @@ ssize_t proc_set_tx_deauth(struct file *file, const char __user *buffer, size_t 
 		}
 		RTW_INFO("key_type=%d\n", key_type);
 	}
-	if (key_type < 0 || key_type > 4)
+	if (key_type > 4)
 		return count;
 
 	if ((check_fwstate(pmlmepriv, WIFI_STATION_STATE) == _TRUE)
@@ -4937,7 +4938,7 @@ ssize_t proc_set_tx_auth(struct file *file, const char __user *buffer, size_t co
 	char tmp[16];
 	u8	mac_addr[NUM_STA][ETH_ALEN];
 	u8 bc_addr[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-	u32 tx_auth;
+	u32 tx_auth = 0;
 	u8 index;
 
 

@@ -1314,7 +1314,7 @@ _phy_iq_calibrate_8822b(
 		_iqk_agc_bnd_int_8822b(p_dm_odm);
 		_iqk_rf_setting_8822b(p_dm_odm);
 
-		_iqk_start_iqk_8822b(p_dm_odm, segment_iqk);
+		_iqk_start_iqk_8822b(p_dm_odm, false /* segment_iqk */);
 
 		_iqk_afe_setting_8822b(p_dm_odm, false);
 		_iqk_restore_mac_bb_8822b(p_dm_odm, MAC_backup, BB_backup, backup_mac_reg, backup_bb_reg);
@@ -1335,7 +1335,7 @@ _phy_iq_calibrate_8822b(
 		ODM_delay_ms(50);
 	};
 
-	if (segment_iqk)
+	if ( false /*segment_iqk*/ )
 		_iqk_reload_iqk_setting_8822b(p_dm_odm, 0x0, 0x1);
 #if 0
 	_iqk_afe_setting_8822b(p_dm_odm, false);

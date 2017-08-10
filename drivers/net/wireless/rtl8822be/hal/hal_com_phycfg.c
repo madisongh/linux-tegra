@@ -2959,6 +2959,9 @@ static s8 _phy_get_txpwr_lmt(
 			s8 limits[MAX_REGULATION_NUM] = {0};
 			u8 i = 0;
 
+			if (bw >= MAX_2_4G_BANDWIDTH_NUM)
+				continue;
+
 			for (i = 0; i < MAX_REGULATION_NUM; ++i)
 				limits[i] = hal_data->TxPwrLimit_2_4G[i][bw][rs][ch_idx][RfPath];
 
@@ -2968,6 +2971,9 @@ static s8 _phy_get_txpwr_lmt(
 		} else if (Band == BAND_ON_5G) {
 			s8 limits[MAX_REGULATION_NUM] = {0};
 			u8 i = 0;
+
+			if (bw >= MAX_5G_BANDWIDTH_NUM)
+				continue;
 
 			for (i = 0; i < MAX_REGULATION_NUM; ++i)
 				limits[i] = hal_data->TxPwrLimit_5G[i][bw][rs][ch_idx][RfPath];

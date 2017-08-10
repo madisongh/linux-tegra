@@ -563,6 +563,7 @@ int rtw_gtk_offload(struct net_device *net, u8 *cmd_ptr)
 
 int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 {
+#define PRIVATE_COMMAND_MAX_LEN	8192
 	int ret = 0;
 	char *command = NULL;
 	int cmd_num;
@@ -609,12 +610,22 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 			ret = -EFAULT;
 			goto exit;
 		}
+
 	if (padapter->registrypriv.mp_mode == 1) {
 		ret = -EFAULT;
 		goto exit;
 	}
+
 	/*RTW_INFO("%s priv_cmd.buf=%p priv_cmd.total_len=%d  priv_cmd.used_len=%d\n",__func__,priv_cmd.buf,priv_cmd.total_len,priv_cmd.used_len);*/
-	command = rtw_zmalloc(priv_cmd.total_len);
+
+	if (priv_cmd.total_len > PRIVATE_COMMAND_MAX_LEN || priv_cmd.total_len < 0) {
+		RTW_WARN("%s: invalid private command (%d)\n", __FUNCTION__,
+			priv_cmd.total_len);
+		ret = -EFAULT;
+		goto exit;
+	}
+
+	command = rtw_zmalloc(priv_cmd.total_len + 1);
 	if (!command) {
 		RTW_INFO("%s: failed to allocate memory\n", __FUNCTION__);
 		ret = -ENOMEM;
@@ -626,10 +637,12 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		ret = -EFAULT;
 		goto exit;
 	}
+
 	if (copy_from_user(command, (void *)priv_cmd.buf, priv_cmd.total_len)) {
 		ret = -EFAULT;
 		goto exit;
 	}
+	command[priv_cmd.total_len] = '\0';
 
 	RTW_INFO("%s: Android private cmd \"%s\" on %s\n"
 		 , __FUNCTION__, command, ifr->ifr_name);
@@ -817,7 +830,7 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		/*	wpa_cli driver wfd-set-tcpport = 554 */
 
 		if (padapter->wdinfo.driver_interface == DRIVER_CFG80211)
-			rtw_wfd_set_ctrl_port(padapter, (u16)get_int_from_command(priv_cmd.buf));
+			rtw_wfd_set_ctrl_port(padapter, (u16)get_int_from_command(command));
 		break;
 	}
 	case ANDROID_WIFI_CMD_WFD_SET_MAX_TPUT: {
@@ -829,7 +842,7 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 
 		pwfd_info = &padapter->wfd_info;
 		if (padapter->wdinfo.driver_interface == DRIVER_CFG80211) {
-			pwfd_info->wfd_device_type = (u8) get_int_from_command(priv_cmd.buf);
+			pwfd_info->wfd_device_type = (u8) get_int_from_command(command);
 			pwfd_info->wfd_device_type &= WFD_DEVINFO_DUAL;
 		}
 		break;
@@ -838,7 +851,7 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	case ANDROID_WIFI_CMD_CHANGE_DTIM: {
 #ifdef CONFIG_LPS
 		u8 dtim;
-		u8 *ptr = (u8 *) &priv_cmd.buf;
+		u8 *ptr = (u8 *) command;
 
 		ptr += 9;/* string command length of  "SET_DTIM"; */
 
