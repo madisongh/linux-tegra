@@ -96,3 +96,5 @@ obj-$(CONFIG_TEGRA_HSP)			+= tegra186-hsp.o
 
 obj-$(CONFIG_TEGRA_SAFETY_SCE) 		+= tegra-safety.o
 tegra-safety-objs			+= tegra-safety-ivc.o tegra-safety-dev.o
+
+obj-$(CONFIG_TEGRA_CRTLDATA)		+= critical_condition/

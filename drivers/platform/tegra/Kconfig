@@ -114,6 +114,15 @@ config TEGRA_NVDUMPER
 	help
 	  This is debug feature to dump whole memory when system crashes.
 
+config TEGRA_CRTLDATA
+	bool "Enable Critical Condition"
+	depends on MTD_QSPI_FRAM
+	default n
+	help
+	  This is critical-condtion driver to save data from ddr-carveout
+	  to Fujitsu's FRAM device when any critical-condition happens
+	  with the help of fujitsu_fram driver
+
 config DENVER_CPU
 	bool "Denver CPU"
 	help
