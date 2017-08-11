@@ -927,6 +927,10 @@ static void tegra210b01_pllre_set_defaults(struct tegra_clk_pll *pllre)
 	fence_udelay(1, clk_base);
 }
 
+/*
+ * PLLX
+ * Dynamic ramp support
+ */
 static void pllx_get_dyn_steps(struct clk_hw *hw, u32 *step_a, u32 *step_b)
 {
 	unsigned long input_rate;
@@ -1637,7 +1641,7 @@ static struct tegra_clk_pll_params pll_c4_vco_params = {
 	.cf_min = 12000000,
 	.cf_max = 38400000,
 	.vco_min = 500000000,
-	.vco_max = 1080000000,
+	.vco_max = 1000000000,
 	.base_reg = PLLC4_BASE,
 	.misc_reg = PLLC4_MISC0,
 	.lock_mask = PLL_BASE_LOCK,
