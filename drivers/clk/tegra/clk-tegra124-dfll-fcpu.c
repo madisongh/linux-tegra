@@ -540,6 +540,10 @@ struct cvb_table tegra210_cpu_cvb_tables[] = {
 		{ 0,	        { } }, \
 	}, \
 	.vmin_coefficients =	{   700000,        0,        0 }, \
+	.cpu_dfll_data = {					  \
+		.tune0_low = 0x00009F87,			  \
+		.tune1_low = 0x010001C0,			  \
+	}, \
 	.cvb_version = "SLT FCPU Table - p4v1"
 
 #define CPUB01_CVB_TABLE	\
@@ -569,6 +573,13 @@ struct cvb_table tegra210_cpu_cvb_tables[] = {
 		{ 0,	        { } }, \
 	}, \
 	.vmin_coefficients =	{   700000,        0,        0 }, \
+	.cpu_dfll_data = {					  \
+		.tune0_low  = 0x0000FFCF,			  \
+		.tune1_low  = 0x16607FF,			  \
+		.tune1_high = 0x3FFF7FF,			  \
+		.tune_high_min_millivolts = 850,		  \
+		.tune_high_margin_millivolts = 38,		  \
+	}, \
 	.cvb_version = "FCPU Table - p4v2"
 
 struct cvb_table tegra210b01_cpu_cvb_tables[] = {
@@ -577,23 +588,12 @@ struct cvb_table tegra210b01_cpu_cvb_tables[] = {
 		.process_id = -1,
 		.max_millivolts = 1120,
 		CPUB01_CVB_TABLE_SLT,
-		.cpu_dfll_data = {
-			.tune0_low = 0x00009F87,
-			.tune1_low = 0x010001C0,
-		}
 	},
 	{
 		.speedo_id = -1,
 		.process_id = -1,
 		.max_millivolts = 1120,
 		CPUB01_CVB_TABLE,
-		.cpu_dfll_data = {
-			.tune0_low  = 0x0000FFCF,
-			.tune1_low  = 0x016607FF,
-			.tune1_high = 0x03FFF7FF,
-			.tune_high_min_millivolts = 850,
-			.tune_high_margin_millivolts = 38,
-		}
 	},
 };
 
