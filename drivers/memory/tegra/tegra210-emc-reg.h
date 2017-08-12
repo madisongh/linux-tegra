@@ -15,6 +15,7 @@
 #define _TEGRA210_EMC_REG_H
 
 #include <linux/of_platform.h>
+#include <linux/cputime.h>
 
 #define DVFS_FGCG_HIGH_SPEED_THRESHOLD				1000
 #define IOBRICK_DCC_THRESHOLD					2400
