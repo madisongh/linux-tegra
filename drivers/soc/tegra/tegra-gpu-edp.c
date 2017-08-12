@@ -263,7 +263,6 @@ static int tegra_gpu_edp_probe(struct platform_device *pdev)
 
 	maxf = clk_round_rate(gpu_clk, ULONG_MAX);
 	if (maxf <= 0) {
-		dev_err(&pdev->dev, "unable to get max GPU freq\n");
 		ret = -EPROBE_DEFER;
 		goto free_params;
 	}
