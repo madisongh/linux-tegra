@@ -1022,7 +1022,7 @@ static void actmon_free_resource(struct platform_device *pdev)
 	devm_kfree(mon_dev, actmon);
 }
 
-int tegra_actmon_register(struct actmon_drv_data *actmon_data)
+int __init tegra_actmon_register(struct actmon_drv_data *actmon_data)
 {
 	struct device_node *dn = NULL;
 	struct platform_device *pdev;
