@@ -37,6 +37,8 @@
 #include <linux/spi/flash.h>
 #include <linux/mtd/qspi_mtd.h>
 
+struct qspi *glbl_qspi_flash;
+
 /*
  * NOTE: Below Macro is used to optimize the QPI/QUAD mode switch logic...
  * - QPI/QUAD mode is used for flash write. QUAD mode is used for flash read.
@@ -231,14 +233,9 @@ static int wait_till_ready(struct qspi *flash, uint8_t is_sleep)
 	return status;
 }
 
-/*
- * Read an address range from the flash chip.  The address range
- * may be any size provided it is within the physical boundaries.
- */
-static int qspi_read(struct mtd_info *mtd, loff_t from, size_t len,
+int _qspi_read(struct qspi *flash, loff_t from, size_t len,
 		size_t *retlen, u_char *buf)
 {
-	struct qspi *flash = mtd_to_qspi(mtd);
 	struct spi_transfer t[3];
 	struct spi_message m;
 	uint8_t merge_cmd_addr = FALSE;
@@ -343,10 +340,9 @@ static int qspi_read(struct mtd_info *mtd, loff_t from, size_t len,
 	return 0;
 }
 
-static int qspi_write(struct mtd_info *mtd, loff_t to, size_t len,
+int _qspi_write(struct qspi *flash, loff_t to, size_t len,
 		size_t *retlen, const u_char *buf)
 {
-	struct qspi *flash = mtd_to_qspi(mtd);
 	struct spi_transfer t[2];
 	struct spi_message m;
 	uint8_t cmd_addr_buf[5];
@@ -412,6 +408,40 @@ clear_qmode:
 
 	mutex_unlock(&flash->lock);
 	return err;
+}
+
+int qspi_read(loff_t from, size_t len,
+		size_t *retlen, u_char *buf)
+{
+	return _qspi_read(glbl_qspi_flash, from, len, retlen, buf);
+}
+EXPORT_SYMBOL_GPL(qspi_read);
+
+int qspi_write(loff_t to, size_t len,
+		size_t *retlen, const u_char *buf)
+{
+	return _qspi_write(glbl_qspi_flash, to, len, retlen, buf);
+}
+EXPORT_SYMBOL_GPL(qspi_write);
+
+/*
+ * Read an address range from the flash chip.  The address range
+ * may be any size provided it is within the physical boundaries.
+ */
+static int qspi_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
+		size_t *retlen, u_char *buf)
+{
+	struct qspi *flash = mtd_to_qspi(mtd);
+
+	return _qspi_read(flash, from, len, retlen, buf);
+}
+
+static int qspi_mtd_write(struct mtd_info *mtd, loff_t to, size_t len,
+		size_t *retlen, const u_char *buf)
+{
+	struct qspi *flash = mtd_to_qspi(mtd);
+
+	return _qspi_write(flash, to, len, retlen, buf);
 }
 
 static const struct spi_device_id *jedec_probe(struct spi_device *spi)
@@ -519,6 +549,7 @@ static int qspi_probe(struct spi_device *spi)
 	mutex_init(&flash->lock);
 
 	dev_set_drvdata(&spi->dev, flash);
+	glbl_qspi_flash = flash;
 
 	if (data && data->name)
 		flash->mtd.name = data->name;
@@ -529,8 +560,8 @@ static int qspi_probe(struct spi_device *spi)
 	flash->mtd.writesize = 1;
 	flash->mtd.flags = MTD_CAP_NVRAM;
 	flash->mtd.size = info->sector_size * info->n_sectors;
-	flash->mtd._read = qspi_read;
-	flash->mtd._write = qspi_write;
+	flash->mtd._read = qspi_mtd_read;
+	flash->mtd._write = qspi_mtd_write;
 	flash->mtd.erasesize = info->sector_size;
 
 	ppdata.of_node = spi->dev.of_node;
