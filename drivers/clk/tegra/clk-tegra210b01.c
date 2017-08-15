@@ -2550,7 +2550,10 @@ const struct clk_div_table *tegra210b01_get_pll_vco_post_div_table(void)
 	return pll_vco_post_div_table;
 }
 
-static enum clk_id tegra210b01_integer_div_io[] = {
+static enum clk_id tegra210b01_integer_div_id[] = {
+	tegra_clk_cilab,
+	tegra_clk_cilcd,
+
 	tegra_clk_i2s0,
 	tegra_clk_i2s1,
 	tegra_clk_i2s2,
@@ -2576,7 +2579,10 @@ static enum clk_id tegra210b01_integer_div_io[] = {
 	tegra_clk_extern2,
 	tegra_clk_extern3,
 
+	tegra_clk_sdmmc_legacy,
+	tegra_clk_i2cslow,
 	tegra_clk_qspi,
+
 	tegra_clk_soc_therm_8,
 	tegra_clk_tsensor,
 };
@@ -2597,8 +2603,8 @@ void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks)
 	tegra_clks[tegra_clk_pll_x_out0].present = false;
 
 	/* Prevent any fractional setting */
-	for (i = 0; i < ARRAY_SIZE(tegra210b01_integer_div_io); i++) {
-		enum clk_id cid = tegra210b01_integer_div_io[i];
+	for (i = 0; i < ARRAY_SIZE(tegra210b01_integer_div_id); i++) {
+		enum clk_id cid = tegra210b01_integer_div_id[i];
 
 		if (cid >= tegra_clk_max || !tegra_clks[cid].present) {
 			pr_warn("%s: clk %d is not present\n", __func__, cid);
