@@ -2550,8 +2550,41 @@ const struct clk_div_table *tegra210b01_get_pll_vco_post_div_table(void)
 	return pll_vco_post_div_table;
 }
 
+static enum clk_id tegra210b01_integer_div_io[] = {
+	tegra_clk_i2s0,
+	tegra_clk_i2s1,
+	tegra_clk_i2s2,
+	tegra_clk_i2s3,
+	tegra_clk_i2s4,
+	tegra_clk_d_audio,
+	tegra_clk_spdif_out,
+	tegra_clk_dmic1,
+	tegra_clk_dmic2,
+	tegra_clk_dmic3,
+
+	tegra_clk_sbc1_9,
+	tegra_clk_sbc2_9,
+	tegra_clk_sbc3_9,
+	tegra_clk_sbc4_9,
+
+	tegra_clk_uarta_8,
+	tegra_clk_uartb_8,
+	tegra_clk_uartc_8,
+	tegra_clk_uartd_8,
+
+	tegra_clk_extern1,
+	tegra_clk_extern2,
+	tegra_clk_extern3,
+
+	tegra_clk_qspi,
+	tegra_clk_soc_therm_8,
+	tegra_clk_tsensor,
+};
+
 void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks)
 {
+	int i;
+
 	/* Prevent 1:1.5 fractional divider setting */
 	div1_5_not_allowed = true;
 
@@ -2562,6 +2595,17 @@ void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks)
 	/* Remove CPU_LP claster clocks */
 	tegra_clks[tegra_clk_cclk_lp].present = false;
 	tegra_clks[tegra_clk_pll_x_out0].present = false;
+
+	/* Prevent any fractional setting */
+	for (i = 0; i < ARRAY_SIZE(tegra210b01_integer_div_io); i++) {
+		enum clk_id cid = tegra210b01_integer_div_io[i];
+
+		if (cid >= tegra_clk_max || !tegra_clks[cid].present) {
+			pr_warn("%s: clk %d is not present\n", __func__, cid);
+			continue;
+		}
+		tegra_clks[cid].use_integer_div = true;
+	}
 }
 
 static struct tegra_clk_init_table t210b01_init_table[] __initdata = {
