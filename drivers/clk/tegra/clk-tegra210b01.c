@@ -2589,6 +2589,20 @@ void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks)
 	/* Prevent 1:1.5 fractional divider setting */
 	div1_5_not_allowed = true;
 
+	/* Adjust cap clocks */
+	tegra_clks[tegra_clk_cap_vcore_sclk].present = false;
+	tegra_clks[tegra_clk_cap_vcore_host1x].present = false;
+	tegra_clks[tegra_clk_cap_vcore_mselect].present = false;
+	tegra_clks[tegra_clk_cap_vcore_abus].present = false;
+
+	tegra_clks[tegra_clk_cap_vcore_ape].dt_id =
+		TEGRA210_CLK_CAP_VCORE_APE;
+	tegra_clks[tegra_clk_cap_vcore_ape].present = true;
+
+	tegra_clks[tegra_clk_cap_vcore_cbus].dt_id =
+		TEGRA210_CLK_CAP_VCORE_CBUS;
+	tegra_clks[tegra_clk_cap_vcore_cbus].present = true;
+
 	/* Add 60MHz output of UTMIPLL */
 	tegra_clks[tegra_clk_utmipll_60m].dt_id = TEGRA210_CLK_UTMIPLL_60M;
 	tegra_clks[tegra_clk_utmipll_60m].present = true;
