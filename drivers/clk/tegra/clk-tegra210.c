@@ -3086,7 +3086,9 @@ static struct tegra_clk_periph tegra_sor1 =
 	TEGRA_CLK_PERIPH(14, 3, 0, 0, 0, 0, 0, 183, 0, NULL, &sor1_lock);
 
 static struct tegra_clk_periph tegra_sor1_mux =
-	TEGRA_CLK_PERIPH(29, 7, 0, 0, 7, 1, 0, 0, TEGRA_PERIPH_NO_GATE, mux_sor1_idx, &sor1_lock);
+	TEGRA_CLK_PERIPH(29, 7, 0, 0, 7, 1, TEGRA_DIVIDER_ROUND_UP |
+			 TEGRA_DIVIDER_INT, 0, TEGRA_PERIPH_NO_GATE,
+			 mux_sor1_idx, &sor1_lock);
 
 static const char *aclk_parents[] = { "pll_a1", "pll_c", "pll_p", "pll_a_out0", "pll_c2", "pll_c3", "clk_m" };
 
