@@ -635,12 +635,22 @@ static struct thermal_tv tegra210b01_thermal_floor_table[] = {
 	{TEGRA210B01_DFLL_THERMAL_FLOOR_NOFLOOR / 1000,   0},
 };
 
+static const struct thermal_tv tegra210b01_thermal_cap_table[] = {
+	{TEGRA210B01_DFLL_THERMAL_CAP_NOCAP / 1000, INT_MAX},
+	{TEGRA210B01_DFLL_THERMAL_CAP_0 / 1000, 1060},
+	{TEGRA210B01_DFLL_THERMAL_CAP_1 / 1000, 1010},
+};
+
 static const struct thermal_table tegra210b01_cpu_thermal_table = {
 	.thermal_floor_table = tegra210b01_thermal_floor_table,
 	.thermal_floor_table_size = ARRAY_SIZE(tegra210b01_thermal_floor_table),
 	.speedo_scale = 100,
 	.voltage_scale = 1000,
 	.temp_scale = 10,
+	.thermal_cap_table = tegra210b01_thermal_cap_table,
+	.thermal_cap_table_size = ARRAY_SIZE(tegra210b01_thermal_cap_table),
+	.thermal_cap_ucm2_table =  tegra210b01_thermal_cap_table,
+	.thermal_cap_ucm2_table_size = ARRAY_SIZE(tegra210b01_thermal_cap_table)
 };
 
 static const struct dfll_fcpu_data tegra124_dfll_fcpu_data = {
