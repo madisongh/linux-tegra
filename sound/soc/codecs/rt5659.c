@@ -4038,7 +4038,7 @@ static void rt5659_calibrate(struct rt5659_priv *rt5659)
 			break;
 
 		if (count > 30) {
-			dev_err(rt5659->codec->dev,
+			dev_err(&rt5659->i2c->dev,
 				"HP Calibration 1 Failure\n");
 			return;
 		}
@@ -4063,7 +4063,7 @@ static void rt5659_calibrate(struct rt5659_priv *rt5659)
 			break;
 
 		if (count > 85) {
-			dev_err(rt5659->codec->dev,
+			dev_err(&rt5659->i2c->dev,
 				"HP Calibration 2 Failure\n");
 			return;
 		}
@@ -4111,7 +4111,7 @@ static void rt5659_calibrate(struct rt5659_priv *rt5659)
 			break;
 
 		if (count > 10) {
-			dev_err(rt5659->codec->dev,
+			dev_err(&rt5659->i2c->dev,
 				"SPK Calibration Failure\n");
 			return;
 		}
@@ -4144,7 +4144,7 @@ static void rt5659_calibrate(struct rt5659_priv *rt5659)
 			break;
 
 		if (count > 35) {
-			dev_err(rt5659->codec->dev,
+			dev_err(&rt5659->i2c->dev,
 				"Mono Calibration Failure\n");
 			return;
 		}
