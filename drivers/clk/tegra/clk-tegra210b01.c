@@ -2570,11 +2570,6 @@ static enum clk_id tegra210b01_integer_div_id[] = {
 	tegra_clk_sbc3_9,
 	tegra_clk_sbc4_9,
 
-	tegra_clk_uarta_8,
-	tegra_clk_uartb_8,
-	tegra_clk_uartc_8,
-	tegra_clk_uartd_8,
-
 	tegra_clk_extern1,
 	tegra_clk_extern2,
 	tegra_clk_extern3,
