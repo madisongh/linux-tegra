@@ -55,7 +55,7 @@
 
 #define TEGRA_SE_MUTEX_WDT_UNITS	0x600000
 #define RNG1_TIMEOUT			2000	/*micro seconds*/
-#define PKA1_TIMEOUT			1000000	/*micro seconds*/
+#define PKA1_TIMEOUT			4000000	/*micro seconds*/
 #define RAND_128			16	/*bytes*/
 #define RAND_256			32	/*bytes*/
 #define ADV_STATE_FREQ			3
