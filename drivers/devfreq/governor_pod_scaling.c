@@ -51,7 +51,7 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/nvhost_podgov.h>
 
-#include <governor.h>
+#include "governor.h"
 
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
