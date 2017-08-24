@@ -855,6 +855,20 @@ int tegra_pmc_cpu_remove_clamping(int cpuid)
 #endif /* CONFIG_SMP */
 #endif /* CONFIG_TEGRA_POWERGATE */
 
+/**
+ * tegra_reset_reason_status() - last reset reason status
+ */
+int tegra_reset_reason_status(void)
+{
+	u32 val, rst_src;
+
+	val = tegra_pmc_readl(TEGRA_PMC_RST_STATUS);
+	rst_src = (val & PMC_RST_SOURCE_MASK) >> PMC_RST_SOURCE_SHIFT;
+
+	return rst_src;
+}
+EXPORT_SYMBOL(tegra_reset_reason_status);
+
 static void tegra_pmc_program_reboot_reason(const char *cmd)
 {
 	u32 value;
