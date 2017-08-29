@@ -232,6 +232,8 @@ int gamedata_cvt_parse_dt(struct platform_device *pdev,
 
 	of_property_read_u32(of_node, "nvidia,read-write-bytes",
 			&pdata->read_write_bytes);
+	of_property_read_u32(of_node, "nvidia,periodic-save-time",
+			&pdata->cc_timer_timeout);
 
 	return 0;
 }

@@ -29,6 +29,7 @@
 #include <linux/miscdevice.h>
 #include <linux/fs.h>
 #include <soc/tegra/pmc.h>
+#include <linux/workqueue.h>
 
 #include "cc.h"
 
@@ -94,6 +95,10 @@ static ssize_t game_data_write(struct file *file, const char __user *buf,
 {
 	gamedata_cvt_write(buf, count);
 	cc_pdata.flags |= CC_PAGE_WRITE;
+
+	mod_timer(&cc_pdata.cc_timer,
+			jiffies + cc_pdata.cc_timer_timeout_jiffies);
+
 	return count;
 }
 
@@ -116,6 +121,23 @@ static struct miscdevice gd_miscdev = {
 	.name   = "gamedata",
 	.fops   = &game_data_fops,
 };
+
+void cc_periodic_save_cvt_data_work(struct work_struct *work)
+{
+	gamedata_ram_read_write();
+}
+
+static void cc_periodic_save_cvt_data_timer(unsigned long _data)
+{
+	if (!(cc_pdata.flags & CC_PAGE_WRITE)) {
+		pr_info("crtcl_cond: No DATA in GameData RAM, skip write\n");
+		return;
+	}
+
+	schedule_work(&cc_pdata.cc_work);
+	mod_timer(&cc_pdata.cc_timer,
+			jiffies + cc_pdata.cc_timer_timeout_jiffies);
+}
 
 static int crtcl_cond_probe(struct platform_device *pdev)
 {
@@ -143,6 +165,13 @@ static int crtcl_cond_probe(struct platform_device *pdev)
 		gamedata_ram_read_write();
 	}
 
+	INIT_WORK(&cc_pdata.cc_work, cc_periodic_save_cvt_data_work);
+
+	setup_timer(&cc_pdata.cc_timer, cc_periodic_save_cvt_data_timer, 0);
+	cc_pdata.cc_timer_timeout_jiffies = msecs_to_jiffies(cc_pdata.
+						cc_timer_timeout * 1000);
+	add_timer(&cc_pdata.cc_timer);
+
 	ret = misc_register(&gd_miscdev);
 	if (ret)
 		pr_err("cannot register miscdev (err=%d)\n", ret);
@@ -153,6 +182,8 @@ static int crtcl_cond_probe(struct platform_device *pdev)
 static int crtcl_cond_remove(struct platform_device *pdev)
 {
 	misc_deregister(&gd_miscdev);
+	del_timer(&cc_pdata.cc_timer);
+	cancel_work_sync(&cc_pdata.cc_work);
 	unregister_reboot_notifier(&crtcl_cond_reboot_notifier);
 
 	return 0;

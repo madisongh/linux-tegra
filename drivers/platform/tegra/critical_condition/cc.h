@@ -79,12 +79,20 @@ struct gd_ram_buffer {
  * @mem_address		physical memory address to contain gamedata_cvt
  * @read_write_bytes	data-size to be write/read to/from FRAM
  * @flags		flags to check write has been done till now
+ * @cc_timer		timer_list that will be used to trigger at certain time
+ * @cc_timer_timeout	timer trigger time in sec. fill from dtb
+ * @cc_timer_timeout_jiffies	timer value in jiffies
+ * @cc_work		work to be schedule when timer triggers
  */
 struct crtlcond_platform_data {
-	unsigned long   cvt_mem_size;
-	unsigned long   cvt_mem_address;
-	u32		read_write_bytes;
-	int		flags;
+	unsigned long		cvt_mem_size;
+	unsigned long		cvt_mem_address;
+	u32			read_write_bytes;
+	int			flags;
+	struct timer_list	cc_timer;
+	int			cc_timer_timeout;
+	int			cc_timer_timeout_jiffies;
+	struct work_struct	cc_work;
 };
 
 struct gd_ram_buffer *gd_ram_new(phys_addr_t start, size_t size);
