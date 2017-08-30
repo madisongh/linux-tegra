@@ -3470,6 +3470,38 @@ static int calibr_delay_set(void *data, u64 val)
 DEFINE_SIMPLE_ATTRIBUTE(calibr_delay_fops, calibr_delay_get, calibr_delay_set,
 			"%llu\n");
 
+static int calibrate_floors_set(void *data, u64 val)
+{
+	struct tegra_dfll *td = data;
+	unsigned long flags, rate;
+	int i;
+
+	if (!val)
+		return 0;
+
+	if (!(td->cfg_flags & DFLL_ONE_SHOT_CALIBRATE)) {
+		calibration_timer_update(td);
+		return 0;
+	}
+
+	spin_lock_irqsave(&td->lock, flags);
+	for (i = 0; i <= td->soc->thermal_floor_table_size; i++)
+		td->dvco_rate_floors[i] = 0;
+	td->tune_high_calibrated = false;
+
+	rate = dfll_request_get(td);
+	dfll_request_rate(td, td->out_rate_min);
+	dfll_one_shot_calibrate_floors(td);
+	set_dvco_rate_min(td, &td->last_req);
+	dfll_request_rate(td, rate);
+
+	spin_unlock_irqrestore(&td->lock, flags);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(calibrate_floors_fops, NULL, calibrate_floors_set,
+			"%llu\n");
+
 static int registers_show(struct seq_file *s, void *data)
 {
 	u32 val, offs;
@@ -3661,6 +3693,7 @@ static struct {
 	{ "vmax_mv", S_IRUGO, &vmax_fops },
 	{ "output_mv", S_IRUGO, &output_fops },
 	{ "profiles", S_IRUGO, &profiles_fops },
+	{ "calibrate_floors", S_IWUSR, &calibrate_floors_fops },
 };
 
 static int dfll_debug_init(struct tegra_dfll *td)
