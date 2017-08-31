@@ -413,6 +413,9 @@ clear_qmode:
 int qspi_read(loff_t from, size_t len,
 		size_t *retlen, u_char *buf)
 {
+	if (!glbl_qspi_flash)
+		return -EINVAL;
+
 	return _qspi_read(glbl_qspi_flash, from, len, retlen, buf);
 }
 EXPORT_SYMBOL_GPL(qspi_read);
@@ -420,6 +423,9 @@ EXPORT_SYMBOL_GPL(qspi_read);
 int qspi_write(loff_t to, size_t len,
 		size_t *retlen, const u_char *buf)
 {
+	if (!glbl_qspi_flash)
+		return -EINVAL;
+
 	return _qspi_write(glbl_qspi_flash, to, len, retlen, buf);
 }
 EXPORT_SYMBOL_GPL(qspi_write);
@@ -497,6 +503,7 @@ static int qspi_probe(struct spi_device *spi)
 	struct mtd_part_parser_data	ppdata;
 	struct device_node __maybe_unused *np;
 	struct tegra_qspi_device_controller_data *cdata = spi->controller_data;
+	int ret;
 
 	id = spi_get_device_id(spi);
 	np = spi->dev.of_node;
@@ -549,7 +556,6 @@ static int qspi_probe(struct spi_device *spi)
 	mutex_init(&flash->lock);
 
 	dev_set_drvdata(&spi->dev, flash);
-	glbl_qspi_flash = flash;
 
 	if (data && data->name)
 		flash->mtd.name = data->name;
@@ -605,9 +611,17 @@ static int qspi_probe(struct spi_device *spi)
 			flash->mtd.eraseregions[i].erasesize / 1024,
 			flash->mtd.eraseregions[i].numblocks);
 
-	return mtd_device_parse_register(&flash->mtd, NULL, &ppdata,
+	ret = mtd_device_parse_register(&flash->mtd, NULL, &ppdata,
 			data ? data->parts : NULL,
 			data ? data->nr_parts : 0);
+	if (ret) {
+		dev_err(&spi->dev, "%s: misc-device registration failed",
+						id->name);
+		return ret;
+	}
+
+	glbl_qspi_flash = flash;
+	return ret;
 }
 
 static int qspi_remove(struct spi_device *spi)
