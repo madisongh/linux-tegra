@@ -40,21 +40,26 @@ static void gamedata_ram_read_write(void)
 	char *buf;
 	size_t len = cc_pdata.read_write_bytes;
 	size_t retlen = 0;
+	int ret = 0;
 
 	retlen = gamedata_cvt_read(&len, &buf);
 	if (!retlen) {
 		pr_info("crtcl_cond: Data not available in GameData RAM\n");
 		return;
 	}
-	pr_debug("crtcl_cond: writing Data into FRAM");
-	qspi_write(START_ADDRESS0, len, &retlen, buf);
+	pr_debug("crtcl_cond: writing Data into FRAM\n");
+	ret = qspi_write(START_ADDRESS0, retlen, &len, buf);
+	if (ret) {
+		pr_info("FRAM driver is not up yet\n");
+		return;
+	}
 }
 
 static int crtcl_cond_reboot_cb(struct notifier_block *nb,
 			      unsigned long event, void *unused)
 {
-	if (!(cc_pdata.flags & CC_PAGE_WRITE)) {
-		pr_info("crtcl_cond: No DATA in GameData RAM, skip write\n");
+	if (!(cc_pdata.flags & CC_PAGE_WRITE_STARTED)) {
+		pr_debug("crtcl_cond: No DATA in GameData RAM, skip write\n");
 		return NOTIFY_DONE;
 	}
 	gamedata_ram_read_write();
@@ -76,43 +81,24 @@ static int game_data_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t game_data_read(struct file *file, char __user *buf,
-			size_t count, loff_t *ppos)
-{
-	int len;
-
-	len = gamedata_cvt_read(&count, &buf);
-	if (!len) {
-		pr_info("%s: crtcl_cond: no data available in gamedata ram\n",
-					 __func__);
-		return -EINVAL;
-	}
-	return len;
-}
-
 static ssize_t game_data_write(struct file *file, const char __user *buf,
 			size_t count, loff_t *ppos)
 {
 	gamedata_cvt_write(buf, count);
-	cc_pdata.flags |= CC_PAGE_WRITE;
+	cc_pdata.flags |= CC_PAGE_WRITE_STARTED;
 
-	mod_timer(&cc_pdata.cc_timer,
-			jiffies + cc_pdata.cc_timer_timeout_jiffies);
+	if (!cc_pdata.cc_timer_started) {
+		mod_timer(&cc_pdata.cc_timer,
+				jiffies + cc_pdata.cc_timer_timeout_jiffies);
+		cc_pdata.cc_timer_started = TRUE;
+	}
 
 	return count;
-}
-
-static long game_data_ioctl(struct file *file, unsigned int cmd,
-			unsigned long arg)
-{
-	return 0;
 }
 
 static const struct file_operations game_data_fops = {
 	.owner		= THIS_MODULE,
 	.write		= game_data_write,
-	.read		= game_data_read,
-	.unlocked_ioctl	= game_data_ioctl,
 	.open		= game_data_open,
 	.release	= game_data_release,
 };
@@ -129,12 +115,14 @@ void cc_periodic_save_cvt_data_work(struct work_struct *work)
 
 static void cc_periodic_save_cvt_data_timer(unsigned long _data)
 {
-	if (!(cc_pdata.flags & CC_PAGE_WRITE)) {
-		pr_info("crtcl_cond: No DATA in GameData RAM, skip write\n");
+	if (!(cc_pdata.flags & CC_PAGE_WRITE_STARTED) &&
+				(cc_pdata.last_reset_status != WDT_TIMEOUT)) {
+		pr_debug("crtcl_cond: No DATA in GameData RAM, skip write\n");
 		return;
 	}
 
 	schedule_work(&cc_pdata.cc_work);
+	cc_pdata.last_reset_status = FALSE;
 	mod_timer(&cc_pdata.cc_timer,
 			jiffies + cc_pdata.cc_timer_timeout_jiffies);
 }
@@ -151,7 +139,7 @@ static int crtcl_cond_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	cc_pdata.flags &= ~CC_PAGE_WRITE;
+	cc_pdata.flags &= ~CC_PAGE_WRITE_STARTED;
 
 	ret = register_reboot_notifier(&crtcl_cond_reboot_notifier);
 	if (ret) {
@@ -159,24 +147,23 @@ static int crtcl_cond_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	reset_reason = tegra_reset_reason_status();
-	if (reset_reason == WDT_TIMEOUT) {
-		pr_info("%s: Reset Reason is Watchdog Timeout\n", __func__);
-		gamedata_ram_read_write();
-	}
-
 	INIT_WORK(&cc_pdata.cc_work, cc_periodic_save_cvt_data_work);
 
 	setup_timer(&cc_pdata.cc_timer, cc_periodic_save_cvt_data_timer, 0);
 	cc_pdata.cc_timer_timeout_jiffies = msecs_to_jiffies(cc_pdata.
 						cc_timer_timeout * 1000);
-	add_timer(&cc_pdata.cc_timer);
-
 	ret = misc_register(&gd_miscdev);
 	if (ret)
 		pr_err("cannot register miscdev (err=%d)\n", ret);
 
-	return ret;
+	reset_reason = tegra_reset_reason_status();
+	if (reset_reason == WDT_TIMEOUT) {
+		pr_debug("%s: Reset Reason is Watchdog Timeout\n", __func__);
+		cc_pdata.last_reset_status = reset_reason;
+	}
+	cc_periodic_save_cvt_data_timer((unsigned long int)&cc_pdata);
+
+	return 0;
 }
 
 static int crtcl_cond_remove(struct platform_device *pdev)

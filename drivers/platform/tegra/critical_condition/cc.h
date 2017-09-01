@@ -19,26 +19,40 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 
+/*
+ * WDT_TIMEOUT = 2, is based on drivers/soc/tegra/pmc.c
+ * "char *t186_pmc_rst_src"
+ */
 #define WDT_TIMEOUT				2
-#define MAX_RECORD_CNT				2
+#define MAX_RECORD_CNT				3
 #define START_ADDRESS0				0
-#define CC_PAGE_WRITE				1
+#define CC_PAGE_WRITE_STARTED			1
+
+#define FALSE					0
+#define TRUE					1
 
 /*
  * This enum is used to update buffer status while writing
  * data to GameData RAM cvt, currently using 2-buffer
- * @GD_BUFFER		To select buffer among 2-buffer to write/read to/from
- *			GameData RAM cvt by toggling this element.
- * @GD_BUFFER_COMPLETE	Once data write to 'GameData RAM' cvt complete, this
- *			element will be set for that buffer.
+ * @GD_BUFFER			To select buffer among 2-buffer to write/read
+ *				to/from GameData RAM cvt by toggling this
+ *				element.
+ * @GD_BUFFER_CONTROL_REG	To select control-region where current state of
+ *				'struct gamedata_cvt_context' save into
+ *				3rd buffer(partition) of carveout, to use across
+ *				system boot, so that if last reset was WDT, cc
+ *				driver can select right buffer to get user-data.
  */
-enum gd_buffer_status {
+enum gd_buffer_number {
 	GD_BUFFER = 1,
-	GD_BUFFER_COMPLETE,
+	GD_BUFFER_CONTROL_REG,
 };
 
 /*
  * structure to maintain gamedata cvt
+ * @cxt_valid		This structure will be save into cvt and
+ *			while reading back, this variable will be used to
+ *			check validity of saved data.
  * @gd_ram_buffs	Contains array of buffers, currently 2 buffer will
  *			be used.
  * @phys_addr		Start of the physical cvt address
@@ -48,6 +62,7 @@ enum gd_buffer_status {
  *			member of 'enum gd_buffer_status'
  */
 struct gamedata_cvt_context {
+	unsigned int cxt_valid;
 	struct gd_ram_buffer **gd_ram_buffs;
 	phys_addr_t phys_addr;
 	unsigned long size;
@@ -63,6 +78,8 @@ struct gamedata_cvt_context {
  * @vaddr		cpu-address mapped via ioremap for paddr
  * @game_data		data to be write/read to/from GameData RAM carveout
  * @data_size		data-size to be write/read to/from GameData RAM carveout
+ * @system_alive	to check whether system fresh boot or already running
+ *			system
  */
 struct gd_ram_buffer {
 	phys_addr_t paddr;
@@ -70,6 +87,7 @@ struct gd_ram_buffer {
 	void *vaddr;
 	char *game_data;
 	size_t data_size;
+	bool system_alive;
 };
 
 /*
@@ -82,7 +100,9 @@ struct gd_ram_buffer {
  * @cc_timer		timer_list that will be used to trigger at certain time
  * @cc_timer_timeout	timer trigger time in sec. fill from dtb
  * @cc_timer_timeout_jiffies	timer value in jiffies
+ * @cc_timer_started	if timer already started do not modify timer
  * @cc_work		work to be schedule when timer triggers
+ * @last_reset_status	to save last reset status in case of wdt-timeout
  */
 struct crtlcond_platform_data {
 	unsigned long		cvt_mem_size;
@@ -91,8 +111,10 @@ struct crtlcond_platform_data {
 	int			flags;
 	struct timer_list	cc_timer;
 	int			cc_timer_timeout;
-	int			cc_timer_timeout_jiffies;
+	unsigned long		cc_timer_timeout_jiffies;
+	bool			cc_timer_started;
 	struct work_struct	cc_work;
+	unsigned int		last_reset_status;
 };
 
 struct gd_ram_buffer *gd_ram_new(phys_addr_t start, size_t size);
@@ -101,7 +123,7 @@ void gd_ram_free(struct gd_ram_buffer *grb);
 int gd_ram_write(struct gd_ram_buffer *grb, const void *s,
 	unsigned int count);
 
-void gd_read_from_cvt(struct gd_ram_buffer *grb);
+int gd_read_from_cvt(struct gd_ram_buffer *grb);
 void gd_ram_free_data(struct gd_ram_buffer *grb);
 
 int gamedata_cvt_write(const char *buf, size_t size);

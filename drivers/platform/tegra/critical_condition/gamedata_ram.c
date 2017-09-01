@@ -31,37 +31,44 @@
 
 static struct gamedata_cvt_context *gd_cvt_cxt;
 
-void gd_read_from_cvt(struct gd_ram_buffer *gdrz)
+int gd_read_from_cvt(struct gd_ram_buffer *gd_rm_buf)
 {
-	if (!gdrz->game_data)
-		gdrz->game_data = kzalloc(gd_cvt_cxt->record_size, GFP_KERNEL);
+	if (!gd_rm_buf->data_size || gd_rm_buf->data_size >
+						gd_rm_buf->mem_size)
+		gd_rm_buf->data_size = gd_cvt_cxt->record_size;
 
-	if (!gdrz->game_data)
-		return;
-	memcpy_fromio(gdrz->game_data, gdrz->vaddr, gd_cvt_cxt->record_size);
+	if (!gd_rm_buf->game_data)
+		gd_rm_buf->game_data = kzalloc(gd_rm_buf->data_size,
+							GFP_KERNEL);
+	if (!gd_rm_buf->game_data || !gd_rm_buf->vaddr)
+		return -ENOMEM;
+
+	memcpy_fromio(gd_rm_buf->game_data, gd_rm_buf->vaddr,
+						gd_rm_buf->data_size);
+	return 0;
 }
 
-int notrace gd_ram_write(struct gd_ram_buffer *gdrz,
+int notrace gd_ram_write(struct gd_ram_buffer *gd_rm_buf,
 	const void *s, unsigned int count)
 {
 	int c = count;
 
-	if (unlikely(c > gdrz->mem_size))
-		c = gdrz->mem_size;
+	if (unlikely(c > gd_rm_buf->mem_size))
+		c = gd_rm_buf->mem_size;
 
-	memcpy_toio(gdrz->vaddr, s, count);
-	if (!gdrz->game_data)
-		gdrz->game_data = kmalloc(c, GFP_KERNEL);
+	memcpy_toio(gd_rm_buf->vaddr, s, c);
+	if (!gd_rm_buf->game_data)
+		gd_rm_buf->game_data = kmalloc(c, GFP_KERNEL);
 
-	gdrz->data_size = c;
+	gd_rm_buf->data_size = c;
 	return c;
 }
 
-void gd_ram_free_data(struct gd_ram_buffer *gdrz)
+void gd_ram_free_data(struct gd_ram_buffer *gd_rm_buf)
 {
-	kfree(gdrz->game_data);
-	gdrz->game_data = NULL;
-	gdrz->data_size = 0;
+	kfree(gd_rm_buf->game_data);
+	gd_rm_buf->game_data = NULL;
+	gd_rm_buf->data_size = 0;
 }
 
 static void *gd_ram_iomap(phys_addr_t start, size_t size)
@@ -80,14 +87,14 @@ static void *gd_ram_iomap(phys_addr_t start, size_t size)
 }
 
 static int gd_ram_buffer_map(phys_addr_t start, phys_addr_t size,
-		struct gd_ram_buffer *gdrz)
+		struct gd_ram_buffer *gd_rm_buf)
 {
-	gdrz->paddr = start;
-	gdrz->mem_size = size;
+	gd_rm_buf->paddr = start;
+	gd_rm_buf->mem_size = size;
 
-	gdrz->vaddr = gd_ram_iomap(start, size);
+	gd_rm_buf->vaddr = gd_ram_iomap(start, size);
 
-	if (!gdrz->vaddr) {
+	if (!gd_rm_buf->vaddr) {
 		pr_err("%s: Failed to map 0x%llx at 0x%llx\n", __func__,
 			(unsigned long long)size, (unsigned long long)start);
 		return -ENOMEM;
@@ -96,68 +103,89 @@ static int gd_ram_buffer_map(phys_addr_t start, phys_addr_t size,
 	return 0;
 }
 
-void gd_ram_free(struct gd_ram_buffer *gdrz)
+void gd_ram_free(struct gd_ram_buffer *gd_rm_buf)
 {
-	if (!gdrz)
+	if (!gd_rm_buf)
 		return;
 
-	if (gdrz->vaddr) {
-		iounmap(gdrz->vaddr);
-		release_mem_region(gdrz->paddr, gdrz->mem_size);
-		gdrz->vaddr = NULL;
+	if (gd_rm_buf->vaddr) {
+		iounmap(gd_rm_buf->vaddr);
+		release_mem_region(gd_rm_buf->paddr, gd_rm_buf->mem_size);
+		gd_rm_buf->vaddr = NULL;
 	}
-	gd_ram_free_data(gdrz);
-	kfree(gdrz);
+	gd_ram_free_data(gd_rm_buf);
+	kfree(gd_rm_buf);
 }
 
 struct gd_ram_buffer *gd_ram_new(phys_addr_t start, size_t size)
 {
-	struct gd_ram_buffer *gdrz;
+	struct gd_ram_buffer *gd_rm_buf;
 	int ret = -ENOMEM;
 
-	gdrz = kzalloc(sizeof(struct gd_ram_buffer), GFP_KERNEL);
-	if (!gdrz) {
+	gd_rm_buf = kzalloc(sizeof(struct gd_ram_buffer), GFP_KERNEL);
+	if (!gd_rm_buf) {
 		pr_err("failed to allocate Gamedata RAM buffer\n");
 		goto err;
 	}
 
-	ret = gd_ram_buffer_map(start, size, gdrz);
+	ret = gd_ram_buffer_map(start, size, gd_rm_buf);
 	if (ret)
 		goto err;
 
-	return gdrz;
+	return gd_rm_buf;
 err:
-	gd_ram_free(gdrz);
+	gd_ram_free(gd_rm_buf);
 	return ERR_PTR(ret);
 }
 
 ssize_t gamedata_cvt_read(size_t *count, char **buf)
 {
-	ssize_t size;
-	struct gd_ram_buffer *gdrz = NULL;
-	int buffer_cnt;
+	struct gd_ram_buffer *gd_rm_buf = NULL;
+	struct gamedata_cvt_context *cxt = NULL;
 
-	/*
-	 * mask the GD_BUFFER_COMPLETE and select write completed
-	 * buffer by shifting mask value to shift left by 1.
-	 */
-	buffer_cnt = (gd_cvt_cxt->flags & GD_BUFFER_COMPLETE) >> 1;
+	/* In fresh-boot, gd_rm_buf->system_alive == 0 */
+	gd_rm_buf = gd_cvt_cxt->gd_ram_buffs[GD_BUFFER_CONTROL_REG];
+	if (!gd_rm_buf->system_alive) {
+		gd_rm_buf->data_size = sizeof(*gd_cvt_cxt);
+		if (gd_read_from_cvt(gd_rm_buf)) {
+			pr_debug("Invalid Memory\n");
+			return 0;
+		}
 
-	gdrz = gd_cvt_cxt->gd_ram_buffs[buffer_cnt];
-	if (!gdrz)
-		return -EINVAL;
+		cxt = (struct gamedata_cvt_context *)gd_rm_buf->game_data;
+		/*
+		 * During flash, observed that some area of cvt got corrupted,
+		 * and if system rebooted via WDT-Timeout without data-write
+		 * to cvt, and if cc driver reads cxt->fags, getting some
+		 * random value, so first check whether write-data is
+		 * valid or not using 'cxt_valid' variable.
+		 */
+		if (!cxt->cxt_valid || (cxt->cxt_valid ^ TRUE)) {
+			pr_debug("Invalid data in 'GameData RAM' carveout\n");
+			return 0;
+		}
+	} else
+		cxt = gd_cvt_cxt;
 
-	gd_read_from_cvt(gdrz);
+	gd_rm_buf = gd_cvt_cxt->gd_ram_buffs[cxt->flags];
+	if (!gd_rm_buf) {
+		pr_debug("Invalid buffer\n");
+		return 0;
+	}
+	if (gd_read_from_cvt(gd_rm_buf)) {
+		pr_debug("Invalid Memory\n");
+		return 0;
+	}
 
-	*buf = gdrz->game_data;
+	*buf = gd_rm_buf->game_data;
 
-	return size;
+	return gd_rm_buf->data_size;
 }
 EXPORT_SYMBOL_GPL(gamedata_cvt_read);
 
 int gamedata_cvt_write(const char *buf, size_t size)
 {
-	struct gd_ram_buffer *gdrz;
+	struct gd_ram_buffer *gd_rm_buf;
 	unsigned int buffer_cnt, buffer_mask;
 
 	/*
@@ -167,11 +195,14 @@ int gamedata_cvt_write(const char *buf, size_t size)
 	buffer_mask = gd_cvt_cxt->flags & GD_BUFFER;
 	buffer_cnt = buffer_mask ^ GD_BUFFER;
 	gd_cvt_cxt->flags ^= GD_BUFFER;
-	gdrz = gd_cvt_cxt->gd_ram_buffs[buffer_cnt];
+	gd_rm_buf = gd_cvt_cxt->gd_ram_buffs[buffer_cnt];
 
-	gd_ram_write(gdrz, buf, size);
+	gd_ram_write(gd_rm_buf, buf, size);
 
-	gd_cvt_cxt->flags ^= GD_BUFFER_COMPLETE;
+	gd_rm_buf = gd_cvt_cxt->gd_ram_buffs[GD_BUFFER_CONTROL_REG];
+	gd_cvt_cxt->cxt_valid = TRUE;
+	gd_ram_write(gd_rm_buf, gd_cvt_cxt, sizeof(*gd_cvt_cxt));
+	gd_rm_buf->system_alive = TRUE;
 
 	return 0;
 }
@@ -187,7 +218,7 @@ static int gamedata_cvt_init_buffs(struct device *dev,
 	if (!gd_cvt_cxt->max_record_cnt)
 		return -ENOMEM;
 
-	/* As of now, use only max_record_cnt = 2 */
+	/* As of now, use only max_record_cnt = 3 */
 	if (gd_cvt_cxt->max_record_cnt > MAX_RECORD_CNT)
 		gd_cvt_cxt->max_record_cnt = MAX_RECORD_CNT;
 
@@ -195,8 +226,8 @@ static int gamedata_cvt_init_buffs(struct device *dev,
 			sizeof(*gd_cvt_cxt->gd_ram_buffs) *
 				 gd_cvt_cxt->max_record_cnt, GFP_KERNEL);
 	if (!gd_cvt_cxt->gd_ram_buffs) {
-		dev_err(dev, "failed to initialize a gdrz for dumps\n");
-		goto fail_gdrz;
+		dev_err(dev, "failed to initialize gamedata buffers\n");
+		goto fail_gd_rm_buf;
 	}
 
 	for (i = 0; i < gd_cvt_cxt->max_record_cnt; i++) {
@@ -212,13 +243,13 @@ static int gamedata_cvt_init_buffs(struct device *dev,
 				i--;
 				gd_ram_free(gd_cvt_cxt->gd_ram_buffs[i]);
 			}
-			goto fail_gdrz;
+			goto fail_gd_rm_buf;
 		}
 		*paddr += gd_cvt_cxt->record_size;
 	}
 
 	return 0;
-fail_gdrz:
+fail_gd_rm_buf:
 	gd_cvt_cxt->max_record_cnt = 0;
 	return err;
 }
