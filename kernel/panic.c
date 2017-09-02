@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/nmi.h>
 #include <linux/console.h>
+#include <linux/of.h>
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
@@ -403,6 +404,12 @@ static u64 oops_id;
 
 static int init_oops_id(void)
 {
+	struct device_node *np;
+
+	np = of_find_node_by_name(NULL, "panic_timeout");
+	if (np)
+		of_property_read_u32(np, "panic-timeout-value", &panic_timeout);
+
 	if (!oops_id)
 		get_random_bytes(&oops_id, sizeof(oops_id));
 	else
