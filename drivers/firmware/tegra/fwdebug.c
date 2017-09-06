@@ -769,6 +769,7 @@ DEFINE_SIMPLE_ATTRIBUTE(trace_disable_fops, NULL,
 		bpmp_trace_disable_store, "%lld\n");
 DEFINE_SIMPLE_ATTRIBUTE(bpmp_mount_fops, bpmp_mount_show, NULL, "%lld\n");
 
+#ifdef CONFIG_BPMP_DEBUGFS_MOUNT_ON_BOOT
 static __init int bpmp_init_mount(void)
 {
 	/* mirroring takes a while */
@@ -778,6 +779,7 @@ static __init int bpmp_init_mount(void)
 	return bpmp_fwdebug_init(bpmp_root);
 }
 late_initcall(bpmp_init_mount);
+#endif
 
 struct bpmp_trace_iter {
 	dma_addr_t phys;
