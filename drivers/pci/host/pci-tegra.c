@@ -1864,6 +1864,10 @@ static int tegra_pcie_save_device(struct device *dev)
 			dev_err(pcie->dev,
 				"enabling pex-io-dpd failed: %d\n", err);
 	}
+	reset_control_assert(pcie->pciex_rst);
+	reset_control_assert(pcie->pcie_rst);
+	reset_control_assert(pcie->afi_rst);
+
 	return err;
 }
 
