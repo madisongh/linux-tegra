@@ -265,7 +265,6 @@ static bool calc_gpu_busy(unsigned int load)
 	unsigned int mask;
 	bool busy;
 
-	mutex_lock(&core_lock);
 	mask = (1 << gpu_high_count) - 1;
 
 	gpu_high_hist <<= 1;
@@ -273,7 +272,6 @@ static bool calc_gpu_busy(unsigned int load)
 		gpu_high_hist |= 1;
 
 	busy = (gpu_high_hist & mask) == mask;
-	mutex_unlock(&core_lock);
 
 	return busy;
 }
