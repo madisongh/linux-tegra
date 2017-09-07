@@ -273,6 +273,8 @@ struct ufs_hba_variant_ops {
 				    enum ufs_notify_change_status);
 	int	(*setup_clocks)(struct ufs_hba *, bool);
 	int     (*setup_regulators)(struct ufs_hba *, bool);
+	void	(*hce_disable_notify)(struct ufs_hba *,
+				     enum ufs_notify_change_status);
 	int	(*hce_enable_notify)(struct ufs_hba *,
 				     enum ufs_notify_change_status);
 	int	(*link_startup_notify)(struct ufs_hba *,
@@ -602,12 +604,20 @@ void ufshcd_dealloc_host(struct ufs_hba *);
 int ufshcd_init(struct ufs_hba * , void __iomem * , unsigned int);
 void ufshcd_remove(struct ufs_hba *);
 
+static inline void ufshcd_vops_hce_disable_notify(struct ufs_hba *hba,
+						bool status)
+{
+	if (hba->vops && hba->vops->hce_disable_notify)
+		hba->vops->hce_disable_notify(hba, status);
+}
+
 /**
  * ufshcd_hba_stop - Send controller to reset state
  * @hba: per adapter instance
  */
 static inline void ufshcd_hba_stop(struct ufs_hba *hba)
 {
+	ufshcd_vops_hce_disable_notify(hba, PRE_CHANGE);
 	ufshcd_writel(hba, CONTROLLER_DISABLE,  REG_CONTROLLER_ENABLE);
 }
 
