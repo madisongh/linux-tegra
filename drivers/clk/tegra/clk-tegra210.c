@@ -2798,6 +2798,7 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .con_id = "extern2", .dt_id = TEGRA210_CLK_EXTERN2 },
 	{ .con_id = "extern3", .dt_id = TEGRA210_CLK_EXTERN3 },
 	{ .con_id = "sclk", .dev_id = "tegra-wifi", .dt_id = TEGRA210_CLK_WIFI_SCLK },
+	{ .con_id = "spdif_in", .dt_id = TEGRA210_CLK_SPDIF_IN },
 };
 
 static struct tegra_audio_clk_info tegra210_audio_plls[] = {
