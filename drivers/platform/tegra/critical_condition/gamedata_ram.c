@@ -26,6 +26,8 @@
 #include <linux/of_address.h>
 #include <linux/vmalloc.h>
 #include <asm/page.h>
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
 
 #include "cc.h"
 
@@ -265,6 +267,8 @@ int gamedata_cvt_parse_dt(struct platform_device *pdev,
 			&pdata->read_write_bytes);
 	of_property_read_u32(of_node, "nvidia,periodic-save-time",
 			&pdata->cc_timer_timeout);
+	pdata->under_volt_gpio = of_get_named_gpio(of_node,
+				"nvidia,under-volt-alert-gpio", 0);
 
 	return 0;
 }

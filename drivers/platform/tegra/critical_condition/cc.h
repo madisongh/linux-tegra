@@ -103,6 +103,9 @@ struct gd_ram_buffer {
  * @cc_timer_started	if timer already started do not modify timer
  * @cc_work		work to be schedule when timer triggers
  * @last_reset_status	to save last reset status in case of wdt-timeout
+ * @under_volt_irq	this variable used to contain irq no. for under-volt
+ * @under_volt_gpio	this variable used to contain gpio no. will be used to
+ *			convert gpio_to_irq
  */
 struct crtlcond_platform_data {
 	unsigned long		cvt_mem_size;
@@ -115,6 +118,8 @@ struct crtlcond_platform_data {
 	bool			cc_timer_started;
 	struct work_struct	cc_work;
 	unsigned int		last_reset_status;
+	int			under_volt_irq;
+	int			under_volt_gpio;
 };
 
 struct gd_ram_buffer *gd_ram_new(phys_addr_t start, size_t size);

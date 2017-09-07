@@ -30,6 +30,10 @@
 #include <linux/fs.h>
 #include <soc/tegra/pmc.h>
 #include <linux/workqueue.h>
+#include <linux/interrupt.h>
+#include <linux/irq.h>
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
 
 #include "cc.h"
 
@@ -127,6 +131,17 @@ static void cc_periodic_save_cvt_data_timer(unsigned long _data)
 			jiffies + cc_pdata.cc_timer_timeout_jiffies);
 }
 
+static irqreturn_t gpio_cc_under_volt_irq(int irq, void *arg)
+{
+	if (!(cc_pdata.flags & CC_PAGE_WRITE_STARTED)) {
+		pr_debug("crtcl_cond: No DATA in GameData RAM, skip write\n");
+		return IRQ_HANDLED;
+	}
+	schedule_work(&cc_pdata.cc_work);
+
+	return IRQ_HANDLED;
+}
+
 static int crtcl_cond_probe(struct platform_device *pdev)
 {
 	int ret, reset_reason;
@@ -155,6 +170,26 @@ static int crtcl_cond_probe(struct platform_device *pdev)
 	ret = misc_register(&gd_miscdev);
 	if (ret)
 		pr_err("cannot register miscdev (err=%d)\n", ret);
+
+	if (gpio_is_valid(cc_pdata.under_volt_gpio)) {
+		cc_pdata.under_volt_irq = gpio_to_irq(cc_pdata.under_volt_gpio);
+		if (cc_pdata.under_volt_irq <= 0) {
+			dev_err(&pdev->dev, "gpio_to_irq failed, err:%d\n",
+				cc_pdata.under_volt_irq);
+		} else {
+			ret = devm_request_irq(&pdev->dev,
+				cc_pdata.under_volt_irq, gpio_cc_under_volt_irq,
+				IRQF_TRIGGER_RISING, "cc_under_volt_irq",
+				NULL);
+			if (ret < 0) {
+				dev_err(&pdev->dev,
+				"Unable to claim irq for under-volt\n");
+			}
+			dev_dbg(&pdev->dev,
+			"registered critical-condition under-volt-irq: %d\n",
+				cc_pdata.under_volt_irq);
+		}
+	}
 
 	reset_reason = tegra_reset_reason_status();
 	if (reset_reason == WDT_TIMEOUT) {
