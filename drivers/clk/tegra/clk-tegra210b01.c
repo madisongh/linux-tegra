@@ -2554,25 +2554,12 @@ static enum clk_id tegra210b01_integer_div_id[] = {
 	tegra_clk_cilab,
 	tegra_clk_cilcd,
 
-	tegra_clk_i2s0,
-	tegra_clk_i2s1,
-	tegra_clk_i2s2,
-	tegra_clk_i2s3,
-	tegra_clk_i2s4,
-	tegra_clk_d_audio,
 	tegra_clk_spdif_out,
-	tegra_clk_dmic1,
-	tegra_clk_dmic2,
-	tegra_clk_dmic3,
 
 	tegra_clk_sbc1_9,
 	tegra_clk_sbc2_9,
 	tegra_clk_sbc3_9,
 	tegra_clk_sbc4_9,
-
-	tegra_clk_extern1,
-	tegra_clk_extern2,
-	tegra_clk_extern3,
 
 	tegra_clk_sdmmc_legacy,
 	tegra_clk_i2cslow,
