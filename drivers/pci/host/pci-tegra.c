@@ -4987,6 +4987,9 @@ static int tegra_pcie_enable_msi(struct tegra_pcie *, bool);
 static int tegra_pcie_resume(struct device *dev)
 {
 	struct tegra_pcie *pcie = dev_get_drvdata(dev);
+
+	if (!pcie)
+		return 0;
 	PR_FUNC_LINE;
 	tegra_pcie_enable_features(pcie);
 	return 0;
@@ -5004,6 +5007,8 @@ static int tegra_pcie_suspend_late(struct device *dev)
 	struct tegra_pcie *pcie = dev_get_drvdata(dev);
 	u32 val = 0;
 
+	if (!pcie)
+		return 0;
 	PR_FUNC_LINE;
 	val = afi_readl(pcie, AFI_INTR_MASK);
 	val &= ~AFI_INTR_MASK_INT_MASK;
@@ -5017,6 +5022,8 @@ static int tegra_pcie_resume_early(struct device *dev)
 	struct tegra_pcie *pcie = dev_get_drvdata(dev);
 	u32 val = 0;
 
+	if (!pcie)
+		return 0;
 	PR_FUNC_LINE;
 	val = afi_readl(pcie, AFI_INTR_MASK);
 	val |= AFI_INTR_MASK_INT_MASK;
