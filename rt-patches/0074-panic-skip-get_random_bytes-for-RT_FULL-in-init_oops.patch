@@ -13,17 +13,17 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 2 insertions(+)
 
 diff --git a/kernel/panic.c b/kernel/panic.c
-index 223564d..f9badcf 100644
+index ea8b7c0..63e4e16 100644
 --- a/kernel/panic.c
 +++ b/kernel/panic.c
-@@ -403,9 +403,11 @@ static u64 oops_id;
- 
- static int init_oops_id(void)
- {
+@@ -410,9 +410,11 @@ static int init_oops_id(void)
+	if (np)
+		of_property_read_u32(np, "panic-timeout-value", &panic_timeout);
+
 +#ifndef CONFIG_PREEMPT_RT_FULL
- 	if (!oops_id)
- 		get_random_bytes(&oops_id, sizeof(oops_id));
- 	else
+	if (!oops_id)
+		get_random_bytes(&oops_id, sizeof(oops_id));
+	else
 +#endif
  		oops_id++;
  
