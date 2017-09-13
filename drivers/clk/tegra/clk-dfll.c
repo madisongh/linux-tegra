@@ -409,6 +409,7 @@ struct tegra_dfll {
 	u8				tune_out_last;
 	unsigned long			tune_high_dvco_rate_min;
 	unsigned long 			tune_high_target_rate_min;
+	unsigned long 			tune_high_target_rate_min_init;
 	bool				tune_high_calibrated;
 
 	/* PWM interface */
@@ -1534,7 +1535,7 @@ static bool dfll_one_shot_calibrate_floors(struct tegra_dfll *td)
 		}
 	}
 
-	/* Tune high Vmin if specified */
+	/* Tune high Vmin if specified. Disable tuning if F@Vmin > Fmax */
 	if (tune_mv && !td->tune_high_calibrated) {
 		if (tune_mv >= therm_mv) {
 			rate = dfll_one_shot_calibrate_mv(
@@ -1543,6 +1544,9 @@ static bool dfll_one_shot_calibrate_floors(struct tegra_dfll *td)
 				td->tune_high_dvco_rate_min = clamp(rate,
 					td->tune_high_target_rate_min,
 					td->out_rate_max);
+				if (rate > td->out_rate_max)
+					td->tune_high_target_rate_min =
+						ULONG_MAX;
 				td->tune_high_calibrated = true;
 				ret = true;
 			}
@@ -2587,6 +2591,7 @@ static void dfll_init_tuning_thresholds(struct tegra_dfll *td)
 	td->tune_high_out_start = max_voltage_index;
 	td->tune_high_dvco_rate_min = ULONG_MAX;
 	td->tune_high_target_rate_min = ULONG_MAX;
+	td->tune_high_target_rate_min_init = ULONG_MAX;
 
 	if (td->soc->tune_high_min_millivolts < td->soc->min_millivolts)
 		return;	/* no difference between low & high voltage range */
@@ -2603,6 +2608,7 @@ static void dfll_init_tuning_thresholds(struct tegra_dfll *td)
 	td->tune_high_out_start = out_start;
 	td->tune_high_dvco_rate_min = get_dvco_rate_above(td, out_start);
 	td->tune_high_target_rate_min = get_dvco_rate_above(td, out_min);
+	td->tune_high_target_rate_min_init = td->tune_high_target_rate_min;
 }
 
 /**
@@ -3476,6 +3482,7 @@ static void dfll_invalidate_one_shot(struct tegra_dfll *td)
 	for (i = 0; i <= td->soc->thermal_floor_table_size; i++)
 		td->dvco_rate_floors[i] = 0;
 	td->tune_high_calibrated = false;
+	td->tune_high_target_rate_min = td->tune_high_target_rate_min_init;
 }
 
 static void dfll_one_shot_log_time(struct tegra_dfll *td)
