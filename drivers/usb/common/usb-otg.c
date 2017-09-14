@@ -41,7 +41,7 @@ static DEFINE_MUTEX(otg_list_mutex);
  *
  * Return: usb_otg data on success, NULL otherwise.
  */
-static struct usb_otg *usb_otg_get_data(struct device *otg_dev)
+struct usb_otg *usb_otg_get_data(struct device *otg_dev)
 {
 	struct usb_otg *otg;
 
@@ -55,6 +55,7 @@ static struct usb_otg *usb_otg_get_data(struct device *otg_dev)
 
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(usb_otg_get_data);
 
 /**
  * usb_otg_start_host() - start/stop the host controller
@@ -381,6 +382,23 @@ void usb_otg_sync_inputs(struct usb_otg *otg)
 	queue_work(otg->wq, &otg->work);
 }
 EXPORT_SYMBOL_GPL(usb_otg_sync_inputs);
+
+/**
+ * usb_otg_flush_work - Flush otg work if needed
+ * @otg:	usb_otg instance
+ *
+ * Used by USB host/device stack to flush OTG queued work
+ * as needed, especailly in suspend/resume states.
+ *
+ */
+void usb_otg_flush_work(struct usb_otg *otg)
+{
+	if (!otg->fsm.running)
+		return;
+
+	flush_workqueue(otg->wq);
+}
+EXPORT_SYMBOL_GPL(usb_otg_flush_work);
 
 /**
  * usb_otg_register_hcd() - Register the host controller to OTG core

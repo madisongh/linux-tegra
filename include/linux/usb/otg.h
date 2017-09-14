@@ -164,8 +164,10 @@ int usb_otg_register_gadget(struct usb_gadget *gadget,
 int usb_otg_unregister_gadget(struct usb_gadget *gadget);
 int usb_otg_kick_fsm(struct device *hcd_gcd_device);
 void usb_otg_sync_inputs(struct usb_otg *otg);
+void usb_otg_flush_work(struct usb_otg *otg);
 int usb_otg_start_host(struct usb_otg *otg, int on);
 int usb_otg_start_gadget(struct usb_otg *otg, int on);
+struct usb_otg *usb_otg_get_data(struct device *otg_dev);
 
 /* used by HCD/PCD to notify events to USB core */
 int usb_otg_notify(struct device *dev, enum usb_otg_event event);
@@ -228,6 +230,10 @@ static inline void usb_otg_sync_inputs(struct usb_otg *otg)
 {
 }
 
+static inline void usb_otg_flush_work(struct usb_otg *otg)
+{
+}
+
 static inline int usb_otg_start_host(struct usb_otg *otg, int on)
 {
 	return -ENOTSUPP;
@@ -236,6 +242,10 @@ static inline int usb_otg_start_host(struct usb_otg *otg, int on)
 static inline int usb_otg_start_gadget(struct usb_otg *otg, int on)
 {
 	return -ENOTSUPP;
+}
+
+static inline struct usb_otg *usb_otg_get_data(struct device *otg_dev) {
+	return NULL;
 }
 
 static inline int usb_otg_notify(struct device *dev, enum usb_otg_event event)

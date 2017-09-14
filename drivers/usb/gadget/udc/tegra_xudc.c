@@ -477,6 +477,8 @@ struct tegra_xudc {
 	struct usb_gadget gadget;
 	struct usb_gadget_driver *driver;
 
+	struct usb_otg *otg;
+
 	struct pci_dev *pci;
 	bool pci_enabled;
 #define XUDC_NR_EVENT_RINGS 2
@@ -3872,6 +3874,7 @@ static int tegra_xudc_probe(struct platform_device *pdev)
 
 		dev_dbg(&pdev->dev, "registered to OTG core\n");
 		xudc->gadget.is_otg = 1;
+		xudc->otg = usb_otg_get_data(xudc->gadget.otg_dev);
 	} else {
 		/* for T186 device-only port or for non-T186 */
 		xudc->data_role_extcon = extcon_get_extcon_dev_by_cable(
@@ -4144,6 +4147,8 @@ static int tegra_xudc_resume(struct device *dev)
 
 	if (!XUDC_IS_T186(xudc) || !xudc->gadget.is_otg)
 		tegra_xudc_update_data_role(xudc);
+	else if (xudc->gadget.is_otg)
+		usb_otg_flush_work(xudc->otg);
 
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
