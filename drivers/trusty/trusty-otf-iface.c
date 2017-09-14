@@ -20,7 +20,7 @@
 #define OTF_PORT_NAME		"com.nvidia.tos.74629d40-1378-4d17-94d0e0af5d861d88"
 #define OTF_REPROGRAM_KEYS	5
 
-void trusty_restore_keyslots(void)
+void te_restore_keyslots(void)
 {
 	void *opaque_channel_context = NULL;
 	int ret = 0;
@@ -46,4 +46,4 @@ void trusty_restore_keyslots(void)
 
 	te_close_trusted_session(opaque_channel_context);
 }
-EXPORT_SYMBOL(trusty_restore_keyslots);
+EXPORT_SYMBOL(te_restore_keyslots);
