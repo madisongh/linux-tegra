@@ -47,7 +47,7 @@ enum {
 static const u32 __initconst cpu_process_speedos[][CPU_PROCESS_CORNERS] = {
 	{ 2119, UINT_MAX },
 	{ 2119, UINT_MAX },
-	{ 1550, UINT_MAX },
+	{ UINT_MAX, UINT_MAX },
 };
 
 static const u32 __initconst gpu_process_speedos[][GPU_PROCESS_CORNERS] = {
@@ -59,7 +59,7 @@ static const u32 __initconst gpu_process_speedos[][GPU_PROCESS_CORNERS] = {
 static const u32 __initconst soc_process_speedos[][SOC_PROCESS_CORNERS] = {
 	{ 1950,     2073,     UINT_MAX },
 	{ UINT_MAX, UINT_MAX, UINT_MAX },
-	{ 1562,     1673,     UINT_MAX },
+	{ 1598,     1709,     UINT_MAX },
 };
 
 static u8 __init get_speedo_revision(void)
