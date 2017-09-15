@@ -839,6 +839,15 @@ struct device {
 	void	(*release)(struct device *dev);
 	struct iommu_group	*iommu_group;
 
+	/* dma-buf stashing is optimized for host1x context device. Adding
+	 * flag to find out whether device is context device or not.
+	 * To iterate over all dma-bufs attached to dev for stashing, we need
+	 * dev to dma-buf mappings list stored in dev node, adding attachments
+	 * for that purpose.
+	 */
+	bool			context_dev;
+	struct list_head	attachments;
+
 	bool			offline_disabled:1;
 	bool			offline:1;
 	bool			no_dmabuf_defer_unmap:1;
