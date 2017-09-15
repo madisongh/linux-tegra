@@ -1356,7 +1356,7 @@ static int get_coreb01slt_sku_max_mv(void)
 
 static int get_coreb01_sku_min_mv(void)
 {
-	return 712;
+	return 637;
 }
 
 static int get_coreb01slt_sku_min_mv(void)
