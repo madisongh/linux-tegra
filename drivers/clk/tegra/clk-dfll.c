@@ -284,6 +284,7 @@
 #define DFLL_DEFER_FORCE_CALIBRATE	BIT(1)
 #define DFLL_ONE_SHOT_CALIBRATE		BIT(2)
 #define DFLL_HAS_IDLE_OVERRIDE		BIT(3)
+#define DFLL_CAN_DISABLE_TUNING		BIT(4)
 
 /**
  * enum dfll_ctrl_mode - DFLL hardware operating mode
@@ -1505,6 +1506,7 @@ static bool dfll_one_shot_calibrate_floors(struct tegra_dfll *td)
 	int mv, therm_mv = 0, tune_mv = 0;
 	int i = td->thermal_floor_index;
 	enum dfll_tune_range range = td->tune_range;
+	bool can_disable = td->cfg_flags & DFLL_CAN_DISABLE_TUNING;
 	unsigned long rate;
 
 	if (!(td->cfg_flags & DFLL_ONE_SHOT_CALIBRATE) ||
@@ -1544,7 +1546,7 @@ static bool dfll_one_shot_calibrate_floors(struct tegra_dfll *td)
 				td->tune_high_dvco_rate_min = clamp(rate,
 					td->tune_high_target_rate_min,
 					td->out_rate_max);
-				if (rate > td->out_rate_max)
+				if (can_disable && (rate > td->out_rate_max))
 					td->tune_high_target_rate_min =
 						ULONG_MAX;
 				td->tune_high_calibrated = true;
@@ -2999,6 +3001,8 @@ static int dfll_fetch_common_params(struct tegra_dfll *td)
 		td->cfg_flags |= DFLL_ONE_SHOT_CALIBRATE;
 	if (of_property_read_bool(dn, "nvidia,idle-override"))
 		td->cfg_flags |= DFLL_HAS_IDLE_OVERRIDE;
+	if (of_property_read_bool(dn, "nvidia,can-disable-tuning"))
+		td->cfg_flags |= DFLL_CAN_DISABLE_TUNING;
 
 	td->one_shot_settle_time = DFLL_ONE_SHOT_SETTLE_TIME;
 	of_property_read_u32(dn, "nvidia,one-shot-settle-time",
