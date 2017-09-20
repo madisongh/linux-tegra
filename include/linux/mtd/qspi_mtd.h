@@ -201,10 +201,10 @@ static struct qcmdset cmd_info_table[OPERATION_MAX_LIMIT] = {
 			.bus_width = X1, .dummy_cycles = 0},
 		{.is_ddr = FALSE, .bus_width = X1}
 	},
-	/*  QPI_FRQAD, need dummy byte 16 instead of 24 byte Bug 200284769 */
+	/*  QPI_FRQAD */
 	{ {.op_code = 0xeb, .is_ddr = FALSE, .bus_width = X1, .post_txn = 2},
 		{.address = 0, .is_ddr = FALSE, .len = 4, .bus_width = X4,
-			.dummy_cycles = 16},
+			.dummy_cycles = 24},
 		{.is_ddr = FALSE, .bus_width = X4}
 	},
 	/*  QPI_WQAD */

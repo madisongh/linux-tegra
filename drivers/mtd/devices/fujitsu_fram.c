@@ -37,7 +37,10 @@
 #include <linux/spi/flash.h>
 #include <linux/mtd/qspi_mtd.h>
 
-struct qspi *glbl_qspi_flash;
+struct qspi_fram {
+	struct qspi	*fram_flash;
+	bool		is_lc_mode_set;
+} glbl_qspi_fram;
 
 /*
  * NOTE: Below Macro is used to optimize the QPI/QUAD mode switch logic...
@@ -60,6 +63,8 @@ struct qspi *glbl_qspi_flash;
 #define WE_RETRY_COUNT				200
 #define WIP_RETRY_COUNT				2000000
 #define BITS8_PER_WORD				8
+#define FRAM_CMD_WRSR				0x01
+#define FRAM_LC_MODE_0				0x00
 
 #define FILL_TX_BUF_LEN(tx, buf, nlen)			\
 		tx.len = nlen,				\
@@ -197,7 +202,7 @@ static int qspi_write_en(struct qspi *flash,
 
 		status = read_sr1_reg(flash, &regval);
 		if (status) {
-			pr_err("error: %s: RDSR1 failed: Status: 0x%x ",
+			pr_err("error: %s: RDSR failed: Status: 0x%x ",
 				__func__, status);
 			return status;
 		}
@@ -240,15 +245,39 @@ int _qspi_read(struct qspi *flash, loff_t from, size_t len,
 	struct spi_message m;
 	uint8_t merge_cmd_addr = FALSE;
 	uint8_t cmd_addr_buf[5];
-	int addr_len;
+	int addr_len, err;
+	uint8_t status, regval;
 
 	pr_debug("%s: %s from 0x%08x, len %zd\n",
 		dev_name(&flash->spi->dev),
 		__func__, (u32)from, len);
 
 	spi_message_init(&m);
-	memset(t, 0, sizeof(t));
 
+	if (!glbl_qspi_fram.is_lc_mode_set) {
+		memset(t, 0, sizeof(t));
+		err = qspi_write_en(flash, TRUE, FALSE);
+		if (err) {
+			pr_err("error: %s: WE failed: Status: x%x ",
+				__func__, err);
+		}
+
+		cmd_addr_buf[0] = FRAM_CMD_WRSR;
+		cmd_addr_buf[1] = FRAM_LC_MODE_0;
+		FILL_TX_BUF_LEN(t[0], cmd_addr_buf, 2);
+		spi_message_add_tail(&t[0], &m);
+		t[0].cs_change = TRUE;
+		spi_sync(flash->spi, &m);
+
+		status = read_sr1_reg(flash, &regval);
+		if (status) {
+			pr_err("error: %s: RDSR failed: Status: 0x%x ",
+				__func__, status);
+		}
+		glbl_qspi_fram.is_lc_mode_set = TRUE;
+	}
+
+	memset(t, 0, sizeof(t));
 	/* take lock here to protect race condition
 	 * in case of concurrent read and write with
 	 * different cmd_mode selection.
@@ -413,20 +442,20 @@ clear_qmode:
 int qspi_read(loff_t from, size_t len,
 		size_t *retlen, u_char *buf)
 {
-	if (!glbl_qspi_flash)
+	if (!glbl_qspi_fram.fram_flash)
 		return -EINVAL;
 
-	return _qspi_read(glbl_qspi_flash, from, len, retlen, buf);
+	return _qspi_read(glbl_qspi_fram.fram_flash, from, len, retlen, buf);
 }
 EXPORT_SYMBOL_GPL(qspi_read);
 
 int qspi_write(loff_t to, size_t len,
 		size_t *retlen, const u_char *buf)
 {
-	if (!glbl_qspi_flash)
+	if (!glbl_qspi_fram.fram_flash)
 		return -EINVAL;
 
-	return _qspi_write(glbl_qspi_flash, to, len, retlen, buf);
+	return _qspi_write(glbl_qspi_fram.fram_flash, to, len, retlen, buf);
 }
 EXPORT_SYMBOL_GPL(qspi_write);
 
@@ -620,7 +649,7 @@ static int qspi_probe(struct spi_device *spi)
 		return ret;
 	}
 
-	glbl_qspi_flash = flash;
+	glbl_qspi_fram.fram_flash = flash;
 	return ret;
 }
 
