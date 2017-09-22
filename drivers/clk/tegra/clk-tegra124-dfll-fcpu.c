@@ -859,6 +859,7 @@ static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
 	INIT_TUNE_PRAM(tune1_high);
 	INIT_TUNE_PRAM(tune_high_min_millivolts);
 	INIT_TUNE_PRAM(tune_high_margin_millivolts);
+	soc->dvco_calibration_max = cvb->cpu_dfll_data.dvco_calibration_max;
 	soc->cvb_version = cvb->cvb_version;
 
 	thermal = fcpu_data->cpu_thermal_table;

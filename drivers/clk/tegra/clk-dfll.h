@@ -59,6 +59,7 @@ struct tegra_dfll_soc_data {
 	const struct thermal_tv *thermal_cap_table;
 	unsigned int thermal_floor_table_size;
 	unsigned int thermal_cap_table_size;
+	unsigned long dvco_calibration_max;
 	const char *cvb_version;
 };
 
