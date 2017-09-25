@@ -284,7 +284,6 @@
 #define DFLL_DEFER_FORCE_CALIBRATE	BIT(1)
 #define DFLL_ONE_SHOT_CALIBRATE		BIT(2)
 #define DFLL_HAS_IDLE_OVERRIDE		BIT(3)
-#define DFLL_CAN_DISABLE_TUNING		BIT(4)
 
 /**
  * enum dfll_ctrl_mode - DFLL hardware operating mode
@@ -410,7 +409,6 @@ struct tegra_dfll {
 	u8				tune_out_last;
 	unsigned long			tune_high_dvco_rate_min;
 	unsigned long 			tune_high_target_rate_min;
-	unsigned long 			tune_high_target_rate_min_init;
 	bool				tune_high_calibrated;
 
 	/* PWM interface */
@@ -1506,7 +1504,6 @@ static bool dfll_one_shot_calibrate_floors(struct tegra_dfll *td)
 	int mv, therm_mv = 0, tune_mv = 0;
 	int i = td->thermal_floor_index;
 	enum dfll_tune_range range = td->tune_range;
-	bool can_disable = td->cfg_flags & DFLL_CAN_DISABLE_TUNING;
 	unsigned long rate;
 
 	if (!(td->cfg_flags & DFLL_ONE_SHOT_CALIBRATE) ||
@@ -1537,7 +1534,7 @@ static bool dfll_one_shot_calibrate_floors(struct tegra_dfll *td)
 		}
 	}
 
-	/* Tune high Vmin if specified. Disable tuning if F@Vmin > Fmax */
+	/* Tune high Vmin if specified */
 	if (tune_mv && !td->tune_high_calibrated) {
 		if (tune_mv >= therm_mv) {
 			rate = dfll_one_shot_calibrate_mv(
@@ -1546,9 +1543,6 @@ static bool dfll_one_shot_calibrate_floors(struct tegra_dfll *td)
 				td->tune_high_dvco_rate_min = clamp(rate,
 					td->tune_high_target_rate_min,
 					td->out_rate_max);
-				if (can_disable && (rate > td->out_rate_max))
-					td->tune_high_target_rate_min =
-						ULONG_MAX;
 				td->tune_high_calibrated = true;
 				ret = true;
 			}
@@ -2593,7 +2587,6 @@ static void dfll_init_tuning_thresholds(struct tegra_dfll *td)
 	td->tune_high_out_start = max_voltage_index;
 	td->tune_high_dvco_rate_min = ULONG_MAX;
 	td->tune_high_target_rate_min = ULONG_MAX;
-	td->tune_high_target_rate_min_init = ULONG_MAX;
 
 	if (td->soc->tune_high_min_millivolts < td->soc->min_millivolts)
 		return;	/* no difference between low & high voltage range */
@@ -2610,7 +2603,6 @@ static void dfll_init_tuning_thresholds(struct tegra_dfll *td)
 	td->tune_high_out_start = out_start;
 	td->tune_high_dvco_rate_min = get_dvco_rate_above(td, out_start);
 	td->tune_high_target_rate_min = get_dvco_rate_above(td, out_min);
-	td->tune_high_target_rate_min_init = td->tune_high_target_rate_min;
 }
 
 /**
@@ -3001,8 +2993,6 @@ static int dfll_fetch_common_params(struct tegra_dfll *td)
 		td->cfg_flags |= DFLL_ONE_SHOT_CALIBRATE;
 	if (of_property_read_bool(dn, "nvidia,idle-override"))
 		td->cfg_flags |= DFLL_HAS_IDLE_OVERRIDE;
-	if (of_property_read_bool(dn, "nvidia,can-disable-tuning"))
-		td->cfg_flags |= DFLL_CAN_DISABLE_TUNING;
 
 	td->one_shot_settle_time = DFLL_ONE_SHOT_SETTLE_TIME;
 	of_property_read_u32(dn, "nvidia,one-shot-settle-time",
@@ -3486,7 +3476,6 @@ static void dfll_invalidate_one_shot(struct tegra_dfll *td)
 	for (i = 0; i <= td->soc->thermal_floor_table_size; i++)
 		td->dvco_rate_floors[i] = 0;
 	td->tune_high_calibrated = false;
-	td->tune_high_target_rate_min = td->tune_high_target_rate_min_init;
 }
 
 static void dfll_one_shot_log_time(struct tegra_dfll *td)
