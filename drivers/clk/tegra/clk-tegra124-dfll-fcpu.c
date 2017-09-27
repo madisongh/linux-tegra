@@ -547,6 +547,7 @@ struct cvb_table tegra210_cpu_cvb_tables[] = {
 		.tune1_low  = 0x21107FF,			  \
 		.tune_high_min_millivolts = 850,		  \
 		.tune_high_margin_millivolts = 38,		  \
+		.dvco_calibration_max = ULONG_MAX,		  \
 	}, \
 	.cvb_version = "FCPU Table - p4v3-AggressiveSLT"
 
@@ -584,6 +585,7 @@ struct cvb_table tegra210_cpu_cvb_tables[] = {
 		.tune1_low  = 0x21107FF,			  \
 		.tune_high_min_millivolts = 850,		  \
 		.tune_high_margin_millivolts = 38,		  \
+		.dvco_calibration_max = ULONG_MAX,		  \
 	}, \
 	.cvb_version = "FCPU Table - p4v3-AggressiveSLT"
 
@@ -620,6 +622,7 @@ struct cvb_table tegra210_cpu_cvb_tables[] = {
 		.tune1_high = 0x3FFF7FF,			  \
 		.tune_high_min_millivolts = 850,		  \
 		.tune_high_margin_millivolts = 38,		  \
+		.dvco_calibration_max = ULONG_MAX,		  \
 	}, \
 	.cvb_version = "FCPU Table - p4v3"
 
