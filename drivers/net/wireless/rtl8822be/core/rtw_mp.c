@@ -1345,6 +1345,46 @@ static struct xmit_frame *alloc_mp_xmitframe(struct xmit_priv *pxmitpriv)
 
 }
 
+static u8 check_nic_enough_desc(_adapter *padapter, struct pkt_attrib *pattrib)
+{
+	u32 prio;
+	struct xmit_priv	*pxmitpriv = &padapter->xmitpriv;
+	struct rtw_tx_ring	*ring;
+
+	switch (pattrib->qsel) {
+	case 0:
+	case 3:
+		prio = BE_QUEUE_INX;
+		break;
+	case 1:
+	case 2:
+		prio = BK_QUEUE_INX;
+		break;
+	case 4:
+	case 5:
+		prio = VI_QUEUE_INX;
+		break;
+	case 6:
+	case 7:
+		prio = VO_QUEUE_INX;
+		break;
+	default:
+		prio = BE_QUEUE_INX;
+		break;
+	}
+
+	ring = &pxmitpriv->tx_ring[prio];
+
+	/*
+	 * for now we reserve two free descriptor as a safety boundary
+	 * between the tail and the head
+	 */
+	if ((ring->entries - ring->qlen) >= 2)
+		return _TRUE;
+	else
+		return _FALSE;
+}
+
 static thread_return mp_xmit_packet_thread(thread_context context)
 {
 	struct xmit_frame	*pxmitframe;
@@ -1363,6 +1403,12 @@ static thread_return mp_xmit_packet_thread(thread_context context)
 	RTW_INFO("%s:pkTx Start\n", __func__);
 	while (1) {
 		pxmitframe = alloc_mp_xmitframe(pxmitpriv);
+#ifdef CONFIG_PCIE_HCI
+		if(check_nic_enough_desc(padapter, &pmptx->attrib) == _FALSE) {
+			rtw_usleep_os(1000);
+			continue;
+		}
+#endif
 		if (pxmitframe == NULL) {
 			if (pmptx->stop ||
 			    RTW_CANNOT_RUN(padapter))

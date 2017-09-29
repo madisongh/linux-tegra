@@ -10744,6 +10744,14 @@ static int rtw_priv_mp_get(struct net_device *dev,
 		rtw_mp_customer_str(dev, info, wdata, extra);
 		break;
 #endif
+	case MP_PWRLMT:
+		RTW_INFO("mp_get MP_SETPWRLMT\n");
+		rtw_mp_pwrlmt(dev, info, wdata, extra);
+		break;
+	case MP_PWRBYRATE:
+		RTW_INFO("mp_get MP_SETPWRBYRATE\n");
+		rtw_mp_pwrbyrate(dev, info, wdata, extra);
+		break;
 	default:
 		return -EIO;
 	}
@@ -12873,6 +12881,8 @@ static const struct iw_priv_args rtw_mp_private_args[] = {
 	{ MP_TX, IW_PRIV_TYPE_CHAR | 1024, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK, "mp_tx" },
 	{ MP_RX, IW_PRIV_TYPE_CHAR | 1024, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK, "mp_rx" },
 	{ MP_HW_TX_MODE, IW_PRIV_TYPE_CHAR | 1024, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK, "mp_hxtx" },
+	{ MP_PWRLMT, IW_PRIV_TYPE_CHAR | 1024, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK, "mp_pwrlmt" },
+	{ MP_PWRBYRATE, IW_PRIV_TYPE_CHAR | 1024, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK, "mp_pwrbyrate" },
 	{ CTA_TEST, IW_PRIV_TYPE_CHAR | 1024, 0, "cta_test"},
 	{ MP_IQK, IW_PRIV_TYPE_CHAR | 1024, 0, "mp_iqk"},
 	{ MP_LCK, IW_PRIV_TYPE_CHAR | 1024, 0, "mp_lck"},

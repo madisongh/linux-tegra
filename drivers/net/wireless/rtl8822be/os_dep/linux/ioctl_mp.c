@@ -1979,6 +1979,60 @@ int rtw_mp_hwtx(struct net_device *dev,
 
 }
 
+int rtw_mp_pwrlmt(struct net_device *dev,
+			struct iw_request_info *info,
+			union iwreq_data *wrqu, char *extra)
+{
+	PADAPTER padapter = rtw_netdev_priv(dev);
+	struct registry_priv  *registry_par = &padapter->registrypriv;
+	u8 pwrlimtstat = 0;
+
+	if (copy_from_user(extra, wrqu->data.pointer, wrqu->data.length))
+		return -EFAULT;
+#ifdef CONFIG_TXPWR_LIMIT
+	pwrlimtstat = registry_par->RegEnableTxPowerLimit;
+	if (strncmp(extra, "off", 3) == 0 && strlen(extra) < 4) {
+		padapter->registrypriv.RegEnableTxPowerLimit = 0;
+		sprintf(extra, "Turn off Power Limit\n");
+
+	} else if (strncmp(extra, "on", 2) == 0 && strlen(extra) < 3) {
+		padapter->registrypriv.RegEnableTxPowerLimit = 1;
+		sprintf(extra, "Turn on Power Limit\n");
+
+	} else
+#endif
+		sprintf(extra, "Get Power Limit Status:%s\n", (pwrlimtstat == 1) ? "ON" : "OFF");
+
+
+	wrqu->data.length = strlen(extra);
+	return 0;
+}
+
+int rtw_mp_pwrbyrate(struct net_device *dev,
+			struct iw_request_info *info,
+			union iwreq_data *wrqu, char *extra)
+{
+	PADAPTER padapter = rtw_netdev_priv(dev);
+
+	if (copy_from_user(extra, wrqu->data.pointer, wrqu->data.length))
+		return -EFAULT;
+
+	if (strncmp(extra, "off", 3) == 0 && strlen(extra) < 4) {
+		padapter->registrypriv.RegEnableTxPowerByRate = 0;
+		sprintf(extra, "Turn off Tx Power by Rate\n");
+
+	} else if (strncmp(extra, "on", 2) == 0 && strlen(extra) < 3) {
+		padapter->registrypriv.RegEnableTxPowerByRate = 1;
+		sprintf(extra, "Turn On Tx Power by Rate\n");
+
+	} else {
+		sprintf(extra, "Get Power by Rate Status:%s\n", (padapter->registrypriv.RegEnableTxPowerByRate == 1) ? "ON" : "OFF");
+	}
+
+	wrqu->data.length = strlen(extra);
+	return 0;
+}
+
 int rtw_efuse_mask_file(struct net_device *dev,
 			struct iw_request_info *info,
 			union iwreq_data *wrqu, char *extra)

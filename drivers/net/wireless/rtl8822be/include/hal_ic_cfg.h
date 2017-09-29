@@ -176,8 +176,8 @@
 		#define DBG_RX_DFRAME_RAW_DATA
 	#endif /* DBG_RX_DFRAME_RAW_DATA */
 
-	#ifndef RTW_IQK_FW_OFFLOAD
-		#define RTW_IQK_FW_OFFLOAD
+	#ifdef RTW_IQK_FW_OFFLOAD
+		#undef RTW_IQK_FW_OFFLOAD
 	#endif /* RTW_IQK_FW_OFFLOAD */
 #endif /* CONFIG_RTL8822B */
 

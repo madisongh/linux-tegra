@@ -20,14 +20,14 @@
 
 #ifdef LOAD_FW_HEADER_FROM_DRIVER
 #if (defined(CONFIG_AP_WOWLAN) || (DM_ODM_SUPPORT_TYPE & (ODM_AP)))
-extern u8 array_mp_8822b_fw_ap[81504];
+extern u8 array_mp_8822b_fw_ap[82248];
 extern u32 array_length_mp_8822b_fw_ap;
 #endif
 
 #if (DM_ODM_SUPPORT_TYPE & (ODM_WIN)) || (DM_ODM_SUPPORT_TYPE & (ODM_CE))
-extern u8 array_mp_8822b_fw_nic[127496];
+extern u8 array_mp_8822b_fw_nic[128536];
 extern u32 array_length_mp_8822b_fw_nic;
-extern u8 array_mp_8822b_fw_wowlan[73536];
+extern u8 array_mp_8822b_fw_wowlan[73672];
 extern u32 array_length_mp_8822b_fw_wowlan;
 #endif
 #endif /* end of LOAD_FW_HEADER_FROM_DRIVER */

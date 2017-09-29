@@ -130,9 +130,11 @@ enum bt_8822b_1ant_coex_algo {
 	BT_8822B_1ANT_COEX_ALGO_PANHS			= 0x6,
 	BT_8822B_1ANT_COEX_ALGO_PANEDR_A2DP		= 0x7,
 	BT_8822B_1ANT_COEX_ALGO_PANEDR_HID		= 0x8,
-	BT_8822B_1ANT_COEX_ALGO_HID_A2DP_PANEDR	= 0x9,
-	BT_8822B_1ANT_COEX_ALGO_HID_A2DP			= 0xa,
-	BT_8822B_1ANT_COEX_ALGO_MAX				= 0xb,
+	BT_8822B_1ANT_COEX_ALGO_HID_A2DP_PANEDR		= 0x9,
+	BT_8822B_1ANT_COEX_ALGO_HID_A2DP		= 0xa,
+	BT_8822B_1ANT_COEX_ALGO_NOPROFILEBUSY		= 0xb,
+	BT_8822B_1ANT_COEX_ALGO_A2DPSINK		= 0xc,
+	BT_8822B_1ANT_COEX_ALGO_MAX
 };
 
 enum bt_8822b_1ant_ext_ant_switch_type {
@@ -165,6 +167,9 @@ enum bt_8822b_1ant_phase {
 	BT_8822B_1ANT_PHASE_2G_RUNTIME				= 0x3,
 	BT_8822B_1ANT_PHASE_5G_RUNTIME				= 0x4,
 	BT_8822B_1ANT_PHASE_BTMPMODE				= 0x5,
+	BT_8822B_1ANT_PHASE_COEX_POWERON			= 0x6,
+	BT_8822B_1ANT_PHASE_2G_FREERUN_ANT_WL		= 0x7,
+	BT_8822B_1ANT_PHASE_2G_FREERUN_ANT_BT		= 0x8,
 	BT_8822B_1ANT_PHASE_MAX
 };
 
@@ -174,6 +179,7 @@ enum bt_8822b_1ant_Scoreboard {
 	BT_8822B_1ANT_SCOREBOARD_ONOFF                             = BIT(1),
 	BT_8822B_1ANT_SCOREBOARD_SCAN                               = BIT(2),
 	BT_8822B_1ANT_SCOREBOARD_UNDERTEST							= BIT(3),
+	BT_8822B_1ANT_SCOREBOARD_RXGAIN								= BIT(4),
 	BT_8822B_1ANT_SCOREBOARD_WLBUSY                          = BIT(6)
 };
 
@@ -197,6 +203,10 @@ struct coex_dm_8822b_1ant {
 	u8		cur_lps;
 	u8		pre_rpwm;
 	u8		cur_rpwm;
+	u8		pre_bt_dec_pwr_lvl;
+	u8		cur_bt_dec_pwr_lvl;
+	u8		pre_fw_dac_swing_lvl;
+	u8		cur_fw_dac_swing_lvl;
 
 	/* sw mechanism */
 	boolean	pre_low_penalty_ra;
@@ -236,6 +246,8 @@ struct coex_dm_8822b_1ant {
 	u32		cur_ext_ant_switch_status;
 
 	u8		error_condition;
+	boolean		pre_agc_table_en;
+	boolean		cur_agc_table_en;
 };
 
 struct coex_sta_8822b_1ant {
@@ -262,8 +274,8 @@ struct coex_sta_8822b_1ant {
 	u32					bt_info_c2h_cnt[BT_INFO_SRC_8822B_1ANT_MAX];
 	boolean					bt_whck_test;
 	boolean					c2h_bt_inquiry_page;
-	boolean				c2h_bt_remote_name_req;
-	boolean					c2h_bt_page;				/* Add for win8.1 page out issue */
+	boolean					c2h_bt_remote_name_req;
+	boolean					c2h_bt_page;			/* Add for win8.1 page out issue */
 	boolean					wifi_is_high_pri_task;		/* Add for win8.1 page out issue */
 
 	u8					bt_info_ext;
@@ -282,9 +294,10 @@ struct coex_sta_8822b_1ant {
 	u32					crc_err_11n;
 	u32					crc_err_11n_vht;
 
-	boolean					cck_lock;
-	boolean					pre_ccklock;
-	boolean					cck_ever_lock;
+	boolean				cck_lock;
+	boolean				cck_lock_ever;
+	boolean				cck_lock_warn;
+
 	u8					coex_table_type;
 
 	boolean					force_lps_ctrl;
@@ -296,8 +309,8 @@ struct coex_sta_8822b_1ant {
 
 	u8					a2dp_bit_pool;
 	u8					cut_version;
-	boolean				acl_busy;
-	boolean				bt_create_connection;
+	boolean					acl_busy;
+	boolean					bt_create_connection;
 
 	u32					bt_coex_supported_feature;
 	u32					bt_coex_supported_version;
@@ -305,13 +318,13 @@ struct coex_sta_8822b_1ant {
 	u8					bt_ble_scan_type;
 	u32					bt_ble_scan_para[3];
 
-	boolean				run_time_state;
-	boolean				freeze_coexrun_by_btinfo;
+	boolean					run_time_state;
+	boolean					freeze_coexrun_by_btinfo;
 
-	boolean				is_A2DP_3M;
-	boolean				voice_over_HOGP;
-	u8                  bt_info;
-	boolean				is_autoslot;
+	boolean					is_A2DP_3M;
+	boolean					voice_over_HOGP;
+	u8					bt_info;
+	boolean					is_autoslot;
 	u8					forbidden_slot;
 	u8					hid_busy_num;
 	u8					hid_pair_cnt;
@@ -326,24 +339,30 @@ struct coex_sta_8822b_1ant {
 	u16					bt_reg_vendor_ac;
 	u16					bt_reg_vendor_ae;
 
-	boolean				is_setupLink;
+	boolean					is_setupLink;
 	u8					wl_noisy_level;
-	u32                 gnt_error_cnt;
+	u32					gnt_error_cnt;
 	u8					bt_afh_map[10];
 	u8					bt_relink_downcount;
-	boolean				is_tdma_btautoslot;
-	boolean				is_tdma_btautoslot_hang;
+	boolean					is_tdma_btautoslot;
+	boolean					is_tdma_btautoslot_hang;
 
 	u8					switch_band_notify_to;
-	boolean				is_rf_state_off;
+	boolean					is_rf_state_off;
 
-	boolean				is_hid_low_pri_tx_overhead;
-	boolean				is_bt_multi_link;
-	boolean				is_bt_a2dp_sink;
-	boolean             rf4ce_enabled;
+	boolean					is_hid_low_pri_tx_overhead;
+	boolean					is_bt_multi_link;
+	boolean					is_bt_a2dp_sink;
 
-	boolean				is_set_ps_state_fail;
+	boolean					is_set_ps_state_fail;
 	u8					cnt_set_ps_state_fail;
+
+	u8					wl_fw_dbg_info[10];
+	u8					wl_rx_rate;
+	u8					wl_rts_rx_rate;
+	u8					wl_center_channel;
+
+	u16					score_board_WB;
 };
 
 struct rfe_type_8822b_1ant {
@@ -427,6 +446,10 @@ void ex_halbtc8822b1ant_specific_packet_notify(IN struct btc_coexist *btcoexist,
 		IN u8 type);
 void ex_halbtc8822b1ant_bt_info_notify(IN struct btc_coexist *btcoexist,
 				       IN u8 *tmp_buf, IN u8 length);
+void ex_halbtc8822b1ant_wl_fwdbginfo_notify(IN struct btc_coexist *btcoexist,
+				       IN u8 *tmp_buf, IN u8 length);
+void ex_halbtc8822b1ant_rx_rate_change_notify(IN struct btc_coexist *btcoexist,
+		IN BOOLEAN is_data_frame, IN u8 btc_rate_id);
 void ex_halbtc8822b1ant_rf_status_notify(IN struct btc_coexist *btcoexist,
 		IN u8 type);
 void ex_halbtc8822b1ant_halt_notify(IN struct btc_coexist *btcoexist);
@@ -464,6 +487,8 @@ void ex_halbtc8822b1ant_dbg_control(IN struct btc_coexist *btcoexist,
 #define	ex_halbtc8822b1ant_media_status_notify(btcoexist, type)
 #define	ex_halbtc8822b1ant_specific_packet_notify(btcoexist, type)
 #define	ex_halbtc8822b1ant_bt_info_notify(btcoexist, tmp_buf, length)
+#define	ex_halbtc8822b1ant_wl_fwdbginfo_notify(btcoexist, tmp_buf, length)
+#define	ex_halbtc8822b1ant_rx_rate_change_notify(btcoexist, is_data_frame, btc_rate_id)
 #define	ex_halbtc8822b1ant_rf_status_notify(btcoexist, type)
 #define	ex_halbtc8822b1ant_halt_notify(btcoexist)
 #define	ex_halbtc8822b1ant_pnp_notify(btcoexist, pnp_state)

@@ -352,6 +352,24 @@ void halbtcoutsrc_NormalLps(PBTC_COEXIST pBtCoexist)
 	}
 }
 
+void halbtcoutsrc_Pre_NormalLps(PBTC_COEXIST pBtCoexist)
+{
+	PADAPTER padapter;
+
+	padapter = pBtCoexist->Adapter;
+
+	if (pBtCoexist->bt_info.bt_ctrl_lps) {
+		pBtCoexist->bt_info.bt_lps_on = _FALSE;
+		rtw_btcoex_LPS_Leave(padapter);
+	}
+}
+
+void halbtcoutsrc_Post_NormalLps(PBTC_COEXIST pBtCoexist)
+{
+	if (pBtCoexist->bt_info.bt_ctrl_lps)
+		pBtCoexist->bt_info.bt_ctrl_lps = _FALSE;
+}
+
 /*
  *  Constraint:
  *	   1. this function will request pwrctrl->lock
@@ -1185,6 +1203,14 @@ u8 halbtcoutsrc_Set(void *pBtcContext, u8 setType, void *pInBuf)
 
 	case BTC_SET_ACT_NORMAL_LPS:
 		halbtcoutsrc_NormalLps(pBtCoexist);
+		break;
+
+	case BTC_SET_ACT_PRE_NORMAL_LPS:
+		halbtcoutsrc_Pre_NormalLps(pBtCoexist);
+		break;
+
+	case BTC_SET_ACT_POST_NORMAL_LPS:
+		halbtcoutsrc_Post_NormalLps(pBtCoexist);
 		break;
 
 	case BTC_SET_ACT_DISABLE_LOW_POWER:
