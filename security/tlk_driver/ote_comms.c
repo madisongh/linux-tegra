@@ -168,29 +168,7 @@ static void do_smc(struct te_request *request, struct tlk_device *dev)
 	(void)send_smc(request->type, smc_args, smc_params);
 }
 
-/*
- * VPR programming SMC
- */
-int te_set_vpr_params(void *vpr_base, size_t vpr_size)
-{
-	uint32_t retval;
-
-	/* Share the same lock used when request is send from user side */
-	mutex_lock(&smc_lock);
-
-	retval = send_smc(TE_SMC_PROGRAM_VPR, (uintptr_t)vpr_base, vpr_size);
-
-	mutex_unlock(&smc_lock);
-
-	if (retval != OTE_SUCCESS) {
-		pr_err("%s: smc failed err (0x%x)\n", __func__, retval);
-		return -EINVAL;
-	}
-	return 0;
-}
-EXPORT_SYMBOL(te_set_vpr_params);
-
-void te_restore_keyslots(void)
+void tlk_restore_keyslots(void)
 {
 	uint32_t retval;
 
@@ -205,7 +183,7 @@ void te_restore_keyslots(void)
 		pr_err("%s: smc failed err (0x%x)\n", __func__, retval);
 	}
 }
-EXPORT_SYMBOL(te_restore_keyslots);
+EXPORT_SYMBOL(tlk_restore_keyslots);
 
 /*
  * VRR Set Buffer
@@ -378,85 +356,6 @@ error:
 	te_release_mem_buffers(&session->temp_shmem_list);
 	te_release_mem_buffers(&session->inactive_persist_shmem_list);
 }
-
-void te_authenticate_vrr(u8 *buf_ptr, u32 buflen)
-{
-	u32 i, no_of_params = 1;
-	struct te_request *request;
-	struct te_oper_param user_param;
-	struct te_oper_param *param_array;
-	struct te_oper_param *params = NULL;
-	struct te_cmd_req_desc *cmd_desc = NULL;
-	u32 session_id, vrr_auth_uuid[4] = VR_AUTH_UUID;
-
-	mutex_lock(&smc_lock);
-
-	/* Open & submit the work to SMC */
-	cmd_desc = NULL;
-	params = NULL;
-	no_of_params =  1;
-
-	cmd_desc = te_get_free_cmd_desc(&tlk_dev);
-	params = te_get_free_params(&tlk_dev, no_of_params);
-
-	if (!cmd_desc || !params) {
-		pr_err("failed to get cmd_desc/params\n");
-		goto error;
-	}
-
-	/* Request and parameter are prepared for VRR authenticaiton */
-	request = cmd_desc->req_addr;
-	memset(request, 0, sizeof(struct te_request));
-	request->params = (uintptr_t)params;
-	request->params_size = no_of_params;
-	request->type = TE_SMC_OPEN_SESSION;
-
-	user_param.index = 0;
-	user_param.u.Mem.len = buflen;
-	user_param.type = TE_PARAM_TYPE_MEM_RW;
-	user_param.u.Mem.type = TE_MEM_TYPE_NS_KERNEL;
-	user_param.u.Mem.base = (uint64_t)(uintptr_t)buf_ptr;
-	memcpy(request->dest_uuid, vrr_auth_uuid, sizeof(vrr_auth_uuid));
-
-	param_array = (struct te_oper_param *)(uintptr_t)request->params;
-
-	for (i = 0; i < no_of_params; i++)
-		memcpy(param_array + i, &user_param, sizeof(struct te_oper_param));
-
-	do_smc(request, &tlk_dev);
-	session_id = request->session_id;
-
-	if (request->result) {
-		pr_err("%s: error opening session: 0x%08x\n",
-			__func__, request->result);
-		goto error;
-	}
-
-	/* Close the session */
-	request = cmd_desc->req_addr;
-	memset(request, 0, sizeof(struct te_request));
-
-	request->type = TE_SMC_CLOSE_SESSION;
-	request->session_id = session_id;
-	memcpy(request->dest_uuid, vrr_auth_uuid, sizeof(vrr_auth_uuid));
-
-	do_smc(request, &tlk_dev);
-
-	if (request->result) {
-		pr_err("%s: error closing session: 0x%08x\n",
-			__func__, request->result);
-	}
-
-error:
-	if (cmd_desc)
-		te_put_used_cmd_desc(&tlk_dev, cmd_desc);
-
-	if (params)
-		te_put_free_params(&tlk_dev, params, no_of_params);
-
-	mutex_unlock(&smc_lock);
-}
-EXPORT_SYMBOL(te_authenticate_vrr);
 
 /*
  * Command to open a session with the trusted app.
