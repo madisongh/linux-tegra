@@ -90,6 +90,41 @@ struct gd_ram_buffer {
 	bool system_alive;
 };
 
+#define NO_CAP		(ULONG_MAX) /* no cap */
+
+enum throttle_type {
+	THROT_MCPU,
+	THROT_BCPU,
+	THROT_EMC,
+	THROT_GPU,
+	THROT_MAX_CAP_CLKS,
+};
+
+/* Tracks the throttle freq. for the given clk */
+struct cc_throt_freqs {
+	unsigned long cap_freq;
+	enum throttle_type type;
+};
+
+/*
+ * Critical Condition throttle data
+ * @cdev		To support thermal cooling device.
+ * @cdev_type		Type of critical-condition cooling-device, will be
+ *			filled by dtb.
+ * @cur_state		current state of throttling table.
+ * @throt_table_size	Size of the throttle table.
+ * @num_cap_clks	No. of clks need to throttle, currently
+ *			bcpu, mcpu, gpu and emc clocks
+ * @throt_table		Throttle table as defined by *.dtb
+ */
+struct cc_throttle {
+	struct thermal_cooling_device *cdev;
+	char *cdev_type;
+	unsigned long cur_state;
+	int throt_table_size;
+	int num_cap_clks;
+	u32 *throt_table;
+};
 /*
  * Critical Condition Carveout platform data, this will be fill
  * from *.dtb value
@@ -106,20 +141,22 @@ struct gd_ram_buffer {
  * @under_volt_irq	this variable used to contain irq no. for under-volt
  * @under_volt_gpio	this variable used to contain gpio no. will be used to
  *			convert gpio_to_irq
+ * @cc_throt		Pointer to critical-condition throttle structure.
  */
 struct crtlcond_platform_data {
-	unsigned long		cvt_mem_size;
-	unsigned long		cvt_mem_address;
-	u32			read_write_bytes;
-	int			flags;
-	struct timer_list	cc_timer;
-	int			cc_timer_timeout;
-	unsigned long		cc_timer_timeout_jiffies;
-	bool			cc_timer_started;
-	struct work_struct	cc_work;
-	unsigned int		last_reset_status;
-	int			under_volt_irq;
-	int			under_volt_gpio;
+	unsigned long			cvt_mem_size;
+	unsigned long			cvt_mem_address;
+	u32				read_write_bytes;
+	int				flags;
+	struct timer_list		cc_timer;
+	int				cc_timer_timeout;
+	unsigned long			cc_timer_timeout_jiffies;
+	bool				cc_timer_started;
+	struct work_struct		cc_work;
+	unsigned int			last_reset_status;
+	int				under_volt_irq;
+	int				under_volt_gpio;
+	struct cc_throttle		*cc_throt;
 };
 
 struct gd_ram_buffer *gd_ram_new(phys_addr_t start, size_t size);
