@@ -75,6 +75,7 @@
 #define PLLM_MISC1 0x98
 #define PLLM_MISC2 0x9c
 #define PLLP_BASE 0xa0
+#define PLLP_OUTA 0xa4
 #define PLLP_OUTB 0xa8
 #define PLLP_MISC0 0xac
 #define PLLP_MISC1 0x680
@@ -3761,7 +3762,7 @@ static unsigned long pll_p_out_rate[5];
 static unsigned long pll_u_out1_rate, pll_u_out2_rate;
 static unsigned long pll_mb_rate;
 static u32 pll_m_v;
-static u32 pll_p_outb;
+static u32 pll_p_outa, pll_p_outb;
 static u32 pll_re_out_div, pll_re_out_1;
 static u32 cpu_softrst_ctx[3];
 static u32 cclkg_burst_policy_ctx[2];
@@ -3884,6 +3885,7 @@ static int tegra210_clk_suspend(void)
 		pll_mb_rate = clk_get_rate_nolock(clks[TEGRA210_CLK_PLL_MB]);
 		pll_m_v = car_readl(PLLM_BASE, 0);
 	}
+	pll_p_outa = car_readl(PLLP_OUTA, 0);
 	pll_p_outb = car_readl(PLLP_OUTB, 0);
 
 	for (i = 0; i < ARRAY_SIZE(cpu_softrst_ctx); i++)
@@ -4039,6 +4041,7 @@ static void tegra210_clk_resume(void)
 	tegra_clk_periph_resume(clk_base);
 
 	/* restore (sync) the actual PLL and secondary divider values */
+	car_writel(pll_p_outa, PLLP_OUTA, 0);
 	car_writel(pll_p_outb, PLLP_OUTB, 0);
 
 	tegra_clk_sync_state_pll_out(clks[TEGRA210_CLK_PLL_U_OUT1]);
