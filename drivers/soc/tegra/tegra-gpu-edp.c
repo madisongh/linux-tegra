@@ -51,7 +51,7 @@ struct gpu_edp {
 	int temperature_now;
 
 	struct edp_attrs *debugfs_attrs;
-
+	struct notifier_block max_gpu_pwr_notifier;
 };
 
 static int tegra_gpu_edp_predict_millivolts(void *p, unsigned long rate)
@@ -127,12 +127,11 @@ static struct thermal_cooling_device_ops edp_cooling_ops = {
 	.set_cur_state = edp_set_cdev_state,
 };
 
-static struct gpu_edp *s_gpu;
 static int max_gpu_power_notify(struct notifier_block *b,
 				unsigned long max_gpu_pwr, void *v)
 {
-	/* XXX there's no private data for a pm_qos notifier call */
-	struct gpu_edp *ctx = s_gpu;
+	struct gpu_edp *ctx = container_of(b, struct gpu_edp,
+					   max_gpu_pwr_notifier);
 
 	mutex_lock(&ctx->edp_lock);
 	edp_update_cap(ctx, ctx->temperature_now,
@@ -141,9 +140,6 @@ static int max_gpu_power_notify(struct notifier_block *b,
 
 	return NOTIFY_OK;
 }
-static struct notifier_block max_gpu_pwr_notifier = {
-	.notifier_call = max_gpu_power_notify,
-};
 
 #ifdef CONFIG_DEBUG_FS
 static int show_edp_max(void *data, u64 *val)
@@ -310,8 +306,9 @@ static int tegra_gpu_edp_probe(struct platform_device *pdev)
 
 	mutex_init(&ctx->edp_lock);
 
-	s_gpu = ctx;
-	ret = pm_qos_add_notifier(PM_QOS_MAX_GPU_POWER, &max_gpu_pwr_notifier);
+	ctx->max_gpu_pwr_notifier.notifier_call = max_gpu_power_notify;
+	ret = pm_qos_add_notifier(PM_QOS_MAX_GPU_POWER,
+				  &ctx->max_gpu_pwr_notifier);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to add PM QOS notifier\n");
 		goto destroy_ppm;
@@ -337,7 +334,8 @@ static int tegra_gpu_edp_probe(struct platform_device *pdev)
 remove_cdev:
 	thermal_cooling_device_unregister(ctx->cdev);
 remove_pm_qos:
-	pm_qos_remove_notifier(PM_QOS_MAX_GPU_POWER, &max_gpu_pwr_notifier);
+	pm_qos_remove_notifier(PM_QOS_MAX_GPU_POWER,
+			       &ctx->max_gpu_pwr_notifier);
 destroy_ppm:
 	tegra_ppm_destroy(ctx->ppm, NULL, NULL);
 destroy_fv:
