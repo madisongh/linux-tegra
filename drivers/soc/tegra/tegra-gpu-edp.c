@@ -270,7 +270,7 @@ static int tegra_gpu_edp_probe(struct platform_device *pdev)
 	if (maxf <= 0) {
 		dev_info(&pdev->dev, "unable to get max GPU freq\n");
 		ret = -EPROBE_DEFER;
-		goto free_params;
+		goto put_clk;
 	}
 
 	fv = fv_relation_create(gpu_clk, pdata.freq_step, 150, maxf, 0,
@@ -278,7 +278,7 @@ static int tegra_gpu_edp_probe(struct platform_device *pdev)
 	if (IS_ERR_OR_NULL(fv)) {
 		dev_err(&pdev->dev, "failed to create freq/volt table\n");
 		ret = PTR_ERR(fv);
-		goto free_params;
+		goto put_clk;
 	}
 
 	iddq_ma = tegra_fuse_get_gpu_iddq();
@@ -342,6 +342,8 @@ destroy_ppm:
 	tegra_ppm_destroy(ctx->ppm, NULL, NULL);
 destroy_fv:
 	fv_relation_destroy(fv);
+put_clk:
+	clk_put(gpu_clk);
 free_params:
 	kfree(params);
 
