@@ -11,12 +11,16 @@
  */
 
 #include <linux/device.h>
+#include <linux/of_graph.h>
+#include <linux/string.h>
 #include <linux/clk/tegra.h>
 #include "camera/csi/csi.h"
 #include "camera/vi/mc_common.h"
 #include "mipical/mipi_cal.h"
+#include "nvcsi/nvcsi.h"
 #include "nvhost_acm.h"
-#include <linux/clk/tegra.h>
+
+#include "csi2_fops.h"
 
 static void csi_write(struct tegra_csi_channel *chan, unsigned int addr,
 			u32 val, u8 port)
@@ -180,7 +184,6 @@ void tegra_csi_error_recover(struct tegra_csi_channel *chan,
 	}
 }
 
-
 static int tpg_clk_enable(struct tegra_csi_device *csi)
 {
 	int err = 0;
@@ -259,10 +262,54 @@ int csi2_start_streaming(struct tegra_csi_channel *chan,
 				enum tegra_csi_port_num port_num)
 {
 	struct tegra_csi_port *port = &chan->ports[port_num];
+	struct tegra_csi_device *csi = chan->csi;
+	struct camera_common_data *s_data = chan->s_data;
+	const struct sensor_mode_properties *mode = NULL;
 	int csi_port, csi_lanes;
+	/* Clocks for the CSI interface */
+	const unsigned int cil_clk_mhz = TEGRA_CSICIL_CLK_MHZ;
+	const unsigned int csi_clk_mhz = csi->clk_freq / 1000000;
+	/* Calculated clock settling times for cil and csi clocks */
+	unsigned int cil_settletime = 0;
+	unsigned int csi_settletime;
 
 	csi_port = chan->ports[port_num].num;
 	csi_lanes = chan->ports[port_num].lanes;
+
+	/* Attempt to find the cil_settingtime from the device tree */
+	if (s_data) {
+		dev_dbg(csi->dev, "cil_settingtime is pulled from device");
+		mode = &s_data->sensor_props.sensor_modes[s_data->mode];
+		cil_settletime = mode->signal_properties.cil_settletime;
+	} else if (chan->of_node) {
+		int err = 0;
+		const char *str;
+
+		dev_dbg(csi->dev,
+			"cil_settletime is pulled from device of_node");
+		err = of_property_read_string(chan->of_node, "cil_settletime",
+			&str);
+		if (!err) {
+			err = kstrtou32(str, 10, &cil_settletime);
+			if (err)
+				dev_dbg(csi->dev,
+					"no cil_settletime in of_node");
+				cil_settletime = 0;
+		}
+	}
+
+	/* calculate MIPI settling time if no settletime is set*/
+	if (!cil_settletime) {
+		dev_dbg(csi->dev, "cil_settingtime was autocalculated");
+		cil_settletime = tegra_csi_ths_settling_time(csi,
+						cil_clk_mhz,
+						csi_clk_mhz);
+	}
+	csi_settletime = tegra_csi_clk_settling_time(csi,
+			cil_clk_mhz);
+
+	dev_dbg(csi->dev, "csi clock settle time: %u, cil settle time: %u",
+			csi_settletime, cil_settletime);
 
 	csi_write(chan, TEGRA_CSI_CLKEN_OVERRIDE, 0, csi_port >> 1);
 
@@ -276,7 +323,9 @@ int csi2_start_streaming(struct tegra_csi_channel *chan,
 	/* CIL PHY registers setup */
 	cil_write(port, TEGRA_CSI_CIL_PAD_CONFIG0, 0x0);
 	cil_write(port, TEGRA_CSI_CIL_PHY_CONTROL,
-			BYPASS_LP_SEQ | 0xA);
+			csi_settletime << CLK_SETTLE_SHIFT |
+			BYPASS_LP_SEQ |
+			cil_settletime << THS_SETTLE_SHIFT);
 
 	/*
 	 * The CSI unit provides for connection of up to six cameras in
@@ -298,9 +347,14 @@ int csi2_start_streaming(struct tegra_csi_channel *chan,
 		csi_write(chan, cilb_offset + TEGRA_CSI_CIL_INTERRUPT_MASK, 0x0,
 				csi_port >> 1);
 		cil_write(port, TEGRA_CSI_CIL_PHY_CONTROL,
-				BYPASS_LP_SEQ | 0xA);
+				csi_settletime << CLK_SETTLE_SHIFT |
+				BYPASS_LP_SEQ |
+				cil_settletime << THS_SETTLE_SHIFT);
 		csi_write(chan, cilb_offset + TEGRA_CSI_CIL_PHY_CONTROL,
-				BYPASS_LP_SEQ | 0xA, csi_port >> 1);
+				csi_settletime << CLK_SETTLE_SHIFT |
+				BYPASS_LP_SEQ |
+				cil_settletime << THS_SETTLE_SHIFT,
+				csi_port >> 1);
 		csi_write(chan, TEGRA_CSI_PHY_CIL_COMMAND,
 				CSI_A_PHY_CIL_ENABLE | CSI_B_PHY_CIL_ENABLE,
 				csi_port >> 1);

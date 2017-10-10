@@ -316,7 +316,7 @@ int sensor_common_init_sensor_properties(
 
 	if (!num_modes) {
 		err = 0;
-		goto fail;
+		goto alloc_fail;
 	}
 
 	sensor->sensor_modes = devm_kzalloc(dev,

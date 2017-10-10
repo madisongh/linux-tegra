@@ -348,7 +348,7 @@ struct tegra_csi_fops {
 struct tegra_t210_vi_data {
 	struct nvhost_device_data *info;
 	struct tegra_vi_fops *vi_fops;
-	struct tegra_csi_fops *csi_fops;
+	const struct tegra_csi_fops *csi_fops;
 };
 
 struct tegra_vi_data {

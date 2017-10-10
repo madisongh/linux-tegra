@@ -10,13 +10,20 @@
  * published by the Free Software Foundation.
  */
 #include <linux/clk/tegra.h>
-#include "nvhost_acm.h"
-#include "camera/csi/csi.h"
-#include "camera/csi/csi4_registers.h"
-#include "camera/vi/core.h"
+#include <linux/of_graph.h>
+#include <linux/string.h>
+
+#include <camera/csi/csi.h>
+#include <camera/csi/csi4_registers.h>
+#include <camera/vi/core.h>
+#include <camera/vi/mc_common.h>
+
+#include "linux/nvhost_ioctl.h"
 #include "mipical/mipi_cal.h"
 #include "nvcsi/nvcsi.h"
-#include "linux/nvhost_ioctl.h"
+#include "nvhost_acm.h"
+
+#include "csi4_fops.h"
 
 #define DEFAULT_TPG_FREQ	102000000
 
@@ -97,9 +104,17 @@ static void csi4_phy_config(
 	int csi_lanes, bool enable)
 {
 	struct tegra_csi_device *csi = chan->csi;
+	struct camera_common_data *s_data = chan->s_data;
+	const struct sensor_mode_properties *mode = NULL;
 	int phy_num = (csi_port & 0x6) >> 1;
 	bool cil_a = (csi_port & 0x1) ? false : true;
 	int cil_config;
+	/* Clocks for the CSI interface */
+	const unsigned int cil_clk_mhz = TEGRA_CSICIL_CLK_MHZ;
+	const unsigned int csi_clk_mhz = csi->clk_freq / 1000000;
+	/* Calculated clock settling times for cil and csi clocks */
+	unsigned int cil_settletime = 0;
+	unsigned int csi_settletime;
 
 	dev_dbg(csi->dev, "%s\n", __func__);
 
@@ -165,6 +180,45 @@ static void csi4_phy_config(
 	/* power on de-serializer */
 	csi4_phy_write(chan, phy_num, NVCSI_CIL_PAD_CONFIG, 0);
 
+	/* Attempt to find the cil_settingtime from the device tree */
+	if (s_data) {
+		dev_dbg(csi->dev, "cil_settingtime is pulled from device");
+		mode = &s_data->sensor_props.sensor_modes[s_data->mode];
+		cil_settletime = mode->signal_properties.cil_settletime;
+	} else if (chan->of_node) {
+		int err = 0;
+		const char *str;
+
+		dev_dbg(csi->dev,
+			"cil_settletime is pulled from device of_node");
+		err = of_property_read_string(chan->of_node, "cil_settletime",
+			&str);
+		if (!err) {
+			err = kstrtou32(str, 10, &cil_settletime);
+			if (err) {
+				dev_dbg(csi->dev,
+					"no cil_settletime in of_node");
+				cil_settletime = 0;
+			}
+		}
+	}
+
+	/* calculate MIPI settling times */
+	dev_dbg(csi->dev, "cil core clock: %u, csi clock: %u", cil_clk_mhz,
+		csi_clk_mhz);
+
+	csi_settletime = tegra_csi_clk_settling_time(csi, cil_clk_mhz);
+	/* If cil_settletime is 0, calculate a settling time */
+	if (!cil_settletime) {
+		dev_dbg(csi->dev, "cil_settingtime was autocalculated");
+		cil_settletime = tegra_csi_ths_settling_time(csi,
+			cil_clk_mhz,
+			csi_clk_mhz);
+	}
+
+	dev_dbg(csi->dev, "csi settle time: %u, cil settle time: %u",
+		csi_settletime, cil_settletime);
+
 	if (cil_a) {
 		/* set CSI lane number */
 		csi4_phy_write(chan, phy_num, NVCSI_CIL_CONFIG,
@@ -178,8 +232,9 @@ static void csi4_phy_config(
 		csi4_phy_write(chan, phy_num,
 			NVCSI_CIL_A_CONTROL,
 			DEFAULT_DESKEW_COMPARE | DEFAULT_DESKEW_SETTLE |
-			DEFAULT_CLK_SETTLE |
-			T18X_BYPASS_LP_SEQ | DEFAULT_THS_SETTLE);
+			csi_settletime << CLK_SETTLE_SHIFT |
+			T18X_BYPASS_LP_SEQ |
+			cil_settletime << THS_SETTLE_SHIFT);
 		/* release soft reset */
 		csi4_phy_write(chan, phy_num, NVCSI_CIL_A_SW_RESET, 0x0);
 
@@ -195,9 +250,11 @@ static void csi4_phy_config(
 			/* setup settle time */
 			csi4_phy_write(chan, phy_num,
 				NVCSI_CIL_B_CONTROL,
-				DEFAULT_DESKEW_COMPARE | DEFAULT_DESKEW_SETTLE
-				| DEFAULT_CLK_SETTLE |
-				T18X_BYPASS_LP_SEQ | DEFAULT_THS_SETTLE);
+				DEFAULT_DESKEW_COMPARE |
+				DEFAULT_DESKEW_SETTLE |
+				csi_settletime << CLK_SETTLE_SHIFT |
+				T18X_BYPASS_LP_SEQ |
+				cil_settletime << THS_SETTLE_SHIFT);
 			/* release soft reset */
 			csi4_phy_write(chan, phy_num,
 				NVCSI_CIL_B_SW_RESET, 0x0);
@@ -215,8 +272,9 @@ static void csi4_phy_config(
 		csi4_phy_write(chan, phy_num,
 			NVCSI_CIL_B_CONTROL,
 			DEFAULT_DESKEW_COMPARE | DEFAULT_DESKEW_SETTLE |
-			DEFAULT_CLK_SETTLE |
-			T18X_BYPASS_LP_SEQ | DEFAULT_THS_SETTLE);
+			csi_settletime << CLK_SETTLE_SHIFT |
+			T18X_BYPASS_LP_SEQ |
+			cil_settletime << THS_SETTLE_SHIFT);
 		/* release soft reset */
 		csi4_phy_write(chan, phy_num, NVCSI_CIL_B_SW_RESET, 0x0);
 	}
@@ -524,3 +582,13 @@ int csi4_mipi_cal(struct tegra_csi_channel *chan)
 	}
 	return tegra_mipi_calibration(lanes);
 }
+
+struct tegra_csi_fops csi4_fops = {
+	.csi_power_on = csi4_power_on,
+	.csi_power_off = csi4_power_off,
+	.csi_start_streaming = csi4_start_streaming,
+	.csi_stop_streaming = csi4_stop_streaming,
+	.csi_override_format = csi4_override_format,
+	.mipical = csi4_mipi_cal,
+	.hw_init = csi4_hw_init,
+};

@@ -90,7 +90,7 @@ struct tegra_csi_device {
 	int num_channels;
 	struct list_head csi_chans;
 	struct tegra_csi_channel *tpg_start;
-	struct tegra_csi_fops *fops;
+	const struct tegra_csi_fops *fops;
 	const struct tpg_frmfmt *tpg_frmfmt_table;
 	unsigned int tpg_frmfmt_table_size;
 	atomic_t power_ref;
@@ -122,6 +122,8 @@ struct tegra_csi_channel {
 	struct camera_common_data *s_data;
 	unsigned int id;
 	atomic_t is_streaming;
+
+	struct device_node *of_node;
 };
 
 static inline struct tegra_csi_channel *to_csi_chan(struct v4l2_subdev *subdev)
@@ -156,4 +158,13 @@ int tegra_csi_media_controller_init(struct tegra_csi_device *csi,
 int tegra_csi_media_controller_remove(struct tegra_csi_device *csi);
 int tpg_csi_media_controller_init(struct tegra_csi_device *csi, int pg_mode);
 void tpg_csi_media_controller_cleanup(struct tegra_csi_device *csi);
+
+/* helper functions to calculate clock setting times */
+unsigned int tegra_csi_clk_settling_time(
+	struct tegra_csi_device *csi,
+	const unsigned int csicil_clk_mhz);
+unsigned int tegra_csi_ths_settling_time(
+	struct tegra_csi_device *csi,
+	const unsigned int csicil_clk_mhz,
+	const unsigned int mipi_clk_mhz);
 #endif
