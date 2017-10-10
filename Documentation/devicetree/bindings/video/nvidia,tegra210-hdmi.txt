@@ -31,6 +31,8 @@ NVIDIA TEGRA210 High Definition Multimedia Interface
 
  Optional properties:
  - nvidia,edid: supplies a binary EDID blob
+ - nvidia,fbcon-default-mode: Specifies a tegra_dc_mode to be used as default mode for
+   fbconsole. Mode parameters can be updated by user as per their requirements.
 
  1.A.i) NVIDIA Display Controller Modes
  This must be contained in hdmi-display parent node. This contains supported modes.
@@ -181,6 +183,20 @@ Example
 			nvidia,hpd-gpio = <&gpio TEGRA_GPIO(N, 7) 1>; /* PN7 */
 			hdmi-display {
 				status = "okay";
+				nvidia,fbcon-default-mode {
+					clock-frequency = <27027000>;
+					hactive = <720>;
+					vactive = <480>;
+					hfront-porch = <16>;
+					hback-porch = <60>;
+					hsync-len = <62>;
+					vfront-porch = <9>;
+					vback-porch = <30>;
+					vsync-len = <6>;
+					nvidia,h-ref-to-sync = <1>;
+					nvidia,v-ref-to-sync = <1>;
+					vmode = <0x400000>;	/* FB_VMODE_NONINTERLACED | FB_VMODE_IS_CEA */
+				};
 				disp-default-out {
 					nvidia,out-type = <TEGRA_DC_OUT_HDMI>;
 					nvidia,out-flags = <TEGRA_DC_OUT_HOTPLUG_HIGH>;

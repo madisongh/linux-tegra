@@ -51,6 +51,8 @@ NVIDIA TEGRA210 DisplayPort
  Optional properties:
  - is_ext_dp_panel: Specifies whether this is an external panel or an eDP panel.
  - nvidia,link-bw: Specifies the preferred link bandwidth to use for main DP link.
+ - nvidia,fbcon-default-mode: Specifies a tegra_dc_mode to be used as default mode for
+   fbconsole. Mode parameters can be updated by user as per their requirements.
 
  1.B) the dp-lt-settings node:
  The dp-lt-settings node holds link training settings for dp.
@@ -82,6 +84,20 @@ host1x {
             nvidia,hpd-gpio = <&gpio TEGRA_GPIO(CC, 1) 1>; /* PN7 */
             nvidia,tx-pu-disable = <1>;
             nvidia,is_ext_dp_panel = <1>;
+            nvidia,fbcon-default-mode {
+                clock-frequency = <27027000>;
+                hactive = <720>;
+                vactive = <480>;
+                hfront-porch = <16>;
+                hback-porch = <60>;
+                hsync-len = <62>;
+                vfront-porch = <9>;
+                vback-porch = <30>;
+                vsync-len = <6>;
+                nvidia,h-ref-to-sync = <1>;
+                nvidia,v-ref-to-sync = <1>;
+                vmode = <0x400000>;	/* FB_VMODE_NONINTERLACED | FB_VMODE_IS_CEA */
+            };
             disp-default-out {
                 nvidia,out-type = <TEGRA_DC_OUT_DP>;
                 nvidia,out-align = <TEGRA_DC_ALIGN_MSB>;
