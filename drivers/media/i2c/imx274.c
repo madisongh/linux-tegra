@@ -657,7 +657,7 @@ static int imx274_calculate_shr(struct imx274 *priv, u32 rep)
 	vmax = ((vmax_m << 8) + vmax_l);
 
 	min = IMX274_MODE1_SHR_MIN;
-	max = ((svr + 1) * IMX274_VMAX) - 4;
+	max = ((svr + 1) * vmax) - 4;
 
 	shr = vmax * (svr + 1) -
 			(rep * IMX274_ET_FACTOR - IMX274_MODE1_OFFSET) /
