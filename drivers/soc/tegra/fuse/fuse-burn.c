@@ -92,6 +92,8 @@ struct tegra_fuse_burn_dev {
 	u32 max_temp;
 };
 
+static DEFINE_MUTEX(fuse_lock);
+
 static void fuse_state_wait_for_idle(void)
 {
 	u32 reg;
@@ -386,7 +388,9 @@ static ssize_t tegra_fuse_show(struct device *dev,
 		return -ENOMEM;
 	}
 
+	mutex_lock(&fuse_lock);
 	tegra_fuse_get_fuse(data, macro_buf);
+	mutex_unlock(&fuse_lock);
 	strcpy(buf, "0x");
 	while (num_words--) {
 		sprintf(str, "%08x", macro_buf[num_words]);
@@ -449,7 +453,9 @@ static ssize_t tegra_fuse_store(struct device *dev,
 	}
 
 	wake_lock(&fuse_dev->wake_lock);
+	mutex_lock(&fuse_lock);
 	ret = tegra_fuse_burn_fuse(fuse_dev, fuse_data, input_data);
+	mutex_unlock(&fuse_lock);
 	wake_unlock(&fuse_dev->wake_lock);
 	if (ret)
 		return ret;
@@ -476,6 +482,7 @@ static ssize_t tegra_fuse_calc_h2_code(struct device *dev,
 	endrowindex = H2_END_MACRO_BIT_INDEX / 32;
 	endbitindex = H2_END_MACRO_BIT_INDEX % 32;
 
+	mutex_lock(&fuse_lock);
 	for (rowindex = startrowindex; rowindex <= endrowindex; rowindex++) {
 		rowdata = fuse_cmd_read(rowindex);
 		for (bitindex = 0; bitindex < 32; bitindex++) {
@@ -490,6 +497,7 @@ static ssize_t tegra_fuse_calc_h2_code(struct device *dev,
 				hammingvalue ^= pattern;
 		}
 	}
+	mutex_unlock(&fuse_lock);
 	parity = tegra_fuse_calculate_parity(hammingvalue);
 	hammingcode = hammingvalue | (1 << 12) | ((parity ^ 1) << 13);
 	sprintf(buf, "0x%08x\n", hammingcode);
@@ -643,6 +651,7 @@ static int tegra_fuse_burn_probe(struct platform_device *pdev)
 
 	fuse_dev->dev = &pdev->dev;
 	platform_set_drvdata(pdev, fuse_dev);
+	mutex_init(&fuse_lock);
 	for (i = 0; i < ARRAY_SIZE(fuse_dev->hw->burn_data) &&
 			fuse_dev->hw->burn_data[i].name != NULL; i++) {
 		ret = sysfs_create_file(&pdev->dev.kobj,
