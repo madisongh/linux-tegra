@@ -32,6 +32,9 @@ struct pwm_regulator_data {
 	/* regulator descriptor */
 	struct regulator_desc desc;
 
+	/* regulator device */
+	struct regulator_dev    *rdev;
+
 	/* Regulator ops */
 	struct regulator_ops ops;
 
@@ -353,10 +356,28 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 			drvdata->desc.name, ret);
 		return ret;
 	}
-
+	drvdata->rdev = regulator;
+	platform_set_drvdata(pdev, drvdata);
 	dev_info(&pdev->dev, "PWM regulator registration passed\n");
 	return 0;
 }
+#ifdef CONFIG_PM_SLEEP
+static int pwm_regulator_resume(struct device *dev)
+{
+	struct pwm_regulator_data *drvdata = dev_get_drvdata(dev);
+
+	if (drvdata->desc.continuous_voltage_range)
+		pwm_regulator_set_voltage(drvdata->rdev, drvdata->volt_uV,
+				drvdata->volt_uV, &drvdata->state);
+	else
+		pwm_regulator_set_voltage_sel(drvdata->rdev, drvdata->state);
+
+	return 0;
+}
+#endif
+static const struct dev_pm_ops pwm_regulator_pm_ops = {
+		SET_SYSTEM_SLEEP_PM_OPS(NULL, pwm_regulator_resume)
+};
 
 static const struct of_device_id pwm_of_match[] = {
 	{ .compatible = "pwm-regulator" },
@@ -368,6 +389,7 @@ static struct platform_driver pwm_regulator_driver = {
 	.driver = {
 		.name		= "pwm-regulator",
 		.of_match_table = of_match_ptr(pwm_of_match),
+		.pm = &pwm_regulator_pm_ops,
 	},
 	.probe = pwm_regulator_probe,
 };
