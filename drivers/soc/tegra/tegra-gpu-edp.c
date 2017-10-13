@@ -58,7 +58,7 @@ static int tegra_gpu_edp_predict_millivolts(void *p, unsigned long rate)
 {
 	struct clk *clk = (struct clk *)p;
 
-	return tegra_dvfs_predict_millivolts(clk, rate);
+	return tegra_dvfs_predict_mv_at_hz_max_tfloor(clk, rate);
 }
 
 static void edp_update_cap(struct gpu_edp *ctx, int temperature,
