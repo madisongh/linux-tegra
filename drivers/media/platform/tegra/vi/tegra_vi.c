@@ -241,8 +241,6 @@ static long vi_ioctl(struct file *file,
 	switch (_IOC_NR(cmd)) {
 	case _IOC_NR(NVHOST_VI_IOCTL_ENABLE_TPG): {
 		uint enable;
-		int ret;
-		struct clk *clk;
 
 		if (copy_from_user(&enable,
 			(const void __user *)arg, sizeof(uint))) {
@@ -251,19 +249,12 @@ static long vi_ioctl(struct file *file,
 			return -EFAULT;
 		}
 
-		clk = clk_get(NULL, "pll_d");
-		if (IS_ERR(clk))
-			return -EINVAL;
-
 		if (enable)
-			ret = tegra_clk_cfg_ex(clk,
-				TEGRA_CLK_PLLD_CSI_OUT_ENB, 1);
+			tegra210_csi_source_from_plld();
 		else
-			ret = tegra_clk_cfg_ex(clk,
-				TEGRA_CLK_MIPI_CSI_OUT_ENB, 1);
-		clk_put(clk);
+			tegra210_csi_source_from_brick();
 
-		return ret;
+		return 0;
 	}
 	case _IOC_NR(NVHOST_VI_IOCTL_GET_VI_CLK): {
 		int ret;
