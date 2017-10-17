@@ -90,6 +90,12 @@ static const int tegra_t210ref_srate_values[] = {
 	192000,
 };
 
+static const int tegra_t210ref_fmt_values[] = {
+	0,
+	SNDRV_PCM_FORMAT_S16_LE,
+	SNDRV_PCM_FORMAT_S32_LE,
+};
+
 static struct snd_soc_jack tegra_t210ref_hp_jack;
 
 #ifdef CONFIG_SWITCH
@@ -179,10 +185,14 @@ static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 	struct tegra_t210ref *machine = snd_soc_card_get_drvdata(card);
 	struct snd_soc_pcm_stream *dai_params;
 	unsigned int idx, mclk, clk_out_rate;
-	int err, codec_rate, clk_rate;
+	int err, clk_rate;
+	u64 format_k;
 
-	codec_rate = tegra_t210ref_srate_values[machine->rate_via_kcontrol];
-	clk_rate = (machine->rate_via_kcontrol) ? codec_rate : rate;
+	clk_rate = (machine->rate_via_kcontrol) ?
+		tegra_t210ref_srate_values[machine->rate_via_kcontrol] : rate;
+	format_k = (machine->fmt_via_kcontrol) ?
+		(1ULL << tegra_t210ref_fmt_values[machine->fmt_via_kcontrol]) :
+		formats;
 	/* aud_mclk, 256 times the sample rate */
 	clk_out_rate = clk_rate << 8;
 
@@ -236,10 +246,7 @@ static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 			  card->rtd[idx].dai_link->params;
 			dai_params->rate_min = rate;
 			dai_params->channels_min = channels;
-			dai_params->formats = 1ULL <<
-				((machine->fmt_via_kcontrol == 2) ?
-				SNDRV_PCM_FORMAT_S32_LE :
-				SNDRV_PCM_FORMAT_S16_LE);
+			dai_params->formats = format_k;
 		}
 	}
 
@@ -258,13 +265,8 @@ static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 			}
 		}
 
-		dai_params->formats = 1ULL <<
-			((machine->fmt_via_kcontrol == 2) ?
-			SNDRV_PCM_FORMAT_S32_LE :
-			SNDRV_PCM_FORMAT_S16_LE);
-
-		dai_params->rate_min = (machine->rate_via_kcontrol) ?
-			codec_rate : rate;
+		dai_params->formats = format_k;
+		dai_params->rate_min = clk_rate;
 		dai_params->channels_min = channels;
 
 		err = snd_soc_dai_set_bclk_ratio(card->rtd[idx].cpu_dai,
@@ -317,8 +319,7 @@ static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 		(struct snd_soc_pcm_stream *)card->rtd[idx].dai_link->params;
 
 		/* update link_param to update hw_param for DAPM */
-		dai_params->rate_min = (machine->rate_via_kcontrol) ?
-			codec_rate : rate;
+		dai_params->rate_min = clk_rate;
 	}
 
 	return 0;
