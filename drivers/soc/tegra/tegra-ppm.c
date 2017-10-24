@@ -672,7 +672,7 @@ static int ppm_debugfs_init(struct tegra_ppm *ctx,
 }
 
 #else
-static int ppm_debugfs_init(struct tegra_ppm *ctx
+static int ppm_debugfs_init(struct tegra_ppm *ctx,
 			    struct dentry *parent)
 { return 0; }
 #endif /* CONFIG_DEBUG_FS */
