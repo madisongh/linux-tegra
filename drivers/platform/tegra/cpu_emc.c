@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016 - 2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -18,34 +18,58 @@
 #include <linux/platform/tegra/emc_bwmgr.h>
 #include <linux/platform/tegra/cpu_emc.h>
 
+#define CPU_EMC_TABLE_NUM		2
+
+#define CPU_EMC_TABLE_SRC_DEFAULT	0
+#define CPU_EMC_TABLE_SRC_DT		1
+
 struct cpu_emc {
 	struct tegra_bwmgr_client *bwmgr;
 	unsigned long max_rate;
-	u32 *cpu_emc_table;
-	int cpu_emc_table_size;
+	u32 *cpu_emc_table[CPU_EMC_TABLE_NUM];
+	int cpu_emc_table_size[CPU_EMC_TABLE_NUM];
+	int cpu_emc_table_src;
 };
 
 static struct cpu_emc cpemc;
+static struct kobject *cpu_emc_kobj;
+
+static u32 default_emc_cpu_table[] = {
+	/* cpu < 275MHz, emc 0MHz (Min) */
+	275000, 0,
+	/* cpu < 500MHz, emc 50MHz */
+	500000, 50000,
+	/* cpu < 725MHz, emc 100MHz */
+	725000, 100000,
+	/* cpu < 925MHz, emc 200MHz */
+	975000, 200000,
+	/* cpu < 1.3GHz, emc 400MHz */
+	1300000, 400000,
+	/* cpu >= 1.3GHz, emc xGMHz (Max) */
+	UINT_MAX, INT_MAX,
+};
 
 void set_cpu_to_emc_freq(u32 cpu_freq)
 {
+	int src = cpemc.cpu_emc_table_src;
+	int size = cpemc.cpu_emc_table_size[src];
+	u32 *table = cpemc.cpu_emc_table[src];
 	unsigned long emc_freq = 0;
 	int i;
 
-	for (i = 0; i < cpemc.cpu_emc_table_size; i += 2) {
-		if (cpu_freq < cpemc.cpu_emc_table[i])
+	for (i = 0; i < size; i += 2) {
+		if (cpu_freq < table[i])
 			break;
 	}
 
 	if (i)
-		emc_freq = min(cpemc.max_rate,
-					cpemc.cpu_emc_table[i-1] * 1000UL);
+		emc_freq = min(cpemc.max_rate, table[i - 1] * 1000UL);
 
 	tegra_bwmgr_set_emc(cpemc.bwmgr, emc_freq,
 		TEGRA_BWMGR_SET_EMC_FLOOR);
 
-	pr_debug("cpu freq(kHz):%u emc_freq(KHz) %lu\n", cpu_freq,
-		emc_freq / 1000);
+	pr_debug("cpu freq(kHz) %u emc_freq(KHz) %lu, using CPU/EMC table %d\n",
+		 cpu_freq, emc_freq / 1000, src);
 }
 
 static int register_with_emc_bwmgr(void)
@@ -116,21 +140,57 @@ _out:
 
 static int cpu_emc_tbl_from_dt(void)
 {
-	int ret = 0;
+	int src = CPU_EMC_TABLE_SRC_DT;
 
-	cpemc.cpu_emc_table =
-		cpufreq_emc_table_get(&cpemc.cpu_emc_table_size);
-	if (IS_ERR(cpemc.cpu_emc_table)) {
-		ret = PTR_ERR(cpemc.cpu_emc_table);
-		goto err_out;
+	cpemc.cpu_emc_table[src] =
+		cpufreq_emc_table_get(&cpemc.cpu_emc_table_size[src]);
+	if (IS_ERR(cpemc.cpu_emc_table[src])) {
+		pr_warn("%s: No cpu emc table in DT, using default one\n",
+			__func__);
+		cpemc.cpu_emc_table_src = CPU_EMC_TABLE_SRC_DEFAULT;
+	} else {
+		cpemc.cpu_emc_table_src = CPU_EMC_TABLE_SRC_DT;
 	}
 
 	cpemc.max_rate = tegra_bwmgr_get_max_emc_rate();
 
+	/* Initialize the default cpu emc table */
+	src = CPU_EMC_TABLE_SRC_DEFAULT;
+	cpemc.cpu_emc_table[src] = default_emc_cpu_table;
+	cpemc.cpu_emc_table_size[src] = ARRAY_SIZE(default_emc_cpu_table);
+
 	return 0;
-err_out:
-	return ret;
 }
+
+static ssize_t cpu_emc_table_src_show(struct kobject *kobj,
+				      struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", cpemc.cpu_emc_table_src);
+}
+
+static ssize_t cpu_emc_table_src_store(struct kobject *kobj,
+				       struct kobj_attribute *attr,
+				       const char *buf, size_t n)
+{
+	u32 *table_dt = cpemc.cpu_emc_table[CPU_EMC_TABLE_SRC_DT];
+	int src;
+
+	if (kstrtouint(buf, 0, &src))
+		return -EINVAL;
+
+	if (src == CPU_EMC_TABLE_SRC_DT && !IS_ERR(table_dt))
+		cpemc.cpu_emc_table_src = CPU_EMC_TABLE_SRC_DT;
+	else
+		cpemc.cpu_emc_table_src = CPU_EMC_TABLE_SRC_DEFAULT;
+
+	pr_debug("cpu_emc_table_src was updated to %d\n",
+		 cpemc.cpu_emc_table_src);
+
+	return n;
+}
+
+static const struct kobj_attribute cpu_emc_attr =
+	__ATTR(table_src, 0644, cpu_emc_table_src_show, cpu_emc_table_src_store);
 
 int enable_cpu_emc_clk(void)
 {
@@ -146,12 +206,28 @@ int enable_cpu_emc_clk(void)
 		goto err_out;
 	}
 
+	cpu_emc_kobj = kobject_create_and_add("tegra_cpu_emc", kernel_kobj);
+	if (!cpu_emc_kobj) {
+		pr_err("%s: failed to create tegra_cpu_emc kobj\n", __func__);
+		ret = -EINVAL;
+		goto err_out;
+	}
+
+	ret = sysfs_create_file(cpu_emc_kobj, &cpu_emc_attr.attr);
+	if (ret) {
+		pr_err("%s, failed to create sysfs attr for %s\n",
+		       __func__, cpu_emc_attr.attr.name);
+		goto err_out;
+	}
+
 err_out:
 	return ret;
 }
 
 void disable_cpu_emc_clk(void)
 {
+	sysfs_remove_file(cpu_emc_kobj, &cpu_emc_attr.attr);
+	kobject_put(cpu_emc_kobj);
 	kfree(cpemc.cpu_emc_table);
 	tegra_bwmgr_unregister(cpemc.bwmgr);
 }
