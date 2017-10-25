@@ -1146,19 +1146,6 @@ static void tegra_channel_free_sensor_properties(
 	s_data->sensor_props.sensor_modes = NULL;
 }
 
-static int tegra_channel_init_sensor_properties(
-		const struct v4l2_subdev *sensor_sd)
-{
-	struct device *sensor_dev = sensor_sd->dev;
-	struct camera_common_data *s_data = to_camera_common_data(sensor_dev);
-
-	if (sensor_dev == NULL || s_data == NULL)
-		return -EINVAL;
-
-	return sensor_common_init_sensor_properties(sensor_dev,
-		sensor_dev->of_node, &s_data->sensor_props);
-}
-
 static int tegra_channel_connect_sensor(
 	struct tegra_channel *chan, struct v4l2_subdev *sensor_sd)
 {
@@ -1288,13 +1275,6 @@ int tegra_channel_init_subdevices(struct tegra_channel *chan)
 	if (strstr(chan->subdev_on_csi->name, "nvcsi") != NULL ||
 			chan->pg_mode)
 		return 0;
-
-	ret = tegra_channel_init_sensor_properties(chan->subdev_on_csi);
-	if (ret < 0) {
-		dev_err(chan->vi->dev,
-			"%s: failed to initialize sensor props\n", __func__);
-		goto fail;
-	}
 
 	ret = tegra_channel_sensorprops_setup(chan);
 	if (ret < 0) {
