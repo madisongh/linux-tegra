@@ -1,7 +1,7 @@
 /*
  * imx214.c - imx214 sensor driver
  *
- * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -1143,7 +1143,6 @@ static int imx214_probe(struct i2c_client *client,
 	struct camera_common_data *common_data;
 	struct device_node *node = client->dev.of_node;
 	struct imx214 *priv;
-	char debugfs_name[10];
 	int err;
 
 	pr_info("[IMX214]: probing v4l2 sensor.\n");
@@ -1208,14 +1207,11 @@ static int imx214_probe(struct i2c_client *client,
 	if (err)
 		return err;
 
-	err = camera_common_parse_ports(client, common_data);
+	err = camera_common_initialize(common_data, "imx214");
 	if (err) {
-		dev_err(&client->dev, "Failed to find port info\n");
+		dev_err(&client->dev, "Failed to initialize imx214.\n");
 		return err;
 	}
-	sprintf(debugfs_name, "imx214_%c", common_data->csi_port + 'a');
-	dev_dbg(&client->dev, "%s: name %s\n", __func__, debugfs_name);
-	camera_common_create_debugfs(common_data, debugfs_name);
 
 	v4l2_i2c_subdev_init(priv->subdev, client, &imx214_subdev_ops);
 
@@ -1265,7 +1261,7 @@ imx214_remove(struct i2c_client *client)
 #endif
 	v4l2_ctrl_handler_free(&priv->ctrl_handler);
 	imx214_power_put(priv);
-	camera_common_remove_debugfs(s_data);
+	camera_common_cleanup(s_data);
 
 	return 0;
 }

@@ -941,7 +941,6 @@ static int imx274_probe(struct i2c_client *client,
 	struct camera_common_data *common_data;
 	struct device_node *node = client->dev.of_node;
 	struct imx274 *priv;
-	char debugfs_name[10];
 	int err;
 
 	pr_info("[IMX274]: probing v4l2 sensor.\n");
@@ -1005,15 +1004,11 @@ static int imx274_probe(struct i2c_client *client,
 	if (err)
 		return err;
 
-	err = camera_common_parse_ports(&client->dev, common_data);
+	err = camera_common_initialize(common_data, "imx274");
 	if (err) {
-		dev_err(&client->dev, "Failed to find port info\n");
+		dev_err(&client->dev, "Failed to initialize imx274.\n");
 		return err;
 	}
-	sprintf(debugfs_name, "imx274_%c", common_data->csi_port + 'a');
-	dev_dbg(&client->dev, "%s: name %s\n", __func__, debugfs_name);
-
-	camera_common_create_debugfs(common_data, "imx274");
 
 	v4l2_i2c_subdev_init(priv->subdev, client, &imx274_subdev_ops);
 
@@ -1062,7 +1057,7 @@ imx274_remove(struct i2c_client *client)
 
 	v4l2_ctrl_handler_free(&priv->ctrl_handler);
 	imx274_power_put(priv);
-	camera_common_remove_debugfs(s_data);
+	camera_common_cleanup(s_data);
 
 	return 0;
 }

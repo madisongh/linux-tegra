@@ -1392,7 +1392,6 @@ static int ov5693_probe(struct i2c_client *client,
 	struct camera_common_data *common_data;
 	struct device_node *node = client->dev.of_node;
 	struct ov5693 *priv;
-	char debugfs_name[10];
 	int err;
 
 	pr_info("[OV5693]: probing v4l2 sensor.\n");
@@ -1455,14 +1454,12 @@ static int ov5693_probe(struct i2c_client *client,
 	if (err)
 		return err;
 
-	err = camera_common_parse_ports(&client->dev, common_data);
+	err = camera_common_initialize(common_data, "ov5693");
 	if (err) {
-		dev_err(&client->dev, "Failed to find port info\n");
+		dev_err(&client->dev, "Failed to initialize ov5693.\n");
 		return err;
 	}
-	sprintf(debugfs_name, "ov5693_%c", common_data->csi_port + 'a');
-	dev_dbg(&client->dev, "%s: name %s\n", __func__, debugfs_name);
-	camera_common_create_debugfs(common_data, debugfs_name);
+
 
 	v4l2_i2c_subdev_init(priv->subdev, client, &ov5693_subdev_ops);
 
@@ -1514,7 +1511,7 @@ ov5693_remove(struct i2c_client *client)
 
 	v4l2_ctrl_handler_free(&priv->ctrl_handler);
 	ov5693_power_put(priv);
-	camera_common_remove_debugfs(s_data);
+	camera_common_cleanup(s_data);
 
 	return 0;
 }
