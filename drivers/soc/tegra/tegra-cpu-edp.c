@@ -482,8 +482,7 @@ static int tegra_cpu_edp_probe(struct platform_device *pdev)
 	iddq_ma = tegra_sku_info.cpu_iddq_value;
 	dev_dbg(&pdev->dev, "CPU IDDQ value %d\n", iddq_ma);
 
-	ret = tegra_edp_debugfs_init(ctx, name);
-	if (ret) {
+	if (tegra_edp_debugfs_init(ctx, name)) {
 		dev_err(&pdev->dev, "Creating debugfs entries failed\n");
 		goto destroy_fv;
 	}
