@@ -35,18 +35,18 @@ static struct cpu_emc cpemc;
 static struct kobject *cpu_emc_kobj;
 
 static u32 default_emc_cpu_table[] = {
-	/* cpu < 275MHz, emc 0MHz (Min) */
-	275000, 0,
-	/* cpu < 500MHz, emc 50MHz */
-	500000, 50000,
-	/* cpu < 725MHz, emc 100MHz */
-	725000, 100000,
-	/* cpu < 925MHz, emc 200MHz */
-	975000, 200000,
-	/* cpu < 1.3GHz, emc 400MHz */
-	1300000, 400000,
-	/* cpu >= 1.3GHz, emc xGMHz (Max) */
-	UINT_MAX, INT_MAX,
+	/* cpu > 0MHz, emc 0MHz (Min) */
+	0, 0,
+	/* cpu > 275MHz, emc 50MHz */
+	275000, 50000,
+	/* cpu > 500MHz, emc 100MHz */
+	500000, 100000,
+	/* cpu > 725MHz, emc 200MHz */
+	725000, 200000,
+	/* cpu > 925MHz, emc 400MHz */
+	975000, 400000,
+	/* cpu > 1.3GHz, emc xGHz (Max) */
+	1300000, INT_MAX,
 };
 
 void set_cpu_to_emc_freq(u32 cpu_freq)
