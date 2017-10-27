@@ -924,6 +924,12 @@ static int ov23850_read_otp_manual(struct ov23850 *priv,
 	err = ov23850_read_reg(priv->s_data, OV23850_OTP_ISP_CTRL_ADDR, &isp);
 	if (err)
 		return err;
+
+	/*
+	 * WAR(Bug 200354166):
+	 *   some delay is needed for fixing i2c call failure.
+	 */
+	usleep_range(10000, 11000);
 	err = ov23850_write_reg(priv->s_data, OV23850_OTP_ISP_CTRL_ADDR,
 				isp & 0xfe);
 	if (err)
