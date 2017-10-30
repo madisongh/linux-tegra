@@ -37,7 +37,7 @@
 #define IMX274_MIN_GAIN		(1 << IMX274_GAIN_SHIFT)
 #define IMX274_MAX_GAIN		(23 << IMX274_GAIN_SHIFT)
 #define IMX274_MIN_FRAME_LENGTH	(0x8ED)
-#define IMX274_MAX_FRAME_LENGTH	(0xB292)
+#define IMX274_MAX_FRAME_LENGTH	(0xFFFF)
 #define IMX274_MIN_EXPOSURE_COARSE	(0x0001)
 #define IMX274_MAX_EXPOSURE_COARSE	\
 	(IMX274_MAX_FRAME_LENGTH-IMX274_MAX_COARSE_DIFF)
@@ -61,7 +61,7 @@ struct imx274 {
 	struct i2c_client		*i2c_client;
 	struct v4l2_subdev		*subdev;
 	struct media_pad		pad;
-
+	u32				vmax;
 	s32				group_hold_prev;
 	bool				group_hold_en;
 	struct regmap			*regmap;
@@ -157,9 +157,11 @@ static inline void imx274_get_vmax_regs(imx274_reg *regs,
 				u32 vmax)
 {
 	regs->addr = IMX274_VMAX_ADDR_MSB;
-	regs->val = (vmax >> 8) & 0xff;
-	(regs + 1)->addr = IMX274_VMAX_ADDR_LSB;
-	(regs + 1)->val = (vmax) & 0xff;
+	regs->val = (vmax >> 16) & 0x0f;
+	(regs + 1)->addr = IMX274_VMAX_ADDR_MID;
+	(regs + 1)->val = (vmax >> 8) & 0xff;
+	(regs + 2)->addr = IMX274_VMAX_ADDR_LSB;
+	(regs + 2)->val = (vmax) & 0xff;
 }
 
 static inline void imx274_get_shr_regs(imx274_reg *regs,
@@ -597,32 +599,36 @@ fail:
 
 static int imx274_set_frame_length(struct imx274 *priv, s32 val)
 {
-	imx274_reg reg_list[2];
+	struct camera_common_data *s_data = priv->s_data;
+	const struct sensor_mode_properties *mode =
+		&s_data->sensor_props.sensor_modes[s_data->mode];
+	imx274_reg reg_list[3];
 	int err;
 	u32 frame_length;
 	u32 frame_rate;
 	int i = 0;
-	u8 svr;
-	u32 vmax;
 
 	dev_dbg(&priv->i2c_client->dev,
 		 "%s: val: %u\n", __func__, val);
 
 	frame_length = (u32)val;
 
-	frame_rate = (u32)(IMX274_PIXEL_CLK_HZ /
-				(u32)(frame_length * IMX274_LINE_LENGTH));
+	frame_rate = (u32)(mode->signal_properties.pixel_clock.val /
+			(u32)(frame_length *
+			mode->image_properties.line_length));
 
-	imx274_read_reg(priv->s_data, IMX274_SVR_ADDR, &svr);
+	/*For 4K mode*/
+	priv->vmax = (u32)(IMX274_SENSOR_INTERNAL_CLK_FREQ /
+			(frame_rate *
+			IMX274_4K_MODE_HMAX));
+	if (priv->vmax < IMX274_4K_MODE_MIN_VMAX)
+		priv->vmax = IMX274_4K_MODE_MIN_VMAX;
 
-	vmax = (u32)(72000000 /
-			(u32)(frame_rate * IMX274_HMAX * (svr + 1))) - 12;
-
-	imx274_get_vmax_regs(reg_list, vmax);
+	imx274_get_vmax_regs(reg_list, priv->vmax);
 
 	imx274_set_group_hold(priv);
 
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < 3; i++) {
 		err = imx274_write_reg(priv->s_data, reg_list[i].addr,
 			 reg_list[i].val);
 		if (err)
@@ -630,7 +636,13 @@ static int imx274_set_frame_length(struct imx274 *priv, s32 val)
 	}
 
 	dev_dbg(&priv->i2c_client->dev,
-		"%s: frame_rate: %d vmax: %u\n", __func__, frame_rate, vmax);
+		"%s: PCLK: %lld, FL: %d, LL: %d, fps: %d, VMAX: %d\n", __func__,
+			mode->signal_properties.pixel_clock.val,
+			frame_length,
+			mode->image_properties.line_length,
+			frame_rate,
+			priv->vmax);
+
 	return 0;
 
 fail:
@@ -641,36 +653,38 @@ fail:
 
 static int imx274_calculate_shr(struct imx274 *priv, u32 rep)
 {
-	u8 svr;
+	const struct camera_common_data *s_data = priv->s_data;
+	const struct sensor_mode_properties *mode =
+		&s_data->sensor_props.sensor_modes[s_data->mode];
 	int shr;
-	int min;
-	int max;
-	u8 vmax_l;
-	u8 vmax_m;
-	u32 vmax;
+	int shr_min;
+	int shr_max;
+	u64 et_long;
 
-	imx274_read_reg(priv->s_data, IMX274_SVR_ADDR, &svr);
+	if (priv->vmax < IMX274_4K_MODE_MIN_VMAX)
+		priv->vmax = IMX274_4K_MODE_MIN_VMAX;
 
-	imx274_read_reg(priv->s_data, IMX274_VMAX_ADDR_LSB, &vmax_l);
-	imx274_read_reg(priv->s_data, IMX274_VMAX_ADDR_MSB, &vmax_m);
+	et_long = mode->image_properties.line_length * rep *
+		FIXED_POINT_SCALING_FACTOR /
+		mode->signal_properties.pixel_clock.val;
 
-	vmax = ((vmax_m << 8) + vmax_l);
+	/*For 4K mode*/
+	shr = priv->vmax -
+		(et_long * IMX274_SENSOR_INTERNAL_CLK_FREQ /
+		FIXED_POINT_SCALING_FACTOR -
+		IMX274_4K_MODE_OFFSET) /
+		IMX274_4K_MODE_HMAX;
 
-	min = IMX274_MODE1_SHR_MIN;
-	max = ((svr + 1) * vmax) - 4;
+	shr_min = 12;
+	shr_max = priv->vmax - 4;
+	if (shr > shr_max)
+		shr = shr_max;
 
-	shr = vmax * (svr + 1) -
-			(rep * IMX274_ET_FACTOR - IMX274_MODE1_OFFSET) /
-			IMX274_HMAX;
-
-	if (shr < min)
-		shr = min;
-
-	if (shr > max)
-		shr = max;
+	if (shr < shr_min)
+		shr = shr_min;
 
 	dev_dbg(&priv->i2c_client->dev,
-		 "%s: shr: %u vmax: %d\n", __func__, shr, vmax);
+		 "%s: shr: %u vmax: %d\n", __func__, shr, priv->vmax);
 	return shr;
 }
 
