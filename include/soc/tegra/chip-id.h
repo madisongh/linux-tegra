@@ -292,6 +292,12 @@ static inline bool tegra_platform_is_qt(void)
 {
 	return tegra_get_platform() == TEGRA_PLATFORM_QT;
 }
+static inline bool tegra_platform_is_linsim(void)
+{
+	int plat = tegra_get_platform();
+	return plat == TEGRA_PLATFORM_LINSIM ||
+			plat == TEGRA_PLATFORM_UNIT_FPGA;
+}
 static inline bool tegra_platform_is_fpga(void)
 {
 	return tegra_get_platform() == TEGRA_PLATFORM_FPGA;
@@ -308,7 +314,8 @@ static inline bool tegra_platform_is_vdk(void)
 }
 static inline bool tegra_platform_is_sim(void)
 {
-	return tegra_platform_is_vdk();
+	return tegra_platform_is_linsim() ||
+		tegra_platform_is_vdk();
 }
 
 bool tegra_bonded_out_dev(enum tegra_bondout_dev);
