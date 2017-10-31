@@ -492,7 +492,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 	}
 }
 
-static const struct reset_control_ops rst_ops = {
+static struct reset_control_ops rst_ops = {
 	.assert = tegra_clk_rst_assert,
 	.deassert = tegra_clk_rst_deassert,
 	.reset = tegra_clk_rst_reset,
