@@ -54,6 +54,9 @@
 #define IMX274_DEFAULT_HEIGHT	2160
 #define IMX274_DEFAULT_DATAFMT	MEDIA_BUS_FMT_SRGGB10_1X10
 #define IMX274_DEFAULT_CLK_FREQ	24000000
+#define IMX274_1080P_MODE_HMAX			260
+#define IMX274_1080P_MODE_MIN_VMAX		4620
+#define IMX274_1080P_MODE_OFFSET		112
 
 struct imx274 {
 	struct camera_common_power_rail	power;
@@ -618,12 +621,20 @@ static int imx274_set_frame_length(struct imx274 *priv, s32 val)
 			(u32)(frame_length *
 			mode->image_properties.line_length));
 
+	if (s_data->mode == IMX274_MODE_1920X1080) {
+		priv->vmax = (u32)(IMX274_SENSOR_INTERNAL_CLK_FREQ /
+				(frame_rate *
+				IMX274_1080P_MODE_HMAX));
+		if (priv->vmax < IMX274_1080P_MODE_MIN_VMAX)
+			priv->vmax = IMX274_1080P_MODE_MIN_VMAX;
+	} else {
 	/*For 4K mode*/
 	priv->vmax = (u32)(IMX274_SENSOR_INTERNAL_CLK_FREQ /
 			(frame_rate *
 			IMX274_4K_MODE_HMAX));
-	if (priv->vmax < IMX274_4K_MODE_MIN_VMAX)
-		priv->vmax = IMX274_4K_MODE_MIN_VMAX;
+		if (priv->vmax < IMX274_4K_MODE_MIN_VMAX)
+			priv->vmax = IMX274_4K_MODE_MIN_VMAX;
+	}
 
 	imx274_get_vmax_regs(reg_list, priv->vmax);
 
@@ -669,21 +680,37 @@ static int imx274_calculate_shr(struct imx274 *priv, u32 rep)
 		FIXED_POINT_SCALING_FACTOR /
 		mode->signal_properties.pixel_clock.val;
 
-	/*For 4K mode*/
-	shr = priv->vmax -
-		(et_long * IMX274_SENSOR_INTERNAL_CLK_FREQ /
-		FIXED_POINT_SCALING_FACTOR -
-		IMX274_4K_MODE_OFFSET) /
-		IMX274_4K_MODE_HMAX;
+	if (s_data->mode == IMX274_MODE_1920X1080) {
+		et_long = mode->image_properties.line_length * rep *
+			FIXED_POINT_SCALING_FACTOR /
+			mode->signal_properties.pixel_clock.val;
 
-	shr_min = 12;
-	shr_max = priv->vmax - 4;
-	if (shr > shr_max)
-		shr = shr_max;
+		shr = priv->vmax  -
+			(et_long * IMX274_SENSOR_INTERNAL_CLK_FREQ /
+			FIXED_POINT_SCALING_FACTOR  -
+			IMX274_1080P_MODE_OFFSET) /
+			IMX274_1080P_MODE_HMAX;
 
-	if (shr < shr_min)
-		shr = shr_min;
+		if (shr > priv->vmax - 4)
+			shr = priv->vmax - 4;
+		if (shr < 8)
+			shr = 8;
+	} else {
+		/*For 4K mode*/
+		shr = priv->vmax -
+			(et_long * IMX274_SENSOR_INTERNAL_CLK_FREQ /
+			FIXED_POINT_SCALING_FACTOR -
+			IMX274_4K_MODE_OFFSET) /
+			IMX274_4K_MODE_HMAX;
 
+		shr_min = 12;
+		shr_max = priv->vmax - 4;
+		if (shr > shr_max)
+			shr = shr_max;
+
+		if (shr < shr_min)
+			shr = shr_min;
+	}
 	dev_dbg(&priv->i2c_client->dev,
 		 "%s: shr: %u vmax: %d\n", __func__, shr, priv->vmax);
 	return shr;
