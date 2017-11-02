@@ -1167,10 +1167,7 @@ int vi2_power_on(struct tegra_channel *chan)
 			tegra_vi->sensor_opened = true;
 	}
 
-	if ((atomic_add_return(1, &chan->power_on_refcnt) == 1))
-		ret = tegra_channel_set_power(chan, 1);
-
-	return ret;
+	return tegra_channel_set_power(chan, true);
 }
 
 void vi2_power_off(struct tegra_channel *chan)
@@ -1184,11 +1181,9 @@ void vi2_power_off(struct tegra_channel *chan)
 	tegra_vi = vi->vi;
 	csi = vi->csi;
 
-	if (atomic_dec_and_test(&chan->power_on_refcnt)) {
-		ret = tegra_channel_set_power(chan, 0);
-		if (ret < 0)
-			dev_err(vi->dev, "Failed to power off subdevices\n");
-	}
+	ret = tegra_channel_set_power(chan, false);
+	if (ret < 0)
+		dev_err(vi->dev, "Failed to power off subdevices\n");
 
 	/* The last release then turn off power */
 	if (atomic_dec_and_test(&vi->power_on_refcnt)) {
