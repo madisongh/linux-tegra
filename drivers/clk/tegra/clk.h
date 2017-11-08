@@ -41,7 +41,7 @@ extern int *periph_clk_enb_refcnt;
 extern bool has_ccplex_therm_control;
 
 struct clk *tegra_clk_register_sync_source(const char *name,
-		unsigned long fixed_rate, unsigned long max_rate);
+					   unsigned long max_rate);
 
 /**
  * struct tegra_clk_frac_div - fractional divider clock
@@ -768,7 +768,7 @@ void tegra_register_devclks(struct tegra_devclk *dev_clks, int num);
 void tegra_audio_clk_init(void __iomem *clk_base,
 			void __iomem *pmc_base, struct tegra_clk *tegra_clks,
 			struct tegra_audio_clk_info *audio_info,
-			unsigned int num_plls);
+			unsigned int num_plls, unsigned long sync_max_rate);
 
 void tegra_periph_clk_init(void __iomem *clk_base, void __iomem *pmc_base,
 			struct tegra_clk *tegra_clks,
