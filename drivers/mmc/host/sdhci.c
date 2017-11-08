@@ -2,7 +2,7 @@
  *  linux/drivers/mmc/host/sdhci.c - Secure Digital Host Controller Interface driver
  *
  *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
- *  Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (c) 2012-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -3054,9 +3054,6 @@ int sdhci_suspend_host(struct sdhci_host *host)
 	 * but Vcc would still be powered on. In resume, we only restore
 	 * the controller context. So, set MMC_PM_KEEP_POWER flag.
 	 */
-	if (!(host->mmc->caps2 & MMC_CAP2_NO_SLEEP_CMD) &&
-		(host->mmc->pm_caps & MMC_PM_KEEP_POWER))
-		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 
 	if (!device_may_wakeup(mmc_dev(host->mmc))) {
 		host->ier = 0;

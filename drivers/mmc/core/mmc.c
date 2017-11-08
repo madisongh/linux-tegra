@@ -4,7 +4,7 @@
  *  Copyright (C) 2003-2004 Russell King, All Rights Reserved.
  *  Copyright (C) 2005-2007 Pierre Ossman, All Rights Reserved.
  *  MMCv4 support Copyright (C) 2006 Philip Langdale, All Rights Reserved.
- *  Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ *  Copyright (c) 2016-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1910,6 +1910,9 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		pr_info("%s: periodic cache flush enabled\n",
 				mmc_hostname(host));
 	}
+	if (!(host->caps2 & MMC_CAP2_NO_SLEEP_CMD) &&
+		(host->pm_caps & MMC_PM_KEEP_POWER))
+		host->pm_flags |= MMC_PM_KEEP_POWER;
 	return 0;
 
 free_card:
@@ -2138,7 +2141,8 @@ static int _mmc_resume(struct mmc_host *host)
 		goto out;
 
 	if (mmc_can_sleep(host->card) &&
-		mmc_card_in_sleep(host->card)) {
+		mmc_card_in_sleep(host->card) &&
+			(host->pm_flags & MMC_PM_KEEP_POWER)) {
 		err = mmc_sleep(host, 0);
 		if (!err) {
 			mmc_card_clr_sleep(host->card);
