@@ -561,6 +561,7 @@ static const struct snd_soc_dapm_widget tegra_t210ref_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("y Headphone", NULL),
 	SND_SOC_DAPM_HP("z Headphone", NULL),
 	SND_SOC_DAPM_HP("s Headphone", NULL),
+	SND_SOC_DAPM_HP("l Headphone", NULL),
 	SND_SOC_DAPM_MIC("x Int Mic", tegra_rt565x_event_int_mic),
 	SND_SOC_DAPM_MIC("x Mic Jack", tegra_rt565x_event_ext_mic),
 	SND_SOC_DAPM_MIC("w Mic", NULL),
@@ -568,6 +569,7 @@ static const struct snd_soc_dapm_widget tegra_t210ref_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("y Mic", NULL),
 	SND_SOC_DAPM_MIC("z Mic", NULL),
 	SND_SOC_DAPM_MIC("s Mic", NULL),
+	SND_SOC_DAPM_MIC("l Mic", NULL),
 	SND_SOC_DAPM_MIC("Int Mic", NULL),
 };
 
