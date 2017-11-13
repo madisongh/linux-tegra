@@ -322,6 +322,17 @@ static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 		dai_params->rate_min = clk_rate;
 	}
 
+	idx = tegra_machine_get_codec_dai_link_idx("spdif-dit-5");
+	if (idx != -EINVAL) {
+		dai_params =
+		(struct snd_soc_pcm_stream *)card->rtd[idx].dai_link->params;
+
+		/* update link_param to update hw_param for DAPM */
+		dai_params->rate_min = clk_rate;
+		dai_params->channels_min = channels;
+		dai_params->formats = formats;
+	}
+
 	return 0;
 }
 
@@ -545,12 +556,14 @@ static struct snd_soc_compr_ops tegra_t210ref_compr_ops = {
 static const struct snd_soc_dapm_widget tegra_t210ref_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("x Headphone Jack", tegra_rt565x_event_hp),
 	SND_SOC_DAPM_SPK("x Int Spk", tegra_rt565x_event_int_spk),
+	SND_SOC_DAPM_HP("w Headphone", NULL),
 	SND_SOC_DAPM_HP("x Headphone", NULL),
 	SND_SOC_DAPM_HP("y Headphone", NULL),
 	SND_SOC_DAPM_HP("z Headphone", NULL),
 	SND_SOC_DAPM_HP("s Headphone", NULL),
 	SND_SOC_DAPM_MIC("x Int Mic", tegra_rt565x_event_int_mic),
 	SND_SOC_DAPM_MIC("x Mic Jack", tegra_rt565x_event_ext_mic),
+	SND_SOC_DAPM_MIC("w Mic", NULL),
 	SND_SOC_DAPM_MIC("x Mic", NULL),
 	SND_SOC_DAPM_MIC("y Mic", NULL),
 	SND_SOC_DAPM_MIC("z Mic", NULL),
