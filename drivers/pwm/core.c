@@ -196,6 +196,28 @@ static void of_pwmchip_remove(struct pwm_chip *chip)
 		of_node_put(chip->dev->of_node);
 }
 
+static void init_pwm_of_config(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+	struct device_node *np = chip->dev->of_node;
+	u32 pval;
+	int ret;
+
+	if (!np)
+		return;
+
+	ret = of_property_read_u32(np, "capture-window-length", &pval);
+	if (!ret)
+		pwm->capture_win_len = pval;
+
+	ret = of_property_read_u32(np, "pwm-ramp-time", &pval);
+	if (!ret)
+		pwm->ramp_time = pval;
+
+	ret = of_property_read_u32(np, "pwm-double-pulse-period", &pval);
+	if (!ret)
+		pwm->double_period = pval;
+}
+
 /**
  * pwm_set_chip_data() - set private chip data for a PWM
  * @pwm: PWM device
@@ -270,6 +292,8 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
 		pwm->hwpwm = i;
 		pwm->polarity = polarity;
 		mutex_init(&pwm->lock);
+
+		init_pwm_of_config(chip, pwm);
 
 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
 	}
@@ -496,6 +520,33 @@ unlock:
 EXPORT_SYMBOL_GPL(pwm_set_polarity);
 
 /**
+ * pwm_capture() - capture and report a PWM signal
+ * @pwm: PWM device
+ * @result: structure to fill with capture result
+ * @timeout: time to wait, in milliseconds, before giving up on capture
+ *
+ * Returns: 0 on success or a negative error code on failure.
+ */
+int pwm_capture(struct pwm_device *pwm, struct pwm_capture *result,
+		unsigned long timeout)
+{
+	int err;
+
+	if (!pwm || !pwm->chip->ops)
+		return -EINVAL;
+
+	if (!pwm->chip->ops->capture)
+		return -ENOSYS;
+
+	mutex_lock(&pwm_lock);
+	err = pwm->chip->ops->capture(pwm->chip, pwm, result, timeout);
+	mutex_unlock(&pwm_lock);
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(pwm_capture);
+
+/**
  * pwm_enable() - start a PWM output toggling
  * @pwm: PWM device
  *
@@ -532,6 +583,93 @@ void pwm_disable(struct pwm_device *pwm)
 		pwm->chip->ops->disable(pwm->chip, pwm);
 }
 EXPORT_SYMBOL_GPL(pwm_disable);
+
+/**
+ * pwm_set_ramp_time(): Set PWM ramp up/down time.
+ * @pwm: PWM device
+ * @ramp_time: Ram up/down time.
+ *
+ * Return success else negative error number in falure.
+ */
+int pwm_set_ramp_time(struct pwm_device *pwm, int ramp_time)
+{
+	int err;
+
+	if (!pwm || ramp_time < 0)
+		return -EINVAL;
+
+	if (!pwm->chip->ops->set_ramp_time)
+		return -ENOTSUPP;
+
+	err = pwm->chip->ops->set_ramp_time(pwm->chip, pwm, ramp_time);
+	if (err)
+		return err;
+
+	pwm->ramp_time = ramp_time;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pwm_set_ramp_time);
+
+/**
+ * pwm_set_double_pulse_period(): Set PWM double pulse period
+ * @pwm: PWM device
+ * @period_ns: Double pulse period.
+ *
+ * Double pulse is feautue in which the pwm signal appear two times and their
+ * periods is different then normal period.
+ *
+ * Return success else negative error number in falure.
+ */
+int pwm_set_double_pulse_period(struct pwm_device *pwm, int period)
+{
+	int err;
+
+	if (!pwm || period < 0 || period > pwm->period)
+		return -EINVAL;
+
+	if (!pwm->chip->ops->set_double_pulse_period)
+		return -ENOTSUPP;
+
+	err = pwm->chip->ops->set_double_pulse_period(pwm->chip, pwm, period);
+	if (err)
+		return err;
+
+	pwm->double_period = period;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pwm_set_double_pulse_period);
+
+/**
+ * pwm_set_capture_window_length(): Set PWM capture window length.
+ * @pwm: PWM device
+ * @window_length: Window length.
+ *
+ * Window lenght to capture the PWM signal.
+ *
+ * Returns 0 in success else negative error number in failure.
+ */
+int pwm_set_capture_window_length(struct pwm_device *pwm, int window_length)
+{
+	int err;
+
+	if (!pwm || window_length <= 0)
+		return -EINVAL;
+
+	if (!pwm->chip->ops->set_capture_window_length)
+		return -ENOTSUPP;
+
+	err = pwm->chip->ops->set_capture_window_length(pwm->chip, pwm,
+							window_length);
+	if (err)
+		return err;
+
+	pwm->capture_win_len = window_length;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pwm_set_capture_window_length);
 
 static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
 {
