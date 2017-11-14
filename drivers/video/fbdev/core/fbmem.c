@@ -1124,10 +1124,6 @@ static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			return -ENODEV;
 		}
 		info->flags |= FBINFO_MISC_USEREVENT;
-#if defined(CONFIG_FRAMEBUFFER_CONSOLE)
-		/* If fbconsole is enabled, update mode of all active TTYs */
-		var.activate |= FB_ACTIVATE_ALL;
-#endif
 		ret = fb_set_var(info, &var);
 		info->flags &= ~FBINFO_MISC_USEREVENT;
 		unlock_fb_info(info);
