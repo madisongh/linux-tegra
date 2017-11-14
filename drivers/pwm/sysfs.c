@@ -167,16 +167,122 @@ static ssize_t polarity_store(struct device *child,
 	return ret ? : size;
 }
 
+static ssize_t double_period_show(struct device *child,
+				  struct device_attribute *attr,
+				  char *buf)
+{
+	const struct pwm_device *pwm = child_to_pwm_device(child);
+
+	return sprintf(buf, "%u\n", pwm_get_double_period(pwm));
+}
+
+static ssize_t double_period_store(struct device *child,
+				   struct device_attribute *attr,
+				   const char *buf, size_t size)
+{
+	struct pwm_device *pwm = child_to_pwm_device(child);
+	unsigned int val;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	ret = pwm_set_double_pulse_period(pwm, val);
+
+	return ret ? : size;
+}
+
+static ssize_t ramp_time_show(struct device *child,
+			      struct device_attribute *attr,
+			      char *buf)
+{
+	const struct pwm_device *pwm = child_to_pwm_device(child);
+
+	return sprintf(buf, "%u\n", pwm_get_ramp_time(pwm));
+}
+
+static ssize_t ramp_time_store(struct device *child,
+			       struct device_attribute *attr,
+			       const char *buf, size_t size)
+{
+	struct pwm_device *pwm = child_to_pwm_device(child);
+	unsigned int val;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	ret = pwm_set_ramp_time(pwm, val);
+
+	return ret ? : size;
+}
+
+static ssize_t capture_window_length_show(struct device *child,
+					  struct device_attribute *attr,
+					  char *buf)
+{
+	const struct pwm_device *pwm = child_to_pwm_device(child);
+
+	return sprintf(buf, "%u\n", pwm_get_capture_window_length(pwm));
+}
+
+static ssize_t capture_window_length_store(struct device *child,
+					   struct device_attribute *attr,
+					   const char *buf, size_t size)
+{
+	struct pwm_device *pwm = child_to_pwm_device(child);
+	unsigned int val;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	ret = pwm_set_capture_window_length(pwm, val);
+
+	return ret ? : size;
+}
+
+static ssize_t rpm_show(struct device *child,
+			struct device_attribute *attr,
+			char *buf)
+{
+	struct pwm_device *pwm = child_to_pwm_device(child);
+	struct pwm_capture result;
+	unsigned int rpm = 0;
+	int err;
+
+	err = pwm_capture(pwm, &result, 0);
+	if (err < 0)
+		return err;
+
+	if (result.period)
+		rpm = DIV_ROUND_CLOSEST_ULL(60ULL * NSEC_PER_SEC,
+				result.period);
+
+	return sprintf(buf, "%u\n", rpm);
+}
+
 static DEVICE_ATTR_RW(period);
 static DEVICE_ATTR_RW(duty_cycle);
 static DEVICE_ATTR_RW(enable);
 static DEVICE_ATTR_RW(polarity);
+static DEVICE_ATTR_RW(double_period);
+static DEVICE_ATTR_RW(ramp_time);
+static DEVICE_ATTR_RW(capture_window_length);
+static DEVICE_ATTR_RO(rpm);
 
 static struct attribute *pwm_attrs[] = {
 	&dev_attr_period.attr,
 	&dev_attr_duty_cycle.attr,
 	&dev_attr_enable.attr,
 	&dev_attr_polarity.attr,
+	&dev_attr_double_period.attr,
+	&dev_attr_ramp_time.attr,
+	&dev_attr_capture_window_length.attr,
+	&dev_attr_rpm.attr,
 	NULL
 };
 ATTRIBUTE_GROUPS(pwm);

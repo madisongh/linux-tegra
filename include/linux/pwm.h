@@ -5,6 +5,7 @@
 #include <linux/mutex.h>
 #include <linux/of.h>
 
+struct pwm_capture;
 struct pwm_device;
 struct seq_file;
 
@@ -33,6 +34,22 @@ int pwm_enable(struct pwm_device *pwm);
  * pwm_disable - stop a PWM output toggling
  */
 void pwm_disable(struct pwm_device *pwm);
+
+/*
+ * Set PWM signal ramp up and down time.
+ */
+int pwm_set_ramp_time(struct pwm_device *pwm, int ramp_time);
+
+/*
+ * Set double pulse period.
+ */
+int pwm_set_double_pulse_period(struct pwm_device *pwm, int period);
+
+/*
+ * Set PWM capture window length.
+ */
+int pwm_set_capture_window_length(struct pwm_device *pwm, int window_length);
+
 #else
 static inline struct pwm_device *pwm_request(int pwm_id, const char *label)
 {
@@ -55,6 +72,23 @@ static inline int pwm_enable(struct pwm_device *pwm)
 
 static inline void pwm_disable(struct pwm_device *pwm)
 {
+}
+
+static inline int pwm_set_ramp_time(struct pwm_device *pwm, int ramp_time)
+{
+	return -EINVAL;
+}
+
+static inline int pwm_set_double_pulse_period(struct pwm_device *pwm,
+					      int period)
+{
+	return -EINVAL;
+}
+
+static inline int pwm_set_capture_window_length(struct pwm_device *pwm,
+					       int window_length)
+{
+	return -EINVAL;
 }
 #endif
 
@@ -91,6 +125,9 @@ enum {
  * @lock: used to serialize accesses to the PWM device where necessary
  * @period: period of the PWM signal (in nanoseconds)
  * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
+ * @double_period: Doble pulse period.
+ * @ramp_time: Ramp up/down time.
+ * @capture_win_len: Window length for captureing PWM signal.
  * @polarity: polarity of the PWM signal
  */
 struct pwm_device {
@@ -105,6 +142,9 @@ struct pwm_device {
 	unsigned int period;
 	unsigned int duty_cycle;
 	enum pwm_polarity polarity;
+	unsigned int double_period;
+	unsigned int ramp_time;
+	unsigned int capture_win_len;;
 };
 
 static inline bool pwm_is_enabled(const struct pwm_device *pwm)
@@ -134,6 +174,22 @@ static inline unsigned int pwm_get_duty_cycle(const struct pwm_device *pwm)
 	return pwm ? pwm->duty_cycle : 0;
 }
 
+static inline unsigned int pwm_get_double_period(const struct pwm_device *pwm)
+{
+	return pwm ? pwm->double_period : 0;
+}
+
+static inline unsigned int pwm_get_ramp_time(const struct pwm_device *pwm)
+{
+	return pwm ? pwm->ramp_time : 0;
+}
+
+static inline unsigned int pwm_get_capture_window_length(
+					const struct pwm_device *pwm)
+{
+	return pwm ? pwm->capture_win_len : 0;
+}
+
 /*
  * pwm_set_polarity - configure the polarity of a PWM signal
  */
@@ -150,8 +206,12 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
  * @free: optional hook for freeing a PWM
  * @config: configure duty cycles and period length for this PWM
  * @set_polarity: configure the polarity of this PWM
+ * @capture: capture and report PWM signal
  * @enable: enable PWM output toggling
  * @disable: disable PWM output toggling
+ * @set_ramp_time: Set PWM ramp up/down time.
+ * @set_double_pulse_period: Set double pulse period time.
+ * @set_capture_window_length: Set PWM capture window length.
  * @dbg_show: optional routine to show contents in debugfs
  * @owner: helps prevent removal of modules exporting active PWMs
  */
@@ -162,8 +222,18 @@ struct pwm_ops {
 		      int duty_ns, int period_ns);
 	int (*set_polarity)(struct pwm_chip *chip, struct pwm_device *pwm,
 			    enum pwm_polarity polarity);
+	int (*capture)(struct pwm_chip *chip, struct pwm_device *pwm,
+		       struct pwm_capture *result, unsigned long timeout);
 	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
 	void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
+	int (*set_ramp_time)(struct pwm_chip *chip, struct pwm_device *pwm,
+			     int ramp_time);
+	int (*set_double_pulse_period)(struct pwm_chip *chip,
+				       struct pwm_device *pwm,
+				       int period);
+	int (*set_capture_window_length)(struct pwm_chip *chip,
+					 struct pwm_device *pwm,
+					 int window_length);
 #ifdef CONFIG_DEBUG_FS
 	void (*dbg_show)(struct pwm_chip *chip, struct seq_file *s);
 #endif
@@ -198,7 +268,19 @@ struct pwm_chip {
 	bool can_sleep;
 };
 
+/**
+ * struct pwm_capture - PWM capture data
+ * @period: period of the PWM signal (in nanoseconds)
+ * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
+ */
+struct pwm_capture {
+	unsigned int period;
+	unsigned int duty_cycle;
+};
+
 #if IS_ENABLED(CONFIG_PWM)
+int pwm_capture(struct pwm_device *pwm, struct pwm_capture *result,
+		unsigned long timeout);
 int pwm_set_chip_data(struct pwm_device *pwm, void *data);
 void *pwm_get_chip_data(struct pwm_device *pwm);
 
@@ -224,6 +306,13 @@ void devm_pwm_put(struct device *dev, struct pwm_device *pwm);
 
 bool pwm_can_sleep(struct pwm_device *pwm);
 #else
+static inline int pwm_capture(struct pwm_device *pwm,
+			      struct pwm_capture *result,
+			      unsigned long timeout)
+{
+	return -EINVAL;
+}
+
 static inline int pwm_set_chip_data(struct pwm_device *pwm, void *data)
 {
 	return -EINVAL;
