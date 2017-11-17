@@ -72,6 +72,7 @@ struct tegra_t210ref {
 	int is_codec_dummy;
 	int rate_via_kcontrol;
 	int fmt_via_kcontrol;
+	unsigned int bclk_ratio_override;
 };
 
 static const int tegra_t210ref_srate_values[] = {
@@ -176,6 +177,15 @@ static struct snd_soc_jack_pin tegra_t210ref_hp_jack_pins[] = {
 };
 #endif
 
+static unsigned int tegra_t210ref_get_bclk_ratio(struct tegra_t210ref *machine,
+						struct snd_soc_pcm_runtime *rtd)
+{
+	if (machine->bclk_ratio_override)
+		return machine->bclk_ratio_override;
+
+	return tegra_machine_get_bclk_ratio(rtd);
+}
+
 static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 					int rate,
 					int channels,
@@ -270,7 +280,7 @@ static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 		dai_params->channels_min = channels;
 
 		err = snd_soc_dai_set_bclk_ratio(card->rtd[idx].cpu_dai,
-		tegra_machine_get_bclk_ratio(&card->rtd[idx]));
+			tegra_t210ref_get_bclk_ratio(machine, &card->rtd[idx]));
 		if (err < 0) {
 			dev_err(card->dev, "Can't set cpu dai bclk ratio\n");
 			return err;
@@ -286,6 +296,13 @@ static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 		dai_params->rate_min = clk_rate;
 		dai_params->channels_min = channels;
 		dai_params->formats = formats;
+
+		err = snd_soc_dai_set_bclk_ratio(card->rtd[idx].cpu_dai,
+			tegra_t210ref_get_bclk_ratio(machine, &card->rtd[idx]));
+		if (err < 0) {
+			dev_err(card->dev, "Can't set cpu dai bclk ratio\n");
+			return err;
+		}
 	}
 
 	idx = tegra_machine_get_codec_dai_link_idx("spdif-dit-1");
@@ -299,7 +316,7 @@ static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 		dai_params->formats = formats;
 
 		err = snd_soc_dai_set_bclk_ratio(card->rtd[idx].cpu_dai,
-			tegra_machine_get_bclk_ratio(&card->rtd[idx]));
+			tegra_t210ref_get_bclk_ratio(machine, &card->rtd[idx]));
 		if (err < 0) {
 			dev_err(card->dev, "Can't set cpu dai bclk ratio\n");
 			return err;
@@ -333,6 +350,13 @@ static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 		dai_params->rate_min = clk_rate;
 		dai_params->channels_min = channels;
 		dai_params->formats = formats;
+
+		err = snd_soc_dai_set_bclk_ratio(card->rtd[idx].cpu_dai,
+			tegra_t210ref_get_bclk_ratio(machine, &card->rtd[idx]));
+		if (err < 0) {
+			dev_err(card->dev, "Can't set cpu dai bclk ratio\n");
+			return err;
+		}
 	}
 
 	idx = tegra_machine_get_codec_dai_link_idx("spdif-dit-5");
@@ -344,6 +368,13 @@ static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 		dai_params->rate_min = clk_rate;
 		dai_params->channels_min = channels;
 		dai_params->formats = formats;
+
+		err = snd_soc_dai_set_bclk_ratio(card->rtd[idx].cpu_dai,
+			tegra_t210ref_get_bclk_ratio(machine, &card->rtd[idx]));
+		if (err < 0) {
+			dev_err(card->dev, "Can't set cpu dai bclk ratio\n");
+			return err;
+		}
 	}
 
 	return 0;
@@ -698,6 +729,28 @@ static int tegra_t210ref_codec_put_format(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int tegra_t210ref_bclk_ratio_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct tegra_t210ref *machine = snd_soc_card_get_drvdata(card);
+
+	ucontrol->value.integer.value[0] = machine->bclk_ratio_override;
+
+	return 0;
+}
+
+static int tegra_t210ref_bclk_ratio_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct tegra_t210ref *machine = snd_soc_card_get_drvdata(card);
+
+	machine->bclk_ratio_override = ucontrol->value.integer.value[0];
+
+	return 0;
+}
+
 static const struct soc_enum tegra_t210ref_codec_rate =
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tegra_t210ref_srate_text),
 		tegra_t210ref_srate_text);
@@ -715,6 +768,8 @@ static const struct snd_kcontrol_new tegra_t210ref_controls[] = {
 		tegra_t210ref_codec_get_rate, tegra_t210ref_codec_put_rate),
 	SOC_ENUM_EXT("codec-x format", tegra_t210ref_codec_format,
 		tegra_t210ref_codec_get_format, tegra_t210ref_codec_put_format),
+	SOC_SINGLE_EXT("bclk ratio override", SND_SOC_NOPM, 0, INT_MAX, 0,
+		tegra_t210ref_bclk_ratio_get, tegra_t210ref_bclk_ratio_put),
 };
 
 static int tegra_t210ref_remove(struct snd_soc_card *card)
