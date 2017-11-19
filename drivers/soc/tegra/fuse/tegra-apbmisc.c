@@ -78,6 +78,7 @@ u8 tegra_get_chip_id(void)
 
 	return (tegra_read_chipid() >> 8) & 0xff;
 }
+EXPORT_SYMBOL(tegra_get_chip_id);
 
 u32 tegra_read_emu_revid(void)
 {
@@ -99,6 +100,7 @@ enum tegra_revision tegra_chip_get_revision(void)
 
 	return tegra_sku_info.id_and_rev;
 }
+EXPORT_SYMBOL(tegra_chip_get_revision);
 
 u32 tegra_read_straps(void)
 {
@@ -152,6 +154,7 @@ static struct chip_revision tegra_chip_revisions[] = {
 	CHIP_REVISION(TEGRA210, 1, 1, 0,   A01),
 	CHIP_REVISION(TEGRA210, 1, 1, 'q', A01q),
 	CHIP_REVISION(TEGRA210, 1, 2, 0,   A02),
+	CHIP_REVISION(TEGRA210B01, 2, 1, 0, A01),
 	CHIP_REVISION(TEGRA186, 1, 1, 0,   A01),
 	CHIP_REVISION(TEGRA186, 1, 2, 0,   A02),
 	CHIP_REVISION(TEGRA186, 1, 2, 'p', A02p),

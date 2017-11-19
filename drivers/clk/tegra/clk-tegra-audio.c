@@ -235,6 +235,7 @@ void __init tegra_audio_clk_init(void __iomem *clk_base,
 	/* make sure the DMIC sync clocks have a valid parent */
 	for (i = 0; i < ARRAY_SIZE(dmic_clks); i++)
 		writel_relaxed(1, clk_base + dmic_clks[i].offset);
+	fence_udelay(2, clk_base);
 
 	tegra_audio_sync_clk_init(clk_base, tegra_clks, dmic_clks,
 				  ARRAY_SIZE(dmic_clks), mux_dmic_sync_clk,

@@ -214,6 +214,13 @@ int tegra_pmc_pwm_blink_enable(void);
 int tegra_pmc_pwm_blink_disable(void);
 int tegra_pmc_pwm_blink_config(int duty_ns, int period_ns);
 
+int tegra_pmc_soft_led_blink_enable(void);
+int tegra_pmc_soft_led_blink_disable(void);
+int tegra_pmc_soft_led_blink_configure(int duty_cycle_ns, int ll_period_ns,
+				       int ramp_time_ns);
+int tegra_pmc_soft_led_blink_set_ramptime(int ramp_time_ns);
+int tegra_pmc_soft_led_blink_set_short_period(int short_low_period_ns);
+
 /* T210 USB2 SLEEPWALK APIs */
 struct tegra_utmi_pad_config {
 	u32 tctrl;
@@ -228,6 +235,7 @@ int tegra_pmc_hsic_phy_disable_sleepwalk(int port);
 
 void tegra_pmc_fuse_control_ps18_latch_set(void);
 void tegra_pmc_fuse_control_ps18_latch_clear(void);
+bool tegra_pmc_fuse_is_redirection_enabled(void);
 
 /* Legacy APIs for IO DPD enable/disable */
 /* Tegra io dpd entry - for each supported driver */
@@ -310,15 +318,16 @@ static inline int tegra_io_pads_padctrl_init(struct device *dev)
 void tegra_pmc_ufs_pwrcntrl_update(unsigned long mask, unsigned long val);
 unsigned long tegra_pmc_ufs_pwrcntrl_get(void);
 
-void tegra_pmc_nvcsi_ab_brick_update(unsigned long mask, unsigned long val);
-unsigned long tegra_pmc_nvcsi_ab_brick_getstatus(void);
-void tegra_pmc_nvcsi_cdef_brick_update(unsigned long mask, unsigned long val);
-unsigned long tegra_pmc_nvcsi_cdef_brick_getstatus(void);
-void tegra186_pmc_disable_nvcsi_brick_dpd(void);
-void tegra186_pmc_enable_nvcsi_brick_dpd(void);
+int tegra_pmc_nvcsi_brick_getstatus(const char *pad_name);
+int tegra_pmc_nvcsi_ab_brick_dpd_enable(void);
+int tegra_pmc_nvcsi_cdef_brick_dpd_enable(void);
+int tegra_pmc_nvcsi_ab_brick_dpd_disable(void);
+int tegra_pmc_nvcsi_cdef_brick_dpd_disable(void);
 
 bool tegra_pmc_is_halt_in_fiq(void);
 void tegra_pmc_sata_pwrgt_update(unsigned long mask,
 		unsigned long val);
 unsigned long tegra_pmc_sata_pwrgt_get(void);
+int tegra_pmc_save_se_context_buffer_address(u32 add);
+u32 tegra_pmc_get_se_context_buffer_address(void);
 #endif /* __SOC_TEGRA_PMC_H__ */

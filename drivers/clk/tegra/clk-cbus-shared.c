@@ -280,6 +280,16 @@ static unsigned long _clk_cap_shared_bus(struct clk *c, unsigned long rate,
 	return min(rate, rounded_ceiling);
 }
 
+static int clk_cbus_prepare(struct clk_hw *hw)
+{
+	return tegra_dvfs_set_rate(hw->clk, clk_get_rate(hw->clk));
+}
+
+static void clk_cbus_unprepare(struct clk_hw *hw)
+{
+	tegra_dvfs_set_rate(hw->clk, 0);
+}
+
 static bool bus_user_is_slower(struct tegra_clk_cbus_shared *a,
 			       struct tegra_clk_cbus_shared *b)
 {
@@ -374,7 +384,8 @@ static unsigned long _clk_shared_bus_update(struct tegra_clk_cbus_shared *cbus,
 		}
 	}
 
-	if (!strcmp(__clk_get_name(cbus->hw.clk), "emc_master")) {
+	if (!strcmp(__clk_get_name(cbus->hw.clk), "emc_master") &&
+	    (cbus->flags & TEGRA_SHARED_BUS_EMC_NATIVE)) {
 		unsigned long iso_bw_min = 0;
 		struct tegra_clk_emc *emc;
 		struct clk_hw *hw_emc;
@@ -393,7 +404,9 @@ static unsigned long _clk_shared_bus_update(struct tegra_clk_cbus_shared *cbus,
 
 	rate = override_rate ? : max(rate, bw);
 	ceiling = min(ceiling, ceiling_but_iso);
+#ifdef CONFIG_TEGRA_CLK_DEBUG
 	ceiling = override_rate ? cbus->max_rate : ceiling;
+#endif
 
 	if (bus_top && bus_slow && rate_cap) {
 		*bus_top = top;
@@ -558,11 +571,19 @@ static unsigned long clk_shared_recalc_rate(struct clk_hw *hw,
 	if (shared->u.shared_bus_user.mode == SHARED_CEILING)
 		return shared->u.shared_bus_user.rate;
 
+	if (!clk_hw_get_parent(clk_hw_get_parent(hw)))
+		return shared->u.shared_bus_user.rate;
+
 	if (shared->u.shared_bus_user.client &&
 	    (~shared->flags & TEGRA_SHARED_BUS_RACE_TO_SLEEP)) {
 		/* FIXME: for clocks with clients that can be divided down */
 	}
-	return parent_rate;
+
+	/*
+	 * CCF wrongly assumes that the parent rate won't change during
+	 * set_rate, so get the parent rate explicitly.
+	 */
+        return clk_hw_get_rate(clk_hw_get_parent(hw));
 }
 
 static int clk_gbus_prepare(struct clk_hw *hw)
@@ -630,6 +651,7 @@ static unsigned long clk_cascade_master_recalc_rate(struct clk_hw *hw,
 		cascade_div_hw = clk_hw_get_parent(bus->u.system.hclk);
 	}
 
+	parent_rate = clk_hw_get_rate(clk_hw_get_parent(hw));
 	return tegra_clk_frac_div_ops.recalc_rate(cascade_div_hw, parent_rate);
 }
 
@@ -907,7 +929,7 @@ static long clk_system_round_rate(struct clk_hw *hw, unsigned long rate,
 static unsigned long clk_system_recalc_rate(struct clk_hw *hw,
 					unsigned long parent_rate)
 {
-	return parent_rate;
+	return clk_hw_get_rate(clk_hw_get_parent(hw));
 }
 
 static int _sbus_update(struct tegra_clk_cbus_shared *cbus)
@@ -1077,6 +1099,8 @@ static const struct clk_ops tegra_clk_cbus_ops = {
 	.recalc_rate = clk_cbus_recalc_rate,
 	.round_rate = clk_cbus_round_rate,
 	.set_rate = clk_cbus_set_rate,
+	.prepare = clk_cbus_prepare,
+	.unprepare = clk_cbus_unprepare,
 	.debug_init = clk_shared_debug,
 };
 
@@ -1288,8 +1312,13 @@ static struct tegra_clk_cbus_shared *tegra_clk_init_shared(const char *name,
 	shared->u.shared_bus_user.mode = mode;
 	if (mode == SHARED_CEILING)
 		shared->u.shared_bus_user.rate = parent_cbus->max_rate;
-	else
+	else {
 		shared->u.shared_bus_user.rate = clk_get_rate(parent_clk);
+		/* If bus parent is not registered yet set default rate */
+		if (!clk_get_parent(parent_clk))
+			shared->u.shared_bus_user.rate =
+				parent_cbus->users_default_rate;
+	}
 
 	shared->flags = flags;
 	shared->iso_usages = usages;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -75,20 +75,21 @@ static int clk_periph_enable(struct clk_hw *hw)
 	}
 
 	write_enb_set(periph_clk_to_bit(gate), gate);
-	udelay(2);
+	fence_udelay(2, gate->clk_base);
 
 	if (!(gate->flags & TEGRA_PERIPH_NO_RESET) &&
 	    !(gate->flags & TEGRA_PERIPH_MANUAL_RESET)) {
 		if (read_rst(gate) & periph_clk_to_bit(gate)) {
 			udelay(5); /* reset propogation delay */
 			write_rst_clr(periph_clk_to_bit(gate), gate);
+			fence_udelay(2, gate->clk_base);
 		}
 	}
 
 	if (gate->flags & TEGRA_PERIPH_WAR_1005168) {
 		writel_relaxed(0, gate->clk_base + LVL2_CLK_GATE_OVRE);
 		writel_relaxed(BIT(22), gate->clk_base + LVL2_CLK_GATE_OVRE);
-		udelay(1);
+		fence_udelay(1, gate->clk_base);
 		writel_relaxed(0, gate->clk_base + LVL2_CLK_GATE_OVRE);
 	}
 
@@ -111,6 +112,7 @@ static void _periph_disable_locked(struct tegra_clk_periph_gate *gate)
 		tegra_read_chipid();
 
 	write_enb_clr(periph_clk_to_bit(gate), gate);
+	fence_udelay(2, gate->clk_base);
 }
 
 static void clk_periph_disable_unused(struct clk_hw *hw)
@@ -171,7 +173,7 @@ const struct clk_ops tegra_clk_periph_gate_ops = {
 	.is_prepared = clk_periph_is_prepared,
 	.enable = clk_periph_enable,
 	.disable = clk_periph_disable,
-	.disable = clk_periph_disable_unused,
+	.disable_unused = clk_periph_disable_unused,
 	.prepare = clk_periph_prepare,
 	.unprepare = clk_periph_unprepare,
 };
@@ -183,7 +185,7 @@ struct clk *tegra_clk_register_periph_gate(const char *name,
 	struct tegra_clk_periph_gate *gate;
 	struct clk *clk;
 	struct clk_init_data init;
-	struct tegra_clk_periph_regs *pregs;
+	const struct tegra_clk_periph_regs *pregs;
 
 	pregs = get_reg_bank(clk_num);
 	if (!pregs)

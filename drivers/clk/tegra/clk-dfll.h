@@ -40,6 +40,7 @@ struct thermal_tv;
  * @thermal_cap_table: table mapping a given temperature to a maximum voltage
  * @thermal_floor_table_size: size of thermal_floor_table
  * @thermal_cap_table_size: size of thermal_cap_table
+ * @cvb_version: version of CVB table used to configure DFLL parameters
  */
 struct tegra_dfll_soc_data {
 	struct device *dev;
@@ -47,8 +48,10 @@ struct tegra_dfll_soc_data {
 	unsigned int min_millivolts;
 	u32 tune0_low;
 	u32 tune0_high;
-	u32 tune1;
+	u32 tune1_low;
+	u32 tune1_high;
 	unsigned int tune_high_min_millivolts;
+	unsigned int tune_high_margin_millivolts;
 	void (*init_clock_trimmers)(void);
 	void (*set_clock_trimmers_high)(void);
 	void (*set_clock_trimmers_low)(void);
@@ -56,13 +59,24 @@ struct tegra_dfll_soc_data {
 	const struct thermal_tv *thermal_cap_table;
 	unsigned int thermal_floor_table_size;
 	unsigned int thermal_cap_table_size;
+	unsigned long dvco_calibration_max;
+	const char *cvb_version;
 };
+
+
+/*
+ * These thermal boundaries are not set in thermal zone as trip-points, but
+ * must be below/above all other actually set DFLL thermal trip-points.
+ */
+#define DFLL_THERMAL_CAP_NOCAP		0
+#define DFLL_THERMAL_FLOOR_NOFLOOR	125000
 
 int tegra_dfll_register(struct platform_device *pdev,
 			struct tegra_dfll_soc_data *soc);
 int tegra_dfll_unregister(struct platform_device *pdev);
 void tegra_dfll_suspend(struct platform_device *pdev);
-void tegra_dfll_resume(struct platform_device *pdev);
+void tegra_dfll_resume(struct platform_device *pdev, bool on_dfll);
+int tegra_dfll_resume_tuning(struct device *dev);
 int tegra_dfll_runtime_suspend(struct device *dev);
 int tegra_dfll_runtime_resume(struct device *dev);
 #endif /* __DRIVERS_CLK_TEGRA_CLK_DFLL_H */

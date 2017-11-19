@@ -342,6 +342,12 @@ long divider_round_rate(struct clk_hw *hw, unsigned long rate,
 
 	div = clk_divider_bestdiv(hw, rate, prate, table, width, flags);
 
+	if (!div) {
+		WARN(1, "%s: %s: Zero divisor \n",
+		     __func__, clk_hw_get_name(hw));
+		return *prate;
+	}
+
 	return DIV_ROUND_UP_ULL((u64)*prate, div);
 }
 EXPORT_SYMBOL_GPL(divider_round_rate);
@@ -358,6 +364,11 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
 		bestdiv &= div_mask(divider->width);
 		bestdiv = _get_div(divider->table, bestdiv, divider->flags,
 			divider->width);
+		if (!bestdiv) {
+			WARN(1, "%s: %s: Zero divisor \n",
+			     __func__, clk_hw_get_name(hw));
+			return *prate;
+		}
 		return DIV_ROUND_UP_ULL((u64)*prate, bestdiv);
 	}
 
@@ -386,12 +397,14 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long parent_rate)
 {
 	struct clk_divider *divider = to_clk_divider(hw);
-	unsigned int value;
+	int value;
 	unsigned long flags = 0;
 	u32 val;
 
 	value = divider_get_val(rate, parent_rate, divider->table,
 				divider->width, divider->flags);
+	if (IS_ERR_VALUE(value))
+		return value;
 
 	if (divider->lock)
 		spin_lock_irqsave(divider->lock, flags);
@@ -404,7 +417,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
 		val = clk_readl(divider->reg);
 		val &= ~(div_mask(divider->width) << divider->shift);
 	}
-	val |= value << divider->shift;
+	val |= (u32)value << divider->shift;
 	clk_writel(val, divider->reg);
 
 	if (divider->lock)

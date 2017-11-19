@@ -1,6 +1,8 @@
 /*
  * Utility functions for parsing Tegra CVB voltage tables
  *
+ * Copyright (C) 2012-2017 NVIDIA Corporation.  All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -43,8 +45,11 @@ struct cvb_table_freq_entry {
 struct cvb_cpu_dfll_data {
 	u32 tune0_low;
 	u32 tune0_high;
-	u32 tune1;
+	u32 tune1_low;
+	u32 tune1_high;
 	unsigned int tune_high_min_millivolts;
+	unsigned int tune_high_margin_millivolts;
+	unsigned long dvco_calibration_max;
 };
 
 struct thermal_coefficients {
@@ -71,6 +76,8 @@ struct cvb_table {
 	int voltage_scale;
 	struct cvb_table_freq_entry cvb_table[MAX_DVFS_FREQS];
 	struct cvb_cpu_dfll_data cpu_dfll_data;
+	struct cvb_coefficients vmin_coefficients;
+	const char *cvb_version;
 };
 
 struct thermal_table {
@@ -96,7 +103,8 @@ const struct cvb_table *tegra_cvb_build_opp_table(
 		int speedo_id,
 		int speedo_value,
 		unsigned long max_rate,
-		struct device *opp_dev);
+		struct device *opp_dev,
+		int *vmin);
 int tegra_round_voltage(int mv, const struct rail_alignment *align, int up);
 #else
 static inline const struct cvb_table *tegra_cvb_build_opp_table(
@@ -107,7 +115,8 @@ static inline const struct cvb_table *tegra_cvb_build_opp_table(
 		int speedo_id,
 		int speedo_value,
 		unsigned long max_rate,
-		struct device *opp_dev)
+		struct device *opp_dev,
+		int *vmin)
 {
 	return ERR_PTR(-ENODEV);
 }
@@ -128,6 +137,6 @@ int tegra_round_cvb_voltage(int mv, int v_scale,
 int tegra_get_cvb_t_voltage(int speedo, int s_scale, int t, int t_scale,
 			    struct cvb_coefficients *cvb);
 int tegra_cvb_build_thermal_table(const struct thermal_table *table,
-		int speedo_value);
+		int speedo_value, unsigned int soc_min_mv);
 
 #endif

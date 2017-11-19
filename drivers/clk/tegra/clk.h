@@ -39,6 +39,7 @@ struct tegra_clk_sync_source {
 extern const struct clk_ops tegra_clk_sync_source_ops;
 extern int *periph_clk_enb_refcnt;
 extern bool has_ccplex_therm_control;
+extern bool div1_5_not_allowed;
 
 struct clk *tegra_clk_register_sync_source(const char *name,
 					   unsigned long max_rate);
@@ -89,6 +90,8 @@ struct clk *tegra_clk_register_divider(const char *name,
 		u8 frac_width, spinlock_t *lock);
 struct clk *tegra_clk_register_mc(const char *name, const char *parent_name,
 				  void __iomem *reg, spinlock_t *lock);
+struct clk *tegra_clk_register_mc_t210(const char *name,
+		const char *parent_name, void __iomem *reg, spinlock_t *lock);
 
 /*
  * Tegra PLL:
@@ -512,7 +515,7 @@ struct tegra_clk_periph_gate {
 	u8			flags;
 	int			clk_num;
 	int			*enable_refcnt;
-	struct tegra_clk_periph_regs	*regs;
+	const struct tegra_clk_periph_regs *regs;
 	bool			prepared;
 };
 
@@ -550,6 +553,12 @@ struct clk *tegra_clk_register_periph_fixed(const char *name,
 					    unsigned int div,
 					    unsigned int num);
 
+struct tegra_clk_periph_reparent_policy {
+	u8 low_rate_parent_idx;
+	u8 high_rate_parent_idx;
+	unsigned long threshold;
+};
+
 /**
  * struct clk-periph - peripheral clock
  *
@@ -558,6 +567,7 @@ struct clk *tegra_clk_register_periph_fixed(const char *name,
  * @mux:	mux clock
  * @divider:	divider clock
  * @gate:	gate clock
+ * @rpolicy	reparent policy
  * @mux_ops:	mux clock ops
  * @div_ops:	divider clock ops
  * @gate_ops:	gate clock ops
@@ -569,6 +579,7 @@ struct tegra_clk_periph {
 	struct clk_mux		mux;
 	struct tegra_clk_frac_div	divider;
 	struct tegra_clk_periph_gate	gate;
+	struct tegra_clk_periph_reparent_policy	rpolicy;
 
 	const struct clk_ops	*mux_ops;
 	const struct clk_ops	*div_ops;
@@ -704,19 +715,24 @@ struct clk *tegra_clk_register_super_clk(const char *name,
 		const char **parent_names, u8 num_parents,
 		unsigned long flags, void __iomem *reg, u8 clk_super_flags,
 		spinlock_t *lock);
+
 /**
  * struct clk_init_table - clock initialization table
  * @clk_id:	clock id as mentioned in device tree bindings
  * @parent_id:	parent clock id as mentioned in device tree bindings
  * @rate:	rate to set
  * @state:	enable/disable
+ * @flags	clock initialization flags
  */
 struct tegra_clk_init_table {
 	unsigned int	clk_id;
 	unsigned int	parent_id;
 	unsigned long	rate;
 	int		state;
+	u32		flags;
 };
+
+#define TEGRA_TABLE_RATE_CHANGE_OVERCLOCK	BIT(0)
 
 /**
  * struct clk_duplicate - duplicate clocks
@@ -740,6 +756,7 @@ struct tegra_clk_duplicate {
 struct tegra_clk {
 	int			dt_id;
 	bool			present;
+	bool			use_integer_div;
 };
 
 struct tegra_devclk {
@@ -757,7 +774,7 @@ void tegra_init_from_table(struct tegra_clk_init_table *tbl,
 void tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
 		struct clk *clks[], int clk_max);
 
-struct tegra_clk_periph_regs *get_reg_bank(int clkid);
+const struct tegra_clk_periph_regs *get_reg_bank(int clkid);
 struct clk **tegra_clk_init(void __iomem *clk_base, int num, int periph_banks);
 
 struct clk **tegra_lookup_dt_id(int clk_id, struct tegra_clk *tegra_clk);
@@ -786,6 +803,21 @@ void tegra_super_clk_gen4_init(void __iomem *clk_base,
 void tegra_super_clk_gen5_init(void __iomem *clk_base,
 			void __iomem *pmc_base, struct tegra_clk *tegra_clks,
 			struct tegra_clk_pll_params *pll_params);
+void tegra210b01_pll_init(void __iomem *car, void __iomem *pmc,
+		unsigned long osc, unsigned long ref, bool emc_is_native,
+		struct clk **clks);
+void tegra210b01_audio_clk_init(void __iomem *clk_base,
+				void __iomem *pmc_base,
+				struct tegra_clk *tegra_clks);
+void tegra210b01_super_clk_init(void __iomem *clk_base,
+				void __iomem *pmc_base,
+				struct tegra_clk *tegra_clks);
+int tegra210b01_init_pllu(void);
+struct tegra_clk_pll_params *tegra210b01_get_pllp_params(void);
+struct tegra_clk_pll_params *tegra210b01_get_pllc4_params(void);
+const struct clk_div_table *tegra210b01_get_pll_vco_post_div_table(void);
+void tegra210b01_adjust_clks(struct tegra_clk *tegra_clks);
+void tegra210b01_clock_table_init(struct clk **clks);
 
 #ifdef CONFIG_TEGRA_CLK_EMC
 struct clk *tegra_clk_register_emc(void __iomem *base, struct device_node *np,
@@ -839,6 +871,7 @@ enum shared_bus_users_mode {
 #define TEGRA_SHARED_BUS_RETENTION	BIT(1)
 #define TEGRA_SHARED_BUS_RACE_TO_SLEEP	BIT(2)
 #define TEGRA_SHARED_BUS_ROUND_PASS_THRU	BIT(3)
+#define TEGRA_SHARED_BUS_EMC_NATIVE	BIT(4)
 
 struct clk_div_sel {
 	struct clk_hw *src;
@@ -855,6 +888,7 @@ struct tegra_clk_cbus_shared {
 	unsigned long		iso_usages;
 	unsigned long		min_rate;
 	unsigned long		max_rate;
+	unsigned long		users_default_rate;
 	bool			rate_update_started;
 	bool			rate_updating;
 	bool			rate_propagating;
@@ -954,7 +988,7 @@ void tegra_clk_pllxc_resume(struct clk *c, unsigned long rate);
 void tegra_clk_pllre_vco_resume(struct clk *c, unsigned long rate);
 void tegra_clk_pllu_resume(struct clk *c, unsigned long rate);
 void tegra_clk_pllss_resume(struct clk *c, unsigned long rate);
-void tegra_clk_divider_resume(struct clk *c, unsigned long rate);
+void tegra_clk_divider_resume(struct clk_hw *hw, unsigned long rate);
 void tegra_clk_pll_out_resume(struct clk *clk, unsigned long rate);
 void tegra_clk_plle_tegra210_resume(struct clk *c);
 void tegra_clk_sync_state_pllcx(struct clk *c);
@@ -980,4 +1014,16 @@ struct tegra_pto_table {
 	u8 cycle_count;
 };
 void tegra_register_ptos(struct tegra_pto_table *ptodefs, int num_pto_defs);
+void tegra_register_pto(struct clk *clk, struct tegra_pto_table *ptodef);
+
+/* add some extra nodes to debugfs */
+void tegra_clk_debugfs_add(struct clk *clk);
+
+/* Combined read fence with delay */
+#define fence_udelay(delay, reg)	\
+	do {				\
+		readl_relaxed(reg);	\
+		udelay(delay);		\
+	} while (0)
+
 #endif /* TEGRA_CLK_H */

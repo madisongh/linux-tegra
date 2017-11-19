@@ -19,6 +19,7 @@
 #include <linux/io.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/clk-provider.h>
 
 #include "clk.h"
@@ -124,6 +125,7 @@ static int clk_frac_div_set_rate(struct clk_hw *hw, unsigned long rate,
 		val |= pll_out_override(divider);
 
 	writel_relaxed(val, divider->reg);
+	fence_udelay(2, divider->reg);
 
 	if (divider->lock)
 		spin_unlock_irqrestore(divider->lock, flags);
@@ -189,18 +191,32 @@ struct clk *tegra_clk_register_mc(const char *name, const char *parent_name,
 					  16, 1, 0, mc_div_table, lock);
 }
 
-#if defined(CONFIG_PM_SLEEP)
-void tegra_clk_divider_resume(struct clk *c, unsigned long rate)
+static const struct clk_div_table mc_div_table_t210[] = {
+	{ .val = 0, .div = 2 },
+	{ .val = 1, .div = 4 },
+	{ .val = 2, .div = 1 },
+	{ .val = 3, .div = 2 },
+	{ .val = 0, .div = 0 },
+};
+
+struct clk *tegra_clk_register_mc_t210(const char *name,
+		const char *parent_name, void __iomem *reg, spinlock_t *lock)
 {
-	struct clk_hw *hw = __clk_get_hw(c);
-	struct clk *parent = clk_get_parent(c);
+	return clk_register_divider_table(NULL, name, parent_name, 0, reg,
+		15, 2, CLK_DIVIDER_READ_ONLY, mc_div_table_t210, lock);
+}
+
+#if defined(CONFIG_PM_SLEEP)
+void tegra_clk_divider_resume(struct clk_hw *hw, unsigned long rate)
+{
+	struct clk_hw *parent = clk_hw_get_parent(hw);
 	unsigned long parent_rate;
 
 	if (IS_ERR(parent)) {
 		WARN_ON(1);
 		return;
 	}
-	parent_rate = clk_get_rate(parent);
+	parent_rate = clk_hw_get_rate(parent);
 
 	if (clk_frac_div_set_rate(hw, rate, parent_rate) < 0)
 		WARN_ON(1);

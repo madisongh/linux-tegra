@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -167,13 +167,6 @@
 			_clk_num, _gate_flags, _clk_id, _parents##_idx, 0,\
 			NULL)
 
-#define MUX8B(_name, _parents, _offset, \
-			     _clk_num, _gate_flags, _clk_id)	\
-	TEGRA_INIT_DATA_TABLE(_name, NULL, NULL, _parents, _offset,\
-			29, MASK(3), 0, 0, 8, 1, 0,\
-			_clk_num, _gate_flags, _clk_id, _parents##_idx, 0,\
-			NULL)
-
 #define MUX8_NOGATE_LOCK(_name, _parents, _offset, _clk_id, _lock)	\
 	TEGRA_INIT_DATA_TABLE(_name, NULL, NULL, _parents, _offset,	\
 			      29, MASK(3), 0, 0, 8, 1, TEGRA_DIVIDER_ROUND_UP,\
@@ -239,7 +232,8 @@
 			     _clk_num, _clk_id)			\
 	TEGRA_INIT_DATA_TABLE(_name, NULL, NULL, _parents, _offset,\
 			30, MASK(2), 0, 0, 16, 0, TEGRA_DIVIDER_ROUND_UP,\
-			_clk_num, 0, _clk_id, _parents##_idx, 0, NULL)
+			_clk_num, TEGRA_PERIPH_ON_APB, _clk_id, \
+			_parents##_idx, 0, NULL)
 
 #define XUSB(_name, _parents, _offset, \
 			     _clk_num, _gate_flags, _clk_id)	 \
@@ -406,13 +400,6 @@ static const char *mux_pllc_pllp_plla1_pllc2_c3_clkm_pllc4[] = {
 };
 #define mux_pllc_pllp_plla1_pllc2_c3_clkm_pllc4_idx \
 	mux_pllc2_c_c3_pllp_clkm_plla1_pllc4_idx
-
-static const char *
-mux_plla_pllc4_out0_pllc_pllc4_out1_pllp_pllc4_out2_clkm[] = {
-	"pll_a_out0", "pll_c4_out0", "pll_c", "pll_c4_out1", "pll_p",
-	"pll_c4_out2", "clk_m"
-};
-#define mux_plla_pllc4_out0_pllc_pllc4_out1_pllp_pllc4_out2_clkm_idx NULL
 
 static const char *mux_pllm_pllc2_c_c3_pllp_plla[] = {
 	"pll_m", "pll_c2", "pll_c", "pll_c3", "pll_p", "pll_a_out0"
@@ -831,7 +818,6 @@ static struct tegra_periph_init_data periph_clks[] = {
 	MUX8("nvenc", mux_pllc2_c_c3_pllp_plla1_clkm, CLK_SOURCE_NVENC, 219, 0, tegra_clk_nvenc),
 	MUX8("nvdec", mux_pllc2_c_c3_pllp_plla1_clkm, CLK_SOURCE_NVDEC, 194, 0, tegra_clk_nvdec),
 	MUX8("nvjpg", mux_pllc2_c_c3_pllp_plla1_clkm, CLK_SOURCE_NVJPG, 195, 0, tegra_clk_nvjpg),
-	MUX8B("ape", mux_plla_pllc4_out0_pllc_pllc4_out1_pllp_pllc4_out2_clkm, CLK_SOURCE_APE, 198, TEGRA_PERIPH_ON_APB, tegra_clk_ape),
 	MUX8_NOGATE_LOCK("sor1_src", mux_pllp_plld_plld2_clkm, CLK_SOURCE_SOR1, tegra_clk_sor1_src, &sor1_lock),
 	NODIV("sor1_brick", mux_plldp_sor1_src, CLK_SOURCE_SOR1, 14, MASK(1), 183, 0, tegra_clk_sor1_brick, &sor1_lock),
 	NODIV("sor1", mux_clkm_sor1_brick_sor1_src, CLK_SOURCE_SOR1, 15, MASK(1), 183, 0, tegra_clk_sor1, &sor1_lock),
@@ -948,7 +934,7 @@ static void __init periph_clk_init(void __iomem *clk_base,
 	struct clk **dt_clk;
 
 	for (i = 0; i < ARRAY_SIZE(periph_clks); i++) {
-		struct tegra_clk_periph_regs *bank;
+		const struct tegra_clk_periph_regs *bank;
 		struct tegra_periph_init_data *data;
 
 		data = periph_clks + i;
@@ -960,6 +946,9 @@ static void __init periph_clk_init(void __iomem *clk_base,
 		bank = get_reg_bank(data->periph.gate.clk_num);
 		if (!bank)
 			continue;
+
+		if (tegra_clks[data->clk_id].use_integer_div)
+			data->periph.divider.flags |= TEGRA_DIVIDER_INT;
 
 		data->periph.gate.regs = bank;
 		clk = tegra_clk_register_periph(data->name,
@@ -1077,7 +1066,7 @@ static void __init init_pllp(void __iomem *clk_base, void __iomem *pmc_base,
 		if (dt_clk) {
 			clk = tegra_clk_register_pll_out("pll_p_out4",
 					"pll_p_out4_div", clk_base + PLLP_OUTB,
-					17, 16, CLK_IGNORE_UNUSED |
+					17, 16,
 					CLK_SET_RATE_PARENT, 0,
 					&PLLP_OUTB_lock);
 			*dt_clk = clk;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -21,6 +21,7 @@
 #include <linux/delay.h>
 #include <linux/export.h>
 #include <linux/clk/tegra.h>
+#include <soc/tegra/chip-id.h>
 
 #include "clk.h"
 #include "clk-id.h"
@@ -47,7 +48,10 @@ int __init tegra_osc_clk_init(void __iomem *clk_base, struct tegra_clk *clks,
 	osc_ctrl_ctx = val & OSC_CTRL_MASK;
 	osc_idx = val >> OSC_CTRL_OSC_FREQ_SHIFT;
 
-	if (osc_idx < num)
+	if (tegra_platform_is_fpga() &&
+			of_machine_is_compatible("nvidia,tegra210"))
+		*osc_freq = input_freqs[5]; /* pretend FPGA is OSC38P4 */
+	else if (osc_idx < num)
 		*osc_freq = input_freqs[osc_idx];
 	else
 		*osc_freq = 0;
@@ -121,5 +125,6 @@ void tegra_clk_osc_resume(void __iomem *clk_base)
 	val = readl_relaxed(clk_base + OSC_CTRL) & ~OSC_CTRL_MASK;
 	val |= osc_ctrl_ctx;
 	writel_relaxed(val, clk_base + OSC_CTRL);
+	fence_udelay(2, clk_base);
 }
 #endif

@@ -318,14 +318,20 @@ static int dvfs_rail_apply_limits(struct dvfs_rail *rail, int millivolts,
 	if (rail->therm_caps && warn_on_cap) {
 		int i = rail->therm_cap_idx;
 
-		if ((i > 0) && (millivolts > rail->therm_caps[i - 1].mv))
-			WARN(1, "tegra_dvfs: %s set to %dmV above cap %dmV\n",
+		if ((i > 0) && (millivolts > rail->therm_caps[i - 1].mv)) {
+			WARN(!rail->therm_cap_warned,
+			     "tegra_dvfs: %s set to %dmV above cap %dmV\n",
 			     rail->reg_id, millivolts,
 			     rail->therm_caps[i - 1].mv);
+			rail->therm_cap_warned = true;
+		} else {
+			rail->therm_cap_warned = false;
+		}
 	}
 
 	if (rail->override_millivolts) {
 		millivolts = rail->override_millivolts;
+		return millivolts;
 	} else if (rail->dbg_mv_offs) {
 		/* apply offset and ignore limits */
 		millivolts += rail->dbg_mv_offs;
@@ -448,6 +454,15 @@ static int dvfs_rail_connect_to_regulator(struct device *dev,
 		if (!regulator_get_constraint_voltages(rail->reg, &min_uv,
 						       &max_uv))
 			rail->min_millivolts = min_uv / 1000;
+	}
+
+	if (v > rail->nominal_millivolts * 1000) {
+		if (dvfs_rail_set_voltage_reg(rail, rail->nominal_millivolts)) {
+			pr_err("tegra_dvfs: failed lower %s voltage %d to %d\n",
+			       rail->reg_id, v, rail->nominal_millivolts);
+			return -EINVAL;
+		}
+		v = rail->nominal_millivolts * 1000;
 	}
 
 	rail->millivolts = v / 1000;
@@ -1155,12 +1170,6 @@ int tegra_setup_dvfs(struct clk *c, struct dvfs *d)
 {
 	cleanup_dvfs_table(d);
 
-	if (!d->num_freqs || (d->freqs[d->num_freqs - 1] == d->freqs[0])) {
-		if (d->num_freqs)
-			clk_set_max_rate(c, d->freqs[0]);
-		return 0;
-	}
-
 	d->clk = c;
 
 	mutex_lock(&dvfs_lock);
@@ -1212,9 +1221,7 @@ static bool tegra_dvfs_all_rails_suspended(void)
 	struct dvfs_rail *rail;
 
 	list_for_each_entry(rail, &dvfs_rail_list, node)
-		if ((!rail->suspended) &&
-		    (!rail->disabled) &&
-		    (rail != tegra_gpu_rail))
+		if (!rail->suspended && !rail->disabled)
 			return false;
 
 	return true;
@@ -1240,8 +1247,7 @@ static int tegra_dvfs_suspend_one(void)
 	int ret = 0;
 
 	list_for_each_entry(rail, &dvfs_rail_list, node) {
-		if ((rail == tegra_gpu_rail) || /* don't suspend vdd-gpu */
-		    (rail->suspended) ||
+		if ((rail->suspended) ||
 		    (rail->disabled) ||
 		    (!tegra_dvfs_from_rails_suspended_or_solved(rail)))
 			continue;
@@ -1829,7 +1835,13 @@ static int tegra_dvfs_regulator_init(struct device *dev)
 
 	list_for_each_entry(rail, &dvfs_rail_list, node) {
 		tegra_config_dvfs(rail);
-		__tegra_dvfs_rail_enable(rail);
+		if (rail->disabled) {
+			/* Overwrite boot voltage with nominal */
+			rail->disabled = false;
+			__tegra_dvfs_rail_disable(rail);
+		} else {
+			__tegra_dvfs_rail_enable(rail);  /* update to clks */
+		}
 	}
 
 	core_dvfs_started = true;
@@ -1946,7 +1958,11 @@ static int dvfs_tree_show(struct seq_file *s, void *data)
 		}
 		seq_printf(s, "   %-26s %-4d mV\n", "nominal",
 			   rail->nominal_millivolts);
+		seq_printf(s, "   %-26s %-4d mV\n", "minimum",
+			   rail->min_millivolts);
 		seq_printf(s, "   %-26s %-4d mV\n", "offset", rail->dbg_mv_offs);
+		seq_printf(s, "   %-26s %-4d mV\n", "override",
+			   rail->override_millivolts);
 
 		if (rail->dfll_mode) {
 			therm_mv = tegra_dfll_get_thermal_floor_mv();
@@ -2021,6 +2037,11 @@ static int dvfs_table_show(struct seq_file *s, void *data)
 	seq_puts(s, "DVFS tables: units mV/MHz\n");
 
 	mutex_lock(&dvfs_lock);
+
+	list_for_each_entry(rail, &dvfs_rail_list, node) {
+		seq_printf(s, "%-8s table version: %s\n",
+			   rail->reg_id, rail->nvver ? : "N/A");
+	}
 
 	list_for_each_entry(rail, &dvfs_rail_list, node) {
 		list_for_each_entry(d, &rail->dvfs, reg_node) {
@@ -2248,6 +2269,31 @@ static int dvfs_offset_set(void *data, u64 val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(dvfs_offset_fops, dvfs_offset_get, dvfs_offset_set, "%lld\n");
 
+static int dvfs_override_get(void *data, u64 *val)
+{
+	struct dvfs_rail *rail = data;
+
+	*val = rail->override_millivolts;
+
+	return 0;
+}
+
+static int dvfs_override_set(void *data, u64 val)
+{
+	struct dvfs_rail *rail = data;
+
+	mutex_lock(&dvfs_lock);
+
+	rail->override_millivolts = val;
+	dvfs_rail_update(rail);
+
+	mutex_unlock(&dvfs_lock);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(dvfs_override_fops,
+			dvfs_override_get, dvfs_override_set, "%lld\n");
+
 static int dvfs_debugfs_init(void)
 {
 	struct dentry *d_root, *d;
@@ -2286,6 +2332,16 @@ static int dvfs_debugfs_init(void)
 	if (!d)
 		return -ENOMEM;
 
+	d = debugfs_create_file("vdd_core_override", S_IRUGO | S_IWUSR, d_root,
+				tegra_core_rail,  &dvfs_override_fops);
+	if (!d)
+		return -ENOMEM;
+
+	d = debugfs_create_file("vdd_gpu_override", S_IRUGO | S_IWUSR, d_root,
+				tegra_gpu_rail,  &dvfs_override_fops);
+	if (!d)
+		return -ENOMEM;
+
 	return 0;
 }
 
@@ -2296,6 +2352,8 @@ typedef int (*dvfs_init_cb_t)(struct device *);
 static const struct of_device_id tegra_dvfs_of_match[] = {
 	{ .compatible = "nvidia,tegra124-dvfs", .data = tegra124_init_dvfs },
 	{ .compatible = "nvidia,tegra210-dvfs", .data = tegra210_init_dvfs },
+	{ .compatible = "nvidia,tegra210b01-dvfs",
+	  .data = tegra210b01_init_dvfs },
 	{},
 };
 
@@ -2330,6 +2388,7 @@ static int tegra_dvfs_probe(struct platform_device *pdev)
 				&tegra_vts_cooling_ops);
 			pr_info("tegra_dvfs: %s: %sregistered\n", name,
 				IS_ERR_OR_NULL(rail->vts_cdev) ? "not " : "");
+			kfree(name);
 		}
 	}
 

@@ -83,10 +83,15 @@ struct tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
 
 int *periph_clk_enb_refcnt;
 bool has_ccplex_therm_control;
+bool div1_5_not_allowed;
+
 static int periph_banks;
 static struct clk **clks;
 static int clk_num;
 static struct clk_onecell_data clk_data;
+static uint32_t *skipped_clkids;
+static int skipped_len;
+
 #ifdef CONFIG_PM_SLEEP
 static u32 *periph_ctx;
 #endif
@@ -96,7 +101,7 @@ static int (*special_reset_assert)(unsigned long);
 static int (*special_reset_deassert)(unsigned long);
 static unsigned int num_special_reset;
 
-static struct tegra_clk_periph_regs periph_regs[] = {
+static const struct tegra_clk_periph_regs periph_regs[] = {
 	[0] = {
 		.enb_reg = CLK_OUT_ENB_L,
 		.enb_set_reg = CLK_OUT_ENB_SET_L,
@@ -174,6 +179,7 @@ static int tegra_clk_rst_assert(struct reset_controller_dev *rcdev,
 	if (id < periph_banks * 32) {
 		writel_relaxed(BIT(id % 32),
 			       clk_base + periph_regs[id / 32].rst_set_reg);
+		fence_udelay(2, clk_base);
 		return 0;
 	} else if (id < periph_banks * 32 + num_special_reset) {
 		return special_reset_assert(id);
@@ -188,6 +194,7 @@ static int tegra_clk_rst_deassert(struct reset_controller_dev *rcdev,
 	if (id < periph_banks * 32) {
 		writel_relaxed(BIT(id % 32),
 			       clk_base + periph_regs[id / 32].rst_clr_reg);
+		fence_udelay(2, clk_base);
 		return 0;
 	} else if (id < periph_banks * 32 + num_special_reset) {
 		return special_reset_deassert(id);
@@ -205,9 +212,20 @@ static int tegra_clk_rst_reset(struct reset_controller_dev *rcdev,
 	if (err)
 		return err;
 
-	udelay(1);
+	udelay(5);
 
 	return tegra_clk_rst_deassert(rcdev, id);
+}
+
+void __init tegra_register_debug_devclks(void)
+{
+	int i;
+
+	for (i = 0; i < clk_num; i++) {
+		if (!IS_ERR_OR_NULL(clks[i]))
+			clk_register_clkdev(clks[i], __clk_get_name(clks[i]),
+				"tegra-clk-debug");
+	}
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -245,6 +263,7 @@ void tegra_clk_periph_resume(void __iomem *clk_base)
 			clk_base + periph_regs[i].rst_reg);
 
 	/* ensure all resets have propagated */
+	fence_udelay(2, clk_base);
 	tegra_read_chipid();
 
 	for (i = 0; i < periph_banks; i++, idx++)
@@ -252,6 +271,7 @@ void tegra_clk_periph_resume(void __iomem *clk_base)
 			clk_base + periph_regs[i].enb_reg);
 
 	/* ensure all enables have propagated */
+	fence_udelay(2, clk_base);
 	tegra_read_chipid();
 }
 
@@ -267,7 +287,7 @@ static int tegra_clk_suspend_ctx_init(int banks)
 }
 #endif
 
-struct tegra_clk_periph_regs *get_reg_bank(int clkid)
+const struct tegra_clk_periph_regs *get_reg_bank(int clkid)
 {
 	int reg_bank = clkid / 32;
 
@@ -343,12 +363,85 @@ void __init tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
 	}
 }
 
+static void tegra_handle_skipped_clks(struct device_node *np)
+{
+	struct property *prop;
+	int err, i;
+
+	prop = of_find_property(np, "nvidia,tegra-ignore-clks", &skipped_len);
+	if (!prop)
+		return;
+
+	if (skipped_len % sizeof(*skipped_clkids)) {
+		pr_err("clk: invalid nvidia,tegra-ignore-clks property len: %d\n",
+			skipped_len);
+		skipped_len = 0;
+		return;
+	}
+
+	skipped_len /= sizeof(*skipped_clkids);
+	skipped_clkids = kmalloc_array(skipped_len, sizeof(*skipped_clkids),
+				 GFP_KERNEL);
+	err = of_property_read_u32_array(np, "nvidia,tegra-ignore-clks",
+					 skipped_clkids, skipped_len);
+	if (err < 0) {
+		pr_err("clk: error %d reading nvidia,tegra-ignore-clks property",
+			err);
+		kfree(skipped_clkids);
+		skipped_len = 0;
+		skipped_clkids = NULL;
+		return;
+	}
+
+	for (i = 0; i < skipped_len; i++) {
+		uint32_t skipid = skipped_clkids[i];
+		struct clk *skipclk;
+
+		if (skipid < clk_num)
+			skipclk = clks[skipid];
+		else {
+			pr_err("clk: ignoring invalid ignored clk id: %d\n",
+				skipid);
+			continue;
+		}
+
+		if (!IS_ERR_OR_NULL(skipclk)) {
+			clk_unregister(skipclk);
+			clks[skipid] = NULL;
+		} else {
+			 pr_err("clk: ignoring unregistered ignored clk id: %d\n",
+				skipid);
+		}
+	}
+}
+
+static bool clk_is_skipped(uint32_t clk_id)
+{
+	int i;
+
+	if (!skipped_clkids)
+		return false;
+
+	for (i = 0; i < skipped_len; i++) {
+		if (skipped_clkids[i] == clk_id)
+			return true;
+	}
+
+	return false;
+}
+
 void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 				  struct clk *clks[], int clk_max)
 {
 	struct clk *clk;
 
 	for (; tbl->clk_id < clk_max; tbl++) {
+		if (clk_is_skipped(tbl->clk_id)) {
+			pr_info("clk: clk %d removed. Skipping init entry\n",
+				tbl->clk_id);
+			continue;
+		}
+
 		clk = clks[tbl->clk_id];
 		if (IS_ERR_OR_NULL(clk)) {
 			pr_err("%s: invalid entry %ld in clks array for id %d\n",
@@ -368,13 +461,27 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 			}
 		}
 
-		if (tbl->rate)
-			if (clk_set_rate(clk, tbl->rate)) {
+		if (tbl->rate) {
+			bool can_set_rate = true;
+
+			if ((tbl->flags & TEGRA_TABLE_RATE_CHANGE_OVERCLOCK) &&
+			    __clk_is_enabled(clk)) {
+				if (tbl->rate != clk_get_rate(clk)) {
+					pr_err("%s: Can't set rate %lu of %s\n",
+					       __func__, tbl->rate,
+					       __clk_get_name(clk));
+					WARN_ON(1);
+				}
+				can_set_rate = false;
+			}
+
+			if (can_set_rate && clk_set_rate(clk, tbl->rate)) {
 				pr_err("%s: Failed to set rate %lu of %s\n",
 				       __func__, tbl->rate,
 				       __clk_get_name(clk));
 				WARN_ON(1);
 			}
+		}
 
 		if (tbl->state)
 			if (clk_prepare_enable(clk)) {
@@ -385,7 +492,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 	}
 }
 
-static const struct reset_control_ops rst_ops = {
+static struct reset_control_ops rst_ops = {
 	.assert = tegra_clk_rst_assert,
 	.deassert = tegra_clk_rst_deassert,
 	.reset = tegra_clk_rst_reset,
@@ -510,12 +617,36 @@ static const struct file_operations parent_fops = {
 };
 #endif
 
+void tegra_clk_debugfs_add(struct clk *clk)
+{
+#ifdef CONFIG_TEGRA_CLK_DEBUG
+	const char *name;
+	struct dentry *d;
+
+	name = __clk_get_name(clk);
+	d = __clk_debugfs_add_file(clk, "clk_update_rate", 0200, clk,
+				   &rate_fops);
+	if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
+		pr_err("debugfs clk_update_rate failed %s\n", name);
+
+	d = __clk_debugfs_add_file(clk, "clk_state", 0644, clk,
+				   &state_fops);
+	if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
+		pr_err("debugfs clk_state failed %s\n", name);
+
+	d = __clk_debugfs_add_file(clk, "clk_parent", 0644, clk,
+				   &parent_fops);
+	if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
+		pr_err("debugfs clk_parent failed %s\n", name);
+#endif
+}
+
 void __init tegra_add_of_provider(struct device_node *np)
 {
 	int i;
-	struct dentry *d;
 	struct clk *clk;
-	char *name;
+
+	tegra_handle_skipped_clks(np);
 
 	for (i = 0; i < clk_num; i++) {
 		clk = clks[i];
@@ -523,29 +654,13 @@ void __init tegra_add_of_provider(struct device_node *np)
 			pr_err
 			    ("Tegra clk %d: register failed with %ld\n",
 			     i, PTR_ERR(clks));
+			continue;
 		}
 		if (!clk) {
 			clks[i] = ERR_PTR(-EINVAL);
 			continue;
 		}
-#ifdef CONFIG_TEGRA_CLK_DEBUG
-		name = __clk_get_name(clk);
-		d = __clk_debugfs_add_file(clk, "clk_update_rate", 0200, clk,
-				   &rate_fops);
-		if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
-			pr_err("debugfs clk_update_rate failed %s\n", name);
-
-		d = __clk_debugfs_add_file(clk, "clk_state", 0644, clk,
-				   &state_fops);
-		if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
-			pr_err("debugfs clk_state failed %s\n", name);
-
-		d = __clk_debugfs_add_file(clk, "clk_parent", 0644, clk,
-				   &parent_fops);
-		if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
-			pr_err("debugfs clk_parent failed %s\n", name);
-
-#endif
+		tegra_clk_debugfs_add(clk);
 	}
 
 	clk_data.clks = clks;
@@ -555,6 +670,8 @@ void __init tegra_add_of_provider(struct device_node *np)
 	rst_ctlr.of_node = np;
 	rst_ctlr.nr_resets = periph_banks * 32 + num_special_reset;
 	reset_controller_register(&rst_ctlr);
+
+	tegra_register_debug_devclks();
 }
 
 static int pto_get(void *data, u64 *output)
@@ -639,31 +756,36 @@ static int cycles_set(void *data, u64 val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(cycles_fops, cycles_get, cycles_set, "%llu\n");
 
+void tegra_register_pto(struct clk *clk, struct tegra_pto_table *ptodef)
+{
+	struct dentry *d;
+
+	d = __clk_debugfs_add_file(clk, "pto_rate", 0400,
+				   ptodef, &pto_fops);
+	if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
+		pr_err("debugfs pto_rate failed %s\n",
+		       __clk_get_name(clk));
+
+	if (!ptodef->cycle_count)
+		ptodef->cycle_count = 16;
+
+	d = __clk_debugfs_add_file(clk, "pto_cycles", 0600,
+				   &ptodef->cycle_count, &cycles_fops);
+	if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
+		pr_err("debugfs pto_cycles failed %s\n",
+		       __clk_get_name(clk));
+}
+
 void tegra_register_ptos(struct tegra_pto_table *ptodefs, int num_pto_defs)
 {
 	int i;
 	struct clk *clk;
-	struct dentry *d;
 
 	for (i = 0; i < num_pto_defs; i++) {
 		clk = clks[ptodefs[i].clk_id];
 		if (IS_ERR(clk))
 			continue;
-
-		d = __clk_debugfs_add_file(clk, "pto_rate", 0400,
-				   &ptodefs[i], &pto_fops);
-		if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
-			pr_err("debugfs pro_counter failed %s\n",
-					__clk_get_name(clk));
-
-		if (!ptodefs[i].cycle_count)
-			ptodefs[i].cycle_count = 16;
-
-		d = __clk_debugfs_add_file(clk, "pto_cycles", 0600,
-				   &ptodefs[i].cycle_count, &cycles_fops);
-		if ((IS_ERR(d) && PTR_ERR(d) != -EAGAIN) || !d)
-			pr_err("debugfs pro_cycles failed %s\n",
-					__clk_get_name(clk));
+		tegra_register_pto(clk, &ptodefs[i]);
 	}
 }
 
@@ -684,11 +806,6 @@ void __init tegra_register_devclks(struct tegra_devclk *dev_clks, int num)
 		clk_register_clkdev(clks[dev_clks->dt_id], dev_clks->con_id,
 				dev_clks->dev_id);
 
-	for (i = 0; i < clk_num; i++) {
-		if (!IS_ERR_OR_NULL(clks[i]))
-			clk_register_clkdev(clks[i], __clk_get_name(clks[i]),
-				"tegra-clk-debug");
-	}
 }
 
 struct clk ** __init tegra_lookup_dt_id(int clk_id,
@@ -711,4 +828,4 @@ static int __init tegra_clocks_apply_init_table(void)
 
 	return 0;
 }
-arch_initcall(tegra_clocks_apply_init_table);
+arch_initcall_sync(tegra_clocks_apply_init_table);

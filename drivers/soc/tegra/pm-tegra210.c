@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_PM
 #include <linux/kernel.h>
 #include <linux/cpu.h>
 #include <linux/cpu_pm.h>
@@ -44,14 +44,13 @@ enum tegra210_idle_index {
 	C7_IDX = 0,
 	CC6_IDX,
 	CC7_IDX,
-	SC2_IDX,
-	SC3_IDX,
-	SC4_IDX,
 	IDLE_STATE_MAX,
 };
 
 struct tegra210_pm_data {
 	bool cc4_no_retention;
+	bool cc3_no_hvc;
+	bool cc6_allow;
 	/* Idle state index array */
 	int idle_state_idx[IDLE_STATE_MAX];
 };
@@ -120,45 +119,23 @@ static int tegra_bpmp_tolerate_idle(int cpu, int ccxtl, int scxtl)
 	return tegra_bpmp_send(MRQ_TOLERATE_IDLE, data, sizeof(data));
 }
 
-static int tegra_bpmp_do_idle(int cpu, int ccxtl, int scxtl)
-{
-	int32_t tl;
-	int32_t data[3];
-
-	data[0] = cpu_to_le32(cpu);
-	data[1] = cpu_to_le32(ccxtl);
-	data[2] = cpu_to_le32(scxtl);
-
-	return tegra_bpmp_send_receive_atomic(MRQ_DO_IDLE, data, sizeof(data),
-					      &tl, sizeof(tl)) ?: tl;
-}
-
 static int proc_idle_state_enter(int cpu, int idle_state)
 {
-	flowctrl_write_cc4_ctrl(cpu,
-		t210_pm_data.cc4_no_retention ? 0xfffffffd : 0xffffffff);
+	u32 ctrl;
+	ctrl = 0xffffffff;
 
-	if (idle_state == t210_pm_data.idle_state_idx[C7_IDX]) {
-		/* C7 */
-	} else if (idle_state == t210_pm_data.idle_state_idx[CC6_IDX]) {
-		/* CC6 */
-		if (tegra_bpmp_do_idle(cpu, TEGRA_PM_CC6, TEGRA_PM_SC1))
-			return -EPERM;
-	} else if (idle_state == t210_pm_data.idle_state_idx[CC7_IDX]) {
-		/* CC7 */
-		if (tegra_bpmp_do_idle(cpu, TEGRA_PM_CC7, TEGRA_PM_SC1))
-			return -EPERM;
-	} else if (idle_state == t210_pm_data.idle_state_idx[SC2_IDX]) {
-		/* SC2 */
-		tegra_bpmp_tolerate_idle(cpu, TEGRA_PM_CC4, TEGRA_PM_SC2);
-	} else if (idle_state == t210_pm_data.idle_state_idx[SC3_IDX]) {
-		/* SC3 */
-		tegra_bpmp_tolerate_idle(cpu, TEGRA_PM_CC4, TEGRA_PM_SC3);
-	} else if (idle_state == t210_pm_data.idle_state_idx[SC4_IDX]) {
-		/* SC4 */
-		tegra_bpmp_tolerate_idle(cpu, TEGRA_PM_CC4, TEGRA_PM_SC4);
-	} else
-		return -EPERM;
+	if (t210_pm_data.cc4_no_retention)
+		ctrl &= ~BIT(1);
+
+	/* We don't allow retention without HVC */
+	if (t210_pm_data.cc3_no_hvc)
+		ctrl &= ~(BIT(1) | BIT(0));
+
+	flowctrl_write_cc4_ctrl(cpu, ctrl);
+
+	if (idle_state == t210_pm_data.idle_state_idx[CC6_IDX] &&
+			!t210_pm_data.cc6_allow)
+		return -ENODEV;
 
 	return 0;
 }
@@ -166,23 +143,6 @@ static int proc_idle_state_enter(int cpu, int idle_state)
 static void proc_idle_state_exit(int cpu, int idle_state)
 {
 	flowctrl_write_cc4_ctrl(cpu, 0);
-
-	if (idle_state == t210_pm_data.idle_state_idx[C7_IDX]) {
-		/* C7 */
-	} else if (idle_state == t210_pm_data.idle_state_idx[CC6_IDX]) {
-		/* CC6 */
-	} else if (idle_state == t210_pm_data.idle_state_idx[CC7_IDX]) {
-		/* CC7 */
-	} else if (idle_state == t210_pm_data.idle_state_idx[SC2_IDX]) {
-		/* SC2 */
-		tegra_bpmp_tolerate_idle(cpu, TEGRA_PM_CC1, TEGRA_PM_SC1);
-	} else if (idle_state == t210_pm_data.idle_state_idx[SC3_IDX]) {
-		/* SC3 */
-		tegra_bpmp_tolerate_idle(cpu, TEGRA_PM_CC1, TEGRA_PM_SC1);
-	} else if (idle_state == t210_pm_data.idle_state_idx[SC4_IDX]) {
-		/* SC4 */
-		tegra_bpmp_tolerate_idle(cpu, TEGRA_PM_CC1, TEGRA_PM_SC1);
-	}
 }
 
 static int tegra210_cpu_pm_notifier(struct notifier_block *self,
@@ -282,6 +242,9 @@ static int tegra210_cpuidle_cc4_probe(struct platform_device *pdev)
 	/* T210 BPMP supports CC4 retention only with max77621 or ovr2. */
 	t210_pm_data.cc4_no_retention = of_property_read_bool(dev->of_node,
 							"cc4-no-retention");
+
+	t210_pm_data.cc3_no_hvc = of_property_read_bool(dev->of_node,
+							"cc3-no-hvc");
 
 	/* If cc4-microvolt is not found, assume not max77621 */
 	if (of_property_read_u32(dev->of_node, "cc4-microvolt", &uv))
@@ -397,6 +360,25 @@ static void suspend_all_device_irqs(void)
 	}
 }
 
+static void resume_all_device_irqs(void)
+{
+        struct irq_desc *desc;
+        int irq;
+
+        for_each_irq_desc(irq, desc) {
+                unsigned long flags;
+
+		/* No need to re-enable the 'wakeup' interrupt */
+		if (is_timer_irq(desc))
+			continue;
+
+                raw_spin_lock_irqsave(&desc->lock, flags);
+		desc->istate &= ~IRQS_SUSPENDED;
+                __enable_irq(desc);
+                raw_spin_unlock_irqrestore(&desc->lock, flags);
+        }
+
+}
 static int idle_write(void *data, u64 val)
 {
 	struct cpuidle_driver *drv;
@@ -436,7 +418,7 @@ static int idle_write(void *data, u64 val)
 	local_fiq_enable();
 	start_critical_timings();
 	tick_nohz_idle_exit();
-	resume_device_irqs();
+	resume_all_device_irqs();
 	preempt_enable_no_resched();
 
 	return 0;
@@ -505,6 +487,10 @@ static struct platform_driver tegra210_cpuidle_driver = {
 
 static int __init tegra210_cpuidle_init(void)
 {
+	struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
+	struct cpuidle_driver *drv = cpuidle_get_cpu_driver(dev);
+	int i;
+
 	if (tegra_get_chip_id() != TEGRA210)
 		goto out;
 
@@ -515,6 +501,17 @@ static int __init tegra210_cpuidle_init(void)
 	platform_driver_register(&tegra210_cpuidle_driver);
 
 	debugfs_init();
+
+	/*
+	 * Disable CC6 during boot. They can be enabled later using the
+	 * fast_cluster_enable knobs from userspace.
+	 */
+	for (i = drv->safe_state_index + 1; i < drv->state_count; i++)
+		if (i == t210_pm_data.idle_state_idx[CC6_IDX])
+			drv->states[i].disabled = true;
+
+	t210_pm_data.cc6_allow = true;
+
 out:
 	return 0;
 }
@@ -551,23 +548,25 @@ static int __init tegra210_pm_init(void)
 	/* Disable CC4 until DFLL clk is ready */
 	t210_pm_data.cc4_no_retention = true;
 
+	/*
+	 * CC6 also needs to be disabled until DFLL clk is ready, but there is
+	 * no explicit hook that notifies when the DFLL init is complete. The
+	 * cluster states can be disabled in the arm cpuidle driver which may
+	 * not be ready here. Use this flag until the tegra_cpuidle driver
+	 * disables the arm cpuidle driver's states during late_init.
+	 */
+	t210_pm_data.cc6_allow = false;
+
 	t210_pm_data.idle_state_idx[C7_IDX] =
 				tegra_of_idle_state_idx_from_name("c7");
 	t210_pm_data.idle_state_idx[CC6_IDX] =
 				tegra_of_idle_state_idx_from_name("cc6");
 	t210_pm_data.idle_state_idx[CC7_IDX] =
 				tegra_of_idle_state_idx_from_name("cc7");
-	t210_pm_data.idle_state_idx[SC2_IDX] =
-				tegra_of_idle_state_idx_from_name("sc2");
-	t210_pm_data.idle_state_idx[SC3_IDX] =
-				tegra_of_idle_state_idx_from_name("sc3");
-	t210_pm_data.idle_state_idx[SC4_IDX] =
-				tegra_of_idle_state_idx_from_name("sc4");
 
 	tegra210_cpu_pm_register_notifier(&tegra210_cpu_pm_nb);
 	register_cpu_notifier(&tegra210_cpu_nb);
 	register_syscore_ops(&bpmp_sc7_suspend_ops);
-
 out:
 	return 0;
 }
