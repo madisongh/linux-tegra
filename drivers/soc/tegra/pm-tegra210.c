@@ -494,6 +494,12 @@ static int __init tegra210_cpuidle_init(void)
 	if (tegra_get_chip_id() != TEGRA210)
 		goto out;
 
+	/* Avoid NULL pointer de-reference */
+	if (drv == NULL) {
+		pr_err("%s cpuidle_driver is NULL - exiting\n", __func__);
+		goto out;
+	}
+
 	/*
 	 * To avoid the race condition between DFLL clock ready
 	 * and CC4 engagement. Put this in late_inticall.
