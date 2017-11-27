@@ -78,7 +78,6 @@ struct tegra_se_rng1_request {
 
 struct tegra_se_pka1_ecc_request {
 	struct tegra_se_elp_dev *se_dev;/* Security Engine device */
-	struct tegra_se_pka1_slot *slot;/* Security Engine rsa key slot */
 	char *message;
 	char *result;
 	char *modulus;
