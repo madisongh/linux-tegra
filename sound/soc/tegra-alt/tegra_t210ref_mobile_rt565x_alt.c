@@ -320,6 +320,8 @@ static int tegra_t210ref_dai_init(struct snd_soc_pcm_runtime *rtd,
 
 		/* update link_param to update hw_param for DAPM */
 		dai_params->rate_min = clk_rate;
+		dai_params->channels_min = channels;
+		dai_params->formats = formats;
 	}
 
 	idx = tegra_machine_get_codec_dai_link_idx("spdif-dit-5");
