@@ -1430,6 +1430,35 @@ SYSCALL_DEFINE3(syslog, int, type, char __user *, buf, int, len)
 }
 
 /*
+ * Call the console drivers with CON_FORCE_LEVEL set to
+ * write out force_text.
+ * The console lock must be held.
+ */
+static void call_force_console_drivers(const char *force_text,
+					size_t force_len)
+{
+	struct console *con;
+
+	if (!console_drivers)
+		return;
+
+	for_each_console(con) {
+		if (exclusive_console && con != exclusive_console)
+			continue;
+		if (!(con->flags & CON_ENABLED))
+			continue;
+		if (!con->write)
+			continue;
+		if (!cpu_online(smp_processor_id()) &&
+		    !(con->flags & CON_ANYTIME))
+			continue;
+
+		if (con->flags & CON_FORCE_LEVEL)
+			con->write(con, force_text, force_len);
+	}
+}
+
+/*
  * Call the console drivers, asking them to write out
  * log_buf[start] to log_buf[end - 1].
  * The console_lock must be held.
@@ -1457,6 +1486,10 @@ static void call_console_drivers(int level,
 		if (!cpu_online(smp_processor_id()) &&
 		    !(con->flags & CON_ANYTIME))
 			continue;
+		// CON_FORCE_LEVEL consoles are handled separately
+		if (con->flags & CON_FORCE_LEVEL)
+			continue;
+
 		if (con->flags & CON_EXTENDED)
 			con->write(con, ext_text, ext_len);
 		else
@@ -2269,6 +2302,9 @@ again:
 		size_t ext_len = 0;
 		size_t len;
 		int level;
+		size_t force_len = 0;
+		static char force_text[LOG_LINE_MAX + PREFIX_MAX];
+
 
 		raw_spin_lock_irqsave(&logbuf_lock, flags);
 		if (seen_seq != log_next_seq) {
@@ -2312,6 +2348,8 @@ skip:
 		level = msg->level;
 		len += msg_print_text(msg, console_prev, false,
 				      text + len, sizeof(text) - len);
+		force_len = msg_print_text(msg, console_prev, true,
+				      force_text, sizeof(force_text));
 		if (nr_ext_console_drivers) {
 			ext_len = msg_print_ext_header(ext_text,
 						sizeof(ext_text),
@@ -2328,6 +2366,7 @@ skip:
 
 		stop_critical_timings();	/* don't trace print latency */
 		call_console_drivers(level, ext_text, ext_len, text, len);
+		call_force_console_drivers(force_text, force_len);
 		start_critical_timings();
 		local_irq_restore(flags);
 
