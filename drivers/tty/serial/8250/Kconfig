@@ -91,6 +91,10 @@ config SERIAL_8250_CONSOLE
 
 	  If unsure, say N.
 
+config SERIAL_8250_CONSOLE_FORCE_FORMAT
+	bool "Forces print consoles to include log level info in output format"
+	depends on SERIAL_8250_CONSOLE
+
 config SERIAL_8250_GSC
 	tristate
 	depends on SERIAL_8250 && GSC
