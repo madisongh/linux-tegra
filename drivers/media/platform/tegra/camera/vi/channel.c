@@ -1094,9 +1094,10 @@ static int tegra_channel_setup_controls(struct tegra_channel *chan)
 
 	/* Add new custom controls */
 	for (i = 0; i < ARRAY_SIZE(common_custom_ctrls); i++) {
-		/* don't create override control for pg mode */
+		/* don't create override control for pg mode and hdmiin */
 		if (common_custom_ctrls[i].id ==
-			TEGRA_CAMERA_CID_OVERRIDE_ENABLE && chan->pg_mode)
+			TEGRA_CAMERA_CID_OVERRIDE_ENABLE &&
+			(chan->pg_mode || chan->hdmiin))
 			continue;
 		v4l2_ctrl_new_custom(&chan->ctrl_handler,
 			&common_custom_ctrls[i], NULL);
@@ -1269,6 +1270,9 @@ int tegra_channel_init_subdevices(struct tegra_channel *chan)
 	/* initialize the available formats */
 	if (chan->num_subdevs)
 		tegra_channel_fmts_bitmap_init(chan);
+
+	chan->hdmiin = v4l2_subdev_has_op(chan->subdev_on_csi,
+				video, s_dv_timings);
 
 	ret = tegra_channel_setup_controls(chan);
 	if (ret < 0) {

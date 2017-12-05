@@ -129,6 +129,7 @@ struct tegra_vi_graph_entity {
  *
  * @fmts_bitmap: a bitmap for formats supported
  * @bypass: bypass flag for VI bypass mode
+ * @hdmiin: hdmiin flag for hdmi to csi bridge
  */
 struct tegra_channel {
 	int id;
@@ -196,6 +197,7 @@ struct tegra_channel {
 	atomic_t power_on_refcnt;
 	struct v4l2_fh *fh;
 	bool bypass;
+	bool hdmiin;
 	bool write_ispformat;
 	enum tegra_vi_pg_mode pg_mode;
 	bool bfirst_fstart;
