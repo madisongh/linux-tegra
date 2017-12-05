@@ -1,7 +1,7 @@
-From d0b12642d9f4092f70aa451716f110022c51cf76 Mon Sep 17 00:00:00 2001
+From 8bee851c05c244c6177fe6492d947643d8b52cc4 Mon Sep 17 00:00:00 2001
 From: Peter Zijlstra <peterz@infradead.org>
 Date: Mon, 16 May 2016 15:01:11 +0200
-Subject: [PATCH 343/365] sched,preempt: Fix preempt_count manipulations
+Subject: [PATCH 343/366] sched,preempt: Fix preempt_count manipulations
 
 Vikram reported that his ARM64 compiler managed to 'optimize' away the
 preempt_count manipulations in code like:
@@ -53,5 +53,5 @@ index 5d8ffa3..c1cde35 100644
  	return &current_thread_info()->preempt_count;
  }
 -- 
-2.7.4
+1.9.1
 

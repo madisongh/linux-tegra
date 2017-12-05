@@ -1,7 +1,7 @@
-From e875cc5dbe87733ff12641735669ccb114d7bdbd Mon Sep 17 00:00:00 2001
+From 346bb6f56c59f819ca70c867f1d9eaddcd5bb2d1 Mon Sep 17 00:00:00 2001
 From: Rik van Riel <riel@redhat.com>
 Date: Mon, 21 Mar 2016 15:13:27 +0100
-Subject: [PATCH 327/365] kvm, rt: change async pagefault code locking for
+Subject: [PATCH 327/366] kvm, rt: change async pagefault code locking for
  PREEMPT_RT
 
 The async pagefault wake code can run from the idle task in exception
@@ -160,5 +160,5 @@ index 47190bd..8079508 100644
  		x86_init.irqs.trap_init = kvm_apf_trap_init;
  
 -- 
-2.7.4
+1.9.1
 

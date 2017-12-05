@@ -1,21 +1,21 @@
-From 014dac029287bf7a528150e9be67a7da207884ec Mon Sep 17 00:00:00 2001
+From 9c0d1325c0d9990745183e086dd25b521fa813c5 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 19 Sep 2012 14:50:37 +0200
-Subject: [PATCH 185/365] printk: Make rt aware
+Subject: [PATCH 185/366] printk: Make rt aware
 
 Drop the lock before calling the console driver and do not disable
 interrupts while printing to a serial console.
 
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 ---
- kernel/printk/printk.c | 27 +++++++++++++++++++++++----
- 1 file changed, 23 insertions(+), 4 deletions(-)
+ kernel/printk/printk.c | 30 ++++++++++++++++++++++++++----
+ 1 file changed, 26 insertions(+), 4 deletions(-)
 
 diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index 67d2df8..e60ae11 100644
+index 1bc8365..e37b4ab 100644
 --- a/kernel/printk/printk.c
 +++ b/kernel/printk/printk.c
-@@ -1447,6 +1447,7 @@ static void call_console_drivers(int level,
+@@ -1442,6 +1442,7 @@ static void call_force_console_drivers(const char *force_text,
  	if (!console_drivers)
  		return;
  
@@ -23,7 +23,23 @@ index 67d2df8..e60ae11 100644
  	for_each_console(con) {
  		if (exclusive_console && con != exclusive_console)
  			continue;
-@@ -1462,6 +1463,7 @@ static void call_console_drivers(int level,
+@@ -1456,6 +1457,7 @@ static void call_force_console_drivers(const char *force_text,
+ 		if (con->flags & CON_FORCE_LEVEL)
+ 			con->write(con, force_text, force_len);
+ 	}
++	migrate_enable();
+ }
+ 
+ /*
+@@ -1476,6 +1478,7 @@ static void call_console_drivers(int level,
+ 	if (!console_drivers)
+ 		return;
+ 
++	migrate_disable();
+ 	for_each_console(con) {
+ 		if (exclusive_console && con != exclusive_console)
+ 			continue;
+@@ -1495,6 +1498,7 @@ static void call_console_drivers(int level,
  		else
  			con->write(con, text, len);
  	}
@@ -31,7 +47,7 @@ index 67d2df8..e60ae11 100644
  }
  
  /*
-@@ -1522,6 +1524,15 @@ static inline int can_use_console(unsigned int cpu)
+@@ -1555,6 +1559,15 @@ static inline int can_use_console(unsigned int cpu)
  static int console_trylock_for_printk(void)
  {
  	unsigned int cpu = smp_processor_id();
@@ -47,7 +63,7 @@ index 67d2df8..e60ae11 100644
  
  	if (!console_trylock())
  		return 0;
-@@ -1884,8 +1895,7 @@ asmlinkage int vprintk_emit(int facility, int level,
+@@ -1917,8 +1930,7 @@ asmlinkage int vprintk_emit(int facility, int level,
  		 * console_sem which would prevent anyone from printing to
  		 * console
  		 */
@@ -57,7 +73,7 @@ index 67d2df8..e60ae11 100644
  		/*
  		 * Try to acquire and then immediately release the console
  		 * semaphore.  The release will print out buffers and wake up
-@@ -1893,7 +1903,7 @@ asmlinkage int vprintk_emit(int facility, int level,
+@@ -1926,7 +1938,7 @@ asmlinkage int vprintk_emit(int facility, int level,
  		 */
  		if (console_trylock_for_printk())
  			console_unlock();
@@ -66,7 +82,7 @@ index 67d2df8..e60ae11 100644
  		lockdep_on();
  	}
  
-@@ -2253,11 +2263,16 @@ static void console_cont_flush(char *text, size_t size)
+@@ -2286,11 +2298,16 @@ static void console_cont_flush(char *text, size_t size)
  		goto out;
  
  	len = cont_print_text(text, size);
@@ -83,18 +99,20 @@ index 67d2df8..e60ae11 100644
  	return;
  out:
  	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
-@@ -2367,13 +2382,17 @@ skip:
+@@ -2405,6 +2422,11 @@ skip:
  		console_idx = log_next(console_idx);
  		console_seq++;
  		console_prev = msg->flags;
 +#ifdef CONFIG_PREEMPT_RT_FULL
 +		raw_spin_unlock_irqrestore(&logbuf_lock, flags);
 +		call_console_drivers(level, ext_text, ext_len, text, len);
++		call_force_console_drivers(force_text, force_len);
 +#else
  		raw_spin_unlock(&logbuf_lock);
  
  		stop_critical_timings();	/* don't trace print latency */
- 		call_console_drivers(level, ext_text, ext_len, text, len);
+@@ -2412,7 +2434,7 @@ skip:
+ 		call_force_console_drivers(force_text, force_len);
  		start_critical_timings();
  		local_irq_restore(flags);
 -
@@ -103,5 +121,5 @@ index 67d2df8..e60ae11 100644
  			cond_resched();
  	}
 -- 
-2.7.4
+1.9.1
 

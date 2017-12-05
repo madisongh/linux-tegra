@@ -1,7 +1,7 @@
-From a72e2f6375c89ab94ac522406c8f5e42baebc02c Mon Sep 17 00:00:00 2001
+From b68844a40cf6580eded14bf33fbe37a2f5f63f7b Mon Sep 17 00:00:00 2001
 From: Marcelo Tosatti <mtosatti@redhat.com>
 Date: Wed, 8 Apr 2015 20:33:24 -0300
-Subject: [PATCH 208/365] KVM: use simple waitqueue for vcpu->wq
+Subject: [PATCH 208/366] KVM: use simple waitqueue for vcpu->wq
 
 The problem:
 
@@ -354,5 +354,5 @@ index 336ed26..abdf387 100644
  			if (!kvm_vcpu_eligible_for_directed_yield(vcpu))
  				continue;
 -- 
-2.7.4
+1.9.1
 

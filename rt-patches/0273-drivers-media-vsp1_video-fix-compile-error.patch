@@ -1,7 +1,7 @@
-From 556dc299206fa66f4c04e1b074a004dd968d141f Mon Sep 17 00:00:00 2001
+From 9d50f4f0c119148b17a3546f6420ea744a7b59b8 Mon Sep 17 00:00:00 2001
 From: Anders Roxell <anders.roxell@linaro.org>
 Date: Fri, 15 Jan 2016 01:09:43 +0100
-Subject: [PATCH 273/365] drivers/media: vsp1_video: fix compile error
+Subject: [PATCH 273/366] drivers/media: vsp1_video: fix compile error
 
 This was found with the -RT patch enabled, but the fix should apply to
 non-RT also.
@@ -34,5 +34,5 @@ index 5ce88e1..b4f8cd7 100644
  
  	return stopped;
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From 6c348d146969e0535ab834e3cc92bbc7ac01ceb5 Mon Sep 17 00:00:00 2001
+From 634d13c79025cd67620d10b807205d1c581279fb Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 21 Jan 2016 15:58:56 +0100
-Subject: [PATCH 271/365] sched: fixup migrate disable (all tasks were bound to
+Subject: [PATCH 271/366] sched: fixup migrate disable (all tasks were bound to
  CPU0)
 
 Includes:
@@ -38,10 +38,10 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  6 files changed, 48 insertions(+), 104 deletions(-)
 
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index eb16590..a6a8709 100644
+index 989e404..c01d46f 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
-@@ -3300,14 +3300,19 @@ static inline int __migrate_disabled(struct task_struct *p)
+@@ -3302,14 +3302,19 @@ static inline int __migrate_disabled(struct task_struct *p)
  /* Future-safe accessor for struct task_struct's cpus_allowed. */
  static inline const struct cpumask *tsk_cpus_allowed(struct task_struct *p)
  {
@@ -477,5 +477,5 @@ index 90b770a..72e23c5 100644
  #else
  		if (p->prio < rq->curr->prio)
 -- 
-2.7.4
+1.9.1
 

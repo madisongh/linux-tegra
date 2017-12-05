@@ -1,7 +1,7 @@
-From 1bd368c5bb7fc6d068153d12742c180ac36b25eb Mon Sep 17 00:00:00 2001
+From f1673859de1b6f2d80092f4d65217fa8d0d2a36f Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 27 Jan 2016 15:05:55 +0100
-Subject: [PATCH 320/365] clk: at91: pmc: remove useless capacities handling
+Subject: [PATCH 320/366] clk: at91: pmc: remove useless capacities handling
 
 Capacities only handles interrupts and they are not use anymore. Remove the
 whole initialisation.
@@ -157,5 +157,5 @@ index dce2855..526df5b 100644
 -CLK_OF_DECLARE(sama5d3_clk_pmc, "atmel,sama5d3-pmc",
 -	       of_sama5d3_pmc_setup);
 -- 
-2.7.4
+1.9.1
 

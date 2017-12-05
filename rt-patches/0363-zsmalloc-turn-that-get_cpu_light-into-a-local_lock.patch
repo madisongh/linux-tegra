@@ -1,7 +1,7 @@
-From 637bfead1d9e0a73044aa77a225c8206ba94292c Mon Sep 17 00:00:00 2001
+From 2877fec6810ca47a8598f86764ca0b31724ce287 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 20 Oct 2016 12:49:10 +0200
-Subject: [PATCH 363/365] zsmalloc: turn that get_cpu_light() into a
+Subject: [PATCH 363/366] zsmalloc: turn that get_cpu_light() into a
  local_lock()
 
 We might get preempted, grab the same ressource again and then corrupt
@@ -53,5 +53,5 @@ index b552fd6..529552c 100644
  }
  EXPORT_SYMBOL_GPL(zs_unmap_object);
 -- 
-2.7.4
+1.9.1
 

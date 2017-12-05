@@ -1,7 +1,7 @@
-From c44c607aa8ed15c4d7a65b9d284fd8e260e52d08 Mon Sep 17 00:00:00 2001
+From 362155102997ccf946cc9c97c95806cc2b1a548c Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 8 Apr 2016 16:18:24 +0200
-Subject: [PATCH 334/365] drivers/block/zram: fixup compile for !RT
+Subject: [PATCH 334/366] drivers/block/zram: fixup compile for !RT
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
@@ -22,5 +22,5 @@ index 1e4a3c6..9e3e953 100644
  static inline void zram_lock_table(struct zram_table_entry *table)
  {
 -- 
-2.7.4
+1.9.1
 

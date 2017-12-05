@@ -1,7 +1,7 @@
-From b984b8bd3e1dee58d056e97583a28c2d4d2420ef Mon Sep 17 00:00:00 2001
+From 1b17a84802c733261b54a4e09c7a3f8d2ac664ef Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 20 Jan 2016 15:13:30 +0100
-Subject: [PATCH 275/365] preempt-lazy: Add the lazy-preemption check to
+Subject: [PATCH 275/366] preempt-lazy: Add the lazy-preemption check to
  preempt_schedule()
 
 Probably in the rebase onto v4.1 this check got moved into less commonly used
@@ -76,5 +76,5 @@ index c4cc43d..04ba588 100644
  		preempt_disable_notrace();
  		/*
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From 7ba7167dadcee20e4feb7578df655c749bc1d085 Mon Sep 17 00:00:00 2001
+From d5292a292c17b57ae8ad8b8b32d0a329f26ca6fa Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 15 Jan 2016 18:05:16 +0100
-Subject: [PATCH 267/365] kernel/softirq: use cond_resched_rcu_qs() on -RT as
+Subject: [PATCH 267/366] kernel/softirq: use cond_resched_rcu_qs() on -RT as
  well (run_ksoftirqd())
 
 The upstream changes were:
@@ -29,5 +29,5 @@ index 0fd9331..f4c2e67 100644
  
  /*
 -- 
-2.7.4
+1.9.1
 

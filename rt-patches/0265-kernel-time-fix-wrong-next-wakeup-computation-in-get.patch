@@ -1,7 +1,7 @@
-From 0b240cb411bc65ee25e6f7403d282ff4142ef786 Mon Sep 17 00:00:00 2001
+From e7235e2fed73e48cc5ddcf615640e22f3dbb8210 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 15 Jan 2016 18:02:39 +0100
-Subject: [PATCH 265/365] kernel/time: fix wrong next wakeup computation in
+Subject: [PATCH 265/366] kernel/time: fix wrong next wakeup computation in
  get_next_timer_interrupt()
 
 resululted in about 25% softirq load on CPUs during idle.
@@ -25,5 +25,5 @@ index a460cbb..fee8682 100644
  	spin_lock(&base->lock);
  	if (base->active_timers) {
 -- 
-2.7.4
+1.9.1
 

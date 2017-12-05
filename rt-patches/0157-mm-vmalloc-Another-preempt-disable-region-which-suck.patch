@@ -1,7 +1,7 @@
-From 60e67bfd47766f8fa26fb279bb8a393a85b99b66 Mon Sep 17 00:00:00 2001
+From b197f652943a6d4dffb9e94ebc1e947b64ec4a93 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 12 Jul 2011 11:39:36 +0200
-Subject: [PATCH 157/365] mm/vmalloc: Another preempt disable region which
+Subject: [PATCH 157/366] mm/vmalloc: Another preempt disable region which
  sucks
 
 Avoid the preempt disable version of get_cpu_var(). The inner-lock should
@@ -13,10 +13,10 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 8 insertions(+), 5 deletions(-)
 
 diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index 7de4b79..07f8577 100644
+index 21f4c5e..eafee07 100644
 --- a/mm/vmalloc.c
 +++ b/mm/vmalloc.c
-@@ -835,7 +835,7 @@ static void *new_vmap_block(unsigned int order, gfp_t gfp_mask)
+@@ -836,7 +836,7 @@ static void *new_vmap_block(unsigned int order, gfp_t gfp_mask)
  	struct vmap_block *vb;
  	struct vmap_area *va;
  	unsigned long vb_idx;
@@ -25,7 +25,7 @@ index 7de4b79..07f8577 100644
  	void *vaddr;
  
  	node = numa_node_id();
-@@ -878,11 +878,12 @@ static void *new_vmap_block(unsigned int order, gfp_t gfp_mask)
+@@ -879,11 +879,12 @@ static void *new_vmap_block(unsigned int order, gfp_t gfp_mask)
  	BUG_ON(err);
  	radix_tree_preload_end();
  
@@ -40,7 +40,7 @@ index 7de4b79..07f8577 100644
  
  	return vaddr;
  }
-@@ -951,6 +952,7 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
+@@ -952,6 +953,7 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
  	struct vmap_block *vb;
  	void *vaddr = NULL;
  	unsigned int order;
@@ -48,7 +48,7 @@ index 7de4b79..07f8577 100644
  
  	BUG_ON(offset_in_page(size));
  	BUG_ON(size > PAGE_SIZE*VMAP_MAX_ALLOC);
-@@ -965,7 +967,8 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
+@@ -966,7 +968,8 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
  	order = get_order(size);
  
  	rcu_read_lock();
@@ -58,7 +58,7 @@ index 7de4b79..07f8577 100644
  	list_for_each_entry_rcu(vb, &vbq->free, free_list) {
  		unsigned long pages_off;
  
-@@ -988,7 +991,7 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
+@@ -989,7 +992,7 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
  		break;
  	}
  
@@ -68,5 +68,5 @@ index 7de4b79..07f8577 100644
  
  	/* Allocate new block if nothing was found */
 -- 
-2.7.4
+1.9.1
 

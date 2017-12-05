@@ -1,7 +1,7 @@
-From 2f424c342b99b1cbeb2e09aea34aac42643892e5 Mon Sep 17 00:00:00 2001
+From 6b9d3f00b51d84e9647b71a98994fc0e58119ab2 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 27 Sep 2012 11:11:46 +0200
-Subject: [PATCH 069/365] mm: page_alloc: Use local_lock_on() instead of plain
+Subject: [PATCH 069/366] mm: page_alloc: Use local_lock_on() instead of plain
  spinlock
 
 The plain spinlock while sufficient does not update the local_lock
@@ -13,7 +13,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index b0ce3ab..f1032ad 100644
+index 0569b33..5a56a98 100644
 --- a/mm/page_alloc.c
 +++ b/mm/page_alloc.c
 @@ -281,9 +281,9 @@ static DEFINE_LOCAL_IRQ_LOCK(pa_lock);
@@ -29,5 +29,5 @@ index b0ce3ab..f1032ad 100644
  # define cpu_lock_irqsave(cpu, flags)		local_irq_save(flags)
  # define cpu_unlock_irqrestore(cpu, flags)	local_irq_restore(flags)
 -- 
-2.7.4
+1.9.1
 

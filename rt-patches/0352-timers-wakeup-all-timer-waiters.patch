@@ -1,7 +1,7 @@
-From 49d4c284b5fc00d0eecfddf1701e3245b6d37b49 Mon Sep 17 00:00:00 2001
+From c0b38ec8cedae8335dc163175e1a62efe8d3797d Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jul 2016 17:13:23 +0200
-Subject: [PATCH 352/365] timers: wakeup all timer waiters
+Subject: [PATCH 352/366] timers: wakeup all timer waiters
 
 The base lock is dropped during the invocation if the timer. That means
 it is possible that we have one waiter while timer1 is running and once
@@ -33,5 +33,5 @@ index fee8682..d521214 100644
  static inline void wait_for_running_timer(struct timer_list *timer)
  {
 -- 
-2.7.4
+1.9.1
 

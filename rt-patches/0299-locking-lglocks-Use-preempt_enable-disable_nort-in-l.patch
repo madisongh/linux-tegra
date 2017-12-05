@@ -1,7 +1,7 @@
-From e6212834b5e64f3e18b15a9764878c9a9ca20dee Mon Sep 17 00:00:00 2001
+From 74839bbc4b18b7817ca13f55a40c1a29900d9bac Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sat, 27 Feb 2016 08:34:43 +0100
-Subject: [PATCH 299/365] locking/lglocks: Use preempt_enable/disable_nort() in
+Subject: [PATCH 299/366] locking/lglocks: Use preempt_enable/disable_nort() in
  lg_double_[un]lock
 
 Let's not do that when snagging an rtmutex.
@@ -37,5 +37,5 @@ index 51bfe64..57e0ea7 100644
  
  void lg_global_lock(struct lglock *lg)
 -- 
-2.7.4
+1.9.1
 

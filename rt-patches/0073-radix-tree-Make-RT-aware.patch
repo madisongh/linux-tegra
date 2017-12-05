@@ -1,7 +1,7 @@
-From 6e84c0d2afcef7dab91bec5fed0b7d633b2f5a97 Mon Sep 17 00:00:00 2001
+From 248a10355c3e68a47651e2dc0bee6db0a890b42c Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 17 Jul 2011 21:33:18 +0200
-Subject: [PATCH 073/365] radix-tree: Make RT aware
+Subject: [PATCH 073/366] radix-tree: Make RT aware
 
 Disable radix_tree_preload() on -RT. This functions returns with
 preemption disabled which may cause high latencies and breaks if the
@@ -77,5 +77,5 @@ index 6b79e90..f27e0bc 100644
  /*
   *	Return the maximum key which can be store into a
 -- 
-2.7.4
+1.9.1
 

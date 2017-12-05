@@ -1,7 +1,7 @@
-From 3b91f0bb2f7d37e4ccdcf0b0cf5f579e9f9b0e41 Mon Sep 17 00:00:00 2001
+From dc2bba8f3fb50c82a0de823c03eb88f3c8c205d8 Mon Sep 17 00:00:00 2001
 From: Yong Zhang <yong.zhang0@gmail.com>
 Date: Thu, 28 Jul 2011 11:16:00 +0800
-Subject: [PATCH 103/365] hotplug: Reread hotplug_pcp on pin_current_cpu()
+Subject: [PATCH 103/366] hotplug: Reread hotplug_pcp on pin_current_cpu()
  retry
 
 When retry happens, it's likely that the task has been migrated to
@@ -37,5 +37,5 @@ index 218c7a1..04df252 100644
  	    hp->unplug == current) {
  		hp->refcount++;
 -- 
-2.7.4
+1.9.1
 

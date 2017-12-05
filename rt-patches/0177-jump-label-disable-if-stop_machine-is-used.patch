@@ -1,7 +1,7 @@
-From c1de93ab63c8eb888ae318324cded7164f5779db Mon Sep 17 00:00:00 2001
+From 916417a6f24e60263e9a65b776b263d7c54f5976 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 8 Jul 2015 17:14:48 +0200
-Subject: [PATCH 177/365] jump-label: disable if stop_machine() is used
+Subject: [PATCH 177/366] jump-label: disable if stop_machine() is used
 
 Some architectures are using stop_machine() while switching the opcode which
 leads to latency spikes.
@@ -37,5 +37,5 @@ index d3159ff..5e24da7 100644
  	select HAVE_ARCH_MMAP_RND_BITS if MMU
  	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
 -- 
-2.7.4
+1.9.1
 

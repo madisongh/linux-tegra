@@ -1,7 +1,7 @@
-From f86ccaf5b8989f33e46a7326f9bd8423f2102c28 Mon Sep 17 00:00:00 2001
+From 0df27f96fd160ee4d2eb516c3e12fa218995cf58 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 16 Sep 2015 23:47:39 +0200
-Subject: [PATCH 311/365] clk: at91: remove IRQ handling and use polling
+Subject: [PATCH 311/366] clk: at91: remove IRQ handling and use polling
 
 The AT91 clock drivers make use of IRQs to avoid polling when waiting for
 some clocks to be enabled. Unfortunately, this leads to a crash when those
@@ -1047,5 +1047,5 @@ index e160cb6..b06a332 100644
  
  int of_at91_get_clk_range(struct device_node *np, const char *propname,
 -- 
-2.7.4
+1.9.1
 

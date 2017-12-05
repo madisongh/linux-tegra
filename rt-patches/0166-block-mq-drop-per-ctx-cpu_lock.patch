@@ -1,7 +1,7 @@
-From 7fda12c18cd6c56ee9c2eb71158bcc236e7a3e6b Mon Sep 17 00:00:00 2001
+From b8002a79390412b686e6fb92f3d6a14a58b02e8c Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 18 Feb 2015 18:37:26 +0100
-Subject: [PATCH 166/365] block/mq: drop per ctx cpu_lock
+Subject: [PATCH 166/366] block/mq: drop per ctx cpu_lock
 
 While converting the get_cpu() to get_cpu_light() I added a cpu lock to
 ensure the same code is not invoked twice on the same CPU. And now I run
@@ -128,5 +128,5 @@ index 26b1605..3cb6feb 100644
  }
  
 -- 
-2.7.4
+1.9.1
 

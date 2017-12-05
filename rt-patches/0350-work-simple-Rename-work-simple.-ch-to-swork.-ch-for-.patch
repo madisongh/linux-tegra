@@ -1,7 +1,7 @@
-From 594516602fb6285adb35f35336522beb5c339edb Mon Sep 17 00:00:00 2001
+From 1a1d7ba9ba9d17325f9f2a8b486ab094527e9b8c Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sun, 5 Jun 2016 08:16:10 +0200
-Subject: [PATCH 350/365] work-simple: Rename work-simple.[ch] to swork.[ch]
+Subject: [PATCH 350/366] work-simple: Rename work-simple.[ch] to swork.[ch]
  for consistency
 
 The internal bits are already swork_blah, rename source to match.
@@ -509,5 +509,5 @@ index 9ffe405..0000000
 -}
 -EXPORT_SYMBOL_GPL(swork_put);
 -- 
-2.7.4
+1.9.1
 

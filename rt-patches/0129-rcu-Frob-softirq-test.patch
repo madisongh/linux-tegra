@@ -1,7 +1,7 @@
-From c571127b748c056ddf8288f48a4f42f162022f97 Mon Sep 17 00:00:00 2001
+From bb53349f15daca390a168bfa09d537cadde84f71 Mon Sep 17 00:00:00 2001
 From: Peter Zijlstra <a.p.zijlstra@chello.nl>
 Date: Sat, 13 Aug 2011 00:23:17 +0200
-Subject: [PATCH 129/365] rcu: Frob softirq test
+Subject: [PATCH 129/366] rcu: Frob softirq test
 
 With RT_FULL we get the below wreckage:
 
@@ -168,5 +168,5 @@ index 32cbe72..9b47b6c 100644
  				       "rcu_read_unlock() from irq or softirq with blocking in critical section!!!\n");
  		pr_alert("->rcu_read_unlock_special: %#x (b: %d, enq: %d nq: %d)\n",
 -- 
-2.7.4
+1.9.1
 

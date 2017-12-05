@@ -1,7 +1,7 @@
-From 14abe4861b3400cf261477a40f68dd54d271eac6 Mon Sep 17 00:00:00 2001
+From 0b4454ae36ae320561b050cbd152fe3071ad0dc0 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 28 Oct 2012 11:18:08 +0100
-Subject: [PATCH 228/365] net: netfilter: Serialize xt_write_recseq sections on
+Subject: [PATCH 228/366] net: netfilter: Serialize xt_write_recseq sections on
  RT
 
 The netfilter code relies only on the implicit semantics of
@@ -77,5 +77,5 @@ index f39276d..10880c8 100644
  
  const struct nf_afinfo __rcu *nf_afinfo[NFPROTO_NUMPROTO] __read_mostly;
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From 41f31de242a3bb03740daff7770c4402efdddcf8 Mon Sep 17 00:00:00 2001
+From da7ba2260668ea3ee4a674a58843b8277890560e Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:41:53 +0100
-Subject: [PATCH 255/365] move update_migrate_disable() definition
+Subject: [PATCH 255/366] move update_migrate_disable() definition
 
 so it is not within CONFIG_SMP, fixes build on SMP=n
 
@@ -48,5 +48,5 @@ index 672dab3..88bfe2d 100644
  {
  	struct rq *rq = task_rq(p);
 -- 
-2.7.4
+1.9.1
 

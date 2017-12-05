@@ -1,7 +1,7 @@
-From 3e4ce617e79266f74b9d36ca2ca6a1c91dd2fc92 Mon Sep 17 00:00:00 2001
+From 680bd5e125b08572115b31354308e55fadec8a88 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 29 Mar 2016 16:28:15 +0200
-Subject: [PATCH 325/365] Revert "trace/writeback: Block cgroup path tracing on
+Subject: [PATCH 325/366] Revert "trace/writeback: Block cgroup path tracing on
  RT"
 
 This reverts commit da53a0a5f0489708585493256ba1cd002292108d because we
@@ -26,5 +26,5 @@ index 253ef28..fff846b 100644
  static inline size_t __trace_wb_cgroup_size(struct bdi_writeback *wb)
  {
 -- 
-2.7.4
+1.9.1
 

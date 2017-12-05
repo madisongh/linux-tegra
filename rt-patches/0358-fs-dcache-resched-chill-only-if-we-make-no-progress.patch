@@ -1,7 +1,7 @@
-From da2d3c1ba11e29d177bf9f627f8621ebad42397c Mon Sep 17 00:00:00 2001
+From 73d999505705cdbe4850a6fd98522de820937c7a Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 8 Sep 2016 18:33:52 +0200
-Subject: [PATCH 358/365] fs/dcache: resched/chill only if we make no progress
+Subject: [PATCH 358/366] fs/dcache: resched/chill only if we make no progress
 
 Upstream commit 47be61845c77 ("fs/dcache.c: avoid soft-lockup in
 dput()") changed the condition _when_ cpu_relax() / cond_resched() was
@@ -75,5 +75,5 @@ index 2ee5a8e6..e8d9522 100644
  	}
  }
 -- 
-2.7.4
+1.9.1
 

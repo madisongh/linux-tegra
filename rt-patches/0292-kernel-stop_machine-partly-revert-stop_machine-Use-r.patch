@@ -1,7 +1,7 @@
-From 4866097e9db1f0e797631761b304616c60e3a2aa Mon Sep 17 00:00:00 2001
+From 1250e418e935851b501b7bda93e05a837fdd8448 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 10 Feb 2016 18:25:16 +0100
-Subject: [PATCH 292/365] kernel/stop_machine: partly revert "stop_machine: Use
+Subject: [PATCH 292/366] kernel/stop_machine: partly revert "stop_machine: Use
  raw spinlocks"
 
 With completion using swait and so rawlocks we don't need this anymore.
@@ -154,5 +154,5 @@ index 2c5acc8..f84d3b4 100644
  
  	mutex_unlock(&stop_cpus_mutex);
 -- 
-2.7.4
+1.9.1
 

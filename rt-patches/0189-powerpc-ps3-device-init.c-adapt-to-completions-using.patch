@@ -1,7 +1,7 @@
-From c88b1e747499ad0fb76833e23dadbfab3c0a78df Mon Sep 17 00:00:00 2001
+From d9b835a2819032b85af97388eabb1947f1628437 Mon Sep 17 00:00:00 2001
 From: Paul Gortmaker <paul.gortmaker@windriver.com>
 Date: Sun, 31 May 2015 14:44:42 -0400
-Subject: [PATCH 189/365] powerpc: ps3/device-init.c - adapt to completions
+Subject: [PATCH 189/366] powerpc: ps3/device-init.c - adapt to completions
  using swait vs wait
 
 To fix:
@@ -34,5 +34,5 @@ index 3f175e8..c4c02f9 100644
  	if (kthread_should_stop())
  		res = -EINTR;
 -- 
-2.7.4
+1.9.1
 

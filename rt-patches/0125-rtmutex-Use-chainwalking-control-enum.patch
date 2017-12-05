@@ -1,7 +1,7 @@
-From 22cf75deacc5268a800bd4fd9d5f48117e2faa69 Mon Sep 17 00:00:00 2001
+From bfd7b18e3065de9293c39664e3f3b74770a57f94 Mon Sep 17 00:00:00 2001
 From: "bmouring@ni.com" <bmouring@ni.com>
 Date: Tue, 15 Dec 2015 17:07:30 -0600
-Subject: [PATCH 125/365] rtmutex: Use chainwalking control enum
+Subject: [PATCH 125/366] rtmutex: Use chainwalking control enum
 
 In 8930ed80 (rtmutex: Cleanup deadlock detector debug logic),
 chainwalking control enums were introduced to limit the deadlock
@@ -29,5 +29,5 @@ index f3e3e44..8275f47 100644
  
  	for (;;) {
 -- 
-2.7.4
+1.9.1
 

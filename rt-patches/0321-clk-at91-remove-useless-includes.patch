@@ -1,7 +1,7 @@
-From a14510b0ce5e555354cb95b03d100b3ac5f02acf Mon Sep 17 00:00:00 2001
+From 5b9bbe7c202d1c44ba1ca6f6b8a7f0aea094de93 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 27 Jan 2016 15:17:37 +0100
-Subject: [PATCH 321/365] clk: at91: remove useless includes
+Subject: [PATCH 321/366] clk: at91: remove useless includes
 
 Over time, some includes were copy pasted from other clocks drivers but are
 not necessary.
@@ -145,5 +145,5 @@ index 617e24f..650ca45 100644
  #include <linux/regmap.h>
  
 -- 
-2.7.4
+1.9.1
 

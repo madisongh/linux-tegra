@@ -1,7 +1,7 @@
-From 4fed6d303a66f00f8ce4f4a7f36df0d484683c2f Mon Sep 17 00:00:00 2001
+From 19ffd6a6892a4d3cfd03da28079faebc3e7b3ac9 Mon Sep 17 00:00:00 2001
 From: Benedikt Spranger <b.spranger@linutronix.de>
 Date: Mon, 8 Mar 2010 18:57:04 +0100
-Subject: [PATCH 016/365] clocksource: TCLIB: Allow higher clock rates for
+Subject: [PATCH 016/366] clocksource: TCLIB: Allow higher clock rates for
  clock events
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -135,7 +135,7 @@ index 4da2af9..7524941 100644
  		goto err_unregister_clksrc;
  
 diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index 1ea931b..4c23b99 100644
+index 928184e..9a368c5 100644
 --- a/drivers/misc/Kconfig
 +++ b/drivers/misc/Kconfig
 @@ -69,8 +69,7 @@ config ATMEL_TCB_CLKSRC
@@ -165,5 +165,5 @@ index 1ea931b..4c23b99 100644
  	tristate "Dummy IRQ handler"
  	default n
 -- 
-2.7.4
+1.9.1
 

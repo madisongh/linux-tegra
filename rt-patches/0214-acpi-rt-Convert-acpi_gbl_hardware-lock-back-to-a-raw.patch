@@ -1,7 +1,7 @@
-From 279e7a5738e11564ff17229f1602386a0fd1366c Mon Sep 17 00:00:00 2001
+From e7b7737c3aa52738884f25999827eac01de2604e Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Wed, 13 Feb 2013 09:26:05 -0500
-Subject: [PATCH 214/365] acpi/rt: Convert acpi_gbl_hardware lock back to a
+Subject: [PATCH 214/366] acpi/rt: Convert acpi_gbl_hardware lock back to a
  raw_spinlock_t
 
 We hit the following bug with 3.6-rt:
@@ -184,5 +184,5 @@ index 323e5da..cc5fbd5 100644
   * OSL interfaces used by debugger/disassembler
   */
 -- 
-2.7.4
+1.9.1
 

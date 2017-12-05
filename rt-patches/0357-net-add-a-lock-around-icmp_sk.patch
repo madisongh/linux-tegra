@@ -1,7 +1,7 @@
-From 8006fb107fe5d8d7f3407e7b55f4e3637dbabceb Mon Sep 17 00:00:00 2001
+From c4315faf41f4c1f8da0b5cc375a67e9de700dbf1 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 31 Aug 2016 17:54:09 +0200
-Subject: [PATCH 357/365] net: add a lock around icmp_sk()
+Subject: [PATCH 357/366] net: add a lock around icmp_sk()
 
 It looks like the this_cpu_ptr() access in icmp_sk() is protected with
 local_bh_disable(). To avoid missing serialization in -RT I am adding
@@ -15,7 +15,7 @@ Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
  1 file changed, 8 insertions(+)
 
 diff --git a/net/ipv4/icmp.c b/net/ipv4/icmp.c
-index 74314d9..ff25932 100644
+index 288d20f..a6f6c9b 100644
 --- a/net/ipv4/icmp.c
 +++ b/net/ipv4/icmp.c
 @@ -78,6 +78,7 @@
@@ -75,5 +75,5 @@ index 74314d9..ff25932 100644
  
  /*
 -- 
-2.7.4
+1.9.1
 

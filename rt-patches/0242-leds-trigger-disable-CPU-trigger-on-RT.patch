@@ -1,7 +1,7 @@
-From 746483514ed98dc5038fb8aa32d840d6ae25f62f Mon Sep 17 00:00:00 2001
+From db1ba3be1c1d6b7cf9fa682ade63e98ad9c6af37 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 23 Jan 2014 14:45:59 +0100
-Subject: [PATCH 242/365] leds: trigger: disable CPU trigger on -RT
+Subject: [PATCH 242/366] leds: trigger: disable CPU trigger on -RT
 
 as it triggers:
 |CPU: 0 PID: 0 Comm: swapper Not tainted 3.12.8-rt10 #141
@@ -16,7 +16,6 @@ as it triggers:
 |[<c000ffd8>] (arch_cpu_idle_exit+0x18/0x1c) from [<c00590b8>] (cpu_startup_entry+0xa8/0x234)
 |[<c00590b8>] (cpu_startup_entry+0xa8/0x234) from [<c043b2cc>] (rest_init+0xb8/0xe0)
 |[<c043b2cc>] (rest_init+0xb8/0xe0) from [<c061ebe0>] (start_kernel+0x2c4/0x380)
-
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
@@ -37,5 +36,5 @@ index 5bda6a9..d628658 100644
  	  This allows LEDs to be controlled by active CPUs. This shows
  	  the active CPUs across an array of LEDs so you can see which
 -- 
-2.7.4
+1.9.1
 

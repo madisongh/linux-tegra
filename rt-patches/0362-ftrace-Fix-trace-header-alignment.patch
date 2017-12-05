@@ -1,7 +1,7 @@
-From 50690497c1847516ec81202798d77d46ec18f24c Mon Sep 17 00:00:00 2001
+From 66eb405266cfb0cb2bf9cec62e73f10924757f3d Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sun, 16 Oct 2016 05:08:30 +0200
-Subject: [PATCH 362/365] ftrace: Fix trace header alignment
+Subject: [PATCH 362/366] ftrace: Fix trace header alignment
 
 Line up helper arrows to the right column.
 
@@ -15,10 +15,10 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 16 insertions(+), 16 deletions(-)
 
 diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
-index 7f9e1f5..327f8da 100644
+index dafe7a5..931f3f6b 100644
 --- a/kernel/trace/trace.c
 +++ b/kernel/trace/trace.c
-@@ -2578,17 +2578,17 @@ get_total_entries(struct trace_buffer *buf,
+@@ -2603,17 +2603,17 @@ get_total_entries(struct trace_buffer *buf,
  
  static void print_lat_help_header(struct seq_file *m)
  {
@@ -47,7 +47,7 @@ index 7f9e1f5..327f8da 100644
  }
  
  static void print_event_info(struct trace_buffer *buf, struct seq_file *m)
-@@ -2624,11 +2624,11 @@ static void print_func_help_header_irq(struct trace_buffer *buf, struct seq_file
+@@ -2649,11 +2649,11 @@ static void print_func_help_header_irq(struct trace_buffer *buf, struct seq_file
  		    "#                            |/  _-----=> need-resched_lazy\n"
  		    "#                            || / _---=> hardirq/softirq\n"
  		    "#                            ||| / _--=> preempt-depth\n"
@@ -65,5 +65,5 @@ index 7f9e1f5..327f8da 100644
  
  static void print_func_help_header_irq_tgid(struct trace_buffer *buf, struct seq_file *m)
 -- 
-2.7.4
+1.9.1
 

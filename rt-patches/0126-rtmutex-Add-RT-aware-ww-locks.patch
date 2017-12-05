@@ -1,7 +1,7 @@
-From 1b4e2052ec92940792c8f9b0b7fc0af1582250a2 Mon Sep 17 00:00:00 2001
+From c8fb8b6dfe32d17346a70acfcd58a8022acbc869 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <sebastian@breakpoint.cc>
 Date: Mon, 28 Oct 2013 09:36:37 +0100
-Subject: [PATCH 126/365] rtmutex: Add RT aware ww locks
+Subject: [PATCH 126/366] rtmutex: Add RT aware ww locks
 
 lockdep says:
 | --------------------------------------------------------------------------
@@ -425,5 +425,5 @@ index 8275f47..7b59f63 100644
 +EXPORT_SYMBOL(ww_mutex_unlock);
  #endif
 -- 
-2.7.4
+1.9.1
 

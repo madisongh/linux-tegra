@@ -1,7 +1,7 @@
-From 8e0e8dfaf484702642647a7c19672a24b6c5a5cf Mon Sep 17 00:00:00 2001
+From 15bdf68bea3b376dc7700b6c4a468fff40405a6b Mon Sep 17 00:00:00 2001
 From: Ingo Molnar <mingo@elte.hu>
 Date: Fri, 3 Jul 2009 08:44:07 -0500
-Subject: [PATCH 076/365] relay: Fix timer madness
+Subject: [PATCH 076/366] relay: Fix timer madness
 
 remove timer calls (!!!) from deep within the tracing infrastructure.
 This was totally bogus code that can cause lockups and worse.  Poll
@@ -53,5 +53,5 @@ index 0b4570c..60684be 100644
  
  	old = buf->data;
 -- 
-2.7.4
+1.9.1
 

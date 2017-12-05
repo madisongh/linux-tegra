@@ -1,7 +1,7 @@
-From 1b509f8928742016cb1a211f4334d30c0665bc6f Mon Sep 17 00:00:00 2001
+From e67b68a651b89851c6a97d0bf32bae603c62cdc3 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 1 Dec 2015 17:57:02 +0100
-Subject: [PATCH 072/365] mm/rmap: retry lock check in anon_vma_free()
+Subject: [PATCH 072/366] mm/rmap: retry lock check in anon_vma_free()
 
 anon_vma_free() checks if the rwsem is locked and if so performs a
 rw lock + unlock operation. It seems the purpose is to flush the current
@@ -54,5 +54,5 @@ index b577fbb..950d797 100644
  
  	kmem_cache_free(anon_vma_cachep, anon_vma);
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From 9b8c08a4605fc8e8a6b83fc6023fced34b86ee33 Mon Sep 17 00:00:00 2001
+From 504b33a923764d27c7af672a06c430c458122e50 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 01:08:33 +0200
-Subject: [PATCH 314/365] ARM: at91: pm: simply call at91_pm_init
+Subject: [PATCH 314/366] ARM: at91: pm: simply call at91_pm_init
 
 at91_pm_init() doesn't return a value, as is the case for its callers,
 simply call it instead of returning its non-existent return value.
@@ -43,5 +43,5 @@ index 23726fb..db32bf8 100644
 +	at91_pm_init();
  }
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From 79ebd3a50a1b13cc939b072ee7b5b2d60c8b2cbf Mon Sep 17 00:00:00 2001
+From b50da802d6c4f671d7b378263e33f28afdfa4dfd Mon Sep 17 00:00:00 2001
 From: Yong Zhang <yong.zhang0@gmail.com>
 Date: Sun, 16 Oct 2011 18:56:43 +0800
-Subject: [PATCH 102/365] hotplug: sync_unplug: No " " in task name
+Subject: [PATCH 102/366] hotplug: sync_unplug: No " " in task name
 
 Otherwise the output will look a little odd.
 
@@ -26,5 +26,5 @@ index cfac14c..218c7a1 100644
  		return (PTR_ERR(tsk));
  	kthread_bind(tsk, cpu);
 -- 
-2.7.4
+1.9.1
 

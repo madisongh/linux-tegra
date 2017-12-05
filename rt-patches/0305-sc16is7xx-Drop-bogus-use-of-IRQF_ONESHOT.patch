@@ -1,7 +1,7 @@
-From 50a03d3fbfe4bf1db18c4fc78c63b023a3372f69 Mon Sep 17 00:00:00 2001
+From 411dc71f6c6cee9dc161a05c82abbec5c04a5d3a Mon Sep 17 00:00:00 2001
 From: Josh Cartwright <joshc@ni.com>
 Date: Thu, 18 Feb 2016 11:26:12 -0600
-Subject: [PATCH 305/365] sc16is7xx: Drop bogus use of IRQF_ONESHOT
+Subject: [PATCH 305/366] sc16is7xx: Drop bogus use of IRQF_ONESHOT
 
 The use of IRQF_ONESHOT when registering an interrupt handler with
 request_irq() is non-sensical.
@@ -56,5 +56,5 @@ index cc86c34..ac51f0d 100644
  		return 0;
  
 -- 
-2.7.4
+1.9.1
 

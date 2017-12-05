@@ -1,7 +1,7 @@
-From 70f9bdb3d0884a99e158158f5722580518b3ea7e Mon Sep 17 00:00:00 2001
+From 0112740f6e71a780f8af4026b7aaa37dbb4da1fc Mon Sep 17 00:00:00 2001
 From: Josh Cartwright <josh.cartwright@ni.com>
 Date: Wed, 28 Jan 2015 13:08:45 -0600
-Subject: [PATCH 232/365] lockdep: selftest: fix warnings due to missing
+Subject: [PATCH 232/366] lockdep: selftest: fix warnings due to missing
  PREEMPT_RT conditionals
 
 "lockdep: Selftest: Only do hardirq context test for raw spinlock"
@@ -18,7 +18,6 @@ like:
 
 Fixed by wrapping the test definitions in #ifndef CONFIG_PREEMPT_RT_FULL
 conditionals.
-
 
 Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
 Signed-off-by: Xander Huff <xander.huff@ni.com>
@@ -144,5 +143,5 @@ index 19ae236..b93a610 100644
   * read-lock / write-lock recursion that is unsafe.
   */
 -- 
-2.7.4
+1.9.1
 

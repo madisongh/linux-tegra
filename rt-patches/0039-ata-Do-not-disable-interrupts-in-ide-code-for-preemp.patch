@@ -1,7 +1,7 @@
-From ea17cc6d11236295101fe78427c253a23da7020d Mon Sep 17 00:00:00 2001
+From 3f17eebed3045515893c1a693f97210435a83ae8 Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <srostedt@redhat.com>
 Date: Fri, 3 Jul 2009 08:44:29 -0500
-Subject: [PATCH 039/365] ata: Do not disable interrupts in ide code for
+Subject: [PATCH 039/366] ata: Do not disable interrupts in ide code for
  preempt-rt
 
 Use the local_irq_*_nort variants.
@@ -66,5 +66,5 @@ index 7dbba38..65beb7a 100644
  		buf = page_address(page);
  		consumed = ap->ops->sff_data_xfer(dev,  buf + offset,
 -- 
-2.7.4
+1.9.1
 

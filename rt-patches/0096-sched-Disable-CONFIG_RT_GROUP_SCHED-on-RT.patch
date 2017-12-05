@@ -1,7 +1,7 @@
-From 130c8858944ca3d9d4b24d785fc2095af69c5344 Mon Sep 17 00:00:00 2001
+From e9865708147d969f471ca882dab4faa783dc47d2 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 18 Jul 2011 17:03:52 +0200
-Subject: [PATCH 096/365] sched: Disable CONFIG_RT_GROUP_SCHED on RT
+Subject: [PATCH 096/366] sched: Disable CONFIG_RT_GROUP_SCHED on RT
 
 Carsten reported problems when running:
 
@@ -30,5 +30,5 @@ index de3acea..9e50d26 100644
  	help
  	  This feature lets you explicitly allocate real CPU bandwidth
 -- 
-2.7.4
+1.9.1
 

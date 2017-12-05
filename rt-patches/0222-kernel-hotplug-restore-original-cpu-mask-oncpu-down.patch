@@ -1,13 +1,12 @@
-From 1afbf95b472634009fba41228d0e6e1e5c77027a Mon Sep 17 00:00:00 2001
+From 7d3a3a61954742f850f0ca4a3d343c6e4d82793d Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 14 Jun 2013 17:16:35 +0200
-Subject: [PATCH 222/365] kernel/hotplug: restore original cpu mask oncpu/down
+Subject: [PATCH 222/366] kernel/hotplug: restore original cpu mask oncpu/down
 
 If a task which is allowed to run only on CPU X puts CPU Y down then it
 will be allowed on all CPUs but the on CPU Y after it comes back from
 kernel. This patch ensures that we don't lose the initial setting unless
 the CPU the task is running is going down.
-
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
@@ -60,5 +59,5 @@ index cc095ff..2635738 100644
  }
  
 -- 
-2.7.4
+1.9.1
 

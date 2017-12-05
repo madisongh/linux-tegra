@@ -1,7 +1,7 @@
-From a3837d7703040f5ccfb2081a0bba4ebc104695e5 Mon Sep 17 00:00:00 2001
+From 152f724b7c81a31c790a44ceb2ac70b95e3bd07e Mon Sep 17 00:00:00 2001
 From: Yang Shi <yang.shi@linaro.org>
 Date: Thu, 3 Mar 2016 01:08:57 -0800
-Subject: [PATCH 326/365] tracing, writeback: Replace cgroup path to cgroup ino
+Subject: [PATCH 326/366] tracing, writeback: Replace cgroup path to cgroup ino
 
 commit 5634cc2aa9aebc77bc862992e7805469dcf83dac ("writeback: update writeback
 tracepoints to report cgroup") made writeback tracepoints print out cgroup
@@ -394,5 +394,5 @@ index fff846b..73614ce 100644
  );
  
 -- 
-2.7.4
+1.9.1
 

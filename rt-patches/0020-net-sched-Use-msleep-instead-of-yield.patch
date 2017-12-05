@@ -1,7 +1,7 @@
-From 48f941e424d048a807f96ba05fce9220d696c9a1 Mon Sep 17 00:00:00 2001
+From 60758036b88c410553d86192794e49df643b788d Mon Sep 17 00:00:00 2001
 From: Marc Kleine-Budde <mkl@pengutronix.de>
 Date: Wed, 5 Mar 2014 00:49:47 +0100
-Subject: [PATCH 020/365] net: sched: Use msleep() instead of yield()
+Subject: [PATCH 020/366] net: sched: Use msleep() instead of yield()
 
 On PREEMPT_RT enabled systems the interrupt handler run as threads at prio 50
 (by default). If a high priority userspace process tries to shut down a busy
@@ -38,7 +38,6 @@ the interrupt thread time to finish, similar to other changes contained in the
 rt patch set. Using wait_for_completion() instead would probably be a better
 solution.
 
-
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
@@ -59,5 +58,5 @@ index 2704a13..3f02edc 100644
  
  void dev_deactivate(struct net_device *dev)
 -- 
-2.7.4
+1.9.1
 

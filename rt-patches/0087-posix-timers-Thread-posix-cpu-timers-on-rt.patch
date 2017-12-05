@@ -1,7 +1,7 @@
-From 580a65262b2dcbd3389f7ce88bc8d5ef6256e93a Mon Sep 17 00:00:00 2001
+From a2b43ee78d107157684dce9f4b80168c6e7b488b Mon Sep 17 00:00:00 2001
 From: John Stultz <johnstul@us.ibm.com>
 Date: Fri, 3 Jul 2009 08:29:58 -0500
-Subject: [PATCH 087/365] posix-timers: Thread posix-cpu-timers on -rt
+Subject: [PATCH 087/366] posix-timers: Thread posix-cpu-timers on -rt
 
 posix-cpu-timer code takes non -rt safe locks in hard irq
 context. Move it to a thread.
@@ -43,7 +43,7 @@ index 6b42f297..d8ec0f2 100644
  		[PIDTYPE_PID]  = INIT_PID_LINK(PIDTYPE_PID),		\
  		[PIDTYPE_PGID] = INIT_PID_LINK(PIDTYPE_PGID),		\
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index a112690..4228b42 100644
+index fb5ee52..668b2cb 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1556,6 +1556,9 @@ struct task_struct {
@@ -57,10 +57,10 @@ index a112690..4228b42 100644
  /* process credentials */
  	const struct cred __rcu *real_cred; /* objective and real subjective task
 diff --git a/kernel/fork.c b/kernel/fork.c
-index 71ea3df..06523cd 100644
+index 81550ca..3256c9e 100644
 --- a/kernel/fork.c
 +++ b/kernel/fork.c
-@@ -1240,6 +1240,9 @@ static void rt_mutex_init_task(struct task_struct *p)
+@@ -1239,6 +1239,9 @@ static void rt_mutex_init_task(struct task_struct *p)
   */
  static void posix_cpu_timers_init(struct task_struct *tsk)
  {
@@ -308,5 +308,5 @@ index 80016b3..b7342b6 100644
   * Set one of the process-wide special case CPU timers or RLIMIT_CPU.
   * The tsk->sighand->siglock must be held by the caller.
 -- 
-2.7.4
+1.9.1
 

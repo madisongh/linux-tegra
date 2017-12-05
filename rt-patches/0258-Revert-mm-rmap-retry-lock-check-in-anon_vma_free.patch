@@ -1,7 +1,7 @@
-From 00d9c20516ab1053697f42407cb9a23c855aa983 Mon Sep 17 00:00:00 2001
+From e827ab493804f291b866c605516458b20a8c4f15 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:44:47 +0100
-Subject: [PATCH 258/365] Revert "mm/rmap: retry lock check in anon_vma_free()"
+Subject: [PATCH 258/366] Revert "mm/rmap: retry lock check in anon_vma_free()"
 
 This is probably just a duct tape patch and root cause has been
 fixed in the meantime.
@@ -46,5 +46,5 @@ index 950d797..b577fbb 100644
  
  	kmem_cache_free(anon_vma_cachep, anon_vma);
 -- 
-2.7.4
+1.9.1
 

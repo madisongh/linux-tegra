@@ -1,7 +1,7 @@
-From 80fd3c5f1be689ce192d73393650c373a09dc99d Mon Sep 17 00:00:00 2001
+From 69c9df477b1fbab268d1ad52e6c9344ffaeb0e8d Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jul 2016 17:13:23 +0200
-Subject: [PATCH 353/365] timers: wakeup all timer waiters without holding the
+Subject: [PATCH 353/366] timers: wakeup all timer waiters without holding the
  base lock
 
 There should be no need to hold the base lock during the wakeup. There
@@ -30,5 +30,5 @@ index d521214..603699f 100644
  
  #ifdef CONFIG_NO_HZ_COMMON
 -- 
-2.7.4
+1.9.1
 

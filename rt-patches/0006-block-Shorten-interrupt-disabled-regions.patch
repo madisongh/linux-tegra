@@ -1,7 +1,7 @@
-From 5ce273a7a9d2f64534af055430064c8f187a878a Mon Sep 17 00:00:00 2001
+From 4fafe4ab112ed15ebd2ba11b319dda038fbe2ac9 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 22 Jun 2011 19:47:02 +0200
-Subject: [PATCH 006/365] block: Shorten interrupt disabled regions
+Subject: [PATCH 006/366] block: Shorten interrupt disabled regions
 
 Moving the blk_sched_flush_plug() call out of the interrupt/preempt
 disabled region in the scheduler allows us to replace
@@ -98,5 +98,5 @@ index ec3be22..b83af44 100644
  
  void blk_finish_plug(struct blk_plug *plug)
 -- 
-2.7.4
+1.9.1
 

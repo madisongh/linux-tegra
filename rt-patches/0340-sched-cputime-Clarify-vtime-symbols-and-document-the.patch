@@ -1,7 +1,7 @@
-From 1b5d8aeb7df59e41a8cf313cdf8e5741450bc44d Mon Sep 17 00:00:00 2001
+From e0e929cba28f4672145404ed2cfd6087cea47c85 Mon Sep 17 00:00:00 2001
 From: Frederic Weisbecker <fweisbec@gmail.com>
 Date: Thu, 19 Nov 2015 16:47:30 +0100
-Subject: [PATCH 340/365] sched/cputime: Clarify vtime symbols and document
+Subject: [PATCH 340/366] sched/cputime: Clarify vtime symbols and document
  them
 
 VTIME_SLEEPING state happens either when:
@@ -35,7 +35,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  3 files changed, 8 insertions(+), 5 deletions(-)
 
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 4beaa14..bc11cd8 100644
+index 436edea..9891e23 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1554,8 +1554,11 @@ struct task_struct {
@@ -52,10 +52,10 @@ index 4beaa14..bc11cd8 100644
  	} vtime_snap_whence;
  #endif
 diff --git a/kernel/fork.c b/kernel/fork.c
-index 72279e3..cdc3a16 100644
+index 46d01b12..5bc0004 100644
 --- a/kernel/fork.c
 +++ b/kernel/fork.c
-@@ -1403,7 +1403,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+@@ -1402,7 +1402,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
  #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
  	seqlock_init(&p->vtime_seqlock);
  	p->vtime_snap = 0;
@@ -96,5 +96,5 @@ index a1aecbe..ac7559b 100644
  			continue;
  
 -- 
-2.7.4
+1.9.1
 

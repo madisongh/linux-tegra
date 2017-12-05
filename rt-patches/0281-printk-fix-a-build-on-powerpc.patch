@@ -1,7 +1,7 @@
-From b0be448772be61e152fbcb461ccb1c484e6ea4cf Mon Sep 17 00:00:00 2001
+From ecf242f713e3f6d1431a98869a14701cdadb70d3 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 4 Feb 2016 18:56:10 +0100
-Subject: [PATCH 281/365] printk: fix a build on powerpc
+Subject: [PATCH 281/366] printk: fix a build on powerpc
 
 As pwe kbuild test robot:
 arch/powerpc/kernel/built-in.o: In function `register_early_udbg_console':
@@ -18,7 +18,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 59 insertions(+), 56 deletions(-)
 
 diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index 54e0422..ecff6e3 100644
+index 84400c4..cd377c4 100644
 --- a/kernel/printk/printk.c
 +++ b/kernel/printk/printk.c
 @@ -245,6 +245,65 @@ struct printk_log {
@@ -87,7 +87,7 @@ index 54e0422..ecff6e3 100644
  #ifdef CONFIG_PRINTK
  DECLARE_WAIT_QUEUE_HEAD(log_wait);
  /* the next printk record to read by syslog(READ) or /proc/kmsg */
-@@ -1696,62 +1755,6 @@ static size_t cont_print_text(char *text, size_t size)
+@@ -1731,62 +1790,6 @@ static size_t cont_print_text(char *text, size_t size)
  	return textlen;
  }
  
@@ -151,5 +151,5 @@ index 54e0422..ecff6e3 100644
  			    const char *dict, size_t dictlen,
  			    const char *fmt, va_list args)
 -- 
-2.7.4
+1.9.1
 

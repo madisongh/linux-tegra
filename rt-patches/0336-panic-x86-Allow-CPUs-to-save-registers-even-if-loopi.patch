@@ -1,7 +1,7 @@
-From d16459afda9c798cc125c6576a02e31b2bb9a655 Mon Sep 17 00:00:00 2001
+From 188183251d3604548c9259493c0fd7399415e7e8 Mon Sep 17 00:00:00 2001
 From: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
 Date: Mon, 14 Dec 2015 11:19:10 +0100
-Subject: [PATCH 336/365] panic, x86: Allow CPUs to save registers even if
+Subject: [PATCH 336/366] panic, x86: Allow CPUs to save registers even if
  looping in NMI context
 
 Currently, kdump_nmi_shootdown_cpus(), a subroutine of crash_kexec(),
@@ -183,7 +183,7 @@ index f660d63..8384207 100644
  void nmi_shootdown_cpus(nmi_shootdown_cb callback)
  {
 diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-index 5252478..3cd9b629 100644
+index d199f2c..c130695 100644
 --- a/include/linux/kernel.h
 +++ b/include/linux/kernel.h
 @@ -259,6 +259,7 @@ extern long (*panic_blink)(int state);
@@ -221,10 +221,10 @@ index 5252478..3cd9b629 100644
  
  /*
 diff --git a/kernel/panic.c b/kernel/panic.c
-index 7149838..5937902 100644
+index 80fcb84..9d093cbf 100644
 --- a/kernel/panic.c
 +++ b/kernel/panic.c
-@@ -64,6 +64,15 @@ void __weak panic_smp_self_stop(void)
+@@ -65,6 +65,15 @@ void __weak panic_smp_self_stop(void)
  		cpu_relax();
  }
  
@@ -254,5 +254,5 @@ index 63073a1..8025fc3 100644
  		__this_cpu_write(hard_watchdog_warn, true);
  		return;
 -- 
-2.7.4
+1.9.1
 

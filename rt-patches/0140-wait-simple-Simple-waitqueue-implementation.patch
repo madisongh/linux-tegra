@@ -1,7 +1,7 @@
-From dc6e0bbbb2bfeba4831b603e10af8db8236e869f Mon Sep 17 00:00:00 2001
+From 5dd7edbd6980c6139624515d75bc93f89dff142a Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 12 Dec 2011 12:29:04 +0100
-Subject: [PATCH 140/365] wait-simple: Simple waitqueue implementation
+Subject: [PATCH 140/366] wait-simple: Simple waitqueue implementation
 
 wait_queue is a swiss army knife and in most of the cases the
 complexity is not needed. For RT waitqueues are a constant source of
@@ -238,7 +238,7 @@ index 0000000..f86bca2
 +
 +#endif
 diff --git a/kernel/sched/Makefile b/kernel/sched/Makefile
-index 43fb319..26505c1 100644
+index 43fb319c..26505c1 100644
 --- a/kernel/sched/Makefile
 +++ b/kernel/sched/Makefile
 @@ -15,7 +15,7 @@ endif
@@ -372,5 +372,5 @@ index 0000000..7dfa86d
 +}
 +EXPORT_SYMBOL(__swait_wake);
 -- 
-2.7.4
+1.9.1
 

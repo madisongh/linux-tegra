@@ -1,7 +1,7 @@
-From 82bd4d7f95a238465543dabdc40eeef443d8acfb Mon Sep 17 00:00:00 2001
+From b4a2c96654d8ba0599c138e5340cf6647f85d8bd Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Sat, 3 May 2014 11:00:29 +0200
-Subject: [PATCH 164/365] blk-mq: revert raw locks, post pone notifier to
+Subject: [PATCH 164/366] blk-mq: revert raw locks, post pone notifier to
  POST_DEAD
 
 The blk_mq_cpu_notify_lock should be raw because some CPU down levels
@@ -88,5 +88,5 @@ index 0345b44..fe026b6 100644
  
  	/*
 -- 
-2.7.4
+1.9.1
 

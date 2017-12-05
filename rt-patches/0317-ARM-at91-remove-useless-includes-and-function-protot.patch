@@ -1,7 +1,7 @@
-From 3efbc24463f3ff1d7d0dfc3f23f414cf5fee0228 Mon Sep 17 00:00:00 2001
+From 82fd9dd143497bdf590050d55ee68fd54d4ea87a Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 02:01:20 +0200
-Subject: [PATCH 317/365] ARM: at91: remove useless includes and function
+Subject: [PATCH 317/366] ARM: at91: remove useless includes and function
  prototypes
 
 Remove leftover from the previous cleanup
@@ -32,5 +32,5 @@ index d224e19..28ca57a 100644
  extern void __init at91rm9200_pm_init(void);
  extern void __init at91sam9260_pm_init(void);
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From aea3dbc3adaf1137a8ad111964d49fdb6cc010eb Mon Sep 17 00:00:00 2001
+From 3870ce93ce2746802f309fae83cd6af517df0fc9 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 12:57:10 +0200
-Subject: [PATCH 318/365] usb: gadget: atmel: access the PMC using regmap
+Subject: [PATCH 318/366] usb: gadget: atmel: access the PMC using regmap
 
 Use regmap to access the PMC to avoid using at91_pmc_read and
 at91_pmc_write.
@@ -79,5 +79,5 @@ index ea448a3..3e1c9d5 100644
  
  static inline struct usba_ep *to_usba_ep(struct usb_ep *ep)
 -- 
-2.7.4
+1.9.1
 

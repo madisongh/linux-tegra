@@ -1,7 +1,7 @@
-From 9ccdf9fac7804bc9cd9233a5909800efdb4e85c3 Mon Sep 17 00:00:00 2001
+From 0252b0470f174ee044a41c376d96dbd7b65c69e0 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 7 Jun 2013 22:37:06 +0200
-Subject: [PATCH 221/365] kernel/cpu: fix cpu down problem if kthread's cpu is
+Subject: [PATCH 221/366] kernel/cpu: fix cpu down problem if kthread's cpu is
  going down
 
 If kthread is pinned to CPUx and CPUx is going down then we get into
@@ -88,5 +88,5 @@ index 4522046..cc095ff 100644
  
  	/* Notifiers are done. Don't let any more tasks pin this CPU. */
 -- 
-2.7.4
+1.9.1
 

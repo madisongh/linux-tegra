@@ -1,7 +1,7 @@
-From d1eaf31637fd08ad11af59e4776eb10f1c4a1d8f Mon Sep 17 00:00:00 2001
+From eb93b402a52ab2b8a5e307ad977c230e44729a1a Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:42:54 +0100
-Subject: [PATCH 256/365] kernel/time/timer: SMP=n fix
+Subject: [PATCH 256/366] kernel/time/timer: SMP=n fix
 
 Reported-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -23,5 +23,5 @@ index c3314fc..a460cbb 100644
   * del_timer_sync - deactivate a timer and wait for the handler to finish.
   * @timer: the timer to be deactivated
 -- 
-2.7.4
+1.9.1
 

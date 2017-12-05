@@ -1,7 +1,7 @@
-From 4531a1c2761899db0fcda25164423b9081bdf2cb Mon Sep 17 00:00:00 2001
+From 59f77bc3df8cecd5a7309fd61407c6bc570c3cff Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sat, 23 Jan 2016 08:11:53 +0100
-Subject: [PATCH 280/365] sched: fix ->nr_cpus_allowed = 1 transcription error
+Subject: [PATCH 280/366] sched: fix ->nr_cpus_allowed = 1 transcription error
  during migrate_disable() cleanup
 
 Setting p->nr_cpus_allowed accidentally wandered into migrate_disable()
@@ -26,5 +26,5 @@ index 04ba588..35da32e 100644
  }
  EXPORT_SYMBOL(migrate_disable);
 -- 
-2.7.4
+1.9.1
 

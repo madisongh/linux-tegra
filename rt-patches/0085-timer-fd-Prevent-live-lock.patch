@@ -1,7 +1,7 @@
-From afa424ab89db59f4fcdd7568521e500ff8805061 Mon Sep 17 00:00:00 2001
+From cf2bb36476c43b2ff3e5e0df4bd4ade546f74faf Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 25 Jan 2012 11:08:40 +0100
-Subject: [PATCH 085/365] timer-fd: Prevent live lock
+Subject: [PATCH 085/366] timer-fd: Prevent live lock
 
 If hrtimer_try_to_cancel() requires a retry, then depending on the
 priority setting te retry loop might prevent timer callback completion
@@ -15,10 +15,10 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/fs/timerfd.c b/fs/timerfd.c
-index 053818d..c4bc14f 100644
+index 1327a02..4260feb 100644
 --- a/fs/timerfd.c
 +++ b/fs/timerfd.c
-@@ -450,7 +450,10 @@ static int do_timerfd_settime(int ufd, int flags,
+@@ -461,7 +461,10 @@ static int do_timerfd_settime(int ufd, int flags,
  				break;
  		}
  		spin_unlock_irq(&ctx->wqh.lock);
@@ -31,5 +31,5 @@ index 053818d..c4bc14f 100644
  
  	/*
 -- 
-2.7.4
+1.9.1
 

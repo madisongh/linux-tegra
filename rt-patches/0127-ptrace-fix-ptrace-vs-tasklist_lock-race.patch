@@ -1,7 +1,7 @@
-From 40a00245cdfbfb07859e8f72b8dab0b62ba5cf97 Mon Sep 17 00:00:00 2001
+From 2f13a0c567fcf0a7b1d8678fcd9dcbd5e5dfa47f Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 29 Aug 2013 18:21:04 +0200
-Subject: [PATCH 127/365] ptrace: fix ptrace vs tasklist_lock race
+Subject: [PATCH 127/366] ptrace: fix ptrace vs tasklist_lock race
 
 As explained by Alexander Fyodorov <halcy@yandex.ru>:
 
@@ -30,7 +30,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  3 files changed, 66 insertions(+), 6 deletions(-)
 
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 9b78143..d144d8c 100644
+index b7657cd..2b59b02 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -243,10 +243,7 @@ extern char ___assert_task_state[1 - 2*!!(
@@ -44,7 +44,7 @@ index 9b78143..d144d8c 100644
  #define task_contributes_to_load(task)	\
  				((task->state & TASK_UNINTERRUPTIBLE) != 0 && \
  				 (task->flags & PF_FROZEN) == 0 && \
-@@ -2996,6 +2993,51 @@ static inline int signal_pending_state(long state, struct task_struct *p)
+@@ -2998,6 +2995,51 @@ static inline int signal_pending_state(long state, struct task_struct *p)
  	return (state & TASK_INTERRUPTIBLE) || __fatal_signal_pending(p);
  }
  
@@ -157,5 +157,5 @@ index 7df7852..7b7a0d3 100644
  		task_rq_unlock(rq, p, &flags);
  
 -- 
-2.7.4
+1.9.1
 

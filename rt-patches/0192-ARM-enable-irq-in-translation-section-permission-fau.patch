@@ -1,7 +1,7 @@
-From 3824144acf875bfb0146231aecced0d258ab4546 Mon Sep 17 00:00:00 2001
+From c2f2bd4637127861680b9fa3085804bf7d95aadb Mon Sep 17 00:00:00 2001
 From: "Yadi.hu" <yadi.hu@windriver.com>
 Date: Wed, 10 Dec 2014 10:32:09 +0800
-Subject: [PATCH 192/365] ARM: enable irq in translation/section permission
+Subject: [PATCH 192/366] ARM: enable irq in translation/section permission
  fault handlers
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -59,7 +59,6 @@ need for other arch to have the siglock converted to raw lock, we can
 conclude that we should enable irq for ARM translation/section
 permission exception.
 
-
 Signed-off-by: Yadi.hu <yadi.hu@windriver.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
@@ -91,5 +90,5 @@ index 506c225..e3355a8 100644
  	return 0;
  }
 -- 
-2.7.4
+1.9.1
 

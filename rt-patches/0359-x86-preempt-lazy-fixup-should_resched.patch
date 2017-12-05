@@ -1,7 +1,7 @@
-From b112d6278e4c2abcdc60218e93c5bb6d2d65376d Mon Sep 17 00:00:00 2001
+From 87495fd5e4eae1f98aafeb38074489c503a6717f Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 14 Sep 2016 19:18:47 +0200
-Subject: [PATCH 359/365] x86/preempt-lazy: fixup should_resched()
+Subject: [PATCH 359/366] x86/preempt-lazy: fixup should_resched()
 
 should_resched() returns true if NEED_RESCHED is set and the
 preempt_count is 0 _or_ if NEED_RESCHED_LAZY is set ignoring the preempt
@@ -52,5 +52,5 @@ index 5dbd2d0..6f432ad 100644
  	return unlikely(raw_cpu_read_4(__preempt_count) == preempt_offset);
  #endif
 -- 
-2.7.4
+1.9.1
 

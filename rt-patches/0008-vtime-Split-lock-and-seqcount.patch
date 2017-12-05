@@ -1,7 +1,7 @@
-From e1a956b9249701fad7242c07a44a9d98c5ab0ec2 Mon Sep 17 00:00:00 2001
+From 0e41faf207be19859e82cedfff5fe6b9b507077e Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 23 Jul 2013 15:45:51 +0200
-Subject: [PATCH 008/365] vtime: Split lock and seqcount
+Subject: [PATCH 008/366] vtime: Split lock and seqcount
 
 Replace vtime_seqlock seqlock with a simple seqcounter and a rawlock
 so it can taken in atomic context on RT.
@@ -29,7 +29,7 @@ index 1c1ff7e..6b42f297 100644
  	.vtime_snap_whence = VTIME_SYS,
  #else
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 4d05a8d..539dbad 100644
+index 78db0ff..faadab9 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1533,7 +1533,8 @@ struct task_struct {
@@ -43,10 +43,10 @@ index 4d05a8d..539dbad 100644
  	enum {
  		VTIME_SLEEPING = 0,
 diff --git a/kernel/fork.c b/kernel/fork.c
-index 18a5cb1..e283178 100644
+index 7161ebe..f7cb034 100644
 --- a/kernel/fork.c
 +++ b/kernel/fork.c
-@@ -1371,7 +1371,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+@@ -1370,7 +1370,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
  	prev_cputime_init(&p->prev_cputime);
  
  #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
@@ -214,5 +214,5 @@ index a1aecbe..09c2e7a 100644
  
  
 -- 
-2.7.4
+1.9.1
 

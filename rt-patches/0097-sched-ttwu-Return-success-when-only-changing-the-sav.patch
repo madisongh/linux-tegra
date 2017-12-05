@@ -1,7 +1,7 @@
-From 60e41547635a19e8fa41486369329c5fca2ce989 Mon Sep 17 00:00:00 2001
+From face0c0e26f242a8a65ef2df4071eff5f580a4ed Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 13 Dec 2011 21:42:19 +0100
-Subject: [PATCH 097/365] sched: ttwu: Return success when only changing the
+Subject: [PATCH 097/366] sched: ttwu: Return success when only changing the
  saved_state value
 
 When a task blocks on a rt lock, it saves the current state in
@@ -36,5 +36,5 @@ index 78a96a3cb..0ea89e6 100644
  		goto out;
  	}
 -- 
-2.7.4
+1.9.1
 

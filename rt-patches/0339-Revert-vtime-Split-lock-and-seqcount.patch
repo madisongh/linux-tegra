@@ -1,7 +1,7 @@
-From 040bdbf6ee0d3044378de21a3db39c3b325bf352 Mon Sep 17 00:00:00 2001
+From b5b4f6e9727c4dd0332f5234d945d8c09a39af99 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 14 Apr 2016 14:42:55 +0200
-Subject: [PATCH 339/365] Revert "vtime: Split lock and seqcount"
+Subject: [PATCH 339/366] Revert "vtime: Split lock and seqcount"
 
 This reverts commit f9b9ebddb16501de52ac6384b012148996fde77f.
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -27,7 +27,7 @@ index d8ec0f2..c52f61d 100644
  	.vtime_snap_whence = VTIME_SYS,
  #else
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 79d8479..4beaa14 100644
+index 694761f..436edea 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1551,8 +1551,7 @@ struct task_struct {
@@ -41,10 +41,10 @@ index 79d8479..4beaa14 100644
  	enum {
  		VTIME_SLEEPING = 0,
 diff --git a/kernel/fork.c b/kernel/fork.c
-index 95cc913..72279e3 100644
+index 32de0eb..46d01b12 100644
 --- a/kernel/fork.c
 +++ b/kernel/fork.c
-@@ -1401,8 +1401,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+@@ -1400,8 +1400,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
  	prev_cputime_init(&p->prev_cputime);
  
  #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
@@ -212,5 +212,5 @@ index 09c2e7a..a1aecbe 100644
  
  
 -- 
-2.7.4
+1.9.1
 

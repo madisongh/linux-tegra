@@ -1,7 +1,7 @@
-From ba9528fd05d25f3a07bfea07a44fc11137cce234 Mon Sep 17 00:00:00 2001
+From fb89ad5e1cd60473b66554bc58e8c38cde6d6529 Mon Sep 17 00:00:00 2001
 From: Clark Williams <williams@redhat.com>
 Date: Fri, 26 Feb 2016 13:19:20 -0600
-Subject: [PATCH 306/365] rcu/torture: Comment out rcu_bh ops on
+Subject: [PATCH 306/366] rcu/torture: Comment out rcu_bh ops on
  PREEMPT_RT_FULL
 
 RT has dropped support of rcu_bh, comment out in rcutorture.
@@ -39,5 +39,5 @@ index d89328e..5bb3364 100644
   * Don't even think about trying any of these in real life!!!
   * The names includes "busted", and they really means it!
 -- 
-2.7.4
+1.9.1
 

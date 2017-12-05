@@ -1,7 +1,7 @@
-From d44cf607f4e764c22bb7c8ff464a4267a7c48173 Mon Sep 17 00:00:00 2001
+From 2a24ce15b54d031374d8469df10d5e1878196683 Mon Sep 17 00:00:00 2001
 From: Anders Roxell <anders.roxell@linaro.org>
 Date: Fri, 15 Jan 2016 20:21:12 +0100
-Subject: [PATCH 272/365] drivers/cpuidle: coupled: fix warning
+Subject: [PATCH 272/366] drivers/cpuidle: coupled: fix warning
  cpuidle_coupled_lock
 
 Used multi_v7_defconfig+PREEMPT_RT_FULL=y and this caused a compilation
@@ -28,5 +28,5 @@ index 344058f..d5657d5 100644
  
  /*
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From 96c79e57732815e2d9063eb43f299e4e7e839431 Mon Sep 17 00:00:00 2001
+From 3686244e5446419fc92bb4b2bc154f776f3d0acb Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Mon, 19 Aug 2013 17:33:25 -0400
-Subject: [PATCH 025/365] hwlat-detector: Update hwlat_detector to add outer
+Subject: [PATCH 025/366] hwlat-detector: Update hwlat_detector to add outer
  loop detection
 
 The hwlat_detector reads two timestamps in a row, then reports any
@@ -128,5 +128,5 @@ index 6864f3c..c07e859 100644
  
  	/* handling partial reads is more trouble than it's worth */
 -- 
-2.7.4
+1.9.1
 

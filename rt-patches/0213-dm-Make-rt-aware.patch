@@ -1,7 +1,7 @@
-From cc8e6f6eef22ec20d6f0e24f326ae07a1e445776 Mon Sep 17 00:00:00 2001
+From 0aeaa6f6ab349b92850f8413a8204e8513721bec Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 14 Nov 2011 23:06:09 +0100
-Subject: [PATCH 213/365] dm: Make rt aware
+Subject: [PATCH 213/366] dm: Make rt aware
 
 Use the BUG_ON_NORT variant for the irq_disabled() checks. RT has
 interrupts legitimately enabled here as we cant deadlock against the
@@ -28,5 +28,5 @@ index 3384a3e..170a3c2 100644
  
  	goto out;
 -- 
-2.7.4
+1.9.1
 

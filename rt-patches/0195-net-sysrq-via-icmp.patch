@@ -1,7 +1,7 @@
-From 8cf1be47623b41cae42c49c3395ac775a2f2e11f Mon Sep 17 00:00:00 2001
+From 0448f4e7b9daf6d126b8ea920d871cd4a03a7806 Mon Sep 17 00:00:00 2001
 From: Carsten Emde <C.Emde@osadl.org>
 Date: Tue, 19 Jul 2011 13:51:17 +0100
-Subject: [PATCH 195/365] net: sysrq via icmp
+Subject: [PATCH 195/366] net: sysrq via icmp
 
 There are (probably rare) situations when a system crashed and the system
 console becomes unresponsive but the network icmp layer still is alive.
@@ -55,7 +55,7 @@ index c68926b..dd0751e 100644
  	int sysctl_icmp_ratelimit;
  	int sysctl_icmp_ratemask;
 diff --git a/net/ipv4/icmp.c b/net/ipv4/icmp.c
-index 36e2697..74314d9 100644
+index ef2d432..288d20f 100644
 --- a/net/ipv4/icmp.c
 +++ b/net/ipv4/icmp.c
 @@ -69,6 +69,7 @@
@@ -66,7 +66,7 @@ index 36e2697..74314d9 100644
  #include <linux/socket.h>
  #include <linux/in.h>
  #include <linux/inet.h>
-@@ -891,6 +892,30 @@ static bool icmp_redirect(struct sk_buff *skb)
+@@ -893,6 +894,30 @@ static bool icmp_redirect(struct sk_buff *skb)
  }
  
  /*
@@ -97,7 +97,7 @@ index 36e2697..74314d9 100644
   *	Handle ICMP_ECHO ("ping") requests.
   *
   *	RFC 1122: 3.2.2.6 MUST have an echo server that answers ICMP echo
-@@ -917,6 +942,11 @@ static bool icmp_echo(struct sk_buff *skb)
+@@ -919,6 +944,11 @@ static bool icmp_echo(struct sk_buff *skb)
  		icmp_param.data_len	   = skb->len;
  		icmp_param.head_len	   = sizeof(struct icmphdr);
  		icmp_reply(&icmp_param, skb);
@@ -128,5 +128,5 @@ index 4612336..123ffd6 100644
  		.data		= &init_net.ipv4.sysctl_icmp_ignore_bogus_error_responses,
  		.maxlen		= sizeof(int),
 -- 
-2.7.4
+1.9.1
 

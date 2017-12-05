@@ -1,7 +1,7 @@
-From 4cfd1d55ab0510be5618d297ef5d68750c96f490 Mon Sep 17 00:00:00 2001
+From 2931bfc8dc735944ee4b76ab83f2c181c0673fa8 Mon Sep 17 00:00:00 2001
 From: Josh Cartwright <joshc@ni.com>
 Date: Tue, 27 Oct 2015 07:31:53 -0500
-Subject: [PATCH 179/365] net: Make synchronize_rcu_expedited() conditional on
+Subject: [PATCH 179/366] net: Make synchronize_rcu_expedited() conditional on
  !RT_FULL
 
 While the use of synchronize_rcu_expedited() might make
@@ -38,5 +38,5 @@ index bfbf0b6..071f0b1 100644
  	else
  		synchronize_rcu();
 -- 
-2.7.4
+1.9.1
 

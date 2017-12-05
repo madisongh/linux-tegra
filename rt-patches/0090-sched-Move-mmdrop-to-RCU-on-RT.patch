@@ -1,7 +1,7 @@
-From 6f2acbe9cf1d07e0b5b78f4cab1180cb2b139df3 Mon Sep 17 00:00:00 2001
+From bc7750635ce03638e9d8d21c0d1113030cf80f83 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 6 Jun 2011 12:20:33 +0200
-Subject: [PATCH 090/365] sched: Move mmdrop to RCU on RT
+Subject: [PATCH 090/366] sched: Move mmdrop to RCU on RT
 
 Takes sleeping locks and calls into the memory allocator, so nothing
 we want to do in task switch and oder atomic contexts.
@@ -37,10 +37,10 @@ index 0a732c5..3c59106 100644
  	/* address of the bounds directory */
  	void __user *bd_addr;
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 8f75cbb..5925cc4 100644
+index f75df33..ac88fc9 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
-@@ -2618,12 +2618,24 @@ extern struct mm_struct * mm_alloc(void);
+@@ -2620,12 +2620,24 @@ extern struct mm_struct * mm_alloc(void);
  
  /* mmdrop drops the mm and the page tables */
  extern void __mmdrop(struct mm_struct *);
@@ -66,7 +66,7 @@ index 8f75cbb..5925cc4 100644
  extern void mmput(struct mm_struct *);
  /* Grab a reference to a task's mm, if it is not already going away */
 diff --git a/kernel/fork.c b/kernel/fork.c
-index a94dde7..ad52eda 100644
+index 39cf90f..ad48c19 100644
 --- a/kernel/fork.c
 +++ b/kernel/fork.c
 @@ -702,6 +702,19 @@ void __mmdrop(struct mm_struct *mm)
@@ -141,5 +141,5 @@ index 9b5ddd8..c0e6f2b 100644
  #endif
  	}
 -- 
-2.7.4
+1.9.1
 

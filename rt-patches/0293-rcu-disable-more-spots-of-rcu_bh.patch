@@ -1,7 +1,7 @@
-From 2bf3ddd5933719827f141b8861b8357e14de51cf Mon Sep 17 00:00:00 2001
+From 128aad8c9fc78095b765db7bc0ccf8d088195f2e Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 10 Feb 2016 18:30:56 +0100
-Subject: [PATCH 293/365] rcu: disable more spots of rcu_bh
+Subject: [PATCH 293/366] rcu: disable more spots of rcu_bh
 
 We don't use ru_bh on -RT but we still fork a thread for it and keep it
 as a flavour. No more.
@@ -67,5 +67,5 @@ index 588509d..2ba8f6c 100644
  #ifdef CONFIG_PREEMPT_RCU
  extern struct rcu_state rcu_preempt_state;
 -- 
-2.7.4
+1.9.1
 

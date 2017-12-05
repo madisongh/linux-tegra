@@ -1,7 +1,7 @@
-From f14bd58c75c4adfb34c96e0397959ec6cebacb26 Mon Sep 17 00:00:00 2001
+From ba14264501ba98167247a4ae81d2effcef5108c8 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <efault@gmx.de>
 Date: Fri, 3 Jul 2009 08:44:12 -0500
-Subject: [PATCH 148/365] fs: ntfs: disable interrupt only on !RT
+Subject: [PATCH 148/366] fs: ntfs: disable interrupt only on !RT
 
 On Sat, 2007-10-27 at 11:44 +0200, Ingo Molnar wrote:
 > * Nick Piggin <nickpiggin@yahoo.com.au> wrote:
@@ -60,5 +60,5 @@ index 39b08f5..f0de4b6 100644
  		if (likely(page_uptodate && !PageError(page)))
  			SetPageUptodate(page);
 -- 
-2.7.4
+1.9.1
 

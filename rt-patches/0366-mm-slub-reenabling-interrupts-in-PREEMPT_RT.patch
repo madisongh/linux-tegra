@@ -1,7 +1,7 @@
-From bb4b5d15f627158edcfca2c6e0dc31d373dce1d6 Mon Sep 17 00:00:00 2001
+From f513b3f0e5b4423278de1e5541377f2f55165d93 Mon Sep 17 00:00:00 2001
 From: dmitry pervushin <dpervushin@nvidia.com>
 Date: Thu, 17 Nov 2016 13:39:25 +0100
-Subject: [PATCH] mm: slub: reenabling interrupts in PREEMPT_RT
+Subject: [PATCH 366/366] mm: slub: reenabling interrupts in PREEMPT_RT
 
 If we are past SYSTEM_BOOTING_SINGLECORE, we have smp fully
 initialized and should allow our spinlocks to sleep
@@ -16,11 +16,11 @@ Reviewed-by: Sumeet Gupta <sumeetg@nvidia.com>
  mm/slub.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Index: kernel-4.4/mm/slub.c
-===================================================================
---- kernel-4.4.orig/mm/slub.c
-+++ kernel-4.4/mm/slub.c
-@@ -1412,7 +1412,7 @@ static struct page *allocate_slab(struct
+diff --git a/mm/slub.c b/mm/slub.c
+index feb4a44..aefc0c4 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -1412,7 +1412,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
  	if (gfpflags_allow_blocking(flags))
  		enableirqs = true;
  #ifdef CONFIG_PREEMPT_RT_FULL
@@ -29,3 +29,6 @@ Index: kernel-4.4/mm/slub.c
  		enableirqs = true;
  #endif
  	if (enableirqs)
+-- 
+1.9.1
+

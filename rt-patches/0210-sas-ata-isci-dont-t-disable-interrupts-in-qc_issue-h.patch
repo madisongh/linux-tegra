@@ -1,7 +1,7 @@
-From cd4a98c53da0bf917e05fc9a27d52ed5f16e9cad Mon Sep 17 00:00:00 2001
+From 18aed6dbadf5116ca7f124d5b6514d367245352a Mon Sep 17 00:00:00 2001
 From: Paul Gortmaker <paul.gortmaker@windriver.com>
 Date: Sat, 14 Feb 2015 11:01:16 -0500
-Subject: [PATCH 210/365] sas-ata/isci: dont't disable interrupts in qc_issue
+Subject: [PATCH 210/366] sas-ata/isci: dont't disable interrupts in qc_issue
  handler
 
 On 3.14-rt we see the following trace on Canoe Pass for
@@ -51,7 +51,6 @@ the task_state_lock -- which is clearly not a candidate for raw lock
 conversion.  As can be seen by the comment nearby, we really should
 be running the qc_issue code with interrupts enabled anyway.
 
-
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
@@ -81,5 +80,5 @@ index 9c706d8..d968ffc 100644
  }
  
 -- 
-2.7.4
+1.9.1
 

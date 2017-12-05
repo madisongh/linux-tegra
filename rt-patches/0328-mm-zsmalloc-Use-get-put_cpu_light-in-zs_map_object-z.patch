@@ -1,7 +1,7 @@
-From fab1335953d7066885671a18113ed09c253dae93 Mon Sep 17 00:00:00 2001
+From f3ee849447d4b99a35cb3162e393bd055beea5d2 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Tue, 22 Mar 2016 11:16:09 +0100
-Subject: [PATCH 328/365] mm/zsmalloc: Use get/put_cpu_light in
+Subject: [PATCH 328/366] mm/zsmalloc: Use get/put_cpu_light in
  zs_map_object()/zs_unmap_object()
 
 Otherwise, we get a ___might_sleep() splat.
@@ -35,5 +35,5 @@ index c1ea194..b552fd6 100644
  }
  EXPORT_SYMBOL_GPL(zs_unmap_object);
 -- 
-2.7.4
+1.9.1
 

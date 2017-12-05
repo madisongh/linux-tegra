@@ -1,7 +1,7 @@
-From 51c27a3546fa6a81fb42052257a90fc780ad433c Mon Sep 17 00:00:00 2001
+From 93b917d06bf5a8fe7283b7fffacff5518e776caf Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 11 Feb 2016 22:06:28 +0100
-Subject: [PATCH 307/365] kernel: sched: Fix preempt_disable_ip recodring for
+Subject: [PATCH 307/366] kernel: sched: Fix preempt_disable_ip recodring for
  preempt_disable()
 
 preempt_disable() invokes preempt_count_add() which saves the caller in
@@ -47,7 +47,7 @@ index 60048c5..f2cd676 100644
    extern void time_hardirqs_on(unsigned long a0, unsigned long a1);
    extern void time_hardirqs_off(unsigned long a0, unsigned long a1);
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index a6a8709..79d8479 100644
+index c01d46f..694761f 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -183,8 +183,6 @@ extern void update_cpu_load_nohz(void);
@@ -115,5 +115,5 @@ index 2ca63cc..cb9c1d5 100644
  }
  EXPORT_SYMBOL(__local_bh_disable_ip);
 -- 
-2.7.4
+1.9.1
 

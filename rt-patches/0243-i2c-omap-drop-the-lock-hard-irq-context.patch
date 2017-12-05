@@ -1,7 +1,7 @@
-From cd14c971e89a7e40f869a082ae1423ec8d9fc1d8 Mon Sep 17 00:00:00 2001
+From 3d3633b39814f19a0c8a16b315a31f4b98782c83 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 21 Mar 2013 11:35:49 +0100
-Subject: [PATCH 243/365] i2c/omap: drop the lock hard irq context
+Subject: [PATCH 243/366] i2c/omap: drop the lock hard irq context
 
 The lock is taken while reading two registers. On RT the first lock is
 taken in hard irq where it might sleep and in the threaded irq.
@@ -35,5 +35,5 @@ index 08d26ba..46b89dd 100644
  }
  
 -- 
-2.7.4
+1.9.1
 

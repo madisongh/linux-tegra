@@ -1,7 +1,7 @@
-From 4789b813219072837fbd3aece25720aabac1aaba Mon Sep 17 00:00:00 2001
+From f14c9bf89b1ea5e50bc7da05b26885e060f311cb Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Mon, 17 Feb 2014 17:30:03 +0100
-Subject: [PATCH 149/365] fs: jbd2: pull your plug when waiting for space
+Subject: [PATCH 149/366] fs: jbd2: pull your plug when waiting for space
 
 Two cps in parallel managed to stall the the ext4 fs. It seems that
 journal code is either waiting for locks or sleeping waiting for
@@ -12,7 +12,6 @@ here is his description:
 |up on journal locks without unplugging, which can lead to
 |terminal IO starvation.  Unplug and schedule when waiting
 |for space.
-
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
@@ -33,5 +32,5 @@ index 684996c..6e18a06 100644
  
  		/*
 -- 
-2.7.4
+1.9.1
 

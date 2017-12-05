@@ -1,7 +1,7 @@
-From 056508405e548cf4cc754f9b23a4c86c4e598315 Mon Sep 17 00:00:00 2001
+From eb88e563343df07b877bad6d9a9d0aaca5f4cf97 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 26 Jul 2009 19:39:56 +0200
-Subject: [PATCH 124/365] rt: Add the preempt-rt lock replacement APIs
+Subject: [PATCH 124/366] rt: Add the preempt-rt lock replacement APIs
 
 Map spinlocks, rwlocks, rw_semaphores and semaphores to the rt_mutex
 based locking functions for preempt-rt.
@@ -42,7 +42,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  create mode 100644 kernel/locking/rt.c
 
 diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-index 88b819e..bebc293 100644
+index 3209242..7d8a0b7 100644
 --- a/include/linux/kernel.h
 +++ b/include/linux/kernel.h
 @@ -188,6 +188,9 @@ extern int _cond_resched(void);
@@ -456,7 +456,7 @@ index 8f498cd..2b21484 100644
  #endif /* _LINUX_RWSEM_H */
 diff --git a/include/linux/rwsem_rt.h b/include/linux/rwsem_rt.h
 new file mode 100644
-index 0000000..f97860b
+index 0000000..f97860b2
 --- /dev/null
 +++ b/include/linux/rwsem_rt.h
 @@ -0,0 +1,152 @@
@@ -613,7 +613,7 @@ index 0000000..f97860b
 +#endif
 +#endif
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index eb695cb..9b78143 100644
+index bb64acc..b7657cd 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -312,6 +312,11 @@ extern char ___assert_task_state[1 - 2*!!(
@@ -2231,5 +2231,5 @@ index 3fa109f..7df7852 100644
  	}
  }
 -- 
-2.7.4
+1.9.1
 

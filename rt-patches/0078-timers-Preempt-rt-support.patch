@@ -1,7 +1,7 @@
-From eb2ec61333b4d76c1a3b32d2f57d661b8242655c Mon Sep 17 00:00:00 2001
+From 547c25f2c511e983f02b8bf14c82caeb6b2ab91f Mon Sep 17 00:00:00 2001
 From: Ingo Molnar <mingo@elte.hu>
 Date: Fri, 3 Jul 2009 08:30:20 -0500
-Subject: [PATCH 078/365] timers: Preempt-rt support
+Subject: [PATCH 078/366] timers: Preempt-rt support
 
 The base->lock is a sleeping lock. Try not to workaround with a
 spin_trylock(). The rt-mutex lock is not irq save even the try-lock
@@ -56,5 +56,5 @@ index 5fa215e..2230419 100644
  
  static int timer_cpu_notify(struct notifier_block *self,
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From 65d27640fad1fa05a0c6753d3dd91a6ea30576e6 Mon Sep 17 00:00:00 2001
+From 50e1b717b6da4dcc0de01c3771e97d1545901994 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 31 Jul 2013 19:00:35 +0200
-Subject: [PATCH 142/365] rcu: use simple waitqueues
+Subject: [PATCH 142/366] rcu: use simple waitqueues
 
 Convert RCU's wait-queues into simple waitqueues.
 
@@ -218,5 +218,5 @@ index 019a1eb5..86af123 100644
  }
  
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From 6f8590f3836c5bddceab874c06be09bf1e737bf7 Mon Sep 17 00:00:00 2001
+From a784fdb4a502f7dce3931fffea28e263d7e8e7a8 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 22 Jan 2016 21:42:32 +0100
-Subject: [PATCH 279/365] RCU: make RCU_EXPERT y on RT
+Subject: [PATCH 279/366] RCU: make RCU_EXPERT y on RT
 
 because we want RCU_BOOST y on RT
 
@@ -24,5 +24,5 @@ index 59d1fa8..7afc0e2 100644
  	  This option needs to be enabled if you wish to make
  	  expert-level adjustments to RCU configuration.  By default,
 -- 
-2.7.4
+1.9.1
 

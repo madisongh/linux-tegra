@@ -1,7 +1,7 @@
-From ba23e3f46d1112276bb606a1087e5a1fe6e00e28 Mon Sep 17 00:00:00 2001
+From b104cc5d7d6d2082bc0dc9795b289187d878715a Mon Sep 17 00:00:00 2001
 From: Peter Zijlstra <peterz@infradead.org>
 Date: Thu, 28 Jul 2011 10:43:51 +0200
-Subject: [PATCH 200/365] mm, rt: kmap_atomic scheduling
+Subject: [PATCH 200/366] mm, rt: kmap_atomic scheduling
 
 In fact, with migrate_disable() existing one could play games with
 kmap_atomic. You could save/restore the kmap_atomic slots on context
@@ -229,7 +229,7 @@ index b76e9cc..396d5c4 100644
  }
  
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index d144d8c..c2c6b05 100644
+index 2b59b02..e980cf1 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -26,6 +26,7 @@ struct sched_param {
@@ -302,5 +302,5 @@ index 123bcd3..16e8cf2 100644
  unsigned int nr_free_highpages (void)
  {
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From 1b88df6066276e31ba54ecb555cb4642bf8dba6c Mon Sep 17 00:00:00 2001
+From bb71401952d67b397e3c07ffae8c9042896167a6 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 1 Apr 2016 11:47:54 +0200
-Subject: [PATCH 330/365] completion: filter out suspend
+Subject: [PATCH 330/366] completion: filter out suspend
 
 Clark Williams that he saw a few backtraces while comming out of
 suspend. So for now we filter suspends out.
@@ -116,5 +116,5 @@ index 8459561..205fe36 100644
  EXPORT_SYMBOL(swake_up_all_locked);
  
 -- 
-2.7.4
+1.9.1
 

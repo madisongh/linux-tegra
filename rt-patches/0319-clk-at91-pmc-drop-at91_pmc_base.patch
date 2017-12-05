@@ -1,7 +1,7 @@
-From 073811484a17cef51e89c3308722f8e1f7dc27f2 Mon Sep 17 00:00:00 2001
+From 642ab5d971cb97a8d991d4e99263a287a2b547cb Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 13:02:01 +0200
-Subject: [PATCH 319/365] clk: at91: pmc: drop at91_pmc_base
+Subject: [PATCH 319/366] clk: at91: pmc: drop at91_pmc_base
 
 at91_pmc_base is not used anymore, remove it along with at91_pmc_read and
 at91_pmc_write.
@@ -73,5 +73,5 @@ index 1e69322..17f413b 100644
  #define	AT91_PMC_SCDR		0x04			/* System Clock Disable Register */
  
 -- 
-2.7.4
+1.9.1
 

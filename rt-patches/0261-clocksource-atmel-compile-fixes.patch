@@ -1,7 +1,7 @@
-From 3a3c93fa18d67a715ffd382e05560e522984fc9f Mon Sep 17 00:00:00 2001
+From 06a5d31199ba4b992bcd46651850f3b82284388f Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:54:36 +0100
-Subject: [PATCH 261/365] clocksource: atmel: compile fixes
+Subject: [PATCH 261/366] clocksource: atmel: compile fixes
 
 Reported-by: kernel test robot <ying.huang@linux.intel.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -60,5 +60,5 @@ index ea37afc..103d0fd 100644
  
  	sclk = of_clk_get(node, 0);
 -- 
-2.7.4
+1.9.1
 

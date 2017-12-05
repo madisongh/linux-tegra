@@ -1,7 +1,7 @@
-From 3146b806c5ee8102030cac61d2066756d444711f Mon Sep 17 00:00:00 2001
+From cc0d9d729e7c51fc9c57a0f1a370eb1885fe7e7f Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 27 Jan 2016 14:59:47 +0100
-Subject: [PATCH 312/365] clk: at91: pmc: merge at91_pmc_init in
+Subject: [PATCH 312/366] clk: at91: pmc: merge at91_pmc_init in
  atmel_pmc_probe
 
 at91_pmc_init() doesn't do much anymore, merge it in atmel_pmc_probe().
@@ -73,5 +73,5 @@ index f17a2a1..01d049d 100644
  
  static void __init of_at91rm9200_pmc_setup(struct device_node *np)
 -- 
-2.7.4
+1.9.1
 

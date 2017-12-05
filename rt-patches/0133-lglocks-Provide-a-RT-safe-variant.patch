@@ -1,7 +1,7 @@
-From 483a43fc7727c1f807d519e01d38078c406ce892 Mon Sep 17 00:00:00 2001
+From 9ee083e19db72f87810c868fa75a75d207b12893 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 15 Jun 2011 11:02:21 +0200
-Subject: [PATCH 133/365] lglocks: Provide a RT safe variant
+Subject: [PATCH 133/366] lglocks: Provide a RT safe variant
 
 lglocks by itself will spin in order to get the lock. This will end up
 badly if a task with the highest priority keeps spinning while a task
@@ -203,5 +203,5 @@ index 951cfcd..390dfc1 100644
  }
  EXPORT_SYMBOL(lg_global_unlock);
 -- 
-2.7.4
+1.9.1
 

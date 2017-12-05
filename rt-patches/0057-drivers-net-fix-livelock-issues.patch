@@ -1,7 +1,7 @@
-From 74e16de3e8f838bd1f2e7a22ee0e6bd64d5df2a0 Mon Sep 17 00:00:00 2001
+From f8b66c5abc2a659e64cee4a28b1fd3452663f977 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sat, 20 Jun 2009 11:36:54 +0200
-Subject: [PATCH 057/365] drivers/net: fix livelock issues
+Subject: [PATCH 057/366] drivers/net: fix livelock issues
 
 Preempt-RT runs into a live lock issue with the NETDEV_TX_LOCKED micro
 optimization. The reason is that the softirq thread is rescheduling
@@ -139,5 +139,5 @@ index e7034c5..2e4ee0f 100644
  	if (is_multicast_ether_addr(eth->h_dest))
  		add_num = nets[rnet->mport->id].nact;
 -- 
-2.7.4
+1.9.1
 

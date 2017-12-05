@@ -1,7 +1,7 @@
-From c6448a68c2c14a76890ecc74a2d4096691311ecc Mon Sep 17 00:00:00 2001
+From ba2508d435e61cbcd5af0b6f5178d0d1ea5915ff Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 11 Jan 2013 11:23:51 +0100
-Subject: [PATCH 143/365] completion: Use simple wait queues
+Subject: [PATCH 143/366] completion: Use simple wait queues
 
 Completions have no long lasting callbacks and therefor do not need
 the complex waitqueue variant. Use simple waitqueues which reduces the
@@ -238,5 +238,5 @@ index 7b7a0d3..061effa 100644
  	WARN_ON_ONCE(p->migrate_disable <= 0);
  
 -- 
-2.7.4
+1.9.1
 

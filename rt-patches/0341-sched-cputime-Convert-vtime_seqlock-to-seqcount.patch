@@ -1,7 +1,7 @@
-From d26d30faf55309b29d4d25597a88dd431b2c3c00 Mon Sep 17 00:00:00 2001
+From 8bedc8143487eeaaa68ec330562695cb0c9af5f5 Mon Sep 17 00:00:00 2001
 From: Frederic Weisbecker <fweisbec@gmail.com>
 Date: Thu, 19 Nov 2015 16:47:34 +0100
-Subject: [PATCH 341/365] sched/cputime: Convert vtime_seqlock to seqcount
+Subject: [PATCH 341/366] sched/cputime: Convert vtime_seqlock to seqcount
 
 The cputime can only be updated by the current task itself, even in
 vtime case. So we can safely use seqcount instead of seqlock as there
@@ -47,7 +47,7 @@ index c52f61d..60fadde 100644
  	.vtime_snap_whence = VTIME_SYS,
  #else
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index bc11cd8..8a303e4 100644
+index 9891e23..bef5058 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1551,7 +1551,7 @@ struct task_struct {
@@ -60,10 +60,10 @@ index bc11cd8..8a303e4 100644
  	enum {
  		/* Task is sleeping or running in a CPU with VTIME inactive */
 diff --git a/kernel/fork.c b/kernel/fork.c
-index cdc3a16..3d9c03e 100644
+index 5bc0004..3b88031 100644
 --- a/kernel/fork.c
 +++ b/kernel/fork.c
-@@ -1401,7 +1401,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+@@ -1400,7 +1400,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
  	prev_cputime_init(&p->prev_cputime);
  
  #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
@@ -214,5 +214,5 @@ index ac7559b..558b98a 100644
  
  
 -- 
-2.7.4
+1.9.1
 

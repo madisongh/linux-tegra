@@ -1,7 +1,7 @@
-From ef1f6aefe0092421cdc9160bae424bf75d20ee9f Mon Sep 17 00:00:00 2001
+From ba84e5d2ef9e5368791183b0984f4d381f3ccefc Mon Sep 17 00:00:00 2001
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 Date: Fri, 15 Jan 2016 16:20:47 +0200
-Subject: [PATCH 270/365] ARM: highmem: take into account FIX_KMAP_BEGIN in
+Subject: [PATCH 270/366] ARM: highmem: take into account FIX_KMAP_BEGIN in
  switch_kmaps()
 
 Now the random crashes are observed on ARM TI am437x-idk-evm used with
@@ -86,5 +86,5 @@ index deabc36..542692d 100644
  		if (!pte_none(next_p->kmap_pte[i]))
  			set_fixmap_pte(idx, next_p->kmap_pte[i]);
 -- 
-2.7.4
+1.9.1
 

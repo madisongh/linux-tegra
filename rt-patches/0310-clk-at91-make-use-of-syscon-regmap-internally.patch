@@ -1,7 +1,7 @@
-From ad2fa591f4ad7ab40e8d7ba2462c6b6e18e96389 Mon Sep 17 00:00:00 2001
+From 10d8c4b6744e5115ffb9830ee00d80d85546efba Mon Sep 17 00:00:00 2001
 From: Boris Brezillon <boris.brezillon@free-electrons.com>
 Date: Sun, 7 Sep 2014 08:14:29 +0200
-Subject: [PATCH 310/365] clk: at91: make use of syscon/regmap internally
+Subject: [PATCH 310/366] clk: at91: make use of syscon/regmap internally
 
 Use the regmap coming from syscon to access the registers instead of using
 pmc_read/pmc_write. This allows to avoid passing the at91_pmc structure to
@@ -3283,5 +3283,5 @@ index e1fc0b0..e160cb6 100644
 -
  #endif /* __PMC_H_ */
 -- 
-2.7.4
+1.9.1
 

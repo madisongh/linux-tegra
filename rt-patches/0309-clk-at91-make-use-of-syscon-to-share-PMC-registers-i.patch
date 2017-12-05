@@ -1,7 +1,7 @@
-From fb2cc33e70b04f76862db24ef0a14a2c46cdb7a6 Mon Sep 17 00:00:00 2001
+From abd21e80bef2e4177631ae1c91b60f673be0864d Mon Sep 17 00:00:00 2001
 From: Boris Brezillon <boris.brezillon@free-electrons.com>
 Date: Fri, 5 Sep 2014 09:54:13 +0200
-Subject: [PATCH 309/365] clk: at91: make use of syscon to share PMC registers
+Subject: [PATCH 309/366] clk: at91: make use of syscon to share PMC registers
  in several drivers
 
 The PMC block is providing several functionnalities:
@@ -127,5 +127,5 @@ index f657392..e1fc0b0 100644
  
  int of_at91_get_clk_range(struct device_node *np, const char *propname,
 -- 
-2.7.4
+1.9.1
 

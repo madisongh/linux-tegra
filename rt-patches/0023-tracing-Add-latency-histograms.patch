@@ -1,7 +1,7 @@
-From 38c420b169f0c1c4e472eab8d6f4b05e3f70c7b9 Mon Sep 17 00:00:00 2001
+From 0d5f5a9947a40c34d3e14ac222b8b52d08f25abb Mon Sep 17 00:00:00 2001
 From: Carsten Emde <C.Emde@osadl.org>
 Date: Tue, 19 Jul 2011 14:03:41 +0100
-Subject: [PATCH 023/365] tracing: Add latency histograms
+Subject: [PATCH 023/366] tracing: Add latency histograms
 
 This patch provides a recording mechanism to store data of potential
 sources of system latencies. The recordings separately determine the
@@ -236,7 +236,7 @@ index 2ead22d..4a2e499 100644
  #ifdef CONFIG_TIMER_STATS
  	int				start_pid;
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 8e13996..248a54e 100644
+index 114cbfa..722b5ff 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1808,6 +1808,12 @@ struct task_struct {
@@ -420,7 +420,7 @@ index 17f7bcf..f55424b 100644
   * High resolution timer interrupt
   * Called with interrupts disabled
 diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-index 5f5b66a..12d07eb 100644
+index 236df5a..6449b9c 100644
 --- a/kernel/trace/Kconfig
 +++ b/kernel/trace/Kconfig
 @@ -190,6 +190,24 @@ config IRQSOFF_TRACER
@@ -1835,5 +1835,5 @@ index be3222b..5c3fcb7 100644
  		start_critical_timing(a0, a1);
  }
 -- 
-2.7.4
+1.9.1
 

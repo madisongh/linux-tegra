@@ -1,7 +1,7 @@
-From 6de82414e10f5a7045655094f38e99b6f9dee7d2 Mon Sep 17 00:00:00 2001
+From add95070e5a4c70fb96fb7927a020341084eac4d Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 24 May 2016 12:56:38 +0200
-Subject: [PATCH 346/365] arm: lazy preempt: correct resched condition
+Subject: [PATCH 346/366] arm: lazy preempt: correct resched condition
 
 If we get out of preempt_schedule_irq() then we check for NEED_RESCHED
 and call the former function again if set because the preemption counter
@@ -33,5 +33,5 @@ index d66b1ae..d044cea 100644
  
  __und_fault:
 -- 
-2.7.4
+1.9.1
 

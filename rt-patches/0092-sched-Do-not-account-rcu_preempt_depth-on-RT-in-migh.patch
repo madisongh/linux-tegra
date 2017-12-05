@@ -1,7 +1,7 @@
-From be9e509c805e12fe63e89bc456e856aa0eab8f7a Mon Sep 17 00:00:00 2001
+From 640d3c4bca903f508d061e33007e227302578695 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 7 Jun 2011 09:19:06 +0200
-Subject: [PATCH 092/365] sched: Do not account rcu_preempt_depth on RT in
+Subject: [PATCH 092/366] sched: Do not account rcu_preempt_depth on RT in
  might_sleep()
 
 RT changes the rcu_preempt_depth semantics, so we cannot check for it
@@ -52,5 +52,5 @@ index e6b63f0..ebd392e 100644
  	return (nested == preempt_offset);
  }
 -- 
-2.7.4
+1.9.1
 

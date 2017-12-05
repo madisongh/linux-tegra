@@ -1,7 +1,7 @@
-From 898d30debf347d6582d4ed273868f3888236dc96 Mon Sep 17 00:00:00 2001
+From 20df50661937c685b6f35f860fcc2e325aee4cfa Mon Sep 17 00:00:00 2001
 From: Juerg Haefliger <juerg.haefliger@hpe.com>
 Date: Thu, 1 Sep 2016 10:57:14 +0200
-Subject: [PATCH 351/365] hyperv: Fix compilation issue with 4.4.19-rt27
+Subject: [PATCH 351/366] hyperv: Fix compilation issue with 4.4.19-rt27
 
 Fix a compilation issue introduced by upstream commit
 4b44f2d18a330565227a7348844493c59366171e
@@ -38,5 +38,5 @@ index 509ed97..b2498b2 100644
  
  
 -- 
-2.7.4
+1.9.1
 

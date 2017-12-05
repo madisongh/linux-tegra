@@ -1,7 +1,7 @@
-From 7ccf32eb6cb0f7a1b5fb47b48f67346bbda5d876 Mon Sep 17 00:00:00 2001
+From 2d2ba86cd9d8bbcc50aee099bf50c407abbe8c0a Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 24 Jul 2011 12:11:43 +0200
-Subject: [PATCH 032/365] kconfig: Disable config options which are not RT
+Subject: [PATCH 032/366] kconfig: Disable config options which are not RT
  compatible
 
 Disable stuff which is known to have issues on RT
@@ -13,7 +13,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  2 files changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/Kconfig b/arch/Kconfig
-index 31a318a..186fc15 100644
+index 0f34639..dc129ab 100644
 --- a/arch/Kconfig
 +++ b/arch/Kconfig
 @@ -9,6 +9,7 @@ config OPROFILE
@@ -38,5 +38,5 @@ index be355e2..d42d6ed 100644
  	help
  	  Transparent Hugepages allows the kernel to use huge pages and
 -- 
-2.7.4
+1.9.1
 

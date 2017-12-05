@@ -1,7 +1,7 @@
-From d1018ba2dc303d0d6015603fdd6d4575d6c0af1c Mon Sep 17 00:00:00 2001
+From cf009bfca549fdada82df1e5db7664951498efb7 Mon Sep 17 00:00:00 2001
 From: Peter Zijlstra <peterz@infradead.org>
 Date: Fri, 3 Jul 2009 08:44:37 -0500
-Subject: [PATCH 060/365] mm: page_alloc: Reduce lock sections further
+Subject: [PATCH 060/366] mm: page_alloc: Reduce lock sections further
 
 Split out the pages which are to be freed into a separate list and
 call free_pages_bulk() outside of the percpu page allocator locks.
@@ -13,7 +13,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 63 insertions(+), 26 deletions(-)
 
 diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 8e791ee..b0ce3ab 100644
+index a2a6b82..0569b33 100644
 --- a/mm/page_alloc.c
 +++ b/mm/page_alloc.c
 @@ -811,7 +811,7 @@ static inline int free_pages_check(struct page *page)
@@ -199,5 +199,5 @@ index 8e791ee..b0ce3ab 100644
  
  out:
 -- 
-2.7.4
+1.9.1
 

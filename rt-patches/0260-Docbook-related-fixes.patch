@@ -1,7 +1,7 @@
-From 49c6b01c2f54c8281d6a6be627cf49b426f87954 Mon Sep 17 00:00:00 2001
+From b2e745ea0d034103931fff1da51ec76f6f1d0b47 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:49:11 +0100
-Subject: [PATCH 260/365] Docbook related fixes
+Subject: [PATCH 260/366] Docbook related fixes
 
 Reported-by: kernel test robot <ying.huang@linux.intel.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -45,5 +45,5 @@ index 47d38a0..79a9622 100644
   *			called in process context.
   * @release:		Function to be called on release.  This will be
 -- 
-2.7.4
+1.9.1
 

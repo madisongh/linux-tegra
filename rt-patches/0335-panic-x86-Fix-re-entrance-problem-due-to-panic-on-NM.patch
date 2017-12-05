@@ -1,7 +1,7 @@
-From b895f372d8c2c744b8fbd8a6d973e98c09da0ef3 Mon Sep 17 00:00:00 2001
+From cc5ec3c5b53849556efab10b11456ae62fda8382 Mon Sep 17 00:00:00 2001
 From: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
 Date: Mon, 14 Dec 2015 11:19:09 +0100
-Subject: [PATCH 335/365] panic, x86: Fix re-entrance problem due to panic on
+Subject: [PATCH 335/366] panic, x86: Fix re-entrance problem due to panic on
  NMI
 
 If panic on NMI happens just after panic() on the same CPU, panic() is
@@ -102,7 +102,7 @@ index 697f90d..fca8793 100644
  	pr_emerg("Dazed and confused, but trying to continue\n");
  }
 diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-index bebc293..5252478 100644
+index 7d8a0b7..d199f2c 100644
 --- a/include/linux/kernel.h
 +++ b/include/linux/kernel.h
 @@ -452,6 +452,26 @@ extern int sysctl_panic_on_stackoverflow;
@@ -133,10 +133,10 @@ index bebc293..5252478 100644
   * CONFIG_PANIC_TIMEOUT, honor it.
   */
 diff --git a/kernel/panic.c b/kernel/panic.c
-index f9badcf..7149838 100644
+index 63e4e16..80fcb84 100644
 --- a/kernel/panic.c
 +++ b/kernel/panic.c
-@@ -64,6 +64,8 @@ void __weak panic_smp_self_stop(void)
+@@ -65,6 +65,8 @@ void __weak panic_smp_self_stop(void)
  		cpu_relax();
  }
  
@@ -145,7 +145,7 @@ index f9badcf..7149838 100644
  /**
   *	panic - halt the system
   *	@fmt: The text string to print
-@@ -74,17 +76,17 @@ void __weak panic_smp_self_stop(void)
+@@ -75,17 +77,17 @@ void __weak panic_smp_self_stop(void)
   */
  void panic(const char *fmt, ...)
  {
@@ -165,7 +165,7 @@ index f9badcf..7149838 100644
  	 */
  	local_irq_disable();
  
-@@ -97,8 +99,16 @@ void panic(const char *fmt, ...)
+@@ -98,8 +100,16 @@ void panic(const char *fmt, ...)
  	 * multiple parallel invocations of panic, all other CPUs either
  	 * stop themself or will wait until they are stopped by the 1st CPU
  	 * with smp_send_stop().
@@ -197,5 +197,5 @@ index 88b20a0..63073a1 100644
  		__this_cpu_write(hard_watchdog_warn, true);
  		return;
 -- 
-2.7.4
+1.9.1
 

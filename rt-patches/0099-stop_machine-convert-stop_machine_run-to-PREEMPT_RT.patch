@@ -1,7 +1,7 @@
-From ad869e45f0f842bfcc1942ebc4a9eb2aca7cf865 Mon Sep 17 00:00:00 2001
+From 54139dfd773a22677e9a8f1e49c4123ed3a55f0b Mon Sep 17 00:00:00 2001
 From: Ingo Molnar <mingo@elte.hu>
 Date: Fri, 3 Jul 2009 08:30:27 -0500
-Subject: [PATCH 099/365] stop_machine: convert stop_machine_run() to
+Subject: [PATCH 099/366] stop_machine: convert stop_machine_run() to
  PREEMPT_RT
 
 Instead of playing with non-preemption, introduce explicit
@@ -37,5 +37,5 @@ index a3bbaee..4ef69a3 100644
  		preempt_disable();
  
 -- 
-2.7.4
+1.9.1
 

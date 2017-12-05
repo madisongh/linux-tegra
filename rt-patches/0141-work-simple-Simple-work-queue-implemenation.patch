@@ -1,7 +1,7 @@
-From 364a14f6660f56519fc5eb00c8bff99ed0534712 Mon Sep 17 00:00:00 2001
+From 0dd749fa3f553fdae6f1096954af24dc76f9eb32 Mon Sep 17 00:00:00 2001
 From: Daniel Wagner <daniel.wagner@bmw-carit.de>
 Date: Fri, 11 Jul 2014 15:26:11 +0200
-Subject: [PATCH 141/365] work-simple: Simple work queue implemenation
+Subject: [PATCH 141/366] work-simple: Simple work queue implemenation
 
 Provides a framework for enqueuing callbacks from irq context
 PREEMPT_RT_FULL safe. The callbacks are executed in kthread context.
@@ -241,5 +241,5 @@ index 0000000..e57a052
 +}
 +EXPORT_SYMBOL_GPL(swork_put);
 -- 
-2.7.4
+1.9.1
 

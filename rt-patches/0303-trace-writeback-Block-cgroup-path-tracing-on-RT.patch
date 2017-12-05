@@ -1,7 +1,7 @@
-From 488ebdb2417ab0b9f78bdd12f731c7895134a56c Mon Sep 17 00:00:00 2001
+From 7f1cd2208ef557fc09e081c436bdec264fa36539 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 28 Feb 2016 15:14:43 +0100
-Subject: [PATCH 303/365] trace/writeback: Block cgroup path tracing on RT
+Subject: [PATCH 303/366] trace/writeback: Block cgroup path tracing on RT
 
 Yang reported that with CGROUP_WRITEBACK enabled the tracer triggers the
 following backtrace:
@@ -57,5 +57,5 @@ index fff846b..253ef28 100644
  static inline size_t __trace_wb_cgroup_size(struct bdi_writeback *wb)
  {
 -- 
-2.7.4
+1.9.1
 

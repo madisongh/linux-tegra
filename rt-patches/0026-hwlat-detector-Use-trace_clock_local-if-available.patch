@@ -1,7 +1,7 @@
-From 252e7984160ee2ceb9dc0f3843764652f8e4dccd Mon Sep 17 00:00:00 2001
+From 5a4e0bc5e940b628a8c7e5146dd3ec1a8ed7c1bf Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Mon, 19 Aug 2013 17:33:26 -0400
-Subject: [PATCH 026/365] hwlat-detector: Use trace_clock_local if available
+Subject: [PATCH 026/366] hwlat-detector: Use trace_clock_local if available
 
 As ktime_get() calls into the timing code which does a read_seq(), it
 may be affected by other CPUS that touch that lock. To remove this
@@ -94,5 +94,5 @@ index c07e859..0fcc0e3 100644
  		/* This shouldn't happen */
  		if (diff < 0) {
 -- 
-2.7.4
+1.9.1
 

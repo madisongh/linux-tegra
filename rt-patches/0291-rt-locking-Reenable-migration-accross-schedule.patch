@@ -1,7 +1,7 @@
-From f088ef8c0d3df92f85d56602f7137e858468b147 Mon Sep 17 00:00:00 2001
+From be08fdc7193bb9321b8029b736818426ea61d99a Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 8 Feb 2016 16:15:28 +0100
-Subject: [PATCH 291/365] rt/locking: Reenable migration accross schedule
+Subject: [PATCH 291/366] rt/locking: Reenable migration accross schedule
 
 We currently disable migration across lock acquisition. That includes the part
 where we block on the lock and schedule out. We cannot disable migration after
@@ -113,5 +113,5 @@ index 913aa40..6697100 100644
  EXPORT_SYMBOL(rt_spin_lock_nested);
  #endif
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From 0472f459c09932375f62c8ca41982f089a71a248 Mon Sep 17 00:00:00 2001
+From b87e370e7f3dec4c335ab7d296c53b0ac9318db7 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 4 Oct 2012 14:20:47 +0100
-Subject: [PATCH 111/365] softirq: Split softirq locks
+Subject: [PATCH 111/366] softirq: Split softirq locks
 
 The 3.x RT series removed the split softirq implementation in favour
 of pushing softirq processing into the context of the thread which
@@ -178,7 +178,7 @@ index 2b761d0..5f73377 100644
  /*
   * Are we in NMI context?
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 1b5aeca..eb695cb 100644
+index 2eb675c..bb64acc 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -1846,6 +1846,8 @@ struct task_struct {
@@ -190,7 +190,7 @@ index 1b5aeca..eb695cb 100644
  #endif
  #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
  	unsigned long	task_state_change;
-@@ -2111,6 +2113,7 @@ extern void thread_group_cputime_adjusted(struct task_struct *p, cputime_t *ut,
+@@ -2113,6 +2115,7 @@ extern void thread_group_cputime_adjusted(struct task_struct *p, cputime_t *ut,
  /*
   * Per process flags
   */
@@ -835,5 +835,5 @@ index 98997de..bfbf0b6 100644
  	return err;
  }
 -- 
-2.7.4
+1.9.1
 

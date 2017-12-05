@@ -1,7 +1,7 @@
-From 567d249c9b31ebf9d95aced2b05ca8842388745a Mon Sep 17 00:00:00 2001
+From 6b53f51d0086412e7f1beae2fcdeb224b8c1bd1c Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 13 Feb 2015 15:52:24 +0100
-Subject: [PATCH 249/365] cgroups: use simple wait in css_release()
+Subject: [PATCH 249/366] cgroups: use simple wait in css_release()
 
 To avoid:
 |BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:914
@@ -54,7 +54,7 @@ index 788c7c4..f599392 100644
  
  /*
 diff --git a/kernel/cgroup.c b/kernel/cgroup.c
-index 9d55e7e..b4db3a9 100644
+index e03a4c7..f539afa 100644
 --- a/kernel/cgroup.c
 +++ b/kernel/cgroup.c
 @@ -4795,10 +4795,10 @@ static void css_free_rcu_fn(struct rcu_head *rcu_head)
@@ -81,7 +81,7 @@ index 9d55e7e..b4db3a9 100644
  }
  
  static void init_and_link_css(struct cgroup_subsys_state *css,
-@@ -5455,6 +5455,7 @@ static int __init cgroup_wq_init(void)
+@@ -5461,6 +5461,7 @@ static int __init cgroup_wq_init(void)
  	 */
  	cgroup_destroy_wq = alloc_workqueue("cgroup_destroy", 0, 1);
  	BUG_ON(!cgroup_destroy_wq);
@@ -90,5 +90,5 @@ index 9d55e7e..b4db3a9 100644
  	/*
  	 * Used to destroy pidlists and separate to serve as flush domain.
 -- 
-2.7.4
+1.9.1
 

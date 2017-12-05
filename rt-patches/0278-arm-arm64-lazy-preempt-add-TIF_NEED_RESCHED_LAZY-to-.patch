@@ -1,7 +1,7 @@
-From a6e559b0bba192b1690b16df17176aa98b38e589 Mon Sep 17 00:00:00 2001
+From 32b1bc5a444d25b77bb717a4cc7f7152ed8c2819 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 22 Jan 2016 21:33:39 +0100
-Subject: [PATCH 278/365] arm+arm64: lazy-preempt: add TIF_NEED_RESCHED_LAZY to
+Subject: [PATCH 278/366] arm+arm64: lazy-preempt: add TIF_NEED_RESCHED_LAZY to
  _TIF_WORK_MASK
 
 _TIF_WORK_MASK is used to check for TIF_NEED_RESCHED so we need to check
@@ -68,7 +68,7 @@ index 30a7228..c3bd6cb 100644
  ENDPROC(ret_fast_syscall)
  
 diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index b1d2e32..0a3bf96 100644
+index ed55fb3..e7209f4 100644
 --- a/arch/arm64/include/asm/thread_info.h
 +++ b/arch/arm64/include/asm/thread_info.h
 @@ -131,7 +131,8 @@ static inline struct thread_info *current_thread_info(void)
@@ -82,5 +82,5 @@ index b1d2e32..0a3bf96 100644
  #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
  				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
 -- 
-2.7.4
+1.9.1
 

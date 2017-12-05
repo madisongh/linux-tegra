@@ -1,7 +1,7 @@
-From 782cb248008f5314a4408a003f5438c9a3ab8c3c Mon Sep 17 00:00:00 2001
+From 6b29324b793709c3cef3897b7f8f3162bf01d816 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 14 Jul 2015 14:26:34 +0200
-Subject: [PATCH 246/365] gpu/i915: don't open code these things
+Subject: [PATCH 246/366] gpu/i915: don't open code these things
 
 The opencode part is gone in 1f83fee0 ("drm/i915: clear up wedged transitions")
 the owner check is still there.
@@ -25,5 +25,5 @@ index 6f10b42..dd3a9a6 100644
  #else
  	/* Since UP may be pre-empted, we cannot assume that we own the lock */
 -- 
-2.7.4
+1.9.1
 

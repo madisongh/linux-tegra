@@ -1,7 +1,7 @@
-From 0cb9a7d2ff1cd1831c9388b320b17c5251326fde Mon Sep 17 00:00:00 2001
+From dcda6bd2544341fdfb477676265c1a5c815698a1 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Sun, 16 Aug 2015 14:27:50 +0200
-Subject: [PATCH 161/365] dump stack: don't disable preemption during trace
+Subject: [PATCH 161/366] dump stack: don't disable preemption during trace
 
 I see here large latencies during a stack dump on x86. The
 preempt_disable() and get_cpu() should forbid moving the task to another
@@ -81,5 +81,5 @@ index 5f1c626..c331e3f 100644
  	pr_cont("\n");
  	show_trace_log_lvl(task, regs, sp, bp, log_lvl);
 -- 
-2.7.4
+1.9.1
 

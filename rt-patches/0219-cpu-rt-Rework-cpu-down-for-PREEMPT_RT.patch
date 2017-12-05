@@ -1,7 +1,7 @@
-From 74e26d744afbb898775ed5b949d5d085a45b04d3 Mon Sep 17 00:00:00 2001
+From 284c17af888771544b54c759f36f2c4c9b488560 Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <srostedt@redhat.com>
 Date: Mon, 16 Jul 2012 08:07:43 +0000
-Subject: [PATCH 219/365] cpu/rt: Rework cpu down for PREEMPT_RT
+Subject: [PATCH 219/366] cpu/rt: Rework cpu down for PREEMPT_RT
 
 Bringing a CPU down is a pain with the PREEMPT_RT kernel because
 tasks can be preempted in many more places than in non-RT. In
@@ -55,10 +55,10 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  3 files changed, 283 insertions(+), 46 deletions(-)
 
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index c2c6b05..e474bd0 100644
+index e980cf1..787f50a 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
-@@ -2297,6 +2297,10 @@ extern void do_set_cpus_allowed(struct task_struct *p,
+@@ -2299,6 +2299,10 @@ extern void do_set_cpus_allowed(struct task_struct *p,
  
  extern int set_cpus_allowed_ptr(struct task_struct *p,
  				const struct cpumask *new_mask);
@@ -69,7 +69,7 @@ index c2c6b05..e474bd0 100644
  #else
  static inline void do_set_cpus_allowed(struct task_struct *p,
  				      const struct cpumask *new_mask)
-@@ -2309,6 +2313,9 @@ static inline int set_cpus_allowed_ptr(struct task_struct *p,
+@@ -2311,6 +2315,9 @@ static inline int set_cpus_allowed_ptr(struct task_struct *p,
  		return -EINVAL;
  	return 0;
  }
@@ -552,5 +552,5 @@ index 41814f6..0f7a78d 100644
  		p->migrate_disable_atomic--;
  #endif
 -- 
-2.7.4
+1.9.1
 

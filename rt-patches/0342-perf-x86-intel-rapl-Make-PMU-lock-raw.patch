@@ -1,7 +1,7 @@
-From 08142006a86254e0c8acffab22212bed2fb037ee Mon Sep 17 00:00:00 2001
+From 5f98d96c17d8476136a02330e9ca830358d4cbba Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 22 Feb 2016 22:19:25 +0000
-Subject: [PATCH 342/365] perf/x86/intel/rapl: Make PMU lock raw
+Subject: [PATCH 342/366] perf/x86/intel/rapl: Make PMU lock raw
 
 Upstream commit: a208749c6426 ("perf/x86/intel/rapl: Make PMU lock raw")
 
@@ -116,5 +116,5 @@ index ed446bd..d2ac364 100644
  	INIT_LIST_HEAD(&pmu->active_list);
  
 -- 
-2.7.4
+1.9.1
 

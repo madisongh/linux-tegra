@@ -1,7 +1,7 @@
-From 2c4f64ce33f86186bcc3d8501b5498dd54800bc0 Mon Sep 17 00:00:00 2001
+From e1a00690e7dcd6b119a8a974ad43a5d1787ed365 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 4 Feb 2016 18:59:19 +0100
-Subject: [PATCH 282/365] net: dev: make xmit_rec_dec() void
+Subject: [PATCH 282/366] net: dev: make xmit_rec_dec() void
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
@@ -22,5 +22,5 @@ index 0aaf93b..14f7b58 100644
  	__this_cpu_dec(xmit_recursion);
  }
 -- 
-2.7.4
+1.9.1
 

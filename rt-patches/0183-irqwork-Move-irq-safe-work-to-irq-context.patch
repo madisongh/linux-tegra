@@ -1,7 +1,7 @@
-From a854eca87c18951d2bb3e30ed94b34da462e3bf6 Mon Sep 17 00:00:00 2001
+From bb74635ad455695063bb89d40207dffcd2742dcd Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 15 Nov 2015 18:40:17 +0100
-Subject: [PATCH 183/365] irqwork: Move irq safe work to irq context
+Subject: [PATCH 183/366] irqwork: Move irq safe work to irq context
 
 On architectures where arch_irq_work_has_interrupt() returns false, we
 end up running the irq safe work from the softirq context. That
@@ -83,5 +83,5 @@ index acfd69b..c3314fc 100644
  	if (time_after_eq(jiffies, base->timer_jiffies))
  		__run_timers(base);
 -- 
-2.7.4
+1.9.1
 

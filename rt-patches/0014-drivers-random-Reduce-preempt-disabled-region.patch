@@ -1,7 +1,7 @@
-From c58052f8d4d49ac67f46f20e83cbbc03f7cb1b5d Mon Sep 17 00:00:00 2001
+From 0026b4c75af334eb0b70d9e9a48f00877e6ba28a Mon Sep 17 00:00:00 2001
 From: Ingo Molnar <mingo@elte.hu>
 Date: Fri, 3 Jul 2009 08:29:30 -0500
-Subject: [PATCH 014/365] drivers: random: Reduce preempt disabled region
+Subject: [PATCH 014/366] drivers: random: Reduce preempt disabled region
 
 No need to keep preemption disabled across the whole function.
 
@@ -33,5 +33,5 @@ index d93dfeb..dd5346c 100644
  
  void add_input_randomness(unsigned int type, unsigned int code,
 -- 
-2.7.4
+1.9.1
 

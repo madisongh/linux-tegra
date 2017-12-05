@@ -1,7 +1,7 @@
-From 51e04ed591d94ad84fdf86efbc53fd6115d31da0 Mon Sep 17 00:00:00 2001
+From 20aeeddcb91864ce190216ca2ac0af391805b9a2 Mon Sep 17 00:00:00 2001
 From: Carsten Emde <C.Emde@osadl.org>
 Date: Tue, 19 Jul 2011 13:53:12 +0100
-Subject: [PATCH 024/365] hwlatdetect.patch
+Subject: [PATCH 024/366] hwlatdetect.patch
 
 Jon Masters developed this wonderful SMI detector. For details please
 consult Documentation/hwlat_detector.txt. It could be ported to Linux
@@ -88,7 +88,7 @@ index 0000000..cb61516
 +then we write to a global sample ring buffer of 8K samples, which is
 +consumed by reading from the "sample" (pipe) debugfs file interface.
 diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index 4c23b99..9d84ec5 100644
+index 9a368c5..a79ec7f 100644
 --- a/drivers/misc/Kconfig
 +++ b/drivers/misc/Kconfig
 @@ -121,6 +121,35 @@ config IBM_ASM
@@ -128,10 +128,10 @@ index 4c23b99..9d84ec5 100644
  	tristate "Sensable PHANToM (PCI)"
  	depends on PCI
 diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
-index c9791c6..fdd4886 100644
+index 02bfee4..508da68 100644
 --- a/drivers/misc/Makefile
 +++ b/drivers/misc/Makefile
-@@ -39,6 +39,7 @@ obj-$(CONFIG_C2PORT)		+= c2port/
+@@ -42,6 +42,7 @@ obj-$(CONFIG_C2PORT)		+= c2port/
  obj-$(CONFIG_HMC6352)		+= hmc6352.o
  obj-y				+= eeprom/
  obj-y				+= cb710/
@@ -1358,5 +1358,5 @@ index 0000000..6864f3c
 +module_init(detector_init);
 +module_exit(detector_exit);
 -- 
-2.7.4
+1.9.1
 

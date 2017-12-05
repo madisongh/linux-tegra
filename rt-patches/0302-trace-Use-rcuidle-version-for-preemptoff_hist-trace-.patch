@@ -1,7 +1,7 @@
-From 0bb090205a0851d130841ae8ed52315e340043d2 Mon Sep 17 00:00:00 2001
+From aca5b8f636abf1517bef36987a35c3097bdef90a Mon Sep 17 00:00:00 2001
 From: Yang Shi <yang.shi@windriver.com>
 Date: Tue, 23 Feb 2016 13:23:23 -0800
-Subject: [PATCH 302/365] trace: Use rcuidle version for preemptoff_hist trace
+Subject: [PATCH 302/366] trace: Use rcuidle version for preemptoff_hist trace
  point
 
 When running -rt kernel with both PREEMPT_OFF_HIST and LOCKDEP enabled,
@@ -90,5 +90,5 @@ index 5c3fcb7..553e712 100644
  
  #else /* !CONFIG_PROVE_LOCKING */
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From abc91922bd513ccc7f5ade555d72359d8d085e28 Mon Sep 17 00:00:00 2001
+From 89f4bdd1f616727f052305f9e93b5a9c57735f42 Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Fri, 27 Feb 2015 15:20:37 +0100
-Subject: [PATCH 151/365] x86/mce: use swait queue for mce wakeups
+Subject: [PATCH 151/366] x86/mce: use swait queue for mce wakeups
 
 We had a customer report a lockup on a 3.0-rt kernel that had the
 following backtrace:
@@ -161,5 +161,5 @@ index 6e7eee8..a080b49 100644
  		err = -ENOMEM;
  		goto err_out;
 -- 
-2.7.4
+1.9.1
 

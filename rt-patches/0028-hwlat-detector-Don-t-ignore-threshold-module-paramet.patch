@@ -1,11 +1,10 @@
-From 30b7842d8eb45cf0edbf979873b879782295077b Mon Sep 17 00:00:00 2001
+From 566c6324fff3e91cd96e89ae96e31a896159b08a Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <bitbucket@online.de>
 Date: Fri, 30 Aug 2013 07:57:25 +0200
-Subject: [PATCH 028/365] hwlat-detector: Don't ignore threshold module
+Subject: [PATCH 028/366] hwlat-detector: Don't ignore threshold module
  parameter
 
 If the user specified a threshold at module load time, use it.
-
 
 Acked-by: Steven Rostedt <rostedt@goodmis.org>
 Signed-off-by: Mike Galbraith <bitbucket@online.de>
@@ -28,5 +27,5 @@ index 6e88113..2429c43 100644
  	data.sample_width = DEFAULT_SAMPLE_WIDTH;   /* width us */
  
 -- 
-2.7.4
+1.9.1
 

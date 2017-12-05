@@ -1,7 +1,7 @@
-From b65518b4051a71b4e76d45453331d55a5b785498 Mon Sep 17 00:00:00 2001
+From abe87869d00c0c215354b331f82af88ed11d9e3c Mon Sep 17 00:00:00 2001
 From: Allen Pais <allen.pais@oracle.com>
 Date: Fri, 13 Dec 2013 09:44:41 +0530
-Subject: [PATCH 003/365] sparc64: use generic rwsem spinlocks rt
+Subject: [PATCH 003/366] sparc64: use generic rwsem spinlocks rt
 
 Signed-off-by: Allen Pais <allen.pais@oracle.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -29,5 +29,5 @@ index 56442d2..8c9598f 100644
  config GENERIC_HWEIGHT
  	bool
 -- 
-2.7.4
+1.9.1
 

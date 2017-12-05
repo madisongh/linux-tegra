@@ -1,7 +1,7 @@
-From eb055bcf0b1e802caa3b5ceee4280d60254e9656 Mon Sep 17 00:00:00 2001
+From eaa98132bab39bc10134573025b5c9dd34425806 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:47:11 +0100
-Subject: [PATCH 259/365] fix compile for CONFIG_MISSED_TIMER_OFFSETS_HIST
+Subject: [PATCH 259/366] fix compile for CONFIG_MISSED_TIMER_OFFSETS_HIST
 
 Reported-by: kernel test robot <ying.huang@linux.intel.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -45,5 +45,5 @@ index 4f54506..ba3d601 100644
  
  /*
 -- 
-2.7.4
+1.9.1
 

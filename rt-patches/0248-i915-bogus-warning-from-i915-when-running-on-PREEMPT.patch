@@ -1,7 +1,7 @@
-From 48f7756b62bb8fa6d047e14d29eb2a234a1ef47c Mon Sep 17 00:00:00 2001
+From b9df39ac463d87a3ebdc5165b06091282aa1b09f Mon Sep 17 00:00:00 2001
 From: Clark Williams <williams@redhat.com>
 Date: Tue, 26 May 2015 10:43:43 -0500
-Subject: [PATCH 248/365] i915: bogus warning from i915 when running on
+Subject: [PATCH 248/366] i915: bogus warning from i915 when running on
  PREEMPT_RT
 
 The i915 driver has a 'WARN_ON(!in_interrupt())' in the display
@@ -32,5 +32,5 @@ index 175595f..d2439b8e 100644
  	if (crtc == NULL)
  		return;
 -- 
-2.7.4
+1.9.1
 

@@ -1,7 +1,7 @@
-From a40c9e2268d2e565cbf0a39fb08c7aca218c4f6e Mon Sep 17 00:00:00 2001
+From 07d173a8679f0d2b6a851caccbcf9bce41f667ed Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 8 Mar 2016 12:57:28 +0100
-Subject: [PATCH 308/365] trace: hist: make it compile again
+Subject: [PATCH 308/366] trace: hist: make it compile again
 
 Fixes: a16cff01f63e ("trace: Use rcuidle version for preemptoff_hist trace point")
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
@@ -22,5 +22,5 @@ index 6122e42..f7710de 100644
  TRACE_EVENT(preemptirqsoff_hist,
  
 -- 
-2.7.4
+1.9.1
 

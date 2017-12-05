@@ -1,7 +1,7 @@
-From 8a441fa4af69e9487c3976df3f0a43b185dd0e83 Mon Sep 17 00:00:00 2001
+From f1cced98061cc840c8941b3a559768477ac870d1 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Fri, 2 May 2014 13:13:22 +0200
-Subject: [PATCH 134/365] stomp-machine: create lg_global_trylock_relax()
+Subject: [PATCH 134/366] stomp-machine: create lg_global_trylock_relax()
  primitive
 
 Create lg_global_trylock_relax() for use by stopper thread when it cannot
@@ -95,5 +95,5 @@ index 7b59f63..e1ddae3 100644
  {
  	int ret = rt_mutex_trylock(&lock->lock);
 -- 
-2.7.4
+1.9.1
 
