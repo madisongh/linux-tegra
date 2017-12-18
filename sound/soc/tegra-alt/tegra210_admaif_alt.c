@@ -142,8 +142,9 @@ static bool tegra210_admaif_rd_reg(struct device *dev, unsigned int reg)
 
 static bool tegra210_admaif_volatile_reg(struct device *dev, unsigned int reg)
 {
-	if (reg > 0 && (reg < TEGRA210_ADMAIF_CHANNEL_COUNT *
-					TEGRA210_ADMAIF_CHANNEL_REG_STRIDE * 2))
+	if (reg > 0 && (reg < (TEGRA210_ADMAIF_XBAR_TX_ENABLE +
+			       (TEGRA210_ADMAIF_CHANNEL_COUNT *
+				TEGRA210_ADMAIF_CHANNEL_REG_STRIDE))))
 		reg = reg % TEGRA210_ADMAIF_CHANNEL_REG_STRIDE;
 
 	switch (reg) {
@@ -437,7 +438,7 @@ static void tegra210_admaif_stop_playback(struct snd_soc_dai *dai)
 	/* HW needs sw reset to make sure previous transaction be clean */
 	ret = tegra210_admaif_sw_reset(dai, SNDRV_PCM_STREAM_PLAYBACK, 0xffff);
 	if (ret)
-		dev_err(dev, "Failed at ADMAIF%d_TX sw reset\n", dev->id);
+		dev_err(dev, "Failed at ADMAIF%d_TX sw reset\n", dai->id);
 }
 
 static void tegra210_admaif_start_capture(struct snd_soc_dai *dai)
@@ -473,7 +474,7 @@ static void tegra210_admaif_stop_capture(struct snd_soc_dai *dai)
 	/* HW needs sw reset to make sure previous transaction be clean */
 	ret = tegra210_admaif_sw_reset(dai, SNDRV_PCM_STREAM_CAPTURE, 0xffff);
 	if (ret)
-		dev_err(dev, "Failed at ADMAIF%d_RX sw reset\n", dev->id);
+		dev_err(dev, "Failed at ADMAIF%d_RX sw reset\n", dai->id);
 }
 
 static int tegra210_admaif_trigger(struct snd_pcm_substream *substream, int cmd,
