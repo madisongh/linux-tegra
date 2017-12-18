@@ -16,8 +16,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef __OTE_PROTOCOL_H__
-#define __OTE_PROTOCOL_H__
+#ifndef __LINUX_OTE_PROTOCOL_H__
+#define __LINUX_OTE_PROTOCOL_H__
 
 int tegra_set_vpr_params(void *vpr_base, size_t vpr_size);
 
