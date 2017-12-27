@@ -15,6 +15,8 @@
 #ifndef __T210_VI_H__
 #define __T210_VI_H__
 
+void vi2_syncpt_init(struct tegra_channel *chan);
+void vi2_syncpt_free(struct tegra_channel *chan);
 int vi2_power_on(struct tegra_channel *chan);
 void vi2_power_off(struct tegra_channel *chan);
 int vi2_channel_start_streaming(struct vb2_queue *vq, u32 count);
@@ -24,6 +26,8 @@ void vi2_init_video_formats(struct tegra_channel *chan);
 int vi2_mfi_work(struct tegra_mc_vi *vi, int csiport);
 
 struct tegra_vi_fops vi2_fops = {
+	.vi_syncpt_init = vi2_syncpt_init,
+	.vi_syncpt_free = vi2_syncpt_free,
 	.vi_power_on = vi2_power_on,
 	.vi_power_off = vi2_power_off,
 	.vi_start_streaming = vi2_channel_start_streaming,

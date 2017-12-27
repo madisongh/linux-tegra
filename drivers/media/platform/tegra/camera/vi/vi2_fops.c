@@ -669,8 +669,6 @@ int vi2_channel_start_streaming(struct vb2_queue *vq, u32 count)
 	struct tegra_csi_device *csi = chan->vi->csi;
 	struct v4l2_ctrl *override_ctrl;
 
-	vi_channel_syncpt_init(chan);
-
 	tegra_channel_ec_init(chan);
 
 	/* Start the pipeline. */
@@ -786,8 +784,6 @@ void vi2_channel_stop_streaming(struct vb2_queue *vq)
 
 	if (!chan->bypass)
 		tegra_channel_update_clknbw(chan, 0);
-
-	vi_channel_syncpt_free(chan);
 }
 
 int vi2_mfi_work(struct tegra_mc_vi *vi, int csiport)
@@ -898,4 +894,14 @@ void vi2_power_off(struct tegra_channel *chan)
 			tegra_vi->sensor_opened = false;
 	}
 	nvhost_module_remove_client(vi->ndev, &chan->video);
+}
+
+void vi2_syncpt_init(struct tegra_channel *chan)
+{
+	vi_channel_syncpt_init(chan);
+}
+
+void vi2_syncpt_free(struct tegra_channel *chan)
+{
+	vi_channel_syncpt_free(chan);
 }

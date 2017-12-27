@@ -325,6 +325,8 @@ void tegra_core_get_description_by_idx(struct tegra_channel *chan,
 		unsigned int index, __u8 *description);
 
 struct tegra_vi_fops {
+	void (*vi_syncpt_init)(struct tegra_channel *chan);
+	void (*vi_syncpt_free)(struct tegra_channel *chan);
 	int (*vi_power_on)(struct tegra_channel *chan);
 	void (*vi_power_off)(struct tegra_channel *chan);
 	int (*vi_start_streaming)(struct vb2_queue *vq, u32 count);

@@ -1735,6 +1735,9 @@ int tegra_channel_init(struct tegra_channel *chan)
 		goto vb2_queue_error;
 	}
 
+	if (vi->fops->vi_syncpt_init)
+		vi->fops->vi_syncpt_init(chan);
+
 	chan->init_done = true;
 	return 0;
 
@@ -1751,6 +1754,9 @@ ctrl_init_error:
 
 int tegra_channel_cleanup(struct tegra_channel *chan)
 {
+	if (chan->vi->fops->vi_syncpt_free)
+		chan->vi->fops->vi_syncpt_free(chan);
+
 	/* release embedded data buffer */
 	if (chan->vi->emb_buf_size > 0) {
 		dma_free_coherent(chan->vi->dev,
