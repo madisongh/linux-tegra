@@ -293,92 +293,44 @@ static void tegra_channel_fmts_bitmap_init(struct tegra_channel *chan)
  * -----------------------------------------------------------------------------
  */
 
-void tegra_channel_init_ring_buffer(struct tegra_channel *chan)
+void release_buffer(struct tegra_channel *chan, struct tegra_channel_buffer* buf)
 {
-	chan->released_bufs = 0;
-	chan->num_buffers = 0;
-	chan->save_index = 0;
-	chan->free_index = 0;
-	chan->bfirst_fstart = false;
-}
+	struct vb2_v4l2_buffer* vbuf = &buf->buf;
+	/* release one frame */
+	vbuf->sequence = chan->sequence++;
+	vbuf->field = V4L2_FIELD_NONE;
+	vb2_set_plane_payload(&vbuf->vb2_buf,
+		0, chan->format.sizeimage);
 
-void free_ring_buffers(struct tegra_channel *chan, int frames)
-{
-	struct vb2_v4l2_buffer *vbuf;
-
-	while (frames) {
-		vbuf = chan->buffers[chan->free_index];
-
-		/* release one frame */
-		vbuf->sequence = chan->sequence++;
-		vbuf->field = V4L2_FIELD_NONE;
-		vb2_set_plane_payload(&vbuf->vb2_buf,
-			0, chan->format.sizeimage);
-
-		/*
-		 * WAR to force buffer state if capture state is not good
-		 * WAR - After sync point timeout or error frame capture
-		 * the second buffer is intermittently frame of zeros
-		 * with no error status or padding.
-		 */
-#if 0
-		/* This will drop the first two frames. Disable for now. */
-		if (chan->capture_state != CAPTURE_GOOD ||
-			chan->released_bufs < 2)
-			chan->buffer_state[chan->free_index] =
-						VB2_BUF_STATE_ERROR;
-#endif
-		vb2_buffer_done(&vbuf->vb2_buf,
-			chan->buffer_state[chan->free_index++]);
-
-		if (chan->free_index >= QUEUED_BUFFERS)
-			chan->free_index = 0;
-		chan->num_buffers--;
-		chan->released_bufs++;
-		frames--;
+	/*
+	 * WAR to force buffer state if capture state is not good
+	 * WAR - After sync point timeout or error frame capture
+	 * the second buffer is intermittently frame of zeros
+	 * with no error status or padding.
+	 */
+	if (chan->capture_state != CAPTURE_GOOD || vbuf->sequence < 2) {
+		buf->state = VB2_BUF_STATE_ERROR;
 	}
+
+	vb2_buffer_done(&vbuf->vb2_buf, buf->state);
 }
 
-static void add_buffer_to_ring(struct tegra_channel *chan,
-				struct vb2_v4l2_buffer *vb)
+/*
+ * `buf` has been successfully setup to receive a frame and is
+ * "in flight" through the VI hardware. We are currently waiting
+ * on it to be filled. Moves the pointer into the `release` list
+ * for the release thread to wait on.
+ */
+void enqueue_inflight(struct tegra_channel *chan,
+		struct tegra_channel_buffer *buf)
 {
-	/* save the buffer to the ring first */
-	/* Mark buffer state as error before start */
-	chan->buffer_state[chan->save_index] = VB2_BUF_STATE_ERROR;
-	chan->buffers[chan->save_index++] = vb;
-	if (chan->save_index >= QUEUED_BUFFERS)
-		chan->save_index = 0;
-	chan->num_buffers++;
-}
+	/* Put buffer into the release queue */
+	spin_lock(&chan->release_lock);
+	list_add_tail(&buf->queue, &chan->release);
+	spin_unlock(&chan->release_lock);
 
-void tegra_channel_ring_buffer(struct tegra_channel *chan,
-					struct tegra_channel_buffer *buf,
-					struct timespec *ts, int state)
-
-{
-	struct vb2_v4l2_buffer *vb = &buf->buf;
-
-	if (!chan->bfirst_fstart)
-		chan->bfirst_fstart = true;
-
-	/* Capture state is not GOOD, release all buffers and re-init state */
-	if (chan->capture_state != CAPTURE_GOOD) {
-		free_ring_buffers(chan, chan->num_buffers);
-		tegra_channel_init_ring_buffer(chan);
-		return;
-	} else {
-		/* update time stamp of the buffer */
-		vb->timestamp.tv_sec = ts->tv_sec;
-		vb->timestamp.tv_usec = ts->tv_nsec / NSEC_PER_USEC;
-
-		/* Put buffer into the release queue */
-		spin_lock(&chan->release_lock);
-		list_add_tail(&buf->queue, &chan->release);
-		spin_unlock(&chan->release_lock);
-
-		/* Wait up kthread for release */
-		wake_up_interruptible(&chan->release_wait);
-	}
+	/* Wake up kthread for release */
+	wake_up_interruptible(&chan->release_wait);
 }
 
 void tegra_channel_ec_close(struct tegra_mc_vi *vi)
@@ -391,21 +343,23 @@ void tegra_channel_ec_close(struct tegra_mc_vi *vi)
 	}
 }
 
-struct tegra_channel_buffer *dequeue_release_buffer(struct tegra_channel *chan)
+struct tegra_channel_buffer* dequeue_inflight(struct tegra_channel* chan)
 {
+
 	struct tegra_channel_buffer *buf = NULL;
 
 	spin_lock(&chan->release_lock);
-	if (list_empty(&chan->release))
-		goto done;
+	if (list_empty(&chan->release)) {
+		spin_unlock(&chan->release_lock);
+		return NULL;
+	}
 
 	buf = list_entry(chan->release.next,
 			 struct tegra_channel_buffer, queue);
-	if (!buf)
-		goto done;
 
-	list_del_init(&buf->queue);
-done:
+	if(buf) {
+		list_del_init(&buf->queue);
+	}
 	spin_unlock(&chan->release_lock);
 	return buf;
 }
@@ -422,8 +376,6 @@ struct tegra_channel_buffer *dequeue_buffer(struct tegra_channel *chan)
 			 struct tegra_channel_buffer, queue);
 	list_del_init(&buf->queue);
 
-	/* add dequeued buffer to the ring buffer */
-	add_buffer_to_ring(chan, &buf->buf);
 done:
 	spin_unlock(&chan->start_lock);
 	return buf;
@@ -502,17 +454,21 @@ void tegra_channel_queued_buf_done(struct tegra_channel *chan,
 	struct list_head *rel_q = &chan->release;
 
 	spin_lock(lock);
-	list_for_each_entry_safe(buf, nbuf, q, queue) {
-		vb2_buffer_done(&buf->buf.vb2_buf, state);
-		list_del(&buf->queue);
+	if(!list_empty(q)) {
+		list_for_each_entry_safe(buf, nbuf, q, queue) {
+			vb2_buffer_done(&buf->buf.vb2_buf, state);
+			list_del(&buf->queue);
+		}
 	}
 	spin_unlock(lock);
 
 	/* delete release list */
 	spin_lock(release_lock);
-	list_for_each_entry_safe(buf, nbuf, rel_q, queue) {
-		vb2_buffer_done(&buf->buf.vb2_buf, state);
-		list_del(&buf->queue);
+	if(!list_empty(rel_q)) {
+		list_for_each_entry_safe(buf, nbuf, rel_q, queue) {
+			vb2_buffer_done(&buf->buf.vb2_buf, state);
+			list_del(&buf->queue);
+		}
 	}
 	spin_unlock(release_lock);
 }
@@ -1649,6 +1605,8 @@ int tegra_channel_init(struct tegra_channel *chan)
 	if (ret)
 		return ret;
 
+	atomic_set(&chan->restart_version, 1);
+	chan->capture_version = 0;
 	chan->width_align = TEGRA_WIDTH_ALIGNMENT;
 	chan->stride_align = TEGRA_STRIDE_ALIGNMENT;
 	chan->num_subdevs = 0;

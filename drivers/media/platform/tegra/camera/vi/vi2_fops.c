@@ -31,15 +31,20 @@ extern void tegra_channel_queued_buf_done(struct tegra_channel *chan,
 					  enum vb2_buffer_state state);
 static void tegra_channel_stop_kthreads(struct tegra_channel *chan);
 extern int tegra_channel_set_stream(struct tegra_channel *chan, bool on);
-extern void tegra_channel_ring_buffer(struct tegra_channel *chan,
-				struct tegra_channel_buffer *buf,
-				struct timespec *ts, int state);
 extern struct tegra_channel_buffer *dequeue_buffer(struct tegra_channel *chan);
-extern struct tegra_channel_buffer
-	*dequeue_release_buffer(struct tegra_channel *chan);
-extern void tegra_channel_init_ring_buffer(struct tegra_channel *chan);
-extern void free_ring_buffers(struct tegra_channel *chan, int frames);
+extern void enqueue_inflight(struct tegra_channel *chan,
+                             struct tegra_channel_buffer *buf);
+extern struct tegra_channel_buffer *dequeue_inflight(struct tegra_channel *chan);
 extern int tegra_channel_set_power(struct tegra_channel *chan, bool on);
+extern void release_buffer(struct tegra_channel *chan, struct tegra_channel_buffer* buf);
+
+/*
+ * Update the timestamp of the buffer
+ */
+static void set_timestamp(struct tegra_channel_buffer *buf, const struct timespec* ts) {
+	buf->buf.timestamp.tv_sec = ts->tv_sec;
+	buf->buf.timestamp.tv_usec = ts->tv_nsec / NSEC_PER_USEC;
+}
 
 static void vi_write(struct tegra_mc_vi *vi, unsigned int addr, u32 val)
 {
@@ -352,10 +357,15 @@ static int tegra_channel_error_status(struct tegra_channel *chan)
 	return err;
 }
 
+/*
+ * Initialize the VI and request it to fill `buf` with the next
+ * inbound frame. If we need to reset, do that now. Then enque
+ * the buffer for the release thread.
+ */
 static int tegra_channel_capture_frame(struct tegra_channel *chan,
 					struct tegra_channel_buffer *buf)
 {
-	struct timespec ts;
+	struct timespec ts = {0, 0};
 	int err = 0;
 	u32 val, frame_start, mw_ack_done;
 	int bytes_per_line = chan->format.bytesperline;
@@ -363,7 +373,8 @@ static int tegra_channel_capture_frame(struct tegra_channel *chan,
 	u32 thresh[TEGRA_CSI_BLOCKS] = { 0 };
 	u32 release_thresh[TEGRA_CSI_BLOCKS] = { 0 };
 	int valid_ports = chan->valid_ports;
-	int state = VB2_BUF_STATE_DONE;
+	int restart_version = 0;
+	bool is_streaming = atomic_read(&chan->is_streaming);
 
 	/* Init registers related to each frames */
 	for (index = 0; index < valid_ports; index++) {
@@ -420,12 +431,29 @@ static int tegra_channel_capture_frame(struct tegra_channel *chan,
 	}
 
 	/* enable input stream once the VI registers are configured */
-	if (!chan->bfirst_fstart) {
+	/* NOTE:
+	 * If a restart request has occured since the last time this
+	 * function was called, then restart (i.e. re-setup) the VI
+	 */
+	restart_version = atomic_read(&chan->restart_version);
+	if(restart_version != chan->capture_version || !is_streaming) {
+		chan->capture_version = restart_version;
+		/* TODO: added this call to ec_recover() here to prevent
+		 * it from happening on two separate threads if there was a
+		 * syncpt timeout on receive. Is this correct approach?
+		 */
+		tegra_channel_ec_recover(chan);
+
 		err = tegra_channel_enable_stream(chan);
 		if (err) {
-			state = VB2_BUF_STATE_ERROR;
+			dev_err(&chan->video.dev,
+				"failed to enable stream. ERROR: %d\n", err);
+
+			buf->state = VB2_BUF_STATE_ERROR;
 			chan->capture_state = CAPTURE_ERROR;
-			tegra_channel_ring_buffer(chan, buf, &ts, state);
+			getrawmonotonic(&ts);
+			set_timestamp(buf, &ts);
+			release_buffer(chan, buf);
 			return err;
 		}
 		/* Bit controls VI memory write, enable after all regs */
@@ -450,7 +478,7 @@ static int tegra_channel_capture_frame(struct tegra_channel *chan,
 		if (err) {
 			dev_err(&chan->video.dev,
 				"frame start syncpt timeout!%d\n", index);
-			state = VB2_BUF_STATE_ERROR;
+			buf->state = VB2_BUF_STATE_ERROR;
 			/* perform error recovery for timeout */
 			tegra_channel_ec_recover(chan);
 			chan->capture_state = CAPTURE_TIMEOUT;
@@ -463,14 +491,23 @@ static int tegra_channel_capture_frame(struct tegra_channel *chan,
 		/* TODO: TPG has frame height short error always set */
 		err = tegra_channel_error_status(chan);
 		if (err) {
-			state = VB2_BUF_STATE_ERROR;
+			buf->state = VB2_BUF_STATE_ERROR;
 			chan->capture_state = CAPTURE_ERROR;
 			/* do we have to run recover here ?? */
 			/* tegra_channel_ec_recover(chan); */
 		}
 	}
 
-	tegra_channel_ring_buffer(chan, buf, &ts, state);
+	set_timestamp(buf, &ts);
+
+	if(chan->capture_state == CAPTURE_GOOD) {
+		/* Set the buffer version to match the current capture version */
+		buf->version = chan->capture_version;
+		enqueue_inflight(chan, buf);
+	} else {
+		release_buffer(chan, buf);
+		atomic_inc(&chan->restart_version);
+	}
 
 	return 0;
 }
@@ -483,12 +520,13 @@ static void tegra_channel_capture_done(struct tegra_channel *chan)
 	u32 val, mw_ack_done;
 	u32 thresh[TEGRA_CSI_BLOCKS] = { 0 };
 	struct tegra_channel_buffer *buf;
-	int state = VB2_BUF_STATE_DONE;
 
 	/* dequeue buffer and return if no buffer exists */
 	buf = dequeue_buffer(chan);
-	if (!buf)
+	if (!buf) {
+		dev_dbg(&chan->video.dev, "%s: no buffers in queue\n", __func__);
 		return;
+	}
 
 	for (index = 0; index < chan->valid_ports; index++) {
 		/* Program buffer address by using surface 0 */
@@ -536,27 +574,41 @@ static void tegra_channel_capture_done(struct tegra_channel *chan)
 		if (err) {
 			dev_err(&chan->video.dev,
 				"MW_ACK_DONE syncpoint time out!%d\n", index);
-			state = VB2_BUF_STATE_ERROR;
+			buf->state = VB2_BUF_STATE_ERROR;
 			/* perform error recovery for timeout */
 			tegra_channel_ec_recover(chan);
-			chan->capture_state = CAPTURE_TIMEOUT;
 			break;
 		}
+		else {
+			buf->state = VB2_BUF_STATE_DONE;
+		}
 	}
+	set_timestamp(buf, &ts);
+	release_buffer(chan, buf);
 
 	/* Mark capture state to IDLE as capture is finished */
 	chan->capture_state = CAPTURE_IDLE;
-
-	tegra_channel_ring_buffer(chan, buf, &ts, state);
 }
 
 static void tegra_channel_release_frame(struct tegra_channel *chan,
 					struct tegra_channel_buffer *buf)
 {
-	struct timespec ts;
+	struct timespec ts = {0, 0};
 	int index;
 	int err = 0;
-	int state = VB2_BUF_STATE_DONE;
+	int restart_version = 0;
+	buf->state = VB2_BUF_STATE_DONE;
+
+	/* If the frame capture was started on a different reset version
+	 * than our current version than either a reset is imminent or
+	 * it has already happened so don't bother waiting for the frame
+	 * to complete. */
+	restart_version = atomic_read(&chan->restart_version);
+	if(buf->version != restart_version) {
+		buf->state = VB2_BUF_STATE_ERROR;
+		release_buffer(chan, buf);
+		return;
+	}
 
 	for (index = 0; index < chan->valid_ports; index++) {
 		err = nvhost_syncpt_wait_timeout_ext(chan->vi->ndev,
@@ -568,15 +620,19 @@ static void tegra_channel_release_frame(struct tegra_channel *chan,
 	}
 
 	if (err) {
-		state = VB2_BUF_STATE_ERROR;
+		buf->state = VB2_BUF_STATE_ERROR;
 		/* perform error recovery for timeout */
+		/* NOTE:
+		 * disabling the following, it will happen in the
+		 * capture thread on the next frame start due to the reset
+		 * request we make by incrementing the reset counter
+
 		tegra_channel_ec_recover(chan);
 		chan->capture_state = CAPTURE_TIMEOUT;
-		tegra_channel_ring_buffer(chan, buf, &ts, state);
-	} else {
-		chan->buffer_state[chan->free_index] = state;
-		free_ring_buffers(chan, 1);
+		 */
+		atomic_inc(&chan->restart_version);
 	}
+	release_buffer(chan, buf);
 }
 
 static int tegra_channel_kthread_capture_start(void *data)
@@ -631,7 +687,7 @@ static int tegra_channel_kthread_release(void *data)
 		if (kthread_should_stop())
 			break;
 
-		buf = dequeue_release_buffer(chan);
+		buf = dequeue_inflight(chan);
 		if (!buf)
 			continue;
 
@@ -643,6 +699,8 @@ static int tegra_channel_kthread_release(void *data)
 
 static void tegra_channel_stop_kthreads(struct tegra_channel *chan)
 {
+	struct tegra_channel_buffer *buf;
+
 	mutex_lock(&chan->stop_kthread_lock);
 	/* Stop the kthread for capture */
 	if (chan->kthread_capture_start) {
@@ -651,6 +709,11 @@ static void tegra_channel_stop_kthreads(struct tegra_channel *chan)
 	}
 
 	if (chan->kthread_release) {
+		if (!list_empty(&chan->release)) {
+			buf = dequeue_inflight(chan);
+			if (buf)
+				tegra_channel_release_frame(chan, buf);
+		}
 		kthread_stop(chan->kthread_release);
 		chan->kthread_release = NULL;
 	}
@@ -787,7 +850,6 @@ int vi2_channel_start_streaming(struct vb2_queue *vq, u32 count)
 		goto error_capture_setup;
 
 	chan->sequence = 0;
-	tegra_channel_init_ring_buffer(chan);
 
 	/* disable override for vi mode */
 	override_ctrl = v4l2_ctrl_find(
@@ -855,8 +917,7 @@ void vi2_channel_stop_streaming(struct vb2_queue *vq)
 		/* wait for last frame memory write ack */
 		if (is_streaming && chan->capture_state == CAPTURE_GOOD)
 			tegra_channel_capture_done(chan);
-		/* free all the ring buffers */
-		free_ring_buffers(chan, chan->num_buffers);
+
 		/* dequeue buffers back to app which are in capture queue */
 		tegra_channel_queued_buf_done(chan, VB2_BUF_STATE_ERROR);
 

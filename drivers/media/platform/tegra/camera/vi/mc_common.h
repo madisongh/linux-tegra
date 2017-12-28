@@ -75,6 +75,8 @@ struct tegra_channel_buffer {
 	u32 thresh[TEGRA_CSI_BLOCKS];
 
 	dma_addr_t addr;
+	int version;
+	int state;
 };
 
 #define to_tegra_channel_buffer(vb) \
@@ -131,6 +133,13 @@ struct tegra_vi_graph_entity {
  * @fmts_bitmap: a bitmap for formats supported
  * @bypass: bypass flag for VI bypass mode
  * @hdmiin: hdmiin flag for hdmi to csi bridge
+ *
+ * @restart_version: incremented every time either capture or release threads
+ *                   wants to reset VI. it is appended to each buffer processed
+ *                   by the capture thread, and inspected by each buffer
+ *                   processed by the receive thread.
+ * @capture_version: thread-local copy of @restart_version created when the
+ *                   capture thread resets the VI.
  */
 struct tegra_channel {
 	int id;
@@ -155,13 +164,9 @@ struct tegra_channel {
 	unsigned int syncpt[TEGRA_CSI_BLOCKS][MAX_SYNCPT_PER_CHANNEL];
 	unsigned int syncpoint_fifo[TEGRA_CSI_BLOCKS][MAX_SYNCPT_PER_CHANNEL];
 	unsigned int buffer_offset[TEGRA_CSI_BLOCKS];
-	unsigned int buffer_state[QUEUED_BUFFERS];
-	struct vb2_v4l2_buffer *buffers[QUEUED_BUFFERS];
 	unsigned int timeout;
-	unsigned int save_index;
-	unsigned int free_index;
-	unsigned int num_buffers;
-	unsigned int released_bufs;
+	atomic_t restart_version;
+	int capture_version;
 
 	struct task_struct *kthread_capture_start;
 	struct task_struct *kthread_release;
@@ -205,7 +210,6 @@ struct tegra_channel {
 	bool hdmiin;
 	bool write_ispformat;
 	enum tegra_vi_pg_mode pg_mode;
-	bool bfirst_fstart;
 	enum channel_capture_state capture_state;
 	spinlock_t capture_state_lock;
 	atomic_t is_streaming;
