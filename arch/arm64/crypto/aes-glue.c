@@ -33,7 +33,11 @@
 MODULE_DESCRIPTION("AES-ECB/CBC/CTR/XTS using ARMv8 Crypto Extensions");
 #else
 #define MODE			"neon"
+#ifdef CONFIG_ARCH_TEGRA_210_SOC
+#define PRIO			400
+#else
 #define PRIO			200
+#endif
 #define aes_setkey		crypto_aes_set_key
 #define aes_expandkey		crypto_aes_expand_key
 #define aes_ecb_encrypt		neon_aes_ecb_encrypt
