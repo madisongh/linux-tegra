@@ -1,7 +1,7 @@
 /*
  * NVIDIA Tegra Video Input Device
  *
- * Copyright (c) 2015-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Bryan Wu <pengw@nvidia.com>
  *
@@ -351,30 +351,15 @@ static void add_buffer_to_ring(struct tegra_channel *chan,
 	chan->num_buffers++;
 }
 
-static void update_state_to_buffer(struct tegra_channel *chan, int state)
-{
-	int save_index = (chan->save_index - PREVIOUS_BUFFER_DEC_INDEX);
-
-	/* save index decrements by 2 as 3 bufs are added in ring buffer */
-	if (save_index < 0)
-		save_index += QUEUED_BUFFERS;
-	/* update state for the previous buffer */
-	chan->buffer_state[save_index] = state;
-
-	/* for timeout/error case update the current buffer state as well */
-	if (chan->capture_state != CAPTURE_GOOD)
-		chan->buffer_state[chan->save_index] = state;
-}
-
 void tegra_channel_ring_buffer(struct tegra_channel *chan,
-					struct vb2_v4l2_buffer *vb,
+					struct tegra_channel_buffer *buf,
 					struct timespec *ts, int state)
 
 {
+	struct vb2_v4l2_buffer *vb = &buf->buf;
+
 	if (!chan->bfirst_fstart)
 		chan->bfirst_fstart = true;
-	else
-		update_state_to_buffer(chan, state);
 
 	/* Capture state is not GOOD, release all buffers and re-init state */
 	if (chan->capture_state != CAPTURE_GOOD) {
@@ -385,11 +370,15 @@ void tegra_channel_ring_buffer(struct tegra_channel *chan,
 		/* update time stamp of the buffer */
 		vb->timestamp.tv_sec = ts->tv_sec;
 		vb->timestamp.tv_usec = ts->tv_nsec / NSEC_PER_USEC;
-	}
 
-	/* release buffer N at N+2 frame start event */
-	if (chan->num_buffers >= (QUEUED_BUFFERS - 1))
-		free_ring_buffers(chan, 1);
+		/* Put buffer into the release queue */
+		spin_lock(&chan->release_lock);
+		list_add_tail(&buf->queue, &chan->release);
+		spin_unlock(&chan->release_lock);
+
+		/* Wait up kthread for release */
+		wake_up_interruptible(&chan->release_wait);
+	}
 }
 
 void tegra_channel_ec_close(struct tegra_mc_vi *vi)
@@ -400,6 +389,25 @@ void tegra_channel_ec_close(struct tegra_mc_vi *vi)
 	list_for_each_entry(chan, &vi->vi_chans, list) {
 		memset(&chan->syncpoint_fifo[0], 0, TEGRA_CSI_BLOCKS);
 	}
+}
+
+struct tegra_channel_buffer *dequeue_release_buffer(struct tegra_channel *chan)
+{
+	struct tegra_channel_buffer *buf = NULL;
+
+	spin_lock(&chan->release_lock);
+	if (list_empty(&chan->release))
+		goto done;
+
+	buf = list_entry(chan->release.next,
+			 struct tegra_channel_buffer, queue);
+	if (!buf)
+		goto done;
+
+	list_del_init(&buf->queue);
+done:
+	spin_unlock(&chan->release_lock);
+	return buf;
 }
 
 struct tegra_channel_buffer *dequeue_buffer(struct tegra_channel *chan)
@@ -490,6 +498,8 @@ void tegra_channel_queued_buf_done(struct tegra_channel *chan,
 	struct tegra_channel_buffer *buf, *nbuf;
 	spinlock_t *lock = &chan->start_lock;
 	struct list_head *q = &chan->capture;
+	spinlock_t *release_lock = &chan->release_lock;
+	struct list_head *rel_q = &chan->release;
 
 	spin_lock(lock);
 	list_for_each_entry_safe(buf, nbuf, q, queue) {
@@ -497,6 +507,14 @@ void tegra_channel_queued_buf_done(struct tegra_channel *chan,
 		list_del(&buf->queue);
 	}
 	spin_unlock(lock);
+
+	/* delete release list */
+	spin_lock(release_lock);
+	list_for_each_entry_safe(buf, nbuf, rel_q, queue) {
+		vb2_buffer_done(&buf->buf.vb2_buf, state);
+		list_del(&buf->queue);
+	}
+	spin_unlock(release_lock);
 }
 
 #define __tegra_channel_device_call_subdevs_all_p(v4l2_dev, sd, cond, o,\
@@ -1639,6 +1657,9 @@ int tegra_channel_init(struct tegra_channel *chan)
 	INIT_LIST_HEAD(&chan->entities);
 	init_waitqueue_head(&chan->start_wait);
 	spin_lock_init(&chan->start_lock);
+	INIT_LIST_HEAD(&chan->release);
+	init_waitqueue_head(&chan->release_wait);
+	spin_lock_init(&chan->release_lock);
 	mutex_init(&chan->stop_kthread_lock);
 	atomic_set(&chan->is_streaming, DISABLE);
 	spin_lock_init(&chan->capture_state_lock);

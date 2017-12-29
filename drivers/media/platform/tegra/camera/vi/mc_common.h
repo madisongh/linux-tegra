@@ -3,7 +3,7 @@
  *
  * Tegra Media controller common APIs
  *
- * Copyright (c) 2012-2017, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2012-2018, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -72,6 +72,7 @@ struct tegra_channel_buffer {
 	struct vb2_v4l2_buffer buf;
 	struct list_head queue;
 	struct tegra_channel *chan;
+	u32 thresh[TEGRA_CSI_BLOCKS];
 
 	dma_addr_t addr;
 };
@@ -152,7 +153,7 @@ struct tegra_channel {
 
 	unsigned char port[TEGRA_CSI_BLOCKS];
 	unsigned int syncpt[TEGRA_CSI_BLOCKS][MAX_SYNCPT_PER_CHANNEL];
-	unsigned int syncpoint_fifo[TEGRA_CSI_BLOCKS];
+	unsigned int syncpoint_fifo[TEGRA_CSI_BLOCKS][MAX_SYNCPT_PER_CHANNEL];
 	unsigned int buffer_offset[TEGRA_CSI_BLOCKS];
 	unsigned int buffer_state[QUEUED_BUFFERS];
 	struct vb2_v4l2_buffer *buffers[QUEUED_BUFFERS];
@@ -163,12 +164,16 @@ struct tegra_channel {
 	unsigned int released_bufs;
 
 	struct task_struct *kthread_capture_start;
+	struct task_struct *kthread_release;
 	wait_queue_head_t start_wait;
+	wait_queue_head_t release_wait;
 	struct vb2_queue queue;
 	void *alloc_ctx;
 	bool init_done;
 	struct list_head capture;
+	struct list_head release;
 	spinlock_t start_lock;
+	spinlock_t release_lock;
 	struct work_struct status_work;
 	struct work_struct error_work;
 
