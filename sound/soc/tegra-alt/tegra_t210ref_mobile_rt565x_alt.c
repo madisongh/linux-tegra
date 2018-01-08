@@ -1,7 +1,7 @@
 /*
  * tegra_t210ref_mobile_rt565x_alt.c - Tegra T210 Machine driver for mobile
  *
- * Copyright (c) 2015-2017 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2018 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -945,13 +945,13 @@ static int tegra_t210ref_driver_probe(struct platform_device *pdev)
 					&pdev->dev,
 					card);
 	if (ret)
-		goto err_alloc_dai_link;
+		goto err_switch_unregister;
 
 	ret = snd_soc_register_card(card);
 	if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
 			ret);
-		goto err_alloc_dai_link;
+		goto err_fini_utils;
 	}
 
 	idx = tegra_machine_get_codec_dai_link_idx("rt565x-playback");
@@ -977,6 +977,12 @@ static int tegra_t210ref_driver_probe(struct platform_device *pdev)
 
 	return 0;
 
+err_fini_utils:
+	tegra_alt_asoc_utils_fini(&machine->audio_clock);
+err_switch_unregister:
+#ifdef CONFIG_SWITCH
+	tegra_alt_asoc_switch_unregister(&tegra_t210ref_headset_switch);
+#endif
 err_alloc_dai_link:
 	tegra_machine_remove_dai_link();
 	tegra_machine_remove_codec_conf();
@@ -991,6 +997,9 @@ static int tegra_t210ref_driver_remove(struct platform_device *pdev)
 
 	snd_soc_unregister_card(card);
 
+#ifdef CONFIG_SWITCH
+	tegra_alt_asoc_switch_unregister(&tegra_t210ref_headset_switch);
+#endif
 	tegra_machine_remove_dai_link();
 	tegra_machine_remove_codec_conf();
 	tegra_alt_asoc_utils_fini(&machine->audio_clock);
