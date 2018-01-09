@@ -179,6 +179,8 @@
 
 #define TRCSTATR_IDLE_BIT		0
 
+#define NUM_OF_ETM_REGISTERS 		100
+
 /**
  * struct etm4_drvdata - specifics associated to an ETM component
  * @base:       Memory mapped base address for this component.
@@ -366,6 +368,7 @@ struct etmv4_drvdata {
 	u8				s_ex_level;
 	u8				ns_ex_level;
 	u32				ext_inp;
+	u32				reg_ctx[NUM_OF_ETM_REGISTERS];
 };
 
 /* Address comparator access types */

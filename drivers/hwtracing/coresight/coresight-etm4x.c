@@ -34,10 +34,12 @@
 #include <linux/pm_runtime.h>
 #include <asm/sections.h>
 #include <linux/of.h>
+#include <linux/cpu_pm.h>
 
 #include "coresight-etm4x.h"
 
 static int boot_enable;
+static int etm4_cpu_enable[NR_CPUS];
 module_param_named(boot_enable, boot_enable, int, S_IRUGO);
 
 /* The number of ETMv4 currently registered */
@@ -199,11 +201,12 @@ static int etm4_enable(struct coresight_device *csdev)
 				       etm4_enable_hw, drvdata, 1);
 	if (ret)
 		goto err;
+
 	drvdata->enable = true;
 	drvdata->sticky_enable = true;
+	etm4_cpu_enable[drvdata->cpu] = 1;
 
 	spin_unlock(&drvdata->spinlock);
-
 	dev_info(drvdata->dev, "ETM tracing enabled\n");
 	return 0;
 err:
@@ -253,7 +256,7 @@ static void etm4_disable(struct coresight_device *csdev)
 	 */
 	smp_call_function_single(drvdata->cpu, etm4_disable_hw, drvdata, 1);
 	drvdata->enable = false;
-
+	etm4_cpu_enable[drvdata->cpu] = 0;
 	spin_unlock(&drvdata->spinlock);
 	put_online_cpus();
 
@@ -2551,6 +2554,250 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
 	drvdata->trcid = 0x20 + drvdata->cpu;
 }
 
+#ifdef CONFIG_CPU_PM
+
+#define SAVE_ETM4_REG(reg) \
+	(drvdata->reg_ctx[cnt++] = readl_relaxed(drvdata->base + reg))
+
+#define ETM4_REG_SAVE_LIST \
+	do { \
+		/* main cfg and control registers */ \
+		SAVE_ETM4_REG(TRCPRGCTLR); \
+		SAVE_ETM4_REG(TRCPROCSELR); \
+		SAVE_ETM4_REG(TRCCONFIGR); \
+		SAVE_ETM4_REG(TRCEVENTCTL0R); \
+		SAVE_ETM4_REG(TRCEVENTCTL1R); \
+		SAVE_ETM4_REG(TRCQCTLR); \
+		SAVE_ETM4_REG(TRCTRACEIDR); \
+		SAVE_ETM4_REG(TRCSTALLCTLR); \
+		SAVE_ETM4_REG(TRCTSCTLR); \
+		SAVE_ETM4_REG(TRCSYNCPR); \
+		SAVE_ETM4_REG(TRCCCCTLR); \
+		SAVE_ETM4_REG(TRCBBCTLR); \
+\
+		/* filtering control registers */ \
+		SAVE_ETM4_REG(TRCVICTLR); \
+		SAVE_ETM4_REG(TRCVIIECTLR); \
+		SAVE_ETM4_REG(TRCVISSCTLR); \
+		SAVE_ETM4_REG(TRCVIPCSSCTLR); \
+\
+		/* derived resources registers */ \
+		SAVE_ETM4_REG(TRCSEQEVRn(0)); \
+		SAVE_ETM4_REG(TRCSEQEVRn(1)); \
+		SAVE_ETM4_REG(TRCSEQRSTEVR); \
+		SAVE_ETM4_REG(TRCSEQSTR); \
+		SAVE_ETM4_REG(TRCCNTRLDVRn(0)); \
+		SAVE_ETM4_REG(TRCCNTRLDVRn(1)); \
+		SAVE_ETM4_REG(TRCCNTVRn(0)); \
+		SAVE_ETM4_REG(TRCCNTVRn(1)); \
+		SAVE_ETM4_REG(TRCCNTCTLRn(0)); \
+		SAVE_ETM4_REG(TRCCNTCTLRn(1)); \
+		SAVE_ETM4_REG(TRCEXTINSELR); \
+\
+		/* resource selection registers */ \
+		SAVE_ETM4_REG(TRCRSCTLRn(2)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(3)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(4)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(5)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(6)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(7)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(8)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(9)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(10)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(11)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(12)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(13)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(14)); \
+		SAVE_ETM4_REG(TRCRSCTLRn(15)); \
+\
+		/* comparator registers */ \
+		SAVE_ETM4_REG(TRCACVRn(0)); \
+		SAVE_ETM4_REG(TRCACVRn(0)+4); \
+		SAVE_ETM4_REG(TRCACVRn(1)); \
+		SAVE_ETM4_REG(TRCACVRn(1)+4); \
+		SAVE_ETM4_REG(TRCACVRn(2)); \
+		SAVE_ETM4_REG(TRCACVRn(2)+4); \
+		SAVE_ETM4_REG(TRCACVRn(3)); \
+		SAVE_ETM4_REG(TRCACVRn(3)+4); \
+		SAVE_ETM4_REG(TRCACVRn(4)); \
+		SAVE_ETM4_REG(TRCACVRn(4)+4); \
+		SAVE_ETM4_REG(TRCACVRn(5)); \
+		SAVE_ETM4_REG(TRCACVRn(5)+4); \
+		SAVE_ETM4_REG(TRCACVRn(6)); \
+		SAVE_ETM4_REG(TRCACVRn(6)+4); \
+		SAVE_ETM4_REG(TRCACVRn(7)); \
+		SAVE_ETM4_REG(TRCACVRn(7)+4); \
+\
+		SAVE_ETM4_REG(TRCACATRn(0)); \
+		SAVE_ETM4_REG(TRCACATRn(1)); \
+		SAVE_ETM4_REG(TRCACATRn(2)); \
+		SAVE_ETM4_REG(TRCACATRn(3)); \
+		SAVE_ETM4_REG(TRCACATRn(4)); \
+		SAVE_ETM4_REG(TRCACATRn(5)); \
+		SAVE_ETM4_REG(TRCACATRn(6)); \
+		SAVE_ETM4_REG(TRCACATRn(7)); \
+\
+		SAVE_ETM4_REG(TRCCIDCVRn(0)); \
+		SAVE_ETM4_REG(TRCCIDCCTLR0); \
+		SAVE_ETM4_REG(TRCVMIDCVRn(0)); \
+\
+		/* single-shot comparator registers */ \
+		SAVE_ETM4_REG(TRCSSCCRn(0)); \
+		SAVE_ETM4_REG(TRCSSCSRn(0)); \
+\
+		/* claim tag registers */ \
+		SAVE_ETM4_REG(TRCCLAIMCLR); \
+	} while (0);
+
+static void etm4_regs_save(int cpu_id)
+{
+	int cnt = 0;
+	struct etmv4_drvdata *drvdata = etmdrvdata[cpu_id];
+
+	if (!drvdata)
+		return;
+	CS_UNLOCK(drvdata->base);
+	ETM4_REG_SAVE_LIST;
+	CS_LOCK(drvdata->base);
+}
+
+
+#define RESTORE_ETM4_REG(reg) \
+	(writel_relaxed(drvdata->reg_ctx[cnt++], drvdata->base + reg))
+
+#define ETM4_REG_RESTORE_LIST \
+	do { \
+		/* main cfg and control registers */ \
+		RESTORE_ETM4_REG(TRCPRGCTLR); \
+		RESTORE_ETM4_REG(TRCPROCSELR); \
+		RESTORE_ETM4_REG(TRCCONFIGR); \
+		RESTORE_ETM4_REG(TRCEVENTCTL0R); \
+		RESTORE_ETM4_REG(TRCEVENTCTL1R); \
+		RESTORE_ETM4_REG(TRCQCTLR); \
+		RESTORE_ETM4_REG(TRCTRACEIDR); \
+		RESTORE_ETM4_REG(TRCSTALLCTLR); \
+		RESTORE_ETM4_REG(TRCTSCTLR); \
+		RESTORE_ETM4_REG(TRCSYNCPR); \
+		RESTORE_ETM4_REG(TRCCCCTLR); \
+		RESTORE_ETM4_REG(TRCBBCTLR); \
+\
+		/* filtering control registers */ \
+		RESTORE_ETM4_REG(TRCVICTLR); \
+		RESTORE_ETM4_REG(TRCVIIECTLR); \
+		RESTORE_ETM4_REG(TRCVISSCTLR); \
+		RESTORE_ETM4_REG(TRCVIPCSSCTLR); \
+\
+		/* derived resources registers */ \
+		RESTORE_ETM4_REG(TRCSEQEVRn(0)); \
+		RESTORE_ETM4_REG(TRCSEQEVRn(1)); \
+		RESTORE_ETM4_REG(TRCSEQRSTEVR); \
+		RESTORE_ETM4_REG(TRCSEQSTR); \
+		RESTORE_ETM4_REG(TRCCNTRLDVRn(0)); \
+		RESTORE_ETM4_REG(TRCCNTRLDVRn(1)); \
+		RESTORE_ETM4_REG(TRCCNTVRn(0)); \
+		RESTORE_ETM4_REG(TRCCNTVRn(1)); \
+		RESTORE_ETM4_REG(TRCCNTCTLRn(0)); \
+		RESTORE_ETM4_REG(TRCCNTCTLRn(1)); \
+		RESTORE_ETM4_REG(TRCEXTINSELR); \
+\
+		/* resource selection registers */ \
+		RESTORE_ETM4_REG(TRCRSCTLRn(2)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(3)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(4)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(5)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(6)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(7)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(8)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(9)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(10)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(11)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(12)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(13)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(14)); \
+		RESTORE_ETM4_REG(TRCRSCTLRn(15)); \
+\
+		/* comparator registers */ \
+		RESTORE_ETM4_REG(TRCACVRn(0)); \
+		RESTORE_ETM4_REG(TRCACVRn(0)+4); \
+		RESTORE_ETM4_REG(TRCACVRn(1)); \
+		RESTORE_ETM4_REG(TRCACVRn(1)+4); \
+		RESTORE_ETM4_REG(TRCACVRn(2)); \
+		RESTORE_ETM4_REG(TRCACVRn(2)+4); \
+		RESTORE_ETM4_REG(TRCACVRn(3)); \
+		RESTORE_ETM4_REG(TRCACVRn(3)+4); \
+		RESTORE_ETM4_REG(TRCACVRn(4)); \
+		RESTORE_ETM4_REG(TRCACVRn(4)+4); \
+		RESTORE_ETM4_REG(TRCACVRn(5)); \
+		RESTORE_ETM4_REG(TRCACVRn(5)+4); \
+		RESTORE_ETM4_REG(TRCACVRn(6)); \
+		RESTORE_ETM4_REG(TRCACVRn(6)+4); \
+		RESTORE_ETM4_REG(TRCACVRn(7)); \
+		RESTORE_ETM4_REG(TRCACVRn(7)+4); \
+\
+		RESTORE_ETM4_REG(TRCACATRn(0)); \
+		RESTORE_ETM4_REG(TRCACATRn(1)); \
+		RESTORE_ETM4_REG(TRCACATRn(2)); \
+		RESTORE_ETM4_REG(TRCACATRn(3)); \
+		RESTORE_ETM4_REG(TRCACATRn(4)); \
+		RESTORE_ETM4_REG(TRCACATRn(5)); \
+		RESTORE_ETM4_REG(TRCACATRn(6)); \
+		RESTORE_ETM4_REG(TRCACATRn(7)); \
+\
+		RESTORE_ETM4_REG(TRCCIDCVRn(0)); \
+		RESTORE_ETM4_REG(TRCCIDCCTLR0); \
+		RESTORE_ETM4_REG(TRCVMIDCVRn(0)); \
+\
+		/* single-shot comparator registers */ \
+		RESTORE_ETM4_REG(TRCSSCCRn(0)); \
+		RESTORE_ETM4_REG(TRCSSCSRn(0)); \
+\
+		/* claim tag registers */ \
+		RESTORE_ETM4_REG(TRCCLAIMCLR); \
+	} while (0);
+
+static void etm4_regs_restore(int cpu_id)
+{
+	int cnt = 0;
+	struct etmv4_drvdata *drvdata = etmdrvdata[cpu_id];
+
+	if (!drvdata)
+		return;
+
+	CS_UNLOCK(drvdata->base);
+	etm4_os_unlock(drvdata);
+	ETM4_REG_RESTORE_LIST;
+	CS_LOCK(drvdata->base);
+
+}
+
+static int etm4_cpu_pm_notifier(struct notifier_block *self,
+	unsigned long action, void *not_used)
+{
+	int ret = NOTIFY_OK;
+	int cpu_id = raw_smp_processor_id();
+
+	switch (action) {
+	case CPU_PM_ENTER:
+		if(etm4_cpu_enable[cpu_id]){
+			etm4_regs_save(cpu_id);
+		}
+		break;
+	case CPU_PM_EXIT:
+		if(etm4_cpu_enable[cpu_id]){
+			etm4_regs_restore(cpu_id);
+		}
+		break;
+	default:
+		ret = NOTIFY_DONE;
+	}
+	return ret;
+}
+
+static struct notifier_block etm4_cpu_pm_notifier_block = {
+	.notifier_call = etm4_cpu_pm_notifier,
+};
+#endif
+
 static int etm4_cpu_callback(struct notifier_block *nfb, unsigned long action,
 			    void *hcpu)
 {
@@ -2642,6 +2889,7 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 
 	get_online_cpus();
 	etmdrvdata[drvdata->cpu] = drvdata;
+	etm4_cpu_enable[drvdata->cpu] = 0;
 
 	if (!smp_call_function_single(drvdata->cpu, etm4_os_unlock, drvdata, 1))
 		drvdata->os_unlock = true;
@@ -2650,8 +2898,13 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 				etm4_init_arch_data,  drvdata, 1))
 		dev_err(dev, "ETM arch init failed\n");
 
-	if (!etm4_count++)
+	if (!etm4_count++){
 		register_hotcpu_notifier(&etm4_cpu_notifier);
+#ifdef CONFIG_CPU_PM
+		if(of_property_read_bool(dev->of_node, "cpu-dynamic-power-gating"))
+			cpu_pm_register_notifier(&etm4_cpu_pm_notifier_block);
+#endif
+	}
 
 	put_online_cpus();
 
@@ -2687,8 +2940,14 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 err_arch_supported:
 	pm_runtime_put(&adev->dev);
 err_coresight_register:
-	if (--etm4_count == 0)
+	if (--etm4_count == 0){
 		unregister_hotcpu_notifier(&etm4_cpu_notifier);
+#ifdef CONFIG_CPU_PM
+	if(of_property_read_bool(dev->of_node, "cpu-dynamic-power-gating"))
+		cpu_pm_unregister_notifier(&etm4_cpu_pm_notifier_block);
+#endif
+	}
+
 	return ret;
 }
 
@@ -2697,8 +2956,13 @@ static int etm4_remove(struct amba_device *adev)
 	struct etmv4_drvdata *drvdata = amba_get_drvdata(adev);
 
 	coresight_unregister(drvdata->csdev);
-	if (--etm4_count == 0)
+	if (--etm4_count == 0){
 		unregister_hotcpu_notifier(&etm4_cpu_notifier);
+#ifdef CONFIG_CPU_PM
+	if(of_property_read_bool(drvdata->dev->of_node, "cpu-dynamic-power-gating"))
+		cpu_pm_unregister_notifier(&etm4_cpu_pm_notifier_block);
+#endif
+	}
 
 	return 0;
 }
