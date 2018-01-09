@@ -484,6 +484,8 @@ static int tegra_channel_capture_frame(struct tegra_channel *chan,
 			chan->capture_state = CAPTURE_TIMEOUT;
 			break;
 		}
+		dev_dbg(&chan->video.dev,
+			"%s: vi2 got SOF syncpt buf[%p]\n", __func__, buf);
 	}
 
 	if (!err && !chan->pg_mode) {
@@ -617,6 +619,9 @@ static void tegra_channel_release_frame(struct tegra_channel *chan,
 		if (err)
 			dev_err(&chan->video.dev,
 				"MW_ACK_DONE syncpoint time out!%d\n", index);
+
+		dev_dbg(&chan->video.dev,
+			"%s: vi2 got EOF syncpt buf[%p]\n", __func__, buf);
 	}
 
 	if (err) {

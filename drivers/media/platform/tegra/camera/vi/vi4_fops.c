@@ -536,6 +536,8 @@ static int tegra_channel_capture_frame(struct tegra_channel *chan,
 
 	/* wait for vi notifier events */
 	vi_notify_wait(chan, &ts);
+	dev_dbg(&chan->video.dev,
+		"%s: vi4 got SOF syncpt buf[%p]\n", __func__, buf);
 
 	vi4_check_status(chan);
 
@@ -590,6 +592,8 @@ static void tegra_channel_release_frame(struct tegra_channel *chan,
 			dev_err(&chan->video.dev,
 				"MW_ACK_DONE syncpoint time out!%d\n", index);
 	}
+	dev_dbg(&chan->video.dev,
+		"%s: vi4 got EOF syncpt buf[%p]\n", __func__, buf);
 
 	if (err) {
 		buf->state = VB2_BUF_STATE_ERROR;

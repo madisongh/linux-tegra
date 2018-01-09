@@ -44,6 +44,8 @@
 
 #define TPG_CSI_GROUP_ID	10
 
+static s64 queue_init_ts;
+
 static void gang_buffer_offsets(struct tegra_channel *chan)
 {
 	int i;
@@ -296,6 +298,7 @@ static void tegra_channel_fmts_bitmap_init(struct tegra_channel *chan)
 void release_buffer(struct tegra_channel *chan, struct tegra_channel_buffer* buf)
 {
 	struct vb2_v4l2_buffer* vbuf = &buf->buf;
+	s64 frame_arrived_ts = 0;
 	/* release one frame */
 	vbuf->sequence = chan->sequence++;
 	vbuf->field = V4L2_FIELD_NONE;
@@ -312,6 +315,19 @@ void release_buffer(struct tegra_channel *chan, struct tegra_channel_buffer* buf
 		buf->state = VB2_BUF_STATE_ERROR;
 	}
 
+	if (chan->sequence == 1) {
+		/*
+		 * Evaluate the initial capture latency between videobuf2 queue
+		 * and first captured frame release to user-space.
+		 */
+		frame_arrived_ts = ktime_to_ms(ktime_get());
+		dev_dbg(&chan->video.dev, "%s: capture init latency is %lld ms\n",
+			__func__, (frame_arrived_ts - queue_init_ts));
+	}
+
+	dev_dbg(&chan->video.dev,
+		"%s: release buf[%p] frame[%d] to user-space\n",
+		__func__, buf, chan->sequence);
 	vb2_buffer_done(&vbuf->vb2_buf, buf->state);
 }
 
@@ -433,6 +449,14 @@ static void tegra_channel_buffer_queue(struct vb2_buffer *vb)
 	/* for bypass mode - do nothing */
 	if (chan->bypass)
 		return;
+
+	if (!queue_init_ts) {
+		/*
+		 * Record videobuf2 queue initial timestamp.
+		 * Note: latency is accurate when streaming is already turned ON
+		 */
+		queue_init_ts = ktime_to_ms(ktime_get());
+	}
 
 	/* Put buffer into the capture queue */
 	spin_lock(&chan->start_lock);
@@ -582,6 +606,9 @@ static void tegra_channel_stop_streaming(struct vb2_queue *vq)
 
 	if (vi->fops)
 		vi->fops->vi_stop_streaming(vq);
+
+	/* Clean-up recorded videobuf2 queue initial timestamp */
+	queue_init_ts = 0;
 }
 
 static const struct vb2_ops tegra_channel_queue_qops = {
