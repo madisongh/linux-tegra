@@ -1,7 +1,7 @@
 /*
  * ADMA driver for Nvidia's Tegra ADMA controller.
  *
- * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -62,6 +62,7 @@ struct tegra_adma_chip_data {
 
 /* ADMA channel registers */
 struct tegra_adma_chan_regs {
+	unsigned long	cmd;
 	unsigned long	ctrl;
 	unsigned long	config;
 	unsigned long	src_ptr;
@@ -1616,6 +1617,7 @@ static int tegra_adma_runtime_suspend(struct device *dev)
 			struct tegra_adma_chan *tdc = &tdma->channels[i];
 			struct tegra_adma_chan_regs *ch_reg = &tdc->channel_reg;
 
+			ch_reg->cmd = channel_read(tdc, ADMA_CH_CMD);
 			ch_reg->tc = channel_read(tdc, ADMA_CH_TC);
 			ch_reg->src_ptr =
 				channel_read(tdc, ADMA_CH_LOWER_SOURCE_ADDR);
@@ -1691,6 +1693,7 @@ static int tegra_adma_runtime_resume(struct device *dev)
 			channel_write(tdc, ADMA_CH_AHUB_FIFO_CTRL,
 					ch_reg->ahub_fifo_ctrl);
 			channel_write(tdc, ADMA_CH_CONFIG, ch_reg->config);
+			channel_write(tdc, ADMA_CH_CMD, ch_reg->cmd);
 		}
 	}
 	return 0;
