@@ -97,36 +97,6 @@ static int wl_cfgvendor_send_cmd_reply(struct wiphy *wiphy,
 	return cfg80211_vendor_cmd_reply(skb);
 }
 
-static int wl_cfgvendor_priv_string_handler(struct wiphy *wiphy,
-        struct wireless_dev *wdev, const void  *data, int len)
-{
-        struct bcm_cfg80211 *cfg = wiphy_priv(wiphy);
-        int err = 0;
-        int data_len = 0;
-
-        bzero(cfg->ioctl_buf, WLC_IOCTL_MAXLEN);
-
-        if (strncmp((char *)data, BRCM_VENDOR_SCMD_CAPA, strlen(BRCM_VENDOR_SCMD_CAPA)) == 0) {
-                err = wldev_iovar_getbuf(bcmcfg_to_prmry_ndev(cfg), "cap", NULL, 0,
-                        cfg->ioctl_buf, WLC_IOCTL_MAXLEN, &cfg->ioctl_buf_sync);
-                if (unlikely(err)) {
-                        WL_ERR(("error (%d)\n", err));
-                        return err;
-                }
-                data_len = strlen(cfg->ioctl_buf);
-                cfg->ioctl_buf[data_len] = '\0';
-        }
-
-        err =  wl_cfgvendor_send_cmd_reply(wiphy, bcmcfg_to_prmry_ndev(cfg),
-                cfg->ioctl_buf, data_len+1);
-        if (unlikely(err))
-                WL_ERR(("Vendor Command reply failed ret:%d \n", err));
-        else
-                WL_INFORM(("Vendor Command reply sent successfully!\n"));
-
-        return err;
-}
-
 static int wl_cfgvendor_set_country(struct wiphy *wiphy,
         struct wireless_dev *wdev, const void  *data, int len)
 {
@@ -206,22 +176,6 @@ exit:
 #endif /* GSCAN_SUPPORT */
 
 static const struct wiphy_vendor_command wl_vendor_cmds [] = {
-	{
-		{
-			.vendor_id = OUI_BRCM,
-			.subcmd = BRCM_VENDOR_SCMD_PRIV_STR
-		},
-		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
-		.doit = wl_cfgvendor_priv_string_handler
-	},
-	{
-		{
-			.vendor_id = OUI_GOOGLE,
-			.subcmd = ANDR_WIFI_SET_COUNTRY
-		},
-		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
-		.doit = wl_cfgvendor_set_country
-	},
 #ifdef GSCAN_SUPPORT
 	{
 		{
