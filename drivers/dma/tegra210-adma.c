@@ -319,9 +319,9 @@ static int tegra_adma_is_paused(struct tegra_adma_chan *tdc)
 	return csts;
 }
 
-static void tegra_adma_pause(struct tegra_adma_chan *tdc,
-	bool wait_for_burst_complete)
+static int tegra_adma_pause(struct dma_chan *dc)
 {
+	struct tegra_adma_chan *tdc = to_tegra_adma_chan(dc);
 	u32 dcnt = 10;
 
 	channel_set_field(tdc, ADMA_CH_CTRL, ADMA_CH_CTRL_TRANSFER_PAUSE_SHIFT,
@@ -330,12 +330,18 @@ static void tegra_adma_pause(struct tegra_adma_chan *tdc,
 	while (tegra_adma_is_paused(tdc) &&
 	       dcnt--)
 		udelay(TEGRA_ADMA_BURST_COMPLETE_TIME);
+
+	return 0;
 }
 
-static void tegra_adma_resume(struct tegra_adma_chan *tdc)
+static int tegra_adma_resume(struct dma_chan *dc)
 {
+	struct tegra_adma_chan *tdc = to_tegra_adma_chan(dc);
+
 	channel_set_field(tdc, ADMA_CH_CTRL, ADMA_CH_CTRL_TRANSFER_PAUSE_SHIFT,
 			ADMA_CH_CTRL_TRANSFER_PAUSE_MASK, 0);
+
+	return 0;
 }
 
 static int tegra_adma_is_enabled(struct tegra_adma_chan *tdc)
@@ -463,7 +469,7 @@ static void tegra_adma_configure_for_next(struct tegra_adma_chan *tdc,
 	 * If there is already interrupt transfer done status then interrupt
 	 * handler need to load new configuration.
 	 */
-	tegra_adma_pause(tdc, false);
+	tegra_adma_pause(&tdc->dma_chan);
 	status  = channel_read(tdc, ADMA_CH_INT_STATUS);
 
 	/*
@@ -473,7 +479,7 @@ static void tegra_adma_configure_for_next(struct tegra_adma_chan *tdc,
 	if (status & ADMA_CH_INT_TD_STATUS) {
 		dev_err(tdc2dev(tdc),
 			"Skipping new configuration as interrupt is pending\n");
-		tegra_adma_resume(tdc);
+		tegra_adma_resume(&tdc->dma_chan);
 		return;
 	}
 
@@ -507,8 +513,7 @@ static void tegra_adma_configure_for_next(struct tegra_adma_chan *tdc,
 
 	nsg_req->configured = true;
 
-	tegra_adma_resume(tdc);
-
+	tegra_adma_resume(&tdc->dma_chan);
 }
 
 static void tdc_start_head_req(struct tegra_adma_chan *tdc)
@@ -807,7 +812,7 @@ static int tegra_adma_terminate_chan(struct dma_chan *dc)
 		goto skip_dma_stop;
 
 	/* Pause ADMA before checking the queue status */
-	tegra_adma_pause(tdc, true);
+	tegra_adma_pause(dc);
 
 	status = channel_read(tdc, ADMA_CH_INT_STATUS);
 	tc = channel_read(tdc, ADMA_CH_TC_STATUS);
@@ -828,7 +833,7 @@ static int tegra_adma_terminate_chan(struct dma_chan *dc)
 		sgreq->dma_desc->bytes_transferred +=
 				get_current_xferred_count(tdc, sgreq, tc);
 	}
-	tegra_adma_resume(tdc);
+	tegra_adma_resume(dc);
 skip_dma_stop:
 	tegra_adma_abort_all(tdc);
 
@@ -1512,6 +1517,8 @@ static int tegra_adma_probe(struct platform_device *pdev)
 	tdma->dma_dev.device_tx_status = tegra_adma_tx_status;
 	tdma->dma_dev.device_issue_pending = tegra_adma_issue_pending;
 	tdma->dma_dev.device_terminate_all = tegra_adma_terminate_all;
+	tdma->dma_dev.device_pause = tegra_adma_pause;
+	tdma->dma_dev.device_resume = tegra_adma_resume;
 
 	/* Enable clock before accessing registers */
 	pm_runtime_get_sync(&pdev->dev);
