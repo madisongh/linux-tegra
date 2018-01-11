@@ -54,6 +54,74 @@
 #define read_barrier_depends()		do { } while (0)
 #endif
 
+/*
+ * Inhibit subsequent speculative memory accesses.
+ *
+ * Architectures with a suitable memory barrier should provide an
+ * implementation. This is non-portable, and generic code should use
+ * nospec_ptr().
+ */
+#ifndef __nospec_barrier
+#define __nospec_barrier()		do { } while (0)
+#endif
+
+/**
+ * nospec_ptr() - Ensure a  pointer is bounded, even under speculation.
+ *
+ * @ptr: the pointer to test
+ * @lo: the lower valid bound for @ptr, inclusive
+ * @hi: the upper valid bound for @ptr, exclusive
+ *
+ * If @ptr falls in the interval [@lo, @i), returns @ptr, otherwise returns
+ * NULL.
+ *
+ * Architectures which do not provide __nospec_barrier() should override this
+ * to ensure that ptr falls in the [lo, hi) interval both under architectural
+ * execution and under speculation, preventing propagation of an out-of-bounds
+ * pointer to code which is speculatively executed.
+ */
+#ifndef nospec_ptr
+#define nospec_ptr(ptr, lo, hi)						\
+({									\
+	typeof (ptr) __ret;						\
+	typeof (ptr) __ptr = (ptr);					\
+	typeof (ptr) __lo = (lo);					\
+	typeof (ptr) __hi = (hi);					\
+									\
+	__ret = (__lo <= __ptr && __ptr < __hi) ? __ptr : NULL;		\
+									\
+	__nospec_barrier();						\
+									\
+	__ret;								\
+})
+#endif
+
+/**
+ * nospec_array_ptr - Generate a pointer to an array element, ensuring the
+ * pointer is bounded under speculation.
+ *
+ * @arr: the base of the array
+ * @idx: the index of the element
+ * @sz: the number of elements in the array
+ *
+ * If @idx falls in the interval [0, @sz), returns the pointer to @arr[@idx],
+ * otherwise returns NULL.
+ *
+ * This is a wrapper around nospec_ptr(), provided for convenience.
+ * Architectures should implement nospec_ptr() to ensure this is the case
+ * under speculation.
+ */
+#define nospec_array_ptr(arr, idx, sz)					\
+({									\
+	typeof(*(arr)) *__arr = (arr);					\
+	typeof(idx) __idx = (idx);					\
+	typeof(sz) __sz = (sz);						\
+									\
+	nospec_ptr(__arr + __idx, __arr, __arr + __sz);			\
+})
+
+#undef __nospec_barrier
+
 #ifdef CONFIG_SMP
 
 #ifndef smp_mb
