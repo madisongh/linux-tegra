@@ -35,46 +35,45 @@
 #define dma_rmb()	dmb(oshld)
 #define dma_wmb()	dmb(oshst)
 
-#define __load_no_speculate_n(ptr, lo, hi, failval, cmpptr, w, sz)	\
+#define __load_no_speculate_n(ptr, hi, failval, cmpptr, w, sz)	\
 ({									\
 	typeof(*ptr)	__nln_val;					\
 	typeof(*ptr)	__failval = 					\
 		(typeof(*ptr))(unsigned long)(failval);			\
 									\
 	asm volatile (							\
-	"	cmp	%[c], %[l]\n"					\
-	"	ccmp	%[c], %[h], 2, cs\n"				\
+	"	cmp	%[c], %[h]\n"				\
 	"	b.cs	1f\n"						\
 	"	ldr" #sz " %" #w "[v], %[p]\n"				\
 	"1:	csel	%" #w "[v], %" #w "[v], %" #w "[f], cc\n"	\
 	"	hint	#0x14 // CSDB\n"				\
 	: [v] "=&r" (__nln_val)						\
-	: [p] "m" (*(ptr)), [l] "r" (lo), [h] "r" (hi),			\
+	: [p] "m" (*(ptr)), [h] "r" (hi),			\
 	  [f] "rZ" (__failval), [c] "r" (cmpptr)			\
 	: "cc");							\
 									\
 	__nln_val;							\
 })
 
-#define __load_no_speculate(ptr, lo, hi, failval, cmpptr)		\
+#define __load_no_speculate(ptr, hi, failval, cmpptr)		\
 ({									\
 	typeof(*(ptr)) __nl_val;					\
 									\
 	switch (sizeof(__nl_val)) {					\
 	case 1:								\
-		__nl_val = __load_no_speculate_n(ptr, lo, hi, failval,	\
+		__nl_val = __load_no_speculate_n(ptr, hi, failval,	\
 						 cmpptr, w, b);		\
 		break;							\
 	case 2:								\
-		__nl_val = __load_no_speculate_n(ptr, lo, hi, failval,	\
+		__nl_val = __load_no_speculate_n(ptr, hi, failval,	\
 						 cmpptr, w, h);		\
 		break;							\
 	case 4:								\
-		__nl_val = __load_no_speculate_n(ptr, lo, hi, failval,	\
+		__nl_val = __load_no_speculate_n(ptr, hi, failval,	\
 						 cmpptr, w, );		\
 		break;							\
 	case 8:								\
-		__nl_val = __load_no_speculate_n(ptr, lo, hi, failval,	\
+		__nl_val = __load_no_speculate_n(ptr, hi, failval,	\
 						 cmpptr, x, );		\
 		break;							\
 	default:							\
@@ -84,10 +83,10 @@
 	__nl_val;							\
 })
 
-#define nospec_ptr(ptr, lo, hi)						\
+#define nospec_ptr(ptr, hi)						\
 ({									\
 	typeof(ptr) __np_ptr = (ptr);					\
-	__load_no_speculate(&__np_ptr, lo, hi, 0, __np_ptr);		\
+	__load_no_speculate(&__np_ptr, hi, 0, __np_ptr);		\
 })
 
 
