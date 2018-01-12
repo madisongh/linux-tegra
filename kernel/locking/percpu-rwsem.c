@@ -37,6 +37,7 @@ void percpu_free_rwsem(struct percpu_rw_semaphore *sem)
 	free_percpu(sem->read_count);
 	sem->read_count = NULL; /* catch use after free bugs */
 }
+EXPORT_SYMBOL_GPL(percpu_free_rwsem);
 
 int __percpu_down_read(struct percpu_rw_semaphore *sem, int try)
 {
