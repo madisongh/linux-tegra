@@ -113,24 +113,45 @@ static inline struct sk_buff *hci_uart_dequeue(struct hci_uart *hu)
 {
 	struct sk_buff *skb = hu->tx_skb;
 
-	if (!skb)
-		skb = hu->proto->dequeue(hu);
-	else
+	if (!skb) {
+		percpu_down_read(&hu->proto_lock);
+
+		if (test_bit(HCI_UART_PROTO_READY, &hu->flags))
+			skb = hu->proto->dequeue(hu);
+
+		percpu_up_read(&hu->proto_lock);
+	} else {
 		hu->tx_skb = NULL;
+	}
 
 	return skb;
 }
 
 int hci_uart_tx_wakeup(struct hci_uart *hu)
 {
+	/* This may be called in an IRQ context, so we can't sleep. Therefore
+	 * we try to acquire the lock only, and if that fails we assume the
+	 * tty is being closed because that is the only time the write lock is
+	 * acquired. If, however, at some point in the future the write lock
+	 * is also acquired in other situations, then this must be revisited.
+	 */
+	if (!percpu_down_read_trylock(&hu->proto_lock))
+		return 0;
+
+	if (!test_bit(HCI_UART_PROTO_READY, &hu->flags))
+		goto no_schedule;
+
 	if (test_and_set_bit(HCI_UART_SENDING, &hu->tx_state)) {
 		set_bit(HCI_UART_TX_WAKEUP, &hu->tx_state);
-		return 0;
+		goto no_schedule;
 	}
 
 	BT_DBG("");
 
 	schedule_work(&hu->write_work);
+
+no_schedule:
+	percpu_up_read(&hu->proto_lock);
 
 	return 0;
 }
@@ -176,6 +197,7 @@ static void hci_uart_init_work(struct work_struct *work)
 {
 	struct hci_uart *hu = container_of(work, struct hci_uart, init_ready);
 	int err;
+	struct hci_dev *hdev;
 
 	if (!test_and_clear_bit(HCI_UART_INIT_PENDING, &hu->hdev_flags))
 		return;
@@ -183,9 +205,12 @@ static void hci_uart_init_work(struct work_struct *work)
 	err = hci_register_dev(hu->hdev);
 	if (err < 0) {
 		BT_ERR("Can't register HCI device");
-		hci_free_dev(hu->hdev);
+		hdev = hu->hdev;
 		hu->hdev = NULL;
+		hci_free_dev(hdev);
+		clear_bit(HCI_UART_PROTO_READY, &hu->flags);
 		hu->proto->close(hu);
+		return;
 	}
 
 	set_bit(HCI_UART_REGISTERED, &hu->flags);
@@ -227,8 +252,12 @@ static int hci_uart_flush(struct hci_dev *hdev)
 	tty_ldisc_flush(tty);
 	tty_driver_flush_buffer(tty);
 
-	if (test_bit(HCI_UART_PROTO_SET, &hu->flags))
+	percpu_down_read(&hu->proto_lock);
+
+	if (test_bit(HCI_UART_PROTO_READY, &hu->flags))
 		hu->proto->flush(hu);
+
+	percpu_up_read(&hu->proto_lock);
 
 	return 0;
 }
@@ -250,7 +279,15 @@ static int hci_uart_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 
 	BT_DBG("%s: type %d len %d", hdev->name, bt_cb(skb)->pkt_type, skb->len);
 
+	percpu_down_read(&hu->proto_lock);
+
+	if (!test_bit(HCI_UART_PROTO_READY, &hu->flags)) {
+		percpu_up_read(&hu->proto_lock);
+		return -EUNATCH;
+	}
+
 	hu->proto->enqueue(hu, skb);
+	percpu_up_read(&hu->proto_lock);
 
 	hci_uart_tx_wakeup(hu);
 
@@ -461,7 +498,7 @@ static int hci_uart_tty_open(struct tty_struct *tty)
 	INIT_WORK(&hu->init_ready, hci_uart_init_work);
 	INIT_WORK(&hu->write_work, hci_uart_write_work);
 
-	/* Flush any pending characters in the driver and line discipline. */
+	percpu_init_rwsem(&hu->proto_lock);
 
 	/* FIXME: why is this needed. Note don't use ldisc_ref here as the
 	   open path is before the ldisc is referencable */
@@ -495,9 +532,13 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 	if (hdev)
 		hci_uart_close(hdev);
 
-	cancel_work_sync(&hu->write_work);
+	if (test_bit(HCI_UART_PROTO_READY, &hu->flags)) {
+		percpu_down_write(&hu->proto_lock);
+		clear_bit(HCI_UART_PROTO_READY, &hu->flags);
+		percpu_up_write(&hu->proto_lock);
 
-	if (test_and_clear_bit(HCI_UART_PROTO_SET, &hu->flags)) {
+		cancel_work_sync(&hu->write_work);
+
 		if (hdev) {
 			if (test_bit(HCI_UART_REGISTERED, &hu->flags))
 				hci_unregister_dev(hdev);
@@ -505,7 +546,8 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 		}
 		hu->proto->close(hu);
 	}
-
+	clear_bit(HCI_UART_PROTO_SET, &hu->flags);
+	percpu_free_rwsem(&hu->proto_lock);
 	kfree(hu);
 }
 
@@ -531,7 +573,7 @@ static void hci_uart_tty_wakeup(struct tty_struct *tty)
 	if (tty != hu->tty)
 		return;
 
-	if (test_bit(HCI_UART_PROTO_SET, &hu->flags))
+	if (test_bit(HCI_UART_PROTO_READY, &hu->flags))
 		hci_uart_tx_wakeup(hu);
 }
 
@@ -555,13 +597,18 @@ static void hci_uart_tty_receive(struct tty_struct *tty, const u8 *data,
 	if (!hu || tty != hu->tty)
 		return;
 
-	if (!test_bit(HCI_UART_PROTO_SET, &hu->flags))
+	percpu_down_read(&hu->proto_lock);
+
+	if (!test_bit(HCI_UART_PROTO_READY, &hu->flags)) {
+		percpu_up_read(&hu->proto_lock);
 		return;
+	}
 
 	/* It does not need a lock here as it is already protected by a mutex in
 	 * tty caller
 	 */
 	hu->proto->recv(hu, data, count);
+	percpu_up_read(&hu->proto_lock);
 
 	if (hu->hdev)
 		hu->hdev->stat.byte_rx += count;
@@ -620,6 +667,7 @@ static int hci_uart_register_dev(struct hci_uart *hu)
 
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
+		hu->hdev = NULL;
 		hci_free_dev(hdev);
 		return -ENODEV;
 	}
@@ -643,9 +691,11 @@ static int hci_uart_set_proto(struct hci_uart *hu, int id)
 		return err;
 
 	hu->proto = p;
+	set_bit(HCI_UART_PROTO_READY, &hu->flags);
 
 	err = hci_uart_register_dev(hu);
 	if (err) {
+		clear_bit(HCI_UART_PROTO_READY, &hu->flags);
 		p->close(hu);
 		return err;
 	}
