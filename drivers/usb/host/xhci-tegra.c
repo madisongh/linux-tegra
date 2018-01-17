@@ -1,7 +1,7 @@
 /*
  * NVIDIA Tegra xHCI host controller driver for T186/future chips
  *
- * Copyright (C) 2015-2017, NVIDIA Corporation.  All rights reserved.
+ * Copyright (C) 2015-2018, NVIDIA Corporation.  All rights reserved.
  * Copyright (C) 2014 Google, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -3640,8 +3640,7 @@ static int tegra_xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 		if ((portsc & PORT_PLS_MASK) == XDEV_U0)
 			tegra_xhci_disable_receiver_detector(tegra, phy);
 		else {
-			if ((portsc & PORT_PLS_MASK) == XDEV_RXDETECT)
-				tegra_xhci_disable_clamp_en_early(tegra, phy);
+			tegra_xhci_disable_clamp_en_early(tegra, phy);
 
 			tegra_xhci_enable_receiver_detector(tegra, phy);
 		}
@@ -3670,6 +3669,7 @@ static void tegra_xhci_endpoint_soft_retry(struct usb_hcd *hcd,
 	u32 portsc;
 
 	if (!udev || udev->speed != USB_SPEED_SUPER ||
+			!(ep->desc.bEndpointAddress & USB_DIR_IN) ||
 			!tegra->soc_config->disable_u0_ts1_detect)
 		return;
 
