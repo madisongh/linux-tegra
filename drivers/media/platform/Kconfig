@@ -282,6 +282,7 @@ menuconfig V4L_TEST_DRIVERS
 
 if V4L_TEST_DRIVERS
 
+source "drivers/media/platform/tegra-vivid/Kconfig"
 source "drivers/media/platform/vivid/Kconfig"
 
 config VIDEO_VIM2M
