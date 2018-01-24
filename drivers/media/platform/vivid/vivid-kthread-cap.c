@@ -119,8 +119,7 @@ static void blend_line(struct vivid_dev *dev, unsigned y_offset, unsigned x_offs
 	}
 }
 
-static void scale_line(const u8 *src, u8 *dst, unsigned srcw, unsigned dstw,
-		unsigned twopixsize, unsigned packedpixels)
+static void scale_line(const u8 *src, u8 *dst, unsigned srcw, unsigned dstw, unsigned twopixsize)
 {
 	/* Coarse scaling with Bresenham */
 	unsigned int_part;
@@ -132,16 +131,9 @@ static void scale_line(const u8 *src, u8 *dst, unsigned srcw, unsigned dstw,
 	/*
 	 * We always combine two pixels to prevent color bleed in the packed
 	 * yuv case.
-	 * only for packed 10bit case three pixels are packed to construct
-	 * 32 bit values. convert srcw and dstw to match the packing.
 	 */
-	if (packedpixels == 3) {
-		srcw /= 3;
-		dstw /= 3;
-	} else {
-		srcw /= 2;
-		dstw /= 2;
-	}
+	srcw /= 2;
+	dstw /= 2;
 	int_part = srcw / dstw;
 	fract_part = srcw % dstw;
 	for (x = 0; x < dstw; x++, dst += twopixsize) {
@@ -295,18 +287,6 @@ static int vivid_copy_buffer(struct vivid_dev *dev, unsigned p, u8 *vcapbuf,
 
 	voutbuf = plane_vaddr(tpg, vid_out_buf, p,
 			      dev->bytesperline_out, dev->fmt_out_rect.height);
-	/* copy embedded meta data */
-	if (dev->fmt_cap->is_metadata[p] &&
-		dev->fmt_out->is_metadata[p]) {
-		unsigned size_out = vid_out_buf->vb.vb2_buf.planes[p].length;
-		unsigned size_cap = vid_cap_buf->vb.vb2_buf.planes[p].length;
-
-		size_out = size_out < size_cap ? size_out : size_cap;
-		/* copy minimum of out and capture sessions */
-		memcpy(vcapbuf, voutbuf, size_out);
-		return 0;
-	}
-
 	if (p < dev->fmt_out->buffers)
 		voutbuf += vid_out_buf->vb.vb2_buf.planes[p].data_offset;
 	voutbuf += tpg_hdiv(tpg, p, dev->loop_vid_out.left) +
@@ -379,7 +359,7 @@ static int vivid_copy_buffer(struct vivid_dev *dev, unsigned p, u8 *vcapbuf,
 			scale_line(voutbuf + vid_out_y * stride_out, dev->scaled_line,
 				tpg_hdiv(tpg, p, dev->loop_vid_out.width),
 				tpg_hdiv(tpg, p, dev->loop_vid_cap.width),
-				tpg_g_twopixelsize(tpg, p), tpg_g_packedpixels(tpg, p));
+				tpg_g_twopixelsize(tpg, p));
 		} else {
 			/*
 			 * Offset in bytes within loop_vid_copy to the start of the
@@ -392,7 +372,7 @@ static int vivid_copy_buffer(struct vivid_dev *dev, unsigned p, u8 *vcapbuf,
 
 			scale_line(voutbuf + vid_out_y * stride_out, dev->blended_line,
 				dev->loop_vid_out.width, dev->loop_vid_copy.width,
-				tpg_g_twopixelsize(tpg, p), tpg_g_packedpixels(tpg, p));
+				tpg_g_twopixelsize(tpg, p));
 			if (blend)
 				blend_line(dev, vid_overlay_y + dev->loop_vid_overlay.top,
 					   dev->loop_vid_overlay.left,
@@ -403,7 +383,7 @@ static int vivid_copy_buffer(struct vivid_dev *dev, unsigned p, u8 *vcapbuf,
 				       osd, (dev->loop_vid_overlay.width * twopixsize) / 2);
 			scale_line(dev->blended_line, dev->scaled_line,
 					dev->loop_vid_copy.width, dev->loop_vid_cap.width,
-					tpg_g_twopixelsize(tpg, p), tpg_g_packedpixels(tpg, p));
+					tpg_g_twopixelsize(tpg, p));
 		}
 		dev->cur_scaled_line = vid_out_y;
 		memcpy(vcapbuf + vid_cap_left, dev->scaled_line,
@@ -487,35 +467,24 @@ static void vivid_fillbuff(struct vivid_dev *dev, struct vivid_buffer *buf)
 
 	for (p = 0; p < tpg_g_planes(tpg); p++) {
 		void *vbuf = plane_vaddr(tpg, buf, p,
-					 tpg->bytesperline, tpg->buf_height[p]);
+					 tpg->bytesperline, tpg->buf_height);
 
 		/*
 		 * The first plane of a multiplanar format has a non-zero
 		 * data_offset. This helps testing whether the application
 		 * correctly supports non-zero data offsets.
 		 */
-		/*
-		 * Disable below code as it resets embedded data passed from
-		 * application.
 		if (p < tpg_g_buffers(tpg) && dev->fmt_cap->data_offset[p]) {
 			memset(vbuf, dev->fmt_cap->data_offset[p] & 0xff,
 			       dev->fmt_cap->data_offset[p]);
 			vbuf += dev->fmt_cap->data_offset[p];
 		}
-		 */
-
 		tpg_calc_text_basep(tpg, basep, p, vbuf);
-		if (!is_loop || vivid_copy_buffer(dev, p, vbuf, buf)) {
-			if (!dev->fmt_cap->is_metadata[p])
-				tpg_fill_plane_buffer(tpg, vivid_get_std_cap(dev),
+		if (!is_loop || vivid_copy_buffer(dev, p, vbuf, buf))
+			tpg_fill_plane_buffer(tpg, vivid_get_std_cap(dev),
 					p, vbuf);
-		}
 	}
 	dev->must_blank[buf->vb.vb2_buf.index] = false;
-
-	/* Write text to plane 0 instead of the last plane */
-	tpg_calc_text_basep(tpg, basep, 0,
-		plane_vaddr(tpg, buf, 0, tpg->bytesperline, tpg->buf_height[0]));
 
 	/* Updates stream time, only update at the start of a new frame. */
 	if (dev->field_cap != V4L2_FIELD_ALTERNATE ||
@@ -795,7 +764,6 @@ static int vivid_thread_vid_cap(void *data)
 			break;
 
 		mutex_lock(&dev->mutex);
-		mutex_lock(&dev->mutex_framerate);
 		cur_jiffies = jiffies;
 		if (dev->cap_seq_resync) {
 			dev->jiffies_vid_cap = cur_jiffies;
@@ -843,7 +811,6 @@ static int vivid_thread_vid_cap(void *data)
 		/* And the number of jiffies since we started */
 		jiffies_since_start = jiffies - dev->jiffies_vid_cap;
 
-		mutex_unlock(&dev->mutex_framerate);
 		mutex_unlock(&dev->mutex);
 
 		/*
