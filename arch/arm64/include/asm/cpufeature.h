@@ -31,8 +31,9 @@
 #define ARM64_WORKAROUND_CAVIUM_23154		6
 #define ARM64_WORKAROUND_834220			7
 #define ARM64_WORKAROUND_CAVIUM_27456		8
+#define ARM64_IC_IALLU_ON_CTX_CHANGE		9
 
-#define ARM64_NCAPS				9
+#define ARM64_NCAPS				10
 
 #ifndef __ASSEMBLY__
 
@@ -184,6 +185,10 @@ static inline bool system_supports_mixed_endian_el0(void)
 {
 	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
 }
+
+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+void invalidate_btb(void);
+#endif
 
 #endif /* __ASSEMBLY__ */
 

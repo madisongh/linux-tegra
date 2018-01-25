@@ -183,6 +183,10 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
 
 switch_mm_fastpath:
 	cpu_switch_mm(mm->pgd, mm);
+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+	invalidate_btb();
+	asm("dsb nsh");
+#endif
 }
 
 static int asids_init(void)

@@ -132,6 +132,7 @@ static void show_map(struct task_struct *tsk, u64 addr)
 		return;
 	pr_alert("Library at 0x%llx: 0x%lx %s\n", addr, vma->vm_start, p);
 }
+
 /*
  * Something tried to access memory that isn't in our memory map. User mode
  * accesses just cause a SIGSEGV
@@ -162,6 +163,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
 	si.si_errno = 0;
 	si.si_code = code;
 	si.si_addr = (void __user *)addr;
+
 	force_sig_info(sig, &si, tsk);
 }
 
@@ -514,6 +516,32 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
 	arm64_notify_die("", regs, &info, esr);
 }
 
+asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
+						   unsigned int esr,
+						   struct pt_regs *regs)
+{
+	/*
+	 * We've taken an instruction abort from userspace and not yet
+	 * re-enabled IRQs. If the address is a kernel address, apply
+	 * BP hardening prior to enabling IRQs and pre-emption.
+	 */
+	if (addr > TASK_SIZE) {
+		invalidate_btb();
+		asm("dsb nsh");
+	}
+
+	local_irq_enable();
+	do_mem_abort(addr, esr, regs);
+}
+
+asmlinkage void __exception do_el0_bp_hardening(unsigned long addr)
+{
+	if (addr > TASK_SIZE) {
+		invalidate_btb();
+		asm("dsb nsh");
+	}
+}
+
 /*
  * Handle stack alignment exceptions.
  */
@@ -535,6 +563,24 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
 	info.si_code  = BUS_ADRALN;
 	info.si_addr  = (void __user *)addr;
 	arm64_notify_die("Oops - SP/PC alignment exception", regs, &info, esr);
+}
+
+asmlinkage void __exception do_el0_sp_pc_abort_bp_hardening(unsigned long addr,
+						   unsigned int esr,
+						   struct pt_regs *regs)
+{
+	/*
+	 * We've taken an instruction abort from userspace and not yet
+	 * re-enabled IRQs. If the address is a kernel address, apply
+	 * BP hardening prior to enabling IRQs and pre-emption.
+	 */
+	if (addr > TASK_SIZE) {
+		invalidate_btb();
+		asm("dsb nsh");
+	}
+
+	local_irq_enable();
+	do_sp_pc_abort(addr, esr, regs);
 }
 
 int __init early_brk64(unsigned long addr, unsigned int esr,
