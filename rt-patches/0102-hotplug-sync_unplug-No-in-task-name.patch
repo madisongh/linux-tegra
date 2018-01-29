@@ -1,4 +1,4 @@
-From b50da802d6c4f671d7b378263e33f28afdfa4dfd Mon Sep 17 00:00:00 2001
+From 206d8a3177cef123a488d74f81b03a0bcc2898ff Mon Sep 17 00:00:00 2001
 From: Yong Zhang <yong.zhang0@gmail.com>
 Date: Sun, 16 Oct 2011 18:56:43 +0800
 Subject: [PATCH 102/366] hotplug: sync_unplug: No " " in task name

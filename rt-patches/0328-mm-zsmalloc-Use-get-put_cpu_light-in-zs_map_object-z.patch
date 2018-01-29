@@ -1,4 +1,4 @@
-From f3ee849447d4b99a35cb3162e393bd055beea5d2 Mon Sep 17 00:00:00 2001
+From d7a08bce4fc0c9f899e907a019e848a978846178 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Tue, 22 Mar 2016 11:16:09 +0100
 Subject: [PATCH 328/366] mm/zsmalloc: Use get/put_cpu_light in

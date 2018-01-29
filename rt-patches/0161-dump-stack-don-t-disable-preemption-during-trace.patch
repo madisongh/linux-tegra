@@ -1,4 +1,4 @@
-From dcda6bd2544341fdfb477676265c1a5c815698a1 Mon Sep 17 00:00:00 2001
+From 5ce722d5019449bb8e0ef54745f674368b082d41 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Sun, 16 Aug 2015 14:27:50 +0200
 Subject: [PATCH 161/366] dump stack: don't disable preemption during trace

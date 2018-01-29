@@ -1,4 +1,4 @@
-From be1a05b4ddd66a61591eb2404fbb26e5f084f84d Mon Sep 17 00:00:00 2001
+From c35752d4224dd57e796b0ae0f1dbe71364b90ce2 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Thu, 17 Sep 2015 15:26:46 +0200
 Subject: [PATCH 313/366] clk: at91: pmc: move pmc structures to C file

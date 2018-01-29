@@ -1,4 +1,4 @@
-From 50e1b717b6da4dcc0de01c3771e97d1545901994 Mon Sep 17 00:00:00 2001
+From 70fffb9a5b9e7c38b15b714a9b5df3b944f1f6e9 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 31 Jul 2013 19:00:35 +0200
 Subject: [PATCH 142/366] rcu: use simple waitqueues

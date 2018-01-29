@@ -1,4 +1,4 @@
-From add95070e5a4c70fb96fb7927a020341084eac4d Mon Sep 17 00:00:00 2001
+From 9f901660b19ded4c28662d4f187a507c9af3d379 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 24 May 2016 12:56:38 +0200
 Subject: [PATCH 346/366] arm: lazy preempt: correct resched condition

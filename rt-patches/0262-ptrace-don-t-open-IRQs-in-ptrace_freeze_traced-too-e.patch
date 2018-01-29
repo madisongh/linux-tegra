@@ -1,4 +1,4 @@
-From 24a4176c16eb260d7caf5e18bbff4db3c9ba1914 Mon Sep 17 00:00:00 2001
+From 3018ab673ff14a9d6be45b91be191c2d2c381738 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 14:09:05 +0100
 Subject: [PATCH 262/366] ptrace: don't open IRQs in ptrace_freeze_traced() too

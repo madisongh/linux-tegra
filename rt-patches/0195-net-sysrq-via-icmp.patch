@@ -1,4 +1,4 @@
-From 0448f4e7b9daf6d126b8ea920d871cd4a03a7806 Mon Sep 17 00:00:00 2001
+From 60d3a88eeb9c6101023f5eeaf0b472954abe8650 Mon Sep 17 00:00:00 2001
 From: Carsten Emde <C.Emde@osadl.org>
 Date: Tue, 19 Jul 2011 13:51:17 +0100
 Subject: [PATCH 195/366] net: sysrq via icmp

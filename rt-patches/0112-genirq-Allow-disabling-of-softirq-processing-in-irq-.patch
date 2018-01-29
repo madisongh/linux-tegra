@@ -1,4 +1,4 @@
-From 7d166568675bb54ef2de1025014a2d52b97660c4 Mon Sep 17 00:00:00 2001
+From a6bdeeb6ddc111384d15dc75a535c6938e3f4f0e Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 31 Jan 2012 13:01:27 +0100
 Subject: [PATCH 112/366] genirq: Allow disabling of softirq processing in irq

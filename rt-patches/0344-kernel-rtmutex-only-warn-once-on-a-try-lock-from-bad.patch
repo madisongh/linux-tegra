@@ -1,4 +1,4 @@
-From c330b615c9f8d57827eeddab58bbcc3af4f7d969 Mon Sep 17 00:00:00 2001
+From cbee4be96ade72c4d0bdb088983beff19f0bd281 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 19 May 2016 17:12:34 +0200
 Subject: [PATCH 344/366] kernel/rtmutex: only warn once on a try lock from bad

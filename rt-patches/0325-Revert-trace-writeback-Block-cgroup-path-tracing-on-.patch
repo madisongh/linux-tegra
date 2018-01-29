@@ -1,4 +1,4 @@
-From 680bd5e125b08572115b31354308e55fadec8a88 Mon Sep 17 00:00:00 2001
+From fc1232b9ebe045d5afa2b4ea9c6dcb3101c7e7f1 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 29 Mar 2016 16:28:15 +0200
 Subject: [PATCH 325/366] Revert "trace/writeback: Block cgroup path tracing on

@@ -1,4 +1,4 @@
-From 73e2a610bf19822d63ea6c507ebcd28c654fe5a6 Mon Sep 17 00:00:00 2001
+From e442b87682792d56f08dcb05b75a6618f7745876 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 5 Feb 2016 18:26:11 +0100
 Subject: [PATCH 290/366] rtmutex: push down migrate_disable() into

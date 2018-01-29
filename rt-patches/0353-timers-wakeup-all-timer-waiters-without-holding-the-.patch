@@ -1,4 +1,4 @@
-From 69c9df477b1fbab268d1ad52e6c9344ffaeb0e8d Mon Sep 17 00:00:00 2001
+From db26591c96dd06105354b1423be924e6fae50d10 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jul 2016 17:13:23 +0200
 Subject: [PATCH 353/366] timers: wakeup all timer waiters without holding the

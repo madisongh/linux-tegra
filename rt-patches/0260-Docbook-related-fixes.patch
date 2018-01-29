@@ -1,4 +1,4 @@
-From b2e745ea0d034103931fff1da51ec76f6f1d0b47 Mon Sep 17 00:00:00 2001
+From 4088ec2b3a99d9203bcc23faf0d131eb6dc063fd Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:49:11 +0100
 Subject: [PATCH 260/366] Docbook related fixes

@@ -1,4 +1,4 @@
-From 6e28744cd8835ef768f93302fa7aef6a83b5f6b1 Mon Sep 17 00:00:00 2001
+From 06ff6aad0253c82140ae2a8bca43a55b9e004395 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 12 Oct 2015 11:18:40 +0200
 Subject: [PATCH 193/366] arm64/xen: Make XEN depend on !RT

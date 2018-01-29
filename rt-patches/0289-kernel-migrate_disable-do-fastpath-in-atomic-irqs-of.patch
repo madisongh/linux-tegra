@@ -1,4 +1,4 @@
-From 5328e3ec3dbfb4bc81a5256e82a1bc41a59f951c Mon Sep 17 00:00:00 2001
+From a6316c13149b456de3cfc9946bd6ac914ccd79e2 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 9 Feb 2016 18:18:01 +0100
 Subject: [PATCH 289/366] kernel: migrate_disable() do fastpath in atomic &

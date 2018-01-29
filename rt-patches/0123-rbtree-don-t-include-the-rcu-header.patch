@@ -1,4 +1,4 @@
-From 8c3f806f515711ac0d3c46846f4f47f0993010d9 Mon Sep 17 00:00:00 2001
+From 86369315e1e2d591cf4b2d3cf3600ff5cf8ce2b2 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 23 Dec 2015 23:36:43 +0100
 Subject: [PATCH 123/366] rbtree: don't include the rcu header

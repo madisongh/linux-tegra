@@ -1,4 +1,4 @@
-From 8bedc8143487eeaaa68ec330562695cb0c9af5f5 Mon Sep 17 00:00:00 2001
+From a5aa41167edeb303c5e044f80a676abbedd327c8 Mon Sep 17 00:00:00 2001
 From: Frederic Weisbecker <fweisbec@gmail.com>
 Date: Thu, 19 Nov 2015 16:47:34 +0100
 Subject: [PATCH 341/366] sched/cputime: Convert vtime_seqlock to seqcount

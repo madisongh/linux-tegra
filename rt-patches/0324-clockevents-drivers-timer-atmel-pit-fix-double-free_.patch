@@ -1,4 +1,4 @@
-From 94d8be554c4ea0a28486be59e2eaae937c4403bb Mon Sep 17 00:00:00 2001
+From bb91a5c38c591f4c83ca98cc3ebcbdd1dfc3c9da Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Thu, 17 Mar 2016 21:09:43 +0100
 Subject: [PATCH 324/366] clockevents/drivers/timer-atmel-pit: fix double

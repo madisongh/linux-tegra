@@ -1,4 +1,4 @@
-From 642ab5d971cb97a8d991d4e99263a287a2b547cb Mon Sep 17 00:00:00 2001
+From 92e8bf1faf2cab21fb6a0df6f9bd1fa70b69e95b Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 13:02:01 +0200
 Subject: [PATCH 319/366] clk: at91: pmc: drop at91_pmc_base

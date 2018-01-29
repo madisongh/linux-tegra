@@ -1,4 +1,4 @@
-From f21d87fefd6e0c37600cbd6f148d0b6fdff0ec7e Mon Sep 17 00:00:00 2001
+From 0e52a4c59879f2768574cc64d6b2afdf51eaa506 Mon Sep 17 00:00:00 2001
 From: Yong Zhang <yong.zhang0@gmail.com>
 Date: Tue, 15 May 2012 13:53:56 +0800
 Subject: [PATCH 146/366] mm: Protect activate_mm() by

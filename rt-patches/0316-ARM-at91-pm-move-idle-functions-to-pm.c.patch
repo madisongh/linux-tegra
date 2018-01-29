@@ -1,4 +1,4 @@
-From 97ebd18f7c0e941c6ad67af0c1fe3d17460bd0d4 Mon Sep 17 00:00:00 2001
+From 93dd56e7d6f15c9accc74c1dd55c3e2651bf4d1c Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 01:58:40 +0200
 Subject: [PATCH 316/366] ARM: at91: pm: move idle functions to pm.c

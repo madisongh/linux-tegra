@@ -1,4 +1,4 @@
-From cc0d9d729e7c51fc9c57a0f1a370eb1885fe7e7f Mon Sep 17 00:00:00 2001
+From 059e08dac9aad3433bc9d5fd2ebecc6c3d0b128b Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 27 Jan 2016 14:59:47 +0100
 Subject: [PATCH 312/366] clk: at91: pmc: merge at91_pmc_init in

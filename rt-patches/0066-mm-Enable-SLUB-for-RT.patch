@@ -1,4 +1,4 @@
-From e59760df865009e750972664f06ea565109a58b2 Mon Sep 17 00:00:00 2001
+From e3b74f487b7a47e215ec5d43f5a074fb97485bcd Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 25 Oct 2012 10:32:35 +0100
 Subject: [PATCH 066/366] mm: Enable SLUB for RT

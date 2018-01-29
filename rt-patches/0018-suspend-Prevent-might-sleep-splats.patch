@@ -1,4 +1,4 @@
-From 7c8fa9e10f343c255b78fc649a8b8c962a22dbd5 Mon Sep 17 00:00:00 2001
+From 7fb8da1dc06c4cb641d4f245137274874bb79ca5 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 15 Jul 2010 10:29:00 +0200
 Subject: [PATCH 018/366] suspend: Prevent might sleep splats

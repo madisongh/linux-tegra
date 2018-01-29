@@ -1,4 +1,4 @@
-From 0dcb9d18df4a17c786e155e0295b031b2d650dce Mon Sep 17 00:00:00 2001
+From 004e332b083fd526246f0d0adc2e65a13416ee63 Mon Sep 17 00:00:00 2001
 From: Tiejun Chen <tiejun.chen@windriver.com>
 Date: Thu, 7 Nov 2013 10:06:07 +0800
 Subject: [PATCH 223/366] cpu_down: move migrate_enable() back

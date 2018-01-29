@@ -1,4 +1,4 @@
-From f8b66c5abc2a659e64cee4a28b1fd3452663f977 Mon Sep 17 00:00:00 2001
+From 2896e9855ee23fd07474d7724571d6212ee14072 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sat, 20 Jun 2009 11:36:54 +0200
 Subject: [PATCH 057/366] drivers/net: fix livelock issues

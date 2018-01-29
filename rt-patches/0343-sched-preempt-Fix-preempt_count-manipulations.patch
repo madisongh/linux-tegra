@@ -1,4 +1,4 @@
-From 8bee851c05c244c6177fe6492d947643d8b52cc4 Mon Sep 17 00:00:00 2001
+From 9d525aa6b523d379b85941031728fe130ca76fc6 Mon Sep 17 00:00:00 2001
 From: Peter Zijlstra <peterz@infradead.org>
 Date: Mon, 16 May 2016 15:01:11 +0200
 Subject: [PATCH 343/366] sched,preempt: Fix preempt_count manipulations

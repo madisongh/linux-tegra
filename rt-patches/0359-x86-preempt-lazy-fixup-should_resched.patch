@@ -1,4 +1,4 @@
-From 87495fd5e4eae1f98aafeb38074489c503a6717f Mon Sep 17 00:00:00 2001
+From 6fca6d60a1b1d329c759ebc58dd981a44c9cebe3 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 14 Sep 2016 19:18:47 +0200
 Subject: [PATCH 359/366] x86/preempt-lazy: fixup should_resched()

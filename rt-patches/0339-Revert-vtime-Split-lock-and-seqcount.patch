@@ -1,4 +1,4 @@
-From b5b4f6e9727c4dd0332f5234d945d8c09a39af99 Mon Sep 17 00:00:00 2001
+From 896fa353de53b2322549c52bcee6222edc0eb76c Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 14 Apr 2016 14:42:55 +0200
 Subject: [PATCH 339/366] Revert "vtime: Split lock and seqcount"

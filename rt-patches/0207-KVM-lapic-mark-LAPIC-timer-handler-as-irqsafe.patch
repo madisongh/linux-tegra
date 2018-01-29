@@ -1,4 +1,4 @@
-From 834b82932948a019886ae3e85029f7aa06a214af Mon Sep 17 00:00:00 2001
+From e81c79485e2cc17d61e33546b17db05b766cf3ea Mon Sep 17 00:00:00 2001
 From: Marcelo Tosatti <mtosatti@redhat.com>
 Date: Wed, 8 Apr 2015 20:33:25 -0300
 Subject: [PATCH 207/366] KVM: lapic: mark LAPIC timer handler as irqsafe

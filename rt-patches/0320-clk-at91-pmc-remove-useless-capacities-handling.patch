@@ -1,4 +1,4 @@
-From f1673859de1b6f2d80092f4d65217fa8d0d2a36f Mon Sep 17 00:00:00 2001
+From dec3b5a60bcd51085bef3f881930627cb8a02f4f Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 27 Jan 2016 15:05:55 +0100
 Subject: [PATCH 320/366] clk: at91: pmc: remove useless capacities handling

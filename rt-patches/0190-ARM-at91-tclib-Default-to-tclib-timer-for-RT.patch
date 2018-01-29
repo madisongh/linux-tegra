@@ -1,4 +1,4 @@
-From 04f8b6ed07a3891ef377e1ba4378493d8d928b89 Mon Sep 17 00:00:00 2001
+From 8318960cf9d49e1f233622101d829002f985a9e5 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sat, 1 May 2010 18:29:35 +0200
 Subject: [PATCH 190/366] ARM: at91: tclib: Default to tclib timer for RT
@@ -12,7 +12,7 @@ Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index a79ec7f..56ec0a2 100644
+index 79f1ed0..b428133 100644
 --- a/drivers/misc/Kconfig
 +++ b/drivers/misc/Kconfig
 @@ -54,6 +54,7 @@ config AD525X_DPOT_SPI

@@ -1,4 +1,4 @@
-From fcf83182a19a3c6d2bcaabbd521898cda505a0a3 Mon Sep 17 00:00:00 2001
+From 6f60e1e918b610550d4591d72f45c9f3b6c367eb Mon Sep 17 00:00:00 2001
 From: Luiz Capitulino <lcapitulino@redhat.com>
 Date: Fri, 27 May 2016 15:03:28 +0200
 Subject: [PATCH 348/366] mm: perform lru_add_drain_all() remotely

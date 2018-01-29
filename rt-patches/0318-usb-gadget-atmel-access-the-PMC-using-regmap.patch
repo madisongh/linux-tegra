@@ -1,4 +1,4 @@
-From 3870ce93ce2746802f309fae83cd6af517df0fc9 Mon Sep 17 00:00:00 2001
+From 4a46eb644f621efe247f649640aa0b394f211fe7 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 12:57:10 +0200
 Subject: [PATCH 318/366] usb: gadget: atmel: access the PMC using regmap

@@ -1,4 +1,4 @@
-From 097b66ba95df30301253b922c13f056b3a0a8e40 Mon Sep 17 00:00:00 2001
+From 038b273afc19eed35389e4ad6c4e32b7230f8848 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 21 Mar 2013 19:01:05 +0100
 Subject: [PATCH 186/366] printk: Drop the logbuf_lock more often
@@ -12,7 +12,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 26 insertions(+), 1 deletion(-)
 
 diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index e37b4ab..84400c4 100644
+index e7d119c..b8a8461 100644
 --- a/kernel/printk/printk.c
 +++ b/kernel/printk/printk.c
 @@ -1207,6 +1207,7 @@ static int syslog_print_all(char __user *buf, int size, bool clear)

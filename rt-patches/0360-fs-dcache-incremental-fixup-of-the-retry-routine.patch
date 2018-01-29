@@ -1,4 +1,4 @@
-From e006b17b4c6155d3a983d6a438abf3859cfa9bdc Mon Sep 17 00:00:00 2001
+From 36667bb0eddf1e59acc06a4af6f06e17a4a86366 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 15 Sep 2016 18:25:47 +0200
 Subject: [PATCH 360/366] fs/dcache: incremental fixup of the retry routine

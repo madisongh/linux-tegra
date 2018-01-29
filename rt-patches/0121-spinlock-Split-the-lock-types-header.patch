@@ -1,4 +1,4 @@
-From 24141c0e59b1e9150f7f80670c6f33f8e80faffc Mon Sep 17 00:00:00 2001
+From 51a81db3a5c938e675b7c9975cd7d72df4fde1c0 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 29 Jun 2011 19:34:01 +0200
 Subject: [PATCH 121/366] spinlock: Split the lock types header

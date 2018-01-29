@@ -1,4 +1,4 @@
-From 4572a37692eb2e8834d97e0d7d030851191f0df1 Mon Sep 17 00:00:00 2001
+From f6461e1f99741900a5d13f8acae88befbcb23c5a Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 14 Jul 2015 14:26:34 +0200
 Subject: [PATCH 187/366] powerpc: Use generic rwsem on RT

@@ -1,4 +1,4 @@
-From ca1f9e02a337584c2a69d21955e3ae99eaa3bae2 Mon Sep 17 00:00:00 2001
+From e1342fe8db93bdb756c99547452ac3ddfbcc3615 Mon Sep 17 00:00:00 2001
 From: Ingo Molnar <mingo@elte.hu>
 Date: Fri, 22 Jul 2011 17:58:40 +0200
 Subject: [PATCH 029/366] printk: Add a printk kill switch
@@ -30,7 +30,7 @@ index 9729565..9cdca69 100644
  
  typedef __printf(1, 0) int (*printk_func_t)(const char *fmt, va_list args);
 diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index 90da9c5..d6f2e2a 100644
+index 7d712cc..01145ec 100644
 --- a/kernel/printk/printk.c
 +++ b/kernel/printk/printk.c
 @@ -1693,6 +1693,55 @@ static size_t cont_print_text(char *text, size_t size)
@@ -103,7 +103,7 @@ index 90da9c5..d6f2e2a 100644
  	if (level == LOGLEVEL_SCHED) {
  		level = LOGLEVEL_DEFAULT;
  		in_sched = true;
-@@ -2002,26 +2058,6 @@ DEFINE_PER_CPU(printk_func_t, printk_func);
+@@ -2005,26 +2061,6 @@ DEFINE_PER_CPU(printk_func_t, printk_func);
  
  #endif /* CONFIG_PRINTK */
  

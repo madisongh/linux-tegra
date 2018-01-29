@@ -1,4 +1,4 @@
-From 07d173a8679f0d2b6a851caccbcf9bce41f667ed Mon Sep 17 00:00:00 2001
+From 90d3e81234ef6f0e98dcfbbcb40e83b5ee2e6be8 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 8 Mar 2016 12:57:28 +0100
 Subject: [PATCH 308/366] trace: hist: make it compile again

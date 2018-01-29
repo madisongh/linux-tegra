@@ -1,4 +1,4 @@
-From 04093c798006adcfb40c352fd02942ff27e91caf Mon Sep 17 00:00:00 2001
+From ebbd92b496d4264e19c6ea8b39d110de006849e8 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 6 Nov 2011 12:26:18 +0100
 Subject: [PATCH 206/366] x86: kvm Require const tsc for RT

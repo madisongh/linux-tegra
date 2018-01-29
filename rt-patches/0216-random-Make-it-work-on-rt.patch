@@ -1,4 +1,4 @@
-From 086a0f5cc75f17bb7d65f3d5c25e6c27db166506 Mon Sep 17 00:00:00 2001
+From 61383dce352c4589f8e6dfacda9c0b1d76ee4b81 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 21 Aug 2012 20:38:50 +0200
 Subject: [PATCH 216/366] random: Make it work on rt

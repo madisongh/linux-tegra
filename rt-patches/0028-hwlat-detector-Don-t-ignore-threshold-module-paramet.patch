@@ -1,4 +1,4 @@
-From 566c6324fff3e91cd96e89ae96e31a896159b08a Mon Sep 17 00:00:00 2001
+From 48dc9c975239d7a03a9cd2b34694799829aac790 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <bitbucket@online.de>
 Date: Fri, 30 Aug 2013 07:57:25 +0200
 Subject: [PATCH 028/366] hwlat-detector: Don't ignore threshold module

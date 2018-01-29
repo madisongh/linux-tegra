@@ -1,4 +1,4 @@
-From d736dddfd0a5d0fe8e1adb146fba2fecc0a1551c Mon Sep 17 00:00:00 2001
+From 21e0aab47a1334b90a483f8273fdb105ed6c0765 Mon Sep 17 00:00:00 2001
 From: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
 Date: Tue, 22 Mar 2016 14:27:17 -0700
 Subject: [PATCH 337/366] panic: change nmi_panic from macro to function

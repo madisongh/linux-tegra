@@ -1,4 +1,4 @@
-From 3d3633b39814f19a0c8a16b315a31f4b98782c83 Mon Sep 17 00:00:00 2001
+From a07f84e8c1104c3c44bdb962df699d5d5b7b9057 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 21 Mar 2013 11:35:49 +0100
 Subject: [PATCH 243/366] i2c/omap: drop the lock hard irq context

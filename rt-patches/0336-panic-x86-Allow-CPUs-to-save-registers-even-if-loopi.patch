@@ -1,4 +1,4 @@
-From 188183251d3604548c9259493c0fd7399415e7e8 Mon Sep 17 00:00:00 2001
+From f546a961e6f01b08a96effa748efd24f1afcbad9 Mon Sep 17 00:00:00 2001
 From: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
 Date: Mon, 14 Dec 2015 11:19:10 +0100
 Subject: [PATCH 336/366] panic, x86: Allow CPUs to save registers even if

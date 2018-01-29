@@ -1,4 +1,4 @@
-From 10007e7134956e7f4d27cd0cf751c18f24c69195 Mon Sep 17 00:00:00 2001
+From 2a30e9a20050a32159b02237cdda84516f68c78f Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 17 Jul 2011 21:56:42 +0200
 Subject: [PATCH 104/366] trace: Add migrate-disabled counter to tracing output

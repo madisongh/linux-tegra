@@ -1,4 +1,4 @@
-From 886a638fbe6b86d1606e9c06175e191604c1ed99 Mon Sep 17 00:00:00 2001
+From 7ae10769b0694d98d8702d12749d4d0a4faa1368 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 4 Feb 2016 14:08:06 +0100
 Subject: [PATCH 283/366] latencyhist: disable jump-labels

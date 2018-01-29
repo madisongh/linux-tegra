@@ -1,4 +1,4 @@
-From bc7d8f766b610e4710b68155879e6260aedecfa3 Mon Sep 17 00:00:00 2001
+From f16bda1ccaa91e2bc11ca59cadc9bc4706a5caa0 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 23 Dec 2015 20:57:41 +0100
 Subject: [PATCH 082/366] hrtimer: enfore 64byte alignment

@@ -1,4 +1,4 @@
-From 8072afcff6ac98ce8a2068dd406d9ad1332c47ce Mon Sep 17 00:00:00 2001
+From 2cc48147f3c2990f8b68e5388f2c37150a586503 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 25 May 2016 14:03:50 +0200
 Subject: [PATCH 349/366] trace: correct off by one while recording the

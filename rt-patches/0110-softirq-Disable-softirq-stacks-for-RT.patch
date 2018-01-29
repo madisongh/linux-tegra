@@ -1,4 +1,4 @@
-From 8967b193c05d8862dec216c6d90f524f2642da70 Mon Sep 17 00:00:00 2001
+From 31c54d8c4f76d3fceb58337f335e051f7af10e1f Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 18 Jul 2011 13:59:17 +0200
 Subject: [PATCH 110/366] softirq: Disable softirq stacks for RT

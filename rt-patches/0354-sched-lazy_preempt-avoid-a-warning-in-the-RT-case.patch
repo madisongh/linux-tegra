@@ -1,4 +1,4 @@
-From 7c12ae3a885838c4230aa8ef2494effa67127491 Mon Sep 17 00:00:00 2001
+From 5d6454f9dc96b0ad8f39a3c54fa7fe4e63bbd8a5 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 14 Jul 2016 14:57:07 +0200
 Subject: [PATCH 354/366] sched: lazy_preempt: avoid a warning in the !RT case

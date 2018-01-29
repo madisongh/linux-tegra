@@ -1,4 +1,4 @@
-From 3ab22b5eed16453d92b83c865471b2e20178f626 Mon Sep 17 00:00:00 2001
+From b757e9e6da1d72d961fecfe113532ec00c667bb1 Mon Sep 17 00:00:00 2001
 From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
 Date: Tue, 21 Jul 2015 19:43:56 +0300
 Subject: [PATCH 118/366] wait.h: include atomic.h

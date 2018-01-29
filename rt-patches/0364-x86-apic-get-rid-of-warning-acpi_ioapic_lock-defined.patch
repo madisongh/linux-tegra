@@ -1,4 +1,4 @@
-From 8a7ce2cb5c7971826fb93362e2562224d9d5b205 Mon Sep 17 00:00:00 2001
+From 512e7c3a7422dae6b35d3229aff41ac84b85982a Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 21 Oct 2016 10:29:11 +0200
 Subject: [PATCH 364/366] x86/apic: get rid of "warning: 'acpi_ioapic_lock'
@@ -32,7 +32,7 @@ Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
  1 file changed, 2 insertions(+)
 
 diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-index e759076..a29fc4f 100644
+index 1e5eb9f..50df2c8 100644
 --- a/arch/x86/kernel/acpi/boot.c
 +++ b/arch/x86/kernel/acpi/boot.c
 @@ -87,7 +87,9 @@ static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;

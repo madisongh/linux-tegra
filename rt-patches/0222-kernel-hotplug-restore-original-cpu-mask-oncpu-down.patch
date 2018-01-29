@@ -1,4 +1,4 @@
-From 7d3a3a61954742f850f0ca4a3d343c6e4d82793d Mon Sep 17 00:00:00 2001
+From 4f121c2fd2e9dbf764fb7aeb5b0c027aec025c26 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 14 Jun 2013 17:16:35 +0200
 Subject: [PATCH 222/366] kernel/hotplug: restore original cpu mask oncpu/down

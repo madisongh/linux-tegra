@@ -1,4 +1,4 @@
-From 41fd87c34e2f54d24081d1963a05ca26ffda3620 Mon Sep 17 00:00:00 2001
+From c32a39d3695e2096bdda480906b6319f6eeeee2b Mon Sep 17 00:00:00 2001
 From: Russ Dill <Russ.Dill@ti.com>
 Date: Wed, 5 Aug 2015 15:30:44 +0530
 Subject: [PATCH 005/366] ARM: OMAP2: Drop the concept of certain power domains

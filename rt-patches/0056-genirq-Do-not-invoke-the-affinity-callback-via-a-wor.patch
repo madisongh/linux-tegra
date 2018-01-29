@@ -1,4 +1,4 @@
-From 254d0a268622e0313e773ccbd8e85dc9108913e4 Mon Sep 17 00:00:00 2001
+From 847d83d9adb7651fee15bc4d019d0e30d2cbb6d2 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 21 Aug 2013 17:48:46 +0200
 Subject: [PATCH 056/366] genirq: Do not invoke the affinity callback via a

@@ -1,4 +1,4 @@
-From 1b17a84802c733261b54a4e09c7a3f8d2ac664ef Mon Sep 17 00:00:00 2001
+From cfadb59fc05bd7b81ff01710a3c19d7632540fa2 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 20 Jan 2016 15:13:30 +0100
 Subject: [PATCH 275/366] preempt-lazy: Add the lazy-preemption check to

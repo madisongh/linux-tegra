@@ -1,4 +1,4 @@
-From 93b917d06bf5a8fe7283b7fffacff5518e776caf Mon Sep 17 00:00:00 2001
+From 7c4e2d71f1483f4b67e7a332bcd69ffb9a64583c Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 11 Feb 2016 22:06:28 +0100
 Subject: [PATCH 307/366] kernel: sched: Fix preempt_disable_ip recodring for

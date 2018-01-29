@@ -1,4 +1,4 @@
-From 5dd7edbd6980c6139624515d75bc93f89dff142a Mon Sep 17 00:00:00 2001
+From 1206ffb590b55b8568714a4eb348ddd271150134 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 12 Dec 2011 12:29:04 +0100
 Subject: [PATCH 140/366] wait-simple: Simple waitqueue implementation

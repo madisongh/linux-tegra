@@ -1,4 +1,4 @@
-From cc5ec3c5b53849556efab10b11456ae62fda8382 Mon Sep 17 00:00:00 2001
+From 7259a9495b7ceafcbf7eed3919af0ea29737b2d6 Mon Sep 17 00:00:00 2001
 From: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
 Date: Mon, 14 Dec 2015 11:19:09 +0100
 Subject: [PATCH 335/366] panic, x86: Fix re-entrance problem due to panic on

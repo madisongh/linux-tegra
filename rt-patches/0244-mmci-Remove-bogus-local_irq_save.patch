@@ -1,4 +1,4 @@
-From e594e0280ccda40502775927192ba83a2dcb84b2 Mon Sep 17 00:00:00 2001
+From f4021cbe1c78c1f59ab79ef41b151f93acd740cc Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 9 Jan 2013 12:11:12 +0100
 Subject: [PATCH 244/366] mmci: Remove bogus local_irq_save()

@@ -1,4 +1,4 @@
-From face0c0e26f242a8a65ef2df4071eff5f580a4ed Mon Sep 17 00:00:00 2001
+From b5a2d9c5a07fdbcd51612ab80d6b9542b65f0d7a Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 13 Dec 2011 21:42:19 +0100
 Subject: [PATCH 097/366] sched: ttwu: Return success when only changing the

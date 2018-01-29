@@ -1,4 +1,4 @@
-From af6bfeca405c6dae67df7faaacb1a3378819f0f8 Mon Sep 17 00:00:00 2001
+From 9df9ff54809b725357c0a2792d7f0df639bc7f25 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Thu, 1 Dec 2011 00:07:16 +0100
 Subject: [PATCH 022/366] pci: Use __wake_up_all_locked in

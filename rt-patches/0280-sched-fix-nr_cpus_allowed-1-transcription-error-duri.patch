@@ -1,4 +1,4 @@
-From 59f77bc3df8cecd5a7309fd61407c6bc570c3cff Mon Sep 17 00:00:00 2001
+From 6026b2649037116ac5808c8ec46aa39fa74e3671 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sat, 23 Jan 2016 08:11:53 +0100
 Subject: [PATCH 280/366] sched: fix ->nr_cpus_allowed = 1 transcription error

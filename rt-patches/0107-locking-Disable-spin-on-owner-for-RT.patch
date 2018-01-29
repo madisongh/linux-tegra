@@ -1,4 +1,4 @@
-From 1cac8f2113a4c0c11ee7162d77792cfecbbb3d93 Mon Sep 17 00:00:00 2001
+From ed20706c80a3d375174213ce9db04889b4ddb4b8 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 17 Jul 2011 21:51:45 +0200
 Subject: [PATCH 107/366] locking: Disable spin on owner for RT

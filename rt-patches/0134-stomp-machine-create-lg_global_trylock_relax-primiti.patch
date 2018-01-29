@@ -1,4 +1,4 @@
-From f1cced98061cc840c8941b3a559768477ac870d1 Mon Sep 17 00:00:00 2001
+From 53148997c26ee8329f370863ab9f6c9b891feb26 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Fri, 2 May 2014 13:13:22 +0200
 Subject: [PATCH 134/366] stomp-machine: create lg_global_trylock_relax()

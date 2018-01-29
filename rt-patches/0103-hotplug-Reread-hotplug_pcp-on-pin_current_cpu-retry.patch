@@ -1,4 +1,4 @@
-From dc2bba8f3fb50c82a0de823c03eb88f3c8c205d8 Mon Sep 17 00:00:00 2001
+From 0e55b1914d28be693f64d3917dafb35fe4781955 Mon Sep 17 00:00:00 2001
 From: Yong Zhang <yong.zhang0@gmail.com>
 Date: Thu, 28 Jul 2011 11:16:00 +0800
 Subject: [PATCH 103/366] hotplug: Reread hotplug_pcp on pin_current_cpu()

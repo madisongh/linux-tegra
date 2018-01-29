@@ -1,4 +1,4 @@
-From 4960ca21833ee1b460f3f4a149a8a68cc5c69be9 Mon Sep 17 00:00:00 2001
+From e0208ab610c0e1f93b731d35646b1253d8827a5c Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Thu, 5 Dec 2013 09:16:52 -0500
 Subject: [PATCH 220/366] cpu hotplug: Document why PREEMPT_RT uses a spinlock

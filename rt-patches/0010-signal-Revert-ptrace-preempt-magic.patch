@@ -1,4 +1,4 @@
-From 33e3e32e963f05ffcd422adfa331d1bc9fdc2b13 Mon Sep 17 00:00:00 2001
+From 054931827a447656a5acf22c4a85e48704050660 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 21 Sep 2011 19:57:12 +0200
 Subject: [PATCH 010/366] signal: Revert ptrace preempt magic

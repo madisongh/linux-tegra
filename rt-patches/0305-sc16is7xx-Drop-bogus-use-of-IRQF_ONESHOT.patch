@@ -1,4 +1,4 @@
-From 411dc71f6c6cee9dc161a05c82abbec5c04a5d3a Mon Sep 17 00:00:00 2001
+From 5bb52b886d117f1834d5a1e941492050852db529 Mon Sep 17 00:00:00 2001
 From: Josh Cartwright <joshc@ni.com>
 Date: Thu, 18 Feb 2016 11:26:12 -0600
 Subject: [PATCH 305/366] sc16is7xx: Drop bogus use of IRQF_ONESHOT

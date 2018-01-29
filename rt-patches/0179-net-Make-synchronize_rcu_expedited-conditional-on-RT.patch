@@ -1,4 +1,4 @@
-From 2931bfc8dc735944ee4b76ab83f2c181c0673fa8 Mon Sep 17 00:00:00 2001
+From 052cdd83e0d6662602a9529a61845b5e1f2c07ae Mon Sep 17 00:00:00 2001
 From: Josh Cartwright <joshc@ni.com>
 Date: Tue, 27 Oct 2015 07:31:53 -0500
 Subject: [PATCH 179/366] net: Make synchronize_rcu_expedited() conditional on

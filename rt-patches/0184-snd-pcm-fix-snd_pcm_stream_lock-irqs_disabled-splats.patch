@@ -1,4 +1,4 @@
-From e85215d6f215cb15a03b34c72aa3e6160f5e292e Mon Sep 17 00:00:00 2001
+From 686996b07f3bba68def3f0e31bda9b9f444db705 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Wed, 18 Feb 2015 15:09:23 +0100
 Subject: [PATCH 184/366] snd/pcm: fix snd_pcm_stream_lock*() irqs_disabled()

@@ -1,4 +1,4 @@
-From 20aeeddcb91864ce190216ca2ac0af391805b9a2 Mon Sep 17 00:00:00 2001
+From a9ac12caf8ce183c5b08e9bad183fc0196985da0 Mon Sep 17 00:00:00 2001
 From: Carsten Emde <C.Emde@osadl.org>
 Date: Tue, 19 Jul 2011 13:53:12 +0100
 Subject: [PATCH 024/366] hwlatdetect.patch
@@ -88,7 +88,7 @@ index 0000000..cb61516
 +then we write to a global sample ring buffer of 8K samples, which is
 +consumed by reading from the "sample" (pipe) debugfs file interface.
 diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index 9a368c5..a79ec7f 100644
+index 7dcd598..79f1ed0 100644
 --- a/drivers/misc/Kconfig
 +++ b/drivers/misc/Kconfig
 @@ -121,6 +121,35 @@ config IBM_ASM
@@ -128,7 +128,7 @@ index 9a368c5..a79ec7f 100644
  	tristate "Sensable PHANToM (PCI)"
  	depends on PCI
 diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
-index 02bfee4..508da68 100644
+index fb917fb..ef5ae7e 100644
 --- a/drivers/misc/Makefile
 +++ b/drivers/misc/Makefile
 @@ -42,6 +42,7 @@ obj-$(CONFIG_C2PORT)		+= c2port/

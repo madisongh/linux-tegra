@@ -1,4 +1,4 @@
-From 9f95e3260a37233228392a4e1ec4c7738ae9c956 Mon Sep 17 00:00:00 2001
+From af34c3b7aa2eb1c67d62e31cc013631d02081ded Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 1 Mar 2013 11:17:42 +0100
 Subject: [PATCH 117/366] futex: Ensure lock/unlock symetry versus pi_lock and

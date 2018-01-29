@@ -1,4 +1,4 @@
-From 5a4e0bc5e940b628a8c7e5146dd3ec1a8ed7c1bf Mon Sep 17 00:00:00 2001
+From 35f7c7c4e07d0f8e22c66748f415a08bd57a57e9 Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Mon, 19 Aug 2013 17:33:26 -0400
 Subject: [PATCH 026/366] hwlat-detector: Use trace_clock_local if available

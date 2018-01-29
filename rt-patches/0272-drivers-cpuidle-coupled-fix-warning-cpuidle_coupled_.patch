@@ -1,4 +1,4 @@
-From 2a24ce15b54d031374d8469df10d5e1878196683 Mon Sep 17 00:00:00 2001
+From 48398c8fd878450a8858784e7d985f97ac63718e Mon Sep 17 00:00:00 2001
 From: Anders Roxell <anders.roxell@linaro.org>
 Date: Fri, 15 Jan 2016 20:21:12 +0100
 Subject: [PATCH 272/366] drivers/cpuidle: coupled: fix warning

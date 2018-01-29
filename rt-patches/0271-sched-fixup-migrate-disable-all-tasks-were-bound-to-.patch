@@ -1,4 +1,4 @@
-From 634d13c79025cd67620d10b807205d1c581279fb Mon Sep 17 00:00:00 2001
+From df5f8271a0d088bf7c7dac1be2ae03f53c3b6ca2 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 21 Jan 2016 15:58:56 +0100
 Subject: [PATCH 271/366] sched: fixup migrate disable (all tasks were bound to

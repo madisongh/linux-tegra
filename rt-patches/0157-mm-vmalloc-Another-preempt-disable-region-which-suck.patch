@@ -1,4 +1,4 @@
-From b197f652943a6d4dffb9e94ebc1e947b64ec4a93 Mon Sep 17 00:00:00 2001
+From 1c64e6dd2303a923f13a7d2e75468df7b7376cbd Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 12 Jul 2011 11:39:36 +0200
 Subject: [PATCH 157/366] mm/vmalloc: Another preempt disable region which

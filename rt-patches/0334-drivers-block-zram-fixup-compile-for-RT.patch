@@ -1,4 +1,4 @@
-From 362155102997ccf946cc9c97c95806cc2b1a548c Mon Sep 17 00:00:00 2001
+From 4c504fe23d8727b63541ca896e4ebcc7da6133dc Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 8 Apr 2016 16:18:24 +0200
 Subject: [PATCH 334/366] drivers/block/zram: fixup compile for !RT

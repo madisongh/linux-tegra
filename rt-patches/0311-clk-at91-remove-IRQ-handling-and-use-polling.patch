@@ -1,4 +1,4 @@
-From 0df27f96fd160ee4d2eb516c3e12fa218995cf58 Mon Sep 17 00:00:00 2001
+From d5176431ea9adeb7c85f70c37bcfb6738016fc47 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 16 Sep 2015 23:47:39 +0200
 Subject: [PATCH 311/366] clk: at91: remove IRQ handling and use polling

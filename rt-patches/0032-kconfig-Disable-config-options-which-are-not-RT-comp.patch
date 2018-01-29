@@ -1,4 +1,4 @@
-From 2d2ba86cd9d8bbcc50aee099bf50c407abbe8c0a Mon Sep 17 00:00:00 2001
+From 1b985272862e118edbd961d2275cffee5d501ffb Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 24 Jul 2011 12:11:43 +0200
 Subject: [PATCH 032/366] kconfig: Disable config options which are not RT

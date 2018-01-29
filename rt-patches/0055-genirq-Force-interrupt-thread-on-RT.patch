@@ -1,4 +1,4 @@
-From 321e23e9a506e9f42d24b7f844e15a2aebf9db91 Mon Sep 17 00:00:00 2001
+From e4d80c164e3f6c5f397055bf27d768996943096f Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 3 Apr 2011 11:57:29 +0200
 Subject: [PATCH 055/366] genirq: Force interrupt thread on RT

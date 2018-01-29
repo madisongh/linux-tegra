@@ -1,4 +1,4 @@
-From 2f755fc1b9556749a4f8a7d3db324feb80a9e24e Mon Sep 17 00:00:00 2001
+From 10cbcd4d861943eb63e6fe071b76c41bf8f48fc0 Mon Sep 17 00:00:00 2001
 From: Yang Shi <yang.shi@linaro.org>
 Date: Thu, 10 Dec 2015 10:58:51 -0800
 Subject: [PATCH 049/366] x86/signal: delay calling signals on 32bit

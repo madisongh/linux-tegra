@@ -1,4 +1,4 @@
-From 0e41faf207be19859e82cedfff5fe6b9b507077e Mon Sep 17 00:00:00 2001
+From dd4b147f3d99dd3b403bd3306c539bdc5b1afd30 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Tue, 23 Jul 2013 15:45:51 +0200
 Subject: [PATCH 008/366] vtime: Split lock and seqcount

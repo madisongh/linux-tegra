@@ -1,4 +1,4 @@
-From 7f2b70c01d0599878d0f85be985d60fcd92b9d38 Mon Sep 17 00:00:00 2001
+From f45a264245c34c244b9ba30e57571dd0aea7bd6f Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 26 Jul 2009 02:21:32 +0200
 Subject: [PATCH 153/366] x86: Use generic rwsem_spinlocks on -rt

@@ -1,4 +1,4 @@
-From 3686244e5446419fc92bb4b2bc154f776f3d0acb Mon Sep 17 00:00:00 2001
+From aed1da90d229580f94bb7484274c08a5f17fe07f Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Mon, 19 Aug 2013 17:33:25 -0400
 Subject: [PATCH 025/366] hwlat-detector: Update hwlat_detector to add outer

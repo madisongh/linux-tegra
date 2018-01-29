@@ -1,4 +1,4 @@
-From c0c286a050ad4480081bda39e6f9f0c55c80c800 Mon Sep 17 00:00:00 2001
+From 5d4d7f5eebc34b7d2c1713478422c23d451839f1 Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 01:31:34 +0200
 Subject: [PATCH 315/366] ARM: at91: pm: find and remap the pmc

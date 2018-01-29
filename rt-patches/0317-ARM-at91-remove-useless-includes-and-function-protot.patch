@@ -1,4 +1,4 @@
-From 82fd9dd143497bdf590050d55ee68fd54d4ea87a Mon Sep 17 00:00:00 2001
+From 2aa847d0a534cbab0785495622b97eb4c899a3ed Mon Sep 17 00:00:00 2001
 From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Date: Wed, 30 Sep 2015 02:01:20 +0200
 Subject: [PATCH 317/366] ARM: at91: remove useless includes and function

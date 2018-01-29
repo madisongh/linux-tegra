@@ -1,4 +1,4 @@
-From 06a5d31199ba4b992bcd46651850f3b82284388f Mon Sep 17 00:00:00 2001
+From 736662459ca3c7aae119cb7c35724eaf5d4805c3 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:54:36 +0100
 Subject: [PATCH 261/366] clocksource: atmel: compile fixes

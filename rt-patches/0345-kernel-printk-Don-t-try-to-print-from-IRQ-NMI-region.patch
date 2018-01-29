@@ -1,4 +1,4 @@
-From 1b96d54cc0f69e08f25fc1ae50016674911ae6c7 Mon Sep 17 00:00:00 2001
+From 4e9164325094aa7c599bb8db3b2e0f5e74fa911c Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 19 May 2016 17:45:27 +0200
 Subject: [PATCH 345/366] kernel/printk: Don't try to print from IRQ/NMI region
@@ -9,13 +9,14 @@ RT).
 We don't print in general from a IRQ off region so we should not try
 this via console_unblank() / bust_spinlocks() as well.
 
+Change-Id: I77967d2d15e4a9df520a7dbafd95ec131af1bfa3
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- kernel/printk/printk.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ kernel/printk/printk.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index cd377c4..cbc627a 100644
+index e2883b4..3fe2eca 100644
 --- a/kernel/printk/printk.c
 +++ b/kernel/printk/printk.c
 @@ -1526,6 +1526,11 @@ static void call_force_console_drivers(const char *force_text,
@@ -30,7 +31,19 @@ index cd377c4..cbc627a 100644
  	migrate_disable();
  	for_each_console(con) {
  		if (exclusive_console && con != exclusive_console)
-@@ -2514,6 +2519,11 @@ void console_unblank(void)
+@@ -1562,6 +1567,11 @@ static void call_console_drivers(int level,
+ 	if (!console_drivers)
+ 		return;
+ 
++	if (IS_ENABLED(CONFIG_PREEMPT_RT_BASE)) {
++		if (in_irq() || in_nmi())
++			return;
++	}
++
+ 	migrate_disable();
+ 	for_each_console(con) {
+ 		if (exclusive_console && con != exclusive_console)
+@@ -2536,6 +2546,11 @@ void console_unblank(void)
  {
  	struct console *c;
  

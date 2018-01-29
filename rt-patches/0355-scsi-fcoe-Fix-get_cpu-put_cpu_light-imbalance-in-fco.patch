@@ -1,4 +1,4 @@
-From e636c3302ea1e418fffe1508f054a14560fefb40 Mon Sep 17 00:00:00 2001
+From c4c6507b60182fb9affaf6afa438bafae7a0b979 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Thu, 28 Jul 2016 06:04:49 +0200
 Subject: [PATCH 355/366] scsi/fcoe: Fix get_cpu()/put_cpu_light() imbalance in

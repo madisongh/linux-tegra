@@ -1,4 +1,4 @@
-From ba84e5d2ef9e5368791183b0984f4d381f3ccefc Mon Sep 17 00:00:00 2001
+From 45340972f2c67836503fc3e39e697373de149aa8 Mon Sep 17 00:00:00 2001
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 Date: Fri, 15 Jan 2016 16:20:47 +0200
 Subject: [PATCH 270/366] ARM: highmem: take into account FIX_KMAP_BEGIN in

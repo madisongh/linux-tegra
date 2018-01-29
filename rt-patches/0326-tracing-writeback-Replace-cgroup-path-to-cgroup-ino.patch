@@ -1,4 +1,4 @@
-From 152f724b7c81a31c790a44ceb2ac70b95e3bd07e Mon Sep 17 00:00:00 2001
+From 259431c4f55b6a4af162f15d5b3233a1f3b2b50d Mon Sep 17 00:00:00 2001
 From: Yang Shi <yang.shi@linaro.org>
 Date: Thu, 3 Mar 2016 01:08:57 -0800
 Subject: [PATCH 326/366] tracing, writeback: Replace cgroup path to cgroup ino

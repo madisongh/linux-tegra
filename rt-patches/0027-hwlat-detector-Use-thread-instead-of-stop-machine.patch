@@ -1,4 +1,4 @@
-From 62184f546d0f099d46a0a503bcc9b5e35c9e04e7 Mon Sep 17 00:00:00 2001
+From 2bddbcee83b51052a19bcb2f5a354f5f2c5c12f2 Mon Sep 17 00:00:00 2001
 From: Steven Rostedt <rostedt@goodmis.org>
 Date: Mon, 19 Aug 2013 17:33:27 -0400
 Subject: [PATCH 027/366] hwlat-detector: Use thread instead of stop machine

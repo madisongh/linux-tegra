@@ -1,4 +1,4 @@
-From 2bab3daae1654ab9f7ce10f8490791dbb1cf7e80 Mon Sep 17 00:00:00 2001
+From a7386498a6ba9922d3fdd8523727d93a4f221d3e Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Fri, 2 May 2014 13:13:34 +0200
 Subject: [PATCH 135/366] stomp-machine: use lg_global_trylock_relax() to dead

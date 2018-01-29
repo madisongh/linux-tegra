@@ -1,4 +1,4 @@
-From edca96f1ef47dddcf640d6963a4b6fb484dc84a2 Mon Sep 17 00:00:00 2001
+From b10ddd2c3bd2c842daf9a8fa2795eaad07728e6a Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 17 Jun 2011 15:42:38 +0200
 Subject: [PATCH 037/366] Intrduce migrate_disable() + cpu_light()

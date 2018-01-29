@@ -1,4 +1,4 @@
-From 5f98d96c17d8476136a02330e9ca830358d4cbba Mon Sep 17 00:00:00 2001
+From d6b3ca94fd672004275204b52952a0ee3d9a0f38 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Mon, 22 Feb 2016 22:19:25 +0000
 Subject: [PATCH 342/366] perf/x86/intel/rapl: Make PMU lock raw

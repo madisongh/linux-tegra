@@ -1,4 +1,4 @@
-From ecf242f713e3f6d1431a98869a14701cdadb70d3 Mon Sep 17 00:00:00 2001
+From e7c08efbd693b9a1c40e3b6d2ccdd7246f19b4c0 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 4 Feb 2016 18:56:10 +0100
 Subject: [PATCH 281/366] printk: fix a build on powerpc
@@ -18,7 +18,7 @@ Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
  1 file changed, 59 insertions(+), 56 deletions(-)
 
 diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index 84400c4..cd377c4 100644
+index b8a8461..e2883b4 100644
 --- a/kernel/printk/printk.c
 +++ b/kernel/printk/printk.c
 @@ -245,6 +245,65 @@ struct printk_log {

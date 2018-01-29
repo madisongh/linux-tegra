@@ -1,4 +1,4 @@
-From e0e929cba28f4672145404ed2cfd6087cea47c85 Mon Sep 17 00:00:00 2001
+From 673bb9c0ac38a4e7bcc409022a6068ac71af1da1 Mon Sep 17 00:00:00 2001
 From: Frederic Weisbecker <fweisbec@gmail.com>
 Date: Thu, 19 Nov 2015 16:47:30 +0100
 Subject: [PATCH 340/366] sched/cputime: Clarify vtime symbols and document

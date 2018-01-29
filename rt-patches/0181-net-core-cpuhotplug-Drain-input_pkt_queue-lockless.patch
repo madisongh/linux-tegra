@@ -1,4 +1,4 @@
-From 3bad93a4ee86f6b1c7d7332505445e5126495797 Mon Sep 17 00:00:00 2001
+From e4de381e162a58dbca974e7813434d4d657e4ab5 Mon Sep 17 00:00:00 2001
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 Date: Fri, 9 Oct 2015 09:25:49 -0500
 Subject: [PATCH 181/366] net/core/cpuhotplug: Drain input_pkt_queue lockless

@@ -1,4 +1,4 @@
-From d4826fe301eb789b1081f37f84d995ee9de59cb0 Mon Sep 17 00:00:00 2001
+From ddb397c37dd05d8cdfac9127d97afa58a6a5657e Mon Sep 17 00:00:00 2001
 From: John Kacur <jkacur@redhat.com>
 Date: Mon, 19 Sep 2011 11:09:27 +0200
 Subject: [PATCH 128/366] rwlocks: Fix section mismatch

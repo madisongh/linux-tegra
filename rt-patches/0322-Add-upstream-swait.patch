@@ -1,4 +1,4 @@
-From ba97d627b3aff2c98c07e9832b0c0f1dcf390349 Mon Sep 17 00:00:00 2001
+From 80880a5c8bdc19dbc99a31b5544ed46e2e2fa268 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 9 Mar 2016 11:24:03 +0100
 Subject: [PATCH 322/366] Add upstream swait

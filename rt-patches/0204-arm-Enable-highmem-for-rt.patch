@@ -1,4 +1,4 @@
-From 93564d8227dfae7268b5cdd20827dcf321d38872 Mon Sep 17 00:00:00 2001
+From dedf5e9569801567e3427580a288f1ee8258eb34 Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Wed, 13 Feb 2013 11:03:11 +0100
 Subject: [PATCH 204/366] arm: Enable highmem for rt

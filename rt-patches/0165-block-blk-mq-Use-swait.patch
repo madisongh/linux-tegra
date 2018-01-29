@@ -1,4 +1,4 @@
-From 21b8131df7cd1ce5b8593656cf14ae7dad1efda7 Mon Sep 17 00:00:00 2001
+From 64f231cbc796171d98b312ddd63db309ada2a6e9 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 13 Feb 2015 11:01:26 +0100
 Subject: [PATCH 165/366] block: blk-mq: Use swait

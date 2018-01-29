@@ -1,4 +1,4 @@
-From 8b90167a1db5162b104acce00c0b8218c0e9225c Mon Sep 17 00:00:00 2001
+From 481c9414e5939a547017d53d0b435de035f8a8a0 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 19 Mar 2013 14:44:30 +0100
 Subject: [PATCH 004/366] kernel/SRCU: provide a static initializer

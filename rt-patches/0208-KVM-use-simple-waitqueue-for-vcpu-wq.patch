@@ -1,4 +1,4 @@
-From b68844a40cf6580eded14bf33fbe37a2f5f63f7b Mon Sep 17 00:00:00 2001
+From 47909a435117d7e186d09dab8ae93eb50e2870d9 Mon Sep 17 00:00:00 2001
 From: Marcelo Tosatti <mtosatti@redhat.com>
 Date: Wed, 8 Apr 2015 20:33:24 -0300
 Subject: [PATCH 208/366] KVM: use simple waitqueue for vcpu->wq

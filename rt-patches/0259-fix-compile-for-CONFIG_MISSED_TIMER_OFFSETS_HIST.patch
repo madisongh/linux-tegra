@@ -1,4 +1,4 @@
-From eaa98132bab39bc10134573025b5c9dd34425806 Mon Sep 17 00:00:00 2001
+From 6f4a933db4e0d261f48aa6937b137a9ff8f7905a Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:47:11 +0100
 Subject: [PATCH 259/366] fix compile for CONFIG_MISSED_TIMER_OFFSETS_HIST

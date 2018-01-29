@@ -1,4 +1,4 @@
-From 63c9bec3074fd089d3be434c1f78ca4a53f251d0 Mon Sep 17 00:00:00 2001
+From f8ac34bf99384d2c3f1327a87ce5f0053581e23f Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 17 Jul 2011 22:51:33 +0200
 Subject: [PATCH 094/366] sched: Use the proper LOCK_OFFSET for cond_resched()

@@ -1,4 +1,4 @@
-From 1a1d7ba9ba9d17325f9f2a8b486ab094527e9b8c Mon Sep 17 00:00:00 2001
+From 6d9f3bf6c88a57b0ac6ffd66940e12267b82d443 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sun, 5 Jun 2016 08:16:10 +0200
 Subject: [PATCH 350/366] work-simple: Rename work-simple.[ch] to swork.[ch]

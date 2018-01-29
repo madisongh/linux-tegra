@@ -1,4 +1,4 @@
-From 9d50f4f0c119148b17a3546f6420ea744a7b59b8 Mon Sep 17 00:00:00 2001
+From 1257d6e88203c2da05b5fdd364f02bfe12242cf0 Mon Sep 17 00:00:00 2001
 From: Anders Roxell <anders.roxell@linaro.org>
 Date: Fri, 15 Jan 2016 01:09:43 +0100
 Subject: [PATCH 273/366] drivers/media: vsp1_video: fix compile error

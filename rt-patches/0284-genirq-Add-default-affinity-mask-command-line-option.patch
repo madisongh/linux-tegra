@@ -1,4 +1,4 @@
-From 29331ef49a7e8c52f2968c3006f972b44fd0e9f4 Mon Sep 17 00:00:00 2001
+From e0625470562f1f9b2359dd1411acbaa0f74789ab Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Fri, 25 May 2012 16:59:47 +0200
 Subject: [PATCH 284/366] genirq: Add default affinity mask command line option

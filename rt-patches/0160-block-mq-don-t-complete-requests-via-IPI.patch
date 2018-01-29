@@ -1,4 +1,4 @@
-From bba832b4d0a1bf7f62691445462c153d1647a134 Mon Sep 17 00:00:00 2001
+From 4e189330826974203c476650c79dfb08794dd27b Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Thu, 29 Jan 2015 15:10:08 +0100
 Subject: [PATCH 160/366] block/mq: don't complete requests via IPI

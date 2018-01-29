@@ -1,4 +1,4 @@
-From 10d8c4b6744e5115ffb9830ee00d80d85546efba Mon Sep 17 00:00:00 2001
+From fb87be1001cf7005f2f7de9abd8ce24aef17419c Mon Sep 17 00:00:00 2001
 From: Boris Brezillon <boris.brezillon@free-electrons.com>
 Date: Sun, 7 Sep 2014 08:14:29 +0200
 Subject: [PATCH 310/366] clk: at91: make use of syscon/regmap internally

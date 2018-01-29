@@ -1,4 +1,4 @@
-From a784fdb4a502f7dce3931fffea28e263d7e8e7a8 Mon Sep 17 00:00:00 2001
+From 7b1328d66817b12a7b3255be6a8f2838b1e2bbb2 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 22 Jan 2016 21:42:32 +0100
 Subject: [PATCH 279/366] RCU: make RCU_EXPERT y on RT

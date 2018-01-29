@@ -1,4 +1,4 @@
-From e488e329e8356bbe7ee31b6a66644b1705dcbb68 Mon Sep 17 00:00:00 2001
+From 6e58d6c97bc8a170f5f3fb35954a765623f3817c Mon Sep 17 00:00:00 2001
 From: Thomas Gleixner <tglx@linutronix.de>
 Date: Sun, 17 Jul 2011 19:35:29 +0200
 Subject: [PATCH 105/366] hotplug: Use migrate disable on unplug

@@ -1,4 +1,4 @@
-From e7235e2fed73e48cc5ddcf615640e22f3dbb8210 Mon Sep 17 00:00:00 2001
+From 6e5f4affaa8ad0ee974e412cd6a05a17ae9e1edb Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 15 Jan 2016 18:02:39 +0100
 Subject: [PATCH 265/366] kernel/time: fix wrong next wakeup computation in

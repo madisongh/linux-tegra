@@ -1,4 +1,4 @@
-From bcf182e737b2dc1a16a1c099c9a074770e770901 Mon Sep 17 00:00:00 2001
+From 28df7f2dfb9b4efd8ae1547641dce91536a12cd1 Mon Sep 17 00:00:00 2001
 From: Mike Galbraith <umgwanakikbuti@gmail.com>
 Date: Sun, 21 Feb 2016 16:11:30 +0100
 Subject: [PATCH 298/366] sched,rt: __always_inline preemptible_lazy()

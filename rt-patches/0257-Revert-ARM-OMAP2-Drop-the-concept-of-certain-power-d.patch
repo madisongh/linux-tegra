@@ -1,4 +1,4 @@
-From ed7c10e75256f03fba7fe0119a2048f230848710 Mon Sep 17 00:00:00 2001
+From 5fe79abd98932de72958fa560f15bc08500917b6 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:43:57 +0100
 Subject: [PATCH 257/366] Revert "ARM: OMAP2: Drop the concept of certain power

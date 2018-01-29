@@ -1,4 +1,4 @@
-From da7ba2260668ea3ee4a674a58843b8277890560e Mon Sep 17 00:00:00 2001
+From de6b5decdb27c0ce92c8e658d680d4b1d3cd0f50 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:41:53 +0100
 Subject: [PATCH 255/366] move update_migrate_disable() definition

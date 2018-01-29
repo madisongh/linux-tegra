@@ -1,4 +1,4 @@
-From bb71401952d67b397e3c07ffae8c9042896167a6 Mon Sep 17 00:00:00 2001
+From 030d3932569e72db6ad530854baed2dd7e164ffc Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 1 Apr 2016 11:47:54 +0200
 Subject: [PATCH 330/366] completion: filter out suspend

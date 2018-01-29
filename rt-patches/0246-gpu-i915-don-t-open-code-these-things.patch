@@ -1,4 +1,4 @@
-From 6b29324b793709c3cef3897b7f8f3162bf01d816 Mon Sep 17 00:00:00 2001
+From 907464ad45d636cc10e38500d822db9b911b2ecc Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Tue, 14 Jul 2015 14:26:34 +0200
 Subject: [PATCH 246/366] gpu/i915: don't open code these things

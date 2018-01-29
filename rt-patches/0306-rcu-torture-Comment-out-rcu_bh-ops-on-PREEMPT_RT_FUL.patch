@@ -1,4 +1,4 @@
-From fb89ad5e1cd60473b66554bc58e8c38cde6d6529 Mon Sep 17 00:00:00 2001
+From b453695e023d9c57f895ba458153be6121fc1532 Mon Sep 17 00:00:00 2001
 From: Clark Williams <williams@redhat.com>
 Date: Fri, 26 Feb 2016 13:19:20 -0600
 Subject: [PATCH 306/366] rcu/torture: Comment out rcu_bh ops on

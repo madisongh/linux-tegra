@@ -1,4 +1,4 @@
-From c0b38ec8cedae8335dc163175e1a62efe8d3797d Mon Sep 17 00:00:00 2001
+From 90f9dc02efb173b84511e6a49efbd1404ea81b43 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jul 2016 17:13:23 +0200
 Subject: [PATCH 352/366] timers: wakeup all timer waiters

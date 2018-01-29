@@ -1,4 +1,4 @@
-From bef5f97142e11a2abb8731c6f85f90dc886d04bb Mon Sep 17 00:00:00 2001
+From 88e81b114b6d119822e59a8cb91347ad80149848 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Fri, 30 Oct 2015 11:59:07 +0100
 Subject: [PATCH 075/366] ipc/msg: Implement lockless pipelined wakeups

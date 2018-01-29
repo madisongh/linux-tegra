@@ -1,4 +1,4 @@
-From deccf9bb375893744a85aa5a49817c1e5b8dbce8 Mon Sep 17 00:00:00 2001
+From 88ca3510e873a0c30a1675cec9acca065d1c0a53 Mon Sep 17 00:00:00 2001
 From: Clark Williams <williams@redhat.com>
 Date: Sat, 30 Jul 2011 21:55:53 -0500
 Subject: [PATCH 197/366] sysfs: Add /sys/kernel/realtime entry

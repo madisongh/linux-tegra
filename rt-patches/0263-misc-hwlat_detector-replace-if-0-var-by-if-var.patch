@@ -1,4 +1,4 @@
-From 2e73adac69d9976b70ca1ec014d24333bd42ce51 Mon Sep 17 00:00:00 2001
+From 0aeb7e3624a14f46e152b7c88805962a086cce55 Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:56:45 +0100
 Subject: [PATCH 263/366] misc: hwlat_detector: replace "if (0 != var)" by "if

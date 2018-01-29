@@ -1,4 +1,4 @@
-From eb93b402a52ab2b8a5e307ad977c230e44729a1a Mon Sep 17 00:00:00 2001
+From af252bcf6c1c671b0d2c45b253cd1e8e466dc8ea Mon Sep 17 00:00:00 2001
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Date: Wed, 13 Jan 2016 17:42:54 +0100
 Subject: [PATCH 256/366] kernel/time/timer: SMP=n fix
