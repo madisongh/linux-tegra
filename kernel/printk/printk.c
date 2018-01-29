@@ -1486,7 +1486,7 @@ static void call_console_drivers(int level,
 		if (!cpu_online(smp_processor_id()) &&
 		    !(con->flags & CON_ANYTIME))
 			continue;
-		// CON_FORCE_LEVEL consoles are handled separately
+		/* CON_FORCE_LEVEL consoles are handled separately */
 		if (con->flags & CON_FORCE_LEVEL)
 			continue;
 
@@ -1978,6 +1978,7 @@ static struct cont {
 	size_t len;
 	size_t cons;
 	u8 level;
+	u8 facility;
 	bool flushed:1;
 } cont;
 static char *log_text(const struct printk_log *msg) { return NULL; }
@@ -1993,6 +1994,8 @@ static ssize_t msg_print_ext_body(char *buf, size_t size,
 static void call_console_drivers(int level,
 				 const char *ext_text, size_t ext_len,
 				 const char *text, size_t len) {}
+static void call_force_console_drivers(const char *force_text,
+					size_t force_len) {}
 static size_t msg_print_text(const struct printk_log *msg, enum log_flags prev,
 			     bool syslog, char *buf, size_t size) { return 0; }
 static size_t cont_print_text(char *text, size_t size) { return 0; }
@@ -2228,6 +2231,7 @@ static void console_cont_flush(char *text, size_t size)
 {
 	unsigned long flags;
 	size_t len;
+	size_t cons;
 
 	raw_spin_lock_irqsave(&logbuf_lock, flags);
 
@@ -2242,10 +2246,27 @@ static void console_cont_flush(char *text, size_t size)
 	if (console_seq < log_next_seq && !cont.cons)
 		goto out;
 
+	cons = cont.cons;
 	len = cont_print_text(text, size);
 	raw_spin_unlock(&logbuf_lock);
 	stop_critical_timings();
 	call_console_drivers(cont.level, NULL, 0, text, len);
+
+	/* Add prefix in case console is with CON_FORCE_LEVEL */
+	if (cons == 0 && (console_prev & LOG_NEWLINE)) {
+		char force_text[LOG_LINE_MAX + PREFIX_MAX];
+		size_t force_len;
+		unsigned int prefix;
+
+		prefix = (cont.facility << 3) | cont.level;
+		force_len = sprintf(force_text, "<%u>", prefix);
+		memcpy(force_text + force_len, text, len);
+		force_len += len;
+		call_force_console_drivers(force_text, force_len);
+	} else {
+		call_force_console_drivers(text, len);
+	}
+
 	start_critical_timings();
 	local_irq_restore(flags);
 	return;
