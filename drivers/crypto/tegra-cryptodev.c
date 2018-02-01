@@ -38,6 +38,7 @@
 #include <crypto/akcipher.h>
 
 #include "tegra-cryptodev.h"
+#include <asm/barrier.h>
 
 #define NBUFS 2
 #define XBUFSIZE 8
@@ -171,6 +172,7 @@ static int process_crypt_req(struct file *filp, struct tegra_crypto_ctx *ctx,
 	if (crypt_req->op != TEGRA_CRYPTO_CBC) {
 		if (crypt_req->op >= TEGRA_CRYPTO_MAX)
 			return -EINVAL;
+		speculation_barrier();
 
 		tfm = crypto_alloc_ablkcipher(aes_algo[crypt_req->op],
 			CRYPTO_ALG_TYPE_ABLKCIPHER | CRYPTO_ALG_ASYNC, 0);
@@ -1296,6 +1298,7 @@ rng_out:
 				rsa_req_ah.msg_len);
 			return -EINVAL;
 		}
+		speculation_barrier();
 		ret = tegra_crypt_rsa_ahash(filp, ctx, &rsa_req_ah);
 		break;
 
@@ -1316,6 +1319,7 @@ rng_out:
 			return -EINVAL;
 		}
 
+		speculation_barrier();
 		ret = tegra_crypt_rsa(filp, ctx, &rsa_req);
 		break;
 
