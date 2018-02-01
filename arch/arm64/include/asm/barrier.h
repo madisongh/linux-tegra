@@ -155,6 +155,10 @@ do {									\
 #define smp_mb__before_atomic()	smp_mb()
 #define smp_mb__after_atomic()	smp_mb()
 
+#define speculation_barrier()                                           \
+        asm volatile(   "dsb sy\n"                                      \
+	                "isb\n" : : : "memory")
+
 #endif	/* __ASSEMBLY__ */
 
 #endif	/* __ASM_BARRIER_H */
