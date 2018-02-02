@@ -32,6 +32,7 @@
 #include <media/videobuf2-v4l2.h>
 
 #include "videobuf2-internal.h"
+#include <asm/barrier.h>
 
 /* Flags that are set by the vb2 core */
 #define V4L2_BUFFER_MASK_FLAGS	(V4L2_BUF_FLAG_MAPPED | V4L2_BUF_FLAG_QUEUED | \
@@ -157,6 +158,8 @@ static int vb2_queue_or_prepare_buf(struct vb2_queue *q, struct v4l2_buffer *b,
 		dprintk(1, "%s: buffer index out of range\n", opname);
 		return -EINVAL;
 	}
+
+	speculation_barrier();
 
 	if (q->bufs[b->index] == NULL) {
 		/* Should never happen */
@@ -464,6 +467,9 @@ int vb2_querybuf(struct vb2_queue *q, struct v4l2_buffer *b)
 		dprintk(1, "buffer index out of range\n");
 		return -EINVAL;
 	}
+
+	speculation_barrier();
+
 	vb = q->bufs[b->index];
 	ret = __verify_planes_array(vb, b);
 
