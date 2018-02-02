@@ -45,6 +45,7 @@
 #include <media/v4l2-event.h>
 #include <media/v4l2-dv-timings.h>
 #include <media/v4l2-of.h>
+#include <asm/barrier.h>
 
 static int debug;
 module_param(debug, int, 0644);
@@ -1999,6 +2000,8 @@ static int adv76xx_get_edid(struct v4l2_subdev *sd, struct v4l2_edid *edid)
 
 	if (edid->start_block >= state->edid.blocks)
 		return -EINVAL;
+
+	speculation_barrier();
 
 	if (edid->start_block + edid->blocks > state->edid.blocks)
 		edid->blocks = state->edid.blocks - edid->start_block;

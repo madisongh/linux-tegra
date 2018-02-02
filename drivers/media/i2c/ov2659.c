@@ -46,6 +46,7 @@
 #include <media/v4l2-mediabus.h>
 #include <media/v4l2-of.h>
 #include <media/v4l2-subdev.h>
+#include <asm/barrier.h>
 
 #define DRIVER_NAME "ov2659"
 
@@ -1021,6 +1022,8 @@ static int ov2659_enum_frame_sizes(struct v4l2_subdev *sd,
 
 	if (fse->index >= ARRAY_SIZE(ov2659_framesizes))
 		return -EINVAL;
+
+	speculation_barrier();
 
 	while (--i)
 		if (fse->code == ov2659_formats[i].code)

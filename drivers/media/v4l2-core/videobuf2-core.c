@@ -29,6 +29,7 @@
 #include <trace/events/vb2.h>
 
 #include "videobuf2-internal.h"
+#include <asm/barrier.h>
 
 int vb2_debug;
 EXPORT_SYMBOL_GPL(vb2_debug);
@@ -1878,6 +1879,8 @@ int vb2_core_expbuf(struct vb2_queue *q, int *fd, unsigned int type,
 		dprintk(1, "buffer index out of range\n");
 		return -EINVAL;
 	}
+
+	speculation_barrier();
 
 	vb = q->bufs[index];
 
