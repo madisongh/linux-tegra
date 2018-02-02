@@ -30,6 +30,7 @@
 #include "camera/vi/mc_common.h"
 #include "mipical/mipi_cal.h"
 #include "linux/nvhost.h"
+#include <asm/barrier.h>
 
 static struct tegra_csi_device *mc_csi;
 
@@ -277,6 +278,8 @@ static int tegra_csi_enum_framesizes(struct v4l2_subdev *sd,
 	}
 	if (i == ARRAY_SIZE(tegra_csi_tpg_fmts))
 		return -EINVAL;
+
+	speculation_barrier();
 
 	fse->min_width = fse->max_width =
 			tegra_csi_tpg_sizes[fse->index].width;
