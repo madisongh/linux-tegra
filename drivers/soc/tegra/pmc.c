@@ -3610,6 +3610,61 @@ static void tegra_pmc_reset_debugfs_init(struct device *dev)
 }
 #endif
 
+#if defined(CONFIG_SYSFS)
+char *tegra_reset_reason_string[] = {
+	"TEGRA_POWER_ON_RESET",
+	"TEGRA_AO_WATCHDOG",
+	"TEGRA_DENVER_WATCHDOG",
+	"TEGRA_BPMP_WATCHDOG",
+	"TEGRA_SCE_WATCHDOG",
+	"TEGRA_SPE_WATCHDOG",
+	"TEGRA_APE_WATCHDOG",
+	"TEGRA_A57_WATCHDOG",
+	"TEGRA_SENSOR",
+	"TEGRA_AOTAG",
+	"TEGRA_VFSENSOR",
+	"TEGRA_SOFTWARE_RESET",
+	"TEGRA_SC7",
+	"TEGRA_HSM",
+	"TEGRA_CSITE",
+	"TEGRA_WATCHDOG",
+	"TEGRA_LP0",
+	"TEGRA_RESET_REASON_MAX"
+};
+
+static ssize_t show_reason(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	enum tegra_system_reset_reason reset_status =
+		tegra_pmc_get_system_reset_reason();
+	sprintf(buf, "%s", tegra_reset_reason_string[reset_status]);
+	sprintf(buf + strlen(buf), "\n");
+	return strlen(buf);
+}
+
+const struct kobj_attribute pmc_attribute =
+		__ATTR(reset_reason, 0444, show_reason, NULL);
+
+static void tegra_pmc_reset_sysfs_init(struct device *dev)
+{
+	int error;
+	static struct kobject *pmc_kobject;
+
+	pmc_kobject = kobject_create_and_add("pmc", kernel_kobj);
+
+	if (!pmc_kobject) {
+		dev_err(dev, "Failed to create sysfs dir - /sys/kernel/pmc\n");
+		return;
+	}
+
+	error = sysfs_create_file(pmc_kobject, &pmc_attribute.attr);
+
+	if (error) {
+		dev_err(dev, "Failed to create sysfs entry - reset_reason\n");
+	}
+}
+#endif
+
 static int tegra_pmc_probe(struct platform_device *pdev)
 {
 	void __iomem *base = pmc->base;
@@ -3661,6 +3716,9 @@ static int tegra_pmc_probe(struct platform_device *pdev)
 
 	tegra_pmc_show_reset_status();
 	tegra_pmc_reset_debugfs_init(&pdev->dev);
+#if defined(CONFIG_SYSFS)
+	tegra_pmc_reset_sysfs_init(&pdev->dev);
+#endif
 
 	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
 		err = tegra_powergate_debugfs_init();
