@@ -169,10 +169,11 @@ static bool vi4_check_status(struct tegra_channel *chan)
 }
 
 static bool vi_notify_wait(struct tegra_channel *chan,
+		struct tegra_channel_buffer *buf,
 		struct timespec *ts)
 {
 	int i, err;
-	u32 thresh[TEGRA_CSI_BLOCKS], temp;
+	u32 thresh[TEGRA_CSI_BLOCKS];
 
 	/*
 	 * Increment syncpt for ATOMP_FE
@@ -181,7 +182,7 @@ static bool vi_notify_wait(struct tegra_channel *chan,
 	 * even if we are not waiting for ATOMP_FE here
 	 */
 	for (i = 0; i < chan->valid_ports; i++)
-		temp = nvhost_syncpt_incr_max_ext(chan->vi->ndev,
+		buf->thresh[i] = nvhost_syncpt_incr_max_ext(chan->vi->ndev,
 					chan->syncpt[i][FE_SYNCPT_IDX], 1);
 
 	/*
@@ -535,7 +536,7 @@ static int tegra_channel_capture_frame(struct tegra_channel *chan,
 	}
 
 	/* wait for vi notifier events */
-	vi_notify_wait(chan, &ts);
+	vi_notify_wait(chan, buf, &ts);
 	dev_dbg(&chan->video.dev,
 		"%s: vi4 got SOF syncpt buf[%p]\n", __func__, buf);
 
@@ -564,8 +565,7 @@ static int tegra_channel_capture_frame(struct tegra_channel *chan,
 static void tegra_channel_release_frame(struct tegra_channel *chan,
 					struct tegra_channel_buffer *buf)
 {
-	struct timespec ts = {0, 0};
-	int index;
+	int i;
 	int err = 0;
 	int restart_version = 0;
 
@@ -584,13 +584,19 @@ static void tegra_channel_release_frame(struct tegra_channel *chan,
 		return;
 	}
 
-	for (index = 0; index < chan->valid_ports; index++) {
+	/*
+	 * Wait for ATOMP_FE syncpt
+	 *
+	 * Use the syncpt max value we set in the capture thread
+	 */
+	for (i = 0; i < chan->valid_ports; i++) {
 		err = nvhost_syncpt_wait_timeout_ext(chan->vi->ndev,
-			chan->syncpt[index][FE_SYNCPT_IDX], buf->thresh[index],
-			chan->timeout, NULL, &ts);
-		if (err)
-			dev_err(&chan->video.dev,
-				"MW_ACK_DONE syncpoint time out!%d\n", index);
+				chan->syncpt[i][FE_SYNCPT_IDX],
+				buf->thresh[i],
+				250, NULL, NULL);
+		if (unlikely(err))
+			dev_err(chan->vi->dev,
+				"ATOMP_FE syncpt timeout! err = %d\n", err);
 	}
 	dev_dbg(&chan->video.dev,
 		"%s: vi4 got EOF syncpt buf[%p]\n", __func__, buf);
