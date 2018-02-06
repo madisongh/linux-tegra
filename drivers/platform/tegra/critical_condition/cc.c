@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/cc.c
  *
- * Copyright (c) 2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -270,7 +270,8 @@ void cc_periodic_save_cvt_data_work(struct work_struct *work)
 static void cc_periodic_save_cvt_data_timer(unsigned long _data)
 {
 	if (!(cc_pdata.flags & CC_PAGE_WRITE_STARTED) &&
-				(cc_pdata.last_reset_status != WDT_TIMEOUT)) {
+			(cc_pdata.last_reset_status !=
+				TEGRA_DENVER_WATCHDOG)) {
 		pr_debug("crtcl_cond: No DATA in GameData RAM, skip write\n");
 		return;
 	}
@@ -404,7 +405,8 @@ err:
 
 static int crtcl_cond_probe(struct platform_device *pdev)
 {
-	int ret, reset_reason;
+	int ret;
+	enum tegra_system_reset_reason reset_reason;
 
 	pdev->dev.platform_data = &cc_pdata;
 	ret = cc_throttle_init(pdev);
@@ -468,8 +470,8 @@ static int crtcl_cond_probe(struct platform_device *pdev)
 		}
 	}
 
-	reset_reason = tegra_reset_reason_status();
-	if (reset_reason == WDT_TIMEOUT) {
+	reset_reason = tegra_pmc_get_system_reset_reason();
+	if (reset_reason == TEGRA_DENVER_WATCHDOG) {
 		pr_debug("%s: Reset Reason is Watchdog Timeout\n", __func__);
 		cc_pdata.last_reset_status = reset_reason;
 	}
