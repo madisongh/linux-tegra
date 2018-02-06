@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2017-2018 NVIDIA Corporation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -19,11 +19,6 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 
-/*
- * WDT_TIMEOUT = 2, is based on drivers/soc/tegra/pmc.c
- * "char *t186_pmc_rst_src"
- */
-#define WDT_TIMEOUT				2
 #define MAX_RECORD_CNT				3
 #define START_ADDRESS0				0
 #define CC_PAGE_WRITE_STARTED			1
