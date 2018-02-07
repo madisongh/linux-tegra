@@ -52,6 +52,8 @@ static void tegra_channel_error_worker(struct work_struct *status_work);
 static void tegra_channel_notify_error_callback(void *);
 extern void release_buffer(struct tegra_channel *chan,
 				struct tegra_channel_buffer *buf);
+extern void set_timestamp(struct tegra_channel_buffer *buf,
+				const struct timespec *ts);
 
 u32 csimux_config_stream[] = {
 	CSIMUX_CONFIG_STREAM_0,
@@ -547,6 +549,8 @@ static int tegra_channel_capture_frame(struct tegra_channel *chan,
 		chan->capture_state = CAPTURE_GOOD;
 	spin_unlock_irqrestore(&chan->capture_state_lock, flags);
 
+	set_timestamp(buf, &ts);
+
 	if (chan->capture_state == CAPTURE_GOOD) {
 		/*
 		 * Set the buffer version to match
@@ -692,6 +696,7 @@ static void tegra_channel_capture_done(struct tegra_channel *chan)
 
 	/* Mark capture state to IDLE as capture is finished */
 	chan->capture_state = CAPTURE_IDLE;
+	set_timestamp(buf, &ts);
 	release_buffer(chan, buf);
 }
 

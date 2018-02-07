@@ -37,14 +37,8 @@ extern void enqueue_inflight(struct tegra_channel *chan,
 extern struct tegra_channel_buffer *dequeue_inflight(struct tegra_channel *chan);
 extern int tegra_channel_set_power(struct tegra_channel *chan, bool on);
 extern void release_buffer(struct tegra_channel *chan, struct tegra_channel_buffer* buf);
-
-/*
- * Update the timestamp of the buffer
- */
-static void set_timestamp(struct tegra_channel_buffer *buf, const struct timespec* ts) {
-	buf->buf.timestamp.tv_sec = ts->tv_sec;
-	buf->buf.timestamp.tv_usec = ts->tv_nsec / NSEC_PER_USEC;
-}
+extern void set_timestamp(struct tegra_channel_buffer *buf,
+				const struct timespec *ts);
 
 static void vi_write(struct tegra_mc_vi *vi, unsigned int addr, u32 val)
 {

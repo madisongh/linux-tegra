@@ -46,6 +46,16 @@
 
 static s64 queue_init_ts;
 
+/*
+ * Update the timestamp of the buffer
+ */
+void set_timestamp(struct tegra_channel_buffer *buf,
+				const struct timespec *ts)
+{
+	buf->buf.timestamp.tv_sec = ts->tv_sec;
+	buf->buf.timestamp.tv_usec = ts->tv_nsec / NSEC_PER_USEC;
+}
+
 static void gang_buffer_offsets(struct tegra_channel *chan)
 {
 	int i;
