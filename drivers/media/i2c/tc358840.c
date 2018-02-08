@@ -620,7 +620,7 @@ static int enable_stream(struct v4l2_subdev *sd, bool enable)
 {
 	struct tc358840_state *state = to_state(sd);
 	struct tc358840_platform_data *pdata = &state->pdata;
-
+	int retries = 0;
 	u32 sync_timeout_ctr;
 
 	v4l2_dbg(2, debug, sd, "%s: %sable\n", __func__, enable ? "en" : "dis");
@@ -628,6 +628,7 @@ static int enable_stream(struct v4l2_subdev *sd, bool enable)
 	if (enable == state->enabled)
 		return 0;
 
+retry:
 	if (enable) {
 #if 0		/* Wait until we can use the clock-noncontinuous property */
 		if (pdata->endpoint.bus.mipi_csi2.flags &
@@ -672,6 +673,7 @@ static int enable_stream(struct v4l2_subdev *sd, bool enable)
 			/* Disable stream again. Probably no cable inserted.. */
 			v4l2_err(sd, "%s: Timeout: HDMI input sync failed.\n",
 					__func__);
+			state->enabled = true;
 			enable_stream(sd, false);
 			return -EIO;
 		}
@@ -686,8 +688,33 @@ static int enable_stream(struct v4l2_subdev *sd, bool enable)
 		enable ? ((pdata->csi_port & (MASK_VTX0EN | MASK_VTX1EN)) |
 		MASK_ABUFEN | MASK_TX_MSEL | MASK_AUTOINDEX) :
 		(MASK_TX_MSEL | MASK_AUTOINDEX));
-	state->enabled = enable;
 
+	if (enable) {
+		/*
+		 * Wait for the data lanes to become active.
+		 * Due to unknown reasons this sometimes fails, so we retry to
+		 * enabling streaming if we detect that the data lanes stay idle.
+		 */
+		u32 v;
+		u32 data_idle_ctr = 100;
+		while (!((v = i2c_rd32(sd, CSITX_INTERNAL_STAT)) & PPI_DL_BUSY) && data_idle_ctr) {
+			usleep_range(100, 1000);
+			data_idle_ctr--;
+		}
+		v4l2_dbg(1, debug, sd,
+			"CSI TX internal stat 0x%02x, counter %d, attempt %d\n",
+			v, data_idle_ctr, retries + 1);
+		if (data_idle_ctr == 0) {
+			state->enabled = true;
+			enable_stream(sd, false);
+			if (retries++ < 5)
+				goto retry;
+			v4l2_err(sd, "Could not detect busy data lanes after %d attempts\n", retries);
+			return -EIO;
+		}
+	}
+
+	state->enabled = enable;
 	return 0;
 }
 

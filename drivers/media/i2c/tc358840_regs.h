@@ -294,6 +294,14 @@
 #define MASK_FORCESTOP				(1 << 10)
 
 #define CSITX_INTERNAL_STAT			0x01B0
+#define APF_VHIF_IND_STAT			(1 << 8)
+#define APF_VHIF_SYNC_STAT			(1 << 7)
+#define PPI_INIT_BUSY				(1 << 5)
+#define PPI_BYTE_BUSY				(1 << 4)
+#define PPI_TXESC_BUSY				(1 << 3)
+#define PPI_CL_BUSY				(1 << 2)
+#define PPI_DL_BUSY				(1 << 1)
+#define CSI_STAT				(1 << 0)
 
 #define LPTXTIMECNT				0x0254
 #define TCLK_HEADERCNT				0x0258
