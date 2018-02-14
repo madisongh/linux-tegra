@@ -29,6 +29,7 @@
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-mediabus.h>
 #include <media/s5k6aa.h>
+#include <asm/barrier.h>
 
 static int debug;
 module_param(debug, int, 0644);
@@ -1005,6 +1006,8 @@ static int s5k6aa_enum_frame_interval(struct v4l2_subdev *sd,
 
 	if (fie->index > ARRAY_SIZE(s5k6aa_intervals))
 		return -EINVAL;
+
+	speculation_barrier();
 
 	v4l_bound_align_image(&fie->width, S5K6AA_WIN_WIDTH_MIN,
 			      S5K6AA_WIN_WIDTH_MAX, 1,

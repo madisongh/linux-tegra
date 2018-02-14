@@ -40,6 +40,7 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-chip-ident.h>
 #include <media/adv7604.h>
+#include <asm/barrier.h>
 
 static int debug;
 module_param(debug, int, 0644);
@@ -1593,6 +1594,9 @@ static int adv7604_get_edid(struct v4l2_subdev *sd, struct v4l2_subdev_edid *edi
 		return -EINVAL;
 	if (edid->start_block >= state->edid_blocks)
 		return -EINVAL;
+
+	speculation_barrier();
+
 	if (edid->start_block + edid->blocks > state->edid_blocks)
 		edid->blocks = state->edid_blocks - edid->start_block;
 	if (!edid->edid)

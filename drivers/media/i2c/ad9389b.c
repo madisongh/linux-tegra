@@ -36,6 +36,7 @@
 #include <media/v4l2-common.h>
 #include <media/v4l2-ctrls.h>
 #include <media/ad9389b.h>
+#include <asm/barrier.h>
 
 static int debug;
 module_param(debug, int, 0644);
@@ -627,6 +628,9 @@ static int ad9389b_get_edid(struct v4l2_subdev *sd, struct v4l2_subdev_edid *edi
 	}
 	if (edid->start_block >= state->edid.segments * 2)
 		return -E2BIG;
+
+	speculation_barrier();
+
 	if (edid->blocks + edid->start_block >= state->edid.segments * 2)
 		edid->blocks = state->edid.segments * 2 - edid->start_block;
 	memcpy(edid->edid, &state->edid.data[edid->start_block * 128],

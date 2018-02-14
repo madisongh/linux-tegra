@@ -23,6 +23,7 @@
 #include <media/v4l2-fh.h>
 #include <media/v4l2-event.h>
 #include <media/videobuf2-core.h>
+#include <asm/barrier.h>
 
 static int debug;
 module_param(debug, int, 0644);
@@ -1799,6 +1800,8 @@ int vb2_expbuf(struct vb2_queue *q, struct v4l2_exportbuffer *eb)
 		dprintk(1, "buffer index out of range\n");
 		return -EINVAL;
 	}
+
+	speculation_barrier();
 
 	vb = q->bufs[eb->index];
 

@@ -30,6 +30,7 @@
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-mediabus.h>
 #include <media/ov9650.h>
+#include <asm/barrier.h>
 
 static int debug;
 module_param(debug, int, 0644);
@@ -1085,6 +1086,8 @@ static int ov965x_enum_frame_sizes(struct v4l2_subdev *sd,
 
 	if (fse->index > ARRAY_SIZE(ov965x_framesizes))
 		return -EINVAL;
+
+	speculation_barrier();
 
 	while (--i)
 		if (fse->code == ov965x_formats[i].code)

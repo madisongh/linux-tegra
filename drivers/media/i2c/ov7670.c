@@ -21,6 +21,7 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-mediabus.h>
 #include <media/ov7670.h>
+#include <asm/barrier.h>
 
 MODULE_AUTHOR("Jonathan Corbet <corbet@lwn.net>");
 MODULE_DESCRIPTION("A low-level driver for OmniVision ov7670 sensors");
@@ -1087,6 +1088,9 @@ static int ov7670_enum_frameintervals(struct v4l2_subdev *sd,
 {
 	if (interval->index >= ARRAY_SIZE(ov7670_frame_rates))
 		return -EINVAL;
+
+	speculation_barrier();
+
 	interval->type = V4L2_FRMIVAL_TYPE_DISCRETE;
 	interval->discrete.numerator = 1;
 	interval->discrete.denominator = ov7670_frame_rates[interval->index];

@@ -33,6 +33,7 @@
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-mediabus.h>
 #include <media/s5c73m3.h>
+#include <asm/barrier.h>
 
 #include "s5c73m3.h"
 
@@ -959,6 +960,8 @@ static int s5c73m3_oif_enum_frame_interval(struct v4l2_subdev *sd,
 	if (fie->index >= ARRAY_SIZE(s5c73m3_intervals))
 		return -EINVAL;
 
+	speculation_barrier();
+
 	mutex_lock(&state->lock);
 	fi = &s5c73m3_intervals[fie->index];
 	if (fie->width > fi->size.width || fie->height > fi->size.height)
@@ -1228,6 +1231,8 @@ static int s5c73m3_enum_frame_size(struct v4l2_subdev *sd,
 	if (fse->index >= s5c73m3_resolutions_len[idx])
 		return -EINVAL;
 
+	speculation_barrier();
+
 	fse->min_width  = s5c73m3_resolutions[idx][fse->index].width;
 	fse->max_width  = fse->min_width;
 	fse->max_height = s5c73m3_resolutions[idx][fse->index].height;
@@ -1271,6 +1276,8 @@ static int s5c73m3_oif_enum_frame_size(struct v4l2_subdev *sd,
 
 	if (fse->index >= s5c73m3_resolutions_len[idx])
 		return -EINVAL;
+
+	speculation_barrier();
 
 	fse->min_width  = s5c73m3_resolutions[idx][fse->index].width;
 	fse->max_width  = fse->min_width;
