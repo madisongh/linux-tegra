@@ -33,6 +33,7 @@
 #include <linux/tegra-soc.h>
 #include <crypto/rng.h>
 #include <crypto/hash.h>
+#include <asm/barrier.h>
 
 #include "tegra-cryptodev.h"
 
@@ -281,6 +282,8 @@ static int process_crypt_req(struct tegra_crypto_ctx *ctx, struct tegra_crypt_re
 	unsigned long total = 0;
 	const u8 *key = NULL;
 	struct tegra_crypto_completion tcrypt_complete;
+
+	speculation_barrier();
 
 	if (crypt_req->op & TEGRA_CRYPTO_ECB) {
 		req = ablkcipher_request_alloc(ctx->ecb_tfm, GFP_KERNEL);
@@ -930,6 +933,9 @@ rng_out:
 				rsa_req.algo);
 			return -EINVAL;
 		}
+
+		speculation_barrier();
+
 		ret = tegra_crypt_rsa(ctx, &rsa_req);
 		break;
 
