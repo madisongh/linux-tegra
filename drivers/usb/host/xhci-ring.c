@@ -1,7 +1,7 @@
 /*
  * xHCI host controller driver
  *
- * Copyright (c) 2015-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2018, NVIDIA CORPORATION.  All rights reserved.
  * Copyright (C) 2008 Intel Corp.
  *
  * Author: Sarah Sharp
@@ -2405,12 +2405,6 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 			xhci_warn_ratelimited(xhci,
 					"WARN Successful completion on short TX: needs XHCI_TRUST_TX_LENGTH quirk?\n");
 	case COMP_SHORT_TX:
-		goto check_soft_try;
-	case COMP_STOP:
-		xhci_dbg(xhci, "Stopped on Transfer TRB\n");
-		goto check_soft_try;
-	case COMP_STOP_INVAL:
-		xhci_dbg(xhci, "Stopped on No-op or Link TRB\n");
 check_soft_try:
 		if (disable_u0_ts1_detect && ep_ring->soft_try) {
 			xhci_dbg(xhci, "soft retry completed successfully\n");
@@ -2418,6 +2412,12 @@ check_soft_try:
 			xhci_endpoint_soft_retry(xhci,
 						slot_id, ep_index + 1, false);
 		}
+		break;
+	case COMP_STOP:
+		xhci_dbg(xhci, "Stopped on Transfer TRB\n");
+		break;
+	case COMP_STOP_INVAL:
+		xhci_dbg(xhci, "Stopped on No-op or Link TRB\n");
 		break;
 	case COMP_STOP_SHORT:
 		xhci_dbg(xhci, "Stopped with short packet transfer detected\n");
@@ -4263,6 +4263,25 @@ int xhci_queue_stop_endpoint(struct xhci_hcd *xhci, struct xhci_command *cmd,
 	u32 trb_ep_index = EP_ID_FOR_TRB(ep_index);
 	u32 type = TRB_TYPE(TRB_STOP_RING);
 	u32 trb_suspend = SUSPEND_PORT_FOR_TRB(suspend);
+	bool disable_u0_ts1_detect = false;
+	struct xhci_ring *ep_ring;
+
+	if (xhci->shared_hcd->driver->is_u0_ts1_detect_disabled)
+		disable_u0_ts1_detect =
+			xhci->shared_hcd->driver->is_u0_ts1_detect_disabled(
+					xhci->shared_hcd);
+
+	if (disable_u0_ts1_detect) {
+		ep_ring = xhci_triad_to_transfer_ring(xhci, slot_id,
+			ep_index, 0);
+
+		if (ep_ring && ep_ring->soft_try) {
+			xhci_dbg(xhci, "stop soft retry\n");
+			ep_ring->soft_try = false;
+			xhci_endpoint_soft_retry(xhci,
+				slot_id, ep_index + 1, false);
+		}
+	}
 
 	return queue_command(xhci, cmd, 0, 0, 0,
 			trb_slot_id | trb_ep_index | type | trb_suspend, false);
