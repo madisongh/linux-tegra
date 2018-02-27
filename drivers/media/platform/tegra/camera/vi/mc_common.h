@@ -45,6 +45,7 @@
 
 #define TEGRA_MEM_FORMAT 0
 #define TEGRA_ISP_FORMAT 1
+#define V4L2_SYNC_EVENT_SUBDEV_ERROR_RECOVER	(1 << 2)
 
 struct tegra_mipi_context;
 
@@ -344,6 +345,8 @@ struct tegra_csi_fops {
 	void (*csi_stop_streaming)(struct tegra_csi_channel *chan,
 		enum tegra_csi_port_num port_num);
 	void (*csi_override_format)(struct tegra_csi_channel *chan,
+		enum tegra_csi_port_num port_num);
+	int (*csi_error_recover)(struct tegra_csi_channel *chan,
 		enum tegra_csi_port_num port_num);
 	int (*mipical)(struct tegra_csi_channel *chan);
 	int (*hw_init)(struct tegra_csi_device *csi);

@@ -1,7 +1,7 @@
 /*
  * NVIDIA Tegra CSI Device
  *
- * Copyright (c) 2015-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Bryan Wu <pengw@nvidia.com>
  *
@@ -98,6 +98,27 @@ static int tegra_csi_power(struct tegra_csi_device *csi,
 }
 EXPORT_SYMBOL(tegra_csi_power);
 
+static int tegra_csi_error_recovery(struct tegra_channel *chan,
+	struct tegra_csi_device *csi, struct tegra_csi_channel *csi_chan)
+{
+	int err = 0;
+	int i = 0;
+	unsigned int csi_port = 0;
+
+	for (i = 0; i < chan->valid_ports; i++) {
+		csi_port = csi_chan->ports[i].num;
+		err = csi->fops->csi_error_recover(csi_chan, i);
+		if (err) {
+			dev_err(csi->dev, "%s: failed to recover csi stream %d\n",
+				__func__, csi_port);
+			break;
+		}
+	}
+
+	return err;
+}
+EXPORT_SYMBOL(tegra_csi_error_recovery);
+
 int tegra_csi_s_power(struct v4l2_subdev *subdev, int enable)
 {
 	int err = 0;
@@ -105,6 +126,20 @@ int tegra_csi_s_power(struct v4l2_subdev *subdev, int enable)
 	struct tegra_csi_channel *chan = to_csi_chan(subdev);
 
 	err = tegra_csi_power(csi, chan, enable);
+
+	return err;
+}
+
+static int tegra_csi_sync_event(struct v4l2_subdev *subdev,
+	unsigned int sync_events)
+{
+	int err = 0;
+	struct tegra_channel *chan = v4l2_get_subdev_hostdata(subdev);
+	struct tegra_csi_device *csi = to_csi(subdev);
+	struct tegra_csi_channel *csi_chan = to_csi_chan(subdev);
+
+	if (sync_events & V4L2_SYNC_EVENT_SUBDEV_ERROR_RECOVER)
+		err = tegra_csi_error_recovery(chan, csi, csi_chan);
 
 	return err;
 }
@@ -502,6 +537,7 @@ static struct v4l2_subdev_pad_ops tegra_csi_pad_ops = {
 
 static struct v4l2_subdev_core_ops tegra_csi_core_ops = {
 	.s_power	= tegra_csi_s_power,
+	.sync		= tegra_csi_sync_event,
 };
 
 static struct v4l2_subdev_ops tegra_csi_ops = {

@@ -3,7 +3,7 @@
  *
  * Tegra 18x CSI register offsets
  *
- * Copyright (c) 2016-2017, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2018, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -132,6 +132,15 @@
 #define NVCSI_PHY_1_CILB_BASE			0x020C00
 #define NVCSI_PHY_2_CILA_BASE			0x030400
 #define NVCSI_PHY_2_CILB_BASE			0x030C00
+
+#define CILA_INTR_STATUS			0x400
+#define CILA_INTR_MASK				0x404
+#define CILA_ERR_INTR_STATUS			0x408
+#define CILA_ERR_INTR_MASK			0x40c
+#define CILB_INTR_STATUS			0xc00
+#define CILB_INTR_MASK				0xc04
+#define CILB_ERR_INTR_STATUS			0xc08
+#define CILB_ERR_INTR_MASK			0xc0c
 
 #define CIL_INTR_STATUS					0x400
 #define CIL_INTR_MASK					0x404
