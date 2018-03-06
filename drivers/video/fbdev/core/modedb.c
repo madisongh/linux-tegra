@@ -2078,9 +2078,11 @@ static bool fb_var_is_equal(const struct fb_var_screeninfo *var1,
 	 * quantization. This shouldn't lead to mode mismatch as the modes
 	 * are still the same even if LIMITED_RANGE flag doesn't match.
 	 * Ignore LIMITED_RANGE bit during vmode comparision.
+	 * Similarly, userspace might reset FB_VMODE_Y420 bit to use the
+	 * mode as RGB mode. Hence, avoid comparing this vmode bit.
 	 */
-	if ((var1->vmode & ~FB_VMODE_LIMITED_RANGE) ==
-			(var2->vmode & ~FB_VMODE_LIMITED_RANGE))
+	if ((var1->vmode & ~(FB_VMODE_LIMITED_RANGE | FB_VMODE_Y420)) ==
+		(var2->vmode & ~(FB_VMODE_LIMITED_RANGE | FB_VMODE_Y420)))
 		return true;
 
 	/*
