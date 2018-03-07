@@ -441,6 +441,7 @@ struct tegra_xhci_hcd {
 	struct tegra_xusb_mbox_msg mbox_req;
 	struct mbox_client mbox_client;
 	struct mbox_chan *mbox_chan;
+	struct workqueue_struct *mbox_wq;
 
 	struct tegra_xhci_fpci_context fpci_ctx;
 
@@ -1423,7 +1424,7 @@ static void tegra_xhci_mbox_rx(struct mbox_client *cl, void *data)
 
 	if (is_host_mbox_message(msg->cmd) || true) {
 		tegra->mbox_req = *msg;
-		schedule_work(&tegra->mbox_req_work);
+		queue_work(tegra->mbox_wq, &tegra->mbox_req_work);
 	}
 }
 
@@ -2509,6 +2510,12 @@ skip_clocks:
 		goto disable_xhci_clk;
 
 	INIT_WORK(&tegra->mbox_req_work, tegra_xhci_mbox_work);
+	tegra->mbox_wq = alloc_ordered_workqueue("mbox_wq", 0);
+	if (IS_ERR_OR_NULL(tegra->mbox_wq)) {
+		dev_err(&pdev->dev, "failed to alloc workqueue\n");
+		ret = -ENOMEM;
+		goto disable_regulator;
+	}
 	tegra->mbox_client.dev = &pdev->dev;
 	tegra->mbox_client.tx_block = true;
 	tegra->mbox_client.tx_tout = 0;
@@ -2741,6 +2748,8 @@ static int tegra_xhci_remove(struct platform_device *pdev)
 		tegra_xusb_boost_cpu_deinit(tegra);
 	cancel_work_sync(&tegra->mbox_req_work);
 	mbox_free_channel(tegra->mbox_chan);
+	flush_workqueue(tegra->mbox_wq);
+	destroy_workqueue(tegra->mbox_wq);
 	tegra_xhci_phy_disable(tegra);
 	regulator_bulk_disable(tegra->num_supplies, tegra->supplies);
 	tegra_xhci_clk_disable(tegra);
