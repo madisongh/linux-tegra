@@ -415,7 +415,7 @@ static const struct soc_enum tegra210_dmic_format_enum =
 		tegra210_dmic_format_text);
 
 static const struct snd_kcontrol_new tegra210_dmic_controls[] = {
-	SOC_SINGLE_EXT("Boost Gain", 0, 0, 25600, 0,
+	SOC_SINGLE_EXT("Boost Gain", 0, 0, 25599, 0,
 		tegra210_dmic_get_control, tegra210_dmic_put_control),
 	SOC_ENUM_EXT("Mono Channel Select", tegra210_dmic_ch_enum,
 		tegra210_dmic_get_control, tegra210_dmic_put_control),
