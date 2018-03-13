@@ -1,4 +1,4 @@
-EXTRA_CFLAGS += -I$(srctree)/../display
+EXTRA_CFLAGS += -I$(srctree)/nvidia/display
 EXTRA_CFLAGS += -I$(srctree)
 
 obj-$(CONFIG_VGASTATE)            += vgastate.o

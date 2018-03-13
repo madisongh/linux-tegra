@@ -142,8 +142,8 @@ config ARCH_TEGRA_APE
 config ARCH_TEGRA_VIC
         bool
 
-trysource ../t18x/arch/arm64/Kconfig
-trysource ../t18x/arch/arm64/Kconfig.t18x
+trysource nvidia/t18x/arch/arm64/Kconfig
+trysource nvidia/t18x/arch/arm64/Kconfig.t18x
 trysource arch/arm64/Kconfig.t18x
 
 config ARCH_TEGRA_18x_SOC

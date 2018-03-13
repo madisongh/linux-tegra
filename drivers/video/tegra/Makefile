@@ -1,6 +1,6 @@
 GCOV_PROFILE := y
 #subdir-ccflags-y := -Werror
-EXTRA_CFLAGS += -I../nvhost/drivers/video/tegra/host
+EXTRA_CFLAGS += -Invidia/nvhost/drivers/video/tegra/host
 EXTRA_CFLAGS += -Idrivers/video/tegra/host
 ifeq ($(CONFIG_ARM64),y)
 subdir-ccflags-y += -Iarch/arm/mach-tegra/include

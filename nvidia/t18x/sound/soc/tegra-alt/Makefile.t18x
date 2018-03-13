@@ -1,8 +1,8 @@
 subdir-ccflags-y += -Werror
 EXTRA_CFLAGS += -I$(srctree)/sound/soc/tegra-alt
 EXTRA_CFLAGS += -I$(srctree)
-EXTRA_CFLAGS += -I$(srctree)/../t18x
-EXTRA_CFLAGS += -I$(srctree)/../t18x/sound/soc/tegra-alt
+EXTRA_CFLAGS += -I$(srctree)/nvidia/t18x
+EXTRA_CFLAGS += -I$(srctree)/nvidia/t18x/sound/soc/tegra-alt
 
 snd-soc-tegra186-alt-xbar-objs := tegra186_xbar_alt.o \
 				  $(call tegra-base-kernel-path)/sound/soc/tegra-alt/tegra210_xbar_alt.o

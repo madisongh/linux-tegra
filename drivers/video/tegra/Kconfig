@@ -1,5 +1,5 @@
-trysource "../nvhost/drivers/video/tegra/Kconfig"
-trysource "../nvhost/drivers/video/tegra/Kconfig.nvhost"
+trysource "nvidia/nvhost/drivers/video/tegra/Kconfig"
+trysource "nvidia/nvhost/drivers/video/tegra/Kconfig.nvhost"
 trysource "drivers/video/tegra/Kconfig.nvhost"
 
 config TEGRA_GRHOST_SYNC
@@ -11,8 +11,8 @@ config TEGRA_GRHOST_SYNC
 	  Add tegra host backend for the cross driver synchronization framework.
 	  Allows creating sync fence file descriptors from Tegra host syncpoints.
 
-trysource "../nvmap/drivers/video/tegra/nvmap/Kconfig"
-trysource "../nvmap/drivers/video/tegra/nvmap/Kconfig.nvmap"
+trysource "nvidia/nvmap/drivers/video/tegra/nvmap/Kconfig"
+trysource "nvidia/nvmap/drivers/video/tegra/nvmap/Kconfig.nvmap"
 trysource "drivers/video/tegra/nvmap/Kconfig.nvmap"
 
 if ARCH_TEGRA
@@ -36,7 +36,7 @@ config TEGRA_DC
 	  console interface and a proprietary dc-ext interface or with ADF.
 
 trysource ../display/drivers/video/tegra/Kconfig
-trysource "../display/drivers/video/tegra/Kconfig.display"
+trysource "nvidia/display/drivers/video/tegra/Kconfig.display"
 trysource "drivers/video/tegra/Kconfig.display"
 
 config TEGRA_CAMERA_PLATFORM

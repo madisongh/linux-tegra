@@ -13,7 +13,7 @@
 define tegra_include
   ifneq ("$(wildcard $(kbuild-dir)/Makefile.$(1))", "")
     include $(kbuild-dir)/Makefile.$(1)
-    EXTRA_CFLAGS += -I$(srctree)/../$(1)/include
+    EXTRA_CFLAGS += -I$(srctree)/nvidia/$(1)/include
   endif
 endef
 

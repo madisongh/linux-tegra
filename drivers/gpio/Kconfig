@@ -1056,8 +1056,8 @@ config GPIO_TMPM32X_I2C
 
 endmenu
 
-trysource "../t18x/drivers/gpio/Kconfig"
-trysource "../t18x/drivers/gpio/Kconfig.t18x"
+trysource "nvidia/t18x/drivers/gpio/Kconfig"
+trysource "nvidia/t18x/drivers/gpio/Kconfig.t18x"
 trysource "drivers/gpio/Kconfig.t18x"
 
 endif

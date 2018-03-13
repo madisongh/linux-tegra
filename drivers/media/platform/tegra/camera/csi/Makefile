@@ -1,6 +1,6 @@
 GCOV_PROFILE := y
-ccflags-y += -I../nvhost/drivers/video/tegra/host
-ccflags-y += -I../nvhost/include
+ccflags-y += -Invidia/nvhost/drivers/video/tegra/host
+ccflags-y += -Invidia/nvhost/include
 ccflags-y += -Idrivers/video/tegra/camera
 ccflags-y += -Idrivers/media/platform/tegra
 ccflags-y += -Werror

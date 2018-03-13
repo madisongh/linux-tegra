@@ -1,5 +1,11 @@
 ccflags-$(CONFIG_DRM_TEGRA_DEBUG) += -DDEBUG
 
+ccflags-y += -Invidia/t18x/drivers/gpu/drm/tegra
+
+ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
+obj-$(CONFIG_TEGRA_HOST1X) += $(call tegra-path,t18x/,drivers/gpu/drm/tegra/)
+endif
+
 tegra-drm-y := \
 	drm.o \
 	gem.o \

@@ -11,7 +11,7 @@
 
 subdir-ccflags-y += -Werror
 
-KBUILD_CFLAGS += -I$(srctree)/../t18x/include
+KBUILD_CFLAGS += -I$(srctree)/nvidia/t18x/include
 obj-y += platform/
 obj-y += video/
 obj-y += clk/
