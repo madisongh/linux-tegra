@@ -64,7 +64,7 @@ dts_mfiles = $(call dts_makefile, $(tegra-dtstree)/platform/, Makefile)
 ifneq ($(dts_mfiles),)
 dts-include :=
 include $(dts_mfiles)
-dtb-y := $(addprefix $(tegra-rel-dtstree)/hardware/nvidia/,$(dtb-y))
+dtb-y := $(addprefix $(tegra-rel-dtstree)/nvidia/,$(dtb-y))
 ifneq ($(dts-include),)
 DTC_FLAGS += $(addprefix -i $(tegra-dtstree)/,$(dts-include))
 DTCCPP_FLAGS += $(addprefix -I$(tegra-dtstree)/,$(dts-include))

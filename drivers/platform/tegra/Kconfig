@@ -238,6 +238,6 @@ config TEGRA_SAFETY_SCE
 	  This also provides a userspace command response interface as
 	  character device which will be used by other safety modules.
 
-trysource "../t18x/drivers/platform/tegra/Kconfig"
-trysource "../t18x/drivers/platform/tegra/Kconfig.t18x"
+trysource "nvidia/t18x/drivers/platform/tegra/Kconfig"
+trysource "nvidia/t18x/drivers/platform/tegra/Kconfig.t18x"
 trysource "drivers/platform/tegra/Kconfig.t18x"

@@ -144,4 +144,5 @@ config GK20A_FREQ_SELECT_STEP
 	  Stepping to use for generating freq_table. nvgpu will choose
 	  every nth entry, where n is controlled by this config.
 
-trysource "../nvgpu-t19x/drivers/gpu/nvgpu/Kconfig"
+trysource "nvidia/nvgpu-t19x/drivers/gpu/nvgpu/Kconfig"
+
