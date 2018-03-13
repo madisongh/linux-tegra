@@ -355,7 +355,7 @@ void tegra_channel_ec_close(struct tegra_mc_vi *vi)
 
 	/* clear all channles sync point fifo context */
 	list_for_each_entry(chan, &vi->vi_chans, list) {
-		memset(&chan->syncpoint_fifo[0], 0, TEGRA_CSI_BLOCKS);
+		memset(&chan->syncpoint_fifo[0], 0, sizeof(chan->syncpoint_fifo));
 	}
 }
 
@@ -1593,7 +1593,7 @@ static int tegra_channel_csi_init(struct tegra_channel *chan)
 	chan->gang_mode = CAMERA_NO_GANG_MODE;
 	chan->total_ports = 0;
 	memset(&chan->port[0], INVALID_CSI_PORT, TEGRA_CSI_BLOCKS);
-	memset(&chan->syncpoint_fifo[0], 0, TEGRA_CSI_BLOCKS);
+	memset(&chan->syncpoint_fifo[0], 0, sizeof(chan->syncpoint_fifo));
 	if (chan->pg_mode) {
 		/* If VI has 4 existing channels, chan->id will start
 		 * from 4 for the first TPG channel, which uses PORT_A(0).
