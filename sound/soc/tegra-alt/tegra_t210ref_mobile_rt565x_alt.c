@@ -73,10 +73,6 @@ struct tegra_t210ref {
 	int rate_via_kcontrol;
 	int fmt_via_kcontrol;
 	unsigned int bclk_ratio_override;
-	unsigned int codec_x_frame_mode;
-	unsigned int codec_w_frame_mode;
-	unsigned int codec_x_master_mode;
-	unsigned int codec_w_master_mode;
 };
 
 static const int tegra_t210ref_srate_values[] = {
@@ -755,156 +751,6 @@ static int tegra_t210ref_bclk_ratio_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int tegra_t210ref_codec_set_mode(struct snd_soc_card *card,
-					char *link_name,
-					unsigned int master_mode,
-					unsigned int frame_mode)
-{
-	unsigned int fmt, shift;
-	int idx;
-
-	idx = tegra_machine_get_codec_dai_link_idx(link_name);
-	if (idx < 0)
-		return idx;
-
-	fmt = card->rtd[idx].dai_link->dai_fmt;
-
-	if (frame_mode) {
-		fmt &= ~SND_SOC_DAIFMT_FORMAT_MASK;
-		fmt |= frame_mode;
-	}
-
-	if (master_mode) {
-		shift = ffs(SND_SOC_DAIFMT_MASTER_MASK) - 1;
-		fmt &= ~SND_SOC_DAIFMT_MASTER_MASK;
-		fmt |= master_mode << shift;
-	}
-
-	return snd_soc_runtime_set_dai_fmt(&card->rtd[idx], fmt);
-}
-
-/*
- * The order of the below must not be changed as this
- * aligns with the SND_SOC_DAIFMT_XXX definitions in
- * include/sound/soc-dai.h.
- */
-static const char * const tegra_t210ref_frame_mode_text[] = {
-	"None",
-	"i2s",
-	"right-j",
-	"left-j",
-	"dsp-a",
-	"dsp-b",
-};
-
-static int tegra_t210ref_codec_get_frame_mode(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
-	struct tegra_t210ref *machine = snd_soc_card_get_drvdata(card);
-
-	if (!strcmp(kcontrol->id.name, "codec-x frame mode"))
-		ucontrol->value.integer.value[0] = machine->codec_x_frame_mode;
-	else if (!strcmp(kcontrol->id.name, "codec-w frame mode"))
-		ucontrol->value.integer.value[0] = machine->codec_w_frame_mode;
-	else
-		return -EINVAL;
-
-	return 0;
-}
-
-static int tegra_t210ref_codec_put_frame_mode(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
-	struct tegra_t210ref *machine = snd_soc_card_get_drvdata(card);
-	unsigned int *frame_mode, master_mode;
-	char *link_name;
-	int err;
-
-	if (!strcmp(kcontrol->id.name, "codec-x frame mode")) {
-		frame_mode = &machine->codec_x_frame_mode;
-		master_mode = machine->codec_x_master_mode;
-		link_name = "rt565x-playback";
-	} else if (!strcmp(kcontrol->id.name, "codec-w frame mode")) {
-		frame_mode = &machine->codec_w_frame_mode;
-		master_mode = machine->codec_w_master_mode;
-		link_name = "spdif-dit-5";
-	} else {
-		return -EINVAL;
-	}
-
-	err = tegra_t210ref_codec_set_mode(card, link_name, master_mode,
-					   ucontrol->value.integer.value[0]);
-	if (err < 0)
-		return err;
-
-	*frame_mode = ucontrol->value.integer.value[0];
-
-	return 0;
-}
-
-/*
- * The order of the below must not be changed as this
- * aligns with the SND_SOC_DAIFMT_XXX definitions in
- * include/sound/soc-dai.h.
- */
-static const char * const tegra_t210ref_master_mode_text[] = {
-	"None",
-	"cbm-cfm",
-	"cbs-cfm",
-	"cbm-cfs",
-	"cbs-cfs",
-};
-
-static int tegra_t210ref_codec_get_master_mode(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
-	struct tegra_t210ref *machine = snd_soc_card_get_drvdata(card);
-
-	if (!strcmp(kcontrol->id.name, "codec-x master mode"))
-		ucontrol->value.integer.value[0] = machine->codec_x_master_mode;
-	else if (!strcmp(kcontrol->id.name, "codec-w master mode"))
-		ucontrol->value.integer.value[0] = machine->codec_w_master_mode;
-	else
-		return -EINVAL;
-
-	return 0;
-}
-
-static int tegra_t210ref_codec_put_master_mode(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
-	struct tegra_t210ref *machine = snd_soc_card_get_drvdata(card);
-	unsigned int *master_mode, frame_mode;
-	char *link_name;
-	int err;
-
-	if (!strcmp(kcontrol->id.name, "codec-x master mode")) {
-		master_mode = &machine->codec_x_master_mode;
-		frame_mode = machine->codec_x_frame_mode;
-		link_name = "rt565x-playback";
-	} else if (!strcmp(kcontrol->id.name, "codec-w master mode")) {
-		master_mode = &machine->codec_w_master_mode;
-		frame_mode = machine->codec_w_frame_mode;
-		link_name = "spdif-dit-5";
-	} else {
-		return -EINVAL;
-	}
-
-	err = tegra_t210ref_codec_set_mode(card, link_name,
-					   ucontrol->value.integer.value[0],
-					   frame_mode);
-	if (err < 0)
-		return err;
-
-	*master_mode = ucontrol->value.integer.value[0];
-
-	return 0;
-}
-
 static const struct soc_enum tegra_t210ref_codec_rate =
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tegra_t210ref_srate_text),
 		tegra_t210ref_srate_text);
@@ -912,14 +758,6 @@ static const struct soc_enum tegra_t210ref_codec_rate =
 static const struct soc_enum tegra_t210ref_codec_format =
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tegra_t210ref_format_text),
 		tegra_t210ref_format_text);
-
-static const struct soc_enum tegra_t210ref_codec_frame_mode =
-	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tegra_t210ref_frame_mode_text),
-		tegra_t210ref_frame_mode_text);
-
-static const struct soc_enum tegra_t210ref_codec_master_mode =
-	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tegra_t210ref_master_mode_text),
-		tegra_t210ref_master_mode_text);
 
 static const struct snd_kcontrol_new tegra_t210ref_controls[] = {
 	SOC_DAPM_PIN_SWITCH("x Int Spk"),
@@ -930,18 +768,6 @@ static const struct snd_kcontrol_new tegra_t210ref_controls[] = {
 		tegra_t210ref_codec_get_rate, tegra_t210ref_codec_put_rate),
 	SOC_ENUM_EXT("codec-x format", tegra_t210ref_codec_format,
 		tegra_t210ref_codec_get_format, tegra_t210ref_codec_put_format),
-	SOC_ENUM_EXT("codec-x frame mode", tegra_t210ref_codec_frame_mode,
-		tegra_t210ref_codec_get_frame_mode,
-		tegra_t210ref_codec_put_frame_mode),
-	SOC_ENUM_EXT("codec-x master mode", tegra_t210ref_codec_master_mode,
-		tegra_t210ref_codec_get_master_mode,
-		tegra_t210ref_codec_put_master_mode),
-	SOC_ENUM_EXT("codec-w frame mode", tegra_t210ref_codec_frame_mode,
-		tegra_t210ref_codec_get_frame_mode,
-		tegra_t210ref_codec_put_frame_mode),
-	SOC_ENUM_EXT("codec-w master mode", tegra_t210ref_codec_master_mode,
-		tegra_t210ref_codec_get_master_mode,
-		tegra_t210ref_codec_put_master_mode),
 	SOC_SINGLE_EXT("bclk ratio override", SND_SOC_NOPM, 0, INT_MAX, 0,
 		tegra_t210ref_bclk_ratio_get, tegra_t210ref_bclk_ratio_put),
 };
@@ -1127,6 +953,9 @@ static int tegra_t210ref_driver_probe(struct platform_device *pdev)
 			ret);
 		goto err_fini_utils;
 	}
+
+	tegra_machine_add_i2s_codec_controls(card,
+			TEGRA210_XBAR_DAI_LINKS + machine->num_codec_links);
 
 	idx = tegra_machine_get_codec_dai_link_idx("rt565x-playback");
 	/* check if idx has valid number */

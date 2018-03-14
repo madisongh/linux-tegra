@@ -290,5 +290,7 @@ struct snd_soc_codec_conf *tegra_machine_get_machine_codec_conf(void);
 unsigned int *tegra_machine_get_bclk_ratio_array(void);
 unsigned int *tegra_machine_get_rx_mask_array(void);
 unsigned int *tegra_machine_get_tx_mask_array(void);
+int tegra_machine_add_i2s_codec_controls(struct snd_soc_card *card,
+					 unsigned int num_dai_links);
 
 #endif
