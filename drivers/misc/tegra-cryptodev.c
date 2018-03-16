@@ -425,6 +425,33 @@ static int tegra_crypt_rsa(struct tegra_crypto_ctx *ctx,
 	int ret = 0;
 	unsigned long *xbuf[XBUFSIZE];
 	struct tegra_crypto_completion rsa_complete;
+	unsigned int total_key_len;
+	char *key_mem;
+
+	if ((((rsa_req->keylen >> 16) & 0xFFFF) >
+			MAX_RSA_MSG_LEN) ||
+		((rsa_req->keylen & 0xFFFF) >
+			MAX_RSA_MSG_LEN)) {
+		pr_err("Invalid rsa key length\n");
+		return -EINVAL;
+	}
+
+	total_key_len = (((rsa_req->keylen >> 16) & 0xFFFF) +
+				(rsa_req->keylen & 0xFFFF));
+
+	key_mem = kzalloc(total_key_len, GFP_KERNEL);
+	if (!key_mem)
+		return -ENOMEM;
+
+	ret = copy_from_user(key_mem, (void __user *)rsa_req->key,
+				total_key_len);
+	if (ret) {
+		pr_err("%s: copy_from_user fail(%d)\n", __func__, ret);
+		kfree(key_mem);
+		return -EINVAL;
+	}
+
+	rsa_req->key = key_mem;
 
 	switch (rsa_req->algo) {
 	case TEGRA_RSA512:
@@ -475,10 +502,8 @@ static int tegra_crypt_rsa(struct tegra_crypto_ctx *ctx,
 	init_completion(&rsa_complete.restart);
 
 	result = kzalloc(rsa_req->keylen >> 16, GFP_KERNEL);
-	if (!result) {
-		pr_err("\nresult alloc fail\n");
+	if (!result)
 		goto result_fail;
-	}
 
 	hash_buff = xbuf[0];
 
@@ -528,6 +553,7 @@ result_fail:
 buf_fail:
 	ahash_request_free(req);
 req_fail:
+	kfree(key_mem);
 	return ret;
 }
 
