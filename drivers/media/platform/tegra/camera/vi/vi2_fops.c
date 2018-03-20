@@ -860,7 +860,7 @@ int vi2_channel_start_streaming(struct vb2_queue *vq, u32 count)
 				dev_err(&chan->video.dev,
 					"failed to disable override control\n");
 		} else
-			dev_err(&chan->video.dev,
+			dev_dbg(&chan->video.dev,
 				"No override control\n");
 	}
 	/* Update clock and bandwidth based on the format */
