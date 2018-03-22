@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -31,6 +31,7 @@
 #include <soc/tegra/reset.h>
 #include <soc/tegra/common.h>
 #include <linux/platform/tegra/mc.h>
+#include <soc/tegra/pmc.h>
 
 
 #define MAX_CLK_EN_NUM			15
@@ -573,7 +574,6 @@ static DEFINE_SPINLOCK(tegra210_pg_lock);
 
 static struct dvfs_rail *gpu_rail;
 static void __iomem *tegra_mc;
-static void __iomem *tegra_pmc;
 
 static int tegra210_pg_powergate_partition(int id);
 static int tegra210_pg_unpowergate_partition(int id);
@@ -588,12 +588,12 @@ static u32 __maybe_unused mc_read(unsigned long reg)
 /* PMC register read/write */
 static u32 pmc_read(unsigned long reg)
 {
-        return readl(tegra_pmc + reg);
+	return tegra_pmc_readl(reg);
 }
 
 static void pmc_write(u32 val, unsigned long reg)
 {
-        writel_relaxed(val, tegra_pmc + reg);
+	tegra_pmc_writel_relaxed(val, reg);
 }
 
 #define HOTRESET_READ_COUNTS		5
@@ -1587,11 +1587,9 @@ static struct tegra_powergate_driver_ops tegra210_pg_ops = {
 	.slcg_unregister_notifier = tegra210_slcg_unregister_notifier,
 };
 
-#define TEGRA_PMC_BASE  0x7000E400
 #define TEGRA_MC_BASE   0x70019000
 struct tegra_powergate_driver_ops *tegra210_powergate_init_chip_support(void)
 {
-	tegra_pmc = ioremap(TEGRA_PMC_BASE, 4096);
 	tegra_mc = ioremap(TEGRA_MC_BASE, 4096);
 
 	if (tegra_platform_is_linsim())
