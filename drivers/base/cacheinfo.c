@@ -674,7 +674,7 @@ static int __init cacheinfo_sysfs_init(void)
 			goto out;
 		}
 	}
-
+	__hotcpu_notifier(cacheinfo_cpu_callback, 0);
 out:
 	cpu_notifier_register_done();
 	return rc;
