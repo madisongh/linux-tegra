@@ -698,6 +698,9 @@ int mmc_sd_get_cid(struct mmc_host *host, u32 ocr, u32 *cid, u32 *rocr)
 	int retries = 10;
 	u32 pocr = ocr;
 
+	if (host->ops->voltage_switch_req)
+		host->ops->voltage_switch_req(host, false);
+
 try_again:
 	if (!retries) {
 		ocr &= ~SD_OCR_S18R;
@@ -740,7 +743,7 @@ try_again:
 
 	err = mmc_send_app_op_cond(host, ocr, rocr);
 	if (err)
-		return err;
+		goto voltage_switch_end;
 
 	/*
 	 * In case CCS and S18A in the response is set, start Signal Voltage
@@ -763,6 +766,9 @@ try_again:
 		err = mmc_send_cid(host, cid);
 	else
 		err = mmc_all_send_cid(host, cid);
+voltage_switch_end:
+	if (host->ops->voltage_switch_req)
+		host->ops->voltage_switch_req(host, true);
 
 	return err;
 }

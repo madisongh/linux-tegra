@@ -611,6 +611,7 @@ struct sdhci_ops {
 	void	(*do_calibration)(struct sdhci_host *sdhci,
 			unsigned char signal_voltage);
 	void	(*config_strobe)(struct sdhci_host *host, bool enable);
+	void	(*voltage_switch_req)(struct sdhci_host *sdhci, bool req);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

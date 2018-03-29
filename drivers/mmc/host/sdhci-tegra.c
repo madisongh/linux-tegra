@@ -62,6 +62,7 @@
 #define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_SHIFT		24
 #define SDHCI_VNDR_CLK_CTRL_TRIM_VALUE_MASK		0x1F
 #define SDHCI_VNDR_CLK_CTRL_SDMMC_CLK			0x1
+#define SDHCI_VNDR_CLK_CTRL_LEGACY_CLKEN_OVERRIDE	BIT(6)
 
 #define SDHCI_VNDR_SYS_SW_CTRL				0x104
 #define SDHCI_VNDR_SYS_SW_CTRL_STROBE_SHIFT		31
@@ -101,6 +102,9 @@
 #define SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300	0x20
 #define SDHCI_MISC_CTRL_ENABLE_DDR50		0x200
 
+#define SDHCI_TEGRA_VENDOR_MISC_CTRL_2		0x128
+#define SDHCI_MISC_CTRL_2_CLK_OVR_ON		0x40000000
+
 #define SDMMC_AUTO_CAL_STATUS	0x1EC
 #define SDMMC_AUTO_CAL_STATUS_AUTO_CAL_ACTIVE	0x80000000
 
@@ -116,6 +120,8 @@
 #define NVQUIRK_DISABLE_AUTO_CALIBRATION	BIT(6)
 #define NVQUIRK_UPDATE_PIN_CNTRL_REG		BIT(7)
 #define NVQUIRK_BROKEN_RTPM_FORBID		BIT(8)
+/* Quirk to identify SLCG registers */
+#define NVQUIRK_SDMMC_CLK_OVERRIDE	BIT(9)
 #define NVQUIRK2_SET_PLL_CLK_PARENT		BIT(0)
 /* Tegra register write WAR - needs follow on register read */
 #define NVQUIRK2_TEGRA_WRITE_REG		BIT(1)
@@ -239,6 +245,7 @@ struct sdhci_tegra {
 	struct pinctrl_state *schmitt_disable[2];
 	struct pinctrl_state *drv_code_strength;
 	struct pinctrl_state *default_drv_code_strength;
+	bool slcg_status;
 };
 
 static void tegra_sdhci_do_calibration(struct sdhci_host *sdhci,
@@ -521,7 +528,7 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
 	const struct tegra_sdhci_platform_data *plat = tegra_host->plat;
-	u32 misc_ctrl;
+	u32 misc_ctrl, misc_ctrl_2, clk_ctrl;
 	int err;
 
 	sdhci_reset(host, mask);
@@ -541,6 +548,7 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 		sdhci_tegra_set_tap_delay(host, plat->tap_delay,
 				SET_DEFAULT_TAP);
 
+	clk_ctrl = sdhci_readl(host, SDHCI_VNDR_CLK_CTRL);
 	misc_ctrl = sdhci_readl(host, SDHCI_TEGRA_VENDOR_MISC_CTRL);
 	/* Erratum: Enable SDHCI spec v3.00 support */
 	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDHCI_SPEC_300)
@@ -553,6 +561,14 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
 	if (soc_data->nvquirks & NVQUIRK_DISABLE_SDR104)
 		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_SDR104;
 	sdhci_writew(host, misc_ctrl, SDHCI_TEGRA_VENDOR_MISC_CTRL);
+
+	if (soc_data->nvquirks & NVQUIRK_SDMMC_CLK_OVERRIDE) {
+		misc_ctrl_2 = sdhci_readl(host, SDHCI_TEGRA_VENDOR_MISC_CTRL_2);
+		tegra_host->slcg_status = !(misc_ctrl_2 &
+					    SDHCI_MISC_CTRL_2_CLK_OVR_ON);
+	} else
+		tegra_host->slcg_status = !(clk_ctrl &
+				     SDHCI_VNDR_CLK_CTRL_LEGACY_CLKEN_OVERRIDE);
 
 	/* SEL_VREG should be 0 for all modes*/
 	vendor_trim_clear_sel_vreg(host, true);
@@ -1358,6 +1374,46 @@ static void tegra_sdhci_post_voltage_switch(struct sdhci_host *sdhci,
 	return;
 }
 
+/* Configure voltage switch specific requirements */
+static void tegra_sdhci_voltage_switch_req(struct sdhci_host *host, bool req)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+	u32 clk_ctrl;
+
+	if (!req) {
+		/* Disable SLCG */
+		clk_ctrl = sdhci_readl(host, SDHCI_VNDR_CLK_CTRL);
+		clk_ctrl = clk_ctrl | SDHCI_VNDR_CLK_CTRL_LEGACY_CLKEN_OVERRIDE;
+		sdhci_writel(host, clk_ctrl, SDHCI_VNDR_CLK_CTRL);
+
+		if (soc_data->nvquirks & NVQUIRK_SDMMC_CLK_OVERRIDE) {
+			clk_ctrl = sdhci_readl(host,
+					       SDHCI_TEGRA_VENDOR_MISC_CTRL_2);
+			clk_ctrl = clk_ctrl | SDHCI_MISC_CTRL_2_CLK_OVR_ON;
+			sdhci_writel(host, clk_ctrl,
+				     SDHCI_TEGRA_VENDOR_MISC_CTRL_2);
+		}
+	} else  {
+		/* Restore SLCG */
+		if (tegra_host->slcg_status) {
+			clk_ctrl = sdhci_readl(host, SDHCI_VNDR_CLK_CTRL);
+			clk_ctrl = clk_ctrl &
+				   ~SDHCI_VNDR_CLK_CTRL_LEGACY_CLKEN_OVERRIDE;
+			sdhci_writel(host, clk_ctrl, SDHCI_VNDR_CLK_CTRL);
+			if (soc_data->nvquirks & NVQUIRK_SDMMC_CLK_OVERRIDE) {
+				clk_ctrl = sdhci_readl(host,
+						SDHCI_TEGRA_VENDOR_MISC_CTRL_2);
+				clk_ctrl = clk_ctrl &
+					   ~SDHCI_MISC_CTRL_2_CLK_OVR_ON;
+				sdhci_writel(host, clk_ctrl,
+					     SDHCI_TEGRA_VENDOR_MISC_CTRL_2);
+			}
+		}
+	}
+
+}
 static int tegra_sdhci_suspend(struct sdhci_host *sdhci)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
@@ -1829,6 +1885,7 @@ static const struct sdhci_ops tegra_sdhci_ops = {
 	.do_calibration	= tegra_sdhci_do_calibration,
 	.config_strobe	= tegra_sdhci_config_strobe,
 	.select_drive_strength	= tegra_sdhci_get_drive_strength,
+	.voltage_switch_req	= tegra_sdhci_voltage_switch_req,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
@@ -1910,11 +1967,13 @@ static const struct sdhci_pltfm_data sdhci_tegra194_pdata = {
 
 static struct sdhci_tegra_soc_data soc_data_tegra186 = {
 	.pdata = &sdhci_tegra186_pdata,
+	.nvquirks = NVQUIRK_SDMMC_CLK_OVERRIDE,
 	.nvquirks2 = NVQUIRK2_SET_PLL_CLK_PARENT,
 };
 
 static struct sdhci_tegra_soc_data soc_data_tegra194 = {
 	.pdata = &sdhci_tegra194_pdata,
+	.nvquirks = NVQUIRK_SDMMC_CLK_OVERRIDE,
 };
 
 static const struct sdhci_pltfm_data sdhci_tegra210_pdata = {

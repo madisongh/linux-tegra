@@ -1712,6 +1712,8 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 			host->mmc->max_busy_timeout /= host->timeout_clk;
 		}
 	}
+	if (mmc->skip_host_clkgate)
+		goto unlock;
 
 	sdhci_set_power(host, ios->power_mode, ios->vdd);
 
@@ -1821,7 +1823,7 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 	 */
 	if (host->quirks & SDHCI_QUIRK_RESET_CMD_DATA_ON_IOS)
 		sdhci_do_reset(host, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
-
+unlock:
 	mmiowb();
 	spin_unlock_irqrestore(&host->lock, flags);
 
@@ -2488,6 +2490,15 @@ static void sdhci_regulator_config_pre(struct mmc_host *mmc, int vdd)
 		host->ops->pre_regulator_config(host, vdd);
 }
 
+static void sdhci_voltage_switch_req(struct mmc_host *mmc, bool req)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+
+	if (host->ops->voltage_switch_req)
+		host->ops->voltage_switch_req(host, req);
+
+}
+
 static const struct mmc_host_ops sdhci_ops = {
 	.request	= sdhci_request,
 	.post_req	= sdhci_post_req,
@@ -2509,6 +2520,7 @@ static const struct mmc_host_ops sdhci_ops = {
 	.discard_cqe_task	= sdhci_cqe_task_discard_rq,
 	.enable_host_int	= sdhci_enable_host_interrupts,
 	.pre_regulator_config	= sdhci_regulator_config_pre,
+	.voltage_switch_req		= sdhci_voltage_switch_req,
 };
 
 /*****************************************************************************\
