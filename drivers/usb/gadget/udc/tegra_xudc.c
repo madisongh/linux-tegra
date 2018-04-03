@@ -306,7 +306,7 @@ BUILD_EP_CONTEXT_RW(data_offset, rsvd[2], 0, 0x1ffff)
 BUILD_EP_CONTEXT_RW(numtrbs, rsvd[2], 22, 0x1f)
 BUILD_EP_CONTEXT_RW(devaddr, rsvd[6], 0, 0x7f)
 
-static const char const driver_name[] = "tegra-xudc-new";
+static const char driver_name[] = "tegra-xudc-new";
 static inline u64 ep_ctx_read_deq_ptr(struct tegra_xudc_ep_context *ctx)
 {
 	return ((u64)ep_ctx_read_deq_hi(ctx) << 32) |
