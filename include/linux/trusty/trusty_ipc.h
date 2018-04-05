@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 Google, Inc.
+ * Copyright (c) 2016-2018, NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -35,6 +36,7 @@ struct tipc_chan_ops {
 	void (*handle_event)(void *cb_arg, int event);
 	struct tipc_msg_buf *(*handle_msg)(void *cb_arg,
 					   struct tipc_msg_buf *mb);
+	void (*handle_release)(void *cb_arg);
 };
 
 struct tipc_chan *tipc_create_channel(struct device *dev,
