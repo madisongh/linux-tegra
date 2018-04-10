@@ -72,11 +72,8 @@ struct tegra_channel_buffer {
 	struct vb2_v4l2_buffer buf;
 	struct list_head queue;
 	struct tegra_channel *chan;
-	u32 thresh[TEGRA_CSI_BLOCKS];
 
 	dma_addr_t addr;
-	int version;
-	int state;
 };
 
 #define to_tegra_channel_buffer(vb) \
@@ -133,13 +130,6 @@ struct tegra_vi_graph_entity {
  * @fmts_bitmap: a bitmap for formats supported
  * @bypass: bypass flag for VI bypass mode
  * @hdmiin: hdmiin flag for hdmi to csi bridge
- *
- * @restart_version: incremented every time either capture or release threads
- *                   wants to reset VI. it is appended to each buffer processed
- *                   by the capture thread, and inspected by each buffer
- *                   processed by the receive thread.
- * @capture_version: thread-local copy of @restart_version created when the
- *                   capture thread resets the VI.
  */
 struct tegra_channel {
 	int id;
@@ -162,23 +152,23 @@ struct tegra_channel {
 
 	unsigned char port[TEGRA_CSI_BLOCKS];
 	unsigned int syncpt[TEGRA_CSI_BLOCKS][MAX_SYNCPT_PER_CHANNEL];
-	unsigned int syncpoint_fifo[TEGRA_CSI_BLOCKS][MAX_SYNCPT_PER_CHANNEL];
+	unsigned int syncpoint_fifo[TEGRA_CSI_BLOCKS];
 	unsigned int buffer_offset[TEGRA_CSI_BLOCKS];
+	unsigned int buffer_state[QUEUED_BUFFERS];
+	struct vb2_v4l2_buffer *buffers[QUEUED_BUFFERS];
 	unsigned int timeout;
-	atomic_t restart_version;
-	int capture_version;
+	unsigned int save_index;
+	unsigned int free_index;
+	unsigned int num_buffers;
+	unsigned int released_bufs;
 
 	struct task_struct *kthread_capture_start;
-	struct task_struct *kthread_release;
 	wait_queue_head_t start_wait;
-	wait_queue_head_t release_wait;
 	struct vb2_queue queue;
 	void *alloc_ctx;
 	bool init_done;
 	struct list_head capture;
-	struct list_head release;
 	spinlock_t start_lock;
-	spinlock_t release_lock;
 	struct work_struct status_work;
 	struct work_struct error_work;
 
@@ -210,6 +200,7 @@ struct tegra_channel {
 	bool hdmiin;
 	bool write_ispformat;
 	enum tegra_vi_pg_mode pg_mode;
+	bool bfirst_fstart;
 	enum channel_capture_state capture_state;
 	spinlock_t capture_state_lock;
 	atomic_t is_streaming;
