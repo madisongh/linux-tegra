@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2012 Avionic Design GmbH
- * Copyright (C) 2012-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2012-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1200,7 +1200,6 @@ static const struct of_device_id host1x_drm_subdevs[] = {
 	{ .compatible = "nvidia,tegra210-nvjpg", },
 	{ .compatible = "nvidia,tegra210-nvenc", },
 	{ .compatible = "nvidia,tegra210-tsec", },
-	{ .compatible = "nvidia,tegra210-isp", },
 	{ /* sentinel */ }
 };
 
@@ -1227,7 +1226,6 @@ static struct platform_driver * const drivers[] = {
 	&tegra_nvjpg_driver,
 	&tegra_nvenc_driver,
 	&tegra_tsec_driver,
-	&tegra_isp_driver,
 };
 
 static int __init host1x_drm_init(void)

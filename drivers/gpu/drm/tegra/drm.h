@@ -291,6 +291,5 @@ extern struct platform_driver tegra_nvdec_driver;
 extern struct platform_driver tegra_nvjpg_driver;
 extern struct platform_driver tegra_nvenc_driver;
 extern struct platform_driver tegra_tsec_driver;
-extern struct platform_driver tegra_isp_driver;
 
 #endif /* HOST1X_DRM_H */
