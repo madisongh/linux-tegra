@@ -33,37 +33,6 @@
 #include "intel_drv.h"
 #include "i915_trace.h"
 
-static int switch_to_pinned_context(struct drm_i915_private *dev_priv)
-{
-	struct intel_engine_cs *engine;
-
-	if (i915.enable_execlists)
-		return 0;
-
-	for_each_engine(engine, dev_priv) {
-		struct drm_i915_gem_request *req;
-		int ret;
-
-		if (engine->last_context == NULL)
-			continue;
-
-		if (engine->last_context == dev_priv->kernel_context)
-			continue;
-
-		req = i915_gem_request_alloc(engine, dev_priv->kernel_context);
-		if (IS_ERR(req))
-			return PTR_ERR(req);
-
-		ret = i915_switch_context(req);
-		i915_add_request_no_flush(req);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
-
-
 static bool
 mark_free(struct i915_vma *vma, struct list_head *unwind)
 {
@@ -147,7 +116,7 @@ i915_gem_evict_something(struct drm_device *dev, struct i915_address_space *vm,
 
 search_again:
 	/* First see if there is a large enough contiguous idle region... */
-	list_for_each_entry(vma, &vm->inactive_list, vm_link) {
+	list_for_each_entry(vma, &vm->inactive_list, mm_list) {
 		if (mark_free(vma, &unwind_list))
 			goto found;
 	}
@@ -156,7 +125,7 @@ search_again:
 		goto none;
 
 	/* Now merge in the soon-to-be-expired objects... */
-	list_for_each_entry(vma, &vm->active_list, vm_link) {
+	list_for_each_entry(vma, &vm->active_list, mm_list) {
 		if (mark_free(vma, &unwind_list))
 			goto found;
 	}
@@ -181,19 +150,11 @@ none:
 
 	/* Only idle the GPU and repeat the search once */
 	if (pass++ == 0) {
-		struct drm_i915_private *dev_priv = to_i915(dev);
-
-		if (i915_is_ggtt(vm)) {
-			ret = switch_to_pinned_context(dev_priv);
-			if (ret)
-				return ret;
-		}
-
-		ret = i915_gem_wait_for_idle(dev_priv);
+		ret = i915_gpu_idle(dev);
 		if (ret)
 			return ret;
 
-		i915_gem_retire_requests(dev_priv);
+		i915_gem_retire_requests(dev);
 		goto search_again;
 	}
 
@@ -238,45 +199,6 @@ found:
 	return ret;
 }
 
-int
-i915_gem_evict_for_vma(struct i915_vma *target)
-{
-	struct drm_mm_node *node, *next;
-
-	list_for_each_entry_safe(node, next,
-			&target->vm->mm.head_node.node_list,
-			node_list) {
-		struct i915_vma *vma;
-		int ret;
-
-		if (node->start + node->size <= target->node.start)
-			continue;
-		if (node->start >= target->node.start + target->node.size)
-			break;
-
-		vma = container_of(node, typeof(*vma), node);
-
-		if (vma->pin_count) {
-			if (!vma->exec_entry || (vma->pin_count > 1))
-				/* Object is pinned for some other use */
-				return -EBUSY;
-
-			/* We need to evict a buffer in the same batch */
-			if (vma->exec_entry->flags & EXEC_OBJECT_PINNED)
-				/* Overlapping fixed objects in the same batch */
-				return -EINVAL;
-
-			return -ENOSPC;
-		}
-
-		ret = i915_vma_unbind(vma);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
-
 /**
  * i915_gem_evict_vm - Evict all idle vmas from a vm
  * @vm: Address space to cleanse
@@ -300,24 +222,16 @@ int i915_gem_evict_vm(struct i915_address_space *vm, bool do_idle)
 	trace_i915_gem_evict_vm(vm);
 
 	if (do_idle) {
-		struct drm_i915_private *dev_priv = to_i915(vm->dev);
-
-		if (i915_is_ggtt(vm)) {
-			ret = switch_to_pinned_context(dev_priv);
-			if (ret)
-				return ret;
-		}
-
-		ret = i915_gem_wait_for_idle(dev_priv);
+		ret = i915_gpu_idle(vm->dev);
 		if (ret)
 			return ret;
 
-		i915_gem_retire_requests(dev_priv);
+		i915_gem_retire_requests(vm->dev);
 
 		WARN_ON(!list_empty(&vm->active_list));
 	}
 
-	list_for_each_entry_safe(vma, next, &vm->inactive_list, vm_link)
+	list_for_each_entry_safe(vma, next, &vm->inactive_list, mm_list)
 		if (vma->pin_count == 0)
 			WARN_ON(i915_vma_unbind(vma));
 

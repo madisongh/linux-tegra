@@ -144,6 +144,50 @@ int drm_pci_set_busid(struct drm_device *dev, struct drm_master *master)
 }
 EXPORT_SYMBOL(drm_pci_set_busid);
 
+int drm_pci_set_unique(struct drm_device *dev,
+		       struct drm_master *master,
+		       struct drm_unique *u)
+{
+	int domain, bus, slot, func, ret;
+
+	master->unique_len = u->unique_len;
+	master->unique = kmalloc(master->unique_len + 1, GFP_KERNEL);
+	if (!master->unique) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	if (copy_from_user(master->unique, u->unique, master->unique_len)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	master->unique[master->unique_len] = '\0';
+
+	/* Return error if the busid submitted doesn't match the device's actual
+	 * busid.
+	 */
+	ret = sscanf(master->unique, "PCI:%d:%d:%d", &bus, &slot, &func);
+	if (ret != 3) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	domain = bus >> 8;
+	bus &= 0xff;
+
+	if ((domain != drm_get_pci_domain(dev)) ||
+	    (bus != dev->pdev->bus->number) ||
+	    (slot != PCI_SLOT(dev->pdev->devfn)) ||
+	    (func != PCI_FUNC(dev->pdev->devfn))) {
+		ret = -EINVAL;
+		goto err;
+	}
+	return 0;
+err:
+	return ret;
+}
+
 static int drm_pci_irq_by_busid(struct drm_device *dev, struct drm_irq_busid *p)
 {
 	if ((p->busnum >> 8) != drm_get_pci_domain(dev) ||
@@ -206,7 +250,7 @@ void drm_pci_agp_destroy(struct drm_device *dev)
 {
 	if (dev->agp) {
 		arch_phys_wc_del(dev->agp->agp_mtrr);
-		drm_legacy_agp_clear(dev);
+		drm_agp_clear(dev);
 		kfree(dev->agp);
 		dev->agp = NULL;
 	}
@@ -366,26 +410,6 @@ int drm_pcie_get_speed_cap_mask(struct drm_device *dev, u32 *mask)
 }
 EXPORT_SYMBOL(drm_pcie_get_speed_cap_mask);
 
-int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw)
-{
-	struct pci_dev *root;
-	u32 lnkcap;
-
-	*mlw = 0;
-	if (!dev->pdev)
-		return -EINVAL;
-
-	root = dev->pdev->bus->self;
-
-	pcie_capability_read_dword(root, PCI_EXP_LNKCAP, &lnkcap);
-
-	*mlw = (lnkcap & PCI_EXP_LNKCAP_MLW) >> 4;
-
-	DRM_INFO("probing mlw for device %x:%x = %x\n", root->vendor, root->device, lnkcap);
-	return 0;
-}
-EXPORT_SYMBOL(drm_pcie_get_max_link_width);
-
 #else
 
 int drm_pci_init(struct drm_driver *driver, struct pci_driver *pdriver)
@@ -397,6 +421,13 @@ void drm_pci_agp_destroy(struct drm_device *dev) {}
 
 int drm_irq_by_busid(struct drm_device *dev, void *data,
 		     struct drm_file *file_priv)
+{
+	return -EINVAL;
+}
+
+int drm_pci_set_unique(struct drm_device *dev,
+		       struct drm_master *master,
+		       struct drm_unique *u)
 {
 	return -EINVAL;
 }
