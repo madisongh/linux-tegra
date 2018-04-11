@@ -25,10 +25,38 @@
 #include <soc/tegra/pmc.h>
 #endif
 
-#include "nvenc.h"
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-#include "nvenc_t186.h"
-#endif
+#include "drm.h"
+#include "falcon.h"
+
+struct nvenc_config {
+	/* Firmware name */
+	const char *ucode_name;
+};
+
+struct nvenc {
+	struct falcon falcon;
+	bool booted;
+
+	void __iomem *regs;
+	struct tegra_drm_client client;
+	struct host1x_channel *channel;
+	struct iommu_domain *domain;
+	struct device *dev;
+	struct clk *clk;
+	struct reset_control *rst;
+
+	/* Platform configuration */
+	const struct nvenc_config *config;
+
+	/* for firewall - this determines if method 1 should be regarded
+	 * as an address register */
+	bool method_data_is_addr_reg;
+};
+
+static inline struct nvenc *to_nvenc(struct tegra_drm_client *client)
+{
+	return container_of(client, struct nvenc, client);
+}
 
 static int nvenc_runtime_resume(struct device *dev)
 {
@@ -81,7 +109,6 @@ static int nvenc_runtime_suspend(struct device *dev)
 static int nvenc_boot(struct nvenc *nvenc)
 {
 	int err = 0;
-	struct tegra_drm_client *client = &nvenc->client;
 
 	if (nvenc->booted)
 		return 0;
@@ -113,9 +140,6 @@ static int nvenc_boot(struct nvenc *nvenc)
 		reset_control_deassert(nvenc->rst);
 	}
 #endif
-
-	if (client->ops->load_regs)
-		client->ops->load_regs(client);
 
 	err = falcon_boot(&nvenc->falcon);
 	if (err < 0)
@@ -273,7 +297,7 @@ static const struct host1x_client_ops nvenc_client_ops = {
 	.exit = nvenc_exit,
 };
 
-int nvenc_open_channel(struct tegra_drm_client *client,
+static int nvenc_open_channel(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context)
 {
 	struct nvenc *nvenc = to_nvenc(client);
@@ -303,7 +327,7 @@ int nvenc_open_channel(struct tegra_drm_client *client,
 	return 0;
 }
 
-void nvenc_close_channel(struct tegra_drm_context *context)
+static void nvenc_close_channel(struct tegra_drm_context *context)
 {
 	struct nvenc *nvenc = to_nvenc(context->client);
 
@@ -320,14 +344,10 @@ static const struct tegra_drm_client_ops nvenc_ops = {
 
 static const struct nvenc_config nvenc_t210_config = {
 	.ucode_name = "tegra21x/nvhost_nvenc050.fw",
-	.drm_client_ops = &nvenc_ops,
 };
 
 static const struct of_device_id nvenc_match[] = {
 	{ .compatible = "nvidia,tegra210-nvenc", .data = &nvenc_t210_config },
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-	{ .compatible = "nvidia,tegra186-nvenc", .data = &nvenc_t186_config },
-#endif
 	{ },
 };
 
@@ -386,7 +406,7 @@ static int nvenc_probe(struct platform_device *pdev)
 	nvenc->config = nvenc_config;
 
 	INIT_LIST_HEAD(&nvenc->client.list);
-	nvenc->client.ops = nvenc->config->drm_client_ops;
+	nvenc->client.ops = &nvenc_ops;
 
 	err = host1x_client_register(&nvenc->client.base);
 	if (err < 0) {
