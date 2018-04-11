@@ -32,10 +32,6 @@
 #include "vic_t186.h"
 #endif
 
-#define VIC_AUTOSUSPEND_DELAY 500
-
-static int vic_boot(struct vic *vic);
-
 static int vic_runtime_resume(struct device *dev)
 {
 	struct vic *vic = dev_get_drvdata(dev);
@@ -51,6 +47,8 @@ static int vic_runtime_resume(struct device *dev)
 		tegra_powergate_partition(TEGRA_POWERGATE_VIC);
 		return err;
 	}
+
+	return 0;
 #else
 	if (vic->rst) {
 		err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_VIC,
@@ -58,22 +56,9 @@ static int vic_runtime_resume(struct device *dev)
 		if (err < 0)
 			dev_err(dev, "failed to power up device\n");
 	}
-#endif
-	err = vic_boot(vic);
-	if (err < 0)
-		goto fail_vic_boot;
 
-	return 0;
-
-fail_vic_boot:
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
-	tegra_powergate_power_off(TEGRA_POWERGATE_VIC);
-#else
-	clk_disable_unprepare(vic->clk);
-	tegra_powergate_partition(TEGRA_POWERGATE_VIC);
-#endif
 	return err;
-
+#endif
 }
 
 static int vic_runtime_suspend(struct device *dev)
@@ -315,17 +300,39 @@ int vic_open_channel(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context)
 {
 	struct vic *vic = to_vic(client);
+	int err;
+
+	err = pm_runtime_get_sync(vic->dev);
+	if (err < 0)
+		return err;
+
+	/*
+	 * Try to boot the Falcon microcontroller. Booting is deferred until
+	 * here because the firmware might not yet be available during system
+	 * boot, for example if it's on remote storage.
+	 */
+	err = vic_boot(vic);
+	if (err < 0) {
+		pm_runtime_put(vic->dev);
+		return err;
+	}
 
 	context->channel = host1x_channel_get(vic->channel);
-	if (!context->channel)
+	if (!context->channel) {
+		pm_runtime_put(vic->dev);
 		return -ENOMEM;
+	}
 
 	return 0;
 }
 
 void vic_close_channel(struct tegra_drm_context *context)
 {
+	struct vic *vic = to_vic(context->client);
+
 	host1x_channel_put(context->channel);
+
+	pm_runtime_put(vic->dev);
 }
 
 int vic_is_addr_reg(struct device *dev, u32 class, u32 offset, u32 val)
@@ -446,18 +453,6 @@ static int vic_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	/* BL can keep partition powered ON,
-	 * if so power off partition explicitly
-	 */
-	if (tegra_powergate_is_powered(TEGRA_POWERGATE_VIC))
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		tegra_powergate_partition(TEGRA_POWERGATE_VIC);
-#else
-		tegra_powergate_power_off(TEGRA_POWERGATE_VIC);
-#endif
-
-	pm_runtime_set_autosuspend_delay(dev, VIC_AUTOSUSPEND_DELAY);
-	pm_runtime_use_autosuspend(dev);
 	pm_runtime_enable(&pdev->dev);
 	if (!pm_runtime_enabled(&pdev->dev)) {
 		err = vic_runtime_resume(&pdev->dev);
