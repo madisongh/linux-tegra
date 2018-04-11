@@ -108,11 +108,25 @@ static int nvjpg_boot(struct nvjpg *nvjpg)
 	}
 
 	/* ensure that the engine is in sane state */
+#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
+	if (nvjpg->rst) {
+		reset_control_assert(nvjpg->rst);
+		usleep_range(10, 100);
+		reset_control_deassert(nvjpg->rst);
+	} else {
+		tegra_mc_flush(true);
+		tegra_periph_reset_assert(nvjpg->clk);
+		usleep_range(10, 100);
+		tegra_periph_reset_deassert(nvjpg->clk);
+		tegra_mc_flush_done(true);
+	}
+#else
 	if (nvjpg->rst) {
 		reset_control_assert(nvjpg->rst);
 		usleep_range(10, 100);
 		reset_control_deassert(nvjpg->rst);
 	}
+#endif
 
 	if (client->ops->load_regs)
 		client->ops->load_regs(client);
@@ -237,11 +251,25 @@ static int nvjpg_exit(struct host1x_client *client)
 	host1x_channel_free(nvjpg->channel);
 
 	if (nvjpg->booted) {
+#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
+		if (nvjpg->rst) {
+			reset_control_assert(nvjpg->rst);
+			usleep_range(10, 100);
+			reset_control_deassert(nvjpg->rst);
+		} else {
+			tegra_mc_flush(true);
+			tegra_periph_reset_assert(nvjpg->clk);
+			usleep_range(10, 100);
+			tegra_periph_reset_deassert(nvjpg->clk);
+			tegra_mc_flush_done(true);
+		}
+#else
 		if (nvjpg->rst) {
 			reset_control_assert(nvjpg->rst);
 			usleep_range(10, 100);
 			reset_control_deassert(nvjpg->rst);
 		}
+#endif
 	}
 
 	falcon_exit(&nvjpg->falcon);
