@@ -76,8 +76,7 @@ static int tsec_runtime_suspend(struct device *dev)
 	struct tsec *tsec = dev_get_drvdata(dev);
 
 	clk_disable_unprepare(tsec->clk);
-	if (tsec->rst)
-		reset_control_assert(tsec->rst);
+	reset_control_assert(tsec->rst);
 
 	tsec->booted = false;
 
@@ -100,23 +99,15 @@ static int tsec_boot(struct tsec *tsec)
 
 	/* ensure that the engine is in sane state */
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	if (tsec->rst) {
-		reset_control_assert(tsec->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(tsec->rst);
-	} else {
-		tegra_mc_flush(true);
-		tegra_periph_reset_assert(tsec->clk);
-		usleep_range(10, 100);
-		tegra_periph_reset_deassert(tsec->clk);
-		tegra_mc_flush_done(true);
-	}
+	tegra_mc_flush(true);
+	tegra_periph_reset_assert(tsec->clk);
+	usleep_range(10, 100);
+	tegra_periph_reset_deassert(tsec->clk);
+	tegra_mc_flush_done(true);
 #else
-	if (tsec->rst) {
-		reset_control_assert(tsec->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(tsec->rst);
-	}
+	reset_control_assert(tsec->rst);
+	usleep_range(10, 100);
+	reset_control_deassert(tsec->rst);
 #endif
 
 	err = falcon_boot(&tsec->falcon);
@@ -242,23 +233,15 @@ static int tsec_exit(struct host1x_client *client)
 
 	if (tsec->booted) {
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		if (tsec->rst) {
-			reset_control_assert(tsec->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(tsec->rst);
-		} else {
-			tegra_mc_flush(true);
-			tegra_periph_reset_assert(tsec->clk);
-			usleep_range(10, 100);
-			tegra_periph_reset_deassert(tsec->clk);
-			tegra_mc_flush_done(true);
-		}
+		tegra_mc_flush(true);
+		tegra_periph_reset_assert(tsec->clk);
+		usleep_range(10, 100);
+		tegra_periph_reset_deassert(tsec->clk);
+		tegra_mc_flush_done(true);
 #else
-		if (tsec->rst) {
-			reset_control_assert(tsec->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(tsec->rst);
-		}
+		reset_control_assert(tsec->rst);
+		usleep_range(10, 100);
+		reset_control_deassert(tsec->rst);
 #endif
 	}
 
@@ -379,10 +362,10 @@ static int tsec_probe(struct platform_device *pdev)
 		return PTR_ERR(tsec->clk);
 	}
 
-	tsec->rst = devm_reset_control_get(dev, NULL);
+	tsec->rst = devm_reset_control_get(dev, "tsec");
 	if (IS_ERR(tsec->rst)) {
 		dev_err(dev, "cannot get reset\n");
-		tsec->rst = NULL;
+		return PTR_ERR(tsec->rst);
 	}
 
 	platform_set_drvdata(pdev, tsec);
