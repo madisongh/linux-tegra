@@ -79,7 +79,7 @@ void radeon_pm_acpi_event_handler(struct radeon_device *rdev)
 				radeon_dpm_enable_bapm(rdev, rdev->pm.dpm.ac_power);
 		}
 		mutex_unlock(&rdev->pm.mutex);
-	} else if (rdev->pm.pm_method == PM_METHOD_PROFILE) {
+        } else if (rdev->pm.pm_method == PM_METHOD_PROFILE) {
 		if (rdev->pm.profile == PM_PROFILE_AUTO) {
 			mutex_lock(&rdev->pm.mutex);
 			radeon_pm_update_profile(rdev);
@@ -276,12 +276,8 @@ static void radeon_pm_set_clocks(struct radeon_device *rdev)
 	if (rdev->irq.installed) {
 		for (i = 0; i < rdev->num_crtc; i++) {
 			if (rdev->pm.active_crtcs & (1 << i)) {
-				/* This can fail if a modeset is in progress */
-				if (drm_vblank_get(rdev->ddev, i) == 0)
-					rdev->pm.req_vblank |= (1 << i);
-				else
-					DRM_DEBUG_DRIVER("crtc %d no vblank, can glitch\n",
-							 i);
+				rdev->pm.req_vblank |= (1 << i);
+				drm_vblank_get(rdev->ddev, i);
 			}
 		}
 	}
@@ -717,7 +713,7 @@ static struct attribute *hwmon_attributes[] = {
 static umode_t hwmon_attributes_visible(struct kobject *kobj,
 					struct attribute *attr, int index)
 {
-	struct device *dev = kobj_to_dev(kobj);
+	struct device *dev = container_of(kobj, struct device, kobj);
 	struct radeon_device *rdev = dev_get_drvdata(dev);
 	umode_t effective_mode = attr->mode;
 

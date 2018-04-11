@@ -300,7 +300,7 @@ struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
 		break;
 	}
 
-	if (!kq->ops.initialize(kq, dev, type, KFD_KERNEL_QUEUE_SIZE)) {
+	if (kq->ops.initialize(kq, dev, type, KFD_KERNEL_QUEUE_SIZE) == false) {
 		pr_err("amdkfd: failed to init kernel queue\n");
 		kfree(kq);
 		return NULL;

@@ -349,6 +349,8 @@ int gma_crtc_cursor_set(struct drm_crtc *crtc,
 	/* If we didn't get a handle then turn the cursor off */
 	if (!handle) {
 		temp = CURSOR_MODE_DISABLE;
+		mutex_lock(&dev->struct_mutex);
+
 		if (gma_power_begin(dev, false)) {
 			REG_WRITE(control, temp);
 			REG_WRITE(base, 0);
@@ -360,9 +362,11 @@ int gma_crtc_cursor_set(struct drm_crtc *crtc,
 			gt = container_of(gma_crtc->cursor_obj,
 					  struct gtt_range, gem);
 			psb_gtt_unpin(gt);
-			drm_gem_object_unreference_unlocked(gma_crtc->cursor_obj);
+			drm_gem_object_unreference(gma_crtc->cursor_obj);
 			gma_crtc->cursor_obj = NULL;
 		}
+
+		mutex_unlock(&dev->struct_mutex);
 		return 0;
 	}
 
@@ -372,7 +376,8 @@ int gma_crtc_cursor_set(struct drm_crtc *crtc,
 		return -EINVAL;
 	}
 
-	obj = drm_gem_object_lookup(file_priv, handle);
+	mutex_lock(&dev->struct_mutex);
+	obj = drm_gem_object_lookup(dev, file_priv, handle);
 	if (!obj) {
 		ret = -ENOENT;
 		goto unlock;
@@ -436,15 +441,17 @@ int gma_crtc_cursor_set(struct drm_crtc *crtc,
 	if (gma_crtc->cursor_obj) {
 		gt = container_of(gma_crtc->cursor_obj, struct gtt_range, gem);
 		psb_gtt_unpin(gt);
-		drm_gem_object_unreference_unlocked(gma_crtc->cursor_obj);
+		drm_gem_object_unreference(gma_crtc->cursor_obj);
 	}
 
 	gma_crtc->cursor_obj = obj;
 unlock:
+	mutex_unlock(&dev->struct_mutex);
 	return ret;
 
 unref_cursor:
-	drm_gem_object_unreference_unlocked(obj);
+	drm_gem_object_unreference(obj);
+	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }
 
@@ -476,6 +483,20 @@ int gma_crtc_cursor_move(struct drm_crtc *crtc, int x, int y)
 		gma_power_end(dev);
 	}
 	return 0;
+}
+
+bool gma_encoder_mode_fixup(struct drm_encoder *encoder,
+			    const struct drm_display_mode *mode,
+			    struct drm_display_mode *adjusted_mode)
+{
+	return true;
+}
+
+bool gma_crtc_mode_fixup(struct drm_crtc *crtc,
+			 const struct drm_display_mode *mode,
+			 struct drm_display_mode *adjusted_mode)
+{
+	return true;
 }
 
 void gma_crtc_prepare(struct drm_crtc *crtc)

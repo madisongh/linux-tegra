@@ -436,7 +436,7 @@ struct platform_driver tegra_dpaux_driver = {
 	.remove = tegra_dpaux_remove,
 };
 
-struct drm_dp_aux *drm_dp_aux_find_by_of_node(struct device_node *np)
+struct tegra_dpaux *tegra_dpaux_find_by_of_node(struct device_node *np)
 {
 	struct tegra_dpaux *dpaux;
 
@@ -445,7 +445,7 @@ struct drm_dp_aux *drm_dp_aux_find_by_of_node(struct device_node *np)
 	list_for_each_entry(dpaux, &dpaux_list, list)
 		if (np == dpaux->dev->of_node) {
 			mutex_unlock(&dpaux_lock);
-			return &dpaux->aux;
+			return dpaux;
 		}
 
 	mutex_unlock(&dpaux_lock);
@@ -453,9 +453,8 @@ struct drm_dp_aux *drm_dp_aux_find_by_of_node(struct device_node *np)
 	return NULL;
 }
 
-int drm_dp_aux_attach(struct drm_dp_aux *aux, struct tegra_output *output)
+int tegra_dpaux_attach(struct tegra_dpaux *dpaux, struct tegra_output *output)
 {
-	struct tegra_dpaux *dpaux = to_dpaux(aux);
 	unsigned long timeout;
 	int err;
 
@@ -471,7 +470,7 @@ int drm_dp_aux_attach(struct drm_dp_aux *aux, struct tegra_output *output)
 	while (time_before(jiffies, timeout)) {
 		enum drm_connector_status status;
 
-		status = drm_dp_aux_detect(aux);
+		status = tegra_dpaux_detect(dpaux);
 		if (status == connector_status_connected) {
 			enable_irq(dpaux->irq);
 			return 0;
@@ -483,9 +482,8 @@ int drm_dp_aux_attach(struct drm_dp_aux *aux, struct tegra_output *output)
 	return -ETIMEDOUT;
 }
 
-int drm_dp_aux_detach(struct drm_dp_aux *aux)
+int tegra_dpaux_detach(struct tegra_dpaux *dpaux)
 {
-	struct tegra_dpaux *dpaux = to_dpaux(aux);
 	unsigned long timeout;
 	int err;
 
@@ -500,7 +498,7 @@ int drm_dp_aux_detach(struct drm_dp_aux *aux)
 	while (time_before(jiffies, timeout)) {
 		enum drm_connector_status status;
 
-		status = drm_dp_aux_detect(aux);
+		status = tegra_dpaux_detect(dpaux);
 		if (status == connector_status_disconnected) {
 			dpaux->output = NULL;
 			return 0;
@@ -512,9 +510,8 @@ int drm_dp_aux_detach(struct drm_dp_aux *aux)
 	return -ETIMEDOUT;
 }
 
-enum drm_connector_status drm_dp_aux_detect(struct drm_dp_aux *aux)
+enum drm_connector_status tegra_dpaux_detect(struct tegra_dpaux *dpaux)
 {
-	struct tegra_dpaux *dpaux = to_dpaux(aux);
 	u32 value;
 
 	value = tegra_dpaux_readl(dpaux, DPAUX_DP_AUXSTAT);
@@ -525,9 +522,8 @@ enum drm_connector_status drm_dp_aux_detect(struct drm_dp_aux *aux)
 	return connector_status_disconnected;
 }
 
-int drm_dp_aux_enable(struct drm_dp_aux *aux)
+int tegra_dpaux_enable(struct tegra_dpaux *dpaux)
 {
-	struct tegra_dpaux *dpaux = to_dpaux(aux);
 	u32 value;
 
 	value = DPAUX_HYBRID_PADCTL_AUX_CMH(2) |
@@ -544,9 +540,8 @@ int drm_dp_aux_enable(struct drm_dp_aux *aux)
 	return 0;
 }
 
-int drm_dp_aux_disable(struct drm_dp_aux *aux)
+int tegra_dpaux_disable(struct tegra_dpaux *dpaux)
 {
-	struct tegra_dpaux *dpaux = to_dpaux(aux);
 	u32 value;
 
 	value = tegra_dpaux_readl(dpaux, DPAUX_HYBRID_SPARE);
@@ -556,11 +551,11 @@ int drm_dp_aux_disable(struct drm_dp_aux *aux)
 	return 0;
 }
 
-int drm_dp_aux_prepare(struct drm_dp_aux *aux, u8 encoding)
+int tegra_dpaux_prepare(struct tegra_dpaux *dpaux, u8 encoding)
 {
 	int err;
 
-	err = drm_dp_dpcd_writeb(aux, DP_MAIN_LINK_CHANNEL_CODING_SET,
+	err = drm_dp_dpcd_writeb(&dpaux->aux, DP_MAIN_LINK_CHANNEL_CODING_SET,
 				 encoding);
 	if (err < 0)
 		return err;
@@ -568,15 +563,15 @@ int drm_dp_aux_prepare(struct drm_dp_aux *aux, u8 encoding)
 	return 0;
 }
 
-int drm_dp_aux_train(struct drm_dp_aux *aux, struct drm_dp_link *link,
-		     u8 pattern)
+int tegra_dpaux_train(struct tegra_dpaux *dpaux, struct drm_dp_link *link,
+		      u8 pattern)
 {
 	u8 tp = pattern & DP_TRAINING_PATTERN_MASK;
 	u8 status[DP_LINK_STATUS_SIZE], values[4];
 	unsigned int i;
 	int err;
 
-	err = drm_dp_dpcd_writeb(aux, DP_TRAINING_PATTERN_SET, pattern);
+	err = drm_dp_dpcd_writeb(&dpaux->aux, DP_TRAINING_PATTERN_SET, pattern);
 	if (err < 0)
 		return err;
 
@@ -589,14 +584,14 @@ int drm_dp_aux_train(struct drm_dp_aux *aux, struct drm_dp_link *link,
 			    DP_TRAIN_MAX_SWING_REACHED |
 			    DP_TRAIN_VOLTAGE_SWING_LEVEL_0;
 
-	err = drm_dp_dpcd_write(aux, DP_TRAINING_LANE0_SET, values,
+	err = drm_dp_dpcd_write(&dpaux->aux, DP_TRAINING_LANE0_SET, values,
 				link->num_lanes);
 	if (err < 0)
 		return err;
 
 	usleep_range(500, 1000);
 
-	err = drm_dp_dpcd_read_link_status(aux, status);
+	err = drm_dp_dpcd_read_link_status(&dpaux->aux, status);
 	if (err < 0)
 		return err;
 
@@ -614,11 +609,11 @@ int drm_dp_aux_train(struct drm_dp_aux *aux, struct drm_dp_link *link,
 		break;
 
 	default:
-		dev_err(aux->dev, "unsupported training pattern %u\n", tp);
+		dev_err(dpaux->dev, "unsupported training pattern %u\n", tp);
 		return -EINVAL;
 	}
 
-	err = drm_dp_dpcd_writeb(aux, DP_EDP_CONFIGURATION_SET, 0);
+	err = drm_dp_dpcd_writeb(&dpaux->aux, DP_EDP_CONFIGURATION_SET, 0);
 	if (err < 0)
 		return err;
 

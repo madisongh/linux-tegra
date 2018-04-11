@@ -22,13 +22,11 @@
  * Authors: Ben Skeggs
  */
 
-#include <linux/apple-gmux.h>
 #include <linux/console.h>
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/pm_runtime.h>
-#include <linux/vgaarb.h>
 #include <linux/vga_switcheroo.h>
 
 #include "drmP.h"
@@ -39,16 +37,12 @@
 #include <core/pci.h>
 #include <core/tegra.h>
 
-#include <nvif/class.h>
-#include <nvif/cl0002.h>
-#include <nvif/cla06f.h>
-#include <nvif/if0004.h>
-
-#include "nouveau_drv.h"
+#include "nouveau_drm.h"
 #include "nouveau_dma.h"
 #include "nouveau_ttm.h"
 #include "nouveau_gem.h"
 #include "nouveau_vga.h"
+#include "nouveau_sysfs.h"
 #include "nouveau_hwmon.h"
 #include "nouveau_acpi.h"
 #include "nouveau_bios.h"
@@ -198,7 +192,6 @@ nouveau_accel_init(struct nouveau_drm *drm)
 			break;
 		case FERMI_CHANNEL_GPFIFO:
 		case KEPLER_CHANNEL_GPFIFO_A:
-		case KEPLER_CHANNEL_GPFIFO_B:
 		case MAXWELL_CHANNEL_GPFIFO_A:
 			ret = nvc0_fence_create(drm);
 			break;
@@ -216,13 +209,13 @@ nouveau_accel_init(struct nouveau_drm *drm)
 
 	if (device->info.family >= NV_DEVICE_INFO_V0_KEPLER) {
 		ret = nouveau_channel_new(drm, &drm->device,
-					  NVA06F_V0_ENGINE_CE0 |
-					  NVA06F_V0_ENGINE_CE1,
+					  KEPLER_CHANNEL_GPFIFO_A_V0_ENGINE_CE0|
+					  KEPLER_CHANNEL_GPFIFO_A_V0_ENGINE_CE1,
 					  0, &drm->cechan);
 		if (ret)
 			NV_ERROR(drm, "failed to create ce channel, %d\n", ret);
 
-		arg0 = NVA06F_V0_ENGINE_GR;
+		arg0 = KEPLER_CHANNEL_GPFIFO_A_V0_ENGINE_GR;
 		arg1 = 1;
 	} else
 	if (device->info.chipset >= 0xa3 &&
@@ -263,8 +256,8 @@ nouveau_accel_init(struct nouveau_drm *drm)
 		}
 
 		ret = nvif_notify_init(&drm->nvsw, nouveau_flip_complete,
-				       false, NV04_NVSW_NTFY_UEVENT,
-				       NULL, 0, 0, &drm->flip);
+				       false, NVSW_NTFY_UEVENT, NULL, 0, 0,
+				       &drm->flip);
 		if (ret == 0)
 			ret = nvif_notify_get(&drm->flip);
 		if (ret) {
@@ -314,15 +307,6 @@ static int nouveau_drm_probe(struct pci_dev *pdev,
 	struct apertures_struct *aper;
 	bool boot = false;
 	int ret;
-
-	/*
-	 * apple-gmux is needed on dual GPU MacBook Pro
-	 * to probe the panel if we're the inactive GPU.
-	 */
-	if (IS_ENABLED(CONFIG_VGA_ARB) && IS_ENABLED(CONFIG_VGA_SWITCHEROO) &&
-	    apple_gmux_present() && pdev != vga_default_device() &&
-	    !vga_switcheroo_handler_flags())
-		return -EPROBE_DEFER;
 
 	/* remove conflicting drivers (vesafb, efifb etc) */
 	aper = alloc_apertures(3);
@@ -376,7 +360,7 @@ nouveau_get_hdmi_dev(struct nouveau_drm *drm)
 	struct pci_dev *pdev = drm->dev->pdev;
 
 	if (!pdev) {
-		NV_DEBUG(drm, "not a PCI device; no HDMI\n");
+		DRM_INFO("not a PCI device; no HDMI\n");
 		drm->hdmi_device = NULL;
 		return;
 	}
@@ -464,7 +448,7 @@ nouveau_drm_load(struct drm_device *dev, unsigned long flags)
 			goto fail_dispinit;
 	}
 
-	nouveau_debugfs_init(drm);
+	nouveau_sysfs_init(dev);
 	nouveau_hwmon_init(dev);
 	nouveau_accel_init(drm);
 	nouveau_fbcon_init(dev);
@@ -502,7 +486,7 @@ nouveau_drm_unload(struct drm_device *dev)
 	nouveau_fbcon_fini(dev);
 	nouveau_accel_fini(drm);
 	nouveau_hwmon_fini(dev);
-	nouveau_debugfs_fini(drm);
+	nouveau_sysfs_fini(dev);
 
 	if (dev->mode_config.num_crtc)
 		nouveau_display_fini(dev);
@@ -944,8 +928,8 @@ driver_stub = {
 	.lastclose = nouveau_vga_lastclose,
 
 #if defined(CONFIG_DEBUG_FS)
-	.debugfs_init = nouveau_drm_debugfs_init,
-	.debugfs_cleanup = nouveau_drm_debugfs_cleanup,
+	.debugfs_init = nouveau_debugfs_init,
+	.debugfs_cleanup = nouveau_debugfs_takedown,
 #endif
 
 	.get_vblank_counter = drm_vblank_no_hw_counter,
@@ -1019,6 +1003,7 @@ static void nouveau_display_options(void)
 	DRM_DEBUG_DRIVER("... modeset      : %d\n", nouveau_modeset);
 	DRM_DEBUG_DRIVER("... runpm        : %d\n", nouveau_runtime_pm);
 	DRM_DEBUG_DRIVER("... vram_pushbuf : %d\n", nouveau_vram_pushbuf);
+	DRM_DEBUG_DRIVER("... pstate       : %d\n", nouveau_pstate);
 }
 
 static const struct dev_pm_ops nouveau_pm_ops = {
@@ -1061,6 +1046,10 @@ nouveau_platform_device_create(const struct nvkm_device_tegra_func *func,
 		goto err_free;
 	}
 
+	err = drm_dev_set_unique(drm, "%s", dev_name(&pdev->dev));
+	if (err < 0)
+		goto err_free;
+
 	drm->platformdev = pdev;
 	platform_set_drvdata(pdev, drm);
 
@@ -1083,8 +1072,10 @@ nouveau_drm_init(void)
 	nouveau_display_options();
 
 	if (nouveau_modeset == -1) {
+#ifdef CONFIG_VGA_CONSOLE
 		if (vgacon_text_force())
 			nouveau_modeset = 0;
+#endif
 	}
 
 	if (!nouveau_modeset)

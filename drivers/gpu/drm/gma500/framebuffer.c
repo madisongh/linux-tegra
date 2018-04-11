@@ -241,7 +241,7 @@ static struct fb_ops psbfb_unaccel_ops = {
  */
 static int psb_framebuffer_init(struct drm_device *dev,
 					struct psb_framebuffer *fb,
-					const struct drm_mode_fb_cmd2 *mode_cmd,
+					struct drm_mode_fb_cmd2 *mode_cmd,
 					struct gtt_range *gt)
 {
 	u32 bpp, depth;
@@ -284,7 +284,7 @@ static int psb_framebuffer_init(struct drm_device *dev,
 
 static struct drm_framebuffer *psb_framebuffer_create
 			(struct drm_device *dev,
-			 const struct drm_mode_fb_cmd2 *mode_cmd,
+			 struct drm_mode_fb_cmd2 *mode_cmd,
 			 struct gtt_range *gt)
 {
 	struct psb_framebuffer *fb;
@@ -406,10 +406,12 @@ static int psbfb_create(struct psb_fbdev *fbdev,
 
 	memset(dev_priv->vram_addr + backing->offset, 0, size);
 
+	mutex_lock(&dev->struct_mutex);
+
 	info = drm_fb_helper_alloc_fbi(&fbdev->psb_fb_helper);
 	if (IS_ERR(info)) {
 		ret = PTR_ERR(info);
-		goto err_free_range;
+		goto out_err1;
 	}
 	info->par = fbdev;
 
@@ -417,7 +419,7 @@ static int psbfb_create(struct psb_fbdev *fbdev,
 
 	ret = psb_framebuffer_init(dev, psbfb, &mode_cmd, backing);
 	if (ret)
-		goto err_release;
+		goto out_unref;
 
 	fb = &psbfb->base;
 	psbfb->fbdev = info;
@@ -461,10 +463,17 @@ static int psbfb_create(struct psb_fbdev *fbdev,
 	dev_dbg(dev->dev, "allocated %dx%d fb\n",
 					psbfb->base.width, psbfb->base.height);
 
+	mutex_unlock(&dev->struct_mutex);
 	return 0;
-err_release:
+out_unref:
+	if (backing->stolen)
+		psb_gtt_free_range(dev, backing);
+	else
+		drm_gem_object_unreference(&backing->gem);
+
 	drm_fb_helper_release_fbi(&fbdev->psb_fb_helper);
-err_free_range:
+out_err1:
+	mutex_unlock(&dev->struct_mutex);
 	psb_gtt_free_range(dev, backing);
 	return ret;
 }
@@ -479,7 +488,7 @@ err_free_range:
  */
 static struct drm_framebuffer *psb_user_framebuffer_create
 			(struct drm_device *dev, struct drm_file *filp,
-			 const struct drm_mode_fb_cmd2 *cmd)
+			 struct drm_mode_fb_cmd2 *cmd)
 {
 	struct gtt_range *r;
 	struct drm_gem_object *obj;
@@ -488,7 +497,7 @@ static struct drm_framebuffer *psb_user_framebuffer_create
 	 *	Find the GEM object and thus the gtt range object that is
 	 *	to back this space
 	 */
-	obj = drm_gem_object_lookup(filp, cmd->handles[0]);
+	obj = drm_gem_object_lookup(dev, filp, cmd->handles[0]);
 	if (obj == NULL)
 		return ERR_PTR(-ENOENT);
 
@@ -560,7 +569,7 @@ static int psb_fbdev_destroy(struct drm_device *dev, struct psb_fbdev *fbdev)
 	drm_framebuffer_cleanup(&psbfb->base);
 
 	if (psbfb->gtt)
-		drm_gem_object_unreference_unlocked(&psbfb->gtt->gem);
+		drm_gem_object_unreference(&psbfb->gtt->gem);
 	return 0;
 }
 
@@ -667,17 +676,29 @@ static const struct drm_mode_config_funcs psb_mode_funcs = {
 	.output_poll_changed = psbfb_output_poll_changed,
 };
 
+static int psb_create_backlight_property(struct drm_device *dev)
+{
+	struct drm_psb_private *dev_priv = dev->dev_private;
+	struct drm_property *backlight;
+
+	if (dev_priv->backlight_property)
+		return 0;
+
+	backlight = drm_property_create_range(dev, 0, "backlight", 0, 100);
+
+	dev_priv->backlight_property = backlight;
+
+	return 0;
+}
+
 static void psb_setup_outputs(struct drm_device *dev)
 {
 	struct drm_psb_private *dev_priv = dev->dev_private;
 	struct drm_connector *connector;
 
 	drm_mode_create_scaling_mode_property(dev);
+	psb_create_backlight_property(dev);
 
-	/* It is ok for this to fail - we just don't get backlight control */
-	if (!dev_priv->backlight_property)
-		dev_priv->backlight_property = drm_property_create_range(dev, 0,
-							"backlight", 0, 100);
 	dev_priv->ops->output_init(dev);
 
 	list_for_each_entry(connector, &dev->mode_config.connector_list,
@@ -763,8 +784,12 @@ void psb_modeset_cleanup(struct drm_device *dev)
 {
 	struct drm_psb_private *dev_priv = dev->dev_private;
 	if (dev_priv->modeset) {
+		mutex_lock(&dev->struct_mutex);
+
 		drm_kms_helper_poll_fini(dev);
 		psb_fbdev_fini(dev);
 		drm_mode_config_cleanup(dev);
+
+		mutex_unlock(&dev->struct_mutex);
 	}
 }

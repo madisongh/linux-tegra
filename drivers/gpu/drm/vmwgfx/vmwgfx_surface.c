@@ -771,7 +771,7 @@ int vmw_surface_define_ioctl(struct drm_device *dev, void *data,
 	}
 	srf->offsets = kmalloc(srf->num_sizes * sizeof(*srf->offsets),
 			       GFP_KERNEL);
-	if (unlikely(srf->offsets == NULL)) {
+	if (unlikely(srf->sizes == NULL)) {
 		ret = -ENOMEM;
 		goto out_no_offsets;
 	}
@@ -815,8 +815,11 @@ int vmw_surface_define_ioctl(struct drm_device *dev, void *data,
 	    srf->sizes[0].height == 64 &&
 	    srf->format == SVGA3D_A8R8G8B8) {
 
-		srf->snooper.image = kzalloc(64 * 64 * 4, GFP_KERNEL);
-		if (!srf->snooper.image) {
+		srf->snooper.image = kmalloc(64 * 64 * 4, GFP_KERNEL);
+		/* clear the image */
+		if (srf->snooper.image) {
+			memset(srf->snooper.image, 0x00, 64 * 64 * 4);
+		} else {
 			DRM_ERROR("Failed to allocate cursor_image\n");
 			ret = -ENOMEM;
 			goto out_no_copy;

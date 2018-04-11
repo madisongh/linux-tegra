@@ -29,10 +29,6 @@ struct ipu_plane {
 	int			w;
 	int			h;
 
-	unsigned int		u_offset;
-	unsigned int		v_offset;
-	unsigned int		stride[2];
-
 	bool			enabled;
 };
 

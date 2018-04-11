@@ -28,7 +28,7 @@
 #include <core/ramht.h>
 #include <engine/dma.h>
 
-#include <nvif/cl507d.h>
+#include <nvif/class.h>
 #include <nvif/event.h>
 #include <nvif/unpack.h>
 
@@ -134,9 +134,9 @@ nv50_disp_chan_uevent_ctor(struct nvkm_object *object, void *data, u32 size,
 	union {
 		struct nvif_notify_uevent_req none;
 	} *args = data;
-	int ret = -ENOSYS;
+	int ret;
 
-	if (!(ret = nvif_unvers(ret, &data, &size, args->none))) {
+	if (nvif_unvers(args->none)) {
 		notify->size  = sizeof(struct nvif_notify_uevent_rep);
 		notify->types = 1;
 		notify->index = chan->chid;

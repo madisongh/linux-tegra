@@ -748,19 +748,19 @@ void radeon_driver_preclose_kms(struct drm_device *dev,
  * radeon_get_vblank_counter_kms - get frame count
  *
  * @dev: drm dev pointer
- * @pipe: crtc to get the frame count from
+ * @crtc: crtc to get the frame count from
  *
  * Gets the frame count on the requested crtc (all asics).
  * Returns frame count on success, -EINVAL on failure.
  */
-u32 radeon_get_vblank_counter_kms(struct drm_device *dev, unsigned int pipe)
+u32 radeon_get_vblank_counter_kms(struct drm_device *dev, int crtc)
 {
 	int vpos, hpos, stat;
 	u32 count;
 	struct radeon_device *rdev = dev->dev_private;
 
-	if (pipe >= rdev->num_crtc) {
-		DRM_ERROR("Invalid crtc %u\n", pipe);
+	if (crtc < 0 || crtc >= rdev->num_crtc) {
+		DRM_ERROR("Invalid crtc %d\n", crtc);
 		return -EINVAL;
 	}
 
@@ -772,29 +772,29 @@ u32 radeon_get_vblank_counter_kms(struct drm_device *dev, unsigned int pipe)
 	 * and start of vsync, so vpos >= 0 means to bump the hw frame counter
 	 * result by 1 to give the proper appearance to caller.
 	 */
-	if (rdev->mode_info.crtcs[pipe]) {
+	if (rdev->mode_info.crtcs[crtc]) {
 		/* Repeat readout if needed to provide stable result if
 		 * we cross start of vsync during the queries.
 		 */
 		do {
-			count = radeon_get_vblank_counter(rdev, pipe);
+			count = radeon_get_vblank_counter(rdev, crtc);
 			/* Ask radeon_get_crtc_scanoutpos to return vpos as
 			 * distance to start of vblank, instead of regular
 			 * vertical scanout pos.
 			 */
 			stat = radeon_get_crtc_scanoutpos(
-				dev, pipe, GET_DISTANCE_TO_VBLANKSTART,
+				dev, crtc, GET_DISTANCE_TO_VBLANKSTART,
 				&vpos, &hpos, NULL, NULL,
-				&rdev->mode_info.crtcs[pipe]->base.hwmode);
-		} while (count != radeon_get_vblank_counter(rdev, pipe));
+				&rdev->mode_info.crtcs[crtc]->base.hwmode);
+		} while (count != radeon_get_vblank_counter(rdev, crtc));
 
 		if (((stat & (DRM_SCANOUTPOS_VALID | DRM_SCANOUTPOS_ACCURATE)) !=
 		    (DRM_SCANOUTPOS_VALID | DRM_SCANOUTPOS_ACCURATE))) {
 			DRM_DEBUG_VBL("Query failed! stat %d\n", stat);
 		}
 		else {
-			DRM_DEBUG_VBL("crtc %u: dist from vblank start %d\n",
-				      pipe, vpos);
+			DRM_DEBUG_VBL("crtc %d: dist from vblank start %d\n",
+				      crtc, vpos);
 
 			/* Bump counter if we are at >= leading edge of vblank,
 			 * but before vsync where vpos would turn negative and
@@ -806,7 +806,7 @@ u32 radeon_get_vblank_counter_kms(struct drm_device *dev, unsigned int pipe)
 	}
 	else {
 	    /* Fallback to use value as is. */
-	    count = radeon_get_vblank_counter(rdev, pipe);
+	    count = radeon_get_vblank_counter(rdev, crtc);
 	    DRM_DEBUG_VBL("NULL mode info! Returned count may be wrong.\n");
 	}
 

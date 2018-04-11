@@ -313,15 +313,19 @@ static const struct dma_buf_ops drm_gem_prime_dmabuf_ops =  {
  *
  * Export callbacks:
  *
- *  * @gem_prime_pin (optional): prepare a GEM object for exporting
- *  * @gem_prime_get_sg_table: provide a scatter/gather table of pinned pages
- *  * @gem_prime_vmap: vmap a buffer exported by your driver
- *  * @gem_prime_vunmap: vunmap a buffer exported by your driver
- *  * @gem_prime_mmap (optional): mmap a buffer exported by your driver
+ *  - @gem_prime_pin (optional): prepare a GEM object for exporting
+ *
+ *  - @gem_prime_get_sg_table: provide a scatter/gather table of pinned pages
+ *
+ *  - @gem_prime_vmap: vmap a buffer exported by your driver
+ *
+ *  - @gem_prime_vunmap: vunmap a buffer exported by your driver
+ *
+ *  - @gem_prime_mmap (optional): mmap a buffer exported by your driver
  *
  * Import callback:
  *
- *  * @gem_prime_import_sg_table (import): produce a GEM object from another
+ *  - @gem_prime_import_sg_table (import): produce a GEM object from another
  *    driver's scatter/gather table
  */
 
@@ -329,7 +333,7 @@ static const struct dma_buf_ops drm_gem_prime_dmabuf_ops =  {
  * drm_gem_prime_export - helper library implementation of the export callback
  * @dev: drm_device to export from
  * @obj: GEM object to export
- * @flags: flags like DRM_CLOEXEC and DRM_RDWR
+ * @flags: flags like DRM_CLOEXEC
  *
  * This is the implementation of the gem_prime_export functions for GEM drivers
  * using the PRIME helpers.
@@ -407,7 +411,7 @@ int drm_gem_prime_handle_to_fd(struct drm_device *dev,
 	struct dma_buf *dmabuf;
 
 	mutex_lock(&file_priv->prime.lock);
-	obj = drm_gem_object_lookup(file_priv, handle);
+	obj = drm_gem_object_lookup(dev, file_priv, handle);
 	if (!obj)  {
 		ret = -ENOENT;
 		goto out_unlock;
@@ -628,6 +632,7 @@ int drm_prime_handle_to_fd_ioctl(struct drm_device *dev, void *data,
 				 struct drm_file *file_priv)
 {
 	struct drm_prime_handle *args = data;
+	uint32_t flags;
 
 	if (!drm_core_check_feature(dev, DRIVER_PRIME))
 		return -EINVAL;
@@ -636,11 +641,14 @@ int drm_prime_handle_to_fd_ioctl(struct drm_device *dev, void *data,
 		return -ENOSYS;
 
 	/* check flags are valid */
-	if (args->flags & ~(DRM_CLOEXEC | DRM_RDWR))
+	if (args->flags & ~DRM_CLOEXEC)
 		return -EINVAL;
 
+	/* we only want to pass DRM_CLOEXEC which is == O_CLOEXEC */
+	flags = args->flags & DRM_CLOEXEC;
+
 	return dev->driver->prime_handle_to_fd(dev, file_priv,
-			args->handle, args->flags, &args->fd);
+			args->handle, flags, &args->fd);
 }
 
 int drm_prime_fd_to_handle_ioctl(struct drm_device *dev, void *data,

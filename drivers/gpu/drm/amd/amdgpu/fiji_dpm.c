@@ -24,7 +24,7 @@
 #include <linux/firmware.h>
 #include "drmP.h"
 #include "amdgpu.h"
-#include "fiji_smum.h"
+#include "fiji_smumgr.h"
 
 MODULE_FIRMWARE("amdgpu/fiji_smc.bin");
 
@@ -72,11 +72,6 @@ static int fiji_dpm_sw_init(void *handle)
 
 static int fiji_dpm_sw_fini(void *handle)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-
-	release_firmware(adev->pm.fw);
-	adev->pm.fw = NULL;
-
 	return 0;
 }
 
@@ -148,7 +143,6 @@ static int fiji_dpm_set_powergating_state(void *handle,
 }
 
 const struct amd_ip_funcs fiji_dpm_ip_funcs = {
-	.name = "fiji_dpm",
 	.early_init = fiji_dpm_early_init,
 	.late_init = NULL,
 	.sw_init = fiji_dpm_sw_init,
@@ -160,6 +154,7 @@ const struct amd_ip_funcs fiji_dpm_ip_funcs = {
 	.is_idle = NULL,
 	.wait_for_idle = NULL,
 	.soft_reset = NULL,
+	.print_status = NULL,
 	.set_clockgating_state = fiji_dpm_set_clockgating_state,
 	.set_powergating_state = fiji_dpm_set_powergating_state,
 };

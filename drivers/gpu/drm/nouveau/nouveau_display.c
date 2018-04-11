@@ -39,7 +39,6 @@
 
 #include "nouveau_fence.h"
 
-#include <nvif/cl0046.h>
 #include <nvif/event.h>
 
 static int
@@ -247,7 +246,7 @@ static const struct drm_framebuffer_funcs nouveau_framebuffer_funcs = {
 int
 nouveau_framebuffer_init(struct drm_device *dev,
 			 struct nouveau_framebuffer *nv_fb,
-			 const struct drm_mode_fb_cmd2 *mode_cmd,
+			 struct drm_mode_fb_cmd2 *mode_cmd,
 			 struct nouveau_bo *nvbo)
 {
 	struct nouveau_display *disp = nouveau_display(dev);
@@ -273,13 +272,13 @@ nouveau_framebuffer_init(struct drm_device *dev,
 static struct drm_framebuffer *
 nouveau_user_framebuffer_create(struct drm_device *dev,
 				struct drm_file *file_priv,
-				const struct drm_mode_fb_cmd2 *mode_cmd)
+				struct drm_mode_fb_cmd2 *mode_cmd)
 {
 	struct nouveau_framebuffer *nouveau_fb;
 	struct drm_gem_object *gem;
 	int ret = -ENOMEM;
 
-	gem = drm_gem_object_lookup(file_priv, mode_cmd->handles[0]);
+	gem = drm_gem_object_lookup(dev, file_priv, mode_cmd->handles[0]);
 	if (!gem)
 		return ERR_PTR(-ENOENT);
 
@@ -296,7 +295,7 @@ nouveau_user_framebuffer_create(struct drm_device *dev,
 err:
 	kfree(nouveau_fb);
 err_unref:
-	drm_gem_object_unreference_unlocked(gem);
+	drm_gem_object_unreference(gem);
 	return ERR_PTR(ret);
 }
 
@@ -495,7 +494,7 @@ nouveau_display_create(struct drm_device *dev)
 
 	if (nouveau_modeset != 2 && drm->vbios.dcb.entries) {
 		static const u16 oclass[] = {
-			GM200_DISP,
+			GM204_DISP,
 			GM107_DISP,
 			GK110_DISP,
 			GK104_DISP,
@@ -739,7 +738,7 @@ nouveau_crtc_page_flip(struct drm_crtc *crtc, struct drm_framebuffer *fb,
 	}
 
 	mutex_lock(&cli->mutex);
-	ret = ttm_bo_reserve(&new_bo->bo, true, false, NULL);
+	ret = ttm_bo_reserve(&new_bo->bo, true, false, false, NULL);
 	if (ret)
 		goto fail_unpin;
 
@@ -753,7 +752,7 @@ nouveau_crtc_page_flip(struct drm_crtc *crtc, struct drm_framebuffer *fb,
 	if (new_bo != old_bo) {
 		ttm_bo_unreserve(&new_bo->bo);
 
-		ret = ttm_bo_reserve(&old_bo->bo, true, false, NULL);
+		ret = ttm_bo_reserve(&old_bo->bo, true, false, false, NULL);
 		if (ret)
 			goto fail_unpin;
 	}
@@ -916,7 +915,7 @@ nouveau_display_dumb_map_offset(struct drm_file *file_priv,
 {
 	struct drm_gem_object *gem;
 
-	gem = drm_gem_object_lookup(file_priv, handle);
+	gem = drm_gem_object_lookup(dev, file_priv, handle);
 	if (gem) {
 		struct nouveau_bo *bo = nouveau_gem_object(gem);
 		*poffset = drm_vma_node_offset_addr(&bo->bo.vma_node);
