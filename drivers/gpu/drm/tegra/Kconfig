@@ -19,7 +19,6 @@ if DRM_TEGRA
 config DRM_TEGRA_DOWNSTREAM
 	bool "Execute in downstream configuration"
 	default y
-	select VIDEOBUF2_DMA_CONTIG
 	help
 	  Choose this option if you are building driver in Tegra downstream.
 
