@@ -88,14 +88,23 @@ static int gr2d_is_addr_reg(struct device *dev, u32 class, u32 offset, u32 val)
 {
 	struct gr2d *gr2d = dev_get_drvdata(dev);
 
-	if (class != HOST1X_CLASS_GR2D && class != HOST1X_CLASS_GR2D_SB)
-		return 0;
+	switch (class) {
+	case HOST1X_CLASS_HOST1X:
+		if (offset == 0x2b)
+			return 1;
 
-	if (offset >= GR2D_NUM_REGS)
-		return 0;
+		break;
 
-	if (test_bit(offset, gr2d->addr_regs))
-		return 1;
+	case HOST1X_CLASS_GR2D:
+	case HOST1X_CLASS_GR2D_SB:
+		if (offset >= GR2D_NUM_REGS)
+			break;
+
+		if (test_bit(offset, gr2d->addr_regs))
+			return 1;
+
+		break;
+	}
 
 	return 0;
 }

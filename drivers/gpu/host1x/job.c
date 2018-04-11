@@ -309,20 +309,10 @@ struct host1x_firewall {
 	u32 count;
 };
 
-static int is_addr_reg(struct host1x_firewall *fw, unsigned long offset,
-		       u32 val)
-{
-	if (fw->class == HOST1X_CLASS_HOST1X &&
-		(offset == 0x2c /* INDOFF2 */ || offset == 0x2d /* INDOFF */))
-		return true;
-
-	return fw->job->is_addr_reg(fw->dev, fw->class, offset, val);
-}
-
 static int check_register(struct host1x_firewall *fw,
 			  unsigned long offset, u32 val)
 {
-	if (is_addr_reg(fw, offset, val)) {
+	if (fw->job->is_addr_reg(fw->dev, fw->class, offset, val)) {
 		if (!fw->num_relocs)
 			return -EINVAL;
 
