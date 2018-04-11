@@ -199,7 +199,7 @@ static void armada_drm_plane_work_run(struct armada_crtc *dcrtc,
 	/* Handle any pending frame work. */
 	if (work) {
 		work->fn(dcrtc, plane, work);
-		drm_crtc_vblank_put(&dcrtc->crtc);
+		drm_vblank_put(dcrtc->crtc.dev, dcrtc->num);
 	}
 
 	wake_up(&plane->frame_wait);
@@ -210,7 +210,7 @@ int armada_drm_plane_work_queue(struct armada_crtc *dcrtc,
 {
 	int ret;
 
-	ret = drm_crtc_vblank_get(&dcrtc->crtc);
+	ret = drm_vblank_get(dcrtc->crtc.dev, dcrtc->num);
 	if (ret) {
 		DRM_ERROR("failed to acquire vblank counter\n");
 		return ret;
@@ -218,7 +218,7 @@ int armada_drm_plane_work_queue(struct armada_crtc *dcrtc,
 
 	ret = cmpxchg(&plane->work, NULL, work) ? -EBUSY : 0;
 	if (ret)
-		drm_crtc_vblank_put(&dcrtc->crtc);
+		drm_vblank_put(dcrtc->crtc.dev, dcrtc->num);
 
 	return ret;
 }
@@ -234,7 +234,7 @@ struct armada_plane_work *armada_drm_plane_work_cancel(
 	struct armada_plane_work *work = xchg(&plane->work, NULL);
 
 	if (work)
-		drm_crtc_vblank_put(&dcrtc->crtc);
+		drm_vblank_put(dcrtc->crtc.dev, dcrtc->num);
 
 	return work;
 }
@@ -260,7 +260,7 @@ static void armada_drm_crtc_complete_frame_work(struct armada_crtc *dcrtc,
 
 	if (fwork->event) {
 		spin_lock_irqsave(&dev->event_lock, flags);
-		drm_crtc_send_vblank_event(&dcrtc->crtc, fwork->event);
+		drm_send_vblank_event(dev, dcrtc->num, fwork->event);
 		spin_unlock_irqrestore(&dev->event_lock, flags);
 	}
 
@@ -410,7 +410,7 @@ static void armada_drm_crtc_irq(struct armada_crtc *dcrtc, u32 stat)
 		DRM_ERROR("graphics underflow on crtc %u\n", dcrtc->num);
 
 	if (stat & VSYNC_IRQ)
-		drm_crtc_handle_vblank(&dcrtc->crtc);
+		drm_handle_vblank(dcrtc->crtc.dev, dcrtc->num);
 
 	spin_lock(&dcrtc->irq_lock);
 	ovl_plane = dcrtc->plane;
@@ -592,9 +592,9 @@ static int armada_drm_crtc_mode_set(struct drm_crtc *crtc,
 
 	if (interlaced ^ dcrtc->interlaced) {
 		if (adj->flags & DRM_MODE_FLAG_INTERLACE)
-			drm_crtc_vblank_get(&dcrtc->crtc);
+			drm_vblank_get(dcrtc->crtc.dev, dcrtc->num);
 		else
-			drm_crtc_vblank_put(&dcrtc->crtc);
+			drm_vblank_put(dcrtc->crtc.dev, dcrtc->num);
 		dcrtc->interlaced = interlaced;
 	}
 

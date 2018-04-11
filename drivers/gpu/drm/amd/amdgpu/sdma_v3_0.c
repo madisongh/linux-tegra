@@ -415,6 +415,18 @@ static void sdma_v3_0_ring_emit_ib(struct amdgpu_ring *ring,
 				   unsigned vm_id, bool ctx_switch)
 {
 	u32 vmid = vm_id & 0xf;
+	u32 next_rptr = ring->wptr + 5;
+
+	while ((next_rptr & 7) != 2)
+		next_rptr++;
+	next_rptr += 6;
+
+	amdgpu_ring_write(ring, SDMA_PKT_HEADER_OP(SDMA_OP_WRITE) |
+			  SDMA_PKT_HEADER_SUB_OP(SDMA_SUBOP_WRITE_LINEAR));
+	amdgpu_ring_write(ring, lower_32_bits(ring->next_rptr_gpu_addr) & 0xfffffffc);
+	amdgpu_ring_write(ring, upper_32_bits(ring->next_rptr_gpu_addr));
+	amdgpu_ring_write(ring, SDMA_PKT_WRITE_UNTILED_DW_3_COUNT(1));
+	amdgpu_ring_write(ring, next_rptr);
 
 	/* IB packet must end on a 8 DW boundary */
 	sdma_v3_0_ring_insert_nop(ring, (10 - (ring->wptr & 7)) % 8);
@@ -604,7 +616,7 @@ static void sdma_v3_0_enable(struct amdgpu_device *adev, bool enable)
 	u32 f32_cntl;
 	int i;
 
-	if (!enable) {
+	if (enable == false) {
 		sdma_v3_0_gfx_stop(adev);
 		sdma_v3_0_rlc_stop(adev);
 	}
@@ -896,19 +908,20 @@ static int sdma_v3_0_ring_test_ring(struct amdgpu_ring *ring)
  * Test a simple IB in the DMA ring (VI).
  * Returns 0 on success, error on failure.
  */
-static int sdma_v3_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
+static int sdma_v3_0_ring_test_ib(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 	struct amdgpu_ib ib;
 	struct fence *f = NULL;
+	unsigned i;
 	unsigned index;
+	int r;
 	u32 tmp = 0;
 	u64 gpu_addr;
-	long r;
 
 	r = amdgpu_wb_get(adev, &index);
 	if (r) {
-		dev_err(adev->dev, "(%ld) failed to allocate wb slot\n", r);
+		dev_err(adev->dev, "(%d) failed to allocate wb slot\n", r);
 		return r;
 	}
 
@@ -918,7 +931,7 @@ static int sdma_v3_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 	memset(&ib, 0, sizeof(ib));
 	r = amdgpu_ib_get(adev, NULL, 256, &ib);
 	if (r) {
-		DRM_ERROR("amdgpu: failed to get ib (%ld).\n", r);
+		DRM_ERROR("amdgpu: failed to get ib (%d).\n", r);
 		goto err0;
 	}
 
@@ -937,24 +950,27 @@ static int sdma_v3_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 	if (r)
 		goto err1;
 
-	r = fence_wait_timeout(f, false, timeout);
-	if (r == 0) {
-		DRM_ERROR("amdgpu: IB test timed out\n");
-		r = -ETIMEDOUT;
-		goto err1;
-	} else if (r < 0) {
-		DRM_ERROR("amdgpu: fence wait failed (%ld).\n", r);
+	r = fence_wait(f, false);
+	if (r) {
+		DRM_ERROR("amdgpu: fence wait failed (%d).\n", r);
 		goto err1;
 	}
-	tmp = le32_to_cpu(adev->wb.wb[index]);
-	if (tmp == 0xDEADBEEF) {
-		DRM_INFO("ib test on ring %d succeeded\n", ring->idx);
-		r = 0;
+	for (i = 0; i < adev->usec_timeout; i++) {
+		tmp = le32_to_cpu(adev->wb.wb[index]);
+		if (tmp == 0xDEADBEEF)
+			break;
+		DRM_UDELAY(1);
+	}
+	if (i < adev->usec_timeout) {
+		DRM_INFO("ib test on ring %d succeeded in %u usecs\n",
+			 ring->idx, i);
+		goto err1;
 	} else {
 		DRM_ERROR("amdgpu: ib test failed (0x%08X)\n", tmp);
 		r = -EINVAL;
 	}
 err1:
+	fence_put(f);
 	amdgpu_ib_free(adev, &ib, NULL);
 	fence_put(f);
 err0:

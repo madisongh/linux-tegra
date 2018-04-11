@@ -34,11 +34,10 @@ static inline void __user *to_user_ptr(u64 address)
 }
 
 static struct msm_gem_submit *submit_create(struct drm_device *dev,
-		struct msm_gpu *gpu, int nr_bos, int nr_cmds)
+		struct msm_gpu *gpu, int nr)
 {
 	struct msm_gem_submit *submit;
-	int sz = sizeof(*submit) + (nr_bos * sizeof(submit->bos[0])) +
-			(nr_cmds * sizeof(*submit->cmd));
+	int sz = sizeof(*submit) + (nr * sizeof(submit->bos[0]));
 
 	submit = kmalloc(sz, GFP_TEMPORARY | __GFP_NOWARN | __GFP_NORETRY);
 	if (!submit)
@@ -48,7 +47,6 @@ static struct msm_gem_submit *submit_create(struct drm_device *dev,
 	submit->gpu = gpu;
 	submit->fence = NULL;
 	submit->pid = get_pid(task_pid(current));
-	submit->cmd = (void *)&submit->bos[nr_bos];
 
 	/* initially, until copy_from_user() and bo lookup succeeds: */
 	submit->nr_bos = 0;
@@ -69,14 +67,6 @@ void msm_gem_submit_free(struct msm_gem_submit *submit)
 	kfree(submit);
 }
 
-static inline unsigned long __must_check
-copy_from_user_inatomic(void *to, const void __user *from, unsigned long n)
-{
-	if (access_ok(VERIFY_READ, from, n))
-		return __copy_from_user_inatomic(to, from, n);
-	return -EFAULT;
-}
-
 static int submit_lookup_objects(struct msm_gem_submit *submit,
 		struct drm_msm_gem_submit *args, struct drm_file *file)
 {
@@ -84,7 +74,6 @@ static int submit_lookup_objects(struct msm_gem_submit *submit,
 	int ret = 0;
 
 	spin_lock(&file->table_lock);
-	pagefault_disable();
 
 	for (i = 0; i < args->nr_bos; i++) {
 		struct drm_msm_gem_submit_bo submit_bo;
@@ -98,15 +87,10 @@ static int submit_lookup_objects(struct msm_gem_submit *submit,
 		 */
 		submit->bos[i].flags = 0;
 
-		ret = copy_from_user_inatomic(&submit_bo, userptr, sizeof(submit_bo));
-		if (unlikely(ret)) {
-			pagefault_enable();
-			spin_unlock(&file->table_lock);
-			ret = copy_from_user(&submit_bo, userptr, sizeof(submit_bo));
-			if (ret)
-				goto out;
-			spin_lock(&file->table_lock);
-			pagefault_disable();
+		ret = copy_from_user(&submit_bo, userptr, sizeof(submit_bo));
+		if (ret) {
+			ret = -EFAULT;
+			goto out_unlock;
 		}
 
 		if (submit_bo.flags & ~MSM_SUBMIT_BO_FLAGS) {
@@ -146,11 +130,8 @@ static int submit_lookup_objects(struct msm_gem_submit *submit,
 	}
 
 out_unlock:
-	pagefault_enable();
-	spin_unlock(&file->table_lock);
-
-out:
 	submit->nr_bos = i;
+	spin_unlock(&file->table_lock);
 
 	return ret;
 }
@@ -303,7 +284,7 @@ static int submit_reloc(struct msm_gem_submit *submit, struct msm_gem_object *ob
 	/* For now, just map the entire thing.  Eventually we probably
 	 * to do it page-by-page, w/ kmap() if not vmap()d..
 	 */
-	ptr = msm_gem_get_vaddr_locked(&obj->base);
+	ptr = msm_gem_vaddr_locked(&obj->base);
 
 	if (IS_ERR(ptr)) {
 		ret = PTR_ERR(ptr);
@@ -356,8 +337,6 @@ static int submit_reloc(struct msm_gem_submit *submit, struct msm_gem_object *ob
 		last_offset = off;
 	}
 
-	msm_gem_put_vaddr_locked(&obj->base);
-
 	return 0;
 }
 
@@ -395,17 +374,14 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 	if (args->pipe != MSM_PIPE_3D0)
 		return -EINVAL;
 
-	ret = mutex_lock_interruptible(&dev->struct_mutex);
-	if (ret)
-		return ret;
+	if (args->nr_cmds > MAX_CMDS)
+		return -EINVAL;
 
-	priv->struct_mutex_task = current;
+	submit = submit_create(dev, gpu, args->nr_bos);
+	if (!submit)
+		return -ENOMEM;
 
-	submit = submit_create(dev, gpu, args->nr_bos, args->nr_cmds);
-	if (!submit) {
-		ret = -ENOMEM;
-		goto out_unlock;
-	}
+	mutex_lock(&dev->struct_mutex);
 
 	ret = submit_lookup_objects(submit, args, file);
 	if (ret)
@@ -491,8 +467,6 @@ out:
 	submit_cleanup(submit);
 	if (ret)
 		msm_gem_submit_free(submit);
-out_unlock:
-	priv->struct_mutex_task = NULL;
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }

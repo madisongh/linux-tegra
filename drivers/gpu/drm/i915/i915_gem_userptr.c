@@ -706,8 +706,7 @@ i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj)
 static void
 i915_gem_userptr_put_pages(struct drm_i915_gem_object *obj)
 {
-	struct sgt_iter sgt_iter;
-	struct page *page;
+	struct sg_page_iter sg_iter;
 
 	BUG_ON(obj->userptr.work != NULL);
 	__i915_gem_userptr_set_active(obj, false);
@@ -717,7 +716,9 @@ i915_gem_userptr_put_pages(struct drm_i915_gem_object *obj)
 
 	i915_gem_gtt_finish_object(obj);
 
-	for_each_sgt_page(page, sgt_iter, obj->pages) {
+	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents, 0) {
+		struct page *page = sg_page_iter_page(&sg_iter);
+
 		if (obj->dirty)
 			set_page_dirty(page);
 
@@ -854,8 +855,11 @@ i915_gem_userptr_ioctl(struct drm_device *dev, void *data, struct drm_file *file
 	return 0;
 }
 
-void i915_gem_init_userptr(struct drm_i915_private *dev_priv)
+int
+i915_gem_init_userptr(struct drm_device *dev)
 {
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	mutex_init(&dev_priv->mm_lock);
 	hash_init(dev_priv->mm_structs);
+	return 0;
 }

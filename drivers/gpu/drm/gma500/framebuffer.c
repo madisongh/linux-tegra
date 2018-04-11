@@ -182,6 +182,12 @@ static int psbfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 	return 0;
 }
 
+static int psbfb_ioctl(struct fb_info *info, unsigned int cmd,
+						unsigned long arg)
+{
+	return -ENOTTY;
+}
+
 static struct fb_ops psbfb_ops = {
 	.owner = THIS_MODULE,
 	.fb_check_var = drm_fb_helper_check_var,
@@ -193,6 +199,7 @@ static struct fb_ops psbfb_ops = {
 	.fb_imageblit = drm_fb_helper_cfb_imageblit,
 	.fb_mmap = psbfb_mmap,
 	.fb_sync = psbfb_sync,
+	.fb_ioctl = psbfb_ioctl,
 };
 
 static struct fb_ops psbfb_roll_ops = {
@@ -206,6 +213,7 @@ static struct fb_ops psbfb_roll_ops = {
 	.fb_imageblit = drm_fb_helper_cfb_imageblit,
 	.fb_pan_display = psbfb_pan,
 	.fb_mmap = psbfb_mmap,
+	.fb_ioctl = psbfb_ioctl,
 };
 
 static struct fb_ops psbfb_unaccel_ops = {
@@ -218,6 +226,7 @@ static struct fb_ops psbfb_unaccel_ops = {
 	.fb_copyarea = drm_fb_helper_cfb_copyarea,
 	.fb_imageblit = drm_fb_helper_cfb_imageblit,
 	.fb_mmap = psbfb_mmap,
+	.fb_ioctl = psbfb_ioctl,
 };
 
 /**

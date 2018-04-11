@@ -329,7 +329,7 @@ gk104_fifo_intr_fault(struct gk104_fifo *fifo, int unit)
 	}
 
 	if (eu == NULL) {
-		enum nvkm_devidx engidx = nvkm_top_fault(device, unit);
+		enum nvkm_devidx engidx = nvkm_top_fault(device->top, unit);
 		if (engidx < NVKM_SUBDEV_NR) {
 			const char *src = nvkm_subdev_name[engidx];
 			char *dst = en;
@@ -589,6 +589,7 @@ gk104_fifo_oneinit(struct nvkm_fifo *base)
 	struct gk104_fifo *fifo = gk104_fifo(base);
 	struct nvkm_subdev *subdev = &fifo->base.engine.subdev;
 	struct nvkm_device *device = subdev->device;
+	struct nvkm_top *top = device->top;
 	int engn, runl, pbid, ret, i, j;
 	enum nvkm_devidx engidx;
 	u32 *map;
@@ -607,7 +608,7 @@ gk104_fifo_oneinit(struct nvkm_fifo *base)
 
 	/* Determine runlist configuration from topology device info. */
 	i = 0;
-	while ((int)(engidx = nvkm_top_engine(device, i++, &runl, &engn)) >= 0) {
+	while ((int)(engidx = nvkm_top_engine(top, i++, &runl, &engn)) >= 0) {
 		/* Determine which PBDMA handles requests for this engine. */
 		for (j = 0, pbid = -1; j < fifo->pbdma_nr; j++) {
 			if (map[j] & (1 << runl)) {
@@ -616,8 +617,8 @@ gk104_fifo_oneinit(struct nvkm_fifo *base)
 			}
 		}
 
-		nvkm_debug(subdev, "engine %2d: runlist %2d pbdma %2d (%s)\n",
-			   engn, runl, pbid, nvkm_subdev_name[engidx]);
+		nvkm_debug(subdev, "engine %2d: runlist %2d pbdma %2d\n",
+			   engn, runl, pbid);
 
 		fifo->engine[engn].engine = nvkm_device_engine(device, engidx);
 		fifo->engine[engn].runl = runl;

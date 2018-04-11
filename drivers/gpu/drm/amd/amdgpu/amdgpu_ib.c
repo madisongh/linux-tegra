@@ -33,8 +33,6 @@
 #include "amdgpu.h"
 #include "atom.h"
 
-#define AMDGPU_IB_TEST_TIMEOUT	msecs_to_jiffies(1000)
-
 /*
  * IB
  * IBs (Indirect Buffers) and areas of GPU accessible memory where
@@ -124,6 +122,7 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 	bool skip_preamble, need_ctx_switch;
 	unsigned patch_offset = ~0;
 	struct amdgpu_vm *vm;
+	struct fence *hwf;
 	uint64_t ctx;
 
 	unsigned i;
@@ -161,7 +160,10 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		patch_offset = amdgpu_ring_init_cond_exec(ring);
 
 	if (vm) {
-		r = amdgpu_vm_flush(ring, job);
+		r = amdgpu_vm_flush(ring, job->vm_id, job->vm_pd_addr,
+				    job->gds_base, job->gds_size,
+				    job->gws_base, job->gws_size,
+				    job->oa_base, job->oa_size);
 		if (r) {
 			amdgpu_ring_undo(ring);
 			return r;
@@ -191,7 +193,7 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 	if (ring->funcs->emit_hdp_invalidate)
 		amdgpu_ring_emit_hdp_invalidate(ring);
 
-	r = amdgpu_fence_emit(ring, f);
+	r = amdgpu_fence_emit(ring, &hwf);
 	if (r) {
 		dev_err(adev->dev, "failed to emit fence (%d)\n", r);
 		if (job && job->vm_id)
@@ -201,10 +203,16 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 	}
 
 	/* wrap the last IB with fence */
-	if (job && job->uf_addr) {
-		amdgpu_ring_emit_fence(ring, job->uf_addr, job->uf_sequence,
+	if (job && job->uf_bo) {
+		uint64_t addr = amdgpu_bo_gpu_offset(job->uf_bo);
+
+		addr += job->uf_offset;
+		amdgpu_ring_emit_fence(ring, addr, job->uf_sequence,
 				       AMDGPU_FENCE_FLAG_64BIT);
 	}
+
+	if (f)
+		*f = fence_get(hwf);
 
 	if (patch_offset != ~0 && ring->funcs->patch_cond_exec)
 		amdgpu_ring_patch_cond_exec(ring, patch_offset);
@@ -280,7 +288,7 @@ void amdgpu_ib_pool_fini(struct amdgpu_device *adev)
 int amdgpu_ib_ring_tests(struct amdgpu_device *adev)
 {
 	unsigned i;
-	int r, ret = 0;
+	int r;
 
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 		struct amdgpu_ring *ring = adev->rings[i];
@@ -288,7 +296,7 @@ int amdgpu_ib_ring_tests(struct amdgpu_device *adev)
 		if (!ring || !ring->ready)
 			continue;
 
-		r = amdgpu_ring_test_ib(ring, AMDGPU_IB_TEST_TIMEOUT);
+		r = amdgpu_ring_test_ib(ring);
 		if (r) {
 			ring->ready = false;
 
@@ -301,11 +309,10 @@ int amdgpu_ib_ring_tests(struct amdgpu_device *adev)
 			} else {
 				/* still not good, but we can live with it */
 				DRM_ERROR("amdgpu: failed testing IB on ring %d (%d).\n", i, r);
-				ret = r;
 			}
 		}
 	}
-	return ret;
+	return 0;
 }
 
 /*

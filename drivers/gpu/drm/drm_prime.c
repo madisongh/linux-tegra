@@ -593,7 +593,7 @@ int drm_gem_prime_fd_to_handle(struct drm_device *dev,
 		get_dma_buf(dma_buf);
 	}
 
-	/* _handle_create_tail unconditionally unlocks dev->object_name_lock. */
+	/* drm_gem_handle_create_tail unlocks dev->object_name_lock. */
 	ret = drm_gem_handle_create_tail(file_priv, obj, handle);
 	drm_gem_object_unreference_unlocked(obj);
 	if (ret)
@@ -601,9 +601,10 @@ int drm_gem_prime_fd_to_handle(struct drm_device *dev,
 
 	ret = drm_prime_add_buf_handle(&file_priv->prime,
 			dma_buf, *handle);
-	mutex_unlock(&file_priv->prime.lock);
 	if (ret)
 		goto fail;
+
+	mutex_unlock(&file_priv->prime.lock);
 
 	dma_buf_put(dma_buf);
 
@@ -614,14 +615,11 @@ fail:
 	 * to detach.. which seems ok..
 	 */
 	drm_gem_handle_delete(file_priv, *handle);
-	dma_buf_put(dma_buf);
-	return ret;
-
 out_unlock:
 	mutex_unlock(&dev->object_name_lock);
 out_put:
-	mutex_unlock(&file_priv->prime.lock);
 	dma_buf_put(dma_buf);
+	mutex_unlock(&file_priv->prime.lock);
 	return ret;
 }
 EXPORT_SYMBOL(drm_gem_prime_fd_to_handle);

@@ -6,8 +6,6 @@
 
 #include "sti_awg_utils.h"
 
-#define AWG_DELAY (-5)
-
 #define AWG_OPCODE_OFFSET 10
 #define AWG_MAX_ARG       0x3ff
 
@@ -127,7 +125,7 @@ static int awg_generate_line_signal(
 		val = timing->blanking_level;
 		ret |= awg_generate_instr(RPLSET, val, 0, 0, fwparams);
 
-		val = timing->trailing_pixels - 1 + AWG_DELAY;
+		val = timing->trailing_pixels - 1;
 		ret |= awg_generate_instr(SKIP, val, 0, 0, fwparams);
 	}
 

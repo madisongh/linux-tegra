@@ -125,7 +125,7 @@ struct etnaviv_gpu {
 	u32 completed_fence;
 	u32 retired_fence;
 	wait_queue_head_t fence_event;
-	u64 fence_context;
+	unsigned int fence_context;
 	spinlock_t fence_spinlock;
 
 	/* worker for handling active-list retiring: */

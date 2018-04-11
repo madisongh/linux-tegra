@@ -24,7 +24,7 @@
 #include <linux/firmware.h>
 #include "drmP.h"
 #include "amdgpu.h"
-#include "iceland_smum.h"
+#include "iceland_smumgr.h"
 
 MODULE_FIRMWARE("amdgpu/topaz_smc.bin");
 

@@ -39,7 +39,6 @@
 
 static void gmc_v7_0_set_gart_funcs(struct amdgpu_device *adev);
 static void gmc_v7_0_set_irq_funcs(struct amdgpu_device *adev);
-static int gmc_v7_0_wait_for_idle(void *handle);
 
 MODULE_FIRMWARE("radeon/bonaire_mc.bin");
 MODULE_FIRMWARE("radeon/hawaii_mc.bin");
@@ -74,15 +73,39 @@ static void gmc_v7_0_init_golden_registers(struct amdgpu_device *adev)
 	}
 }
 
-static void gmc_v7_0_mc_stop(struct amdgpu_device *adev,
-			     struct amdgpu_mode_mc_save *save)
+/**
+ * gmc7_mc_wait_for_idle - wait for MC idle callback.
+ *
+ * @adev: amdgpu_device pointer
+ *
+ * Wait for the MC (memory controller) to be idle.
+ * (evergreen+).
+ * Returns 0 if the MC is idle, -1 if not.
+ */
+int gmc_v7_0_mc_wait_for_idle(struct amdgpu_device *adev)
+{
+	unsigned i;
+	u32 tmp;
+
+	for (i = 0; i < adev->usec_timeout; i++) {
+		/* read MC_STATUS */
+		tmp = RREG32(mmSRBM_STATUS) & 0x1F00;
+		if (!tmp)
+			return 0;
+		udelay(1);
+	}
+	return -1;
+}
+
+void gmc_v7_0_mc_stop(struct amdgpu_device *adev,
+		      struct amdgpu_mode_mc_save *save)
 {
 	u32 blackout;
 
 	if (adev->mode_info.num_crtc)
 		amdgpu_display_stop_mc_access(adev, save);
 
-	gmc_v7_0_wait_for_idle((void *)adev);
+	amdgpu_asic_wait_for_mc_idle(adev);
 
 	blackout = RREG32(mmMC_SHARED_BLACKOUT_CNTL);
 	if (REG_GET_FIELD(blackout, MC_SHARED_BLACKOUT_CNTL, BLACKOUT_MODE) != 1) {
@@ -97,8 +120,8 @@ static void gmc_v7_0_mc_stop(struct amdgpu_device *adev,
 	udelay(100);
 }
 
-static void gmc_v7_0_mc_resume(struct amdgpu_device *adev,
-			       struct amdgpu_mode_mc_save *save)
+void gmc_v7_0_mc_resume(struct amdgpu_device *adev,
+			struct amdgpu_mode_mc_save *save)
 {
 	u32 tmp;
 
@@ -144,7 +167,6 @@ static int gmc_v7_0_init_microcode(struct amdgpu_device *adev)
 		break;
 	case CHIP_KAVERI:
 	case CHIP_KABINI:
-	case CHIP_MULLINS:
 		return 0;
 	default: BUG();
 	}
@@ -289,7 +311,7 @@ static void gmc_v7_0_mc_program(struct amdgpu_device *adev)
 		amdgpu_display_set_vga_render_state(adev, false);
 
 	gmc_v7_0_mc_stop(adev, &save);
-	if (gmc_v7_0_wait_for_idle((void *)adev)) {
+	if (amdgpu_asic_wait_for_mc_idle(adev)) {
 		dev_warn(adev->dev, "Wait for MC idle timedout !\n");
 	}
 	/* Update configuration */
@@ -309,7 +331,7 @@ static void gmc_v7_0_mc_program(struct amdgpu_device *adev)
 	WREG32(mmMC_VM_AGP_BASE, 0);
 	WREG32(mmMC_VM_AGP_TOP, 0x0FFFFFFF);
 	WREG32(mmMC_VM_AGP_BOT, 0x0FFFFFFF);
-	if (gmc_v7_0_wait_for_idle((void *)adev)) {
+	if (amdgpu_asic_wait_for_mc_idle(adev)) {
 		dev_warn(adev->dev, "Wait for MC idle timedout !\n");
 	}
 	gmc_v7_0_mc_resume(adev, &save);
@@ -1115,7 +1137,7 @@ static int gmc_v7_0_soft_reset(void *handle)
 
 	if (srbm_soft_reset) {
 		gmc_v7_0_mc_stop(adev, &save);
-		if (gmc_v7_0_wait_for_idle((void *)adev)) {
+		if (gmc_v7_0_wait_for_idle(adev)) {
 			dev_warn(adev->dev, "Wait for GMC idle timed out !\n");
 		}
 

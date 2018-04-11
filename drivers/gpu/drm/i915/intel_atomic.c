@@ -191,7 +191,7 @@ int intel_atomic_setup_scalers(struct drm_device *dev,
 
 			/* plane scaler case: assign as a plane scaler */
 			/* find the plane that set the bit as scaler_user */
-			plane = drm_state->planes[i].ptr;
+			plane = drm_state->planes[i];
 
 			/*
 			 * to enable/disable hq mode, add planes that are using scaler
@@ -223,8 +223,7 @@ int intel_atomic_setup_scalers(struct drm_device *dev,
 				continue;
 			}
 
-			plane_state = intel_atomic_get_existing_plane_state(drm_state,
-									    intel_plane);
+			plane_state = to_intel_plane_state(drm_state->plane_states[i]);
 			scaler_id = &plane_state->scaler_id;
 		}
 

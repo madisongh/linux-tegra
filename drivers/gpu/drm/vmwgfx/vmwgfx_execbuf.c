@@ -3625,7 +3625,9 @@ static int vmw_resize_cmd_bounce(struct vmw_sw_context *sw_context,
 				   (sw_context->cmd_bounce_size >> 1));
 	}
 
-	vfree(sw_context->cmd_bounce);
+	if (sw_context->cmd_bounce != NULL)
+		vfree(sw_context->cmd_bounce);
+
 	sw_context->cmd_bounce = vmalloc(sw_context->cmd_bounce_size);
 
 	if (sw_context->cmd_bounce == NULL) {

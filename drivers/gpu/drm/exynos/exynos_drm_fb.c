@@ -55,11 +55,11 @@ static int check_fb_gem_memory_type(struct drm_device *drm_dev,
 	flags = exynos_gem->flags;
 
 	/*
-	 * Physically non-contiguous memory type for framebuffer is not
-	 * supported without IOMMU.
+	 * without iommu support, not support physically non-continuous memory
+	 * for framebuffer.
 	 */
 	if (IS_NONCONTIG_BUFFER(flags)) {
-		DRM_ERROR("Non-contiguous GEM memory is not supported.\n");
+		DRM_ERROR("cannot use this gem memory type for fb.\n");
 		return -EINVAL;
 	}
 

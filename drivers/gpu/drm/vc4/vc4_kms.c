@@ -26,7 +26,8 @@ static void vc4_output_poll_changed(struct drm_device *dev)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 
-	drm_fbdev_cma_hotplug_event(vc4->fbdev);
+	if (vc4->fbdev)
+		drm_fbdev_cma_hotplug_event(vc4->fbdev);
 }
 
 struct vc4_commit {
@@ -110,8 +111,6 @@ static int vc4_atomic_commit(struct drm_device *dev,
 	int i;
 	uint64_t wait_seqno = 0;
 	struct vc4_commit *c;
-	struct drm_plane *plane;
-	struct drm_plane_state *new_state;
 
 	c = commit_init(state);
 	if (!c)
@@ -139,7 +138,13 @@ static int vc4_atomic_commit(struct drm_device *dev,
 		return ret;
 	}
 
-	for_each_plane_in_state(state, plane, new_state, i) {
+	for (i = 0; i < dev->mode_config.num_total_plane; i++) {
+		struct drm_plane *plane = state->planes[i];
+		struct drm_plane_state *new_state = state->plane_states[i];
+
+		if (!plane)
+			continue;
+
 		if ((plane->state->fb != new_state->fb) && new_state->fb) {
 			struct drm_gem_cma_object *cma_bo =
 				drm_fb_cma_get_gem_obj(new_state->fb, 0);
@@ -155,7 +160,7 @@ static int vc4_atomic_commit(struct drm_device *dev,
 	 * the software side now.
 	 */
 
-	drm_atomic_helper_swap_state(state, true);
+	drm_atomic_helper_swap_state(dev, state);
 
 	/*
 	 * Everything below can be run asynchronously without the need to grab

@@ -151,6 +151,12 @@ static int mixer_dbg_show(struct seq_file *s, void *arg)
 {
 	struct drm_info_node *node = s->private;
 	struct sti_mixer *mixer = (struct sti_mixer *)node->info_ent->data;
+	struct drm_device *dev = node->minor->dev;
+	int ret;
+
+	ret = mutex_lock_interruptible(&dev->struct_mutex);
+	if (ret)
+		return ret;
 
 	seq_printf(s, "%s: (vaddr = 0x%p)",
 		   sti_mixer_to_str(mixer), mixer->regs);
@@ -170,6 +176,7 @@ static int mixer_dbg_show(struct seq_file *s, void *arg)
 	mixer_dbg_mxn(s, mixer->regs + GAM_MIXER_MX0);
 	seq_puts(s, "\n");
 
+	mutex_unlock(&dev->struct_mutex);
 	return 0;
 }
 
@@ -181,7 +188,7 @@ static struct drm_info_list mixer1_debugfs_files[] = {
 	{ "mixer_aux", mixer_dbg_show, 0, NULL },
 };
 
-int sti_mixer_debugfs_init(struct sti_mixer *mixer, struct drm_minor *minor)
+static int mixer_debugfs_init(struct sti_mixer *mixer, struct drm_minor *minor)
 {
 	unsigned int i;
 	struct drm_info_list *mixer_debugfs_files;
@@ -239,9 +246,12 @@ static void sti_mixer_set_background_area(struct sti_mixer *mixer,
 
 int sti_mixer_set_plane_depth(struct sti_mixer *mixer, struct sti_plane *plane)
 {
-	int plane_id, depth = plane->drm_plane.state->normalized_zpos;
+	int plane_id, depth = plane->zorder;
 	unsigned int i;
 	u32 mask, val;
+
+	if ((depth < 1) || (depth > GAM_MIXER_NB_DEPTH_LEVEL))
+		return 1;
 
 	switch (plane->desc) {
 	case STI_GDP_0:
@@ -275,8 +285,8 @@ int sti_mixer_set_plane_depth(struct sti_mixer *mixer, struct sti_plane *plane)
 			break;
 	}
 
-	mask |= GAM_DEPTH_MASK_ID << (3 * depth);
-	plane_id = plane_id << (3 * depth);
+	mask |= GAM_DEPTH_MASK_ID << (3 * (depth - 1));
+	plane_id = plane_id << (3 * (depth - 1));
 
 	DRM_DEBUG_DRIVER("%s %s depth=%d\n", sti_mixer_to_str(mixer),
 			 sti_plane_to_str(plane), depth);
@@ -389,6 +399,9 @@ struct sti_mixer *sti_mixer_create(struct device *dev,
 
 	DRM_DEBUG_DRIVER("%s created. Regs=%p\n",
 			 sti_mixer_to_str(mixer), mixer->regs);
+
+	if (mixer_debugfs_init(mixer, drm_dev->primary))
+		DRM_ERROR("MIXER debugfs setup failed\n");
 
 	return mixer;
 }

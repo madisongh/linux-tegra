@@ -269,7 +269,8 @@ static void exynos_drm_fbdev_destroy(struct drm_device *dev,
 	struct exynos_drm_gem *exynos_gem = exynos_fbd->exynos_gem;
 	struct drm_framebuffer *fb;
 
-	vunmap(exynos_gem->kvaddr);
+	if (exynos_gem->kvaddr)
+		vunmap(exynos_gem->kvaddr);
 
 	/* release drm framebuffer and real buffer */
 	if (fb_helper->fb && fb_helper->fb->funcs) {

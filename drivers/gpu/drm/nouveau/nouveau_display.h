@@ -28,8 +28,7 @@ int nouveau_framebuffer_init(struct drm_device *, struct nouveau_framebuffer *,
 struct nouveau_page_flip_state {
 	struct list_head head;
 	struct drm_pending_vblank_event *event;
-	struct drm_crtc *crtc;
-	int bpp, pitch;
+	int crtc, bpp, pitch, x, y;
 	u64 offset;
 };
 

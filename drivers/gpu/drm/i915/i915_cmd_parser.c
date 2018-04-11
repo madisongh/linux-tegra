@@ -215,8 +215,7 @@ static const struct drm_i915_cmd_descriptor hsw_render_cmds[] = {
 	CMD(  MI_RS_CONTEXT,                    SMI,    F,  1,      S  ),
 	CMD(  MI_LOAD_SCAN_LINES_INCL,          SMI,   !F,  0x3F,   M  ),
 	CMD(  MI_LOAD_SCAN_LINES_EXCL,          SMI,   !F,  0x3F,   R  ),
-	CMD(  MI_LOAD_REGISTER_REG,             SMI,   !F,  0xFF,   W,
-	      .reg = { .offset = 1, .mask = 0x007FFFFC, .step = 1 }    ),
+	CMD(  MI_LOAD_REGISTER_REG,             SMI,   !F,  0xFF,   R  ),
 	CMD(  MI_RS_STORE_DATA_IMM,             SMI,   !F,  0xFF,   S  ),
 	CMD(  MI_LOAD_URB_MEM,                  SMI,   !F,  0xFF,   S  ),
 	CMD(  MI_STORE_URB_MEM,                 SMI,   !F,  0xFF,   S  ),
@@ -737,7 +736,7 @@ static void fini_hash_table(struct intel_engine_cs *engine)
 
 /**
  * i915_cmd_parser_init_ring() - set cmd parser related fields for a ringbuffer
- * @engine: the engine to initialize
+ * @ring: the ringbuffer to initialize
  *
  * Optionally initializes fields related to batch buffer command parsing in the
  * struct intel_engine_cs based on whether the platform requires software
@@ -751,12 +750,12 @@ int i915_cmd_parser_init_ring(struct intel_engine_cs *engine)
 	int cmd_table_count;
 	int ret;
 
-	if (!IS_GEN7(engine->i915))
+	if (!IS_GEN7(engine->dev))
 		return 0;
 
 	switch (engine->id) {
 	case RCS:
-		if (IS_HASWELL(engine->i915)) {
+		if (IS_HASWELL(engine->dev)) {
 			cmd_tables = hsw_render_ring_cmds;
 			cmd_table_count =
 				ARRAY_SIZE(hsw_render_ring_cmds);
@@ -765,7 +764,7 @@ int i915_cmd_parser_init_ring(struct intel_engine_cs *engine)
 			cmd_table_count = ARRAY_SIZE(gen7_render_cmds);
 		}
 
-		if (IS_HASWELL(engine->i915)) {
+		if (IS_HASWELL(engine->dev)) {
 			engine->reg_tables = hsw_render_reg_tables;
 			engine->reg_table_count = ARRAY_SIZE(hsw_render_reg_tables);
 		} else {
@@ -781,7 +780,7 @@ int i915_cmd_parser_init_ring(struct intel_engine_cs *engine)
 		engine->get_cmd_length_mask = gen7_bsd_get_cmd_length_mask;
 		break;
 	case BCS:
-		if (IS_HASWELL(engine->i915)) {
+		if (IS_HASWELL(engine->dev)) {
 			cmd_tables = hsw_blt_ring_cmds;
 			cmd_table_count = ARRAY_SIZE(hsw_blt_ring_cmds);
 		} else {
@@ -789,7 +788,7 @@ int i915_cmd_parser_init_ring(struct intel_engine_cs *engine)
 			cmd_table_count = ARRAY_SIZE(gen7_blt_cmds);
 		}
 
-		if (IS_HASWELL(engine->i915)) {
+		if (IS_HASWELL(engine->dev)) {
 			engine->reg_tables = hsw_blt_reg_tables;
 			engine->reg_table_count = ARRAY_SIZE(hsw_blt_reg_tables);
 		} else {
@@ -830,7 +829,7 @@ int i915_cmd_parser_init_ring(struct intel_engine_cs *engine)
 
 /**
  * i915_cmd_parser_fini_ring() - clean up cmd parser related fields
- * @engine: the engine to clean up
+ * @ring: the ringbuffer to clean up
  *
  * Releases any resources related to command parsing that may have been
  * initialized for the specified ring.
@@ -1024,7 +1023,7 @@ unpin_src:
 
 /**
  * i915_needs_cmd_parser() - should a given ring use software command parsing?
- * @engine: the engine in question
+ * @ring: the ring in question
  *
  * Only certain platforms require software batch buffer command parsing, and
  * only when enabled via module parameter.
@@ -1036,7 +1035,7 @@ bool i915_needs_cmd_parser(struct intel_engine_cs *engine)
 	if (!engine->needs_cmd_parser)
 		return false;
 
-	if (!USES_PPGTT(engine->i915))
+	if (!USES_PPGTT(engine->dev))
 		return false;
 
 	return (i915.enable_cmd_parser == 1);
@@ -1099,11 +1098,6 @@ static bool check_cmd(const struct intel_engine_cs *engine,
 					return false;
 				}
 
-				if (desc->cmd.value == MI_LOAD_REGISTER_REG) {
-					DRM_DEBUG_DRIVER("CMD: Rejected LRR to OACONTROL\n");
-					return false;
-				}
-
 				if (desc->cmd.value == MI_LOAD_REGISTER_IMM(1))
 					*oacontrol_set = (cmd[offset + 1] != 0);
 			}
@@ -1115,12 +1109,6 @@ static bool check_cmd(const struct intel_engine_cs *engine,
 			if (reg->mask) {
 				if (desc->cmd.value == MI_LOAD_REGISTER_MEM) {
 					DRM_DEBUG_DRIVER("CMD: Rejected LRM to masked register 0x%08X\n",
-							 reg_addr);
-					return false;
-				}
-
-				if (desc->cmd.value == MI_LOAD_REGISTER_REG) {
-					DRM_DEBUG_DRIVER("CMD: Rejected LRR to masked register 0x%08X\n",
 							 reg_addr);
 					return false;
 				}
@@ -1176,7 +1164,7 @@ static bool check_cmd(const struct intel_engine_cs *engine,
 
 /**
  * i915_parse_cmds() - parse a submitted batch buffer for privilege violations
- * @engine: the engine on which the batch is to execute
+ * @ring: the ring on which the batch is to execute
  * @batch_obj: the batch buffer in question
  * @shadow_batch_obj: copy of the batch buffer in question
  * @batch_start_offset: byte offset in the batch at which execution starts
@@ -1281,28 +1269,14 @@ int i915_parse_cmds(struct intel_engine_cs *engine,
 
 /**
  * i915_cmd_parser_get_version() - get the cmd parser version number
- * @dev_priv: i915 device private
  *
  * The cmd parser maintains a simple increasing integer version number suitable
  * for passing to userspace clients to determine what operations are permitted.
  *
  * Return: the current version number of the cmd parser
  */
-int i915_cmd_parser_get_version(struct drm_i915_private *dev_priv)
+int i915_cmd_parser_get_version(void)
 {
-	struct intel_engine_cs *engine;
-	bool active = false;
-
-	/* If the command parser is not enabled, report 0 - unsupported */
-	for_each_engine(engine, dev_priv) {
-		if (i915_needs_cmd_parser(engine)) {
-			active = true;
-			break;
-		}
-	}
-	if (!active)
-		return 0;
-
 	/*
 	 * Command parser version history
 	 *
@@ -1314,7 +1288,6 @@ int i915_cmd_parser_get_version(struct drm_i915_private *dev_priv)
 	 * 4. L3 atomic chicken bits of HSW_SCRATCH1 and HSW_ROW_CHICKEN3.
 	 * 5. GPGPU dispatch compute indirect registers.
 	 * 6. TIMESTAMP register and Haswell CS GPR registers
-	 * 7. Allow MI_LOAD_REGISTER_REG between whitelisted registers.
 	 */
-	return 7;
+	return 6;
 }

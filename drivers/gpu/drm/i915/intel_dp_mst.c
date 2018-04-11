@@ -47,6 +47,7 @@ static bool intel_dp_mst_compute_config(struct intel_encoder *encoder,
 
 	pipe_config->dp_encoder_is_mst = true;
 	pipe_config->has_pch_encoder = false;
+	pipe_config->has_dp_encoder = true;
 	bpp = 24;
 	/*
 	 * for MST we always configure max link bw - the spec doesn't
@@ -139,7 +140,7 @@ static void intel_mst_pre_enable_dp(struct intel_encoder *encoder)
 	struct intel_digital_port *intel_dig_port = intel_mst->primary;
 	struct intel_dp *intel_dp = &intel_dig_port->dp;
 	struct drm_device *dev = encoder->base.dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	enum port port = intel_dig_port->port;
 	int ret;
 	uint32_t temp;
@@ -206,17 +207,14 @@ static void intel_mst_enable_dp(struct intel_encoder *encoder)
 	struct intel_digital_port *intel_dig_port = intel_mst->primary;
 	struct intel_dp *intel_dp = &intel_dig_port->dp;
 	struct drm_device *dev = intel_dig_port->base.base.dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	enum port port = intel_dig_port->port;
 	int ret;
 
 	DRM_DEBUG_KMS("%d\n", intel_dp->active_mst_links);
 
-	if (intel_wait_for_register(dev_priv,
-				    DP_TP_STATUS(port),
-				    DP_TP_STATUS_ACT_SENT,
-				    DP_TP_STATUS_ACT_SENT,
-				    1))
+	if (wait_for((I915_READ(DP_TP_STATUS(port)) & DP_TP_STATUS_ACT_SENT),
+		     1))
 		DRM_ERROR("Timed out waiting for ACT sent\n");
 
 	ret = drm_dp_check_act_status(&intel_dp->mst_mgr);
@@ -241,9 +239,11 @@ static void intel_dp_mst_enc_get_config(struct intel_encoder *encoder,
 	struct intel_digital_port *intel_dig_port = intel_mst->primary;
 	struct intel_crtc *crtc = to_intel_crtc(encoder->base.crtc);
 	struct drm_device *dev = encoder->base.dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	enum transcoder cpu_transcoder = pipe_config->cpu_transcoder;
 	u32 temp, flags = 0;
+
+	pipe_config->has_dp_encoder = true;
 
 	temp = I915_READ(TRANS_DDI_FUNC_CTL(cpu_transcoder));
 	if (temp & TRANS_DDI_PHSYNC)
@@ -336,8 +336,6 @@ static const struct drm_connector_funcs intel_dp_mst_connector_funcs = {
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = intel_dp_mst_set_property,
 	.atomic_get_property = intel_connector_atomic_get_property,
-	.late_register = intel_connector_register,
-	.early_unregister = intel_connector_unregister,
 	.destroy = intel_dp_mst_connector_destroy,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
@@ -457,6 +455,7 @@ static struct drm_connector *intel_dp_add_mst_connector(struct drm_dp_mst_topolo
 	drm_connector_init(dev, connector, &intel_dp_mst_connector_funcs, DRM_MODE_CONNECTOR_DisplayPort);
 	drm_connector_helper_add(connector, &intel_dp_mst_connector_helper_funcs);
 
+	intel_connector->unregister = intel_connector_unregister;
 	intel_connector->get_hw_state = intel_dp_mst_get_hw_state;
 	intel_connector->mst_port = intel_dp;
 	intel_connector->port = port;
@@ -478,11 +477,9 @@ static void intel_dp_register_mst_connector(struct drm_connector *connector)
 {
 	struct intel_connector *intel_connector = to_intel_connector(connector);
 	struct drm_device *dev = connector->dev;
-
 	drm_modeset_lock_all(dev);
 	intel_connector_add_to_fbdev(intel_connector);
 	drm_modeset_unlock_all(dev);
-
 	drm_connector_register(&intel_connector->base);
 }
 
@@ -492,7 +489,7 @@ static void intel_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	struct intel_connector *intel_connector = to_intel_connector(connector);
 	struct drm_device *dev = connector->dev;
 
-	drm_connector_unregister(connector);
+	intel_connector->unregister(intel_connector);
 
 	/* need to nuke the connector */
 	drm_modeset_lock_all(dev);
@@ -537,7 +534,7 @@ intel_dp_create_fake_mst_encoder(struct intel_digital_port *intel_dig_port, enum
 	intel_mst->primary = intel_dig_port;
 
 	drm_encoder_init(dev, &intel_encoder->base, &intel_dp_mst_enc_funcs,
-			 DRM_MODE_ENCODER_DPMST, "DP-MST %c", pipe_name(pipe));
+			 DRM_MODE_ENCODER_DPMST, NULL);
 
 	intel_encoder->type = INTEL_OUTPUT_DP_MST;
 	intel_encoder->crtc_mask = 0x7;

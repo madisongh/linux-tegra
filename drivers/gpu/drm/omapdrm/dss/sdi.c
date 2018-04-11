@@ -29,7 +29,7 @@
 #include <linux/of.h>
 #include <linux/component.h>
 
-#include "omapdss.h"
+#include <video/omapdss.h>
 #include "dss.h"
 
 static struct {

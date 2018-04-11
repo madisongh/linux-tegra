@@ -307,10 +307,11 @@ static void dce_v11_0_page_flip(struct amdgpu_device *adev,
 	struct amdgpu_crtc *amdgpu_crtc = adev->mode_info.crtcs[crtc_id];
 	u32 tmp;
 
-	/* flip immediate for async, default is vsync */
+	/* flip at hsync for async, default is vsync */
+	/* use UPDATE_IMMEDIATE_EN instead for async? */
 	tmp = RREG32(mmGRPH_FLIP_CONTROL + amdgpu_crtc->crtc_offset);
 	tmp = REG_SET_FIELD(tmp, GRPH_FLIP_CONTROL,
-			    GRPH_SURFACE_UPDATE_IMMEDIATE_EN, async ? 1 : 0);
+			    GRPH_SURFACE_UPDATE_H_RETRACE_EN, async ? 1 : 0);
 	WREG32(mmGRPH_FLIP_CONTROL + amdgpu_crtc->crtc_offset, tmp);
 	/* update the scanout addresses */
 	WREG32(mmGRPH_PRIMARY_SURFACE_ADDRESS_HIGH + amdgpu_crtc->crtc_offset,
@@ -2677,21 +2678,19 @@ static void dce_v11_0_cursor_reset(struct drm_crtc *crtc)
 	}
 }
 
-static int dce_v11_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
-				    u16 *blue, uint32_t size)
+static void dce_v11_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				    u16 *blue, uint32_t start, uint32_t size)
 {
 	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
-	int i;
+	int end = (start + size > 256) ? 256 : start + size, i;
 
 	/* userspace palettes are always correct as is */
-	for (i = 0; i < size; i++) {
+	for (i = start; i < end; i++) {
 		amdgpu_crtc->lut_r[i] = red[i] >> 6;
 		amdgpu_crtc->lut_g[i] = green[i] >> 6;
 		amdgpu_crtc->lut_b[i] = blue[i] >> 6;
 	}
 	dce_v11_0_crtc_load_lut(crtc);
-
-	return 0;
 }
 
 static void dce_v11_0_crtc_destroy(struct drm_crtc *crtc)
@@ -2729,13 +2728,13 @@ static void dce_v11_0_crtc_dpms(struct drm_crtc *crtc, int mode)
 		type = amdgpu_crtc_idx_to_irq_type(adev, amdgpu_crtc->crtc_id);
 		amdgpu_irq_update(adev, &adev->crtc_irq, type);
 		amdgpu_irq_update(adev, &adev->pageflip_irq, type);
-		drm_crtc_vblank_on(crtc);
+		drm_vblank_on(dev, amdgpu_crtc->crtc_id);
 		dce_v11_0_crtc_load_lut(crtc);
 		break;
 	case DRM_MODE_DPMS_STANDBY:
 	case DRM_MODE_DPMS_SUSPEND:
 	case DRM_MODE_DPMS_OFF:
-		drm_crtc_vblank_off(crtc);
+		drm_vblank_off(dev, amdgpu_crtc->crtc_id);
 		if (amdgpu_crtc->enabled) {
 			dce_v11_0_vga_enable(crtc, true);
 			amdgpu_atombios_crtc_blank(crtc, ATOM_ENABLE);
@@ -3434,7 +3433,7 @@ static int dce_v11_0_pageflip_irq(struct amdgpu_device *adev,
 
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 
-	drm_crtc_vblank_put(&amdgpu_crtc->base);
+	drm_vblank_put(adev->ddev, amdgpu_crtc->crtc_id);
 	schedule_work(&works->unpin_work);
 
 	return 0;

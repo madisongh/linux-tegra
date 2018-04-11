@@ -140,17 +140,18 @@ int rcar_du_atomic_check_planes(struct drm_device *dev,
 	bool needs_realloc = false;
 	unsigned int groups = 0;
 	unsigned int i;
-	struct drm_plane *drm_plane;
-	struct drm_plane_state *drm_plane_state;
 
 	/* Check if hardware planes need to be reallocated. */
-	for_each_plane_in_state(state, drm_plane, drm_plane_state, i) {
+	for (i = 0; i < dev->mode_config.num_total_plane; ++i) {
 		struct rcar_du_plane_state *plane_state;
 		struct rcar_du_plane *plane;
 		unsigned int index;
 
-		plane = to_rcar_plane(drm_plane);
-		plane_state = to_rcar_plane_state(drm_plane_state);
+		if (!state->planes[i])
+			continue;
+
+		plane = to_rcar_plane(state->planes[i]);
+		plane_state = to_rcar_plane_state(state->plane_states[i]);
 
 		dev_dbg(rcdu->dev, "%s: checking plane (%u,%tu)\n", __func__,
 			plane->group->index, plane - plane->group->planes);
@@ -246,15 +247,18 @@ int rcar_du_atomic_check_planes(struct drm_device *dev,
 	}
 
 	/* Reallocate hardware planes for each plane that needs it. */
-	for_each_plane_in_state(state, drm_plane, drm_plane_state, i) {
+	for (i = 0; i < dev->mode_config.num_total_plane; ++i) {
 		struct rcar_du_plane_state *plane_state;
 		struct rcar_du_plane *plane;
 		unsigned int crtc_planes;
 		unsigned int free;
 		int idx;
 
-		plane = to_rcar_plane(drm_plane);
-		plane_state = to_rcar_plane_state(drm_plane_state);
+		if (!state->planes[i])
+			continue;
+
+		plane = to_rcar_plane(state->planes[i]);
+		plane_state = to_rcar_plane_state(state->plane_states[i]);
 
 		dev_dbg(rcdu->dev, "%s: allocating plane (%u,%tu)\n", __func__,
 			plane->group->index, plane - plane->group->planes);
@@ -652,7 +656,7 @@ static void rcar_du_plane_reset(struct drm_plane *plane)
 	state->source = RCAR_DU_PLANE_MEMORY;
 	state->alpha = 255;
 	state->colorkey = RCAR_DU_COLORKEY_NONE;
-	state->state.zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
+	state->zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
 
 	plane->state = &state->state;
 	plane->state->plane = plane;
@@ -670,6 +674,8 @@ static int rcar_du_plane_atomic_set_property(struct drm_plane *plane,
 		rstate->alpha = val;
 	else if (property == rcdu->props.colorkey)
 		rstate->colorkey = val;
+	else if (property == rcdu->props.zpos)
+		rstate->zpos = val;
 	else
 		return -EINVAL;
 
@@ -688,6 +694,8 @@ static int rcar_du_plane_atomic_get_property(struct drm_plane *plane,
 		*val = rstate->alpha;
 	else if (property == rcdu->props.colorkey)
 		*val = rstate->colorkey;
+	else if (property == rcdu->props.zpos)
+		*val = rstate->zpos;
 	else
 		return -EINVAL;
 
@@ -759,7 +767,8 @@ int rcar_du_planes_init(struct rcar_du_group *rgrp)
 		drm_object_attach_property(&plane->plane.base,
 					   rcdu->props.colorkey,
 					   RCAR_DU_COLORKEY_NONE);
-		drm_plane_create_zpos_property(&plane->plane, 1, 1, 7);
+		drm_object_attach_property(&plane->plane.base,
+					   rcdu->props.zpos, 1);
 	}
 
 	return 0;

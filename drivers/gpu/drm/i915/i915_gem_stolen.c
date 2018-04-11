@@ -55,10 +55,8 @@ int i915_gem_stolen_insert_node_in_range(struct drm_i915_private *dev_priv,
 		return -ENODEV;
 
 	/* See the comment at the drm_mm_init() call for more about this check.
-	 * WaSkipStolenMemoryFirstPage:bdw,chv,kbl (incomplete)
-	 */
-	if (start < 4096 && (IS_GEN8(dev_priv) ||
-			     IS_KBL_REVID(dev_priv, 0, KBL_REVID_A0)))
+	 * WaSkipStolenMemoryFirstPage:bdw,chv (incomplete) */
+	if (INTEL_INFO(dev_priv)->gen == 8 && start < 4096)
 		start = 4096;
 
 	mutex_lock(&dev_priv->mm.stolen_lock);
@@ -111,9 +109,9 @@ static unsigned long i915_stolen_to_physical(struct drm_device *dev)
 	if (INTEL_INFO(dev)->gen >= 3) {
 		u32 bsm;
 
-		pci_read_config_dword(dev->pdev, INTEL_BSM, &bsm);
+		pci_read_config_dword(dev->pdev, BSM, &bsm);
 
-		base = bsm & INTEL_BSM_MASK;
+		base = bsm & BSM_MASK;
 	} else if (IS_I865G(dev)) {
 		u16 toud = 0;
 
@@ -270,7 +268,7 @@ static unsigned long i915_stolen_to_physical(struct drm_device *dev)
 
 void i915_gem_cleanup_stolen(struct drm_device *dev)
 {
-	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	if (!drm_mm_initialized(&dev_priv->mm.stolen))
 		return;
@@ -550,7 +548,7 @@ static void i915_gem_object_put_pages_stolen(struct drm_i915_gem_object *obj)
 static void
 i915_gem_object_release_stolen(struct drm_i915_gem_object *obj)
 {
-	struct drm_i915_private *dev_priv = to_i915(obj->base.dev);
+	struct drm_i915_private *dev_priv = obj->base.dev->dev_private;
 
 	if (obj->stolen) {
 		i915_gem_stolen_remove_node(dev_priv, obj->stolen);
@@ -601,7 +599,7 @@ cleanup:
 struct drm_i915_gem_object *
 i915_gem_object_create_stolen(struct drm_device *dev, u32 size)
 {
-	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct drm_i915_gem_object *obj;
 	struct drm_mm_node *stolen;
 	int ret;

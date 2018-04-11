@@ -749,8 +749,13 @@ static int nv17_tv_set_property(struct drm_encoder *encoder,
 
 		/* Disable the crtc to ensure a full modeset is
 		 * performed whenever it's turned on again. */
-		if (crtc)
-			drm_crtc_force_disable(crtc);
+		if (crtc) {
+			struct drm_mode_set modeset = {
+				.crtc = crtc,
+			};
+
+			drm_mode_set_config_internal(&modeset);
+		}
 	}
 
 	return 0;

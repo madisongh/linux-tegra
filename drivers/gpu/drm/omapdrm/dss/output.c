@@ -21,7 +21,8 @@
 #include <linux/slab.h>
 #include <linux/of.h>
 
-#include "omapdss.h"
+#include <video/omapdss.h>
+
 #include "dss.h"
 
 static LIST_HEAD(output_list);

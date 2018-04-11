@@ -98,9 +98,7 @@ struct vop_win {
 	const struct vop_win_data *data;
 	struct vop *vop;
 
-	/* protected by dev->event_lock */
-	bool enable;
-	dma_addr_t yrgb_mst;
+	struct vop_plane_state state;
 };
 
 struct vop {
@@ -114,8 +112,6 @@ struct vop {
 	bool vsync_work_pending;
 	struct completion dsp_hold_completion;
 	struct completion wait_update_complete;
-
-	/* protected by dev->event_lock */
 	struct drm_pending_vblank_event *event;
 
 	const struct vop_data *data;
@@ -328,9 +324,9 @@ static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
 			    scl_cal_scale2(src_h, dst_h));
 		if (is_yuv) {
 			VOP_SCL_SET(vop, win, scale_cbcr_x,
-				    scl_cal_scale2(cbcr_src_w, dst_w));
+				    scl_cal_scale2(src_w, dst_w));
 			VOP_SCL_SET(vop, win, scale_cbcr_y,
-				    scl_cal_scale2(cbcr_src_h, dst_h));
+				    scl_cal_scale2(src_h, dst_h));
 		}
 		return;
 	}
@@ -435,6 +431,9 @@ static void vop_enable(struct drm_crtc *crtc)
 	struct vop *vop = to_vop(crtc);
 	int ret;
 
+	if (vop->is_enabled)
+		return;
+
 	ret = pm_runtime_get_sync(vop->dev);
 	if (ret < 0) {
 		dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
@@ -502,7 +501,8 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
 	struct vop *vop = to_vop(crtc);
 	int i;
 
-	WARN_ON(vop->event);
+	if (!vop->is_enabled)
+		return;
 
 	/*
 	 * We need to make sure that all windows are disabled before we
@@ -553,14 +553,6 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
 	clk_disable(vop->aclk);
 	clk_disable(vop->hclk);
 	pm_runtime_put(vop->dev);
-
-	if (crtc->state->event && !crtc->state->active) {
-		spin_lock_irq(&crtc->dev->event_lock);
-		drm_crtc_send_vblank_event(crtc, crtc->state->event);
-		spin_unlock_irq(&crtc->dev->event_lock);
-
-		crtc->state->event = NULL;
-	}
 }
 
 static void vop_plane_destroy(struct drm_plane *plane)
@@ -626,7 +618,6 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
 
 	ret = drm_plane_helper_check_update(plane, crtc, state->fb,
 					    src, dest, &clip,
-					    state->rotation,
 					    min_scale,
 					    max_scale,
 					    true, true, &visible);
@@ -667,11 +658,6 @@ static void vop_plane_atomic_disable(struct drm_plane *plane,
 	if (!old_state->crtc)
 		return;
 
-	spin_lock_irq(&plane->dev->event_lock);
-	vop_win->enable = false;
-	vop_win->yrgb_mst = 0;
-	spin_unlock_irq(&plane->dev->event_lock);
-
 	spin_lock(&vop->reg_lock);
 
 	VOP_WIN_SET(vop, win, enable, 0);
@@ -706,7 +692,7 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
 	/*
 	 * can't update plane when vop is disabled.
 	 */
-	if (WARN_ON(!crtc))
+	if (!crtc)
 		return;
 
 	if (WARN_ON(!vop->is_enabled))
@@ -734,11 +720,6 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
 	offset = (src->x1 >> 16) * drm_format_plane_cpp(fb->pixel_format, 0);
 	offset += (src->y1 >> 16) * fb->pitches[0];
 	vop_plane_state->yrgb_mst = rk_obj->dma_addr + offset + fb->offsets[0];
-
-	spin_lock_irq(&plane->dev->event_lock);
-	vop_win->enable = true;
-	vop_win->yrgb_mst = vop_plane_state->yrgb_mst;
-	spin_unlock_irq(&plane->dev->event_lock);
 
 	spin_lock(&vop->reg_lock);
 
@@ -798,7 +779,7 @@ static const struct drm_plane_helper_funcs plane_helper_funcs = {
 	.atomic_disable = vop_plane_atomic_disable,
 };
 
-static void vop_atomic_plane_reset(struct drm_plane *plane)
+void vop_atomic_plane_reset(struct drm_plane *plane)
 {
 	struct vop_plane_state *vop_plane_state =
 					to_vop_plane_state(plane->state);
@@ -815,7 +796,7 @@ static void vop_atomic_plane_reset(struct drm_plane *plane)
 	plane->state->plane = plane;
 }
 
-static struct drm_plane_state *
+struct drm_plane_state *
 vop_atomic_plane_duplicate_state(struct drm_plane *plane)
 {
 	struct vop_plane_state *old_vop_plane_state;
@@ -895,10 +876,30 @@ static void vop_crtc_wait_for_update(struct drm_crtc *crtc)
 	WARN_ON(!wait_for_completion_timeout(&vop->wait_update_complete, 100));
 }
 
+static void vop_crtc_cancel_pending_vblank(struct drm_crtc *crtc,
+					   struct drm_file *file_priv)
+{
+	struct drm_device *drm = crtc->dev;
+	struct vop *vop = to_vop(crtc);
+	struct drm_pending_vblank_event *e;
+	unsigned long flags;
+
+	spin_lock_irqsave(&drm->event_lock, flags);
+	e = vop->event;
+	if (e && e->base.file_priv == file_priv) {
+		vop->event = NULL;
+
+		e->base.destroy(&e->base);
+		file_priv->event_space += sizeof(e->event);
+	}
+	spin_unlock_irqrestore(&drm->event_lock, flags);
+}
+
 static const struct rockchip_crtc_funcs private_crtc_funcs = {
 	.enable_vblank = vop_crtc_enable_vblank,
 	.disable_vblank = vop_crtc_disable_vblank,
 	.wait_for_update = vop_crtc_wait_for_update,
+	.cancel_pending_vblank = vop_crtc_cancel_pending_vblank,
 };
 
 static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
@@ -929,8 +930,6 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
 	u16 vact_st = adjusted_mode->vtotal - adjusted_mode->vsync_start;
 	u16 vact_end = vact_st + vdisplay;
 	uint32_t val;
-
-	WARN_ON(vop->event);
 
 	vop_enable(crtc);
 	/*
@@ -1028,15 +1027,12 @@ static void vop_crtc_atomic_begin(struct drm_crtc *crtc,
 {
 	struct vop *vop = to_vop(crtc);
 
-	spin_lock_irq(&crtc->dev->event_lock);
 	if (crtc->state->event) {
 		WARN_ON(drm_crtc_vblank_get(crtc) != 0);
-		WARN_ON(vop->event);
 
 		vop->event = crtc->state->event;
 		crtc->state->event = NULL;
 	}
-	spin_unlock_irq(&crtc->dev->event_lock);
 }
 
 static const struct drm_crtc_helper_funcs vop_crtc_helper_funcs = {
@@ -1050,17 +1046,6 @@ static const struct drm_crtc_helper_funcs vop_crtc_helper_funcs = {
 static void vop_crtc_destroy(struct drm_crtc *crtc)
 {
 	drm_crtc_cleanup(crtc);
-}
-
-static void vop_crtc_reset(struct drm_crtc *crtc)
-{
-	if (crtc->state)
-		__drm_atomic_helper_crtc_destroy_state(crtc->state);
-	kfree(crtc->state);
-
-	crtc->state = kzalloc(sizeof(struct rockchip_crtc_state), GFP_KERNEL);
-	if (crtc->state)
-		crtc->state->crtc = crtc;
 }
 
 static struct drm_crtc_state *vop_crtc_duplicate_state(struct drm_crtc *crtc)
@@ -1088,21 +1073,23 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
 	.set_config = drm_atomic_helper_set_config,
 	.page_flip = drm_atomic_helper_page_flip,
 	.destroy = vop_crtc_destroy,
-	.reset = vop_crtc_reset,
+	.reset = drm_atomic_helper_crtc_reset,
 	.atomic_duplicate_state = vop_crtc_duplicate_state,
 	.atomic_destroy_state = vop_crtc_destroy_state,
 };
 
 static bool vop_win_pending_is_complete(struct vop_win *vop_win)
 {
+	struct drm_plane *plane = &vop_win->base;
+	struct vop_plane_state *state = to_vop_plane_state(plane->state);
 	dma_addr_t yrgb_mst;
 
-	if (!vop_win->enable)
+	if (!state->enable)
 		return VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0;
 
 	yrgb_mst = VOP_WIN_GET_YRGBADDR(vop_win->vop, vop_win->data);
 
-	return yrgb_mst == vop_win->yrgb_mst;
+	return yrgb_mst == state->yrgb_mst;
 }
 
 static void vop_handle_vblank(struct vop *vop)
@@ -1117,16 +1104,15 @@ static void vop_handle_vblank(struct vop *vop)
 			return;
 	}
 
-	spin_lock_irqsave(&drm->event_lock, flags);
 	if (vop->event) {
+		spin_lock_irqsave(&drm->event_lock, flags);
 
 		drm_crtc_send_vblank_event(crtc, vop->event);
 		drm_crtc_vblank_put(crtc);
 		vop->event = NULL;
 
+		spin_unlock_irqrestore(&drm->event_lock, flags);
 	}
-	spin_unlock_irqrestore(&drm->event_lock, flags);
-
 	if (!completion_done(&vop->wait_update_complete))
 		complete(&vop->wait_update_complete);
 }

@@ -51,6 +51,7 @@ static inline struct rcar_du_plane *to_rcar_plane(struct drm_plane *plane)
  * @hwindex: 0-based hardware plane index, -1 means unused
  * @alpha: value of the plane alpha property
  * @colorkey: value of the plane colorkey property
+ * @zpos: value of the plane zpos property
  */
 struct rcar_du_plane_state {
 	struct drm_plane_state state;
@@ -61,6 +62,7 @@ struct rcar_du_plane_state {
 
 	unsigned int alpha;
 	unsigned int colorkey;
+	unsigned int zpos;
 };
 
 static inline struct rcar_du_plane_state *
