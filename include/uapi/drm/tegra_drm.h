@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2015 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2012-2013, NVIDIA CORPORATION.  All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -61,23 +61,6 @@ struct drm_tegra_syncpt_wait {
 	__u32 value;
 };
 
-struct drm_tegra_fence_info {
-	__u32 id;
-	__u32 thresh;
-};
-
-struct drm_tegra_fence_create {
-	__u32 num_pts;
-	__s32 fence_fd; /* fd of new fence */
-	__u64 pts; /* struct drm_tegra_fence_info* */
-	__u64 name; /* const char* */
-};
-
-struct drm_tegra_fence_set_name {
-	__u64 name; /* const char* for name */
-	__s32 fence_fd; /* fd of fence */
-};
-
 #define DRM_TEGRA_NO_TIMEOUT	(0xffffffff)
 
 struct drm_tegra_open_channel {
@@ -111,7 +94,7 @@ struct drm_tegra_cmdbuf {
 	__u32 handle;
 	__u32 offset;
 	__u32 words;
-	__s32 pre_fence;
+	__u32 pad;
 };
 
 struct drm_tegra_reloc {
@@ -134,15 +117,13 @@ struct drm_tegra_waitchk {
 	__u32 thresh;
 };
 
-#define DRM_TEGRA_SUBMIT_FLAGS_SYNC_FD	(1 << 0)
-
 struct drm_tegra_submit {
 	__u64 context;
 	__u32 num_syncpts;
 	__u32 num_cmdbufs;
 	__u32 num_relocs;
 	__u32 num_waitchks;
-	__u32 flags;
+	__u32 waitchk_mask;
 	__u32 timeout;
 	__u64 syncpts;
 	__u64 cmdbufs;
@@ -205,9 +186,6 @@ struct drm_tegra_gem_get_flags {
 #define DRM_TEGRA_GEM_GET_TILING	0x0b
 #define DRM_TEGRA_GEM_SET_FLAGS		0x0c
 #define DRM_TEGRA_GEM_GET_FLAGS		0x0d
-#define DRM_TEGRA_SET_ERROR_NOTIFIER	0x11
-#define DRM_TEGRA_FENCE_CREATE		0x40
-#define DRM_TEGRA_FENCE_SET_NAME	0x41
 
 #define DRM_IOCTL_TEGRA_GEM_CREATE DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_CREATE, struct drm_tegra_gem_create)
 #define DRM_IOCTL_TEGRA_GEM_MMAP DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_MMAP, struct drm_tegra_gem_mmap)
@@ -223,8 +201,6 @@ struct drm_tegra_gem_get_flags {
 #define DRM_IOCTL_TEGRA_GEM_GET_TILING DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_GET_TILING, struct drm_tegra_gem_get_tiling)
 #define DRM_IOCTL_TEGRA_GEM_SET_FLAGS DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_SET_FLAGS, struct drm_tegra_gem_set_flags)
 #define DRM_IOCTL_TEGRA_GEM_GET_FLAGS DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_GET_FLAGS, struct drm_tegra_gem_get_flags)
-#define DRM_IOCTL_TEGRA_FENCE_CREATE DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_FENCE_CREATE, struct drm_tegra_fence_create)
-#define DRM_IOCTL_TEGRA_FENCE_SET_NAME DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_FENCE_SET_NAME, struct drm_tegra_fence_set_name)
 
 #if defined(__cplusplus)
 }

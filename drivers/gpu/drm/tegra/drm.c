@@ -15,7 +15,6 @@
 
 #include "drm.h"
 #include "gem.h"
-#include "../../../staging/android/sync.h"
 
 #define DRIVER_NAME "tegra"
 #define DRIVER_DESC "NVIDIA Tegra graphics"
@@ -326,7 +325,6 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 		     struct drm_tegra_submit *args, struct drm_device *drm,
 		     struct drm_file *file)
 {
-	struct host1x *host1x = dev_get_drvdata(drm->dev->parent);
 	unsigned int num_cmdbufs = args->num_cmdbufs;
 	unsigned int num_relocs = args->num_relocs;
 	unsigned int num_waitchks = args->num_waitchks;
@@ -356,7 +354,6 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 	job->serialize = true;
 
 	while (num_cmdbufs) {
-		struct sync_fence *pre_fence = NULL;
 		struct drm_tegra_cmdbuf cmdbuf;
 		struct host1x_bo *bo;
 
@@ -371,11 +368,8 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 			goto fail;
 		}
 
-		if (cmdbuf.pre_fence > 0)
-			pre_fence = sync_fence_fdget(cmdbuf.pre_fence);
-
 		host1x_job_add_gather(job, bo, cmdbuf.words, cmdbuf.offset,
-				      pre_fence);
+				      NULL);
 		num_cmdbufs--;
 		cmdbufs++;
 	}
@@ -417,14 +411,7 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 	if (err)
 		goto fail_submit;
 
-	if (args->flags & DRM_TEGRA_SUBMIT_FLAGS_SYNC_FD) {
-		err = host1x_sync_create_fence_single(host1x, job->syncpt_id,
-						      job->syncpt_end,
-						      "fence_drm",
-						      &args->fence);
-	} else {
-		args->fence = job->syncpt_end;
-	}
+	args->fence = job->syncpt_end;
 
 	host1x_job_put(job);
 	return 0;
@@ -532,75 +519,6 @@ static int tegra_syncpt_wait(struct drm_device *drm, void *data,
 	return host1x_syncpt_wait(sp, args->thresh, args->timeout,
 				  &args->value);
 }
-
-static int tegra_fence_create(struct drm_device *drm, void *data,
-			      struct drm_file *file)
-{
-	int err;
-	struct host1x *host1x = dev_get_drvdata(drm->dev->parent);
-	struct drm_tegra_fence_create *args = data;
-	struct host1x_syncpt_fence *fences;
-	struct drm_tegra_fence_info pt;
-	char name[32];
-	const char __user *args_name =
-		(const char __user *)(uintptr_t)args->name;
-	const void __user *args_pts =
-		(const void __user *)(uintptr_t)args->pts;
-	int i;
-
-	if (args_name) {
-		if (strncpy_from_user(name, args_name, sizeof(name)) < 0)
-			return -EFAULT;
-		name[sizeof(name) - 1] = '\0';
-	} else {
-		name[0] = '\0';
-	}
-
-	fences = kmalloc_array(args->num_pts, sizeof(*fences), GFP_KERNEL);
-	if (!fences) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-	for (i = 0; i < args->num_pts; i++) {
-		err = copy_from_user(&pt, args_pts + i, sizeof(pt));
-		if (err < 0)
-			goto out;
-
-		fences[i].id = pt.id;
-		fences[i].threshold = pt.thresh;
-	}
-
-	err = host1x_sync_create_fence_fd(host1x, fences, args->num_pts,
-					  name, &args->fence_fd);
-out:
-	kfree(fences);
-
-	return err;
-}
-
-static int tegra_fence_set_name(struct drm_device *drm, void *data,
-				struct drm_file *file)
-{
-	struct drm_tegra_fence_set_name *args = data;
-	int err;
-	char name[32];
-	const char __user *args_name =
-		(const char __user *)(uintptr_t)args->name;
-
-	if (args_name) {
-		if (strncpy_from_user(name, args_name, sizeof(name)) < 0)
-			return -EFAULT;
-		name[sizeof(name) - 1] = '\0';
-	} else {
-		name[0] = '\0';
-	}
-
-	err = host1x_sync_fence_set_name(args->fence_fd, name);
-
-	return err;
-}
-
 
 static int tegra_open_channel(struct drm_device *drm, void *data,
 			      struct drm_file *file)
@@ -872,8 +790,6 @@ static const struct drm_ioctl_desc tegra_drm_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(TEGRA_GEM_GET_TILING, tegra_gem_get_tiling, 0),
 	DRM_IOCTL_DEF_DRV(TEGRA_GEM_SET_FLAGS, tegra_gem_set_flags, 0),
 	DRM_IOCTL_DEF_DRV(TEGRA_GEM_GET_FLAGS, tegra_gem_get_flags, 0),
-	DRM_IOCTL_DEF_DRV(TEGRA_FENCE_CREATE, tegra_fence_create, 0),
-	DRM_IOCTL_DEF_DRV(TEGRA_FENCE_SET_NAME, tegra_fence_set_name, 0),
 #endif
 };
 
