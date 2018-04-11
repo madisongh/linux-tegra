@@ -35,7 +35,7 @@
 static int vic_runtime_resume(struct device *dev)
 {
 	struct vic *vic = dev_get_drvdata(dev);
-	int err = 0;
+	int err;
 
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_unpowergate_partition(TEGRA_POWERGATE_VIC);
@@ -50,12 +50,10 @@ static int vic_runtime_resume(struct device *dev)
 
 	return 0;
 #else
-	if (vic->rst) {
-		err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_VIC,
-							vic->clk, vic->rst);
-		if (err < 0)
-			dev_err(dev, "failed to power up device\n");
-	}
+	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_VIC,
+						vic->clk, vic->rst);
+	if (err < 0)
+		dev_err(dev, "failed to power up device\n");
 
 	return err;
 #endif
@@ -70,8 +68,7 @@ static int vic_runtime_suspend(struct device *dev)
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
 	tegra_powergate_partition(TEGRA_POWERGATE_VIC);
 #else
-	if (vic->rst)
-		reset_control_assert(vic->rst);
+	reset_control_assert(vic->rst);
 	tegra_powergate_power_off(TEGRA_POWERGATE_VIC);
 #endif
 
@@ -98,23 +95,15 @@ static int vic_boot(struct vic *vic)
 
 	/* ensure that the engine is in sane state */
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	if (vic->rst) {
-		reset_control_assert(vic->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(vic->rst);
-	} else {
-		tegra_mc_flush(true);
-		tegra_periph_reset_assert(vic->clk);
-		usleep_range(10, 100);
-		tegra_periph_reset_deassert(vic->clk);
-		tegra_mc_flush_done(true);
-	}
+	tegra_mc_flush(true);
+	tegra_periph_reset_assert(vic->clk);
+	usleep_range(10, 100);
+	tegra_periph_reset_deassert(vic->clk);
+	tegra_mc_flush_done(true);
 #else
-	if (vic->rst) {
-		reset_control_assert(vic->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(vic->rst);
-	}
+	reset_control_assert(vic->rst);
+	usleep_range(10, 100);
+	reset_control_deassert(vic->rst);
 #endif
 
 	/* setup clockgating registers */
@@ -257,23 +246,15 @@ static int vic_exit(struct host1x_client *client)
 
 	if (vic->booted) {
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		if (vic->rst) {
-			reset_control_assert(vic->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(vic->rst);
-		} else {
-			tegra_mc_flush(true);
-			tegra_periph_reset_assert(vic->clk);
-			usleep_range(10, 100);
-			tegra_periph_reset_deassert(vic->clk);
-			tegra_mc_flush_done(true);
-		}
+		tegra_mc_flush(true);
+		tegra_periph_reset_assert(vic->clk);
+		usleep_range(10, 100);
+		tegra_periph_reset_deassert(vic->clk);
+		tegra_mc_flush_done(true);
 #else
-		if (vic->rst) {
-			reset_control_assert(vic->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(vic->rst);
-		}
+		reset_control_assert(vic->rst);
+		usleep_range(10, 100);
+		reset_control_deassert(vic->rst);
 #endif
 	}
 
@@ -424,9 +405,11 @@ static int vic_probe(struct platform_device *pdev)
 		return PTR_ERR(vic->clk);
 	}
 
-	vic->rst = devm_reset_control_get(dev, NULL);
-	if (IS_ERR(vic->rst))
+	vic->rst = devm_reset_control_get(dev, "vic");
+	if (IS_ERR(vic->rst)) {
 		dev_err(&pdev->dev, "cannot get reset\n");
+		return PTR_ERR(vic->rst);
+	}
 
 	platform_set_drvdata(pdev, vic);
 
