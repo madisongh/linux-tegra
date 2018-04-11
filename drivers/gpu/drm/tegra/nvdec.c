@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -47,7 +47,6 @@ struct nvdec_bl_shared_data {
 };
 
 static int nvdec_boot(struct nvdec *nvdec);
-static unsigned int tegra_nvdec_bootloader_enabled;
 
 static int nvdec_runtime_resume(struct device *dev)
 {
@@ -154,7 +153,7 @@ static int nvdec_read_firmware(struct nvdec *nvdec)
 {
 	int err;
 
-	if (tegra_nvdec_bootloader_enabled) {
+	if (IS_ENABLED(CONFIG_NVDEC_BOOTLOADER)) {
 		err = falcon_read_firmware(&nvdec->falcon_bl,
 					   nvdec->config->ucode_name_bl);
 		if (err < 0)
@@ -288,7 +287,7 @@ static int nvdec_init(struct host1x_client *client)
 	if (err < 0)
 		goto detach_device;
 
-	if (tegra_nvdec_bootloader_enabled) {
+	if (IS_ENABLED(CONFIG_NVDEC_BOOTLOADER)) {
 		nvdec->falcon_ls.dev = nvdec->dev;
 		nvdec->falcon_ls.regs = nvdec->regs;
 		nvdec->falcon_ls.data = tegra;
@@ -323,7 +322,7 @@ free_syncpt:
 free_channel:
 	host1x_channel_free(nvdec->channel);
 exit_falcon_ls:
-	if (tegra_nvdec_bootloader_enabled)
+	if (IS_ENABLED(CONFIG_NVDEC_BOOTLOADER))
 		falcon_exit(&nvdec->falcon_ls);
 exit_falcon_bl:
 	falcon_exit(&nvdec->falcon_bl);
@@ -371,7 +370,7 @@ static int nvdec_exit(struct host1x_client *client)
 #endif
 	}
 
-	if (tegra_nvdec_bootloader_enabled)
+	if (IS_ENABLED(CONFIG_NVDEC_BOOTLOADER))
 		falcon_exit(&nvdec->falcon_ls);
 
 	falcon_exit(&nvdec->falcon_bl);
@@ -543,15 +542,6 @@ static int nvdec_remove(struct platform_device *pdev)
 static const struct dev_pm_ops nvdec_pm_ops = {
 	SET_RUNTIME_PM_OPS(nvdec_runtime_suspend, nvdec_runtime_resume, NULL)
 };
-
-static int __init tegra_nvdec_bootloader_enabled_arg(char *options)
-{
-	char *p = options;
-
-	tegra_nvdec_bootloader_enabled = memparse(p, &p);
-	return 0;
-}
-early_param("nvdec_enabled", tegra_nvdec_bootloader_enabled_arg);
 
 struct platform_driver tegra_nvdec_driver = {
 	.driver = {
