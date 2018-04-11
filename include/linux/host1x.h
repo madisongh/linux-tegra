@@ -44,10 +44,6 @@ struct host1x;
 struct host1x_client_ops {
 	int (*init)(struct host1x_client *client);
 	int (*exit)(struct host1x_client *client);
-	int (*get_clk_rate)(struct host1x_client *client, u64 *data,
-			u32 type);
-	int (*set_clk_rate)(struct host1x_client *client, u64 data,
-			u32 type);
 };
 
 struct host1x_characteristics {

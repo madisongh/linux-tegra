@@ -223,29 +223,6 @@ struct drm_tegra_get_characteristics {
 	__u64 drm_tegra_chara_buf_addr;
 };
 
-enum request_type {
-	DRM_TEGRA_REQ_TYPE_CLK_KHZ = 0,
-	DRM_TEGRA_REQ_TYPE_BW_KBPS,
-};
-
-struct drm_tegra_get_clk_rate {
-	/* class ID*/
-	__u32 id;
-	/* request type: KBps or KHz */
-	__u32 type;
-	/* numeric value for type */
-	__u64 data;
-};
-
-struct drm_tegra_set_clk_rate {
-	/* class ID*/
-	__u32 id;
-	/* request type: KBps or KHz */
-	__u32 type;
-	/* numeric value for type */
-	__u64 data;
-};
-
 #define DRM_TEGRA_GEM_CREATE		0x00
 #define DRM_TEGRA_GEM_MMAP		0x01
 #define DRM_TEGRA_SYNCPT_READ		0x02
@@ -264,8 +241,6 @@ struct drm_tegra_set_clk_rate {
 #define DRM_TEGRA_FENCE_SET_NAME	0x41
 #define DRM_TEGRA_SET_ERROR_NOTIFIER	0x42
 #define DRM_TEGRA_GET_CHARACTERISTICS   0x43
-#define DRM_TEGRA_GET_CLK_RATE		0x44
-#define DRM_TEGRA_SET_CLK_RATE		0x45
 
 #define DRM_IOCTL_TEGRA_GEM_CREATE DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_CREATE, struct drm_tegra_gem_create)
 #define DRM_IOCTL_TEGRA_GEM_MMAP DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_MMAP, struct drm_tegra_gem_mmap)
@@ -285,8 +260,6 @@ struct drm_tegra_set_clk_rate {
 #define DRM_IOCTL_TEGRA_FENCE_SET_NAME DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_FENCE_SET_NAME, struct drm_tegra_fence_set_name)
 #define DRM_IOCTL_TEGRA_SET_ERROR_NOTIFIER DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_SET_ERROR_NOTIFIER, struct drm_tegra_set_error_notifier)
 #define DRM_IOCTL_TEGRA_GET_CHARACTERISTICS DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GET_CHARACTERISTICS, struct drm_tegra_get_characteristics)
-#define DRM_IOCTL_TEGRA_GET_CLK_RATE DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GET_CLK_RATE, struct drm_tegra_get_clk_rate)
-#define DRM_IOCTL_TEGRA_SET_CLK_RATE DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_SET_CLK_RATE, struct drm_tegra_set_clk_rate)
 
 #if defined(__cplusplus)
 }

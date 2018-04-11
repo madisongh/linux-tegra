@@ -1006,53 +1006,6 @@ static int tegra_gem_get_flags(struct drm_device *drm, void *data,
 
 	return 0;
 }
-
-static int tegra_get_clk_rate(struct drm_device *drm, void *data,
-					struct drm_file *file)
-{
-	struct tegra_drm *tegra = drm->dev_private;
-	struct tegra_drm_client *client;
-	struct host1x_client *base;
-	struct drm_tegra_get_clk_rate *args = data;
-
-	list_for_each_entry(client, &tegra->clients, list) {
-		base = &client->base;
-		if (base->class == args->id) {
-			if (!base->ops || !base->ops->get_clk_rate) {
-				DRM_INFO("%s:%s No ops to get clk\n",
-					 __func__, dev_name(base->dev));
-				return -EINVAL;
-			}
-			return base->ops->get_clk_rate(base, &args->data,
-					args->type);
-		}
-	}
-
-	return -EINVAL;
-}
-
-static int tegra_set_clk_rate(struct drm_device *drm, void *data,
-					struct drm_file *file)
-{
-	struct tegra_drm *tegra = drm->dev_private;
-	struct tegra_drm_client *client;
-	struct host1x_client *base;
-	struct drm_tegra_set_clk_rate *args = data;
-
-	list_for_each_entry(client, &tegra->clients, list) {
-		base = &client->base;
-		if (base->class == args->id) {
-			if (!base->ops || !base->ops->set_clk_rate) {
-				DRM_INFO("%s:%s No ops to set clk\n",
-					 __func__, dev_name(base->dev));
-				return -EINVAL;
-			}
-			return base->ops->set_clk_rate(base, args->data,
-					args->type);
-		}
-	}
-	return -EINVAL;
-}
 #endif
 
 static const struct drm_ioctl_desc tegra_drm_ioctls[] = {
@@ -1075,8 +1028,6 @@ static const struct drm_ioctl_desc tegra_drm_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(TEGRA_FENCE_SET_NAME, tegra_fence_set_name, DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(TEGRA_SET_ERROR_NOTIFIER, tegra_set_error_notifier, DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(TEGRA_GET_CHARACTERISTICS, tegra_get_characteristics, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(TEGRA_GET_CLK_RATE, tegra_get_clk_rate, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(TEGRA_SET_CLK_RATE, tegra_set_clk_rate, DRM_RENDER_ALLOW),
 #endif
 };
 
