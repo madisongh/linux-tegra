@@ -30,9 +30,6 @@
 #endif
 
 #define TSEC_OS_START_OFFSET 256
-#define TSEC_AUTOSUSPEND_DELAY 500
-
-static int tsec_boot(struct tsec *tsec);
 
 static int tsec_runtime_resume(struct device *dev)
 {
@@ -40,10 +37,6 @@ static int tsec_runtime_resume(struct device *dev)
 	int err;
 
 	err = clk_prepare_enable(tsec->clk);
-
-	err = tsec_boot(tsec);
-	if (err < 0)
-		clk_disable_unprepare(tsec->clk);
 
 	return err;
 }
@@ -262,17 +255,39 @@ int tsec_open_channel(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context)
 {
 	struct tsec *tsec = to_tsec(client);
+	int err;
+
+	err = pm_runtime_get_sync(tsec->dev);
+	if (err < 0)
+		return err;
+
+	/*
+	 * Try to boot the Falcon microcontroller. Booting is deferred until
+	 * here because the firmware might not yet be available during system
+	 * boot, for example if it's on remote storage.
+	 */
+	err = tsec_boot(tsec);
+	if (err < 0) {
+		pm_runtime_put(tsec->dev);
+		return err;
+	}
 
 	context->channel = host1x_channel_get(tsec->channel);
-	if (!context->channel)
+	if (!context->channel) {
+		pm_runtime_put(tsec->dev);
 		return -ENOMEM;
+	}
 
 	return 0;
 }
 
 void tsec_close_channel(struct tegra_drm_context *context)
 {
+	struct tsec *tsec = to_tsec(context->client);
+
 	host1x_channel_put(context->channel);
+
+	pm_runtime_put(tsec->dev);
 }
 
 static const struct tegra_drm_client_ops tsec_ops = {
@@ -375,8 +390,6 @@ static int tsec_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	pm_runtime_set_autosuspend_delay(dev, TSEC_AUTOSUSPEND_DELAY);
-	pm_runtime_use_autosuspend(dev);
 	pm_runtime_enable(dev);
 	if (!pm_runtime_enabled(dev)) {
 		err = tsec_runtime_resume(dev);

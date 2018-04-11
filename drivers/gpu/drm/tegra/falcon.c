@@ -248,7 +248,7 @@ int falcon_boot(struct falcon *falcon)
 		return err;
 	}
 
-	dev_dbg(falcon->dev, "falcon booted");
+	dev_info(falcon->dev, "falcon booted");
 
 	return 0;
 }
