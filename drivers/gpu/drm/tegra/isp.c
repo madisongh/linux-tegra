@@ -319,9 +319,7 @@ static const struct isp_config ispa_t210_config = {
 
 static const struct isp_config ispb_t210_config = {
 	.class_id = HOST1X_CLASS_ISPB,
-#ifdef TEGRA_POWERGATE_VE2
 	.powergate_id = TEGRA_POWERGATE_VE2,
-#endif
 	.ctrl_node_name = "nvhost-ctrl-isp.1",
 };
 
