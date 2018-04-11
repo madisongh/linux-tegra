@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -195,7 +195,6 @@ int falcon_boot(struct falcon *falcon)
 {
 	unsigned long offset;
 	int err = 0;
-	unsigned int os_start_offset = falcon->firmware.os_start_offset;
 
 	if (!falcon->firmware.valid)
 		return -EINVAL;
@@ -214,9 +213,8 @@ int falcon_boot(struct falcon *falcon)
 				  offset, FALCON_MEMORY_DATA);
 
 	/* copy the first code segment into Falcon internal memory */
-	falcon_copy_chunk(falcon,
-			  falcon->firmware.code.offset + os_start_offset,
-			  os_start_offset, FALCON_MEMORY_IMEM);
+	falcon_copy_chunk(falcon, falcon->firmware.code.offset,
+			  0, FALCON_MEMORY_IMEM);
 
 	/* setup falcon interrupts */
 	falcon_writel(falcon, FALCON_IRQMSET_EXT(0xff) |
@@ -239,7 +237,7 @@ int falcon_boot(struct falcon *falcon)
 		      FALCON_ITFEN);
 
 	/* boot falcon */
-	falcon_writel(falcon, os_start_offset, FALCON_BOOTVEC);
+	falcon_writel(falcon, 0x00000000, FALCON_BOOTVEC);
 	falcon_writel(falcon, FALCON_CPUCTL_STARTCPU, FALCON_CPUCTL);
 
 	err = falcon_wait_idle(falcon);

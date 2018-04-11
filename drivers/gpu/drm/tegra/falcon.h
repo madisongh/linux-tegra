@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -106,8 +106,6 @@ struct falcon_firmware {
 	struct falcon_firmware_section bin_data;
 	struct falcon_firmware_section data;
 	struct falcon_firmware_section code;
-
-	unsigned int os_start_offset;
 
 	bool valid;
 };
