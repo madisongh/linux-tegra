@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2009-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,8 +30,6 @@ enum host1x_class {
 	HOST1X_CLASS_VIC = 0x5D,
 	HOST1X_CLASS_GR3D = 0x60,
 	HOST1X_CLASS_NVJPG = 0xC0,
-	HOST1X_CLASS_TSEC = 0xE0,
-	HOST1X_CLASS_TSECB = 0xE1,
 	HOST1X_CLASS_NVDEC = 0xF0,
 };
 
