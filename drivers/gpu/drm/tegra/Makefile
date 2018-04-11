@@ -13,7 +13,6 @@ tegra-drm-y := \
 	sor.o \
 	dpaux.o \
 	gr2d.o \
-	gr3d.o \
-	falcon.o
+	gr3d.o
 
 obj-$(CONFIG_DRM_TEGRA) += tegra-drm.o
