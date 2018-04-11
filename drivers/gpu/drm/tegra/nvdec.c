@@ -26,10 +26,8 @@
 #include <soc/tegra/pmc.h>
 #endif
 
-#include "nvdec.h"
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-#include "nvdec_t186.h"
-#endif
+#include "drm.h"
+#include "falcon.h"
 
 #define NVDEC_MAX_CLK_RATE	716800000
 
@@ -45,10 +43,42 @@ struct nvdec_bl_shared_data {
 	u32 wpr_size;
 };
 
+struct nvdec_config {
+	/* Firmware name */
+	const char *ucode_name;
+	const char *ucode_name_bl;
+	const char *ucode_name_ls;
+};
+
+struct nvdec {
+	struct falcon falcon_bl;
+	struct falcon falcon_ls;
+	bool booted;
+
+	void __iomem *regs;
+	struct tegra_drm_client client;
+	struct host1x_channel *channel;
+	struct iommu_domain *domain;
+	struct device *dev;
+	struct clk *clk;
+	struct reset_control *rst;
+
+	/* Platform configuration */
+	const struct nvdec_config *config;
+
+	/* for firewall - this determines if method 1 should be regarded
+	 * as an address register */
+	bool method_data_is_addr_reg;
+};
+
+static inline struct nvdec *to_nvdec(struct tegra_drm_client *client)
+{
+	return container_of(client, struct nvdec, client);
+}
+
 static int nvdec_runtime_resume(struct device *dev)
 {
 	struct nvdec *nvdec = dev_get_drvdata(dev);
-	struct tegra_drm_client *client = &nvdec->client;
 	int err = 0;
 
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
@@ -60,15 +90,6 @@ static int nvdec_runtime_resume(struct device *dev)
 	if (err) {
 		tegra_powergate_partition(TEGRA_POWERGATE_NVDEC);
 		return err;
-	}
-
-	if (client->ops->finalize_poweron) {
-		err = client->ops->finalize_poweron(client);
-		if (err) {
-			clk_disable_unprepare(nvdec->clk);
-			tegra_powergate_partition(TEGRA_POWERGATE_NVDEC);
-			return err;
-		}
 	}
 
 	return 0;
@@ -87,14 +108,11 @@ static int nvdec_runtime_resume(struct device *dev)
 static int nvdec_runtime_suspend(struct device *dev)
 {
 	struct nvdec *nvdec = dev_get_drvdata(dev);
-	struct tegra_drm_client *client = &nvdec->client;
 
 	clk_disable_unprepare(nvdec->clk);
 
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
 	tegra_powergate_partition(TEGRA_POWERGATE_NVDEC);
-	if (client->ops->prepare_poweroff)
-		client->ops->prepare_poweroff(client);
 #else
 	if (nvdec->rst)
 		reset_control_assert(nvdec->rst);
@@ -165,7 +183,6 @@ static int nvdec_read_firmware(struct nvdec *nvdec)
 static int nvdec_boot(struct nvdec *nvdec)
 {
 	int err = 0;
-	struct tegra_drm_client *client = &nvdec->client;
 
 	if (nvdec->booted)
 		return 0;
@@ -194,9 +211,6 @@ static int nvdec_boot(struct nvdec *nvdec)
 		reset_control_deassert(nvdec->rst);
 	}
 #endif
-
-	if (client->ops->load_regs)
-		client->ops->load_regs(client);
 
 	err = falcon_boot(&nvdec->falcon_bl);
 	if (err < 0)
@@ -373,7 +387,7 @@ static const struct host1x_client_ops nvdec_client_ops = {
 	.exit = nvdec_exit,
 };
 
-int nvdec_open_channel(struct tegra_drm_client *client,
+static int nvdec_open_channel(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context)
 {
 	struct nvdec *nvdec = to_nvdec(client);
@@ -403,7 +417,7 @@ int nvdec_open_channel(struct tegra_drm_client *client,
 	return 0;
 }
 
-void nvdec_close_channel(struct tegra_drm_context *context)
+static void nvdec_close_channel(struct tegra_drm_context *context)
 {
 	struct nvdec *nvdec = to_nvdec(context->client);
 
@@ -422,14 +436,10 @@ static const struct nvdec_config nvdec_t210_config = {
 	.ucode_name = "tegra21x/nvhost_nvdec020_ns.fw",
 	.ucode_name_bl = "tegra21x/nvhost_nvdec_bl020_prod.fw",
 	.ucode_name_ls = "tegra21x/nvhost_nvdec020_prod.fw",
-	.drm_client_ops = &nvdec_ops,
 };
 
 static const struct of_device_id nvdec_match[] = {
 	{ .compatible = "nvidia,tegra210-nvdec", .data = &nvdec_t210_config },
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-	{ .compatible = "nvidia,tegra186-nvdec", .data = &nvdec_t186_config },
-#endif
 	{ },
 };
 
@@ -488,7 +498,7 @@ static int nvdec_probe(struct platform_device *pdev)
 	nvdec->config = nvdec_config;
 
 	INIT_LIST_HEAD(&nvdec->client.list);
-	nvdec->client.ops = nvdec->config->drm_client_ops;
+	nvdec->client.ops = &nvdec_ops;
 
 	err = host1x_client_register(&nvdec->client.base);
 	if (err < 0) {

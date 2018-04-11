@@ -82,8 +82,6 @@ struct tegra_drm_client_ops {
 		      struct drm_tegra_submit *args, struct drm_device *drm,
 		      struct drm_file *file);
 	int (*load_regs)(struct tegra_drm_client *client);
-	int (*finalize_poweron)(struct tegra_drm_client *client);
-	int (*prepare_poweroff)(struct tegra_drm_client *client);
 };
 
 int tegra_drm_submit(struct tegra_drm_context *context,
