@@ -23,7 +23,6 @@
 #include <linux/iommu.h>
 #include <linux/regulator/consumer.h>
 #include <linux/nvhost_vi_ioctl.h>
-#include "../../../media/platform/tegra/camera/vi/mc_common.h"
 
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
 #include <linux/clk/tegra.h>
@@ -64,8 +63,6 @@ struct vi {
 
 	/* Platform configuration */
 	struct vi_config *config;
-
-	struct tegra_mc_vi mc_vi;
 };
 
 static const struct file_operations tegra_vi_ctrl_ops;
@@ -468,18 +465,10 @@ static int vi_probe(struct platform_device *pdev)
 		goto error_vi_power_off;
 	}
 
-	err = tegra_vi_media_controller_init(&vi->mc_vi, pdev);
-	if (err) {
-		dev_err(dev, "failed to register media controller%d\n", err);
-		goto error_client_unregister;
-	}
-
 	dev_info(dev, "initialized");
 
 	return 0;
 
-error_client_unregister:
-	host1x_client_unregister(&vi->client.base);
 error_vi_power_off:
 	vi_power_off(dev);
 	return err;
@@ -489,8 +478,6 @@ static int vi_remove(struct platform_device *pdev)
 {
 	struct vi *vi = platform_get_drvdata(pdev);
 	int err;
-
-	tegra_vi_media_controller_cleanup(&vi->mc_vi);
 
 	err = host1x_client_unregister(&vi->client.base);
 	if (err < 0)
