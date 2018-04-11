@@ -79,7 +79,7 @@ static inline struct nvdec *to_nvdec(struct tegra_drm_client *client)
 static int nvdec_runtime_resume(struct device *dev)
 {
 	struct nvdec *nvdec = dev_get_drvdata(dev);
-	int err = 0;
+	int err;
 
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_unpowergate_partition(TEGRA_POWERGATE_NVDEC);
@@ -94,12 +94,10 @@ static int nvdec_runtime_resume(struct device *dev)
 
 	return 0;
 #else
-	if (nvdec->rst) {
-		err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_NVDEC,
-							nvdec->clk, nvdec->rst);
-		if (err < 0)
-			dev_err(dev, "failed to power up device\n");
-	}
+	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_NVDEC,
+						nvdec->clk, nvdec->rst);
+	if (err < 0)
+		dev_err(dev, "failed to power up device\n");
 
 	return err;
 #endif
@@ -114,8 +112,7 @@ static int nvdec_runtime_suspend(struct device *dev)
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
 	tegra_powergate_partition(TEGRA_POWERGATE_NVDEC);
 #else
-	if (nvdec->rst)
-		reset_control_assert(nvdec->rst);
+	reset_control_assert(nvdec->rst);
 	tegra_powergate_power_off(TEGRA_POWERGATE_NVDEC);
 #endif
 
@@ -193,23 +190,15 @@ static int nvdec_boot(struct nvdec *nvdec)
 
 	/* ensure that the engine is in sane state */
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	if (nvdec->rst) {
-		reset_control_assert(nvdec->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(nvdec->rst);
-	} else {
-		tegra_mc_flush(true);
-		tegra_periph_reset_assert(nvdec->clk);
-		usleep_range(10, 100);
-		tegra_periph_reset_deassert(nvdec->clk);
-		tegra_mc_flush_done(true);
-	}
+	tegra_mc_flush(true);
+	tegra_periph_reset_assert(nvdec->clk);
+	usleep_range(10, 100);
+	tegra_periph_reset_deassert(nvdec->clk);
+	tegra_mc_flush_done(true);
 #else
-	if (nvdec->rst) {
-		reset_control_assert(nvdec->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(nvdec->rst);
-	}
+	reset_control_assert(nvdec->rst);
+	usleep_range(10, 100);
+	reset_control_deassert(nvdec->rst);
 #endif
 
 	err = falcon_boot(&nvdec->falcon_bl);
@@ -349,23 +338,15 @@ static int nvdec_exit(struct host1x_client *client)
 
 	if (nvdec->booted) {
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		if (nvdec->rst) {
-			reset_control_assert(nvdec->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(nvdec->rst);
-		} else {
-			tegra_mc_flush(true);
-			tegra_periph_reset_assert(nvdec->clk);
-			usleep_range(10, 100);
-			tegra_periph_reset_deassert(nvdec->clk);
-			tegra_mc_flush_done(true);
-		}
+		tegra_mc_flush(true);
+		tegra_periph_reset_assert(nvdec->clk);
+		usleep_range(10, 100);
+		tegra_periph_reset_deassert(nvdec->clk);
+		tegra_mc_flush_done(true);
 #else
-		if (nvdec->rst) {
-			reset_control_assert(nvdec->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(nvdec->rst);
-		}
+		reset_control_assert(nvdec->rst);
+		usleep_range(10, 100);
+		reset_control_deassert(nvdec->rst);
 #endif
 	}
 
@@ -480,10 +461,10 @@ static int nvdec_probe(struct platform_device *pdev)
 		return PTR_ERR(nvdec->clk);
 	}
 
-	nvdec->rst = devm_reset_control_get(dev, NULL);
+	nvdec->rst = devm_reset_control_get(dev, "nvdec");
 	if (IS_ERR(nvdec->rst)) {
 		dev_err(&pdev->dev, "cannot get reset\n");
-		nvdec->rst = NULL;
+		return PTR_ERR(nvdec->rst);
 	}
 
 	platform_set_drvdata(pdev, nvdec);
