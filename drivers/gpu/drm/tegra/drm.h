@@ -73,7 +73,6 @@ struct tegra_drm_client_ops {
 	int (*open_channel)(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context);
 	void (*close_channel)(struct tegra_drm_context *context);
-	void (*reset)(struct device *dev);
 	int (*is_addr_reg)(struct device *dev, u32 class, u32 offset, u32 val);
 	int (*submit)(struct tegra_drm_context *context,
 		      struct drm_tegra_submit *args, struct drm_device *drm,
