@@ -30,10 +30,6 @@
 #include "nvjpg_t186.h"
 #endif
 
-#define NVJPG_AUTOSUSPEND_DELAY 500
-
-static int nvjpg_boot(struct nvjpg *nvjpg);
-
 static int nvjpg_runtime_resume(struct device *dev)
 {
 	struct nvjpg *nvjpg = dev_get_drvdata(dev);
@@ -49,6 +45,8 @@ static int nvjpg_runtime_resume(struct device *dev)
 		tegra_powergate_partition(TEGRA_POWERGATE_NVJPG);
 		return err;
 	}
+
+	return 0;
 #else
 	if (nvjpg->rst) {
 		err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_NVJPG,
@@ -56,21 +54,9 @@ static int nvjpg_runtime_resume(struct device *dev)
 		if (err < 0)
 			dev_err(dev, "failed to power up device\n");
 	}
-#endif
-	err = nvjpg_boot(nvjpg);
-	if (err < 0)
-		goto boot_fail;
 
-	return 0;
-
-boot_fail:
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
-	tegra_powergate_power_off(TEGRA_POWERGATE_NVJPG);
-#else
-	clk_disable_unprepare(nvjpg->clk);
-	tegra_powergate_partition(TEGRA_POWERGATE_NVJPG);
-#endif
 	return err;
+#endif
 }
 
 static int nvjpg_runtime_suspend(struct device *dev)
@@ -291,17 +277,39 @@ int nvjpg_open_channel(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context)
 {
 	struct nvjpg *nvjpg = to_nvjpg(client);
+	int err;
+
+	err = pm_runtime_get_sync(nvjpg->dev);
+	if (err < 0)
+		return err;
+
+	/*
+	 * Try to boot the Falcon microcontroller. Booting is deferred until
+	 * here because the firmware might not yet be available during system
+	 * boot, for example if it's on remote storage.
+	 */
+	err = nvjpg_boot(nvjpg);
+	if (err < 0) {
+		pm_runtime_put(nvjpg->dev);
+		return err;
+	}
 
 	context->channel = host1x_channel_get(nvjpg->channel);
-	if (!context->channel)
+	if (!context->channel) {
+		pm_runtime_put(nvjpg->dev);
 		return -ENOMEM;
+	}
 
 	return 0;
 }
 
 void nvjpg_close_channel(struct tegra_drm_context *context)
 {
+	struct nvjpg *nvjpg = to_nvjpg(context->client);
+
 	host1x_channel_put(context->channel);
+
+	pm_runtime_put(nvjpg->dev);
 }
 
 static const struct tegra_drm_client_ops nvjpg_ops = {
@@ -387,18 +395,6 @@ static int nvjpg_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	/* BL can keep partition powered ON,
-	 * if so power off partition explicitly
-	 */
-	if (tegra_powergate_is_powered(TEGRA_POWERGATE_NVJPG))
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		tegra_powergate_partition(TEGRA_POWERGATE_NVJPG);
-#else
-		tegra_powergate_power_off(TEGRA_POWERGATE_NVJPG);
-#endif
-
-	pm_runtime_set_autosuspend_delay(dev, NVJPG_AUTOSUSPEND_DELAY);
-	pm_runtime_use_autosuspend(dev);
 	pm_runtime_enable(&pdev->dev);
 	if (!pm_runtime_enabled(&pdev->dev)) {
 		err = nvjpg_runtime_resume(&pdev->dev);
