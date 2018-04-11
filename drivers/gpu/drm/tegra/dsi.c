@@ -847,12 +847,10 @@ static void tegra_dsi_unprepare(struct tegra_dsi *dsi)
 	if (dsi->slave)
 		tegra_dsi_unprepare(dsi->slave);
 
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_mipi_disable(dsi->mipi);
 	if (err < 0)
 		dev_err(dsi->dev, "failed to disable MIPI calibration: %d\n",
 			err);
-#endif
 
 	pm_runtime_put(dsi->dev);
 }
@@ -902,12 +900,10 @@ static void tegra_dsi_prepare(struct tegra_dsi *dsi)
 
 	pm_runtime_get_sync(dsi->dev);
 
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_mipi_enable(dsi->mipi);
 	if (err < 0)
 		dev_err(dsi->dev, "failed to enable MIPI calibration: %d\n",
 			err);
-#endif
 
 	err = tegra_dsi_pad_calibrate(dsi);
 	if (err < 0)
