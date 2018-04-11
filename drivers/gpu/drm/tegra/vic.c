@@ -28,9 +28,41 @@
 #include "drm.h"
 #include "falcon.h"
 #include "vic.h"
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-#include "vic_t186.h"
-#endif
+
+struct vic_config {
+	/* Firmware name */
+	const char *ucode_name;
+};
+
+struct vic {
+	struct falcon falcon;
+	bool booted;
+
+	void __iomem *regs;
+	struct tegra_drm_client client;
+	struct host1x_channel *channel;
+	struct iommu_domain *domain;
+	struct device *dev;
+	struct clk *clk;
+	struct reset_control *rst;
+
+	/* Platform configuration */
+	const struct vic_config *config;
+
+	/* for firewall - this determines if method 1 should be regarded
+	 * as an address register */
+	bool method_data_is_addr_reg;
+};
+
+static inline struct vic *to_vic(struct tegra_drm_client *client)
+{
+	return container_of(client, struct vic, client);
+}
+
+static void vic_writel(struct vic *vic, u32 value, unsigned int offset)
+{
+	writel(value, vic->regs + offset);
+}
 
 static int vic_runtime_resume(struct device *dev)
 {
@@ -273,7 +305,7 @@ static const struct host1x_client_ops vic_client_ops = {
 	.exit = vic_exit,
 };
 
-int vic_open_channel(struct tegra_drm_client *client,
+static int vic_open_channel(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context)
 {
 	struct vic *vic = to_vic(client);
@@ -303,7 +335,7 @@ int vic_open_channel(struct tegra_drm_client *client,
 	return 0;
 }
 
-void vic_close_channel(struct tegra_drm_context *context)
+static void vic_close_channel(struct tegra_drm_context *context)
 {
 	struct vic *vic = to_vic(context->client);
 
@@ -312,7 +344,7 @@ void vic_close_channel(struct tegra_drm_context *context)
 	pm_runtime_put(vic->dev);
 }
 
-int vic_is_addr_reg(struct device *dev, u32 class, u32 offset, u32 val)
+static int vic_is_addr_reg(struct device *dev, u32 class, u32 offset, u32 val)
 {
 	struct vic *vic = dev_get_drvdata(dev);
 
@@ -351,20 +383,15 @@ static const struct tegra_drm_client_ops vic_ops = {
 
 static const struct vic_config vic_t124_config = {
 	.ucode_name = "vic03_ucode.bin",
-	.drm_client_ops = &vic_ops,
 };
 
 static const struct vic_config vic_t210_config = {
 	.ucode_name = "tegra21x/vic04_ucode.bin",
-	.drm_client_ops = &vic_ops,
 };
 
 static const struct of_device_id vic_match[] = {
 	{ .compatible = "nvidia,tegra124-vic", .data = &vic_t124_config },
 	{ .compatible = "nvidia,tegra210-vic", .data = &vic_t210_config },
-#ifdef CONFIG_ARCH_TEGRA_18x_SOC
-	{ .compatible = "nvidia,tegra186-vic", .data = &vic_t186_config },
-#endif
 	{ },
 };
 
@@ -423,7 +450,7 @@ static int vic_probe(struct platform_device *pdev)
 	vic->config = vic_config;
 
 	INIT_LIST_HEAD(&vic->client.list);
-	vic->client.ops = vic->config->drm_client_ops;
+	vic->client.ops = &vic_ops;
 
 	err = host1x_client_register(&vic->client.base);
 	if (err < 0) {
