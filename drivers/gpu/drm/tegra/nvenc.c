@@ -30,10 +30,6 @@
 #include "nvenc_t186.h"
 #endif
 
-#define NVENC_AUTOSUSPEND_DELAY 500
-
-static int nvenc_boot(struct nvenc *nvenc);
-
 static int nvenc_runtime_resume(struct device *dev)
 {
 	struct nvenc *nvenc = dev_get_drvdata(dev);
@@ -49,6 +45,8 @@ static int nvenc_runtime_resume(struct device *dev)
 		tegra_powergate_partition(TEGRA_POWERGATE_NVENC);
 		return err;
 	}
+
+	return 0;
 #else
 	if (nvenc->rst) {
 		err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_NVENC,
@@ -56,21 +54,9 @@ static int nvenc_runtime_resume(struct device *dev)
 		if (err < 0)
 			dev_err(dev, "failed to power up device\n");
 	}
-#endif
-	err = nvenc_boot(nvenc);
-	if (err < 0)
-		goto nvenc_boot_fail;
 
-	return 0;
-nvenc_boot_fail:
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
-	tegra_powergate_power_off(TEGRA_POWERGATE_NVENC);
-#else
-	clk_disable_unprepare(nvenc->clk);
-	tegra_powergate_partition(TEGRA_POWERGATE_NVENC);
-#endif
 	return err;
-
+#endif
 }
 
 static int nvenc_runtime_suspend(struct device *dev)
@@ -291,17 +277,39 @@ int nvenc_open_channel(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context)
 {
 	struct nvenc *nvenc = to_nvenc(client);
+	int err;
+
+	err = pm_runtime_get_sync(nvenc->dev);
+	if (err < 0)
+		return err;
+
+	/*
+	 * Try to boot the Falcon microcontroller. Booting is deferred until
+	 * here because the firmware might not yet be available during system
+	 * boot, for example if it's on remote storage.
+	 */
+	err = nvenc_boot(nvenc);
+	if (err < 0) {
+		pm_runtime_put(nvenc->dev);
+		return err;
+	}
 
 	context->channel = host1x_channel_get(nvenc->channel);
-	if (!context->channel)
+	if (!context->channel) {
+		pm_runtime_put(nvenc->dev);
 		return -ENOMEM;
+	}
 
 	return 0;
 }
 
 void nvenc_close_channel(struct tegra_drm_context *context)
 {
+	struct nvenc *nvenc = to_nvenc(context->client);
+
 	host1x_channel_put(context->channel);
+
+	pm_runtime_put(nvenc->dev);
 }
 
 static const struct tegra_drm_client_ops nvenc_ops = {
@@ -387,18 +395,6 @@ static int nvenc_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	/* BL can keep partition powered ON,
-	 * if so power off partition explicitly
-	 */
-	if (tegra_powergate_is_powered(TEGRA_POWERGATE_NVENC))
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		tegra_powergate_partition(TEGRA_POWERGATE_NVENC);
-#else
-		tegra_powergate_power_off(TEGRA_POWERGATE_NVENC);
-#endif
-
-	pm_runtime_set_autosuspend_delay(dev, NVENC_AUTOSUSPEND_DELAY);
-	pm_runtime_use_autosuspend(dev);
 	pm_runtime_enable(&pdev->dev);
 	if (!pm_runtime_enabled(&pdev->dev)) {
 		err = nvenc_runtime_resume(&pdev->dev);
