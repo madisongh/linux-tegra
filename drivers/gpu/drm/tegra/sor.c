@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2013 NVIDIA Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1428,13 +1428,9 @@ static void tegra_sor_edp_disable(struct drm_encoder *encoder)
 			dev_err(sor->dev, "failed to disable DP: %d\n", err);
 	}
 
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_io_rail_power_off(TEGRA_IO_RAIL_LVDS);
 	if (err < 0)
 		dev_err(sor->dev, "failed to power off I/O rail: %d\n", err);
-#else
-	dev_err(sor->dev, "io rail ops not implemented in downstream\n");
-#endif
 
 	if (output->panel)
 		drm_panel_unprepare(output->panel);
@@ -1592,13 +1588,9 @@ static void tegra_sor_edp_enable(struct drm_encoder *encoder)
 	tegra_sor_writel(sor, value, SOR_DP_PADCTL0);
 
 	/* step 2 */
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_io_rail_power_on(TEGRA_IO_RAIL_LVDS);
 	if (err < 0)
 		dev_err(sor->dev, "failed to power on I/O rail: %d\n", err);
-#else
-	dev_err(sor->dev, "io rail ops not implemented in downstream\n");
-#endif
 
 	usleep_range(5, 100);
 
@@ -1985,13 +1977,9 @@ static void tegra_sor_hdmi_disable(struct drm_encoder *encoder)
 	if (err < 0)
 		dev_err(sor->dev, "failed to power down SOR: %d\n", err);
 
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_io_rail_power_off(TEGRA_IO_RAIL_HDMI);
 	if (err < 0)
 		dev_err(sor->dev, "failed to power off HDMI rail: %d\n", err);
-#else
-	dev_err(sor->dev, "io rail ops not implemented in downstream\n");
-#endif
 
 	pm_runtime_put(sor->dev);
 }
@@ -2021,13 +2009,9 @@ static void tegra_sor_hdmi_enable(struct drm_encoder *encoder)
 
 	div = clk_get_rate(sor->clk) / 1000000 * 4;
 
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_io_rail_power_on(TEGRA_IO_RAIL_HDMI);
 	if (err < 0)
 		dev_err(sor->dev, "failed to power on HDMI rail: %d\n", err);
-#else
-	dev_err(sor->dev, "io rail ops not implemented in downstream\n");
-#endif
 
 	usleep_range(20, 100);
 

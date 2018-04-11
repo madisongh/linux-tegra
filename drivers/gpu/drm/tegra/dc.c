@@ -13,13 +13,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/reset.h>
 
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-#include <linux/clk/tegra.h>
-#include <linux/tegra-powergate.h>
-#include <linux/platform/tegra/mc.h>
-#else
 #include <soc/tegra/pmc.h>
-#endif
 
 #include "dc.h"
 #include "drm.h"
@@ -2000,19 +1994,11 @@ static int tegra_dc_probe(struct platform_device *pdev)
 
 	if (dc->soc->has_powergate) {
 		if (dc->pipe == 0)
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 			dc->powergate = TEGRA_POWERGATE_DIS;
-#else
-			dc->powergate = TEGRA_POWERGATE_DISA;
-#endif
 		else
 			dc->powergate = TEGRA_POWERGATE_DISB;
 
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		tegra_powergate_partition(dc->powergate);
-#else
 		tegra_powergate_power_off(dc->powergate);
-#endif
 	}
 
 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -2085,11 +2071,7 @@ static int tegra_dc_suspend(struct device *dev)
 	}
 
 	if (dc->soc->has_powergate)
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 		tegra_powergate_power_off(dc->powergate);
-#else
-		tegra_powergate_partition(dc->powergate);
-#endif
 
 	clk_disable_unprepare(dc->clk);
 
@@ -2102,31 +2084,12 @@ static int tegra_dc_resume(struct device *dev)
 	int err;
 
 	if (dc->soc->has_powergate) {
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		err = tegra_unpowergate_partition(dc->powergate);
-		if (err)
-			return err;
-
-		err = clk_prepare_enable(dc->clk);
-		if (err) {
-			tegra_powergate_partition(dc->powergate);
-			return err;
-		}
-
-		err = reset_control_deassert(dc->rst);
-		if (err) {
-			tegra_powergate_partition(dc->powergate);
-			return err;
-		}
-#else
 		err = tegra_powergate_sequence_power_up(dc->powergate, dc->clk,
 							dc->rst);
 		if (err < 0) {
 			dev_err(dev, "failed to power partition: %d\n", err);
 			return err;
 		}
-
-#endif
 	} else {
 		err = clk_prepare_enable(dc->clk);
 		if (err < 0) {

@@ -342,11 +342,7 @@ static struct tegra_bo *tegra_bo_import(struct drm_device *drm,
 	if (IS_ERR(bo))
 		return bo;
 
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	attach = dma_buf_attach(buf, drm->dev->parent);
-#else
 	attach = dma_buf_attach(buf, drm->dev);
-#endif
 	if (IS_ERR(attach)) {
 		err = PTR_ERR(attach);
 		goto free;
@@ -370,12 +366,10 @@ static struct tegra_bo *tegra_bo_import(struct drm_device *drm,
 		if (err < 0)
 			goto detach;
 	} else {
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 		if (bo->sgt->nents > 1) {
 			err = -EINVAL;
 			goto detach;
 		}
-#endif
 
 		bo->paddr = sg_dma_address(bo->sgt->sgl);
 	}
