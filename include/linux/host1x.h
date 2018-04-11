@@ -270,9 +270,6 @@ struct host1x_job {
 
 	/* Add a channel wait for previous ops to complete */
 	bool serialize;
-
-	struct host1x_bo *error_notifier_bo;
-	u64 error_notifier_offset;
 };
 
 struct host1x_job *host1x_job_alloc(struct host1x_channel *ch,

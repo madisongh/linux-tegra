@@ -1,7 +1,7 @@
 /*
  * Tegra host1x Job
  *
- * Copyright (C) 2010-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2010-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -48,8 +48,6 @@ struct host1x_job_unpin_data {
 	struct host1x_bo *bo;
 	struct sg_table *sgt;
 };
-
-void host1x_job_set_notifier(struct host1x_job *job, u32 error);
 
 /*
  * Dump contents of job to debug output.

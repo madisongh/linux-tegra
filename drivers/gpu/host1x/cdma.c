@@ -1,7 +1,7 @@
 /*
  * Tegra host1x Command DMA
  *
- * Copyright (c) 2010-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -26,7 +26,6 @@
 #include <linux/kfifo.h>
 #include <linux/slab.h>
 #include <trace/events/host1x.h>
-#include <drm/tegra_drm.h>
 
 #include "cdma.h"
 #include "channel.h"
@@ -350,7 +349,6 @@ out:
 		/* won't need a timeout when replayed */
 		job->timeout = 0;
 
-		host1x_job_set_notifier(job, DRM_TEGRA_ERROR_SUBMIT_TIMEOUT);
 		host1x_job_dump(dev, job);
 
 		/* first, make all missing increments */

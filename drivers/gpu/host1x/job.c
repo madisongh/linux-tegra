@@ -1,7 +1,7 @@
 /*
  * Tegra host1x Job
  *
- * Copyright (C) 2010-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2010-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -25,7 +25,6 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <trace/events/host1x.h>
-#include <drm/tegra_drm.h>
 
 #include "channel.h"
 #include "dev.h"
@@ -629,38 +628,6 @@ void host1x_job_unpin(struct host1x_job *job)
 				      job->gather_copy);
 }
 EXPORT_SYMBOL(host1x_job_unpin);
-
-void host1x_job_set_notifier(struct host1x_job *job, u32 error)
-{
-	struct drm_tegra_notification *error_notifier;
-	struct timespec time_data;
-	void *notifier_va;
-	u64 nsec;
-
-	if (!job->error_notifier_bo)
-		return;
-
-	notifier_va = host1x_bo_mmap(job->error_notifier_bo);
-	if (!notifier_va)
-		return;
-
-	error_notifier = notifier_va + job->error_notifier_offset;
-
-	getnstimeofday(&time_data);
-	nsec = ((u64)time_data.tv_sec) * 1000000000u +
-		(u64)time_data.tv_nsec;
-	error_notifier->time_stamp.nanoseconds[0] =
-		(u32)nsec;
-	error_notifier->time_stamp.nanoseconds[1] =
-		(u32)(nsec >> 32);
-
-	error_notifier->error32 = error;
-	error_notifier->status = 0xffff;
-
-	dev_err(job->channel->dev, "error notifier set to %d\n", error);
-
-	host1x_bo_munmap(job->error_notifier_bo, notifier_va);
-}
 
 /*
  * Debug routine used to dump job entries

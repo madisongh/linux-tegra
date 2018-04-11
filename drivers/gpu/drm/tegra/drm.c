@@ -357,11 +357,6 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 	job->class = context->client->base.class;
 	job->serialize = true;
 
-	if (context->error_notifier_bo) {
-		job->error_notifier_bo = context->error_notifier_bo;
-		job->error_notifier_offset = context->error_notifier_offset;
-	}
-
 	while (num_cmdbufs) {
 		struct sync_fence *pre_fence = NULL;
 		struct drm_tegra_cmdbuf cmdbuf;
@@ -645,50 +640,6 @@ static int tegra_fence_set_name(struct drm_device *drm, void *data,
 	return err;
 }
 
-static int tegra_set_error_notifier(struct drm_device *drm, void *data,
-				    struct drm_file *file)
-{
-	struct tegra_drm_file *fpriv = file->driver_priv;
-	struct drm_tegra_set_error_notifier *args = data;
-	struct tegra_drm_context *context;
-	struct host1x_bo *bo;
-	void *notifier;
-
-	context = tegra_drm_get_context(args->context);
-	if (!tegra_drm_file_owns_context(fpriv, context))
-		return -EINVAL;
-
-	if (!args->handle) {
-		if (context->error_notifier_bo)
-			host1x_bo_put(context->error_notifier_bo);
-		context->error_notifier_bo = NULL;
-		return 0;
-	}
-
-	if (context->error_notifier_bo) {
-		host1x_bo_put(context->error_notifier_bo);
-		context->error_notifier_bo = NULL;
-	}
-
-	bo = host1x_bo_lookup(file, args->handle);
-	if (!bo)
-		return -ENOENT;
-
-	notifier = host1x_bo_mmap(bo);
-	if (!notifier)
-		return -EINVAL;
-
-	host1x_bo_get(bo);
-
-	memset(notifier + args->offset, 0,
-			sizeof(struct drm_tegra_notification));
-	host1x_bo_munmap(bo, notifier);
-
-	context->error_notifier_bo = bo;
-	context->error_notifier_offset = args->offset;
-
-	return 0;
-}
 
 static int tegra_open_channel(struct drm_device *drm, void *data,
 			      struct drm_file *file)
@@ -731,11 +682,6 @@ static int tegra_close_channel(struct drm_device *drm, void *data,
 
 	if (!tegra_drm_file_owns_context(fpriv, context))
 		return -EINVAL;
-
-	if (context->error_notifier_bo) {
-		host1x_bo_put(context->error_notifier_bo);
-		context->error_notifier_bo = NULL;
-	}
 
 	list_del(&context->list);
 	tegra_drm_context_free(context);
@@ -967,7 +913,6 @@ static const struct drm_ioctl_desc tegra_drm_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(TEGRA_GEM_GET_FLAGS, tegra_gem_get_flags, 0),
 	DRM_IOCTL_DEF_DRV(TEGRA_FENCE_CREATE, tegra_fence_create, DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(TEGRA_FENCE_SET_NAME, tegra_fence_set_name, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(TEGRA_SET_ERROR_NOTIFIER, tegra_set_error_notifier, DRM_RENDER_ALLOW),
 #endif
 };
 

@@ -67,9 +67,6 @@ struct tegra_drm_context {
 	struct tegra_drm_client *client;
 	struct host1x_channel *channel;
 	struct list_head list;
-
-	struct host1x_bo *error_notifier_bo;
-	u64 error_notifier_offset;
 };
 
 struct tegra_drm_client_ops {

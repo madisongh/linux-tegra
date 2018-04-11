@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2012-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -76,24 +76,6 @@ struct drm_tegra_fence_create {
 struct drm_tegra_fence_set_name {
 	__u64 name; /* const char* for name */
 	__s32 fence_fd; /* fd of fence */
-};
-
-#define DRM_TEGRA_ERROR_SUBMIT_TIMEOUT		1
-
-struct drm_tegra_notification {
-	struct {
-		__u32 nanoseconds[2];   /* nanoseconds since Jan. 1, 1970 */
-	} time_stamp;
-	__u32 error32;
-	__u16 error16;
-	__u16 status;
-};
-
-struct drm_tegra_set_error_notifier {
-	__u64 context;
-	__u64 offset;
-	__u32 handle;
-	__u32 pad;
 };
 
 #define DRM_TEGRA_NO_TIMEOUT	(0xffffffff)
@@ -245,7 +227,6 @@ struct drm_tegra_gem_get_flags {
 #define DRM_IOCTL_TEGRA_GEM_GET_FLAGS DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_GEM_GET_FLAGS, struct drm_tegra_gem_get_flags)
 #define DRM_IOCTL_TEGRA_FENCE_CREATE DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_FENCE_CREATE, struct drm_tegra_fence_create)
 #define DRM_IOCTL_TEGRA_FENCE_SET_NAME DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_FENCE_SET_NAME, struct drm_tegra_fence_set_name)
-#define DRM_IOCTL_TEGRA_SET_ERROR_NOTIFIER DRM_IOWR(DRM_COMMAND_BASE + DRM_TEGRA_SET_ERROR_NOTIFIER, struct drm_tegra_set_error_notifier)
 
 #if defined(__cplusplus)
 }
