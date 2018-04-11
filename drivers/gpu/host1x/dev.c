@@ -126,7 +126,6 @@ MODULE_DEVICE_TABLE(of, host1x_of_match);
 static int host1x_update_chara(struct host1x *host1x)
 {
 	host1x->host1x_chara.flags = 0;
-	host1x->host1x_chara.num_syncpts = host1x->info->nb_pts;
 
 	return 0;
 }

@@ -48,8 +48,6 @@ struct host1x_client_ops {
 
 struct host1x_characteristics {
 	__u64 flags;
-
-	__u32 num_syncpts;
 };
 
 struct host1x_characteristics *host1x_get_chara(struct host1x *host1x);
