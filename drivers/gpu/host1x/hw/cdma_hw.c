@@ -1,7 +1,7 @@
 /*
  * Tegra host1x Command DMA
  *
- * Copyright (c) 2010-2016, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -83,8 +83,6 @@ static void cdma_start(struct host1x_cdma *cdma)
 			 HOST1X_CHANNEL_DMACTRL_DMAINITGET,
 			 HOST1X_CHANNEL_DMACTRL);
 
-	host1x_channel_enable_gather_filter(ch);
-
 	/* start the command DMA */
 	host1x_ch_writel(ch, 0, HOST1X_CHANNEL_DMACTRL);
 
@@ -132,8 +130,6 @@ static void cdma_timeout_restart(struct host1x_cdma *cdma, u32 getptr)
 	host1x_ch_writel(ch, HOST1X_CHANNEL_DMACTRL_DMASTOP,
 			 HOST1X_CHANNEL_DMACTRL);
 	host1x_ch_writel(ch, cdma->push_buffer.pos, HOST1X_CHANNEL_DMAPUT);
-
-	host1x_channel_enable_gather_filter(ch);
 
 	/* start the command DMA */
 	host1x_ch_writel(ch, 0, HOST1X_CHANNEL_DMACTRL);

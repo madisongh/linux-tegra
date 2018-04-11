@@ -722,9 +722,6 @@ static int tegra_get_characteristics(struct drm_device *drm, void *data,
 	host1x_char = host1x_get_chara(host1x);
 	drm_tegra_char.flags = host1x_char->flags;
 
-	if (host1x_channel_gather_filter_enabled(host1x))
-		drm_tegra_char.flags |= DRM_TEGRA_CHARA_GFILTER;
-
 	if (args->drm_tegra_chara_buf_size > 0) {
 		size_t write_size = sizeof(drm_tegra_char);
 

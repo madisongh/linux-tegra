@@ -247,16 +247,8 @@ static int host1x_channel_init(struct host1x_channel *ch, struct host1x *dev,
 	return 0;
 }
 
-static void channel_enable_gather_filter(struct host1x_channel *ch)
-{
-	host1x_ch_writel(ch,
-			 HOST1X_CHANNEL_CHANNELCTRL_KERNEL_FILTER_GBUFFER_F(1),
-			 HOST1X_CHANNEL_CHANNELCTRL);
-}
-
 static const struct host1x_channel_ops host1x_channel_ops = {
 	.init = host1x_channel_init,
 	.submit = channel_submit,
-	.push_wait = channel_push_wait,
-	.enable_gather_filter = channel_enable_gather_filter,
+	.push_wait = channel_push_wait
 };
