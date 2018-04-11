@@ -381,12 +381,8 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 		struct sync_fence *pre_fence = NULL;
 		struct drm_tegra_cmdbuf cmdbuf;
 		struct host1x_bo *bo;
-		u32 class_id;
-
-		if (class_ids && local_class_ids[i])
-			class_id = local_class_ids[i];
-		else
-			class_id = context->client->base.class;
+		u32 class_id = class_ids ? local_class_ids[i]
+					 : context->client->base.class;
 
 		if (copy_from_user(&cmdbuf, cmdbufs, sizeof(cmdbuf))) {
 			err = -EFAULT;
