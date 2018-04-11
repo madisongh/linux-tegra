@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -61,7 +61,7 @@ static inline struct nvenc *to_nvenc(struct tegra_drm_client *client)
 static int nvenc_runtime_resume(struct device *dev)
 {
 	struct nvenc *nvenc = dev_get_drvdata(dev);
-	int err = 0;
+	int err;
 
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_unpowergate_partition(TEGRA_POWERGATE_NVENC);
@@ -76,12 +76,10 @@ static int nvenc_runtime_resume(struct device *dev)
 
 	return 0;
 #else
-	if (nvenc->rst) {
-		err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_NVENC,
-							nvenc->clk, nvenc->rst);
-		if (err < 0)
-			dev_err(dev, "failed to power up device\n");
-	}
+	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_NVENC,
+						nvenc->clk, nvenc->rst);
+	if (err < 0)
+		dev_err(dev, "failed to power up device\n");
 
 	return err;
 #endif
@@ -96,8 +94,7 @@ static int nvenc_runtime_suspend(struct device *dev)
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
 	tegra_powergate_partition(TEGRA_POWERGATE_NVENC);
 #else
-	if (nvenc->rst)
-		reset_control_assert(nvenc->rst);
+	reset_control_assert(nvenc->rst);
 	tegra_powergate_power_off(TEGRA_POWERGATE_NVENC);
 #endif
 
@@ -122,23 +119,15 @@ static int nvenc_boot(struct nvenc *nvenc)
 
 	/* ensure that the engine is in sane state */
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	if (nvenc->rst) {
-		reset_control_assert(nvenc->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(nvenc->rst);
-	} else {
-		tegra_mc_flush(true);
-		tegra_periph_reset_assert(nvenc->clk);
-		usleep_range(10, 100);
-		tegra_periph_reset_deassert(nvenc->clk);
-		tegra_mc_flush_done(true);
-	}
+	tegra_mc_flush(true);
+	tegra_periph_reset_assert(nvenc->clk);
+	usleep_range(10, 100);
+	tegra_periph_reset_deassert(nvenc->clk);
+	tegra_mc_flush_done(true);
 #else
-	if (nvenc->rst) {
-		reset_control_assert(nvenc->rst);
-		usleep_range(10, 100);
-		reset_control_deassert(nvenc->rst);
-	}
+	reset_control_assert(nvenc->rst);
+	usleep_range(10, 100);
+	reset_control_deassert(nvenc->rst);
 #endif
 
 	err = falcon_boot(&nvenc->falcon);
@@ -262,23 +251,15 @@ static int nvenc_exit(struct host1x_client *client)
 
 	if (nvenc->booted) {
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		if (nvenc->rst) {
-			reset_control_assert(nvenc->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(nvenc->rst);
-		} else {
-			tegra_mc_flush(true);
-			tegra_periph_reset_assert(nvenc->clk);
-			usleep_range(10, 100);
-			tegra_periph_reset_deassert(nvenc->clk);
-			tegra_mc_flush_done(true);
-		}
+		tegra_mc_flush(true);
+		tegra_periph_reset_assert(nvenc->clk);
+		usleep_range(10, 100);
+		tegra_periph_reset_deassert(nvenc->clk);
+		tegra_mc_flush_done(true);
 #else
-		if (nvenc->rst) {
-			reset_control_assert(nvenc->rst);
-			usleep_range(10, 100);
-			reset_control_deassert(nvenc->rst);
-		}
+		reset_control_assert(nvenc->rst);
+		usleep_range(10, 100);
+		reset_control_deassert(nvenc->rst);
 #endif
 	}
 
@@ -388,10 +369,10 @@ static int nvenc_probe(struct platform_device *pdev)
 		return PTR_ERR(nvenc->clk);
 	}
 
-	nvenc->rst = devm_reset_control_get(dev, NULL);
+	nvenc->rst = devm_reset_control_get(dev, "nvenc");
 	if (IS_ERR(nvenc->rst)) {
 		dev_err(&pdev->dev, "cannot get reset\n");
-		nvenc->rst = NULL;
+		return PTR_ERR(nvenc->rst);
 	}
 
 	platform_set_drvdata(pdev, nvenc);
