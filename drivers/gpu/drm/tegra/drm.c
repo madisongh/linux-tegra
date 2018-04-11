@@ -690,37 +690,6 @@ static int tegra_set_error_notifier(struct drm_device *drm, void *data,
 	return 0;
 }
 
-static int tegra_get_characteristics(struct drm_device *drm, void *data,
-				struct drm_file *file)
-{
-	struct drm_tegra_get_characteristics *args = data;
-	struct host1x *host1x = dev_get_drvdata(drm->dev->parent);
-	struct host1x_characteristics *host1x_char;
-	struct drm_tegra_characteristics drm_tegra_char;
-	int err = 0;
-
-	/* get characterisitcs from host1x and update to drm fields */
-	host1x_char = host1x_get_chara(host1x);
-	drm_tegra_char.flags = host1x_char->flags;
-
-	if (args->drm_tegra_chara_buf_size > 0) {
-		size_t write_size = sizeof(drm_tegra_char);
-
-		if (write_size > args->drm_tegra_chara_buf_size)
-			write_size = args->drm_tegra_chara_buf_size;
-
-		err = copy_to_user((void __user *)(uintptr_t)
-				   args->drm_tegra_chara_buf_addr,
-				   &drm_tegra_char, write_size);
-	}
-
-	if (err == 0)
-		args->drm_tegra_chara_buf_size =
-			sizeof(drm_tegra_char);
-
-	return err;
-}
-
 static int tegra_open_channel(struct drm_device *drm, void *data,
 			      struct drm_file *file)
 {
@@ -999,7 +968,6 @@ static const struct drm_ioctl_desc tegra_drm_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(TEGRA_FENCE_CREATE, tegra_fence_create, DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(TEGRA_FENCE_SET_NAME, tegra_fence_set_name, DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(TEGRA_SET_ERROR_NOTIFIER, tegra_set_error_notifier, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(TEGRA_GET_CHARACTERISTICS, tegra_get_characteristics, DRM_RENDER_ALLOW),
 #endif
 };
 
