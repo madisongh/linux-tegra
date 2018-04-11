@@ -1,7 +1,7 @@
 /*
  * Tegra host1x Command DMA
  *
- * Copyright (c) 2010-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2013, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -36,11 +36,18 @@ static void push_buffer_init(struct push_buffer *pb)
 /*
  * Increment timedout buffer's syncpt via CPU.
  */
-static void cdma_timeout_handle(struct host1x_cdma *cdma, u32 getptr,
-				u32 nr_slots)
+static void cdma_timeout_cpu_incr(struct host1x_cdma *cdma, u32 getptr,
+				u32 syncpt_incrs, u32 syncval, u32 nr_slots)
 {
 	struct host1x *host1x = cdma_to_host1x(cdma);
 	struct push_buffer *pb = &cdma->push_buffer;
+	unsigned int i;
+
+	for (i = 0; i < syncpt_incrs; i++)
+		host1x_syncpt_incr(cdma->timeout.syncpt);
+
+	/* after CPU incr, ensure shadow is up to date */
+	host1x_syncpt_load(cdma->timeout.syncpt);
 
 	/* NOP all the PB slots */
 	while (nr_slots--) {
@@ -227,12 +234,10 @@ static void cdma_resume(struct host1x_cdma *cdma, u32 getptr)
  */
 static void cdma_timeout_handler(struct work_struct *work)
 {
-	u32 prev_cmdproc, cmdproc_stop;
+	u32 prev_cmdproc, cmdproc_stop, syncpt_val;
 	struct host1x_cdma *cdma;
 	struct host1x *host1x;
 	struct host1x_channel *ch;
-	bool has_timedout = 0;
-	unsigned int i;
 
 	cdma = container_of(to_delayed_work(work), struct host1x_cdma,
 			    timeout.wq);
@@ -258,20 +263,10 @@ static void cdma_timeout_handler(struct work_struct *work)
 	dev_dbg(host1x->dev, "cdma_timeout: cmdproc was 0x%x is 0x%x\n",
 		prev_cmdproc, cmdproc_stop);
 
-	for (i = 0; i < cdma->timeout.num_syncpts; ++i) {
-		u32 id = cdma->timeout.syncpts[i].id;
-		u32 end = cdma->timeout.syncpts[i].end;
-		struct host1x_syncpt *syncpt = host1x_syncpt_get(host1x, id);
-
-		host1x_syncpt_load(syncpt);
-
-		has_timedout = !host1x_syncpt_is_expired(syncpt, end);
-		if (has_timedout)
-			break;
-	}
+	syncpt_val = host1x_syncpt_load(cdma->timeout.syncpt);
 
 	/* has buffer actually completed? */
-	if (!has_timedout) {
+	if ((s32)(syncpt_val - cdma->timeout.syncpt_val) >= 0) {
 		dev_dbg(host1x->dev,
 			"cdma_timeout: expired, but buffer had completed\n");
 		/* restore */
@@ -282,15 +277,9 @@ static void cdma_timeout_handler(struct work_struct *work)
 		return;
 	}
 
-	for (i = 0; i < cdma->timeout.num_syncpts; ++i) {
-		u32 id = cdma->timeout.syncpts[i].id;
-		struct host1x_syncpt *syncpt = host1x_syncpt_get(host1x, id);
-		u32 syncpt_val = host1x_syncpt_read_min(syncpt);
-
-		dev_warn(host1x->dev, "%s: timeout: %d (%s), HW thresh %d, done %d\n",
-			__func__, syncpt->id, syncpt->name,
-			syncpt_val, syncpt_val);
-	}
+	dev_warn(host1x->dev, "%s: timeout: %u (%s), HW thresh %d, done %d\n",
+		 __func__, cdma->timeout.syncpt->id, cdma->timeout.syncpt->name,
+		 syncpt_val, cdma->timeout.syncpt_val);
 
 	/* stop HW, resetting channel/module */
 	host1x_hw_cdma_freeze(host1x, cdma);
@@ -302,7 +291,7 @@ static void cdma_timeout_handler(struct work_struct *work)
 /*
  * Init timeout resources
  */
-static int cdma_timeout_init(struct host1x_cdma *cdma)
+static int cdma_timeout_init(struct host1x_cdma *cdma, unsigned int syncpt)
 {
 	INIT_DELAYED_WORK(&cdma->timeout.wq, cdma_timeout_handler);
 	cdma->timeout.initialized = true;
@@ -330,7 +319,7 @@ static const struct host1x_cdma_ops host1x_cdma_ops = {
 	.timeout_destroy = cdma_timeout_destroy,
 	.freeze = cdma_freeze,
 	.resume = cdma_resume,
-	.timeout_handle = cdma_timeout_handle,
+	.timeout_cpu_incr = cdma_timeout_cpu_incr,
 };
 
 static const struct host1x_pushbuffer_ops host1x_pushbuffer_ops = {

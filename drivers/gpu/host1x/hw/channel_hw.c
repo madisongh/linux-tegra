@@ -95,73 +95,42 @@ static void channel_push_wait(struct host1x_channel *channel,
 			 host1x_class_host_wait_syncpt(id, thresh));
 }
 
-static inline void serialize(struct host1x_job *job)
-{
-	struct host1x_channel *ch = job->channel;
-	struct host1x *host = dev_get_drvdata(ch->dev->parent);
-	unsigned int i;
-
-	for (i = 0; i < job->num_syncpts; ++i) {
-		u32 syncpt_id = job->syncpts[i].id;
-		struct host1x_syncpt *syncpt =
-			host1x_syncpt_get(host, syncpt_id);
-
-		/*
-		 * Force serialization by inserting a host wait for the
-		 * previous job to finish before this one can commence.
-		 */
-		host1x_cdma_push(&ch->cdma,
-			 host1x_opcode_setclass(HOST1X_CLASS_HOST1X,
-				host1x_uclass_wait_syncpt_r(), 1),
-			 host1x_class_host_wait_syncpt(syncpt_id,
-				host1x_syncpt_read_max(syncpt)));
-	}
-}
-
 static inline void synchronize_syncpt_base(struct host1x_job *job)
 {
-	struct host1x_channel *ch = job->channel;
-	struct host1x *host = dev_get_drvdata(ch->dev->parent);
-	unsigned int i;
+	struct host1x *host = dev_get_drvdata(job->channel->dev->parent);
+	struct host1x_syncpt *sp = host->syncpt + job->syncpt_id;
+	unsigned int id;
+	u32 value;
 
-	for (i = 0; i < job->num_syncpts; ++i) {
-		u32 syncpt_id = job->syncpts[i].id;
-		struct host1x_syncpt *syncpt =
-			host1x_syncpt_get(host, syncpt_id);
-		u32 base_id, value;
+	value = host1x_syncpt_read_max(sp);
+	id = sp->base->id;
 
-		if (!syncpt->base)
-			continue;
-
-		value = host1x_syncpt_read_max(syncpt);
-		base_id = syncpt->base->id;
-
-		host1x_cdma_push(&job->channel->cdma,
+	host1x_cdma_push(&job->channel->cdma,
 			 host1x_opcode_setclass(HOST1X_CLASS_HOST1X,
 				HOST1X_UCLASS_LOAD_SYNCPT_BASE, 1),
-			 HOST1X_UCLASS_LOAD_SYNCPT_BASE_BASE_INDX_F(base_id) |
+			 HOST1X_UCLASS_LOAD_SYNCPT_BASE_BASE_INDX_F(id) |
 			 HOST1X_UCLASS_LOAD_SYNCPT_BASE_VALUE_F(value));
-	}
 }
 
 static int channel_submit(struct host1x_job *job)
 {
 	struct host1x_channel *ch = job->channel;
-	struct host1x_syncpt *syncpt;
+	struct host1x_syncpt *sp;
+	u32 user_syncpt_incrs = job->syncpt_incrs;
 	u32 prev_max = 0;
+	u32 syncval;
 	int err;
-	struct host1x_waitlist *completed_waiter[job->num_syncpts];
+	struct host1x_waitlist *completed_waiter = NULL;
 	struct host1x *host = dev_get_drvdata(ch->dev->parent);
-	unsigned int i;
 
+	sp = host->syncpt + job->syncpt_id;
 	trace_host1x_channel_submit(dev_name(ch->dev),
 				    job->num_gathers, job->num_relocs,
-				    job->num_waitchk, job->syncpts[0].id,
-				    job->syncpts[0].incrs);
+				    job->num_waitchk, job->syncpt_id,
+				    job->syncpt_incrs);
 
 	/* before error checks, return current max */
-	syncpt = host1x_syncpt_get(host, job->syncpts[0].id);
-	prev_max = host1x_syncpt_read_max(syncpt);
+	prev_max = job->syncpt_end = host1x_syncpt_read_max(sp);
 
 	/* keep device powered on */
 	for (i = 0; i < job->num_syncpts; ++i)
@@ -172,14 +141,11 @@ static int channel_submit(struct host1x_job *job)
 	if (err)
 		goto error;
 
-	for (i = 0; i < job->num_syncpts; i++) {
-		completed_waiter[i] = kzalloc(sizeof(*completed_waiter[i]),
-					      GFP_KERNEL);
-		if (!completed_waiter[i]) {
-			mutex_unlock(&ch->submitlock);
-			err = -ENOMEM;
-			goto error;
-		}
+	completed_waiter = kzalloc(sizeof(*completed_waiter), GFP_KERNEL);
+	if (!completed_waiter) {
+		mutex_unlock(&ch->submitlock);
+		err = -ENOMEM;
+		goto error;
 	}
 
 	/* begin a CDMA submit */
@@ -189,50 +155,46 @@ static int channel_submit(struct host1x_job *job)
 		goto error;
 	}
 
-	if (job->serialize)
-		serialize(job);
+	if (job->serialize) {
+		/*
+		 * Force serialization by inserting a host wait for the
+		 * previous job to finish before this one can commence.
+		 */
+		host1x_cdma_push(&ch->cdma,
+				 host1x_opcode_setclass(HOST1X_CLASS_HOST1X,
+					host1x_uclass_wait_syncpt_r(), 1),
+				 host1x_class_host_wait_syncpt(job->syncpt_id,
+					host1x_syncpt_read_max(sp)));
+	}
 
 	/* Synchronize base register to allow using it for relative waiting */
-	synchronize_syncpt_base(job);
+	if (sp->base)
+		synchronize_syncpt_base(job);
 
-	/* Increment syncpoint maximum values */
-	for (i = 0; i < job->num_syncpts; ++i) {
-		u32 id;
-		u32 incrs;
+	syncval = host1x_syncpt_incr_max(sp, user_syncpt_incrs);
 
-		id = job->syncpts[i].id;
-		incrs = job->syncpts[i].incrs;
-		syncpt = host1x_syncpt_get(host, id);
-		job->syncpts[i].end = host1x_syncpt_incr_max(syncpt, incrs);
-	}
+	job->syncpt_end = syncval;
 
 	submit_gathers(job);
 
 	/* end CDMA submit & stash pinned hMems into sync queue */
 	host1x_cdma_end(&ch->cdma, job);
 
-	trace_host1x_channel_submitted(dev_name(ch->dev), prev_max,
-				       job->syncpts[0].end);
+	trace_host1x_channel_submitted(dev_name(ch->dev), prev_max, syncval);
 
-	/* schedule submit complete interrupts */
-	for (i = 0; i < job->num_syncpts; ++i) {
-		u32 syncpt_id = job->syncpts[i].id;
-		u32 syncpt_end = job->syncpts[i].end;
-
-		err = host1x_intr_add_action(host, syncpt_id, syncpt_end,
-					     HOST1X_INTR_ACTION_SUBMIT_COMPLETE,
-					     ch, completed_waiter[i], NULL);
-		completed_waiter[i] = NULL;
-		WARN(err, "Failed to set submit complete interrupt");
-	}
+	/* schedule a submit complete interrupt */
+	err = host1x_intr_add_action(host, job->syncpt_id, syncval,
+				     HOST1X_INTR_ACTION_SUBMIT_COMPLETE, ch,
+				     completed_waiter, NULL);
+	completed_waiter = NULL;
+	WARN(err, "Failed to set submit complete interrupt");
 
 	mutex_unlock(&ch->submitlock);
 
 	return 0;
 
 error:
-	for (i = 0; i < job->num_syncpts; i++)
-		kfree(completed_waiter[i]);
+	kfree(completed_waiter);
 	return err;
 }
 

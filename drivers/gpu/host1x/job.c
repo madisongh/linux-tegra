@@ -33,7 +33,7 @@
 
 struct host1x_job *host1x_job_alloc(struct host1x_channel *ch,
 				    u32 num_cmdbufs, u32 num_relocs,
-				    u32 num_waitchks, u32 num_syncpts)
+				    u32 num_waitchks)
 {
 	struct host1x_job *job = NULL;
 	unsigned int num_unpins = num_cmdbufs + num_relocs;
@@ -46,7 +46,6 @@ struct host1x_job *host1x_job_alloc(struct host1x_channel *ch,
 		(u64)num_unpins * sizeof(struct host1x_job_unpin_data) +
 		(u64)num_waitchks * sizeof(struct host1x_waitchk) +
 		(u64)num_cmdbufs * sizeof(struct host1x_job_gather) +
-		(u64)num_syncpts * sizeof(struct host1x_job_syncpt) +
 		(u64)num_unpins * sizeof(dma_addr_t) +
 		(u64)num_unpins * sizeof(u32 *);
 	if (total > ULONG_MAX)
@@ -69,8 +68,6 @@ struct host1x_job *host1x_job_alloc(struct host1x_channel *ch,
 	mem += num_waitchks * sizeof(struct host1x_waitchk);
 	job->gathers = num_cmdbufs ? mem : NULL;
 	mem += num_cmdbufs * sizeof(struct host1x_job_gather);
-	job->syncpts = num_syncpts ? mem : NULL;
-	mem += num_syncpts * sizeof(struct host1x_job_syncpt);
 	job->addr_phys = num_unpins ? mem : NULL;
 
 	job->reloc_addr_phys = job->addr_phys;
@@ -634,12 +631,8 @@ EXPORT_SYMBOL(host1x_job_unpin);
  */
 void host1x_job_dump(struct device *dev, struct host1x_job *job)
 {
-	unsigned int i;
-
-	for (i = 0; i < job->num_syncpts; i++) {
-		dev_dbg(dev, "    SYNCPT_ID   %d\n", job->syncpts[i].id);
-		dev_dbg(dev, "    SYNCPT_VAL  %d\n", job->syncpts[i].end);
-	}
+	dev_dbg(dev, "    SYNCPT_ID   %d\n", job->syncpt_id);
+	dev_dbg(dev, "    SYNCPT_VAL  %d\n", job->syncpt_end);
 	dev_dbg(dev, "    FIRST_GET   0x%x\n", job->first_get);
 	dev_dbg(dev, "    TIMEOUT     %d\n", job->timeout);
 	dev_dbg(dev, "    NUM_SLOTS   %d\n", job->num_slots);
