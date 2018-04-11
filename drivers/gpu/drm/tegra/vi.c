@@ -42,9 +42,6 @@
 struct vi_config {
 	u32 class_id;
 	int powergate_id;
-	struct clk **clk;
-
-	int clk_cnt;
 };
 
 struct vi {
@@ -54,6 +51,7 @@ struct vi {
 
 	struct host1x_channel *channel;
 	struct device *dev;
+	struct clk *clk;
 	struct reset_control *rst;
 	struct regulator *reg;
 
@@ -86,10 +84,7 @@ static int vi_power_off(struct device *dev)
 	struct vi *vi = dev_get_drvdata(dev);
 
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	int i;
-
-	for (i = 0; i < vi->config->clk_cnt; i++)
-		clk_disable_unprepare(vi->config->clk[i]);
+	clk_disable_unprepare(vi->clk);
 	tegra_powergate_partition(vi->config->powergate_id);
 
 	return 0;
@@ -107,7 +102,7 @@ static int vi_power_off(struct device *dev)
 		return err;
 	}
 
-	clk_disable_unprepare(vi->config->clk[0]);
+	clk_disable_unprepare(vi->clk);
 
 	return tegra_powergate_power_off(vi->config->powergate_id);
 #endif
@@ -119,27 +114,18 @@ static int vi_power_on(struct device *dev)
 	int err;
 
 #ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-	int i;
-
 	err = tegra_unpowergate_partition(vi->config->powergate_id);
 	if (err)
 		return err;
 
-	for (i = 0; i < vi->config->clk_cnt; i++) {
-		err = clk_prepare_enable(vi->config->clk[i]);
-		if (err) {
-			int j;
-
-			dev_err(dev, "failed to enable clk:%d\n", i);
-			for (j = 0; j < i; j++)
-				clk_disable_unprepare(vi->config->clk[i]);
-			tegra_powergate_partition(vi->config->powergate_id);
-			return err;
-		}
+	err = clk_prepare_enable(vi->clk);
+	if (err) {
+		tegra_powergate_partition(vi->config->powergate_id);
+		return err;
 	}
 #else
 	err = tegra_powergate_sequence_power_up(vi->config->powergate_id,
-						vi->config->clk[0], vi->rst);
+						vi->clk, vi->rst);
 	if (err)
 		return err;
 
@@ -408,16 +394,12 @@ static int vi_probe(struct platform_device *pdev)
 	struct resource *regs;
 	struct vi *vi;
 	int err;
-	int i =  0;
-	struct device_node *np;
-	const char *name;
 
 	if (!dev->of_node) {
 		dev_err(dev, "no dt node\n");
 		return -EINVAL;
 	}
 
-	np = pdev->dev.of_node;
 	match = of_match_node(vi_match, pdev->dev.of_node);
 	if (match)
 		vi_config = (struct vi_config *)match->data;
@@ -448,23 +430,9 @@ static int vi_probe(struct platform_device *pdev)
 		return PTR_ERR(vi->rst);
 	}
 
-	vi_config->clk_cnt = of_property_count_strings(np, "clock-names");
-	vi_config->clk = devm_kzalloc(dev, vi_config->clk_cnt * sizeof(struct clk *), GFP_KERNEL);
-	if (!vi_config->clk)
-		return -ENOMEM;
-
-	for (i = 0; i < vi_config->clk_cnt; i++) {
-		of_property_read_string_index(np, "clock-names", i, &name);
-
-		if (IS_ENABLED(CONFIG_COMMON_CLK))
-			vi_config->clk[i] = devm_clk_get(dev, name);
-		else
-			vi_config->clk[i] = clk_get_sys("tegra_vi", name);
-		if (IS_ERR(vi_config->clk[i]))  {
-			dev_err(dev, "cannot get clk[%s].[%d]\n", name, i);
-			return PTR_ERR(vi_config->clk[i]);
-		}
-	}
+	vi->clk = devm_clk_get(dev, "vi");
+	if (IS_ERR(vi->clk))
+		return PTR_ERR(vi->clk);
 
 #ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	vi->reg = devm_regulator_get(dev, "avdd-dsi-csi");
