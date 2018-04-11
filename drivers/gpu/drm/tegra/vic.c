@@ -83,7 +83,6 @@ static int vic_runtime_suspend(struct device *dev)
 static int vic_boot(struct vic *vic)
 {
 	u32 fce_ucode_size, fce_bin_data_offset;
-	struct tegra_drm_client *client = &vic->client;
 	void *hdr;
 	int err = 0;
 
@@ -123,9 +122,6 @@ static int vic_boot(struct vic *vic)
 			CG_IDLE_CG_EN |
 			CG_WAKEUP_DLY_CNT(4),
 		   NV_PVIC_MISC_PRI_VIC_CG);
-
-	if (client->ops->load_regs)
-		client->ops->load_regs(client);
 
 	err = falcon_boot(&vic->falcon);
 	if (err < 0)
