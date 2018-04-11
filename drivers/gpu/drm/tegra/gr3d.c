@@ -94,7 +94,7 @@ static void gr3d_close_channel(struct tegra_drm_context *context)
 	host1x_channel_put(context->channel);
 }
 
-static int gr3d_is_addr_reg(struct device *dev, u32 class, u32 offset, u32 val)
+static int gr3d_is_addr_reg(struct device *dev, u32 class, u32 offset)
 {
 	struct gr3d *gr3d = dev_get_drvdata(dev);
 

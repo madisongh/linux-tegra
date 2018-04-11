@@ -246,7 +246,7 @@ struct host1x_job {
 	u8 *gather_copy_mapped;
 
 	/* Check if register is marked as an address reg */
-	int (*is_addr_reg)(struct device *dev, u32 reg, u32 class, u32 val);
+	int (*is_addr_reg)(struct device *dev, u32 reg, u32 class);
 
 	/* Function to reset the engine in case timeout occurs */
 	void (*reset)(struct device *dev);

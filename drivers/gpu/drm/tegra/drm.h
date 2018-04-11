@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2012 Avionic Design GmbH
- * Copyright (C) 2012-2015 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2012-2013 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -73,7 +73,7 @@ struct tegra_drm_client_ops {
 	int (*open_channel)(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context);
 	void (*close_channel)(struct tegra_drm_context *context);
-	int (*is_addr_reg)(struct device *dev, u32 class, u32 offset, u32 val);
+	int (*is_addr_reg)(struct device *dev, u32 class, u32 offset);
 	int (*submit)(struct tegra_drm_context *context,
 		      struct drm_tegra_submit *args, struct drm_device *drm,
 		      struct drm_file *file);

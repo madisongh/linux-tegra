@@ -309,10 +309,9 @@ struct host1x_firewall {
 	u32 count;
 };
 
-static int check_register(struct host1x_firewall *fw,
-			  unsigned long offset, u32 val)
+static int check_register(struct host1x_firewall *fw, unsigned long offset)
 {
-	if (fw->job->is_addr_reg(fw->dev, fw->class, offset, val)) {
+	if (fw->job->is_addr_reg(fw->dev, fw->class, offset)) {
 		if (!fw->num_relocs)
 			return -EINVAL;
 
@@ -326,21 +325,18 @@ static int check_register(struct host1x_firewall *fw,
 	return 0;
 }
 
-static int check_mask(struct host1x_firewall *fw, struct host1x_job_gather *g)
+static int check_mask(struct host1x_firewall *fw)
 {
-	u32 *cmdbuf_base = (u32 *)fw->job->gather_copy_mapped +
-		(g->offset / sizeof(u32));
 	u32 mask = fw->mask;
 	u32 reg = fw->reg;
 	int ret;
 
 	while (mask) {
-		u32 val = cmdbuf_base[fw->offset];
 		if (fw->words == 0)
 			return -EINVAL;
 
 		if (mask & 1) {
-			ret = check_register(fw, reg, val);
+			ret = check_register(fw, reg);
 			if (ret < 0)
 				return ret;
 
@@ -354,20 +350,17 @@ static int check_mask(struct host1x_firewall *fw, struct host1x_job_gather *g)
 	return 0;
 }
 
-static int check_incr(struct host1x_firewall *fw, struct host1x_job_gather *g)
+static int check_incr(struct host1x_firewall *fw)
 {
-	u32 *cmdbuf_base = (u32 *)fw->job->gather_copy_mapped +
-		(g->offset / sizeof(u32));
 	u32 count = fw->count;
 	u32 reg = fw->reg;
 	int ret;
 
 	while (count) {
-		u32 val = cmdbuf_base[fw->offset];
 		if (fw->words == 0)
 			return -EINVAL;
 
-		ret = check_register(fw, reg, val);
+		ret = check_register(fw, reg);
 		if (ret < 0)
 			return ret;
 
@@ -380,20 +373,16 @@ static int check_incr(struct host1x_firewall *fw, struct host1x_job_gather *g)
 	return 0;
 }
 
-static int check_nonincr(struct host1x_firewall *fw,
-			 struct host1x_job_gather *g)
+static int check_nonincr(struct host1x_firewall *fw)
 {
-	u32 *cmdbuf_base = (u32 *)fw->job->gather_copy_mapped +
-		(g->offset / sizeof(u32));
 	u32 count = fw->count;
 	int ret;
 
 	while (count) {
-		u32 val = cmdbuf_base[fw->offset];
 		if (fw->words == 0)
 			return -EINVAL;
 
-		ret = check_register(fw, fw->reg, val);
+		ret = check_register(fw, fw->reg);
 		if (ret < 0)
 			return ret;
 
@@ -433,14 +422,14 @@ static int validate(struct host1x_firewall *fw, struct host1x_job_gather *g)
 			fw->class = word >> 6 & 0x3ff;
 			fw->mask = word & 0x3f;
 			fw->reg = word >> 16 & 0xfff;
-			err = check_mask(fw, g);
+			err = check_mask(fw);
 			if (err)
 				goto out;
 			break;
 		case 1:
 			fw->reg = word >> 16 & 0xfff;
 			fw->count = word & 0xffff;
-			err = check_incr(fw, g);
+			err = check_incr(fw);
 			if (err)
 				goto out;
 			break;
@@ -448,7 +437,7 @@ static int validate(struct host1x_firewall *fw, struct host1x_job_gather *g)
 		case 2:
 			fw->reg = word >> 16 & 0xfff;
 			fw->count = word & 0xffff;
-			err = check_nonincr(fw, g);
+			err = check_nonincr(fw);
 			if (err)
 				goto out;
 			break;
@@ -456,7 +445,7 @@ static int validate(struct host1x_firewall *fw, struct host1x_job_gather *g)
 		case 3:
 			fw->mask = word & 0xffff;
 			fw->reg = word >> 16 & 0xfff;
-			err = check_mask(fw, g);
+			err = check_mask(fw);
 			if (err)
 				goto out;
 			break;
