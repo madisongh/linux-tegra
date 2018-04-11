@@ -32,7 +32,6 @@
 #endif
 
 #define NVDEC_MAX_CLK_RATE	716800000
-#define NVDEC_AUTOSUSPEND_DELAY 500
 
 #define MC_SECURITY_CARVEOUT1_BOM_LO		0xc0c
 #define MC_SECURITY_CARVEOUT1_BOM_HI		0xc10
@@ -45,8 +44,6 @@ struct nvdec_bl_shared_data {
 	u32 wpr_addr;
 	u32 wpr_size;
 };
-
-static int nvdec_boot(struct nvdec *nvdec);
 
 static int nvdec_runtime_resume(struct device *dev)
 {
@@ -73,6 +70,8 @@ static int nvdec_runtime_resume(struct device *dev)
 			return err;
 		}
 	}
+
+	return 0;
 #else
 	if (nvdec->rst) {
 		err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_NVDEC,
@@ -80,23 +79,9 @@ static int nvdec_runtime_resume(struct device *dev)
 		if (err < 0)
 			dev_err(dev, "failed to power up device\n");
 	}
-#endif
-	err = nvdec_boot(nvdec);
-	if (err < 0)
-		goto fail_boot;
 
-	return 0;
-
-fail_boot:
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
-	tegra_powergate_power_off(TEGRA_POWERGATE_NVDEC);
-#else
-	if (client->ops->prepare_poweroff)
-		client->ops->prepare_poweroff(client);
-	clk_disable_unprepare(nvdec->clk);
-	tegra_powergate_partition(TEGRA_POWERGATE_NVDEC);
-#endif
 	return err;
+#endif
 }
 
 static int nvdec_runtime_suspend(struct device *dev)
@@ -392,17 +377,39 @@ int nvdec_open_channel(struct tegra_drm_client *client,
 			    struct tegra_drm_context *context)
 {
 	struct nvdec *nvdec = to_nvdec(client);
+	int err;
+
+	err = pm_runtime_get_sync(nvdec->dev);
+	if (err < 0)
+		return err;
+
+	/*
+	 * Try to boot the Falcon microcontroller. Booting is deferred until
+	 * here because the firmware might not yet be available during system
+	 * boot, for example if it's on remote storage.
+	 */
+	err = nvdec_boot(nvdec);
+	if (err < 0) {
+		pm_runtime_put(nvdec->dev);
+		return err;
+	}
 
 	context->channel = host1x_channel_get(nvdec->channel);
-	if (!context->channel)
+	if (!context->channel) {
+		pm_runtime_put(nvdec->dev);
 		return -ENOMEM;
+	}
 
 	return 0;
 }
 
 void nvdec_close_channel(struct tegra_drm_context *context)
 {
+	struct nvdec *nvdec = to_nvdec(context->client);
+
 	host1x_channel_put(context->channel);
+
+	pm_runtime_put(nvdec->dev);
 }
 
 static const struct tegra_drm_client_ops nvdec_ops = {
@@ -490,18 +497,6 @@ static int nvdec_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	/* BL can keep partition powered ON,
-	 * if so power off partition explicitly
-	 */
-	if (tegra_powergate_is_powered(TEGRA_POWERGATE_NVDEC))
-#ifdef CONFIG_DRM_TEGRA_DOWNSTREAM
-		tegra_powergate_partition(TEGRA_POWERGATE_NVDEC);
-#else
-		tegra_powergate_power_off(TEGRA_POWERGATE_NVDEC);
-#endif
-
-	pm_runtime_set_autosuspend_delay(dev, NVDEC_AUTOSUSPEND_DELAY);
-	pm_runtime_use_autosuspend(dev);
 	pm_runtime_enable(&pdev->dev);
 	if (!pm_runtime_enabled(&pdev->dev)) {
 		err = nvdec_runtime_resume(&pdev->dev);
