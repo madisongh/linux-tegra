@@ -203,7 +203,7 @@ static void tegra_bo_free(struct drm_device *drm, struct tegra_bo *bo)
 		sg_free_table(bo->sgt);
 		kfree(bo->sgt);
 	} else if (bo->vaddr) {
-		dma_free_writecombine(drm->dev->parent, bo->gem.size, bo->vaddr, 
+		dma_free_writecombine(drm->dev, bo->gem.size, bo->vaddr, 
 				bo->paddr);
 	}
 }
@@ -261,7 +261,11 @@ static int tegra_bo_alloc(struct drm_device *drm, struct tegra_bo *bo)
 	} else {
 		size_t size = bo->gem.size;
 
+<<<<<<< HEAD
 		bo->vaddr = dma_alloc_writecombine(drm->dev->parent, size, &bo->paddr,
+=======
+		bo->vaddr = dma_alloc_wc(drm->dev, size, &bo->paddr,
+>>>>>>> parent of 4cc4a26... drm: tegra: allocate BO from host1x as
 					 GFP_KERNEL | __GFP_NOWARN);
 		if (!bo->vaddr) {
 			dev_err(drm->dev,
