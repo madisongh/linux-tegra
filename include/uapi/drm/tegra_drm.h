@@ -149,10 +149,8 @@ struct drm_tegra_submit {
 	__u64 relocs;
 	__u64 waitchks;
 	__u32 fence;		/* Return value */
-	__u32 reserved0;
-	__u64 fences;
 
-	__u32 reserved1[2];	/* future expansion */
+	__u32 reserved[5];	/* future expansion */
 };
 
 #define DRM_TEGRA_GEM_TILING_MODE_PITCH 0
