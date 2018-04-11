@@ -340,8 +340,6 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 	struct drm_tegra_syncpt __user *syncpts =
 		(void __user *)(uintptr_t)args->syncpts;
 	u32 __user *fences = (void __user *)(uintptr_t)args->fences;
-	u32 __user *class_ids = (u32 __user *)(uintptr_t)args->class_ids;
-	u32 *local_class_ids = NULL;
 	struct host1x_job *job;
 	unsigned int i;
 	int err;
@@ -356,6 +354,7 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 	job->num_relocs = args->num_relocs;
 	job->num_waitchk = args->num_waitchks;
 	job->client = (u32)args->context;
+	job->class = context->client->base.class;
 	job->serialize = true;
 
 	if (context->error_notifier_bo) {
@@ -363,26 +362,10 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 		job->error_notifier_offset = context->error_notifier_offset;
 	}
 
-	if (class_ids) {
-		local_class_ids = kzalloc(sizeof(u32) * num_cmdbufs,
-					GFP_KERNEL);
-		if (!local_class_ids) {
-			err = -ENOMEM;
-			goto fail;
-		}
-
-		err = copy_from_user(local_class_ids, class_ids,
-				sizeof(u32) * num_cmdbufs);
-		if (err)
-			goto fail;
-	}
-
-	for (i = 0; i < num_cmdbufs; i++) {
+	while (num_cmdbufs) {
 		struct sync_fence *pre_fence = NULL;
 		struct drm_tegra_cmdbuf cmdbuf;
 		struct host1x_bo *bo;
-		u32 class_id = class_ids ? local_class_ids[i]
-					 : context->client->base.class;
 
 		if (copy_from_user(&cmdbuf, cmdbufs, sizeof(cmdbuf))) {
 			err = -EFAULT;
@@ -399,12 +382,10 @@ int tegra_drm_submit(struct tegra_drm_context *context,
 			pre_fence = sync_fence_fdget(cmdbuf.pre_fence);
 
 		host1x_job_add_gather(job, bo, cmdbuf.words, cmdbuf.offset,
-				      pre_fence, class_id);
+				      pre_fence);
+		num_cmdbufs--;
 		cmdbufs++;
 	}
-
-	kfree(local_class_ids);
-	local_class_ids = NULL;
 
 	/* copy and resolve relocations from submit */
 	while (num_relocs--) {

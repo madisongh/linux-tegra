@@ -1,7 +1,7 @@
 /*
  * Tegra host1x Channel
  *
- * Copyright (C) 2010-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2010-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -76,9 +76,9 @@ static void submit_gathers(struct host1x_job *job)
 					       job->channel);
 
 		/* add a setclass for modules that require it */
-		if (g->class_id)
+		if (job->class)
 			host1x_cdma_push(cdma,
-				 host1x_opcode_setclass(g->class_id, 0, 0),
+				 host1x_opcode_setclass(job->class, 0, 0),
 				 HOST1X_OPCODE_NOP);
 
 		trace_write_gather(cdma, g->bo, g->offset, op1 & 0xffff);

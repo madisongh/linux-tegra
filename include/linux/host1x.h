@@ -265,6 +265,8 @@ struct host1x_job {
 	/* Function to reset the engine in case timeout occurs */
 	void (*reset)(struct device *dev);
 
+	/* Request a SETCLASS to this class */
+	u32 class;
 
 	/* Add a channel wait for previous ops to complete */
 	bool serialize;
