@@ -74,7 +74,6 @@ static const struct host1x_info host1x01_info = {
 	.init = host1x01_init,
 	.sync_offset = 0x3000,
 	.dma_mask = DMA_BIT_MASK(32),
-	.gather_filter_enabled = false,
 };
 
 static const struct host1x_info host1x02_info = {
@@ -85,7 +84,6 @@ static const struct host1x_info host1x02_info = {
 	.init = host1x02_init,
 	.sync_offset = 0x3000,
 	.dma_mask = DMA_BIT_MASK(32),
-	.gather_filter_enabled = false,
 };
 
 static const struct host1x_info host1x04_info = {
@@ -96,7 +94,6 @@ static const struct host1x_info host1x04_info = {
 	.init = host1x04_init,
 	.sync_offset = 0x2100,
 	.dma_mask = DMA_BIT_MASK(34),
-	.gather_filter_enabled = true,
 };
 
 static const struct host1x_info host1x05_info = {
@@ -107,7 +104,6 @@ static const struct host1x_info host1x05_info = {
 	.init = host1x05_init,
 	.sync_offset = 0x2100,
 	.dma_mask = DMA_BIT_MASK(34),
-	.gather_filter_enabled = true,
 };
 
 static const struct of_device_id host1x_of_match[] = {
@@ -126,7 +122,6 @@ MODULE_DEVICE_TABLE(of, host1x_of_match);
 static int host1x_update_chara(struct host1x *host1x)
 {
 	host1x->host1x_chara.flags = 0;
-	host1x->host1x_chara.num_syncpts = host1x->info->nb_pts;
 
 	return 0;
 }

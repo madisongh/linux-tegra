@@ -39,7 +39,6 @@
 
 #include "nouveau_fence.h"
 
-#include <nvif/cl0046.h>
 #include <nvif/event.h>
 
 static int
@@ -47,7 +46,7 @@ nouveau_display_vblank_handler(struct nvif_notify *notify)
 {
 	struct nouveau_crtc *nv_crtc =
 		container_of(notify, typeof(*nv_crtc), vblank);
-	drm_crtc_handle_vblank(&nv_crtc->base);
+	drm_handle_vblank(nv_crtc->base.dev, nv_crtc->index);
 	return NVIF_NOTIFY_KEEP;
 }
 
@@ -247,7 +246,7 @@ static const struct drm_framebuffer_funcs nouveau_framebuffer_funcs = {
 int
 nouveau_framebuffer_init(struct drm_device *dev,
 			 struct nouveau_framebuffer *nv_fb,
-			 const struct drm_mode_fb_cmd2 *mode_cmd,
+			 struct drm_mode_fb_cmd2 *mode_cmd,
 			 struct nouveau_bo *nvbo)
 {
 	struct nouveau_display *disp = nouveau_display(dev);
@@ -273,13 +272,13 @@ nouveau_framebuffer_init(struct drm_device *dev,
 static struct drm_framebuffer *
 nouveau_user_framebuffer_create(struct drm_device *dev,
 				struct drm_file *file_priv,
-				const struct drm_mode_fb_cmd2 *mode_cmd)
+				struct drm_mode_fb_cmd2 *mode_cmd)
 {
 	struct nouveau_framebuffer *nouveau_fb;
 	struct drm_gem_object *gem;
 	int ret = -ENOMEM;
 
-	gem = drm_gem_object_lookup(file_priv, mode_cmd->handles[0]);
+	gem = drm_gem_object_lookup(dev, file_priv, mode_cmd->handles[0]);
 	if (!gem)
 		return ERR_PTR(-ENOENT);
 
@@ -296,7 +295,7 @@ nouveau_user_framebuffer_create(struct drm_device *dev,
 err:
 	kfree(nouveau_fb);
 err_unref:
-	drm_gem_object_unreference_unlocked(gem);
+	drm_gem_object_unreference(gem);
 	return ERR_PTR(ret);
 }
 
@@ -495,9 +494,7 @@ nouveau_display_create(struct drm_device *dev)
 
 	if (nouveau_modeset != 2 && drm->vbios.dcb.entries) {
 		static const u16 oclass[] = {
-			GP104_DISP,
-			GP100_DISP,
-			GM200_DISP,
+			GM204_DISP,
 			GM107_DISP,
 			GK110_DISP,
 			GK104_DISP,
@@ -556,7 +553,6 @@ nouveau_display_destroy(struct drm_device *dev)
 	nouveau_display_vblank_fini(dev);
 
 	drm_kms_helper_poll_fini(dev);
-	drm_crtc_force_disable_all(dev);
 	drm_mode_config_cleanup(dev);
 
 	if (disp->dtor)
@@ -742,7 +738,7 @@ nouveau_crtc_page_flip(struct drm_crtc *crtc, struct drm_framebuffer *fb,
 	}
 
 	mutex_lock(&cli->mutex);
-	ret = ttm_bo_reserve(&new_bo->bo, true, false, NULL);
+	ret = ttm_bo_reserve(&new_bo->bo, true, false, false, NULL);
 	if (ret)
 		goto fail_unpin;
 
@@ -756,18 +752,19 @@ nouveau_crtc_page_flip(struct drm_crtc *crtc, struct drm_framebuffer *fb,
 	if (new_bo != old_bo) {
 		ttm_bo_unreserve(&new_bo->bo);
 
-		ret = ttm_bo_reserve(&old_bo->bo, true, false, NULL);
+		ret = ttm_bo_reserve(&old_bo->bo, true, false, false, NULL);
 		if (ret)
 			goto fail_unpin;
 	}
 
 	/* Initialize a page flip struct */
 	*s = (struct nouveau_page_flip_state)
-		{ { }, event, crtc, fb->bits_per_pixel, fb->pitches[0],
+		{ { }, event, nouveau_crtc(crtc)->index,
+		  fb->bits_per_pixel, fb->pitches[0], crtc->x, crtc->y,
 		  new_bo->bo.offset };
 
 	/* Keep vblanks on during flip, for the target crtc of this flip */
-	drm_crtc_vblank_get(crtc);
+	drm_vblank_get(dev, nouveau_crtc(crtc)->index);
 
 	/* Emit a page flip */
 	if (drm->device.info.family >= NV_DEVICE_INFO_V0_TESLA) {
@@ -812,7 +809,7 @@ nouveau_crtc_page_flip(struct drm_crtc *crtc, struct drm_framebuffer *fb,
 	return 0;
 
 fail_unreserve:
-	drm_crtc_vblank_put(crtc);
+	drm_vblank_put(dev, nouveau_crtc(crtc)->index);
 	ttm_bo_unreserve(&old_bo->bo);
 fail_unpin:
 	mutex_unlock(&cli->mutex);
@@ -844,17 +841,17 @@ nouveau_finish_page_flip(struct nouveau_channel *chan,
 	s = list_first_entry(&fctx->flip, struct nouveau_page_flip_state, head);
 	if (s->event) {
 		if (drm->device.info.family < NV_DEVICE_INFO_V0_TESLA) {
-			drm_crtc_arm_vblank_event(s->crtc, s->event);
+			drm_arm_vblank_event(dev, s->crtc, s->event);
 		} else {
-			drm_crtc_send_vblank_event(s->crtc, s->event);
+			drm_send_vblank_event(dev, s->crtc, s->event);
 
 			/* Give up ownership of vblank for page-flipped crtc */
-			drm_crtc_vblank_put(s->crtc);
+			drm_vblank_put(dev, s->crtc);
 		}
 	}
 	else {
 		/* Give up ownership of vblank for page-flipped crtc */
-		drm_crtc_vblank_put(s->crtc);
+		drm_vblank_put(dev, s->crtc);
 	}
 
 	list_del(&s->head);
@@ -875,10 +872,9 @@ nouveau_flip_complete(struct nvif_notify *notify)
 
 	if (!nouveau_finish_page_flip(chan, &state)) {
 		if (drm->device.info.family < NV_DEVICE_INFO_V0_TESLA) {
-			nv_set_crtc_base(drm->dev, drm_crtc_index(state.crtc),
-					 state.offset + state.crtc->y *
-					 state.pitch + state.crtc->x *
-					 state.bpp / 8);
+			nv_set_crtc_base(drm->dev, state.crtc, state.offset +
+					 state.y * state.pitch +
+					 state.x * state.bpp / 8);
 		}
 	}
 
@@ -919,7 +915,7 @@ nouveau_display_dumb_map_offset(struct drm_file *file_priv,
 {
 	struct drm_gem_object *gem;
 
-	gem = drm_gem_object_lookup(file_priv, handle);
+	gem = drm_gem_object_lookup(dev, file_priv, handle);
 	if (gem) {
 		struct nouveau_bo *bo = nouveau_gem_object(gem);
 		*poffset = drm_vma_node_offset_addr(&bo->bo.vma_node);

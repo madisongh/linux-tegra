@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2016 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2009-2015 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,18 +24,9 @@
 
 enum host1x_class {
 	HOST1X_CLASS_HOST1X = 0x1,
-	HOST1X_CLASS_NVENC = 0x21,
-	HOST1X_CLASS_VI = 0x30,
-	HOST1X_CLASS_ISPA = 0x32,
-	HOST1X_CLASS_ISPB = 0x34,
 	HOST1X_CLASS_GR2D = 0x51,
 	HOST1X_CLASS_GR2D_SB = 0x52,
-	HOST1X_CLASS_VIC = 0x5D,
 	HOST1X_CLASS_GR3D = 0x60,
-	HOST1X_CLASS_NVJPG = 0xC0,
-	HOST1X_CLASS_TSEC = 0xE0,
-	HOST1X_CLASS_TSECB = 0xE1,
-	HOST1X_CLASS_NVDEC = 0xF0,
 };
 
 struct host1x_client;
@@ -44,16 +35,10 @@ struct host1x;
 struct host1x_client_ops {
 	int (*init)(struct host1x_client *client);
 	int (*exit)(struct host1x_client *client);
-	int (*get_clk_rate)(struct host1x_client *client, u64 *data,
-			u32 type);
-	int (*set_clk_rate)(struct host1x_client *client, u64 data,
-			u32 type);
 };
 
 struct host1x_characteristics {
 	__u64 flags;
-
-	__u32 num_syncpts;
 };
 
 struct host1x_characteristics *host1x_get_chara(struct host1x *host1x);
@@ -206,15 +191,10 @@ struct host1x_reloc {
 	unsigned long shift;
 };
 
+
 struct host1x_syncpt_fence {
 	u32 id;
 	u32 threshold;
-};
-
-struct host1x_job_syncpt {
-	u32 id;
-	u32 incrs;
-	u32 end;
 };
 
 struct host1x_job {
@@ -248,10 +228,10 @@ struct host1x_job {
 	dma_addr_t *gather_addr_phys;
 	dma_addr_t *reloc_addr_phys;
 
-	/* Sync point ids, numbers of increments and ends related to the
-	 * submit */
-	unsigned int num_syncpts;
-	struct host1x_job_syncpt *syncpts;
+	/* Sync point id, number of increments and end related to the submit */
+	u32 syncpt_id;
+	u32 syncpt_incrs;
+	u32 syncpt_end;
 
 	/* Maximum time to wait for this job */
 	unsigned int timeout;
@@ -266,22 +246,21 @@ struct host1x_job {
 	u8 *gather_copy_mapped;
 
 	/* Check if register is marked as an address reg */
-	int (*is_addr_reg)(struct device *dev, u32 reg, u32 class, u32 val);
+	int (*is_addr_reg)(struct device *dev, u32 reg, u32 class);
 
 	/* Function to reset the engine in case timeout occurs */
 	void (*reset)(struct device *dev);
 
+	/* Request a SETCLASS to this class */
+	u32 class;
 
 	/* Add a channel wait for previous ops to complete */
 	bool serialize;
-
-	struct host1x_bo *error_notifier_bo;
-	u64 error_notifier_offset;
 };
 
 struct host1x_job *host1x_job_alloc(struct host1x_channel *ch,
 				    u32 num_cmdbufs, u32 num_relocs,
-				    u32 num_waitchks, u32 num_syncpts);
+				    u32 num_waitchks);
 void host1x_job_add_gather(struct host1x_job *job, struct host1x_bo *mem_id,
 			   u32 words, u32 offset,
 			   struct sync_fence *pre_fence,
@@ -295,8 +274,6 @@ struct host1x_job *host1x_job_get(struct host1x_job *job);
 void host1x_job_put(struct host1x_job *job);
 int host1x_job_pin(struct host1x_job *job, struct device *dev);
 void host1x_job_unpin(struct host1x_job *job);
-
-bool host1x_channel_gather_filter_enabled(struct host1x *host);
 
 /*
  * subdevice probe infrastructure

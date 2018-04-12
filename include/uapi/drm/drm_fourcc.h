@@ -24,11 +24,7 @@
 #ifndef DRM_FOURCC_H
 #define DRM_FOURCC_H
 
-#include "drm.h"
-
-#if defined(__cplusplus)
-extern "C" {
-#endif
+#include <linux/types.h>
 
 #define fourcc_code(a, b, c, d) ((__u32)(a) | ((__u32)(b) << 8) | \
 				 ((__u32)(c) << 16) | ((__u32)(d) << 24))
@@ -229,12 +225,8 @@ extern "C" {
  * - multiple of 128 pixels for the width
  * - multiple of  32 pixels for the height
  *
- * For more information: see https://linuxtv.org/downloads/v4l-dvb-apis/re32.html
+ * For more information: see http://linuxtv.org/downloads/v4l-dvb-apis/re32.html
  */
 #define DRM_FORMAT_MOD_SAMSUNG_64_32_TILE	fourcc_mod_code(SAMSUNG, 1)
-
-#if defined(__cplusplus)
-}
-#endif
 
 #endif /* DRM_FOURCC_H */

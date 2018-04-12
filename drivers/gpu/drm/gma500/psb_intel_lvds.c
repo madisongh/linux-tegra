@@ -561,7 +561,8 @@ void psb_intel_lvds_destroy(struct drm_connector *connector)
 	struct gma_encoder *gma_encoder = gma_attached_encoder(connector);
 	struct psb_intel_lvds_priv *lvds_priv = gma_encoder->dev_priv;
 
-	psb_intel_i2c_destroy(lvds_priv->ddc_bus);
+	if (lvds_priv->ddc_bus)
+		psb_intel_i2c_destroy(lvds_priv->ddc_bus);
 	drm_connector_unregister(connector);
 	drm_connector_cleanup(connector);
 	kfree(connector);
@@ -652,6 +653,8 @@ const struct drm_connector_helper_funcs
 
 const struct drm_connector_funcs psb_intel_lvds_connector_funcs = {
 	.dpms = drm_helper_connector_dpms,
+	.save = psb_intel_lvds_save,
+	.restore = psb_intel_lvds_restore,
 	.detect = psb_intel_lvds_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = psb_intel_lvds_set_property,
@@ -712,9 +715,6 @@ void psb_intel_lvds_init(struct drm_device *dev,
 	gma_encoder->dev_priv = lvds_priv;
 
 	connector = &gma_connector->base;
-	gma_connector->save = psb_intel_lvds_save;
-	gma_connector->restore = psb_intel_lvds_restore;
-
 	encoder = &gma_encoder->base;
 	drm_connector_init(dev, connector,
 			   &psb_intel_lvds_connector_funcs,
@@ -722,7 +722,7 @@ void psb_intel_lvds_init(struct drm_device *dev,
 
 	drm_encoder_init(dev, encoder,
 			 &psb_intel_lvds_enc_funcs,
-			 DRM_MODE_ENCODER_LVDS, NULL);
+			 DRM_MODE_ENCODER_LVDS);
 
 	gma_connector_attach_encoder(gma_connector, gma_encoder);
 	gma_encoder->type = INTEL_OUTPUT_LVDS;
@@ -834,9 +834,11 @@ out:
 
 failed_find:
 	mutex_unlock(&dev->mode_config.mutex);
-	psb_intel_i2c_destroy(lvds_priv->ddc_bus);
+	if (lvds_priv->ddc_bus)
+		psb_intel_i2c_destroy(lvds_priv->ddc_bus);
 failed_ddc:
-	psb_intel_i2c_destroy(lvds_priv->i2c_bus);
+	if (lvds_priv->i2c_bus)
+		psb_intel_i2c_destroy(lvds_priv->i2c_bus);
 failed_blc_i2c:
 	drm_encoder_cleanup(encoder);
 	drm_connector_cleanup(connector);

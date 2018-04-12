@@ -29,7 +29,7 @@
 #include "intel_renderstate.h"
 
 static const struct intel_renderstate_rodata *
-render_state_get_rodata(const int gen)
+render_state_get_rodata(struct drm_device *dev, const int gen)
 {
 	switch (gen) {
 	case 6:
@@ -45,22 +45,21 @@ render_state_get_rodata(const int gen)
 	return NULL;
 }
 
-static int render_state_init(struct render_state *so,
-			     struct drm_i915_private *dev_priv)
+static int render_state_init(struct render_state *so, struct drm_device *dev)
 {
 	int ret;
 
-	so->gen = INTEL_GEN(dev_priv);
-	so->rodata = render_state_get_rodata(so->gen);
+	so->gen = INTEL_INFO(dev)->gen;
+	so->rodata = render_state_get_rodata(dev, so->gen);
 	if (so->rodata == NULL)
 		return 0;
 
 	if (so->rodata->batch_items * 4 > 4096)
 		return -EINVAL;
 
-	so->obj = i915_gem_object_create(&dev_priv->drm, 4096);
-	if (IS_ERR(so->obj))
-		return PTR_ERR(so->obj);
+	so->obj = i915_gem_alloc_object(dev, 4096);
+	if (so->obj == NULL)
+		return -ENOMEM;
 
 	ret = i915_gem_obj_ggtt_pin(so->obj, 4096, 0);
 	if (ret)
@@ -94,7 +93,6 @@ free_gem:
 
 static int render_state_setup(struct render_state *so)
 {
-	struct drm_device *dev = so->obj->base.dev;
 	const struct intel_renderstate_rodata *rodata = so->rodata;
 	unsigned int i = 0, reloc_index = 0;
 	struct page *page;
@@ -105,7 +103,7 @@ static int render_state_setup(struct render_state *so)
 	if (ret)
 		return ret;
 
-	page = i915_gem_object_get_dirty_page(so->obj, 0);
+	page = sg_page(so->obj->pages->sgl);
 	d = kmap(page);
 
 	while (i < rodata->batch_items) {
@@ -135,33 +133,6 @@ static int render_state_setup(struct render_state *so)
 		OUT_BATCH(d, i, MI_NOOP);
 
 	so->aux_batch_offset = i * sizeof(u32);
-
-	if (HAS_POOLED_EU(dev)) {
-		/*
-		 * We always program 3x6 pool config but depending upon which
-		 * subslice is disabled HW drops down to appropriate config
-		 * shown below.
-		 *
-		 * In the below table 2x6 config always refers to
-		 * fused-down version, native 2x6 is not available and can
-		 * be ignored
-		 *
-		 * SNo  subslices config                eu pool configuration
-		 * -----------------------------------------------------------
-		 * 1    3 subslices enabled (3x6)  -    0x00777000  (9+9)
-		 * 2    ss0 disabled (2x6)         -    0x00777000  (3+9)
-		 * 3    ss1 disabled (2x6)         -    0x00770000  (6+6)
-		 * 4    ss2 disabled (2x6)         -    0x00007000  (9+3)
-		 */
-		u32 eu_pool_config = 0x00777000;
-
-		OUT_BATCH(d, i, GEN9_MEDIA_POOL_STATE);
-		OUT_BATCH(d, i, GEN9_MEDIA_POOL_ENABLE);
-		OUT_BATCH(d, i, eu_pool_config);
-		OUT_BATCH(d, i, 0);
-		OUT_BATCH(d, i, 0);
-		OUT_BATCH(d, i, 0);
-	}
 
 	OUT_BATCH(d, i, MI_BATCH_BUFFER_END);
 	so->aux_batch_size = (i * sizeof(u32)) - so->aux_batch_offset;
@@ -198,15 +169,15 @@ void i915_gem_render_state_fini(struct render_state *so)
 	drm_gem_object_unreference(&so->obj->base);
 }
 
-int i915_gem_render_state_prepare(struct intel_engine_cs *engine,
+int i915_gem_render_state_prepare(struct intel_engine_cs *ring,
 				  struct render_state *so)
 {
 	int ret;
 
-	if (WARN_ON(engine->id != RCS))
+	if (WARN_ON(ring->id != RCS))
 		return -ENOENT;
 
-	ret = render_state_init(so, engine->i915);
+	ret = render_state_init(so, ring->dev);
 	if (ret)
 		return ret;
 
@@ -227,21 +198,21 @@ int i915_gem_render_state_init(struct drm_i915_gem_request *req)
 	struct render_state so;
 	int ret;
 
-	ret = i915_gem_render_state_prepare(req->engine, &so);
+	ret = i915_gem_render_state_prepare(req->ring, &so);
 	if (ret)
 		return ret;
 
 	if (so.rodata == NULL)
 		return 0;
 
-	ret = req->engine->dispatch_execbuffer(req, so.ggtt_offset,
+	ret = req->ring->dispatch_execbuffer(req, so.ggtt_offset,
 					     so.rodata->batch_items * 4,
 					     I915_DISPATCH_SECURE);
 	if (ret)
 		goto out;
 
 	if (so.aux_batch_size > 8) {
-		ret = req->engine->dispatch_execbuffer(req,
+		ret = req->ring->dispatch_execbuffer(req,
 						     (so.ggtt_offset +
 						      so.aux_batch_offset),
 						     so.aux_batch_size,

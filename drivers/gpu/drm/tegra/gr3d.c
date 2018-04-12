@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2013 Avionic Design GmbH
- * Copyright (C) 2013-2015 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (C) 2013 NVIDIA Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -94,18 +94,26 @@ static void gr3d_close_channel(struct tegra_drm_context *context)
 	host1x_channel_put(context->channel);
 }
 
-static int gr3d_is_addr_reg(struct device *dev, u32 class, u32 offset, u32 val)
+static int gr3d_is_addr_reg(struct device *dev, u32 class, u32 offset)
 {
 	struct gr3d *gr3d = dev_get_drvdata(dev);
 
-	if (class != HOST1X_CLASS_GR3D)
-		return 0;
+	switch (class) {
+	case HOST1X_CLASS_HOST1X:
+		if (offset == 0x2b)
+			return 1;
 
-	if (offset >= GR3D_NUM_REGS)
-		return 0;
+		break;
 
-	if (test_bit(offset, gr3d->addr_regs))
-		return 1;
+	case HOST1X_CLASS_GR3D:
+		if (offset >= GR3D_NUM_REGS)
+			break;
+
+		if (test_bit(offset, gr3d->addr_regs))
+			return 1;
+
+		break;
+	}
 
 	return 0;
 }
@@ -273,7 +281,6 @@ static int gr3d_probe(struct platform_device *pdev)
 		}
 	}
 
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_3D, gr3d->clk,
 						gr3d->rst);
 	if (err < 0) {
@@ -291,7 +298,6 @@ static int gr3d_probe(struct platform_device *pdev)
 			return err;
 		}
 	}
-#endif
 
 	INIT_LIST_HEAD(&gr3d->client.base.list);
 	gr3d->client.base.ops = &gr3d_client_ops;
@@ -331,7 +337,6 @@ static int gr3d_remove(struct platform_device *pdev)
 		return err;
 	}
 
-#ifndef CONFIG_DRM_TEGRA_DOWNSTREAM
 	if (gr3d->clk_secondary) {
 		tegra_powergate_power_off(TEGRA_POWERGATE_3D1);
 		clk_disable_unprepare(gr3d->clk_secondary);
@@ -339,7 +344,6 @@ static int gr3d_remove(struct platform_device *pdev)
 
 	tegra_powergate_power_off(TEGRA_POWERGATE_3D);
 	clk_disable_unprepare(gr3d->clk);
-#endif
 
 	return 0;
 }

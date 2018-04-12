@@ -49,7 +49,6 @@ int vmw_dmabuf_pin_in_placement(struct vmw_private *dev_priv,
 {
 	struct ttm_buffer_object *bo = &buf->base;
 	int ret;
-	uint32_t new_flags;
 
 	ret = ttm_write_lock(&dev_priv->reservation_sem, interruptible);
 	if (unlikely(ret != 0))
@@ -57,16 +56,11 @@ int vmw_dmabuf_pin_in_placement(struct vmw_private *dev_priv,
 
 	vmw_execbuf_release_pinned_bo(dev_priv);
 
-	ret = ttm_bo_reserve(bo, interruptible, false, NULL);
+	ret = ttm_bo_reserve(bo, interruptible, false, false, NULL);
 	if (unlikely(ret != 0))
 		goto err;
 
-	if (buf->pin_count > 0)
-		ret = ttm_bo_mem_compat(placement, &bo->mem,
-					&new_flags) == true ? 0 : -EINVAL;
-	else
-		ret = ttm_bo_validate(bo, placement, interruptible, false);
-
+	ret = ttm_bo_validate(bo, placement, interruptible, false);
 	if (!ret)
 		vmw_bo_pin_reserved(buf, true);
 
@@ -97,7 +91,6 @@ int vmw_dmabuf_pin_in_vram_or_gmr(struct vmw_private *dev_priv,
 {
 	struct ttm_buffer_object *bo = &buf->base;
 	int ret;
-	uint32_t new_flags;
 
 	ret = ttm_write_lock(&dev_priv->reservation_sem, interruptible);
 	if (unlikely(ret != 0))
@@ -105,15 +98,9 @@ int vmw_dmabuf_pin_in_vram_or_gmr(struct vmw_private *dev_priv,
 
 	vmw_execbuf_release_pinned_bo(dev_priv);
 
-	ret = ttm_bo_reserve(bo, interruptible, false, NULL);
+	ret = ttm_bo_reserve(bo, interruptible, false, false, NULL);
 	if (unlikely(ret != 0))
 		goto err;
-
-	if (buf->pin_count > 0) {
-		ret = ttm_bo_mem_compat(&vmw_vram_gmr_placement, &bo->mem,
-					&new_flags) == true ? 0 : -EINVAL;
-		goto out_unreserve;
-	}
 
 	ret = ttm_bo_validate(bo, &vmw_vram_gmr_placement, interruptible,
 			      false);
@@ -174,7 +161,6 @@ int vmw_dmabuf_pin_in_start_of_vram(struct vmw_private *dev_priv,
 	struct ttm_placement placement;
 	struct ttm_place place;
 	int ret = 0;
-	uint32_t new_flags;
 
 	place = vmw_vram_placement.placement[0];
 	place.lpfn = bo->num_pages;
@@ -188,7 +174,7 @@ int vmw_dmabuf_pin_in_start_of_vram(struct vmw_private *dev_priv,
 		return ret;
 
 	vmw_execbuf_release_pinned_bo(dev_priv);
-	ret = ttm_bo_reserve(bo, interruptible, false, NULL);
+	ret = ttm_bo_reserve(bo, interruptible, false, false, NULL);
 	if (unlikely(ret != 0))
 		goto err_unlock;
 
@@ -199,15 +185,10 @@ int vmw_dmabuf_pin_in_start_of_vram(struct vmw_private *dev_priv,
 	 */
 	if (bo->mem.mem_type == TTM_PL_VRAM &&
 	    bo->mem.start < bo->num_pages &&
-	    bo->mem.start > 0 &&
-	    buf->pin_count == 0)
+	    bo->mem.start > 0)
 		(void) ttm_bo_validate(bo, &vmw_sys_placement, false, false);
 
-	if (buf->pin_count > 0)
-		ret = ttm_bo_mem_compat(&placement, &bo->mem,
-					&new_flags) == true ? 0 : -EINVAL;
-	else
-		ret = ttm_bo_validate(bo, &placement, interruptible, false);
+	ret = ttm_bo_validate(bo, &placement, interruptible, false);
 
 	/* For some reason we didn't end up at the start of vram */
 	WARN_ON(ret == 0 && bo->offset != 0);
@@ -244,7 +225,7 @@ int vmw_dmabuf_unpin(struct vmw_private *dev_priv,
 	if (unlikely(ret != 0))
 		return ret;
 
-	ret = ttm_bo_reserve(bo, interruptible, false, NULL);
+	ret = ttm_bo_reserve(bo, interruptible, false, false, NULL);
 	if (unlikely(ret != 0))
 		goto err;
 

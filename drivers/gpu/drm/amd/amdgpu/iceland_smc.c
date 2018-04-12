@@ -25,7 +25,7 @@
 #include "drmP.h"
 #include "amdgpu.h"
 #include "ppsmc.h"
-#include "iceland_smum.h"
+#include "iceland_smumgr.h"
 #include "smu_ucode_xfer_vi.h"
 #include "amdgpu_ucode.h"
 
@@ -211,7 +211,7 @@ static int iceland_send_msg_to_smc_without_waiting(struct amdgpu_device *adev,
 						   PPSMC_Msg msg)
 {
 	if (!iceland_is_smc_ram_running(adev))
-		return -EINVAL;
+		return -EINVAL;;
 
 	if (wait_smu_response(adev)) {
 		DRM_ERROR("Failed to send previous message\n");
@@ -278,12 +278,6 @@ static int iceland_smu_upload_firmware_image(struct amdgpu_device *adev)
 
 	if (!adev->pm.fw)
 		return -EINVAL;
-
-	/* Skip SMC ucode loading on SR-IOV capable boards.
-	 * vbios does this for us in asic_init in that case.
-	 */
-	if (adev->virtualization.supports_sr_iov)
-		return 0;
 
 	hdr = (const struct smc_firmware_header_v1_0 *)adev->pm.fw->data;
 	amdgpu_ucode_print_smc_hdr(&hdr->header);
