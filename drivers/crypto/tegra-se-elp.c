@@ -4,7 +4,7 @@
  *
  * Support for Tegra Security Engine Elliptic crypto algorithms.
  *
- * Copyright (c) 2015-2017, NVIDIA Corporation. All Rights Reserved.
+ * Copyright (c) 2015-2018, NVIDIA Corporation. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2, as
@@ -474,7 +474,7 @@ static u32 tegra_se_set_trng_op(struct tegra_se_elp_dev *se_dev)
 		val = se_elp_readl(se_dev, PKA1,
 				   TEGRA_SE_PKA1_TRNG_STATUS_OFFSET);
 		i++;
-	} while (val & TEGRA_SE_PKA1_TRNG_STATUS_SEEDED(ELP_FALSE));
+	} while (!(val & TEGRA_SE_PKA1_TRNG_STATUS_SEEDED(ELP_TRUE)));
 
 	return 0;
 }
