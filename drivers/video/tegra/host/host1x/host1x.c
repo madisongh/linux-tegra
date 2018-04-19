@@ -33,6 +33,8 @@
 #include <linux/tegra-soc.h>
 #include <linux/tegra_pm_domains.h>
 
+#include <linux/version.h>
+#include <asm/barrier.h>
 #include "dev.h"
 #include <trace/events/nvhost.h>
 
@@ -267,6 +269,8 @@ static int nvhost_ioctl_ctrl_module_mutex(struct nvhost_ctrl_userctx *ctx,
 	    args->lock > 1)
 		return -EINVAL;
 
+	speculation_barrier();
+
 	trace_nvhost_ioctl_ctrl_module_mutex(args->lock, args->id);
 	if (args->lock && !ctx->mod_locks[args->id]) {
 		if (args->id == 0)
@@ -379,6 +383,7 @@ static int nvhost_ioctl_ctrl_syncpt_read_max(struct nvhost_ctrl_userctx *ctx,
 {
 	if (args->id >= nvhost_syncpt_nb_pts(&ctx->dev->syncpt))
 		return -EINVAL;
+	speculation_barrier();
 	args->value = nvhost_syncpt_read_max(&ctx->dev->syncpt, args->id);
 	return 0;
 }
