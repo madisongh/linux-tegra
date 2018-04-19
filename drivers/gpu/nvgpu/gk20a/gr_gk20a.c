@@ -26,6 +26,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/firmware.h>
 #include <linux/nvhost.h>
+#include <asm/barrier.h>
 
 #include "gk20a.h"
 #include "kind_gk20a.h"
@@ -3594,6 +3595,7 @@ int gr_gk20a_add_zbc(struct gk20a *g, struct gr_gk20a *gr,
 	mutex_lock(&gr->zbc_lock);
 	switch (zbc_val->type) {
 	case GK20A_ZBC_TYPE_COLOR:
+		speculation_barrier();
 		/* search existing tables */
 		for (i = 0; i < gr->max_used_color_index; i++) {
 
@@ -3632,6 +3634,7 @@ int gr_gk20a_add_zbc(struct gk20a *g, struct gr_gk20a *gr,
 		}
 		break;
 	case GK20A_ZBC_TYPE_DEPTH:
+		speculation_barrier();
 		/* search existing tables */
 		for (i = 0; i < gr->max_used_depth_index; i++) {
 
