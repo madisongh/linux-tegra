@@ -1,7 +1,7 @@
 /*
  * drivers/platform/tegra/tegra21_emc_cc_r21012.c
  *
- * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -195,15 +195,17 @@ static u32 update_clock_tree_delay(struct emc_table *last_timing,
 		}
 	}
 
-	cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
-		(last_timing_rate_mhz * 2 * temp0_0);
-
-	if (dvfs_pt1)
+	if (dvfs_pt1) {
+		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+			(last_timing_rate_mhz * 2 * temp0_0);
 		__INCREMENT_PTFV(C0D0U0, cval);
-	else if (dvfs_update)
+	} else if (dvfs_update) {
 		__AVERAGE_PTFV(C0D0U0);
-	else if (periodic_training_update)
+	} else if (periodic_training_update) {
+		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+			(last_timing_rate_mhz * 2 * temp0_0);
 		__WEIGHTED_UPDATE_PTFV(C0D0U0, cval);
+	}
 
 	if (dvfs_update || periodic_training_update) {
 		tdel = next_timing->current_dram_clktree_c0d0u0 -
@@ -216,15 +218,17 @@ static u32 update_clock_tree_delay(struct emc_table *last_timing,
 				__MOVAVG_AC(next_timing, C0D0U0);
 	}
 
-	cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
-		(last_timing_rate_mhz * 2 * temp0_1);
-
-	if (dvfs_pt1)
+	if (dvfs_pt1) {
+		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+			(last_timing_rate_mhz * 2 * temp0_1);
 		__INCREMENT_PTFV(C0D0U1, cval);
-	else if (dvfs_update)
+	} else if (dvfs_update) {
 		__AVERAGE_PTFV(C0D0U1);
-	else if (periodic_training_update)
+	} else if (periodic_training_update) {
+		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+			(last_timing_rate_mhz * 2 * temp0_1);
 		__WEIGHTED_UPDATE_PTFV(C0D0U1, cval);
+	}
 
 	if (dvfs_update || periodic_training_update) {
 		tdel = next_timing->current_dram_clktree_c0d0u1 -
@@ -241,14 +245,17 @@ static u32 update_clock_tree_delay(struct emc_table *last_timing,
 	}
 
 	if (channel_mode == DUAL_CHANNEL) {
-		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
-			(last_timing_rate_mhz * 2 * temp1_0);
-		if (dvfs_pt1)
+		if (dvfs_pt1) {
+			cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+				(last_timing_rate_mhz * 2 * temp1_0);
 			__INCREMENT_PTFV(C1D0U0, cval);
-		else if (dvfs_update)
+		} else if (dvfs_update) {
 			__AVERAGE_PTFV(C1D0U0);
-		else if (periodic_training_update)
+		} else if (periodic_training_update) {
+			cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+				(last_timing_rate_mhz * 2 * temp1_0);
 			__WEIGHTED_UPDATE_PTFV(C1D0U0, cval);
+		}
 
 		if (dvfs_update || periodic_training_update) {
 			tdel = next_timing->current_dram_clktree_c1d0u0 -
@@ -264,14 +271,17 @@ static u32 update_clock_tree_delay(struct emc_table *last_timing,
 					__MOVAVG_AC(next_timing, C1D0U0);
 		}
 
-		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
-			(last_timing_rate_mhz * 2 * temp1_1);
-		if (dvfs_pt1)
+		if (dvfs_pt1) {
+			cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+				(last_timing_rate_mhz * 2 * temp1_1);
 			__INCREMENT_PTFV(C1D0U1, cval);
-		else if (dvfs_update)
+		} else if (dvfs_update) {
 			__AVERAGE_PTFV(C1D0U1);
-		else if (periodic_training_update)
+		} else if (periodic_training_update) {
+			cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+				(last_timing_rate_mhz * 2 * temp1_1);
 			__WEIGHTED_UPDATE_PTFV(C1D0U1, cval);
+		}
 
 		if (dvfs_update || periodic_training_update) {
 			tdel = next_timing->current_dram_clktree_c1d0u1 -
@@ -349,15 +359,17 @@ static u32 update_clock_tree_delay(struct emc_table *last_timing,
 		}
 	}
 
-	cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
-		(last_timing_rate_mhz * 2 * temp0_0);
-
-	if (dvfs_pt1)
+	if (dvfs_pt1) {
+		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+			(last_timing_rate_mhz * 2 * temp0_0);
 		__INCREMENT_PTFV(C0D1U0, cval);
-	else if (dvfs_update)
+	} else if (dvfs_update) {
 		__AVERAGE_PTFV(C0D1U0);
-	else if (periodic_training_update)
+	} else if (periodic_training_update) {
+		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+			(last_timing_rate_mhz * 2 * temp0_0);
 		__WEIGHTED_UPDATE_PTFV(C0D1U0, cval);
+	}
 
 	if (dvfs_update || periodic_training_update) {
 		tdel = next_timing->current_dram_clktree_c0d1u0 -
@@ -372,15 +384,17 @@ static u32 update_clock_tree_delay(struct emc_table *last_timing,
 				__MOVAVG_AC(next_timing, C0D1U0);
 	}
 
-	cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
-		(last_timing_rate_mhz * 2 * temp0_1);
-
-	if (dvfs_pt1)
+	if (dvfs_pt1) {
+		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+			(last_timing_rate_mhz * 2 * temp0_1);
 		__INCREMENT_PTFV(C0D1U1, cval);
-	else if (dvfs_update)
+	} else if (dvfs_update) {
 		__AVERAGE_PTFV(C0D1U1);
-	else if (periodic_training_update)
+	} else if (periodic_training_update) {
+		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+			(last_timing_rate_mhz * 2 * temp0_1);
 		__WEIGHTED_UPDATE_PTFV(C0D1U1, cval);
+	}
 
 	if (dvfs_update || periodic_training_update) {
 		tdel = next_timing->current_dram_clktree_c0d1u1 -
@@ -396,15 +410,17 @@ static u32 update_clock_tree_delay(struct emc_table *last_timing,
 	}
 
 	if (channel_mode == DUAL_CHANNEL) {
-		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
-			(last_timing_rate_mhz * 2 * temp1_0);
-
-		if (dvfs_pt1)
+		if (dvfs_pt1) {
+			cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+				(last_timing_rate_mhz * 2 * temp1_0);
 			__INCREMENT_PTFV(C1D1U0, cval);
-		else if (dvfs_update)
+		} else if (dvfs_update) {
 			__AVERAGE_PTFV(C1D1U0);
-		else if (periodic_training_update)
+		} else if (periodic_training_update) {
+			cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+				(last_timing_rate_mhz * 2 * temp1_0);
 			__WEIGHTED_UPDATE_PTFV(C1D1U0, cval);
+		}
 
 		if (dvfs_update || periodic_training_update) {
 			tdel = next_timing->current_dram_clktree_c1d1u0 -
@@ -419,15 +435,17 @@ static u32 update_clock_tree_delay(struct emc_table *last_timing,
 					__MOVAVG_AC(next_timing, C1D1U0);
 		}
 
-		cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
-			(last_timing_rate_mhz * 2 * temp1_1);
-
-		if (dvfs_pt1)
+		if (dvfs_pt1) {
+			cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+				(last_timing_rate_mhz * 2 * temp1_1);
 			__INCREMENT_PTFV(C1D1U1, cval);
-		else if (dvfs_update)
+		} else if (dvfs_update) {
 			__AVERAGE_PTFV(C1D1U1);
-		else if (periodic_training_update)
+		} else if (periodic_training_update) {
+			cval = (1000000 * tegra210_actual_osc_clocks(last_timing->run_clocks)) /
+				(last_timing_rate_mhz * 2 * temp1_1);
 			__WEIGHTED_UPDATE_PTFV(C1D1U1, cval);
+		}
 
 		if (dvfs_update || periodic_training_update) {
 			tdel = next_timing->current_dram_clktree_c1d1u1 -
