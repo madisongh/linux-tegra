@@ -481,10 +481,6 @@ int tegra_mcerr_init(struct dentry *mc_parent, struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	mc_int_mask = be32_to_cpup(prop);
-	mc_writel(mc_int_mask, MC_INTMASK);
-	pr_info("Set intmask: 0x%x\n", mc_readl(MC_INTMASK));
-
 	irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
 	if (irq < 0) {
 		pr_err("Unable to parse/map MC error interrupt\n");
@@ -496,6 +492,11 @@ int tegra_mcerr_init(struct dentry *mc_parent, struct platform_device *pdev)
 		pr_err("Unable to register MC error interrupt\n");
 		goto done;
 	}
+	mc_int_mask = be32_to_cpup(prop);
+	/* clear any mc-err's that occured before. */
+	chip_specific.clear_interrupt(irq);
+	mc_writel(mc_int_mask, MC_INTMASK);
+	pr_debug("Set intmask: 0x%x\n", mc_readl(MC_INTMASK));
 
 	tegra_emcerr_init(mc_parent, pdev);
 
