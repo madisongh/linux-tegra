@@ -84,8 +84,8 @@
 #define SPI_RX_TAP_DELAY(x)			(((x) & 0x3F) << 0)
 
 #define SPI_CS_TIMING1				0x008
-#define SPI_SETUP_HOLD(setup, hold)		(((setup - 1) << 4) |	\
-						(hold - 1))
+#define SPI_SETUP_HOLD(setup, hold)		(((setup) << 4) |	\
+						(hold))
 #define SPI_CS_SETUP_HOLD(reg, cs, val)			\
 		((((val) & 0xFFu) << ((cs) * 8)) |	\
 		((reg) & ~(0xFFu << ((cs) * 8))))
@@ -884,7 +884,7 @@ static void tegra_spi_set_timing1(struct spi_device *spi)
 	struct tegra_spi_client_ctl_data *cdata = spi->controller_data;
 	u32 set_count;
 	u32 hold_count;
-	u32 spi_cs_timing;
+	u32 spi_cs_timing = tspi->spi_cs_timing;
 	u32 spi_cs_setup;
 
 	if (!cdata || tspi->prod_list)
@@ -911,7 +911,7 @@ static void tegra_spi_set_timing2(struct spi_device *spi)
 {
 	struct tegra_spi_data *tspi = spi_master_get_devdata(spi->master);
 	struct tegra_spi_client_ctl_data *cdata = spi->controller_data;
-	u32 spi_cs_timing2 = 0;
+	u32 spi_cs_timing2 = tspi->spi_cs_timing2;
 
 	if (!cdata || tspi->prod_list)
 		return;
@@ -1109,9 +1109,7 @@ static u32 tegra_spi_setup_transfer_one(struct spi_device *spi,
 				tegra_spi_writel(tspi, command1, SPI_COMMAND1);
 
 		tspi->is_hw_based_cs = false;
-		if (cdata && cdata->is_hw_based_cs && is_single_xfer &&
-		    ((tspi->curr_dma_words * tspi->bytes_per_word) ==
-		     (t->len - tspi->cur_pos))) {
+		if (cdata && cdata->is_hw_based_cs && is_single_xfer) {
 			tegra_spi_set_timing1(spi);
 			tspi->is_hw_based_cs = true;
 		}
@@ -2016,6 +2014,8 @@ static int tegra_spi_probe(struct platform_device *pdev)
 	tspi->def_command1_reg |= SPI_CS_SEL(tspi->def_chip_select);
 	tegra_spi_writel(tspi, tspi->def_command1_reg, SPI_COMMAND1);
 	tspi->command2_reg = tegra_spi_readl(tspi, SPI_COMMAND2);
+	tspi->spi_cs_timing = tegra_spi_readl(tspi, SPI_CS_TIMING1);
+	tspi->spi_cs_timing2 = tegra_spi_readl(tspi, SPI_CS_TIMING2);
 	tegra_spi_set_slcg(tspi);
 	pm_runtime_put(&pdev->dev);
 
