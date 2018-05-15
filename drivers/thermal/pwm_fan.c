@@ -1,7 +1,7 @@
 /*
  * pwm_fan.c fan driver that is controlled by pwm
  *
- * Copyright (c) 2013-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Anshul Jain <anshulj@nvidia.com>
  *
@@ -1222,8 +1222,6 @@ static int pwm_fan_suspend(struct platform_device *pdev, pm_message_t state)
 			fan_data->is_fan_reg_enabled = false;
 		}
 	}
-	/*Stop thermal control*/
-	fan_data->fan_temp_control_flag = 0;
 	mutex_unlock(&fan_data->fan_state_lock);
 	return 0;
 }
@@ -1232,6 +1230,7 @@ static int pwm_fan_resume(struct platform_device *pdev)
 {
 	int err;
 	struct fan_dev_data *fan_data = platform_get_drvdata(pdev);
+	int target_pwm = 0;
 
 	mutex_lock(&fan_data->fan_state_lock);
 
@@ -1249,10 +1248,20 @@ static int pwm_fan_resume(struct platform_device *pdev)
 	gpio_free(fan_data->pwm_gpio);
 	pwm_enable(fan_data->pwm_dev);
 
+	if (fan_data->fan_temp_control_flag) {
+		/*
+		 * Update the target pwm value in case set_cur_state gets
+		 * called during suspend and changes fan_data->next_state.
+		 */
+		target_pwm = (fan_data->next_state <= 0) ? 0 :
+				fan_data->fan_pwm[fan_data->next_state];
+		fan_data->next_target_pwm = min(fan_data->fan_cap_pwm,
+								target_pwm);
+	}
 	queue_delayed_work(fan_data->workqueue,
 			&fan_data->fan_ramp_work,
 			msecs_to_jiffies(fan_data->step_time));
-	fan_data->fan_temp_control_flag = 1;
+
 	mutex_unlock(&fan_data->fan_state_lock);
 	return 0;
 }
