@@ -56,7 +56,6 @@
  * also linked into the probe response struct.
  */
 
-#define IEEE80211_SCAN_RESULT_EXPIRE	(7 * HZ)
 /*
  * Limit the number of BSS entries stored in mac80211. Each one is
  * a bit over 4k at most, so this limits to roughly 4-5M of memory.

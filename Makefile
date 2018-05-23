@@ -1,6 +1,6 @@
 VERSION = 4
 PATCHLEVEL = 4
-SUBLEVEL = 38
+SUBLEVEL = 58
 EXTRAVERSION =
 NAME = Blurry Fish Butt
 
@@ -623,14 +623,10 @@ KBUILD_CFLAGS	+= $(call cc-disable-warning,frame-address,)
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os
 else
-ifdef CONFIG_LESS_GCC_OPT
-KBUILD_CFLAGS	+= -O1
-else
 ifdef CONFIG_PROFILE_ALL_BRANCHES
-KBUILD_CFLAGS	+= -O2 $(call cc-disable-warning,maybe-uninitialized,)
+KBUILD_CFLAGS	+= -O2
 else
 KBUILD_CFLAGS   += -O2
-endif
 endif
 endif
 
