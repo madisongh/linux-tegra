@@ -89,7 +89,7 @@ SECTIONS
 		*(.discard.*)
 	}
 
-	. = PAGE_OFFSET_LD + TEXT_OFFSET;
+	. = PAGE_OFFSET + TEXT_OFFSET;
 
 	.head.text : {
 		_text = .;
@@ -190,4 +190,4 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
 /*
  * If padding is applied before .head.text, virt<->phys conversions will fail.
  */
-ASSERT(_text == (PAGE_OFFSET_LD + TEXT_OFFSET), "HEAD is misaligned")
+ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
