@@ -32,19 +32,7 @@
 #define FE_SYNCPT_IDX	1
 #define PG_BITRATE	32
 
-void tegra_channel_queued_buf_done(struct tegra_channel *chan,
-					  enum vb2_buffer_state state);
-int tegra_channel_set_stream(struct tegra_channel *chan, bool on);
-void tegra_channel_ring_buffer(struct tegra_channel *chan,
-		struct vb2_v4l2_buffer *vb,
-		struct timespec *ts, int state);
-struct tegra_channel_buffer *dequeue_buffer(struct tegra_channel *chan);
-void tegra_channel_init_ring_buffer(struct tegra_channel *chan);
-void free_ring_buffers(struct tegra_channel *chan, int frames);
-int tegra_channel_set_power(struct tegra_channel *chan, bool on);
-
 static void tegra_channel_error_recovery(struct tegra_channel *chan);
-static void tegra_channel_stop_kthreads(struct tegra_channel *chan);
 static int tegra_channel_stop_increments(struct tegra_channel *chan);
 static void tegra_channel_notify_status_callback(
 				struct vi_notify_channel *,
@@ -168,11 +156,13 @@ static bool vi4_check_status(struct tegra_channel *chan)
 	return true;
 }
 
+
 static bool vi_notify_wait(struct tegra_channel *chan,
+		struct tegra_channel_buffer *buf,
 		struct timespec *ts)
 {
 	int i, err;
-	u32 thresh[TEGRA_CSI_BLOCKS], temp;
+	u32 thresh[TEGRA_CSI_BLOCKS];
 	struct vi_capture_status status;
 
 	/*
@@ -182,8 +172,9 @@ static bool vi_notify_wait(struct tegra_channel *chan,
 	 * even if we are not waiting for ATOMP_FE here
 	 */
 	for (i = 0; i < chan->valid_ports; i++)
-		temp = nvhost_syncpt_incr_max_ext(chan->vi->ndev,
-					chan->syncpt[i][FE_SYNCPT_IDX], 1);
+		buf->thresh[i] = nvhost_syncpt_incr_max_ext(
+			chan->vi->ndev,
+			chan->syncpt[i][FE_SYNCPT_IDX], 1);
 
 	/*
 	 * Increment syncpt for PXL_SOF
@@ -506,8 +497,9 @@ static int tegra_channel_capture_setup(struct tegra_channel *chan,
 	return 0;
 }
 
-static int tegra_channel_capture_frame(struct tegra_channel *chan,
-				       struct tegra_channel_buffer *buf)
+static int tegra_channel_capture_frame_single_thread(
+			struct tegra_channel *chan,
+			struct tegra_channel_buffer *buf)
 {
 	struct vb2_v4l2_buffer *vb = &buf->buf;
 	struct timespec ts;
@@ -530,13 +522,14 @@ static int tegra_channel_capture_frame(struct tegra_channel *chan,
 	}
 
 	for (i = 0; i < chan->valid_ports; i++) {
-		vi4_channel_write(chan, chan->vnc_id[i], CHANNEL_COMMAND, LOAD);
+		vi4_channel_write(chan, chan->vnc_id[i],
+			CHANNEL_COMMAND, LOAD);
 		vi4_channel_write(chan, chan->vnc_id[i],
 			CONTROL, SINGLESHOT | MATCH_STATE_EN);
 	}
 
 	/* wait for vi notifier events */
-	if (!vi_notify_wait(chan, &ts)) {
+	if (!vi_notify_wait(chan, buf, &ts)) {
 		tegra_channel_error_recovery(chan);
 
 		state = VB2_BUF_STATE_ERROR;
@@ -554,6 +547,154 @@ static int tegra_channel_capture_frame(struct tegra_channel *chan,
 	spin_unlock_irqrestore(&chan->capture_state_lock, flags);
 
 	tegra_channel_ring_buffer(chan, vb, &ts, state);
+
+	return 0;
+}
+
+static int tegra_channel_capture_frame_multi_thread(
+			struct tegra_channel *chan,
+			struct tegra_channel_buffer *buf)
+{
+	struct timespec ts;
+	unsigned long flags;
+	bool is_streaming = atomic_read(&chan->is_streaming);
+	int restart_version = 0;
+	int err = false;
+	int i;
+
+	for (i = 0; i < chan->valid_ports; i++)
+		tegra_channel_surface_setup(chan, buf, i);
+
+	restart_version = atomic_read(&chan->restart_version);
+	if (!is_streaming ||
+		restart_version != chan->capture_version) {
+
+		chan->capture_version = restart_version;
+		err = tegra_channel_set_stream(chan, true);
+		if (err < 0)
+			return err;
+	}
+
+	for (i = 0; i < chan->valid_ports; i++) {
+		vi4_channel_write(chan, chan->vnc_id[i],
+			CHANNEL_COMMAND, LOAD);
+		vi4_channel_write(chan, chan->vnc_id[i],
+			CONTROL, SINGLESHOT | MATCH_STATE_EN);
+	}
+
+	/* wait for vi notifier events */
+	vi_notify_wait(chan, buf, &ts);
+	dev_dbg(&chan->video.dev,
+		"%s: vi4 got SOF syncpt buf[%p]\n", __func__, buf);
+
+	vi4_check_status(chan);
+
+	spin_lock_irqsave(&chan->capture_state_lock, flags);
+	if (chan->capture_state != CAPTURE_ERROR)
+		chan->capture_state = CAPTURE_GOOD;
+	spin_unlock_irqrestore(&chan->capture_state_lock, flags);
+
+	set_timestamp(buf, &ts);
+
+	if (chan->capture_state == CAPTURE_GOOD) {
+		/*
+		 * Set the buffer version to match
+		 * current capture version
+		 */
+		buf->version = chan->capture_version;
+		enqueue_inflight(chan, buf);
+	} else {
+		release_buffer(chan, buf);
+		atomic_inc(&chan->restart_version);
+	}
+
+	return 0;
+}
+
+static int tegra_channel_capture_frame(struct tegra_channel *chan,
+				struct tegra_channel_buffer *buf)
+{
+	int ret = 0;
+
+	if (chan->low_latency)
+		ret = tegra_channel_capture_frame_multi_thread(chan, buf);
+	else
+		ret = tegra_channel_capture_frame_single_thread(chan, buf);
+
+	return ret;
+}
+
+static void tegra_channel_release_frame(struct tegra_channel *chan,
+				struct tegra_channel_buffer *buf)
+{
+	int i;
+	int err = 0;
+	int restart_version = 0;
+
+	buf->state = VB2_BUF_STATE_DONE;
+
+	/*
+	 * If the frame capture was started on a different reset version
+	 * than our current version than either a reset is imminent or
+	 * it has already happened so don't bother waiting for the frame
+	 * to complete.
+	 */
+	restart_version = atomic_read(&chan->restart_version);
+	if (buf->version != restart_version) {
+		buf->state = VB2_BUF_STATE_ERROR;
+		release_buffer(chan, buf);
+		return;
+	}
+
+	/*
+	 * Wait for ATOMP_FE syncpt
+	 *
+	 * Use the syncpt max value we set in the capture thread
+	 */
+	for (i = 0; i < chan->valid_ports; i++) {
+		err = nvhost_syncpt_wait_timeout_ext(chan->vi->ndev,
+				chan->syncpt[i][FE_SYNCPT_IDX],
+				buf->thresh[i],
+				250, NULL, NULL);
+		if (unlikely(err))
+			dev_err(chan->vi->dev,
+				"ATOMP_FE syncpt timeout! err = %d\n", err);
+	}
+	dev_dbg(&chan->video.dev,
+		"%s: vi4 got EOF syncpt buf[%p]\n", __func__, buf);
+
+	if (err) {
+		buf->state = VB2_BUF_STATE_ERROR;
+		atomic_inc(&chan->restart_version);
+	}
+
+	release_buffer(chan, buf);
+}
+
+static int tegra_channel_kthread_release(void *data)
+{
+	struct tegra_channel *chan = data;
+	struct tegra_channel_buffer *buf;
+
+	set_freezable();
+
+	while (1) {
+
+		try_to_freeze();
+
+		wait_event_interruptible(chan->release_wait,
+					 !list_empty(&chan->release) ||
+					 kthread_should_stop());
+
+		if (kthread_should_stop())
+			break;
+
+		buf = dequeue_inflight(chan);
+		if (!buf)
+			continue;
+
+		tegra_channel_release_frame(chan, buf);
+	}
 
 	return 0;
 }
@@ -582,7 +723,7 @@ static void tegra_channel_capture_done(struct tegra_channel *chan)
 {
 	struct timespec ts;
 	struct tegra_channel_buffer *buf;
-	int state = VB2_BUF_STATE_DONE;
+
 	u32 thresh[TEGRA_CSI_BLOCKS];
 	int i, err;
 
@@ -616,7 +757,8 @@ static void tegra_channel_capture_done(struct tegra_channel *chan)
 					index,
 					250, NULL, NULL);
 			if (unlikely(err))
-				dev_err(chan->vi->dev, "ATOMP_FE syncpt timeout!\n");
+				dev_err(chan->vi->dev,
+				"ATOMP_FE syncpt timeout!\n");
 			else {
 				err = vi_notify_get_capture_status(chan->vnc[i],
 						chan->vnc_id[i],
@@ -634,7 +776,12 @@ static void tegra_channel_capture_done(struct tegra_channel *chan)
 	/* Mark capture state to IDLE as capture is finished */
 	chan->capture_state = CAPTURE_IDLE;
 
-	tegra_channel_ring_buffer(chan, &buf->buf, &ts, state);
+	if (chan->low_latency) {
+		set_timestamp(buf, &ts);
+		release_buffer(chan, buf);
+	} else
+		tegra_channel_ring_buffer(
+			chan, &buf->buf, &ts, VB2_BUF_STATE_DONE);
 }
 
 
@@ -725,11 +872,26 @@ static int tegra_channel_kthread_capture_start(void *data)
 
 static void tegra_channel_stop_kthreads(struct tegra_channel *chan)
 {
+	struct tegra_channel_buffer *buf = NULL;
+
 	mutex_lock(&chan->stop_kthread_lock);
-	/* Stop the kthread for capture */
+	/* Stop the kthread for frame capture */
 	if (chan->kthread_capture_start) {
 		kthread_stop(chan->kthread_capture_start);
 		chan->kthread_capture_start = NULL;
+	}
+
+	if (chan->low_latency) {
+		/* Stop the kthread for release frame */
+		if (chan->kthread_release) {
+			if (!list_empty(&chan->release)) {
+				buf = dequeue_inflight(chan);
+				if (buf)
+					tegra_channel_release_frame(chan, buf);
+			}
+			kthread_stop(chan->kthread_release);
+			chan->kthread_release = NULL;
+		}
 	}
 	mutex_unlock(&chan->stop_kthread_lock);
 }
@@ -928,7 +1090,7 @@ int vi4_channel_start_streaming(struct vb2_queue *vq, u32 count)
 					&chan->vi->emb_buf, GFP_KERNEL);
 			if (!chan->vi->emb_buf_addr) {
 				dev_err(&chan->video.dev,
-						"Can't allocate memory for embedded data\n");
+					"Can't allocate memory for embedded data\n");
 				goto error_capture_setup;
 			}
 			chan->vi->emb_buf_size = emb_buf_size;
@@ -942,7 +1104,9 @@ int vi4_channel_start_streaming(struct vb2_queue *vq, u32 count)
 	}
 
 	chan->sequence = 0;
-	tegra_channel_init_ring_buffer(chan);
+
+	if (!chan->low_latency)
+		tegra_channel_init_ring_buffer(chan);
 
 	/* disable override for vi mode */
 	override_ctrl = v4l2_ctrl_find(
@@ -975,6 +1139,19 @@ int vi4_channel_start_streaming(struct vb2_queue *vq, u32 count)
 			"failed to run kthread for capture start\n");
 		ret = PTR_ERR(chan->kthread_capture_start);
 		goto error_capture_setup;
+	}
+
+	if (chan->low_latency) {
+		/* Start thread to release buffers */
+		chan->kthread_release = kthread_run(
+					tegra_channel_kthread_release,
+					chan, chan->video.name);
+		if (IS_ERR(chan->kthread_release)) {
+			dev_err(&chan->video.dev,
+				"failed to run kthread for release\n");
+			ret = PTR_ERR(chan->kthread_release);
+			goto error_capture_setup;
+		}
 	}
 
 	return 0;
@@ -1012,8 +1189,10 @@ int vi4_channel_stop_streaming(struct vb2_queue *vq)
 			tegra_channel_capture_done(chan);
 		for (i = 0; i < chan->valid_ports; i++)
 			tegra_channel_notify_disable(chan, i);
-		/* free all the ring buffers */
-		free_ring_buffers(chan, chan->num_buffers);
+		if (!chan->low_latency) {
+			/* free all the ring buffers */
+			free_ring_buffers(chan, chan->num_buffers);
+		}
 		/* dequeue buffers back to app which are in capture queue */
 		tegra_channel_queued_buf_done(chan, VB2_BUF_STATE_ERROR);
 	}

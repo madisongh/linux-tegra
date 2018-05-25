@@ -1,7 +1,7 @@
 /**
  * TEGRA_V4L2_CAMERA.h - utilities for tegra camera driver
  *
- * Copyright (c) 2017, NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2017-2018, NVIDIA Corporation.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -47,6 +47,8 @@
 #define TEGRA_CAMERA_CID_SENSOR_IMAGE_PROPERTIES   (TEGRA_CAMERA_CID_BASE+106)
 #define TEGRA_CAMERA_CID_SENSOR_CONTROL_PROPERTIES (TEGRA_CAMERA_CID_BASE+107)
 #define TEGRA_CAMERA_CID_SENSOR_DV_TIMINGS         (TEGRA_CAMERA_CID_BASE+108)
+
+#define TEGRA_CAMERA_CID_LOW_LATENCY         (TEGRA_CAMERA_CID_BASE+109)
 
 /**
  * This is temporary with the current v4l2 infrastructure
