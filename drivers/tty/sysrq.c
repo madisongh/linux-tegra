@@ -134,6 +134,12 @@ static void sysrq_handle_crash(int key)
 {
 	char *killer = NULL;
 
+	/* we need to release the RCU read lock here,
+	 * otherwise we get an annoying
+	 * 'BUG: sleeping function called from invalid context'
+	 * complaint from the kernel before the panic.
+	 */
+	rcu_read_unlock();
 	panic_on_oops = 1;	/* force panic */
 	wmb();
 	*killer = 1;
@@ -237,17 +243,17 @@ static void sysrq_handle_showallcpus(int key)
 	 * backtrace printing did not succeed or the
 	 * architecture has no support for it:
 	 */
-	preempt_disable();
 	if (!trigger_all_cpu_backtrace()) {
-		struct pt_regs *regs = get_irq_regs();
+		struct pt_regs *regs = NULL;
 
+		if (in_irq())
+			regs = get_irq_regs();
 		if (regs) {
 			pr_info("CPU%d:\n", smp_processor_id());
 			show_regs(regs);
 		}
 		schedule_work(&sysrq_showallcpus);
 	}
-	preempt_enable();
 }
 
 static struct sysrq_key_op sysrq_showallcpus_op = {
@@ -260,10 +266,10 @@ static struct sysrq_key_op sysrq_showallcpus_op = {
 
 static void sysrq_handle_showregs(int key)
 {
-	struct pt_regs *regs;
+	struct pt_regs *regs = NULL;
 
-	preempt_disable();
-	regs = get_irq_regs();
+	if (in_irq())
+		regs = get_irq_regs();
 	if (regs)
 		show_regs(regs);
 	perf_event_print_debug();

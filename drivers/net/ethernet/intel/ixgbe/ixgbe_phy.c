@@ -104,7 +104,7 @@ s32 ixgbe_read_i2c_combined_generic_int(struct ixgbe_hw *hw, u8 addr, u16 reg,
 					u16 *val, bool lock)
 {
 	u32 swfw_mask = hw->phy.phy_semaphore_mask;
-	int max_retry = 10;
+	int max_retry = 3;
 	int retry = 0;
 	u8 csum_byte;
 	u8 high_bits;
