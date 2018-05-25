@@ -614,8 +614,8 @@ static int usb_parse_configuration(struct usb_device *dev, int cfgidx,
 			d = (struct usb_interface_assoc_descriptor *)header;
 			if (d->bLength < USB_DT_INTERFACE_ASSOCIATION_SIZE) {
 				dev_warn(ddev,
-					"config %d has an invalid interface association descriptor of length %d, skipping\n",
-					cfgno, d->bLength);
+					 "config %d has an invalid interface association descriptor of length %d, skipping\n",
+					 cfgno, d->bLength);
 				continue;
 			}
 
@@ -626,6 +626,7 @@ static int usb_parse_configuration(struct usb_device *dev, int cfgidx,
 					       "configuration %d\n", cfgno);
 			} else {
 				config->intf_assoc[iad_num] = d;
+				iad_num++;
 			}
 
 		} else if (header->bDescriptorType == USB_DT_DEVICE ||
@@ -825,7 +826,7 @@ int usb_get_configuration(struct usb_device *dev)
 		}
 
 		if (dev->quirks & USB_QUIRK_DELAY_INIT)
-			msleep(100);
+			msleep(200);
 
 		result = usb_get_descriptor(dev, USB_DT_CONFIG, cfgno,
 		    bigbuffer, length);
