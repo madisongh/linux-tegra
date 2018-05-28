@@ -15,11 +15,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-#include <linux/clk.h>
 #include <linux/debugfs.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/kernel.h>
+#include <linux/clk.h>
+#include <linux/init.h>
 #include <linux/module.h>
 #include <linux/irq.h>
 #include <linux/io.h>
@@ -84,6 +85,7 @@ struct tegra_rtc_info {
 	struct platform_device	*pdev;
 	struct rtc_device	*rtc_dev;
 	void __iomem		*rtc_base; /* NULL if not initialized. */
+	struct clk		*clk;
 	int			tegra_rtc_irq; /* alarm and periodic irq */
 	spinlock_t		tegra_rtc_lock;
 };
@@ -596,6 +598,14 @@ static int __init tegra_rtc_probe(struct platform_device *pdev)
 	if (info->tegra_rtc_irq <= 0)
 		return -EBUSY;
 
+	info->clk = devm_clk_get(&pdev->dev, NULL);
+	if (IS_ERR(info->clk))
+		return PTR_ERR(info->clk);
+
+	ret = clk_prepare_enable(info->clk);
+	if (ret < 0)
+		return ret;
+
 	/* set context info. */
 	info->pdev = pdev;
 	spin_lock_init(&info->tegra_rtc_lock);
@@ -647,7 +657,7 @@ static int __init tegra_rtc_probe(struct platform_device *pdev)
 		ret = PTR_ERR(info->rtc_dev);
 		dev_err(&pdev->dev, "Unable to register device (err=%d).\n",
 			ret);
-		return ret;
+		goto disable_clk;
 	}
 
 	ret = debugfs_init();
@@ -660,11 +670,19 @@ static int __init tegra_rtc_probe(struct platform_device *pdev)
 	dev_notice(&pdev->dev, "Tegra internal Real Time Clock\n");
 
 	return 0;
+
+disable_clk:
+	clk_disable_unprepare(info->clk);
+	return ret;
 }
 
 static int tegra_rtc_remove(struct platform_device *pdev)
 {
+	struct tegra_rtc_info *info = platform_get_drvdata(pdev);
+
 	debugfs_remove_recursive(pm_dentry);
+
+	clk_disable_unprepare(info->clk);
 
 	return 0;
 }
