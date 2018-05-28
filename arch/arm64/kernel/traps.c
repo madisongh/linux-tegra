@@ -478,28 +478,44 @@ EXPORT_SYMBOL(unregister_serr_hook);
 #endif
 
 /*
- * bad_mode handles the impossible case in the exception vector.
+ * bad_mode handles the impossible case in the exception vector. This is always
+ * fatal.
  */
 asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 {
-	siginfo_t info;
-	void __user *pc = (void __user *)instruction_pointer(regs);
+        console_verbose();
 
-	console_verbose();
+        pr_crit("Bad mode in %s handler detected, code 0x%08x -- %s\n",
+                handler[reason], esr, esr_get_class_string(esr));
 
-	pr_crit("Bad mode in %s handler detected, code 0x%08x -- %s\n",
-		handler[reason], esr, esr_get_class_string(esr));
+        die("Oops - bad mode", regs, 0);
+        local_irq_disable();
+        panic("bad mode");
+}
 
-#ifdef CONFIG_DEBUG_VERBOSE_OOPS
-	__show_regs(regs);
-#endif
+/*
+ * bad_el0_sync handles unexpected, but potentially recoverable synchronous
+ * exceptions taken from EL0. Unlike bad_mode, this returns.
+ */
+asmlinkage void bad_el0_sync(struct pt_regs *regs, int reason, unsigned int esr)
+{
+        siginfo_t info;
+        void __user *pc = (void __user *)instruction_pointer(regs);
+        console_verbose();
 
-	info.si_signo = SIGILL;
-	info.si_errno = 0;
-	info.si_code  = ILL_ILLOPC;
-	info.si_addr  = pc;
+        pr_crit("Bad EL0 synchronous exception detected on CPU%d, code 0x%08x -- %s\n",
+                smp_processor_id(), esr, esr_get_class_string(esr));
+        __show_regs(regs);
 
-	arm64_notify_die("Oops - bad mode", regs, &info, 0);
+        info.si_signo = SIGILL;
+        info.si_errno = 0;
+        info.si_code  = ILL_ILLOPC;
+        info.si_addr  = pc;
+
+        current->thread.fault_address = 0;
+        current->thread.fault_code = 0;
+
+        force_sig_info(info.si_signo, &info, current);
 }
 
 asmlinkage void __exception handle_serr(unsigned long daif, unsigned long spsr,
