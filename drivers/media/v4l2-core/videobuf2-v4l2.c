@@ -600,8 +600,8 @@ static int vb2_internal_dqbuf(struct vb2_queue *q, struct v4l2_buffer *b,
 		q->last_buffer_dequeued = true;
 
 	/*
-	 * After calling the VIDIOC_DQBUF V4L2_BUF_FLAG_DONE must be
-	 * cleared.
+	 *  After calling the VIDIOC_DQBUF V4L2_BUF_FLAG_DONE must be
+	 *  cleared.
 	 */
 	b->flags &= ~V4L2_BUF_FLAG_DONE;
 

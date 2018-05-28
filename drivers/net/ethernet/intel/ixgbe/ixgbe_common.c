@@ -4203,9 +4203,9 @@ s32 ixgbe_set_fw_drv_ver_generic(struct ixgbe_hw *hw, u8 maj, u8 min,
 	fw_cmd.ver_min = min;
 	fw_cmd.ver_build = build;
 	fw_cmd.ver_sub = sub;
+	fw_cmd.hdr.checksum = 0;
 	fw_cmd.pad = 0;
 	fw_cmd.pad2 = 0;
-	fw_cmd.hdr.checksum = 0;
 	fw_cmd.hdr.checksum = ixgbe_calculate_checksum((u8 *)&fw_cmd,
 				(FW_CEM_HDR_LEN + fw_cmd.hdr.buf_len));
 
