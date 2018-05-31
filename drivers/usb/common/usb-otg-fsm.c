@@ -2,7 +2,7 @@
  * OTG Finite State Machine from OTG spec
  *
  * Copyright (C) 2007,2008 Freescale Semiconductor, Inc.
- * Copyright (c) 2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author:	Li Yang <LeoLi@freescale.com>
  *		Jerry Huang <Chang-Ming.Huang@freescale.com>
@@ -489,20 +489,25 @@ int otg_set_state_op(struct usb_otg *otg, enum usb_otg_state from,
 {
 	struct list_head *ptr;
 	struct otg_fsm_state_op *entry;
+	int ret = 0;
+
+	mutex_lock(&otg->fsm.lock);
 
 	list_for_each(ptr, &otg->fsm.state_op_list) {
 		entry = list_entry(ptr, struct otg_fsm_state_op, list);
 		if (entry->from_state == from && entry->to_state == to) {
 			entry->op = op;
 			debug_state_op(entry);
-			return 0;
+			goto out;
 		}
 	}
 
 	/* add to fsm->state_op_list */
 	entry = devm_kzalloc(otg->dev, sizeof(*entry), GFP_ATOMIC);
-	if (!entry)
-		return -ENOMEM;
+	if (!entry) {
+		ret = -ENOMEM;
+		goto out;
+	}
 
 	entry->from_state = from;
 	entry->to_state = to;
@@ -510,7 +515,9 @@ int otg_set_state_op(struct usb_otg *otg, enum usb_otg_state from,
 	debug_state_op(entry);
 	list_add_tail(&entry->list, &otg->fsm.state_op_list);
 
-	return 0;
+out:
+	mutex_unlock(&otg->fsm.lock);
+	return ret;
 }
 EXPORT_SYMBOL_GPL(otg_set_state_op);
 

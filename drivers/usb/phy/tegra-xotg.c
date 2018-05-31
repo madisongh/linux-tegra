@@ -1,7 +1,7 @@
 /*
 * tegra-xotg.c - Nvidia XUSB OTG Controller Driver
 *
-* Copyright (c) 2017, NVIDIA CORPORATION.  All rights reserved.
+* Copyright (c) 2017-2018, NVIDIA CORPORATION.  All rights reserved.
 *
 * This program is free software; you can redistribute it and/or modify it
 * under the terms and conditions of the GNU General Public License,
@@ -1416,9 +1416,6 @@ static int tegra_xotg_probe(struct platform_device *pdev)
 	xotg->otg->fsm.a_bus_drop = 0;
 	xotg->otg->fsm.a_bus_req = 1;
 	usb_otg_sync_inputs(xotg->otg);
-
-	/* initialize OTG FSM state transition operation */
-	otg_init_state_op(xotg->otg);
 
 	/* for SRP: only enable SRP detection in A_IDLE state */
 	otg_set_state_op(xotg->otg,

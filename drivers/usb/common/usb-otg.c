@@ -2,7 +2,7 @@
  * drivers/usb/common/usb-otg.c - USB OTG core
  *
  * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com
- * Copyright (c) 2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Roger Quadros <rogerq@ti.com>
  *
@@ -23,6 +23,7 @@
 #include <linux/of_platform.h>
 #include <linux/usb/of.h>
 #include <linux/usb/otg.h>
+#include <linux/usb/otg-fsm.h>
 #include <linux/usb/gadget.h>
 #include <linux/workqueue.h>
 
@@ -204,6 +205,9 @@ struct usb_otg *usb_otg_register(struct device *dev,
 		ret = -EINVAL;
 		goto err_wq;
 	}
+
+	/* initialize OTG FSM state transition operation */
+	otg_init_state_op(otg);
 
 	INIT_WORK(&otg->work, config->otg_work);
 
