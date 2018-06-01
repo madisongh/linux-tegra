@@ -2195,8 +2195,6 @@ static void soctherm_init_hw_throt_cdev(struct platform_device *pdev)
 				stc->init = true;
 			}
 		}
-
-		of_node_put(c);
 	}
 
 	of_node_put(np);
