@@ -379,6 +379,10 @@ static int tegra_channel_notify_disable(
 	int ret = 0;
 	struct tegra_vi4_syncpts_req req;
 
+	/* clear vi notify callbacks */
+	vi_notify_channel_set_notify_funcs(chan->vnc[index],
+			NULL, NULL, NULL);
+
 	/* free syncpts */
 	nvhost_syncpt_put_ref_ext(
 		chan->vi->ndev, chan->syncpt[index][SOF_SYNCPT_IDX]);
@@ -723,7 +727,7 @@ static void tegra_channel_capture_done(struct tegra_channel *chan)
 {
 	struct timespec ts;
 	struct tegra_channel_buffer *buf;
-
+	int state = VB2_BUF_STATE_DONE;
 	u32 thresh[TEGRA_CSI_BLOCKS];
 	int i, err;
 
@@ -741,36 +745,44 @@ static void tegra_channel_capture_done(struct tegra_channel *chan)
 	}
 
 	for (i = 0; i < chan->valid_ports; i++) {
-		err = nvhost_syncpt_read_ext_check(chan->vi->ndev,
-				chan->syncpt[i][FE_SYNCPT_IDX], &thresh[i]);
-		/* Get current ATOMP_FE syncpt min value */
-		if (!err) {
-			struct vi_capture_status status;
-			u32 index = thresh[i] + 1;
-			/* Wait for ATOMP_FE syncpt
-			 *
-			 * This is to make sure we don't exit the capture thread
-			 * before the last frame is done writing to memory
-			 */
-			err = nvhost_syncpt_wait_timeout_ext(chan->vi->ndev,
+		/*
+		 * Increment syncpt for ATOMP_FE
+		 *
+		 * Increment and retrieve ATOMP_FE syncpt max value.
+		 * This value will be used to wait for next syncpt
+		 */
+		struct vi_capture_status status;
+		thresh[i] = nvhost_syncpt_incr_max_ext(chan->vi->ndev,
+					chan->syncpt[i][FE_SYNCPT_IDX], 1);
+
+		/* Wait for ATOMP_FE syncpt
+		 *
+		 * This is to make sure we don't exit the capture thread
+		 * before the last frame is done writing to memory
+		 */
+		err = nvhost_syncpt_wait_timeout_ext(chan->vi->ndev,
 					chan->syncpt[i][FE_SYNCPT_IDX],
-					index,
+					thresh[i],
 					chan->timeout, NULL, NULL);
-			if (unlikely(err))
-				dev_err(chan->vi->dev,
-				"ATOMP_FE syncpt timeout!\n");
-			else {
-				err = vi_notify_get_capture_status(chan->vnc[i],
-						chan->vnc_id[i],
-						index, &status);
-				if (unlikely(err))
-					dev_err(chan->vi->dev,
-						"no capture status! err = %d\n",
-						err);
-				else
-					ts = ns_to_timespec((s64)status.eof_ts);
-			}
+		if (unlikely(err)) {
+			dev_err(chan->vi->dev, "ATOMP_FE syncpt timeout!\n");
+			break;
 		}
+
+		err = vi_notify_get_capture_status(chan->vnc[i],
+				chan->vnc_id[i],
+				thresh[i], &status);
+		if (unlikely(err)) {
+			dev_err(chan->vi->dev,
+					"no capture status! err = %d\n", err);
+			break;
+		}
+		ts = ns_to_timespec((s64)status.eof_ts);
+	}
+
+	if (err) {
+		tegra_channel_error_recovery(chan);
+		state = VB2_BUF_STATE_REQUEUEING;
 	}
 
 	/* Mark capture state to IDLE as capture is finished */
@@ -781,7 +793,7 @@ static void tegra_channel_capture_done(struct tegra_channel *chan)
 		release_buffer(chan, buf);
 	} else
 		tegra_channel_ring_buffer(
-			chan, &buf->buf, &ts, VB2_BUF_STATE_DONE);
+			chan, &buf->buf, &ts, state);
 }
 
 
@@ -1186,10 +1198,14 @@ int vi4_channel_stop_streaming(struct vb2_queue *vq)
 	if (!chan->bypass) {
 		tegra_channel_stop_kthreads(chan);
 		/* wait for last frame memory write ack */
-		if (is_streaming)
+		if (is_streaming && chan->capture_state == CAPTURE_GOOD)
 			tegra_channel_capture_done(chan);
-		for (i = 0; i < chan->valid_ports; i++)
+		for (i = 0; i < chan->valid_ports; i++) {
+			vi4_channel_write(chan, chan->vnc_id[i], CONTROL, 0);
+			vi4_channel_write(chan, chan->vnc_id[i],
+				CHANNEL_COMMAND, LOAD);
 			tegra_channel_notify_disable(chan, i);
+		}
 		if (!chan->low_latency) {
 			/* free all the ring buffers */
 			free_ring_buffers(chan, chan->num_buffers);
