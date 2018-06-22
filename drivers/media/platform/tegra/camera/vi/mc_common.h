@@ -167,7 +167,7 @@ struct tegra_channel {
 	unsigned int buffer_offset[TEGRA_CSI_BLOCKS];
 	unsigned int buffer_state[QUEUED_BUFFERS];
 	struct vb2_v4l2_buffer *buffers[QUEUED_BUFFERS];
-	unsigned int timeout;
+	unsigned long timeout;
 
 	atomic_t restart_version;
 	int capture_version;
