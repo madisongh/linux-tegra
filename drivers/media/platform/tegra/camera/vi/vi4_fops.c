@@ -532,7 +532,7 @@ static int tegra_channel_capture_frame_single_thread(
 	if (!vi_notify_wait(chan, buf, &ts)) {
 		tegra_channel_error_recovery(chan);
 
-		state = VB2_BUF_STATE_ERROR;
+		state = VB2_BUF_STATE_REQUEUEING;
 
 		spin_lock_irqsave(&chan->capture_state_lock, flags);
 		chan->capture_state = CAPTURE_TIMEOUT;
@@ -641,7 +641,7 @@ static void tegra_channel_release_frame(struct tegra_channel *chan,
 	 */
 	restart_version = atomic_read(&chan->restart_version);
 	if (buf->version != restart_version) {
-		buf->state = VB2_BUF_STATE_ERROR;
+		buf->state = VB2_BUF_STATE_REQUEUEING;
 		release_buffer(chan, buf);
 		return;
 	}
@@ -664,7 +664,7 @@ static void tegra_channel_release_frame(struct tegra_channel *chan,
 		"%s: vi4 got EOF syncpt buf[%p]\n", __func__, buf);
 
 	if (err) {
-		buf->state = VB2_BUF_STATE_ERROR;
+		buf->state = VB2_BUF_STATE_REQUEUEING;
 		atomic_inc(&chan->restart_version);
 	}
 

@@ -349,7 +349,7 @@ void release_buffer(struct tegra_channel *chan,
 	 * with no error status or padding.
 	 */
 	if (chan->capture_state != CAPTURE_GOOD || vbuf->sequence < 2)
-		buf->state = VB2_BUF_STATE_ERROR;
+		buf->state = VB2_BUF_STATE_REQUEUEING;
 
 	if (chan->sequence == 1) {
 		/*
@@ -440,7 +440,7 @@ void free_ring_buffers(struct tegra_channel *chan, int frames)
 		if (chan->capture_state != CAPTURE_GOOD ||
 			chan->released_bufs < 2)
 			chan->buffer_state[chan->free_index] =
-						VB2_BUF_STATE_ERROR;
+						VB2_BUF_STATE_REQUEUEING;
 #endif
 		if (chan->sequence == 1) {
 			/*
@@ -473,7 +473,7 @@ static void add_buffer_to_ring(struct tegra_channel *chan,
 {
 	/* save the buffer to the ring first */
 	/* Mark buffer state as error before start */
-	chan->buffer_state[chan->save_index] = VB2_BUF_STATE_ERROR;
+	chan->buffer_state[chan->save_index] = VB2_BUF_STATE_REQUEUEING;
 	chan->buffers[chan->save_index++] = vb;
 	if (chan->save_index >= QUEUED_BUFFERS)
 		chan->save_index = 0;
