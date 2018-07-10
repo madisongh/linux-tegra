@@ -328,6 +328,8 @@ static void tegra_spi_clear_status(struct tegra_spi_data *tspi)
 	/* Write 1 to clear status register */
 	val = tegra_spi_readl(tspi, SPI_TRANS_STATUS);
 	tegra_spi_writel(tspi, val, SPI_TRANS_STATUS);
+	/* Read back status register to confirm interrrupt is cleared */
+	val = tegra_spi_readl(tspi, SPI_TRANS_STATUS);
 
 	/* Clear fifo status error if any */
 	if (tspi->status_reg & SPI_ERR) {
