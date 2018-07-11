@@ -472,6 +472,9 @@ static int tegra_channel_capture_frame_multi_thread(
 	int restart_version = 0;
 	bool is_streaming = atomic_read(&chan->is_streaming);
 
+	if (!is_streaming)
+		tegra_channel_ec_recover(chan);
+
 	/* Init registers related to each frames */
 	for (index = 0; index < valid_ports; index++) {
 		/* Program buffer address by using surface 0 */
@@ -534,12 +537,6 @@ static int tegra_channel_capture_frame_multi_thread(
 	restart_version = atomic_read(&chan->restart_version);
 	if (restart_version != chan->capture_version || !is_streaming) {
 		chan->capture_version = restart_version;
-		/* TODO: added this call to ec_recover() here to prevent
-		 * it from happening on two separate threads if there was a
-		 * syncpt timeout on receive. Is this correct approach?
-		 */
-		tegra_channel_ec_recover(chan);
-
 		err = tegra_channel_enable_stream(chan);
 		if (err) {
 			dev_err(&chan->video.dev,
