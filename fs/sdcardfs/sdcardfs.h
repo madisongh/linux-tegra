@@ -85,15 +85,6 @@
  * These two macro should be used in pair, and OVERRIDE_CRED() should be
  * placed at the beginning of a function, right after variable declaration.
  */
-#define OVERRIDE_CRED(sdcardfs_sbi, saved_cred)		\
-	saved_cred = override_fsids(sdcardfs_sbi);	\
-	if (!saved_cred) { return -ENOMEM; }
-
-#define OVERRIDE_CRED_PTR(sdcardfs_sbi, saved_cred)	\
-	saved_cred = override_fsids(sdcardfs_sbi);	\
-	if (!saved_cred) { return ERR_PTR(-ENOMEM); }
-
-#define REVERT_CRED(saved_cred)	revert_fsids(saved_cred)
 
 #define DEBUG_CRED()		\
 	printk("KAKJAGI: %s:%d fsuid %d fsgid %d\n", 	\
