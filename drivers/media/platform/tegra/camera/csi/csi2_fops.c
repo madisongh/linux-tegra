@@ -127,6 +127,7 @@ void tegra_csi_error_recover(struct tegra_csi_channel *chan,
 	struct tegra_csi_port *port = &chan->ports[port_num];
 	const int TPG_B = TEGRA_CSI_TPG_OFFSET + TEGRA_CSI_PORT_OFFSET;
 	const int CIL_B = TEGRA_CSI_CIL_OFFSET + TEGRA_CSI_PORT_OFFSET;
+	const int csi_port = chan->ports[port_num].num;
 
 	if (port->lanes == 4) {
 		tpg_write(port, TEGRA_CSI_PATTERN_GENERATOR_CTRL,
@@ -134,27 +135,27 @@ void tegra_csi_error_recover(struct tegra_csi_channel *chan,
 		csi_write(chan,
 			TPG_B + TEGRA_CSI_PATTERN_GENERATOR_CTRL,
 				PG_ENABLE,
-				port_num >> 1);
+				csi_port >> 1);
 		cil_write(port, TEGRA_CSI_CIL_SW_SENSOR_RESET, 0x1);
 		csi_write(chan, CIL_B + TEGRA_CSI_CIL_SW_SENSOR_RESET,
 				0x1,
-				port_num >> 1);
+				csi_port >> 1);
 		csi_write(chan, TEGRA_CSI_CSI_SW_STATUS_RESET, 0x1,
-				port_num >> 1);
+				csi_port >> 1);
 		/* sleep for clock cycles to drain the Rx FIFO */
 		usleep_range(10, 20);
 		cil_write(port, TEGRA_CSI_CIL_SW_SENSOR_RESET, 0x0);
 		csi_write(chan, CIL_B + TEGRA_CSI_CIL_SW_SENSOR_RESET,
 				0x0,
-				port_num >> 1);
+				csi_port >> 1);
 		csi_write(chan, TEGRA_CSI_CSI_SW_STATUS_RESET, 0x0,
-				port_num >> 1);
+				csi_port >> 1);
 		tpg_write(port, TEGRA_CSI_PATTERN_GENERATOR_CTRL,
 				PG_DISABLE);
 		csi_write(chan,
 			TPG_B + TEGRA_CSI_PATTERN_GENERATOR_CTRL,
 				PG_DISABLE,
-				port_num >> 1);
+				csi_port >> 1);
 	} else {
 		tpg_write(port,
 			TEGRA_CSI_PATTERN_GENERATOR_CTRL, PG_ENABLE);
@@ -162,14 +163,14 @@ void tegra_csi_error_recover(struct tegra_csi_channel *chan,
 			TEGRA_CSI_CIL_SW_SENSOR_RESET, 0x1);
 		csi_write(chan,
 			TEGRA_CSI_CSI_SW_STATUS_RESET,
-			0x1, port_num >> 1);
+			0x1, csi_port >> 1);
 		/* sleep for clock cycles to drain the Rx FIFO */
 		usleep_range(10, 20);
 		cil_write(port,
 			TEGRA_CSI_CIL_SW_SENSOR_RESET, 0x0);
 		csi_write(chan,
 			TEGRA_CSI_CSI_SW_STATUS_RESET,
-			0x0, port_num >> 1);
+			0x0, csi_port >> 1);
 		tpg_write(port,
 			TEGRA_CSI_PATTERN_GENERATOR_CTRL, PG_DISABLE);
 		}
