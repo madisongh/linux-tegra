@@ -1,7 +1,7 @@
 /*
  * camera_common.c - utilities for tegra camera driver
  *
- * Copyright (c) 2015-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -603,7 +603,7 @@ int camera_common_g_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *mf)
 EXPORT_SYMBOL_GPL(camera_common_g_fmt);
 
 static int camera_common_evaluate_color_format(struct v4l2_subdev *sd,
-					       int pixelformat)
+					       int code)
 {
 	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
 	int i;
@@ -616,7 +616,7 @@ static int camera_common_evaluate_color_format(struct v4l2_subdev *sd,
 		sensor_fmt = find_matching_color_fmt(s_data, i);
 		if (sensor_fmt == NULL)
 			return -EINVAL;
-		if (sensor_fmt->pix_fmt == pixelformat)
+		if (sensor_fmt->code == code)
 			break;
 	}
 
