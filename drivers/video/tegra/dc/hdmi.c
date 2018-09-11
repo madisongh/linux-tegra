@@ -392,7 +392,7 @@ static const struct tegra_hdmi_audio_config
 
 	while (table->pix_clock) {
 		if (table->pix_clock > (pix_clock/100*99) &&
-                table->pix_clock < (pix_clock/100*109) &&
+                table->pix_clock < (pix_clock/100*101) &&
                 table->pix_clock >= 1000)
 			return table;
 		table++;
