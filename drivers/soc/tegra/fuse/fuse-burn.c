@@ -222,6 +222,24 @@ static int tegra_fuse_is_temp_under_range(struct tegra_fuse_burn_dev *fuse_dev)
 	return 0;
 }
 
+static void tegra_fuse_set_pd(bool pd)
+{
+	u32 reg;
+
+	tegra_fuse_control_read(TEGRA_FUSE_CTRL, &reg);
+
+	if (pd && !(reg & TEGRA_FUSE_CTRL_PD)) {
+		udelay(1);
+		reg |= TEGRA_FUSE_CTRL_PD;
+		tegra_fuse_control_write(reg, TEGRA_FUSE_CTRL);
+	} else if (!pd && (reg & TEGRA_FUSE_CTRL_PD)) {
+		reg &= ~TEGRA_FUSE_CTRL_PD;
+		tegra_fuse_control_write(reg, TEGRA_FUSE_CTRL);
+		tegra_fuse_control_read(TEGRA_FUSE_CTRL, &reg);
+		udelay(1);
+	}
+}
+
 static int tegra_fuse_pre_burn_process(struct tegra_fuse_burn_dev *fuse_dev)
 {
 	u32 off_0_val, off_1_val, reg;
@@ -253,13 +271,8 @@ static int tegra_fuse_pre_burn_process(struct tegra_fuse_burn_dev *fuse_dev)
 	tegra_fuse_control_write(0, TEGRA_FUSE_WRITE_ACCESS_SW);
 
 	/* Disable power down mode */
-	if (fuse_dev->hw->power_down_mode) {
-		tegra_fuse_control_read(TEGRA_FUSE_CTRL, &reg);
-		if (TEGRA_FUSE_CTRL_PD & reg) {
-			reg &= ~TEGRA_FUSE_CTRL_PD;
-			tegra_fuse_control_write(reg, TEGRA_FUSE_CTRL);
-		}
-	}
+	if (fuse_dev->hw->power_down_mode)
+		tegra_fuse_set_pd(false);
 
 	if (fuse_dev->pgm_width)
 		tegra_fuse_control_write(fuse_dev->pgm_width,
@@ -296,11 +309,10 @@ static void tegra_fuse_post_burn_process(struct tegra_fuse_burn_dev *fuse_dev)
 		sense_done = reg & TEGRA_FUSE_CTRL_SENSE_DONE;
 	} while (!sense_done);
 
-	if (fuse_dev->hw->power_down_mode) {
-		tegra_fuse_control_read(TEGRA_FUSE_CTRL, &reg);
-		reg |= TEGRA_FUSE_CTRL_PD;
-		tegra_fuse_control_write(reg, TEGRA_FUSE_CTRL);
-	}
+	/* Enable power down mode */
+	if (fuse_dev->hw->power_down_mode)
+		tegra_fuse_set_pd(true);
+
 	tegra_pmc_fuse_control_ps18_latch_clear();
 
 	if (fuse_dev->hw->mirroring_support)
@@ -348,7 +360,8 @@ static int tegra_fuse_burn_fuse(struct tegra_fuse_burn_dev *fuse_dev,
 	return 0;
 }
 
-static void tegra_fuse_get_fuse(struct fuse_burn_data *data, u32 *macro_buf)
+static void tegra_fuse_get_fuse(struct tegra_fuse_burn_dev *fuse_dev,
+	struct fuse_burn_data *data, u32 *macro_buf)
 {
 	int start_bit = data->start_bit;
 	int nbits = data->size_bits;
@@ -357,6 +370,10 @@ static void tegra_fuse_get_fuse(struct fuse_burn_data *data, u32 *macro_buf)
 	int bit_position = 0;
 	int i, loops;
 	u32 actual_val, redun_val;
+
+	/* Disable power down mode */
+	if (fuse_dev->hw->power_down_mode)
+		tegra_fuse_set_pd(false);
 
 	do {
 		actual_val = fuse_cmd_read(offset);
@@ -383,12 +400,19 @@ static void tegra_fuse_get_fuse(struct fuse_burn_data *data, u32 *macro_buf)
 			offset += 1;
 		start_bit = 0;
 	} while (nbits > 0);
+
+	/* Enable power down mode */
+	if (fuse_dev->hw->power_down_mode)
+		tegra_fuse_set_pd(true);
 }
 
 static ssize_t tegra_fuse_show(struct device *dev,
 	struct device_attribute *attr,
 	char *buf)
 {
+	struct platform_device *pdev = container_of(dev,
+			struct platform_device, dev);
+	struct tegra_fuse_burn_dev *fuse_dev = platform_get_drvdata(pdev);
 	struct fuse_burn_data *data;
 	char str[9];
 	u32 *macro_buf;
@@ -404,7 +428,7 @@ static ssize_t tegra_fuse_show(struct device *dev,
 	}
 
 	mutex_lock(&fuse_lock);
-	tegra_fuse_get_fuse(data, macro_buf);
+	tegra_fuse_get_fuse(fuse_dev, data, macro_buf);
 	mutex_unlock(&fuse_lock);
 	strcpy(buf, "0x");
 	if (data->is_big_endian) {
