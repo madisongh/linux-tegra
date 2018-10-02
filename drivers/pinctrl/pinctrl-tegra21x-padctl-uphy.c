@@ -82,7 +82,7 @@
 
 #define XUSB_PADCTL_USB3_PAD_MUX_0		(0x28)
 #define   SEL(_lane, _val)			(((_val) & 0x3)		\
-						<< (((_lane) * 2) + 12))
+						<< (((_lane) * 2) + 12 + ((_lane == 7) ? 4 : 0)))
 #define   SEL_PCIE_X1(_lane)			SEL(_lane, 0)
 #define   SEL_USB3(_lane)			SEL(_lane, 1)
 #define   SEL_SATA(_lane)			SEL(_lane, 2)
