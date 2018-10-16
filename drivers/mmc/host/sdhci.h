@@ -454,6 +454,11 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_SEL_SDR104_UHS_MODE_IN_SDR50	(1<<21)
 #define SDHCI_QUIRK2_NON_STD_TUNING_LOOP_CNTR		(1<<22)
 #define SDHCI_QUIRK2_PERIODIC_CALIBRATION		(1<<23)
+/*
+ * Apply correction to the tuned tap value in case of
+ * window merge detection or partial window selection by HW tuning
+ */
+#define SDHCI_QUIRK2_TUNING_CORRECTION			(1<<24)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
