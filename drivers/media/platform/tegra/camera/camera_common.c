@@ -789,23 +789,24 @@ int camera_common_s_power(struct v4l2_subdev *sd, int on)
 	struct camera_common_data *s_data = to_camera_common_data(sd->dev);
 
 	if (on) {
-		err = camera_common_mclk_enable(s_data);
-		if (err)
-			return err;
-
-		camera_common_dpd_disable(s_data);
-
 		err = call_s_op(s_data, power_on);
 		if (err) {
-			dev_err(s_data->dev,
-				"%s: error power on\n", __func__);
-			camera_common_dpd_enable(s_data);
-			camera_common_mclk_disable(s_data);
+			dev_err(s_data->dev, "%s: error power on\n", __func__);
+			return err;
 		}
+
+		err = camera_common_mclk_enable(s_data);
+		if (err) {
+			dev_err(s_data->dev, "%s: failed to enable mclk\n",
+					__func__);
+			call_s_op(s_data, power_off);
+			return err;
+		}
+		camera_common_dpd_disable(s_data);
 	} else {
-		call_s_op(s_data, power_off);
 		camera_common_dpd_enable(s_data);
 		camera_common_mclk_disable(s_data);
+		call_s_op(s_data, power_off);
 	}
 
 	return err;
