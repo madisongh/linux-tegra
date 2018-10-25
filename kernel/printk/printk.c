@@ -1434,11 +1434,13 @@ SYSCALL_DEFINE3(syslog, int, type, char __user *, buf, int, len)
  * write out force_text.
  * The console lock must be held.
  */
-static void call_force_console_drivers(const char *force_text,
+static void call_force_console_drivers(int level, const char *force_text,
 					size_t force_len)
 {
 	struct console *con;
 
+	if (level >= console_loglevel && !ignore_loglevel)
+		return;
 	if (!console_drivers)
 		return;
 
@@ -1994,7 +1996,7 @@ static ssize_t msg_print_ext_body(char *buf, size_t size,
 static void call_console_drivers(int level,
 				 const char *ext_text, size_t ext_len,
 				 const char *text, size_t len) {}
-static void call_force_console_drivers(const char *force_text,
+static void call_force_console_drivers(int level, const char *force_text,
 					size_t force_len) {}
 static size_t msg_print_text(const struct printk_log *msg, enum log_flags prev,
 			     bool syslog, char *buf, size_t size) { return 0; }
@@ -2262,9 +2264,9 @@ static void console_cont_flush(char *text, size_t size)
 		force_len = sprintf(force_text, "<%u>", prefix);
 		memcpy(force_text + force_len, text, len);
 		force_len += len;
-		call_force_console_drivers(force_text, force_len);
+		call_force_console_drivers(cont.level, force_text, force_len);
 	} else {
-		call_force_console_drivers(text, len);
+		call_force_console_drivers(cont.level, text, len);
 	}
 
 	start_critical_timings();
@@ -2387,7 +2389,7 @@ skip:
 
 		stop_critical_timings();	/* don't trace print latency */
 		call_console_drivers(level, ext_text, ext_len, text, len);
-		call_force_console_drivers(force_text, force_len);
+		call_force_console_drivers(level, force_text, force_len);
 		start_critical_timings();
 		local_irq_restore(flags);
 
