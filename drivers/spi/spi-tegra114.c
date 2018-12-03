@@ -1,7 +1,7 @@
 /*
  * SPI driver for NVIDIA's Tegra114 SPI Controller.
  *
- * Copyright (c) 2013-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -206,6 +206,8 @@ struct tegra_spi_client_ctl_data {
 	int clk_delay_between_packets;
 };
 
+#define MAX_SPI_PARENTS_CLKS        4
+
 struct tegra_spi_data {
 	struct device				*dev;
 	struct spi_master			*master;
@@ -213,6 +215,8 @@ struct tegra_spi_data {
 	struct dentry				*debugfs;
 
 	struct clk				*clk;
+	int					clk_parents;
+	struct clk				*pclk[MAX_SPI_PARENTS_CLKS];
 	struct reset_control			*rst;
 	void __iomem				*base;
 	phys_addr_t				phys;
@@ -951,35 +955,14 @@ static void tegra_spi_set_timing2(struct spi_device *spi)
 static void set_best_clk_source(struct tegra_spi_data *tspi,
 				unsigned long rate)
 {
-	long new_rate;
+	long i, new_rate;
 	unsigned long err_rate, crate, prate;
 	unsigned int cdiv, fin_err = rate;
 	int ret;
 	struct clk *pclk, *fpclk = NULL;
-	const char *pclk_name, *fpclk_name;
-	struct device_node *node;
-	struct property *prop;
 
-	node = tspi->master->dev.of_node;
-	if (!of_property_count_strings(node, "nvidia,clk-parents"))
+	if (!tspi->clk_parents)
 		return;
-
-	/* when parent of a clk changes divider is not changed
-	 * set a min div with which clk will not cross max rate
-	 */
-	if (!tspi->min_div) {
-		of_property_for_each_string(node, "nvidia,clk-parents",
-					    prop, pclk_name) {
-			pclk = clk_get(tspi->dev, pclk_name);
-			if (IS_ERR(pclk))
-				continue;
-			prate = clk_get_rate(pclk);
-			crate = tspi->master->max_speed_hz;
-			cdiv = DIV_ROUND_UP(prate, crate);
-			if (cdiv > tspi->min_div)
-				tspi->min_div = cdiv;
-		}
-	}
 
 	pclk = clk_get_parent(tspi->clk);
 	crate = clk_get_rate(tspi->clk);
@@ -992,13 +975,11 @@ static void set_best_clk_source(struct tegra_spi_data *tspi,
 		clk_set_rate(tspi->clk, crate);
 	}
 
-	of_property_for_each_string(node, "nvidia,clk-parents",
-				    prop, pclk_name) {
-		pclk = clk_get(tspi->dev, pclk_name);
-		if (IS_ERR(pclk))
+	for (i = 0; i <= tspi->clk_parents; i++) {
+		if (IS_ERR(tspi->pclk[i]))
 			continue;
 
-		ret = clk_set_parent(tspi->clk, pclk);
+		ret = clk_set_parent(tspi->clk, tspi->pclk[i]);
 		if (ret < 0)
 			continue;
 
@@ -1008,17 +989,13 @@ static void set_best_clk_source(struct tegra_spi_data *tspi,
 
 		err_rate = abs(new_rate - rate);
 		if (err_rate < fin_err) {
-			fpclk = pclk;
+			fpclk = tspi->pclk[i];
 			fin_err = err_rate;
-			fpclk_name = pclk_name;
 		}
 	}
 
-	if (fpclk) {
-		dev_dbg(tspi->dev, "Setting clk_src %s\n",
-			fpclk_name);
+	if (fpclk)
 		clk_set_parent(tspi->clk, fpclk);
-	}
 }
 
 static int tegra_spi_set_clock_rate(struct tegra_spi_data *tspi, u32 speed)
@@ -1770,6 +1747,52 @@ static void tegra_spi_parse_dt(struct tegra_spi_data *tspi)
 		else
 			tspi->def_chip_select = be32_to_cpup(prop);
 	}
+
+}
+
+static int tegra_spi_clk_get(struct platform_device *pdev,
+		struct tegra_spi_data *tspi)
+{
+	struct property *prop;
+	struct device_node *np = tspi->dev->of_node;
+	unsigned int cdiv;
+	unsigned long crate, prate;
+	const char *pclk_name;
+
+	tspi->clk = devm_clk_get(&pdev->dev, "spi");
+	if (IS_ERR(tspi->clk)) {
+		dev_err(&pdev->dev, "can not get clock\n");
+		return PTR_ERR(tspi->clk);
+	}
+
+	of_property_for_each_string(np, "nvidia,clk-parents",
+			prop, pclk_name) {
+		tspi->pclk[tspi->clk_parents] = clk_get(tspi->dev, pclk_name);
+		if (IS_ERR(tspi->pclk))
+			continue;
+		prate = clk_get_rate(tspi->pclk[tspi->clk_parents]);
+		crate = tspi->master->max_speed_hz;
+		cdiv = DIV_ROUND_UP(prate, crate);
+		if (cdiv > tspi->min_div)
+			tspi->min_div = cdiv;
+		tspi->clk_parents++;
+	}
+
+	if (!tspi->clk_parents)
+		devm_clk_put(&pdev->dev, tspi->clk);
+
+	return 0;
+}
+
+static void tegra_spi_clk_put(struct platform_device *pdev,
+		struct tegra_spi_data *tspi)
+{
+	int i;
+
+	for (i = 0; i <= tspi->clk_parents; i++)
+		clk_put(tspi->pclk[i]);
+	tspi->clk_parents = 0;
+	devm_clk_put(&pdev->dev, tspi->clk);
 }
 
 static struct tegra_spi_chip_data tegra114_spi_chip_data = {
@@ -1942,12 +1965,9 @@ static int tegra_spi_probe(struct platform_device *pdev)
 	spi_irq = platform_get_irq(pdev, 0);
 	tspi->irq = spi_irq;
 
-	tspi->clk = devm_clk_get(&pdev->dev, "spi");
-	if (IS_ERR(tspi->clk)) {
-		dev_err(&pdev->dev, "can not get clock\n");
-		ret = PTR_ERR(tspi->clk);
+	ret = tegra_spi_clk_get(pdev, tspi);
+	if (ret)
 		goto exit_free_master;
-	}
 
 	tspi->rst = devm_reset_control_get(&pdev->dev, "spi");
 	if (IS_ERR(tspi->rst)) {
@@ -1972,7 +1992,7 @@ static int tegra_spi_probe(struct platform_device *pdev)
 	}
 
 	tspi->max_buf_size = SPI_FIFO_DEPTH << 2;
-	tspi->min_div = 0;
+
 
 	ret = tegra_spi_init_dma_param(tspi, true);
 	if (ret < 0)
@@ -2080,6 +2100,8 @@ static int tegra_spi_remove(struct platform_device *pdev)
 
 	tegra_spi_debugfs_deinit(tspi);
 	spi_unregister_master(master);
+
+	tegra_spi_clk_put(pdev, tspi);
 
 	if (tspi->tx_dma_chan)
 		tegra_spi_deinit_dma_param(tspi, false);
