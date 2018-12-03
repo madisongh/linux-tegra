@@ -1866,13 +1866,16 @@ static void tegra_sdhci_post_tuning(struct sdhci_host *host)
 	u16 num_tun_iter;
 	u32 clk_rate_mhz, period, bestcase, worstcase;
 	u32 avg_tap_delay, min_tap_delay, max_tap_delay;
+	unsigned long flags;
 
 	if (!(host->quirks2 & SDHCI_QUIRK2_TUNING_CORRECTION))
 		goto save_tuned_tap;
 
+	spin_unlock_irqrestore(&host->lock, flags);
 	min_tap_delay = SDMMC_TUN_MIN_TAP_DELAY;
 	max_tap_delay = SDMMC_TUN_MAX_TAP_DELAY;
 	clk_rate_mhz = clk_get_rate(pltfm_host->clk)/1000000;
+	spin_lock_irqsave(&host->lock, flags);
 
 	period = 1000000/clk_rate_mhz;
 	bestcase = period/min_tap_delay;
