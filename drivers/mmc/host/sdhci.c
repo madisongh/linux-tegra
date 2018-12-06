@@ -3081,7 +3081,10 @@ int sdhci_suspend_host(struct sdhci_host *host)
 	sdhci_disable_card_detection(host);
 
 	mmc_retune_timer_stop(host->mmc);
-	mmc_retune_needed(host->mmc);
+
+	if (!host->ops->is_tuning_done ||
+		!host->ops->is_tuning_done(host))
+		mmc_retune_needed(host->mmc);
 
 	/*
 	 * If eMMC cards are put in sleep state, Vccq can be disabled
