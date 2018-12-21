@@ -1816,6 +1816,11 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		}
 	}
 
+	if (!oldcard)
+		host->card = card;
+
+	if (card->host->ops->post_init)
+		card->host->ops->post_init(card->host);
 	/*
 	 * Choose the power class with selected bus interface
 	 */
@@ -1885,11 +1890,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		}
 	}
 
-	if (!oldcard)
-		host->card = card;
-
-	if (mmc_card_hs400(card) && card->host->ops->post_init) {
-		card->host->ops->post_init(card->host);
+	if (mmc_card_hs400(card)) {
 		if (host->caps & MMC_CAP_BUS_WIDTH_TEST)
 			err = mmc_bus_test(card, MMC_BUS_WIDTH_8);
 		else
