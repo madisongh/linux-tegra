@@ -10,7 +10,7 @@ config TEGRA_BPMP
 
 config BPMP_DEBUGFS_MOUNT_ON_BOOT
 	bool "Mount the BPMP debug fs on boot"
-	default y
+	default n
 	depends on DEBUG_FS
 	help
 	  Disable this if you don't want to mount the BPMP debug fs by default
