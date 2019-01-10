@@ -4,7 +4,7 @@
  *
  * Support for Tegra Security Engine hardware crypto algorithms.
  *
- * Copyright (c) 2011-2017, NVIDIA Corporation. All Rights Reserved.
+ * Copyright (c) 2011-2019, NVIDIA Corporation. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -111,6 +111,7 @@ struct tegra_se_chipdata {
 	bool mccif_supported;
 	bool rsa_key_rw_op;
 	u32 aes_keydata_reg_sz;
+	bool handle_sc7;
 };
 
 struct tegra_se_dev {
@@ -2466,6 +2467,7 @@ static struct tegra_se_chipdata tegra_se_chipdata = {
 	.mccif_supported = false,
 	.rsa_key_rw_op = true,
 	.aes_keydata_reg_sz = 128,
+	.handle_sc7 = true,
 };
 
 static struct tegra_se_chipdata tegra11_se_chipdata = {
@@ -2484,6 +2486,7 @@ static struct tegra_se_chipdata tegra11_se_chipdata = {
 	.mccif_supported = false,
 	.rsa_key_rw_op = true,
 	.aes_keydata_reg_sz = 128,
+	.handle_sc7 = true,
 };
 
 static struct tegra_se_chipdata tegra21_se_chipdata = {
@@ -2502,6 +2505,7 @@ static struct tegra_se_chipdata tegra21_se_chipdata = {
 	.mccif_supported = true,
 	.rsa_key_rw_op = false,
 	.aes_keydata_reg_sz = 32,
+	.handle_sc7 = false,
 };
 
 static struct of_device_id tegra_se_of_match[] = {
@@ -3302,6 +3306,11 @@ static int se_suspend(struct device *dev, bool polling)
 	if (!se_dev)
 		return -ENODEV;
 
+	if (!se_dev->chipdata->handle_sc7) {
+		/* SC7 is handled in Secure OS driver */
+		return 0;
+	}
+
 	save_se_device = dev;
 
 	se_dev->polling = polling;
@@ -3432,6 +3441,11 @@ static int tegra_se_suspend(struct device *dev)
 static int tegra_se_resume(struct device *dev)
 {
 	struct tegra_se_dev *se_dev = sg_tegra_se_dev;
+
+	if (!se_dev->chipdata->handle_sc7) {
+		/* SC7 is handled in Secure OS driver */
+		return 0;
+	}
 
 	/* pair with tegra_se_suspend, no need to actually enable clock */
 	pm_runtime_get_noresume(dev);
