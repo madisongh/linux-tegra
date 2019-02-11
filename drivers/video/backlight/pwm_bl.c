@@ -127,9 +127,11 @@ static int pwm_backlight_notify(struct device *dev, int brightness)
 	bl_info.dev = dev;
 	bl_info.brightness = brightness;
 
-	return backlight_device_notifier_call_chain(bl,
+	backlight_device_notifier_call_chain(bl,
 			BACKLIGHT_DEVICE_PRE_BRIGHTNESS_CHANGE,
 			(void *)&bl_info);
+
+	return bl_info.brightness;
 }
 
 static void pwm_backlight_notify_after(struct device *dev, int brightness)
