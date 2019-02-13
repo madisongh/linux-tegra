@@ -4,7 +4,7 @@
  *
  * Support for Tegra Security Engine Elliptic crypto algorithms.
  *
- * Copyright (c) 2015-2018, NVIDIA Corporation. All Rights Reserved.
+ * Copyright (c) 2015-2019, NVIDIA Corporation. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2, as
@@ -1516,8 +1516,6 @@ static u32 tegra_se_acquire_rng1_mutex(struct tegra_se_elp_dev *se_dev)
 
 static u32 tegra_se_check_rng1_status(struct tegra_se_elp_dev *se_dev)
 {
-	static bool rng1_first = true;
-	bool secure_mode;
 	u32 val, i = 0;
 
 	/*Wait until RNG is Idle */
@@ -1531,29 +1529,6 @@ static u32 tegra_se_check_rng1_status(struct tegra_se_elp_dev *se_dev)
 				   TEGRA_SE_RNG1_STATUS_OFFSET);
 		i++;
 	} while (val & TEGRA_SE_RNG1_STATUS_BUSY(ELP_TRUE));
-
-	if (rng1_first) {
-		val = se_elp_readl(se_dev, RNG1, TEGRA_SE_RNG1_STATUS_OFFSET);
-		if (val & TEGRA_SE_RNG1_STATUS_SECURE(STATUS_SECURE))
-			secure_mode = true;
-		else
-			secure_mode = false;
-
-		/*Check health test is ok*/
-		val = se_elp_readl(se_dev, RNG1,
-				   TEGRA_SE_RNG1_ISTATUS_OFFSET);
-		if (secure_mode)
-			val &= TEGRA_SE_RNG1_ISTATUS_DONE(ISTATUS_ACTIVE);
-		else
-			val &= TEGRA_SE_RNG1_ISTATUS_DONE(ISTATUS_ACTIVE) |
-			TEGRA_SE_RNG1_ISTATUS_NOISE_RDY(ISTATUS_ACTIVE);
-		if (!val) {
-			dev_err(se_dev->dev,
-				"Wrong Startup value in RNG1_ISTATUS Reg\n");
-			return -EINVAL;
-		}
-		rng1_first = false;
-	}
 
 	val = se_elp_readl(se_dev, RNG1, TEGRA_SE_RNG1_ISTATUS_OFFSET);
 	se_elp_writel(se_dev, RNG1, val, TEGRA_SE_RNG1_ISTATUS_OFFSET);
