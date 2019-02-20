@@ -3445,6 +3445,8 @@ static int nvme_suspend(struct device *dev)
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct nvme_dev *ndev = pci_get_drvdata(pdev);
 
+	if (flush_work(&ndev->probe_work))
+		dev_dbg(dev, "%s: flushed probe_work\n", __func__);
 	nvme_dev_shutdown(ndev);
 	return 0;
 }
