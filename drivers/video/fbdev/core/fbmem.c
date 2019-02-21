@@ -1392,8 +1392,11 @@ static long fb_compat_ioctl(struct file *file, unsigned int cmd,
 		break;
 
 	default:
+		if (!lock_fb_info(info))
+			return -ENODEV;
 		if (fb->fb_compat_ioctl)
 			ret = fb->fb_compat_ioctl(info, cmd, arg);
+		unlock_fb_info(info);
 		break;
 	}
 	return ret;
