@@ -1839,6 +1839,34 @@ static void tegra_pmc_wake_syscore_resume(void)
 	}
 }
 
+static u64 wake_sources ;
+
+static int wake_sources_set(void *data, u64 val)
+{
+	wake_sources = val;
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(wake_sources_fops, NULL, wake_sources_set, "%llu\n");
+
+static int debugfs_init(void)
+{
+	struct dentry *root = NULL;
+
+	root = debugfs_create_dir("tegra_wakeup", NULL);
+	if (!root)
+		return -ENOMEM;
+
+	if (!debugfs_create_file("wake_sources", S_IWUSR, root, NULL, &wake_sources_fops))
+		goto err_out;
+
+	return 0;
+
+err_out:
+	debugfs_remove_recursive(root);
+	return -ENOMEM;
+}
+
 static int tegra_pmc_wake_syscore_suspend(void)
 {
 	u32 reg;
@@ -1877,7 +1905,11 @@ static int tegra_pmc_wake_syscore_suspend(void)
 	/* Clear PMC Wake Status registers while going to suspend */
 	clear_pmc_wake_status();
 	write_pmc_wake_level(wake_level);
-	write_pmc_wake_mask(wake_enb);
+
+	if(wake_sources)
+		write_pmc_wake_mask(wake_sources);
+	else
+		write_pmc_wake_mask(wake_enb);
 
 	return 0;
 }
@@ -3294,6 +3326,7 @@ static void tegra_pmc_init(struct tegra_pmc *pmc)
 	set_core_power_timers();
 	tegra_pmc_syscore_init();
 	tegra_pmc_wake_syscore_init();
+	debugfs_init();
 }
 
 void tegra_pmc_init_tsense_reset(struct tegra_pmc *pmc)
