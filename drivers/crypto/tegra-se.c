@@ -86,14 +86,6 @@ struct tegra_se_req_context {
 	bool encrypt;	/* Operation type */
 };
 
-struct tegra_se_prev_req_config {
-	enum tegra_se_aes_op_mode mode; /* Security Engine operation mode */
-	bool encrypt;	/* Operation type */
-	bool called; /* To Know if cofiguration is set for atleast once */
-	u32 key_len;	/* Key length */
-};
-static struct tegra_se_prev_req_config *prev_cfg;
-
 struct tegra_se_chipdata {
 	bool cprng_supported;
 	bool drbg_supported;
@@ -349,11 +341,6 @@ static void tegra_se_config_algo(struct tegra_se_dev *se_dev,
 	enum tegra_se_aes_op_mode mode, bool encrypt, u32 key_len)
 {
 	u32 val = 0;
-
-	prev_cfg->mode = mode;
-	prev_cfg->encrypt = encrypt;
-	prev_cfg->called = true;
-	prev_cfg->key_len = key_len;
 
 	switch (mode) {
 	case SE_AES_OP_MODE_CBC:
@@ -1024,16 +1011,11 @@ static void tegra_se_process_new_req(struct crypto_async_request *async_req)
 	}
 	tegra_se_setup_ablk_req(se_dev, req);
 
-	if ((prev_cfg->mode != req_ctx->op_mode) ||
-		(prev_cfg->encrypt != req_ctx->encrypt) ||
-		(prev_cfg->key_len != aes_ctx->keylen) ||
-		!prev_cfg->called) {
-		tegra_se_config_algo(se_dev, req_ctx->op_mode,
-				req_ctx->encrypt, aes_ctx->keylen);
-		tegra_se_config_crypto(se_dev, req_ctx->op_mode,
+	tegra_se_config_algo(se_dev, req_ctx->op_mode,
+			req_ctx->encrypt, aes_ctx->keylen);
+	tegra_se_config_crypto(se_dev, req_ctx->op_mode,
 			req_ctx->encrypt, aes_ctx->slot->slot_num,
 			false);
-	}
 
 	ret = tegra_se_start_operation(se_dev, req->nbytes, false,
 				       ((req->src == req->dst) ? false : true));
@@ -2111,6 +2093,7 @@ static int tegra_se_rsa_op(struct akcipher_request *req)
 		return -EINVAL;
 	}
 
+	mutex_lock(&se_hw_lock);
 	*se_dev->src_ll_buf = num_src_sgs - 1;
 	src_ll = (struct tegra_se_ll *)(se_dev->src_ll_buf + 1);
 
@@ -2127,10 +2110,7 @@ static int tegra_se_rsa_op(struct akcipher_request *req)
 			req->dst, 1, DMA_FROM_DEVICE, dst_ll, req->dst_len);
 	}
 
-	/* take access to the hw */
-	mutex_lock(&se_hw_lock);
 	pm_runtime_get_sync(se_dev->dev);
-
 	/* Write key length */
 	se_writel(se_dev, ((rsa_ctx->mod_len / 64) - 1),
 		SE_RSA_KEY_SIZE_REG_OFFSET);
@@ -2637,18 +2617,12 @@ static int tegra_se_probe(struct platform_device *pdev)
 	pm_runtime_enable(se_dev->dev);
 	tegra_se_key_read_disable_all();
 
-	prev_cfg = kzalloc(sizeof(struct tegra_se_prev_req_config), GFP_KERNEL);
-	if (!prev_cfg) {
-		dev_err(&pdev->dev, "memory allocation for prev_cfg failed\n");
-		goto free_res;
-	}
-
 	err = request_irq(se_dev->irq, tegra_se_irq, 0,
 			DRIVER_NAME, se_dev);
 	if (err) {
 		dev_err(se_dev->dev, "request_irq failed - irq[%d] err[%d]\n",
 			se_dev->irq, err);
-		goto irq_fail;
+		goto free_res;
 	}
 
 	se_dev->dev->coherent_dma_mask = DMA_BIT_MASK(32);
@@ -2768,8 +2742,6 @@ static int tegra_se_probe(struct platform_device *pdev)
 
 clean:
 	free_irq(se_dev->irq, &pdev->dev);
-irq_fail:
-	kfree(prev_cfg);
 free_res:
 	pm_runtime_disable(se_dev->dev);
 	for (k = 0; k < i; k++)
@@ -2854,7 +2826,6 @@ static int tegra_se_remove(struct platform_device *pdev)
 	kfree(se_dev);
 	sg_tegra_se_dev = NULL;
 
-	kfree(prev_cfg);
 	return 0;
 }
 
