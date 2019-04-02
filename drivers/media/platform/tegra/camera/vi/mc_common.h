@@ -31,6 +31,7 @@
 #include <media/videobuf2-core.h>
 
 #include <linux/workqueue.h>
+#include <linux/rwsem.h>
 
 #include "core.h"
 #include "../csi/csi.h"
@@ -235,6 +236,7 @@ struct tegra_channel {
 	unsigned int subdevs_bound;
 	unsigned int link_status;
 	atomic_t syncpt_depth;
+	struct rw_semaphore reset_lock;
 };
 
 #define to_tegra_channel(vdev) \

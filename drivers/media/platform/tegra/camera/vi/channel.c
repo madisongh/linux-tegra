@@ -1825,6 +1825,7 @@ int tegra_channel_init(struct tegra_channel *chan)
 	spin_lock_init(&chan->start_lock);
 	spin_lock_init(&chan->release_lock);
 	mutex_init(&chan->stop_kthread_lock);
+	init_rwsem(&chan->reset_lock);
 	atomic_set(&chan->is_streaming, DISABLE);
 	spin_lock_init(&chan->capture_state_lock);
 
