@@ -457,7 +457,7 @@ static int tegra21x_actmon_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id tegra21x_actmon_of[] __initconst = {
+static const struct of_device_id tegra21x_actmon_of[] = {
 	{ .compatible = "nvidia,tegra210-cactmon", .data = NULL, },
 	{},
 };
