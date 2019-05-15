@@ -188,7 +188,7 @@ static int te_pin_user_pages(struct te_oper_param *param,
 	 * across get user pages and process returned vmas.
 	 */
 	nr_pinned = get_user_pages(current, current->mm, start, nr_pages,
-				writable, 0, *pages, vmas);
+				writable, *pages, vmas);
 	if (nr_pinned != nr_pages) {
 		pr_err("%s: Error %d in get_user_pages for buffer 0x%lx\n",
 				__func__, nr_pinned, start);
