@@ -1961,8 +1961,11 @@ int fb_mode_find_cea(struct fb_videomode *mode)
 {
 	int i;
 
-	/* TODO: optimize search, for now start from top */
-	for (i = CEA_MODEDB_SIZE - 1; i > 0; i--)
+	/*
+         * 640x480p which is with VIC 1 is not CEA mode hence is excluded from search
+         * TODO: optimize search, for now start from top
+         */
+	for (i = CEA_MODEDB_SIZE - 1; i > 1; i--)
 		if (fb_mode_is_equal_tolerance(cea_modes + i, mode,
 					FB_MODE_TOLERANCE_DEFAULT))
 			return i;
