@@ -749,21 +749,18 @@ cqe_resume:
 static int cmdq_halt(struct mmc_host *mmc, bool halt)
 {
 	struct cmdq_host *cq_host = (struct cmdq_host *)mmc_cmdq_private(mmc);
-	unsigned timeout = HALT_TIMEOUT_MS;
 	int err = 0;
 
 	if (cq_host->ops->runtime_pm_get)
 		cq_host->ops->runtime_pm_get(mmc);
 	if (halt) {
+		int timeout;
+
 		cmdq_writel(cq_host, cmdq_readl(cq_host, CQCTL) | HALT,
 			    CQCTL);
-		/* Poll for 1000ms until the Halt is set in CQCTL */
-		do {
-			if (cmdq_readl(cq_host, CQCTL) & HALT)
-				break;
-			mdelay(1);
-			timeout--;
-		} while (timeout);
+
+		timeout = wait_for_completion_timeout(&cq_host->halt_comp,
+				msecs_to_jiffies(HALT_TIMEOUT_MS));
 
 		if (!timeout) {
 			pr_err("%s: Setting HALT is failed\n",
