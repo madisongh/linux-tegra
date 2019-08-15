@@ -167,6 +167,18 @@
 #define MII_BCM54XX_TOPL_EXP_EXP40		0x0d40
 #define  MII_BCM54XX_TOPL_EXP_EXP40_AUTOGREEE	BIT(0)
 
+#ifdef CONFIG_EQOS_DISABLE_EEE
+#define MII_BCM89610_CLAUSE22_DEVAD_FIELD	0x1F
+#define MII_BCM89610_CLAUSE22_FUNCTION_FIELD	0xC000
+#define MII_BCM89610_CLAUSE22_DEVAD_7		0x7
+#define MII_BCM89610_CLAUSE22_FUNCTION_ADDR	(0UL << 14)
+#define MII_BCM89610_CLAUSE22_FUNCTION_DATA	BIT(14)
+#define MII_BCM89610_CLAUSE22_REG_ADDR		0xd
+#define MII_BCM89610_CLAUSE22_REG_DATA		0xe
+#define BCM89610_EEE_ADVERTISEMENT_REG		0x3c
+#define BCM89610_EEE_ADVERTISEMENT_DISABLE	0x0
+#endif /* CONFIG_EQOS_DISABLE_EEE */
+
 /*
  * BCM5482: Secondary SerDes registers
  */
@@ -463,6 +475,53 @@ static void bcm54xx_low_power_mode(struct phy_device *phydev,
 	}
 }
 
+#ifdef CONFIG_EQOS_DISABLE_EEE
+static int bcm89610_disable_eee_adv(struct phy_device *phydev)
+{
+	int ret;
+	u32 val;
+
+	val = phy_read(phydev, MII_BCM89610_CLAUSE22_REG_ADDR);
+
+	/* Clear function field and device address fields */
+	val &= ~(MII_BCM89610_CLAUSE22_DEVAD_FIELD |
+		 MII_BCM89610_CLAUSE22_FUNCTION_FIELD);
+	/* Set function field to addr and device addr 7 */
+	val |= (MII_BCM89610_CLAUSE22_DEVAD_7 |
+		MII_BCM89610_CLAUSE22_FUNCTION_ADDR);
+
+	ret = phy_write(phydev, MII_BCM89610_CLAUSE22_REG_ADDR, val);
+	if (ret < 0)
+		goto exit;
+
+	ret = phy_write(phydev, MII_BCM89610_CLAUSE22_REG_DATA,
+			BCM89610_EEE_ADVERTISEMENT_REG);
+	if (ret < 0)
+		goto exit;
+
+	val = phy_read(phydev, MII_BCM89610_CLAUSE22_REG_ADDR);
+
+	/* Clear function field and device address fields */
+	val &= ~(MII_BCM89610_CLAUSE22_DEVAD_FIELD |
+		 MII_BCM89610_CLAUSE22_FUNCTION_FIELD);
+	/* Set function field to data and device addr 7 */
+	val |= (MII_BCM89610_CLAUSE22_DEVAD_7 |
+		MII_BCM89610_CLAUSE22_FUNCTION_DATA);
+
+	ret = phy_write(phydev, MII_BCM89610_CLAUSE22_REG_ADDR, val);
+	if (ret < 0)
+		goto exit;
+
+	val = phy_write(phydev, MII_BCM89610_CLAUSE22_REG_DATA,
+			BCM89610_EEE_ADVERTISEMENT_DISABLE);
+	if (ret < 0)
+		goto exit;
+
+exit:
+	return ret;
+}
+#endif /* CONFIG_EQOS_DISABLE_EEE */
+
 static int bcm54xx_config_init(struct phy_device *phydev)
 {
 	int reg, err;
@@ -534,6 +593,13 @@ static int bcm54xx_config_init(struct phy_device *phydev)
 					err);
 		if (err < 0)
 			return err;
+
+#ifdef CONFIG_EQOS_DISABLE_EEE
+		/* Disable EEE advertisement. Nvbugs 2678273 */
+		err = bcm89610_disable_eee_adv(phydev);
+		if (err < 0)
+			return err;
+#endif /* CONFIG_EQOS_DISABLE_EEE */
 	}
 
 	bcm54xx_phydsp_config(phydev);
