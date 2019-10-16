@@ -1837,9 +1837,7 @@ void unregister_gadget_item(struct config_item *item)
 	struct gadget_info *gi = to_gadget_info(item);
 
 	mutex_lock(&gi->lock);
-	if (gi->udc_name)
-		unregister_gadget(gi);
-	WARN_ON(gi->udc_name);
+	unregister_gadget(gi);
 	mutex_unlock(&gi->lock);
 }
 EXPORT_SYMBOL_GPL(unregister_gadget_item);
