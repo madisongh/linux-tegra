@@ -175,6 +175,8 @@ alternative_endif
 	ldr	lr, [sp, #S_LR]
 	add	sp, sp, #S_FRAME_SIZE		// restore sp
 	eret					// return to kernel
+	dsb nsh
+	isb
 	.endm
 
 	.macro	get_thread_info, rd

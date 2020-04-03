@@ -704,6 +704,8 @@ switch_to_guest_fpsimd:
 	pop	x0, x1
 
 	eret
+	dsb nsh
+	isb
 
 /*
  * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
@@ -754,6 +756,8 @@ ENTRY(__kvm_vcpu_run)
 
 	// That's it, no more messing around.
 	eret
+	dsb nsh
+	isb
 
 __kvm_vcpu_return:
 	// Assume x0 is the vcpu pointer, x1 the return code
@@ -911,6 +915,8 @@ __kvm_hyp_panic:
 	ldr	lr, =panic
 	msr	elr_el2, lr
 	eret
+	dsb nsh
+	isb
 
 	.align	3
 2:	.quad	HYP_PAGE_OFFSET
@@ -1002,6 +1008,8 @@ el1_sync:					// Guest trapped into EL2
 
 	pop	lr, xzr
 2:	eret
+	dsb nsh
+	isb
 
 el1_trap:
 	/*
@@ -1079,6 +1087,8 @@ alternative_endif
 	pop	x0, x1
 
 	eret
+	dsb nsh
+	isb
 
 el1_irq:
 	push	x0, x1
