@@ -1,12 +1,12 @@
 GCOV_PROFILE := y
-ccflags-y += -I../nvhost/drivers/video/tegra/host
+ccflags-y += -Invidia/nvhost/drivers/video/tegra/host
 ccflags-y += -Idrivers/video/tegra/host
 ccflags-y += -Idrivers/video/tegra/camera
 ccflags-y += -Idrivers/media/platform/tegra/
 ccflags-y += -Werror
 
 ifeq ($(CONFIG_ARCH_TEGRA_18x_SOC),y)
-ccflags-y += -I../t18x/drivers/video/tegra/host/
+ccflags-y += -Invidia/t18x/drivers/video/tegra/host/
 endif
 
 ifneq (,$(filter $(CONFIG_VIDEO_TEGRA_VI),y m))

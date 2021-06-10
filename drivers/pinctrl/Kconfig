@@ -282,8 +282,8 @@ config PINCTRL_TB10X
 	depends on OF && ARC_PLAT_TB10X
 	select GPIOLIB
 
-trysource "../t18x/drivers/pinctrl/Kconfig"
-trysource "../t18x/drivers/pinctrl/Kconfig.t18x"
+trysource "nvidia/t18x/drivers/pinctrl/Kconfig"
+trysource "nvidia/t18x/drivers/pinctrl/Kconfig.t18x"
 trysource "drivers/pinctrl/Kconfig.t18x"
 
 config PINCTRL_TEGRA21x_PADCTL_UPHY

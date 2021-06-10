@@ -1659,8 +1659,8 @@ config USBPCWATCHDOG
 
 	  Most people will say N.
 
-trysource "../t18x/drivers/watchdog/Kconfig"
-trysource "../t18x/drivers/watchdog/Kconfig.t18x"
+trysource "nvidia/t18x/drivers/watchdog/Kconfig"
+trysource "nvidia/t18x/drivers/watchdog/Kconfig.t18x"
 trysource "drivers/watchdog/Kconfig.t18x"
 
 endif # WATCHDOG

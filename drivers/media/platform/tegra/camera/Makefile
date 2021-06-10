@@ -1,7 +1,7 @@
 GCOV_PROFILE := y
 obj-y				+= vi/
 obj-y				+= csi/
-ccflags-y += -I../nvhost/drivers/video/tegra/host
+ccflags-y += -Invidia/nvhost/drivers/video/tegra/host
 ccflags-y += -Idrivers/video/tegra/host
 ccflags-y += -Idrivers/video/tegra/camera
 ccflags-y += -Idrivers/media/platform/tegra

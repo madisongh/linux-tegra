@@ -128,4 +128,4 @@ config GK20A_VIDMEM
 	  memory aperture (in contrast to general system memory), available on
 	  GPUs that have their own banks. PCIe GPUs have this, for example.
 
-trysource "../nvgpu-t19x/drivers/gpu/nvgpu/Kconfig"
+trysource "nvidia/nvgpu-t19x/drivers/gpu/nvgpu/Kconfig"

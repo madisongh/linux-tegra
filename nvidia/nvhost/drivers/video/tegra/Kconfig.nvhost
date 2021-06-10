@@ -91,4 +91,4 @@ config NVDEC_BOOTLOADER
 	  Say Y here if you want to enable nvdec bootloader
 	  If unsure, say N
 
-trysource "../nvhost-t19x/drivers/video/tegra/host/Kconfig"
+trysource "nvidia/nvhost-t19x/drivers/video/tegra/host/Kconfig"
