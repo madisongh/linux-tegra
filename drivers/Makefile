@@ -182,9 +182,9 @@ obj-$(CONFIG_NVPMODEL_EMC)	+= nvpmodel/
 
 # The wildcard hack is necessary for kernel's make clean.
 ifneq ($(wildcard $(srctree)/nvidia/t18x/drivers/Makefile.*),)
-obj-$(CONFIG_ARCH_TEGRA_18x_SOC) += nvidia/t18x/drivers/
+obj-$(CONFIG_ARCH_TEGRA_18x_SOC) += ../nvidia/t18x/drivers/
 endif
 
-ifneq ($(wildcard $(srctree)/../t19x/drivers/Makefile.*),)
-obj-$(CONFIG_ARCH_TEGRA_19x_SOC) += ../../t19x/drivers/
+ifneq ($(wildcard $(srctree)/nvidia/t19x/drivers/Makefile.*),)
+obj-$(CONFIG_ARCH_TEGRA_19x_SOC) += ../nvidia/t19x/drivers/
 endif
