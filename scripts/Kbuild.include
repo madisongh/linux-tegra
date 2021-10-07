@@ -389,5 +389,7 @@ tegra-base-kernel-path = $(call _TEGRA_REL_PATH)
 tegra-path = $(if  $(wildcard $(srctree)/nvidia/$(1)),$(call _TEGRA_REL_PATH)/nvidia/$(1)/$(2),$(call tegra-base-kernel-path)/$(2))
 tegra-dtstree = $(srctree)/nvidia
 tegra-root-dtstree = $(subst ^$(realpath $(tegra-dtstree)/..)/,,^$(realpath $(srctree)/arch/arm64/boot/dts))
+tegra-rel-dtstree = $(subst $(the-space),/,$(patsubst %,..,$(subst /, ,$(tegra-root-dtstree))))
+
 # delete partially updated (i.e. corrupted) files on error
 .DELETE_ON_ERROR:
